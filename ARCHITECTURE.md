@@ -19,9 +19,8 @@ The MVP is built with **Godot 4.7.1**. The UI skeleton uses a minimal Godot
 layout: `project.godot`, one root scene, and a dynamic GDScript UI entry point.
 Persistence format remains open.
 
-The editor's virtual workspace is 1920×1200 (16:10). Its default output window
-is 1920×1080 (Full HD); Godot preserves the 16:10 aspect ratio with letterbox
-space rather than stretching the interface.
+The editor workspace and default output window are 1920×1080 (Full HD). The UI
+uses the available window space directly, without letterboxing.
 
 ## Working rule: minimum necessary capability
 

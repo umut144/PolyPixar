@@ -21,7 +21,7 @@ The current implementation target is not a functional morphing engine.
 
 - Engine: **Godot 4.7.1**
 - Project layout: `project.godot`, `scenes/main.tscn`, and `scripts/main.gd`
-- Virtual editor size: 1920×1200 (16:10), letterboxed in a 1920×1080 window
+- Editor workspace and default window: 1920×1080 (Full HD), without letterboxing
 
 ## Confirmed vocabulary
 

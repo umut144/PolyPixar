@@ -14,6 +14,12 @@ func _ready() -> void:
 
 
 func _build_ui() -> void:
+	var background := ColorRect.new()
+	background.color = Color("#181a1f")
+	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(background)
+
 	var root_margin := MarginContainer.new()
 	root_margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	root_margin.add_theme_constant_override("margin_left", 12)
@@ -26,19 +32,24 @@ func _build_ui() -> void:
 	main_layout.add_theme_constant_override("separation", 8)
 	root_margin.add_child(main_layout)
 
+	var toolbar_panel := _create_panel()
+	main_layout.add_child(toolbar_panel)
 	var toolbar := HBoxContainer.new()
 	toolbar.custom_minimum_size = Vector2(0, 32)
-	main_layout.add_child(toolbar)
+	toolbar_panel.add_child(toolbar)
 
 	var workspace_row := HBoxContainer.new()
 	workspace_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	workspace_row.add_theme_constant_override("separation", 8)
 	main_layout.add_child(workspace_row)
 
+	var module_rail_panel := _create_panel(Color("#20242c"))
+	module_rail_panel.custom_minimum_size = Vector2(104, 0)
+	workspace_row.add_child(module_rail_panel)
 	var module_rail := VBoxContainer.new()
 	module_rail.custom_minimum_size = Vector2(104, 0)
 	module_rail.add_theme_constant_override("separation", 4)
-	workspace_row.add_child(module_rail)
+	module_rail_panel.add_child(module_rail)
 	create_button = _add_module_button(module_rail, "Create", true)
 	for module_name in INACTIVE_MODULES:
 		_add_module_button(module_rail, module_name, false)
@@ -49,7 +60,7 @@ func _build_ui() -> void:
 	workspace_split.split_offset = 220
 	workspace_row.add_child(workspace_split)
 
-	var outliner_panel := PanelContainer.new()
+	var outliner_panel := _create_panel()
 	outliner_panel.custom_minimum_size = Vector2(180, 0)
 	workspace_split.add_child(outliner_panel)
 	var outliner_scroll := ScrollContainer.new()
@@ -73,22 +84,42 @@ func _build_ui() -> void:
 	canvas_column.add_theme_constant_override("separation", 8)
 	canvas_split.add_child(canvas_column)
 
+	var action_bar_panel := _create_panel()
+	canvas_column.add_child(action_bar_panel)
 	var action_bar := HBoxContainer.new()
 	action_bar.custom_minimum_size = Vector2(0, 32)
-	canvas_column.add_child(action_bar)
+	action_bar_panel.add_child(action_bar)
 
+	var canvas_panel := _create_panel(Color("#1b1e24"))
+	canvas_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	canvas_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	canvas_column.add_child(canvas_panel)
 	var canvas := Control.new()
 	canvas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	canvas_column.add_child(canvas)
+	canvas_panel.add_child(canvas)
 
-	var inspector_panel := PanelContainer.new()
+	var inspector_panel := _create_panel()
 	inspector_panel.custom_minimum_size = Vector2(260, 0)
 	canvas_split.add_child(inspector_panel)
 
-	var status_bar := PanelContainer.new()
+	var status_bar := _create_panel()
 	status_bar.custom_minimum_size = Vector2(0, 24)
 	main_layout.add_child(status_bar)
+
+
+func _create_panel(background_color := Color("#20242c")) -> PanelContainer:
+	var panel := PanelContainer.new()
+	var style := StyleBoxFlat.new()
+	style.bg_color = background_color
+	style.border_color = Color("#363d48")
+	style.set_border_width_all(1)
+	style.corner_radius_top_left = 2
+	style.corner_radius_top_right = 2
+	style.corner_radius_bottom_right = 2
+	style.corner_radius_bottom_left = 2
+	panel.add_theme_stylebox_override("panel", style)
+	return panel
 
 
 func _add_module_button(parent: Container, text: String, is_active: bool) -> Button:
