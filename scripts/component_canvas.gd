@@ -15,11 +15,14 @@ var context_name := ""
 var active_tool := ""
 var line_draft: Array[Vector2] = []
 var cursor_world := Vector2.ZERO
+var cursor_over_canvas := false
 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	focus_mode = Control.FOCUS_CLICK
+	mouse_entered.connect(_on_mouse_entered)
+	mouse_exited.connect(_on_mouse_exited)
 	queue_redraw()
 
 
@@ -31,6 +34,7 @@ func _gui_input(event: InputEvent) -> void:
 			line_draft_changed.emit(line_draft)
 			queue_redraw()
 	if event is InputEventMouseMotion:
+		cursor_over_canvas = true
 		cursor_world = _snap_to_grid(_screen_to_world(event.position))
 		queue_redraw()
 	if event is InputEventKey and event.pressed and not event.echo:
@@ -46,6 +50,16 @@ func _gui_input(event: InputEvent) -> void:
 
 func set_context(name: String) -> void:
 	context_name = name
+	queue_redraw()
+
+
+func _on_mouse_entered() -> void:
+	cursor_over_canvas = true
+	queue_redraw()
+
+
+func _on_mouse_exited() -> void:
+	cursor_over_canvas = false
 	queue_redraw()
 
 
@@ -95,14 +109,16 @@ func _draw() -> void:
 
 
 func _draw_line_draft() -> void:
-	if active_tool != "line" or line_draft.is_empty():
+	if active_tool != "line" or not cursor_over_canvas:
 		return
 	var draft_color := Color("#f2c94c")
 	for index in range(line_draft.size() - 1):
 		draw_line(_world_to_screen(line_draft[index]), _world_to_screen(line_draft[index + 1]), draft_color, 2.0)
 	for point in line_draft:
 		draw_circle(_world_to_screen(point), 5.0, draft_color)
-	if has_focus():
+	if line_draft.is_empty():
+		draw_circle(_world_to_screen(cursor_world), 5.0, draft_color)
+	elif has_focus():
 		draw_line(_world_to_screen(line_draft.back()), _world_to_screen(cursor_world), Color("#f2c94c88"), 1.0)
 		draw_circle(_world_to_screen(cursor_world), 4.0, Color("#f2c94c88"))
 

@@ -59,6 +59,8 @@ before implementing real creation tools.
       Components; record the selected tool without drawing yet.
 - [x] Place snapped Polyline draft points with `Line` and show the next-edge
       preview toward the cursor.
+- [x] Show a snapped preview point while hovering the Canvas in `Line` mode,
+      even before the first point is placed.
 - [x] Remove the last draft point with `Backspace` and clear the draft with
       `Escape`.
 - [x] Show an empty, canvas-first working area without fake asset previews.
