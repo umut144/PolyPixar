@@ -218,6 +218,7 @@ func _build_ui() -> void:
 	canvas_view.outer_shape_changed.connect(_on_outer_shape_changed)
 	canvas_view.reference_component_selected.connect(_on_reference_component_selected)
 	canvas_view.pivot_changed.connect(_on_pivot_changed)
+	canvas_view.transform_changed.connect(_on_transform_changed)
 	var canvas := canvas_view
 	canvas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -1369,6 +1370,12 @@ func _on_pivot_changed(pivot: Vector2) -> void:
 	var transform: Dictionary = component.get("transform", _default_component_transform())
 	transform["pivot"] = pivot
 	component["transform"] = transform
+
+
+func _on_transform_changed(transform: Dictionary) -> void:
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if not component.is_empty():
+		component["transform"] = transform.duplicate(true)
 
 
 func _on_reference_component_selected(component_id: String) -> void:

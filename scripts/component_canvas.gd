@@ -7,6 +7,7 @@ signal point_selection_changed(index: int)
 signal outer_shape_changed(points: Array[Vector2])
 signal reference_component_selected(component_id: String)
 signal pivot_changed(pivot: Vector2)
+signal transform_changed(transform: Dictionary)
 
 const PAN_SPEED := 420.0
 const MIN_ZOOM := 0.25
@@ -45,6 +46,9 @@ var component_transform: Dictionary = {
 	"pivot": Vector2.ZERO
 }
 var pivot_dragging := false
+var transform_drag_axis := ""
+var transform_drag_start_world := Vector2.ZERO
+var transform_drag_start_position := Vector2.ZERO
 
 
 func _ready() -> void:
@@ -59,7 +63,7 @@ func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed:
 		grab_focus()
 		if event.button_index == MOUSE_BUTTON_LEFT and active_tool == "line":
-			var snapped_point := _snap_to_grid(_screen_to_world(event.position))
+			var snapped_point := _snap_to_grid(_world_to_local(_screen_to_world(event.position)))
 			if line_draft.size() >= 3 and _is_near_first_point(snapped_point):
 				line_completed.emit(line_draft.duplicate())
 				line_draft.clear()
@@ -88,6 +92,13 @@ func _gui_input(event: InputEvent) -> void:
 			else:
 				clear_selection()
 			queue_redraw()
+		elif event.button_index == MOUSE_BUTTON_LEFT and interaction_state == "transform" and transform_mode == "transform":
+			var handle_axis := _transform_handle_at(event.position)
+			if handle_axis != "":
+				transform_drag_axis = handle_axis
+				transform_drag_start_world = _screen_to_world(event.position)
+				transform_drag_start_position = component_transform.get("position", Vector2.ZERO)
+				return
 		elif event.button_index == MOUSE_BUTTON_LEFT and interaction_state == "asset":
 			var component_id := _reference_component_at(_screen_to_world(event.position))
 			if not component_id.is_empty():
@@ -95,19 +106,32 @@ func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and not event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		drag_axis = ""
 		pivot_dragging = false
+		transform_drag_axis = ""
 	if event is InputEventMouseMotion:
 		cursor_over_canvas = true
-		cursor_world = _snap_to_grid(_screen_to_world(event.position))
+		cursor_world = _snap_to_grid(_world_to_local(_screen_to_world(event.position)))
 		if pivot_dragging:
-			var pivot := _snap_to_grid(_screen_to_world(event.position))
+			var pivot := _snap_to_grid(_world_to_local(_screen_to_world(event.position)))
 			component_transform["pivot"] = pivot
 			pivot_changed.emit(pivot)
+			queue_redraw()
+			return
+		if interaction_state == "transform" and transform_drag_axis != "":
+			var current_world := _screen_to_world(event.position)
+			var delta := current_world - transform_drag_start_world
+			if transform_drag_axis == "x":
+				delta.y = 0.0
+			elif transform_drag_axis == "y":
+				delta.x = 0.0
+			var new_position := _snap_to_grid(transform_drag_start_position + delta)
+			component_transform["position"] = new_position
+			transform_changed.emit(component_transform.duplicate(true))
 			queue_redraw()
 			return
 		if interaction_state == "edit" and edit_mode == "add":
 			_update_add_preview(event.position)
 		if interaction_state == "edit" and selected_point_index >= 0 and drag_axis != "":
-			var moved_point := _snap_to_grid(_screen_to_world(event.position))
+			var moved_point := _snap_to_grid(_world_to_local(_screen_to_world(event.position)))
 			var original_point: Vector2 = outer_shape[selected_point_index]
 			if drag_axis == "x":
 				moved_point.y = original_point.y
@@ -200,6 +224,27 @@ func set_component_transform(transform: Dictionary) -> void:
 	queue_redraw()
 
 
+func _local_to_world(local_point: Vector2) -> Vector2:
+	var pivot: Vector2 = component_transform.get("pivot", Vector2.ZERO)
+	var position: Vector2 = component_transform.get("position", Vector2.ZERO)
+	var scale: Vector2 = component_transform.get("scale", Vector2.ONE)
+	var rotation := deg_to_rad(float(component_transform.get("rotation", 0.0)))
+	return position + ((local_point - pivot) * scale).rotated(rotation)
+
+
+func _world_to_local(world_point: Vector2) -> Vector2:
+	var pivot: Vector2 = component_transform.get("pivot", Vector2.ZERO)
+	var position: Vector2 = component_transform.get("position", Vector2.ZERO)
+	var scale: Vector2 = component_transform.get("scale", Vector2.ONE)
+	var rotation := deg_to_rad(float(component_transform.get("rotation", 0.0)))
+	var local_offset := (world_point - position).rotated(-rotation)
+	if not is_zero_approx(scale.x):
+		local_offset.x /= scale.x
+	if not is_zero_approx(scale.y):
+		local_offset.y /= scale.y
+	return pivot + local_offset
+
+
 func clear_selection() -> void:
 	selected_point_index = -1
 	drag_axis = ""
@@ -219,8 +264,8 @@ func _update_add_preview(screen_position: Vector2) -> void:
 	var nearest_distance := 16.0
 	for index in range(outer_shape.size()):
 		var next_index := (index + 1) % outer_shape.size()
-		var start := _world_to_screen(outer_shape[index])
-		var end := _world_to_screen(outer_shape[next_index])
+		var start := _world_to_screen(_local_to_world(outer_shape[index]))
+		var end := _world_to_screen(_local_to_world(outer_shape[next_index]))
 		var segment := end - start
 		if segment.length_squared() <= 0.001:
 			continue
@@ -230,7 +275,7 @@ func _update_add_preview(screen_position: Vector2) -> void:
 		if distance < nearest_distance:
 			nearest_distance = distance
 			add_segment_index = index
-			add_preview_point = _screen_to_world(candidate)
+			add_preview_point = _world_to_local(_screen_to_world(candidate))
 			add_preview_visible = true
 	queue_redraw()
 
@@ -300,8 +345,7 @@ func _draw() -> void:
 func _draw_pivot() -> void:
 	if context_name.is_empty() or interaction_state == "asset":
 		return
-	var pivot: Vector2 = component_transform.get("pivot", Vector2.ZERO)
-	var pivot_screen := _world_to_screen(pivot)
+	var pivot_screen := _world_to_screen(component_transform.get("position", Vector2.ZERO))
 	var pivot_color := Color("#d98cff")
 	draw_circle(pivot_screen, 7.0, pivot_color, false, 2.0)
 	draw_line(pivot_screen - Vector2(11.0, 0.0), pivot_screen + Vector2(11.0, 0.0), pivot_color, 1.0)
@@ -311,8 +355,7 @@ func _draw_pivot() -> void:
 func _draw_transform_gizmo() -> void:
 	if interaction_state != "transform" or context_name.is_empty():
 		return
-	var pivot: Vector2 = component_transform.get("pivot", Vector2.ZERO)
-	var center := _world_to_screen(pivot)
+	var center := _world_to_screen(component_transform.get("position", Vector2.ZERO))
 	if transform_mode == "rotate":
 		draw_arc(center, 34.0, 0.0, TAU, 48, Color("#f2c94c"), 2.0)
 		draw_circle(center + Vector2(0.0, -34.0), 7.0, Color("#f2c94c"))
@@ -329,11 +372,22 @@ func _draw_transform_gizmo() -> void:
 		draw_rect(Rect2(center - Vector2(7.0, 7.0), Vector2(14.0, 14.0)), Color("#f2c94c"), false, 2.0)
 
 
+func _transform_handle_at(screen_position: Vector2) -> String:
+	var center := _world_to_screen(component_transform.get("position", Vector2.ZERO))
+	if screen_position.distance_to(center) <= 12.0:
+		return "free"
+	if screen_position.distance_to(center + Vector2(44.0, 0.0)) <= 12.0:
+		return "x"
+	if screen_position.distance_to(center + Vector2(0.0, -44.0)) <= 12.0:
+		return "y"
+	return ""
+
+
 func _is_near_pivot(screen_position: Vector2) -> bool:
 	if context_name.is_empty() or interaction_state == "asset":
 		return false
-	var pivot: Vector2 = component_transform.get("pivot", Vector2.ZERO)
-	return screen_position.distance_to(_world_to_screen(pivot)) <= 12.0
+	var pivot_position: Vector2 = component_transform.get("position", Vector2.ZERO)
+	return screen_position.distance_to(_world_to_screen(pivot_position)) <= 12.0
 
 
 func _draw_reference_shapes() -> void:
@@ -374,16 +428,16 @@ func _draw_outer_shape() -> void:
 	var shape_color := Color("#55c7d9")
 	for index in range(outer_shape.size()):
 		var next_index := (index + 1) % outer_shape.size()
-		draw_line(_world_to_screen(outer_shape[index]), _world_to_screen(outer_shape[next_index]), shape_color, 2.0)
+		draw_line(_world_to_screen(_local_to_world(outer_shape[index])), _world_to_screen(_local_to_world(outer_shape[next_index])), shape_color, 2.0)
 	for point in outer_shape:
-		draw_circle(_world_to_screen(point), 4.0, shape_color)
+		draw_circle(_world_to_screen(_local_to_world(point)), 4.0, shape_color)
 	if interaction_state == "edit" and selected_point_index >= 0 and selected_point_index < outer_shape.size():
-		var selected_position := _world_to_screen(outer_shape[selected_point_index])
+		var selected_position := _world_to_screen(_local_to_world(outer_shape[selected_point_index]))
 		draw_circle(selected_position, 7.0, Color("#f2c94c"), false, 2.0)
 		_draw_move_gizmo(selected_position)
 	if interaction_state == "edit" and edit_mode == "add" and add_preview_visible:
-		draw_circle(_world_to_screen(add_preview_point), 8.0, Color("#f2c94c"), false, 2.0)
-		draw_circle(_world_to_screen(add_preview_point), 3.0, Color("#f2c94c"))
+		draw_circle(_world_to_screen(_local_to_world(add_preview_point)), 8.0, Color("#f2c94c"), false, 2.0)
+		draw_circle(_world_to_screen(_local_to_world(add_preview_point)), 3.0, Color("#f2c94c"))
 
 
 func _draw_move_gizmo(point: Vector2) -> void:
@@ -400,7 +454,7 @@ func _draw_move_gizmo(point: Vector2) -> void:
 func _gizmo_axis_at(screen_position: Vector2) -> String:
 	if selected_point_index < 0 or selected_point_index >= outer_shape.size():
 		return ""
-	var point := _world_to_screen(outer_shape[selected_point_index])
+	var point := _world_to_screen(_local_to_world(outer_shape[selected_point_index]))
 	if screen_position.distance_to(point) <= FREE_HANDLE_RADIUS:
 		return "free"
 	if screen_position.distance_to(point + Vector2(GIZMO_AXIS_LENGTH, 0.0)) <= HANDLE_HIT_RADIUS:
@@ -414,7 +468,7 @@ func _nearest_outer_point(screen_position: Vector2) -> int:
 	var nearest_index := -1
 	var nearest_distance := HANDLE_HIT_RADIUS
 	for index in range(outer_shape.size()):
-		var distance := screen_position.distance_to(_world_to_screen(outer_shape[index]))
+		var distance := screen_position.distance_to(_world_to_screen(_local_to_world(outer_shape[index])))
 		if distance <= nearest_distance:
 			nearest_distance = distance
 			nearest_index = index
@@ -426,18 +480,18 @@ func _draw_line_draft() -> void:
 		return
 	var draft_color := Color("#f2c94c")
 	for index in range(line_draft.size() - 1):
-		draw_line(_world_to_screen(line_draft[index]), _world_to_screen(line_draft[index + 1]), draft_color, 2.0)
+		draw_line(_world_to_screen(_local_to_world(line_draft[index])), _world_to_screen(_local_to_world(line_draft[index + 1])), draft_color, 2.0)
 	for point in line_draft:
-		draw_circle(_world_to_screen(point), 5.0, draft_color)
+		draw_circle(_world_to_screen(_local_to_world(point)), 5.0, draft_color)
 	if line_draft.is_empty():
-		draw_circle(_world_to_screen(cursor_world), 5.0, draft_color)
+		draw_circle(_world_to_screen(_local_to_world(cursor_world)), 5.0, draft_color)
 	elif has_focus():
 		var preview_target := line_draft[0] if line_draft.size() >= 3 and _is_near_first_point(cursor_world) else cursor_world
 		var preview_color := Color("#76e0a5") if preview_target == line_draft[0] and line_draft.size() >= 3 else Color("#f2c94c88")
-		draw_line(_world_to_screen(line_draft.back()), _world_to_screen(preview_target), preview_color, 1.0)
-		draw_circle(_world_to_screen(cursor_world), 4.0, Color("#f2c94c88"))
+		draw_line(_world_to_screen(_local_to_world(line_draft.back())), _world_to_screen(_local_to_world(preview_target)), preview_color, 1.0)
+		draw_circle(_world_to_screen(_local_to_world(cursor_world)), 4.0, Color("#f2c94c88"))
 		if preview_target == line_draft[0] and line_draft.size() >= 3:
-			draw_circle(_world_to_screen(line_draft[0]), 7.0, Color("#76e0a5"), false, 2.0)
+			draw_circle(_world_to_screen(_local_to_world(line_draft[0])), 7.0, Color("#76e0a5"), false, 2.0)
 
 
 func _visible_grid_step() -> float:
@@ -469,4 +523,4 @@ func _snap_to_grid(world_position: Vector2) -> Vector2:
 func _is_near_first_point(world_position: Vector2) -> bool:
 	if line_draft.is_empty():
 		return false
-	return _world_to_screen(world_position).distance_to(_world_to_screen(line_draft[0])) <= CLOSE_DISTANCE_PIXELS
+	return _world_to_screen(_local_to_world(world_position)).distance_to(_world_to_screen(_local_to_world(line_draft[0]))) <= CLOSE_DISTANCE_PIXELS

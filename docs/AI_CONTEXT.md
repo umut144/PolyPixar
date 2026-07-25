@@ -155,8 +155,9 @@ the settings are workspace-persistent. Phase 3 stores Component transform data
 (position, rotation, scale, pivot) plus visibility and z-index. Phase 4 exposes
 these values in the Component Inspector. Phase 5 displays and edits the local
 Pivot with Snap support. Phase 6 exposes `CMD/Ctrl + 3` with `1: Transform`,
-`2: Rotate`, and `3: Scale`; the initial gizmo is drawn at the Pivot and is not
-interactive yet.
+`2: Rotate`, and `3: Scale`; the gizmo is drawn at the Pivot and the Transform
+submode supports free, X-axis, and Y-axis translation with Snap. Rotate and
+Scale interaction remain later steps.
 
 ## Documentation maintenance
 
