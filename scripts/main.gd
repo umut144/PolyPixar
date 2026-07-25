@@ -1239,6 +1239,7 @@ func _on_transform_value_changed(value: float, property_name: String) -> void:
 	var position: Vector2 = transform.get("position", Vector2.ZERO)
 	var scale: Vector2 = transform.get("scale", Vector2.ONE)
 	var pivot: Vector2 = transform.get("pivot", Vector2.ZERO)
+	var previous_pivot := pivot
 	match property_name:
 		"position_x": position.x = value
 		"position_y": position.y = value
@@ -1247,6 +1248,9 @@ func _on_transform_value_changed(value: float, property_name: String) -> void:
 		"scale_y": scale.y = value
 		"pivot_x": pivot.x = value
 		"pivot_y": pivot.y = value
+	if property_name == "pivot_x" or property_name == "pivot_y":
+		var rotation := deg_to_rad(float(transform.get("rotation", 0.0)))
+		position += ((pivot - previous_pivot) * scale).rotated(rotation)
 	transform["position"] = position
 	transform["scale"] = scale
 	transform["pivot"] = pivot
