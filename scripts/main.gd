@@ -56,6 +56,7 @@ func _build_ui() -> void:
 	workspace_split.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	workspace_split.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	workspace_split.add_theme_constant_override("separation", 1)
+	workspace_split.add_theme_constant_override("minimum_grab_thickness", 1)
 	workspace_split.split_offset = 220
 	workspace_row.add_child(workspace_split)
 
@@ -79,6 +80,7 @@ func _build_ui() -> void:
 	canvas_split.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	canvas_split.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	canvas_split.add_theme_constant_override("separation", 1)
+	canvas_split.add_theme_constant_override("minimum_grab_thickness", 1)
 	canvas_split.split_offset = 820
 	workspace_split.add_child(canvas_split)
 
