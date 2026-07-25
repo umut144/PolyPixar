@@ -135,8 +135,12 @@ right                   inspector for selected objects
 bottom                  compact status/info grid
 ```
 
-Export is a distinct, terminal action/area. The lower status grid can expand
-inside time-based workspaces when a local timeline needs more space.
+Export is a distinct, terminal action/area. The lower status grid is split into
+three regions: 20% program status on the left, 60% contextual tool information
+in the middle, and 20% reserved space on the right. It can expand inside
+time-based workspaces when a local timeline needs more space. `CMD/Ctrl + S`
+saves the active Workspace and emits a temporary yellow confirmation in the
+left status area.
 
 The visual language follows the compact, utilitarian editor style of the
 PolyTexture reference: regular Godot controls, 1 px outer margin, 1 px

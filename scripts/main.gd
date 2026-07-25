@@ -26,6 +26,8 @@ var canvas_context_label: Label
 var canvas_view: ComponentCanvas
 var context_bar: HBoxContainer
 var info_bar: HBoxContainer
+var program_status_label: Label
+var status_clear_timer: Timer
 var active_draw_tool := ""
 var active_state := ""
 var active_edit_mode := "select"
@@ -56,9 +58,13 @@ func _load_last_workspace() -> void:
 func _unhandled_key_input(event: InputEvent) -> void:
 	if not event is InputEventKey or not event.pressed or event.echo:
 		return
+	var has_command_modifier: bool = event.meta_pressed or event.ctrl_pressed
+	if has_command_modifier and event.keycode == KEY_S:
+		_save_workspace()
+		get_viewport().set_input_as_handled()
+		return
 	if selected_component_id.is_empty():
 		return
-	var has_command_modifier: bool = event.meta_pressed or event.ctrl_pressed
 	if has_command_modifier and event.keycode == KEY_1:
 		_activate_draw_state()
 	elif has_command_modifier and event.keycode == KEY_2:
@@ -211,9 +217,35 @@ func _build_ui() -> void:
 	var status_bar := _create_panel()
 	status_bar.custom_minimum_size = Vector2(0, 24)
 	main_layout.add_child(status_bar)
+	var status_layout := HBoxContainer.new()
+	status_layout.add_theme_constant_override("separation", 1)
+	status_bar.add_child(status_layout)
+	var status_left := _create_status_region()
+	status_left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	status_left.size_flags_stretch_ratio = 20.0
+	status_layout.add_child(status_left)
+	program_status_label = Label.new()
+	program_status_label.visible = false
+	program_status_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	program_status_label.add_theme_font_size_override("font_size", 11)
+	program_status_label.add_theme_color_override("font_color", Color("#f2c94c"))
+	status_left.add_child(program_status_label)
+	var status_middle := _create_status_region()
+	status_middle.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	status_middle.size_flags_stretch_ratio = 60.0
+	status_layout.add_child(status_middle)
 	info_bar = HBoxContainer.new()
 	info_bar.add_theme_constant_override("separation", 16)
-	status_bar.add_child(info_bar)
+	status_middle.add_child(info_bar)
+	var status_right := _create_status_region()
+	status_right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	status_right.size_flags_stretch_ratio = 20.0
+	status_layout.add_child(status_right)
+	status_clear_timer = Timer.new()
+	status_clear_timer.one_shot = true
+	status_clear_timer.wait_time = 2.5
+	status_clear_timer.timeout.connect(_clear_status_message)
+	add_child(status_clear_timer)
 
 	_create_asset_dialog()
 	_create_component_dialog()
@@ -243,6 +275,16 @@ func _create_panel_label(text: String) -> Label:
 	label.add_theme_font_size_override("font_size", 11)
 	label.add_theme_color_override("font_color", Color("#9aa3b2"))
 	return label
+
+
+func _create_status_region() -> PanelContainer:
+	var region := PanelContainer.new()
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color("#20242c")
+	style.border_color = Color("#363d48")
+	style.set_border_width_all(1)
+	region.add_theme_stylebox_override("panel", style)
+	return region
 
 
 func _create_asset_dialog() -> void:
@@ -439,6 +481,24 @@ func _save_workspace() -> void:
 		"assets": asset_ids
 	})
 	_write_json(CONFIG_PATH, {"schema_version": 1, "last_workspace": workspace_name})
+	_show_status_message("Saved Workspace: %s!" % workspace_name)
+
+
+func _show_status_message(message: String) -> void:
+	if not is_instance_valid(program_status_label):
+		return
+	program_status_label.text = message
+	program_status_label.visible = true
+	program_status_label.modulate = Color.WHITE
+	status_clear_timer.start()
+	var tween := create_tween()
+	tween.tween_property(program_status_label, "modulate", Color("#f2c94c"), 0.15)
+
+
+func _clear_status_message() -> void:
+	if is_instance_valid(program_status_label):
+		program_status_label.visible = false
+		program_status_label.text = ""
 
 
 func _load_workspace(workspace_entry: String) -> bool:

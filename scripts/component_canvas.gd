@@ -213,7 +213,8 @@ func set_outer_shape(points: Array) -> void:
 func _process(delta: float) -> void:
 	if not has_focus():
 		return
-	var pan_input := Vector2(
+	var command_modifier: bool = Input.is_key_pressed(KEY_META) or Input.is_key_pressed(KEY_CTRL)
+	var pan_input := Vector2.ZERO if command_modifier else Vector2(
 		float(Input.is_key_pressed(KEY_D)) - float(Input.is_key_pressed(KEY_A)),
 		float(Input.is_key_pressed(KEY_S)) - float(Input.is_key_pressed(KEY_W))
 	)

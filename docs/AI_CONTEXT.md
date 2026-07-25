@@ -141,7 +141,10 @@ Load uses an in-app list of existing workspace folders. Each workspace has a
 `workspace.json` plus one `assets/<asset_id>/asset.json` per Asset. The latest
 loaded or saved workspace name is stored in `configs/app_config.json` and is
 loaded automatically on startup. Every workspace, asset, and config JSON uses
-the numeric `schema_version` field; the current schema is version `1`.
+the numeric `schema_version` field; the current schema is version `1`. The
+bottom status bar is divided into 20% program status, 60% contextual tool
+information, and 20% reserved space. `CMD/Ctrl + S` saves the active workspace;
+the canvas suppresses ASDW panning while that modifier is held.
 
 ## Documentation maintenance
 

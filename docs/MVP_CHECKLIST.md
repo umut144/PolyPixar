@@ -87,6 +87,9 @@ before implementing real creation tools.
 - [x] Serialize workspaces and their Assets/Components as versioned JSON files.
 - [x] Include `schema_version` in Workspace, Asset, and app-config JSON files.
 - [x] Store and automatically restore the last workspace through app config.
+- [x] Split the bottom status bar into 20% / 60% / 20% regions.
+- [x] Save the active Workspace with `CMD/Ctrl + S` and show a temporary yellow
+      confirmation in the program-status region.
 - [x] Show an empty, scrollable Inspector on the right.
 - [x] Let users resize the Outliner and Inspector independently with split
       handles while keeping the module rail fixed.
