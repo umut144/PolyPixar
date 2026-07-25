@@ -57,6 +57,10 @@ before implementing real creation tools.
 - [x] Zoom the canvas with `Q/E`, with `E` zooming in.
 - [x] Show `Draw ▼` with a `Line` entry in the Context Bar for selected
       Components; record the selected tool without drawing yet.
+- [x] Place snapped Polyline draft points with `Line` and show the next-edge
+      preview toward the cursor.
+- [x] Remove the last draft point with `Backspace` and clear the draft with
+      `Escape`.
 - [x] Show an empty, canvas-first working area without fake asset previews.
 - [x] Show an empty, scrollable Inspector on the right.
 - [x] Let users resize the Outliner and Inspector independently with split

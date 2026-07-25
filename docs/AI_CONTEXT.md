@@ -109,7 +109,10 @@ Shapes canvas now provides a PolyPixAAA-style grid with click-to-focus `A/S/D/W`
 pan and `Q/E` zoom controls (`E` zooms in); it still contains no asset data.
 When a Component is selected, the Context Bar shows `Draw ▼` with a `Line`
 entry. Selecting `Line` only records the active tool for now; point input is the
-next step.
+next step. In the current Phase 4b implementation, clicks place snapped
+Polyline draft points, the next edge follows the cursor, `Backspace` removes
+the last point, and `Escape` clears the draft. Closing and storing the contour
+are still deferred.
 
 ## Documentation maintenance
 

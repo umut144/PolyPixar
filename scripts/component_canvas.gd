@@ -1,6 +1,8 @@
 class_name ComponentCanvas
 extends Control
 
+signal line_draft_changed(points: Array[Vector2])
+
 const PAN_SPEED := 420.0
 const MIN_ZOOM := 0.25
 const MAX_ZOOM := 8.0
@@ -11,6 +13,8 @@ var view_center := Vector2.ZERO
 var zoom := 1.0
 var context_name := ""
 var active_tool := ""
+var line_draft: Array[Vector2] = []
+var cursor_world := Vector2.ZERO
 
 
 func _ready() -> void:
@@ -22,6 +26,22 @@ func _ready() -> void:
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed:
 		grab_focus()
+		if event.button_index == MOUSE_BUTTON_LEFT and active_tool == "line":
+			line_draft.append(_snap_to_grid(_screen_to_world(event.position)))
+			line_draft_changed.emit(line_draft)
+			queue_redraw()
+	if event is InputEventMouseMotion:
+		cursor_world = _snap_to_grid(_screen_to_world(event.position))
+		queue_redraw()
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_BACKSPACE and active_tool == "line" and not line_draft.is_empty():
+			line_draft.pop_back()
+			line_draft_changed.emit(line_draft)
+			queue_redraw()
+		elif event.keycode == KEY_ESCAPE and active_tool == "line":
+			line_draft.clear()
+			line_draft_changed.emit(line_draft)
+			queue_redraw()
 
 
 func set_context(name: String) -> void:
@@ -31,6 +51,9 @@ func set_context(name: String) -> void:
 
 func set_tool_mode(tool_name: String) -> void:
 	active_tool = tool_name
+	line_draft.clear()
+	line_draft_changed.emit(line_draft)
+	queue_redraw()
 
 
 func _process(delta: float) -> void:
@@ -68,6 +91,20 @@ func _draw() -> void:
 	var axis_color := Color("#46505e")
 	draw_line(_world_to_screen(Vector2(min_world.x, 0.0)), _world_to_screen(Vector2(max_world.x, 0.0)), axis_color, 1.0)
 	draw_line(_world_to_screen(Vector2(0.0, min_world.y)), _world_to_screen(Vector2(0.0, max_world.y)), axis_color, 1.0)
+	_draw_line_draft()
+
+
+func _draw_line_draft() -> void:
+	if active_tool != "line" or line_draft.is_empty():
+		return
+	var draft_color := Color("#f2c94c")
+	for index in range(line_draft.size() - 1):
+		draw_line(_world_to_screen(line_draft[index]), _world_to_screen(line_draft[index + 1]), draft_color, 2.0)
+	for point in line_draft:
+		draw_circle(_world_to_screen(point), 5.0, draft_color)
+	if has_focus():
+		draw_line(_world_to_screen(line_draft.back()), _world_to_screen(cursor_world), Color("#f2c94c88"), 1.0)
+		draw_circle(_world_to_screen(cursor_world), 4.0, Color("#f2c94c88"))
 
 
 func _visible_grid_step() -> float:
@@ -81,3 +118,15 @@ func _visible_grid_step() -> float:
 
 func _world_to_screen(world_position: Vector2) -> Vector2:
 	return size * 0.5 + (world_position - view_center) * zoom
+
+
+func _screen_to_world(screen_position: Vector2) -> Vector2:
+	return view_center + (screen_position - size * 0.5) / zoom
+
+
+func _snap_to_grid(world_position: Vector2) -> Vector2:
+	var grid_step := _visible_grid_step()
+	return Vector2(
+		round(world_position.x / grid_step) * grid_step,
+		round(world_position.y / grid_step) * grid_step
+	)
