@@ -1,3 +1,8 @@
-# Godot editor and import cache
+# Godot editor state and generated import cache
 .godot/
+.mono/
+.export/
 *.import
+
+# macOS
+.DS_Store
