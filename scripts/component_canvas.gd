@@ -52,7 +52,6 @@ var transform_drag_start_position := Vector2.ZERO
 var transform_drag_start_angle := 0.0
 var transform_drag_start_rotation := 0.0
 var transform_drag_start_scale := Vector2.ONE
-var transform_drag_start_local := Vector2.ZERO
 
 
 func _ready() -> void:
@@ -103,7 +102,6 @@ func _gui_input(event: InputEvent) -> void:
 				transform_drag_start_angle = _angle_from_transform_center(event.position)
 				transform_drag_start_rotation = float(component_transform.get("rotation", 0.0))
 				transform_drag_start_scale = component_transform.get("scale", Vector2.ONE)
-				transform_drag_start_local = _world_to_local(transform_drag_start_world) - component_transform.get("pivot", Vector2.ZERO)
 				return
 		elif event.button_index == MOUSE_BUTTON_LEFT and interaction_state == "asset":
 			var component_id := _reference_component_at(_screen_to_world(event.position))
@@ -141,14 +139,12 @@ func _gui_input(event: InputEvent) -> void:
 				queue_redraw()
 				return
 			if transform_drag_axis.begins_with("scale"):
-				var current_local: Vector2 = _world_to_local(current_world) - component_transform.get("pivot", Vector2.ZERO)
+				var start_rotation := deg_to_rad(transform_drag_start_rotation)
+				var start_offset := (transform_drag_start_world - transform_drag_start_position).rotated(-start_rotation)
+				var current_offset := (current_world - transform_drag_start_position).rotated(-start_rotation)
 				var new_scale := transform_drag_start_scale
-				if transform_drag_axis == "scale_x" and not is_zero_approx(transform_drag_start_local.x):
-					new_scale.x = maxf(0.01, transform_drag_start_scale.x * current_local.x / transform_drag_start_local.x)
-				elif transform_drag_axis == "scale_y" and not is_zero_approx(transform_drag_start_local.y):
-					new_scale.y = maxf(0.01, transform_drag_start_scale.y * current_local.y / transform_drag_start_local.y)
-				elif transform_drag_axis == "scale_uniform" and not is_zero_approx(transform_drag_start_local.length()):
-					var ratio: float = current_local.length() / transform_drag_start_local.length()
+				if transform_drag_axis == "scale_uniform" and not is_zero_approx(start_offset.length()):
+					var ratio: float = current_offset.length() / start_offset.length()
 					new_scale = transform_drag_start_scale * maxf(0.01, ratio)
 				component_transform["scale"] = new_scale
 				transform_changed.emit(component_transform.duplicate(true))
@@ -398,8 +394,6 @@ func _draw_transform_gizmo() -> void:
 	elif transform_mode == "scale":
 		var box := Rect2(center - Vector2(30.0, 30.0), Vector2(60.0, 60.0))
 		draw_rect(box, Color("#8ab4f8"), false, 2.0)
-		draw_circle(center + Vector2(30.0, 0.0), 6.0, Color("#e56b6f"))
-		draw_circle(center + Vector2(0.0, -30.0), 6.0, Color("#6bcB77"))
 		for corner in [box.position, box.position + Vector2(box.size.x, 0.0), box.position + Vector2(0.0, box.size.y), box.end]:
 			draw_circle(corner, 6.0, Color("#8ab4f8"))
 	else:
@@ -418,13 +412,8 @@ func _transform_handle_at(screen_position: Vector2) -> String:
 			return "rotate"
 		return ""
 	if transform_mode == "scale":
-		var scale_center := center
-		if screen_position.distance_to(scale_center + Vector2(30.0, 0.0)) <= 12.0:
-			return "scale_x"
-		if screen_position.distance_to(scale_center + Vector2(0.0, -30.0)) <= 12.0:
-			return "scale_y"
 		for corner in [Vector2(30.0, -30.0), Vector2(-30.0, -30.0), Vector2(30.0, 30.0), Vector2(-30.0, 30.0)]:
-			if screen_position.distance_to(scale_center + corner) <= 12.0:
+			if screen_position.distance_to(center + corner) <= 12.0:
 				return "scale_uniform"
 		return ""
 	if screen_position.distance_to(center) <= 12.0:
