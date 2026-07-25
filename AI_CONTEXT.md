@@ -60,6 +60,11 @@ It includes a scrollable Outliner, a scrollable Inspector, a central workspace,
 and a compact bottom status grid. Motion and Transform may display a dummy
 local timeline; Create and Style do not display one by default.
 
+The UI must follow the compact PolyTexture-inspired editor aesthetic: retain
+the fixed vertical module rail, but use nested resizable split panes for the
+Outliner, centre workspace, and Inspector. Avoid decorative cards; the canvas
+must be the visual focus.
+
 The UI is dynamically assembled in GDScript from editor state and small
 definition lists. Do not build a large, manually maintained Control hierarchy
 for the module-specific UI.

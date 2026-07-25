@@ -1,15 +1,70 @@
 extends Control
 
-const BACKGROUND := Color("#101319")
-const PANEL := Color("#171c25")
-const PANEL_ALT := Color("#1d2430")
-const PANEL_HOVER := Color("#273243")
-const BORDER := Color("#303b4c")
-const TEXT := Color("#e5edf7")
-const MUTED := Color("#93a2b7")
-const ACCENT := Color("#75b6ff")
-const ACCENT_SOFT := Color("#233d5b")
-const GOOD := Color("#79d2a6")
+const BACKGROUND := Color("#2b2b2b")
+const PANEL := Color("#202020")
+const PANEL_ALT := Color("#252525")
+const PANEL_HOVER := Color("#343434")
+const BORDER := Color("#383838")
+const TEXT := Color("#d6d6d6")
+const MUTED := Color("#8b8b8b")
+const ACCENT := Color("#ffcc2d")
+const ACCENT_SOFT := Color("#3a3a3a")
+const GOOD := Color("#8fc58a")
+
+
+class WorkspaceCanvas extends Control:
+	var mode := "create"
+
+	func _ready() -> void:
+		custom_minimum_size = Vector2(320, 240)
+		queue_redraw()
+
+	func _draw() -> void:
+		draw_rect(Rect2(Vector2.ZERO, size), BACKGROUND)
+		match mode:
+			"transform":
+				_draw_transform_preview()
+			"effects":
+				_draw_effect_preview()
+			"style":
+				_draw_style_preview()
+			_:
+				_draw_asset_canvas()
+
+	func _draw_asset_canvas() -> void:
+		var edge := maxf(96.0, minf(size.x - 72.0, size.y - 48.0))
+		var rect := Rect2(Vector2((size.x - edge) * 0.5, (size.y - edge) * 0.5), Vector2(edge, edge))
+		draw_rect(rect, Color("#f6f6f6"))
+		for step in range(0, int(edge) + 1, 32):
+			var color := Color("#e4e4e4") if step % 64 != 0 else Color("#cfcfcf")
+			draw_line(rect.position + Vector2(step, 0), rect.position + Vector2(step, edge), color, 1.0)
+			draw_line(rect.position + Vector2(0, step), rect.position + Vector2(edge, step), color, 1.0)
+
+	func _draw_transform_preview() -> void:
+		var block := Vector2(maxf(80.0, size.x * 0.24), maxf(80.0, size.y * 0.42))
+		var left := Rect2(Vector2(size.x * 0.18 - block.x * 0.5, size.y * 0.5 - block.y * 0.5), block)
+		var right := Rect2(Vector2(size.x * 0.82 - block.x * 0.5, size.y * 0.5 - block.y * 0.5), block)
+		draw_rect(left, Color("#f1f1f1"))
+		draw_rect(right, Color("#e2e2e2"))
+		var start := left.get_center() + Vector2(block.x * 0.58, 0)
+		var end := right.get_center() - Vector2(block.x * 0.58, 0)
+		draw_line(start, end, ACCENT, 2.0)
+		draw_circle(end, 5.0, ACCENT)
+
+	func _draw_effect_preview() -> void:
+		var origin := Vector2(size.x * 0.5, size.y * 0.7)
+		for index in 7:
+			var angle := lerpf(-2.75, -0.4, float(index) / 6.0)
+			var end := origin + Vector2(cos(angle), sin(angle)) * minf(size.x, size.y) * (0.24 + 0.04 * (index % 3))
+			draw_line(origin, end, GOOD, 2.0)
+			draw_circle(end, 3.0, GOOD)
+
+	func _draw_style_preview() -> void:
+		var block := Vector2(maxf(90.0, size.x * 0.18), maxf(110.0, size.y * 0.5))
+		var start_x := size.x * 0.5 - block.x * 1.7
+		for index in 3:
+			var color: Color = [Color("#d79556"), Color("#7664b7"), Color("#469b91")][index]
+			draw_rect(Rect2(Vector2(start_x + index * block.x * 1.2, size.y * 0.5 - block.y * 0.5), block), color)
 
 const MODULES := [
 	{
@@ -93,25 +148,25 @@ func _ready() -> void:
 
 
 func _build_shell() -> void:
+	var frame := _panel(BACKGROUND)
+	frame.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(frame)
+	var root_margin := _margin(frame, 4, 4)
 	var root := VBoxContainer.new()
-	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	root.add_theme_constant_override("separation", 0)
-	add_child(root)
+	root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	root.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	root.add_theme_constant_override("separation", 4)
+	root_margin.add_child(root)
 
-	var toolbar_panel := _panel(PANEL)
-	toolbar_panel.custom_minimum_size = Vector2(0, 58)
-	root.add_child(toolbar_panel)
-	var toolbar_margin := _margin(toolbar_panel, 12, 8)
 	var toolbar := HBoxContainer.new()
-	toolbar.add_theme_constant_override("separation", 10)
-	toolbar_margin.add_child(toolbar)
-
+	toolbar.custom_minimum_size = Vector2(0, 28)
+	toolbar.add_theme_constant_override("separation", 4)
+	root.add_child(toolbar)
 	toolbar_tools = HBoxContainer.new()
 	toolbar_tools.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	toolbar_tools.add_theme_constant_override("separation", 6)
+	toolbar_tools.add_theme_constant_override("separation", 4)
 	toolbar.add_child(toolbar_tools)
-	var preview_button := _button("▶ Preview", false)
-	preview_button.tooltip_text = "Placeholder preview action"
+	var preview_button := _button("Preview", false)
 	preview_button.pressed.connect(_noop)
 	toolbar.add_child(preview_button)
 	var export_button := _button("Export", false)
@@ -120,89 +175,76 @@ func _build_shell() -> void:
 
 	var main_area := HBoxContainer.new()
 	main_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	main_area.add_theme_constant_override("separation", 0)
+	main_area.add_theme_constant_override("separation", 4)
 	root.add_child(main_area)
 
 	var rail_panel := _panel(PANEL_ALT)
-	rail_panel.custom_minimum_size = Vector2(92, 0)
+	rail_panel.custom_minimum_size = Vector2(84, 0)
 	main_area.add_child(rail_panel)
-	var rail_margin := _margin(rail_panel, 8, 10)
+	var rail_margin := _margin(rail_panel, 4, 4)
 	module_rail = VBoxContainer.new()
 	module_rail.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	module_rail.add_theme_constant_override("separation", 6)
+	module_rail.add_theme_constant_override("separation", 2)
 	rail_margin.add_child(module_rail)
 
-	var context_panel := _panel(PANEL)
-	context_panel.custom_minimum_size = Vector2(230, 0)
-	main_area.add_child(context_panel)
-	var context_stack := VBoxContainer.new()
-	context_stack.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	context_stack.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var outer_split := HSplitContainer.new()
+	outer_split.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	outer_split.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	outer_split.split_offset = 220
+	main_area.add_child(outer_split)
+
+	var outliner_panel := _panel(PANEL)
+	outliner_panel.custom_minimum_size = Vector2(170, 0)
+	outer_split.add_child(outliner_panel)
 	var outliner_scroll := ScrollContainer.new()
-	outliner_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	outliner_scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	outliner_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	context_stack.add_child(outliner_scroll)
+	outliner_panel.add_child(outliner_scroll)
 	outliner_list = VBoxContainer.new()
 	outliner_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	outliner_list.add_theme_constant_override("separation", 0)
 	outliner_scroll.add_child(outliner_list)
-	context_panel.add_child(context_stack)
+
+	var workspace_split := HSplitContainer.new()
+	workspace_split.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	workspace_split.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	workspace_split.split_offset = 820
+	outer_split.add_child(workspace_split)
 
 	var centre := VBoxContainer.new()
 	centre.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	centre.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	centre.add_theme_constant_override("separation", 0)
-	main_area.add_child(centre)
-	var action_panel := _panel(PANEL_ALT)
-	action_panel.custom_minimum_size = Vector2(0, 48)
-	centre.add_child(action_panel)
-	var action_margin := _margin(action_panel, 12, 6)
+	centre.add_theme_constant_override("separation", 4)
+	workspace_split.add_child(centre)
 	var action_row := HBoxContainer.new()
-	action_row.add_theme_constant_override("separation", 8)
-	action_margin.add_child(action_row)
+	action_row.custom_minimum_size = Vector2(0, 28)
+	action_row.add_theme_constant_override("separation", 4)
+	centre.add_child(action_row)
 	action_controls = HBoxContainer.new()
 	action_controls.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	action_controls.add_theme_constant_override("separation", 6)
+	action_controls.add_theme_constant_override("separation", 4)
 	action_row.add_child(action_controls)
-	var workspace_panel := _panel(BACKGROUND)
-	workspace_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	centre.add_child(workspace_panel)
-	var workspace_margin := _margin(workspace_panel, 22, 18)
 	workspace_content = VBoxContainer.new()
 	workspace_content.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	workspace_content.add_theme_constant_override("separation", 12)
-	workspace_margin.add_child(workspace_content)
+	workspace_content.add_theme_constant_override("separation", 4)
+	centre.add_child(workspace_content)
 
 	var inspector_panel := _panel(PANEL)
-	inspector_panel.custom_minimum_size = Vector2(270, 0)
-	main_area.add_child(inspector_panel)
-	var inspector_margin := _margin(inspector_panel, 12, 12)
-	var inspector_stack := VBoxContainer.new()
-	inspector_stack.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	inspector_margin.add_child(inspector_stack)
+	inspector_panel.custom_minimum_size = Vector2(210, 0)
+	workspace_split.add_child(inspector_panel)
+	var inspector_margin := _margin(inspector_panel, 8, 8)
 	var inspector_scroll := ScrollContainer.new()
 	inspector_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	inspector_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	inspector_stack.add_child(inspector_scroll)
+	inspector_margin.add_child(inspector_scroll)
 	inspector_content = VBoxContainer.new()
 	inspector_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	inspector_content.add_theme_constant_override("separation", 8)
+	inspector_content.add_theme_constant_override("separation", 4)
 	inspector_scroll.add_child(inspector_content)
 
 	var status_panel := _panel(PANEL_ALT)
-	status_panel.custom_minimum_size = Vector2(0, 16)
+	status_panel.custom_minimum_size = Vector2(0, 18)
 	root.add_child(status_panel)
-	var status_row := HBoxContainer.new()
-	status_row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	status_row.add_theme_constant_override("separation", 1)
-	status_panel.add_child(status_row)
-	var left_status := _status_block(280)
-	var centre_status := _status_block(0)
-	centre_status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var right_status := _status_block(270)
-	status_row.add_child(left_status)
-	status_row.add_child(centre_status)
-	status_row.add_child(right_status)
 
 
 func _render_all() -> void:
@@ -281,68 +323,21 @@ func _render_outliner() -> void:
 
 func _render_workspace() -> void:
 	_clear(workspace_content)
-	var preview := _panel(PANEL)
-	preview.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	workspace_content.add_child(preview)
-	var preview_margin := _margin(preview, 20, 20)
-	preview_margin.add_child(_workspace_visual())
+	var canvas := WorkspaceCanvas.new()
+	canvas.mode = active_module_id
+	canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	workspace_content.add_child(canvas)
 	if _shows_time_area():
 		workspace_content.add_child(_time_area())
-
-
-func _workspace_visual() -> Control:
-	var centre := CenterContainer.new()
-	centre.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	centre.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	var content: Control
-	match active_module_id:
-		"create":
-			content = _visual_block(ACCENT_SOFT, Vector2(300, 210))
-		"style":
-			var colors := HBoxContainer.new()
-			colors.add_theme_constant_override("separation", 12)
-			colors.add_child(_visual_block(Color("#d28c53"), Vector2(96, 180)))
-			colors.add_child(_visual_block(Color("#7463b8"), Vector2(96, 180)))
-			colors.add_child(_visual_block(Color("#2f9c91"), Vector2(96, 180)))
-			content = colors
-		"motion":
-			var motion := VBoxContainer.new()
-			motion.add_theme_constant_override("separation", 12)
-			motion.add_child(_visual_block(ACCENT_SOFT, Vector2(250, 150)))
-			var sway := HSlider.new()
-			sway.custom_minimum_size = Vector2(250, 0)
-			sway.value = 62.0
-			motion.add_child(sway)
-			content = motion
-		"transform":
-			var pair := HBoxContainer.new()
-			pair.add_theme_constant_override("separation", 22)
-			pair.add_child(_visual_block(Color("#465a78"), Vector2(132, 170)))
-			pair.add_child(_visual_block(ACCENT, Vector2(18, 170)))
-			pair.add_child(_visual_block(Color("#7962aa"), Vector2(132, 170)))
-			content = pair
-		"effects":
-			var effect := HBoxContainer.new()
-			effect.add_theme_constant_override("separation", 8)
-			for height in [80, 150, 115, 190, 95]:
-				effect.add_child(_visual_block(GOOD if active_submodule == "Root Growth" else ACCENT_SOFT, Vector2(24, height)))
-			content = effect
-		"export":
-			content = _visual_block(Color("#30455e"), Vector2(280, 220))
-	centre.add_child(content)
-	return centre
 
 
 func _render_inspector() -> void:
 	_clear(inspector_content)
 	for index in 4:
-		var row := _panel(PANEL_ALT)
-		row.custom_minimum_size = Vector2(0, 42)
-		inspector_content.add_child(row)
-		var margin := _margin(row, 8, 8)
 		var slider := HSlider.new()
 		slider.value = 25 + index * 20
-		margin.add_child(slider)
+		slider.custom_minimum_size = Vector2(0, 28)
+		inspector_content.add_child(slider)
 
 
 func _activate_module(module_id: String) -> void:
@@ -442,8 +437,8 @@ func _shows_time_area() -> bool:
 
 func _time_area() -> PanelContainer:
 	var panel := _panel(PANEL_ALT)
-	panel.custom_minimum_size = Vector2(0, 150)
-	var margin := _margin(panel, 14, 10)
+	panel.custom_minimum_size = Vector2(0, 110)
+	var margin := _margin(panel, 8, 6)
 	var stack := VBoxContainer.new()
 	stack.add_theme_constant_override("separation", 8)
 	margin.add_child(stack)
@@ -490,12 +485,14 @@ func _button(text: String, active: bool) -> Button:
 	button.text = text
 	button.flat = true
 	button.focus_mode = Control.FOCUS_NONE
-	button.add_theme_font_size_override("font_size", 13)
+	button.add_theme_font_size_override("font_size", 14)
 	button.add_theme_color_override("font_color", TEXT)
-	button.add_theme_color_override("font_hover_color", TEXT)
-	button.add_theme_stylebox_override("normal", _style(ACCENT_SOFT if active else PANEL, ACCENT if active else BORDER, 6))
-	button.add_theme_stylebox_override("hover", _style(PANEL_HOVER, ACCENT if active else BORDER, 6))
-	button.add_theme_stylebox_override("pressed", _style(ACCENT_SOFT, ACCENT, 6))
+	button.add_theme_color_override("font_hover_color", Color("#f0f0f0"))
+	button.add_theme_stylebox_override("normal", _style(ACCENT if active else PANEL, Color.TRANSPARENT, 0))
+	button.add_theme_stylebox_override("hover", _style(PANEL_HOVER, Color.TRANSPARENT, 0))
+	button.add_theme_stylebox_override("pressed", _style(ACCENT_SOFT, Color.TRANSPARENT, 0))
+	if active:
+		button.add_theme_color_override("font_color", Color("#202020"))
 	return button
 
 
@@ -503,28 +500,15 @@ func _style(background: Color, border: Color, radius: int) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
 	style.bg_color = background
 	style.border_color = border
-	style.border_width_left = 1
-	style.border_width_top = 1
-	style.border_width_right = 1
-	style.border_width_bottom = 1
+	style.border_width_left = 0
+	style.border_width_top = 0
+	style.border_width_right = 0
+	style.border_width_bottom = 0
 	style.corner_radius_top_left = radius
 	style.corner_radius_top_right = radius
 	style.corner_radius_bottom_right = radius
 	style.corner_radius_bottom_left = radius
 	return style
-
-
-func _visual_block(color: Color, size: Vector2) -> PanelContainer:
-	var block := _panel(color)
-	block.custom_minimum_size = size
-	return block
-
-
-func _status_block(minimum_width: int) -> ColorRect:
-	var block := ColorRect.new()
-	block.color = BORDER
-	block.custom_minimum_size = Vector2(minimum_width, 0)
-	return block
 
 
 func _noop() -> void:

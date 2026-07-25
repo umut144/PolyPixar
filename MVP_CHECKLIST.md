@@ -38,6 +38,8 @@ implementing real creation tools.
       states for Create, Motion, Transform, and Effects.
 - [ ] Show a scrollable Inspector on the right with placeholder properties for
       the current selection.
+- [ ] Let users resize the Outliner and Inspector independently with split
+      handles while keeping the module rail fixed.
 - [ ] Show a compact bottom status grid with document, contextual information,
       and coordinate/viewport placeholders.
 - [ ] Motion and Transform demonstrate an expandable dummy time area; Create
