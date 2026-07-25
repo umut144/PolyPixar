@@ -49,6 +49,8 @@ var pivot_dragging := false
 var transform_drag_axis := ""
 var transform_drag_start_world := Vector2.ZERO
 var transform_drag_start_position := Vector2.ZERO
+var transform_drag_start_angle := 0.0
+var transform_drag_start_rotation := 0.0
 
 
 func _ready() -> void:
@@ -90,12 +92,14 @@ func _gui_input(event: InputEvent) -> void:
 			else:
 				clear_selection()
 			queue_redraw()
-		elif event.button_index == MOUSE_BUTTON_LEFT and interaction_state == "transform" and transform_mode == "transform":
+		elif event.button_index == MOUSE_BUTTON_LEFT and interaction_state == "transform":
 			var handle_axis := _transform_handle_at(event.position)
 			if handle_axis != "":
 				transform_drag_axis = handle_axis
 				transform_drag_start_world = _screen_to_world(event.position)
 				transform_drag_start_position = component_transform.get("position", Vector2.ZERO)
+				transform_drag_start_angle = _angle_from_transform_center(event.position)
+				transform_drag_start_rotation = float(component_transform.get("rotation", 0.0))
 				return
 		elif event.button_index == MOUSE_BUTTON_LEFT and interaction_state == "asset":
 			var component_id := _reference_component_at(_screen_to_world(event.position))
@@ -123,6 +127,15 @@ func _gui_input(event: InputEvent) -> void:
 			return
 		if interaction_state == "transform" and transform_drag_axis != "":
 			var current_world := _screen_to_world(event.position)
+			if transform_drag_axis == "rotate":
+				var angle_delta := rad_to_deg(_angle_from_transform_center(event.position) - transform_drag_start_angle)
+				var new_rotation := transform_drag_start_rotation + angle_delta
+				if snap_enabled:
+					new_rotation = round(new_rotation / rotation_step) * rotation_step
+				component_transform["rotation"] = new_rotation
+				transform_changed.emit(component_transform.duplicate(true))
+				queue_redraw()
+				return
 			var delta := current_world - transform_drag_start_world
 			if transform_drag_axis == "x":
 				delta.y = 0.0
@@ -379,6 +392,11 @@ func _draw_transform_gizmo() -> void:
 
 func _transform_handle_at(screen_position: Vector2) -> String:
 	var center := _world_to_screen(component_transform.get("position", Vector2.ZERO))
+	if transform_mode == "rotate":
+		var distance_to_center := screen_position.distance_to(center)
+		if distance_to_center >= 24.0 and distance_to_center <= 46.0:
+			return "rotate"
+		return ""
 	if screen_position.distance_to(center) <= 12.0:
 		return "free"
 	if screen_position.distance_to(center + Vector2(44.0, 0.0)) <= 12.0:
@@ -386,6 +404,11 @@ func _transform_handle_at(screen_position: Vector2) -> String:
 	if screen_position.distance_to(center + Vector2(0.0, -44.0)) <= 12.0:
 		return "y"
 	return ""
+
+
+func _angle_from_transform_center(screen_position: Vector2) -> float:
+	var center := _world_to_screen(component_transform.get("position", Vector2.ZERO))
+	return (screen_position - center).angle()
 
 
 func _is_near_pivot(screen_position: Vector2) -> bool:

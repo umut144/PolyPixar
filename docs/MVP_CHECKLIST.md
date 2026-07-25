@@ -102,6 +102,8 @@ before implementing real creation tools.
       submodes, displaying the initial gizmo at the Pivot.
 - [x] Translate a Component from the Pivot with free, X-axis, and Y-axis
       gizmo handles using Snap.
+- [x] Rotate a Component around its Pivot with the Rotate ring and Rotation
+      Step snapping.
 - [x] Show an empty, scrollable Inspector on the right.
 - [x] Let users resize the Outliner and Inspector independently with split
       handles while keeping the module rail fixed.
