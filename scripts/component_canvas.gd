@@ -2,18 +2,21 @@ class_name ComponentCanvas
 extends Control
 
 signal line_draft_changed(points: Array[Vector2])
+signal line_completed(points: Array[Vector2])
 
 const PAN_SPEED := 420.0
 const MIN_ZOOM := 0.25
 const MAX_ZOOM := 8.0
 const ZOOM_RATE := 1.8
 const BASE_GRID_STEP := 32.0
+const CLOSE_DISTANCE_PIXELS := 14.0
 
 var view_center := Vector2.ZERO
 var zoom := 1.0
 var context_name := ""
 var active_tool := ""
 var line_draft: Array[Vector2] = []
+var outer_shape: Array[Vector2] = []
 var cursor_world := Vector2.ZERO
 var cursor_over_canvas := false
 
@@ -30,7 +33,14 @@ func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed:
 		grab_focus()
 		if event.button_index == MOUSE_BUTTON_LEFT and active_tool == "line":
-			line_draft.append(_snap_to_grid(_screen_to_world(event.position)))
+			var snapped_point := _snap_to_grid(_screen_to_world(event.position))
+			if line_draft.size() >= 3 and _is_near_first_point(snapped_point):
+				line_completed.emit(line_draft.duplicate())
+				line_draft.clear()
+				line_draft_changed.emit(line_draft)
+				queue_redraw()
+				return
+			line_draft.append(snapped_point)
 			line_draft_changed.emit(line_draft)
 			queue_redraw()
 	if event is InputEventMouseMotion:
@@ -70,6 +80,13 @@ func set_tool_mode(tool_name: String) -> void:
 	queue_redraw()
 
 
+func set_outer_shape(points: Array) -> void:
+	outer_shape.clear()
+	for point in points:
+		outer_shape.append(point)
+	queue_redraw()
+
+
 func _process(delta: float) -> void:
 	if not has_focus():
 		return
@@ -105,7 +122,19 @@ func _draw() -> void:
 	var axis_color := Color("#46505e")
 	draw_line(_world_to_screen(Vector2(min_world.x, 0.0)), _world_to_screen(Vector2(max_world.x, 0.0)), axis_color, 1.0)
 	draw_line(_world_to_screen(Vector2(0.0, min_world.y)), _world_to_screen(Vector2(0.0, max_world.y)), axis_color, 1.0)
+	_draw_outer_shape()
 	_draw_line_draft()
+
+
+func _draw_outer_shape() -> void:
+	if outer_shape.size() < 3:
+		return
+	var shape_color := Color("#55c7d9")
+	for index in range(outer_shape.size()):
+		var next_index := (index + 1) % outer_shape.size()
+		draw_line(_world_to_screen(outer_shape[index]), _world_to_screen(outer_shape[next_index]), shape_color, 2.0)
+	for point in outer_shape:
+		draw_circle(_world_to_screen(point), 4.0, shape_color)
 
 
 func _draw_line_draft() -> void:
@@ -119,8 +148,12 @@ func _draw_line_draft() -> void:
 	if line_draft.is_empty():
 		draw_circle(_world_to_screen(cursor_world), 5.0, draft_color)
 	elif has_focus():
-		draw_line(_world_to_screen(line_draft.back()), _world_to_screen(cursor_world), Color("#f2c94c88"), 1.0)
+		var preview_target := line_draft[0] if line_draft.size() >= 3 and _is_near_first_point(cursor_world) else cursor_world
+		var preview_color := Color("#76e0a5") if preview_target == line_draft[0] and line_draft.size() >= 3 else Color("#f2c94c88")
+		draw_line(_world_to_screen(line_draft.back()), _world_to_screen(preview_target), preview_color, 1.0)
 		draw_circle(_world_to_screen(cursor_world), 4.0, Color("#f2c94c88"))
+		if preview_target == line_draft[0] and line_draft.size() >= 3:
+			draw_circle(_world_to_screen(line_draft[0]), 7.0, Color("#76e0a5"), false, 2.0)
 
 
 func _visible_grid_step() -> float:
@@ -146,3 +179,9 @@ func _snap_to_grid(world_position: Vector2) -> Vector2:
 		round(world_position.x / grid_step) * grid_step,
 		round(world_position.y / grid_step) * grid_step
 	)
+
+
+func _is_near_first_point(world_position: Vector2) -> bool:
+	if line_draft.is_empty():
+		return false
+	return _world_to_screen(world_position).distance_to(_world_to_screen(line_draft[0])) <= CLOSE_DISTANCE_PIXELS

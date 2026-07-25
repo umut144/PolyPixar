@@ -112,7 +112,9 @@ entry. Selecting `Line` only records the active tool for now; point input is the
 next step. In the current Phase 4b implementation, clicks place snapped
 Polyline draft points, a yellow preview point appears on hover, the next edge
 follows the cursor, `Backspace` removes the last point, and `Escape` clears the
-draft. Closing and storing the contour are still deferred.
+draft. Clicking near the first point now closes a draft with at least three
+points; the closed Polyline is stored as the Component's `Outer Shape` and
+rendered in cyan. This is still in-memory only.
 
 ## Documentation maintenance
 

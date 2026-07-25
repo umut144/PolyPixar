@@ -63,6 +63,8 @@ before implementing real creation tools.
       even before the first point is placed.
 - [x] Remove the last draft point with `Backspace` and clear the draft with
       `Escape`.
+- [x] Close a draft by clicking near its first point once it has at least three
+      points, then store and display it as the Component's `Outer Shape`.
 - [x] Show an empty, canvas-first working area without fake asset previews.
 - [x] Show an empty, scrollable Inspector on the right.
 - [x] Let users resize the Outliner and Inspector independently with split

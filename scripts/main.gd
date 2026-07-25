@@ -130,6 +130,7 @@ func _build_ui() -> void:
 	canvas_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	canvas_column.add_child(canvas_panel)
 	canvas_view = ComponentCanvas.new()
+	canvas_view.line_completed.connect(_on_line_completed)
 	var canvas := canvas_view
 	canvas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -360,7 +361,7 @@ func _confirm_component_creation() -> void:
 		component_name = _next_default_component_name(asset)
 	var component_id := "component_%d" % next_component_id
 	next_component_id += 1
-	asset["components"].append({"id": component_id, "name": component_name})
+	asset["components"].append({"id": component_id, "name": component_name, "outer_shape": []})
 	selected_asset_id = asset_id
 	selected_component_id = component_id
 	expanded_assets[asset_id] = true
@@ -463,18 +464,31 @@ func _render_canvas_context() -> void:
 	if asset.is_empty():
 		canvas_context_label.text = ""
 		canvas_view.set_context("")
+		canvas_view.set_outer_shape([])
 		return
 	if selected_component_id.is_empty():
 		canvas_context_label.text = "Asset: %s" % str(asset["name"])
 		canvas_view.set_context(str(asset["name"]))
+		canvas_view.set_outer_shape([])
 		return
 	var component := _get_component(asset, selected_component_id)
 	if component.is_empty():
 		canvas_context_label.text = "Asset: %s" % str(asset["name"])
 		canvas_view.set_context(str(asset["name"]))
+		canvas_view.set_outer_shape([])
 		return
 	canvas_context_label.text = "Component: %s" % str(component["name"])
 	canvas_view.set_context(str(component["name"]))
+	canvas_view.set_outer_shape(component["outer_shape"])
+
+
+func _on_line_completed(points: Array[Vector2]) -> void:
+	var asset := _get_asset(selected_asset_id)
+	var component := _get_component(asset, selected_component_id)
+	if component.is_empty():
+		return
+	component["outer_shape"] = points
+	canvas_view.set_outer_shape(points)
 
 
 func _get_asset(asset_id: String) -> Dictionary:
