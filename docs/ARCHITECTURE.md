@@ -104,8 +104,8 @@ The editor is organised around a canvas-first workspace:
 ```text
 left module rail        expandable Create / Style / Motion / Transform / Effects sections
 left context panel      current-context outliner
-top toolbar             tools and direct actions
-context/action bar      settings for the active tool or operation
+Main Toolbar            global tools and direct actions
+Context Bar             settings and actions for the active tool or operation
 centre                  working area
 right                   inspector for selected objects
 bottom                  compact status/info grid
@@ -127,7 +127,7 @@ The editor UI is assembled dynamically in GDScript from the current editor
 state and small, data-driven module/submodule definitions. The `tscn` scene is
 only a root host; the editor shell and context-sensitive controls are created
 in code. This avoids a large, hand-maintained Control tree and lets the same
-state drive the module rail, toolbar, context/action bar, workspace, and
+state drive the module rail, Main Toolbar, Context Bar, workspace, and
 inspector.
 
 The fixed shell is created once, while context-sensitive regions are rebuilt or
@@ -161,7 +161,7 @@ parent-button click is intentionally reserved for this toggle.
 
 Tool settings and object properties have separate homes:
 
-- The context/action bar configures the active tool or a temporary operation.
+- The Context Bar configures the active tool or a temporary operation.
 - The inspector edits persistent properties of the selected object.
 - A direct action executes once; it must not create an unnecessary persistent
   editor state.

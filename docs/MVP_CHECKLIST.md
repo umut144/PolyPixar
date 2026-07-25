@@ -35,7 +35,7 @@ before implementing real creation tools.
       margins, padding, indentation placeholders, or expand/collapse icons.
 - [x] Keep category navigation behaviour in a reusable `ModuleSection`
       component; reserve the Outliner for real content hierarchy.
-- [x] Show empty structural toolbar and context/action strips ready for real
+- [x] Show empty structural Main Toolbar and Context Bar areas ready for real
       controls.
 - [x] Show an empty, canvas-first working area without fake asset previews.
 - [x] Show an empty, scrollable Inspector on the right.

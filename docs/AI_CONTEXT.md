@@ -59,7 +59,7 @@ The skeleton should demonstrate the following navigation state changes without
 invented asset content:
 
 ```text
-category accordion → module selection → toolbar/context bar → workspace state
+category accordion → module selection → Main Toolbar → Context Bar → workspace state
 ```
 
 It includes a scrollable Outliner, a scrollable Inspector, a central workspace,
