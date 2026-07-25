@@ -63,10 +63,14 @@ func _build_ui() -> void:
 	var outliner_panel := _create_panel()
 	outliner_panel.custom_minimum_size = Vector2(180, 0)
 	workspace_split.add_child(outliner_panel)
+	var outliner_content := VBoxContainer.new()
+	outliner_content.add_theme_constant_override("separation", 4)
+	outliner_panel.add_child(outliner_content)
+	outliner_content.add_child(_create_panel_label("Outliner"))
 	var outliner_scroll := ScrollContainer.new()
-	outliner_scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	outliner_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	outliner_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	outliner_panel.add_child(outliner_scroll)
+	outliner_content.add_child(outliner_scroll)
 	outliner_list = VBoxContainer.new()
 	outliner_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	outliner_list.add_theme_constant_override("separation", 0)
@@ -102,6 +106,10 @@ func _build_ui() -> void:
 	var inspector_panel := _create_panel()
 	inspector_panel.custom_minimum_size = Vector2(260, 0)
 	canvas_split.add_child(inspector_panel)
+	var inspector_content := VBoxContainer.new()
+	inspector_content.add_theme_constant_override("separation", 4)
+	inspector_panel.add_child(inspector_content)
+	inspector_content.add_child(_create_panel_label("Inspector"))
 
 	var status_bar := _create_panel()
 	status_bar.custom_minimum_size = Vector2(0, 24)
@@ -120,6 +128,17 @@ func _create_panel(background_color := Color("#20242c")) -> PanelContainer:
 	style.corner_radius_bottom_left = 2
 	panel.add_theme_stylebox_override("panel", style)
 	return panel
+
+
+func _create_panel_label(text: String) -> Label:
+	var label := Label.new()
+	label.text = text
+	label.custom_minimum_size = Vector2(0, 24)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", 11)
+	label.add_theme_color_override("font_color", Color("#9aa3b2"))
+	return label
 
 
 func _add_module_button(parent: Container, text: String, is_active: bool) -> Button:
@@ -146,6 +165,7 @@ func _render_create_outliner() -> void:
 		var button := Button.new()
 		button.text = submodule
 		button.custom_minimum_size = Vector2(0, 30)
+		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		button.focus_mode = Control.FOCUS_NONE
 		button.toggle_mode = true
 		button.button_pressed = submodule == active_create_submodule
