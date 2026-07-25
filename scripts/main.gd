@@ -1251,18 +1251,21 @@ func _on_transform_value_changed(value: float, property_name: String) -> void:
 	transform["scale"] = scale
 	transform["pivot"] = pivot
 	component["transform"] = transform
+	_render_canvas_context()
 
 
 func _on_component_visibility_changed(visible: bool) -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	if not component.is_empty():
 		component["visibility"] = visible
+		_render_canvas_context()
 
 
 func _on_component_z_index_changed(value: float) -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	if not component.is_empty():
 		component["z_index"] = int(value)
+		_render_canvas_context()
 
 
 func _rename_selected_asset(new_name: String) -> void:
