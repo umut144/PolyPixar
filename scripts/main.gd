@@ -37,7 +37,7 @@ func _build_ui() -> void:
 	toolbar.custom_minimum_size = Vector2(0, 32)
 	toolbar_panel.add_child(toolbar)
 	var new_menu := MenuButton.new()
-	new_menu.text = "New"
+	new_menu.text = "New  ▼"
 	new_menu.custom_minimum_size = Vector2(72, 32)
 	new_menu.focus_mode = Control.FOCUS_NONE
 	var new_popup := new_menu.get_popup()
