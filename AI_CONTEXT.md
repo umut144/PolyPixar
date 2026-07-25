@@ -21,8 +21,8 @@ The current implementation target is not a functional morphing engine.
 
 - Engine: **Godot 4.7.1**
 - Project layout: `project.godot`, `scenes/main.tscn`, and `scripts/main.gd`
-- Editor workspace and default window: 1920×1080 (Full HD); current preview uses
-  preserved aspect ratio (`keep`) for temporary letterbox evaluation
+- Editor workspace and default window: 1920×1200 (16:10); preview uses preserved
+  aspect ratio (`keep`) so the UI proportions remain stable
 
 ## Confirmed vocabulary
 
