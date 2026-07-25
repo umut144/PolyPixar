@@ -79,7 +79,7 @@ Keep the initial skeleton visually sparse. The Outliner and Inspector may have
 small contextual panel labels; avoid decorative descriptions and status values.
 
 Use PolyPixAAA as the visual reference: standard Godot control styling, 1px
-outer margin, 2px separation between major panels, and resizable split panes. Do not add
+outer margin, 1px separation between major panels, and resizable split panes. Do not add
 custom button font/hover colours in the initial skeleton.
 
 The Outliner is `ScrollContainer` + an edge-to-edge vertical list of direct

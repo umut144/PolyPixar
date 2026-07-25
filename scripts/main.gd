@@ -28,7 +28,7 @@ func _build_ui() -> void:
 	add_child(root_margin)
 
 	var main_layout := VBoxContainer.new()
-	main_layout.add_theme_constant_override("separation", 2)
+	main_layout.add_theme_constant_override("separation", 1)
 	root_margin.add_child(main_layout)
 
 	var toolbar_panel := _create_panel()
@@ -39,7 +39,7 @@ func _build_ui() -> void:
 
 	var workspace_row := HBoxContainer.new()
 	workspace_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	workspace_row.add_theme_constant_override("separation", 2)
+	workspace_row.add_theme_constant_override("separation", 1)
 	main_layout.add_child(workspace_row)
 
 	var module_rail_panel := _create_panel(Color("#20242c"))
@@ -55,7 +55,7 @@ func _build_ui() -> void:
 	var workspace_split := HSplitContainer.new()
 	workspace_split.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	workspace_split.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	workspace_split.add_theme_constant_override("separation", 2)
+	workspace_split.add_theme_constant_override("separation", 1)
 	workspace_split.split_offset = 220
 	workspace_row.add_child(workspace_split)
 
@@ -78,14 +78,14 @@ func _build_ui() -> void:
 	var canvas_split := HSplitContainer.new()
 	canvas_split.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	canvas_split.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	canvas_split.add_theme_constant_override("separation", 2)
+	canvas_split.add_theme_constant_override("separation", 1)
 	canvas_split.split_offset = 820
 	workspace_split.add_child(canvas_split)
 
 	var canvas_column := VBoxContainer.new()
 	canvas_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	canvas_column.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	canvas_column.add_theme_constant_override("separation", 2)
+	canvas_column.add_theme_constant_override("separation", 1)
 	canvas_split.add_child(canvas_column)
 
 	var action_bar_panel := _create_panel()
