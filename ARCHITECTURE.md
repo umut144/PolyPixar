@@ -145,7 +145,8 @@ Tool settings and object properties have separate homes:
 
 ## Architecture constraints for the MVP
 
-- UI prototypes may use dummy data and are allowed to be disposable.
+- UI prototypes may use only the smallest dummy data needed to exercise a
+  specific interaction. Prefer empty panes over invented asset content.
 - Real functionality must be developed as vertical, user-testable slices.
 - Avoid building a general node graph, plugin system, or universal rigging
   system before a slice requires one.

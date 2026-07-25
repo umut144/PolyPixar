@@ -11,9 +11,9 @@ testable vertical slices rather than a complete feature set up front.
 
 ## Current phase
 
-The repository has just been initialised. The immediate goal is a **UI
-skeleton with dummy data** so that the interaction model can be reviewed before
-real asset functionality is built.
+The repository has just been initialised. The immediate goal is a **minimal UI
+skeleton** so that the interaction model can be reviewed before real asset
+functionality is built. Empty panes are preferred to invented asset content.
 
 The current implementation target is not a functional morphing engine.
 
@@ -49,16 +49,16 @@ need and name are open.
 
 ## UI skeleton target
 
-The skeleton should demonstrate the following state changes with placeholder
-content:
+The skeleton should demonstrate the following navigation state changes without
+invented asset content:
 
 ```text
 module rail → submodule buttons in the Outliner → toolbar/context bar → workspace state
 ```
 
 It includes a scrollable Outliner, a scrollable Inspector, a central workspace,
-and a compact bottom status grid. Motion and Transform may display a dummy
-local timeline; Create and Style do not display one by default.
+and a compact bottom status grid. Time controls are added only with the first
+real time-based interaction.
 
 The UI must follow the compact PolyTexture-inspired editor aesthetic: retain
 the fixed vertical module rail, but use nested resizable split panes for the
@@ -74,10 +74,9 @@ descriptions, or status values. Use text only on interactive buttons.
 
 The Outliner is `ScrollContainer` + an edge-to-edge vertical list of direct
 button rows, not Godot's `Tree` control. The active module's submodules are the
-first buttons in this same list. There are no margins, padding, indentation
-placeholders, or expand/collapse icons. A parent button still toggles visibility
-of its immediate child rows; its first-skeleton click behaviour is therefore
-expand/collapse rather than selection.
+only buttons in the initial skeleton. There are no margins, padding,
+indentation placeholders, or expand/collapse icons. Parent/child behaviour is
+added only when the first real hierarchy exists.
 
 ## Documentation maintenance
 
