@@ -5,6 +5,7 @@ const INACTIVE_MODULES := ["Style", "Motion", "Transform", "Effects", "Export"]
 
 var active_create_submodule := "Shapes"
 var outliner_list: VBoxContainer
+var module_sections: Array[ModuleSection] = []
 
 
 func _ready() -> void:
@@ -141,9 +142,26 @@ func _create_panel_label(text: String) -> Label:
 func _add_module_section(parent: Container, module_name: String, submodules: Array, open_by_default := false) -> void:
 	var section := ModuleSection.new()
 	section.setup(module_name, submodules, open_by_default)
-	section.submodule_pressed.connect(_select_create_submodule)
+	section.module_pressed.connect(_on_category_pressed)
+	section.submodule_pressed.connect(_select_submodule.bind(section))
+	module_sections.append(section)
 	parent.add_child(section)
 
 
-func _select_create_submodule(_module_name: String, submodule: String) -> void:
-	active_create_submodule = submodule
+func _on_category_pressed(_module_name: String) -> void:
+	var pressed_section := _find_section(_module_name)
+	for section in module_sections:
+		section.set_expanded(section == pressed_section and section.expanded)
+
+
+func _find_section(module_name: String) -> ModuleSection:
+	for section in module_sections:
+		if section.module_name == module_name:
+			return section
+	return null
+
+
+func _select_submodule(module_name: String, submodule: String, section: ModuleSection) -> void:
+	section.set_active_submodule(submodule)
+	if module_name == "Create":
+		active_create_submodule = submodule

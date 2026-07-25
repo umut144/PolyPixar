@@ -9,6 +9,7 @@ var header_button: Button
 var content_panel: PanelContainer
 var content_list: VBoxContainer
 var expanded := false
+var active_submodule := ""
 
 
 func setup(name: String, submodules: Array, open_by_default := false) -> void:
@@ -31,6 +32,8 @@ func setup(name: String, submodules: Array, open_by_default := false) -> void:
 
 	for submodule in submodules:
 		_add_submodule_button(str(submodule))
+	if not submodules.is_empty():
+		set_active_submodule(str(submodules[0]))
 	set_expanded(open_by_default)
 
 
@@ -57,6 +60,36 @@ func _add_submodule_button(submodule_name: String) -> void:
 		submodule_pressed.emit(module_name, submodule_name)
 	)
 	content_list.add_child(button)
+
+
+func set_active_submodule(submodule_name: String) -> void:
+	active_submodule = submodule_name
+	if not is_instance_valid(content_list):
+		return
+	for child in content_list.get_children():
+		var button := child as Button
+		if button == null:
+			continue
+		var is_active := button.text == active_submodule
+		button.add_theme_stylebox_override("normal", _create_submodule_style(is_active, false))
+		button.add_theme_stylebox_override("hover", _create_submodule_style(is_active, true))
+		button.add_theme_stylebox_override("pressed", _create_submodule_style(is_active, true))
+		button.add_theme_stylebox_override("focus", _create_submodule_style(is_active, false))
+		button.add_theme_color_override("font_color", Color("#0b0d10") if is_active else Color("#d6dbe4"))
+		button.add_theme_color_override("font_hover_color", Color("#0b0d10") if is_active else Color("#ffffff"))
+		button.add_theme_color_override("font_pressed_color", Color("#0b0d10") if is_active else Color("#ffffff"))
+
+
+func _create_submodule_style(is_active: bool, is_hovered: bool) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color("#f2c94c") if is_active else Color("#282d36")
+	if is_hovered and not is_active:
+		style.bg_color = Color("#343b47")
+	style.corner_radius_top_left = 2
+	style.corner_radius_top_right = 2
+	style.corner_radius_bottom_left = 2
+	style.corner_radius_bottom_right = 2
+	return style
 
 
 func _create_content_style() -> StyleBoxFlat:

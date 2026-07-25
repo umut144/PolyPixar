@@ -27,6 +27,8 @@ before implementing real creation tools.
       intentionally inert until their slice begins.
 - [ ] Use expandable module sections in the left rail so submodules stay with
       their parent module instead of appearing in the Outliner.
+- [ ] Allow only one expanded category section at a time and highlight the
+      active module with a yellow background and black text.
 - [ ] Show a scrollable current-context Outliner in the left workspace panel
       using narrow button rows rather than Godot's `Tree` control.
 - [ ] Keep every Outliner row as one direct, left-aligned button without

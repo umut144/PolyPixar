@@ -125,6 +125,10 @@ The fixed shell is created once, while context-sensitive regions are rebuilt or
 updated when the active state changes. The MVP needs only the simplest form of
 this pattern; it does not need a general UI framework.
 
+Module navigation uses an accordion rule: only one category section may be
+expanded at a time. The selected module inside that category is the active
+working context and is highlighted with a yellow background and black text.
+
 The first skeleton stays visually sparse. Outliner and Inspector have small
 contextual labels; otherwise text is used only where it identifies an
 interactive control or current context.
