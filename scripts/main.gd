@@ -21,10 +21,10 @@ func _build_ui() -> void:
 
 	var root_margin := MarginContainer.new()
 	root_margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	root_margin.add_theme_constant_override("margin_left", 12)
-	root_margin.add_theme_constant_override("margin_top", 12)
-	root_margin.add_theme_constant_override("margin_right", 12)
-	root_margin.add_theme_constant_override("margin_bottom", 12)
+	root_margin.add_theme_constant_override("margin_left", 1)
+	root_margin.add_theme_constant_override("margin_top", 1)
+	root_margin.add_theme_constant_override("margin_right", 1)
+	root_margin.add_theme_constant_override("margin_bottom", 1)
 	add_child(root_margin)
 
 	var main_layout := VBoxContainer.new()
@@ -55,6 +55,7 @@ func _build_ui() -> void:
 	var workspace_split := HSplitContainer.new()
 	workspace_split.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	workspace_split.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	workspace_split.add_theme_constant_override("separation", 2)
 	workspace_split.split_offset = 220
 	workspace_row.add_child(workspace_split)
 
@@ -77,6 +78,7 @@ func _build_ui() -> void:
 	var canvas_split := HSplitContainer.new()
 	canvas_split.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	canvas_split.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	canvas_split.add_theme_constant_override("separation", 2)
 	canvas_split.split_offset = 820
 	workspace_split.add_child(canvas_split)
 
