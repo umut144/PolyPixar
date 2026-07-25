@@ -51,8 +51,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		if event.keycode == KEY_1:
 			_set_edit_mode("select")
 		elif event.keycode == KEY_2:
-			_set_edit_mode("move")
+			_set_edit_mode("add")
 		elif event.keycode == KEY_3:
+			_set_edit_mode("move")
+		elif event.keycode == KEY_4:
 			_set_edit_mode("delete")
 
 
@@ -273,8 +275,9 @@ func _render_context_bar() -> void:
 	edit_menu.pressed.connect(_activate_edit_state)
 	var edit_popup := edit_menu.get_popup()
 	edit_popup.add_item("1: Select", 0)
-	edit_popup.add_item("2: Move", 1)
-	edit_popup.add_item("3: Delete", 2)
+	edit_popup.add_item("2: Add", 1)
+	edit_popup.add_item("3: Move", 2)
+	edit_popup.add_item("4: Delete", 3)
 	edit_popup.id_pressed.connect(_on_edit_menu_id)
 	context_bar.add_child(edit_menu)
 
@@ -287,8 +290,10 @@ func _on_draw_menu_id(id: int) -> void:
 func _on_edit_menu_id(id: int) -> void:
 	_activate_edit_state()
 	if id == 1:
-		_set_edit_mode("move")
+		_set_edit_mode("add")
 	elif id == 2:
+		_set_edit_mode("move")
+	elif id == 3:
 		_set_edit_mode("delete")
 
 
@@ -345,8 +350,9 @@ func _render_info_bar() -> void:
 		_add_info_option("1: Line")
 	elif active_state == "edit":
 		_add_info_option("1: Select")
-		_add_info_option("2: Move")
-		_add_info_option("3: Delete")
+		_add_info_option("2: Add")
+		_add_info_option("3: Move")
+		_add_info_option("4: Delete")
 	else:
 		_add_info_option("⌘1: Draw")
 		_add_info_option("⌘2: Edit")

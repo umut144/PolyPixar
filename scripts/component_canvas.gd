@@ -27,6 +27,9 @@ var cursor_world := Vector2.ZERO
 var cursor_over_canvas := false
 var selected_point_index := -1
 var drag_axis := ""
+var add_segment_index := -1
+var add_preview_point := Vector2.ZERO
+var add_preview_visible := false
 
 
 func _ready() -> void:
@@ -52,6 +55,8 @@ func _gui_input(event: InputEvent) -> void:
 			line_draft_changed.emit(line_draft)
 			queue_redraw()
 		elif event.button_index == MOUSE_BUTTON_LEFT and interaction_state == "edit":
+			if edit_mode == "add":
+				return
 			var gizmo_axis := _gizmo_axis_at(event.position)
 			if selected_point_index >= 0 and gizmo_axis != "":
 				drag_axis = gizmo_axis
@@ -68,6 +73,8 @@ func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:
 		cursor_over_canvas = true
 		cursor_world = _snap_to_grid(_screen_to_world(event.position))
+		if interaction_state == "edit" and edit_mode == "add":
+			_update_add_preview(event.position)
 		if interaction_state == "edit" and selected_point_index >= 0 and drag_axis != "":
 			var moved_point := _snap_to_grid(_screen_to_world(event.position))
 			var original_point: Vector2 = outer_shape[selected_point_index]
@@ -85,6 +92,8 @@ func _gui_input(event: InputEvent) -> void:
 			point_selection_changed.emit(selected_point_index)
 			outer_shape_changed.emit(outer_shape.duplicate())
 			queue_redraw()
+		elif event.keycode == KEY_SPACE and interaction_state == "edit" and edit_mode == "add":
+			_confirm_add_point()
 		elif event.keycode == KEY_ESCAPE and interaction_state == "edit":
 			clear_selection()
 		elif event.keycode == KEY_BACKSPACE and active_tool == "line" and not line_draft.is_empty():
@@ -128,6 +137,8 @@ func set_interaction_state(state: String) -> void:
 
 func set_edit_mode(mode: String) -> void:
 	edit_mode = mode
+	if edit_mode != "add":
+		_clear_add_preview()
 	queue_redraw()
 
 
@@ -135,6 +146,46 @@ func clear_selection() -> void:
 	selected_point_index = -1
 	drag_axis = ""
 	point_selection_changed.emit(selected_point_index)
+
+
+func _clear_add_preview() -> void:
+	add_segment_index = -1
+	add_preview_visible = false
+
+
+func _update_add_preview(screen_position: Vector2) -> void:
+	add_segment_index = -1
+	add_preview_visible = false
+	if outer_shape.size() < 3:
+		return
+	var nearest_distance := 16.0
+	for index in range(outer_shape.size()):
+		var next_index := (index + 1) % outer_shape.size()
+		var start := _world_to_screen(outer_shape[index])
+		var end := _world_to_screen(outer_shape[next_index])
+		var segment := end - start
+		if segment.length_squared() <= 0.001:
+			continue
+		var factor := clampf((screen_position - start).dot(segment) / segment.length_squared(), 0.0, 1.0)
+		var candidate := start + segment * factor
+		var distance := screen_position.distance_to(candidate)
+		if distance < nearest_distance:
+			nearest_distance = distance
+			add_segment_index = index
+			add_preview_point = _screen_to_world(candidate)
+			add_preview_visible = true
+	queue_redraw()
+
+
+func _confirm_add_point() -> void:
+	if not add_preview_visible or add_segment_index < 0:
+		return
+	outer_shape.insert(add_segment_index + 1, add_preview_point)
+	selected_point_index = add_segment_index + 1
+	point_selection_changed.emit(selected_point_index)
+	outer_shape_changed.emit(outer_shape.duplicate())
+	_clear_add_preview()
+	queue_redraw()
 
 
 func set_outer_shape(points: Array) -> void:
@@ -196,6 +247,9 @@ func _draw_outer_shape() -> void:
 		var selected_position := _world_to_screen(outer_shape[selected_point_index])
 		draw_circle(selected_position, 7.0, Color("#f2c94c"), false, 2.0)
 		_draw_move_gizmo(selected_position)
+	if interaction_state == "edit" and edit_mode == "add" and add_preview_visible:
+		draw_circle(_world_to_screen(add_preview_point), 8.0, Color("#f2c94c"), false, 2.0)
+		draw_circle(_world_to_screen(add_preview_point), 3.0, Color("#f2c94c"))
 
 
 func _draw_move_gizmo(point: Vector2) -> void:

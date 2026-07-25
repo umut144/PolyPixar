@@ -112,9 +112,11 @@ When a Component is selected, the Context Bar shows `⌘1 Draw ▼` and `⌘2 Ed
 Info Bar lists the available subcommands dynamically. Draw exposes `1: Line`;
 Edit exposes `1: Select`, `2: Move`, and `3: Delete`. Draw uses the Line
 Polyline tool. Edit defaults to point selection; clicking a point reveals a
-move gizmo with X/Y handles that can be dragged on the canvas. `Backspace`
-deletes the selected point when at least three points remain. The modifier
-shortcut selects a state, and the unmodified number selects its subcommand.
+move gizmo with X/Y handles that can be dragged on the canvas. Add mode (`2`)
+highlights the nearest position on a contour segment and inserts a point there
+when `Space` is pressed. `Backspace` deletes the selected point when at least
+three points remain. The modifier shortcut selects a state, and the unmodified
+number selects its subcommand.
 Clicks place snapped Polyline draft points, a yellow preview point appears on
 hover, and `Escape` clears the draft or selection.
 Clicking near the first point closes a draft with at least three points; the
