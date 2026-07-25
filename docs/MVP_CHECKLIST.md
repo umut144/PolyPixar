@@ -81,6 +81,8 @@ before implementing real creation tools.
 - [x] Show all completed component contours in the selected Asset canvas.
 - [x] Select a Component by clicking its contour in the Asset canvas and keep
       other components as transparent references.
+- [x] Highlight selected Outliner entries yellow with black text.
+- [x] Require a second click on the selected Asset to toggle its component list.
 - [x] Show an empty, scrollable Inspector on the right.
 - [x] Let users resize the Outliner and Inspector independently with split
       handles while keeping the module rail fixed.

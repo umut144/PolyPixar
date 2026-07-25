@@ -130,6 +130,10 @@ near one of its edges selects that Component. The selected Component then
 renders as the active contour while the other components remain visible as
 transparent background references.
 
+Outliner selection uses explicit yellow/black selected-button styling. Selecting
+an unselected Asset only changes selection; clicking that already selected Asset
+again toggles its component list open or closed.
+
 ## Documentation maintenance
 
 - Update `ARCHITECTURE.md` when a stable product boundary is decided.

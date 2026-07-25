@@ -423,8 +423,7 @@ func _render_outliner() -> void:
 		asset_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		asset_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		asset_button.focus_mode = Control.FOCUS_NONE
-		asset_button.toggle_mode = true
-		asset_button.button_pressed = asset_id == selected_asset_id
+		_style_outliner_button(asset_button, asset_id == selected_asset_id and selected_component_id.is_empty())
 		asset_button.pressed.connect(_select_asset.bind(asset_id))
 		asset_header.add_child(asset_button)
 		var add_button := Button.new()
@@ -449,18 +448,19 @@ func _render_outliner() -> void:
 			component_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			component_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 			component_button.focus_mode = Control.FOCUS_NONE
-			component_button.toggle_mode = true
-			component_button.button_pressed = component_id == selected_component_id
+			_style_outliner_button(component_button, component_id == selected_component_id)
 			component_button.pressed.connect(_select_component.bind(asset_id, component_id))
 			component_row.add_child(component_button)
 
 
 func _select_asset(asset_id: String) -> void:
+	var was_selected := selected_asset_id == asset_id and selected_component_id.is_empty()
 	selected_asset_id = asset_id
 	selected_component_id = ""
 	active_state = ""
 	canvas_view.set_interaction_state("")
-	expanded_assets[asset_id] = not bool(expanded_assets.get(asset_id, false))
+	if was_selected:
+		expanded_assets[asset_id] = not bool(expanded_assets.get(asset_id, false))
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
@@ -524,6 +524,26 @@ func _select_component(asset_id: String, component_id: String) -> void:
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
+
+
+func _style_outliner_button(button: Button, selected: bool) -> void:
+	var normal := StyleBoxFlat.new()
+	normal.bg_color = Color("#f2c94c") if selected else Color("#252a33")
+	normal.border_color = Color("#f2c94c") if selected else Color("#303744")
+	normal.set_border_width_all(1)
+	var hover := normal.duplicate()
+	hover.bg_color = Color("#ffe083") if selected else Color("#303744")
+	var pressed := normal.duplicate()
+	pressed.bg_color = Color("#e7b936") if selected else Color("#394252")
+	button.add_theme_stylebox_override("normal", normal)
+	button.add_theme_stylebox_override("hover", hover)
+	button.add_theme_stylebox_override("pressed", pressed)
+	button.add_theme_stylebox_override("focus", normal)
+	var text_color := Color("#16181d") if selected else Color("#d7dce5")
+	button.add_theme_color_override("font_color", text_color)
+	button.add_theme_color_override("font_hover_color", Color("#16181d") if selected else Color("#ffffff"))
+	button.add_theme_color_override("font_pressed_color", Color("#16181d"))
+	button.add_theme_color_override("font_focus_color", text_color)
 
 
 func _render_inspector() -> void:
