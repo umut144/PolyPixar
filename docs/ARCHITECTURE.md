@@ -76,9 +76,10 @@ more **modules** that provide the concrete working context. For example,
 An Asset is a container for independently editable Components. Drawing is
 performed on a selected Component, never directly on the Asset container. The
 first `Create → Shapes` drawing tool is named `Line`; despite the name, it is a
-Polyline tool that places ordered points and produces a closed contour marked
-as an outer shape when confirmed. Bézier editing and other contour types are
-deferred.
+Polyline tool that stores each ordered point immediately. `Enter` confirms an
+open line, while clicking the first point after at least three points marks it
+as a closed contour for outer-shape semantics. Bézier editing and other contour
+types are deferred.
 
 ## Confirmed domain relationship
 
@@ -290,7 +291,6 @@ The following topics are intentionally not decided yet:
   Stage, or is needed at all
 - How animation clips are represented and stored
 - Where a time-based effect stores its keyframes in later slices
-- Undo/redo scope for the first functional slice
 - Export formats and packing behaviour
 - Rigging depth required by the Stone-to-Monster slice
 

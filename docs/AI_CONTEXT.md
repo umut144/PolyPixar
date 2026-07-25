@@ -49,8 +49,9 @@ need and name are open.
 - Keep data types generic enough to avoid example-specific code. A closed
   `PolylineContour` is appropriate; a `WizardHatShape` is not.
 - Assets contain independently editable Components. The `Line` tool in
-  `Create → Shapes` creates closed Polyline contours on the selected Component;
-  it does not draw directly on the Asset container.
+  `Create → Shapes` stores Polyline points on the selected Component and can
+  optionally mark the result closed; it does not draw directly on the Asset
+  container.
 - Do not add Bézier editing, maps, full materials, a node graph, generic
   rigging, or export pipelines until a confirmed checklist item requires them.
 - Treat dummy UI data as dummy UI data. Do not let it quietly become a rigid
@@ -118,11 +119,12 @@ highlights the nearest position on a contour segment and inserts a point there
 when `Space` is pressed. `Backspace` deletes the selected point when at least
 three points remain; `Delete` is also available in Select mode. The modifier shortcut selects a state, and the unmodified
 number selects its subcommand.
-Clicks place snapped Polyline draft points, a yellow preview point appears on
-hover, and `Escape` clears the draft or selection.
-Clicking near the first point closes a draft with at least three points; the
-closed Polyline is stored as the Component's `Outer Shape` and rendered in
-cyan. This is still in-memory only.
+Clicks place snapped Polyline points immediately, and each point is an
+independent Undo snapshot. A yellow preview point appears on hover. `Enter`
+confirms the current open line without closing it; `Escape` clears the active
+draft. Clicking near the first point after at least three points marks the
+stored line as closed, enabling outer-shape polygon semantics. Both open and
+closed lines are persisted in the Component data.
 
 When an Asset (rather than a Component) is selected, the Shapes canvas shows
 all of its completed component contours together. Clicking inside a contour or
