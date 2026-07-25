@@ -37,8 +37,12 @@ before implementing real creation tools.
       component; reserve the Outliner for real content hierarchy.
 - [x] Show empty structural Main Toolbar and Context Bar areas ready for real
       controls.
-- [x] Add an inert `New` menu to the Main Toolbar with `Asset` and `Texture`
-      entries.
+- [x] Add a `New` menu to the Main Toolbar with `Asset` and `Texture` entries;
+      keep `Texture` inert until its phase begins.
+- [x] Implement `New → Asset` with a name dialog, OK/Cancel controls, Enter
+      confirmation, and Escape cancellation.
+- [x] List created Assets in the Outliner and select them there.
+- [x] Show the selected Asset's name in the Inspector and allow renaming.
 - [x] Show an empty, canvas-first working area without fake asset previews.
 - [x] Show an empty, scrollable Inspector on the right.
 - [x] Let users resize the Outliner and Inspector independently with split

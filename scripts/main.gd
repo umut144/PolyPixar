@@ -5,11 +5,20 @@ const INACTIVE_MODULES := ["Style", "Motion", "Transform", "Effects", "Export"]
 
 var active_create_submodule := "Shapes"
 var outliner_list: VBoxContainer
+var inspector_content: VBoxContainer
 var module_sections: Array[ModuleSection] = []
+var assets: Array[Dictionary] = []
+var selected_asset_id := ""
+var next_asset_id := 1
+var asset_dialog: ConfirmationDialog
+var asset_name_input: LineEdit
+var asset_name_editor: LineEdit
 
 
 func _ready() -> void:
 	_build_ui()
+	_render_outliner()
+	_render_inspector()
 
 
 func _build_ui() -> void:
@@ -43,6 +52,7 @@ func _build_ui() -> void:
 	var new_popup := new_menu.get_popup()
 	new_popup.add_item("Asset")
 	new_popup.add_item("Texture")
+	new_popup.id_pressed.connect(_on_new_menu_id)
 	toolbar.add_child(new_menu)
 
 	var workspace_row := HBoxContainer.new()
@@ -116,14 +126,15 @@ func _build_ui() -> void:
 	var inspector_panel := _create_panel()
 	inspector_panel.custom_minimum_size = Vector2(260, 0)
 	canvas_split.add_child(inspector_panel)
-	var inspector_content := VBoxContainer.new()
+	inspector_content = VBoxContainer.new()
 	inspector_content.add_theme_constant_override("separation", 4)
 	inspector_panel.add_child(inspector_content)
-	inspector_content.add_child(_create_panel_label("Inspector"))
 
 	var status_bar := _create_panel()
 	status_bar.custom_minimum_size = Vector2(0, 24)
 	main_layout.add_child(status_bar)
+
+	_create_asset_dialog()
 
 
 func _create_panel(background_color := Color("#20242c")) -> PanelContainer:
@@ -149,6 +160,113 @@ func _create_panel_label(text: String) -> Label:
 	label.add_theme_font_size_override("font_size", 11)
 	label.add_theme_color_override("font_color", Color("#9aa3b2"))
 	return label
+
+
+func _create_asset_dialog() -> void:
+	asset_dialog = ConfirmationDialog.new()
+	asset_dialog.title = "New Asset"
+	asset_dialog.dialog_text = "Enter an asset name"
+	asset_dialog.size = Vector2i(360, 160)
+	asset_dialog.confirmed.connect(_confirm_asset_creation)
+	asset_name_input = LineEdit.new()
+	asset_name_input.placeholder_text = "Asset name"
+	asset_name_input.custom_minimum_size = Vector2(320, 32)
+	asset_name_input.focus_mode = Control.FOCUS_ALL
+	asset_name_input.text_submitted.connect(_submit_asset_name)
+	asset_dialog.add_child(asset_name_input)
+	add_child(asset_dialog)
+
+
+func _on_new_menu_id(id: int) -> void:
+	if id == 0:
+		_open_new_asset_dialog()
+
+
+func _open_new_asset_dialog() -> void:
+	asset_name_input.text = ""
+	asset_dialog.popup_centered()
+	asset_name_input.grab_focus()
+
+
+func _submit_asset_name(_submitted_text: String) -> void:
+	_confirm_asset_creation()
+
+
+func _confirm_asset_creation() -> void:
+	var asset_name := asset_name_input.text.strip_edges()
+	if asset_name.is_empty():
+		asset_dialog.popup_centered()
+		asset_name_input.grab_focus()
+		return
+	var asset_id := "asset_%d" % next_asset_id
+	next_asset_id += 1
+	assets.append({"id": asset_id, "name": asset_name})
+	selected_asset_id = asset_id
+	asset_dialog.hide()
+	_render_outliner()
+	_render_inspector()
+
+
+func _render_outliner() -> void:
+	_clear(outliner_list)
+	for asset in assets:
+		var button := Button.new()
+		button.text = str(asset["name"])
+		button.custom_minimum_size = Vector2(0, 30)
+		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		button.focus_mode = Control.FOCUS_NONE
+		button.toggle_mode = true
+		button.button_pressed = str(asset["id"]) == selected_asset_id
+		button.pressed.connect(_select_asset.bind(str(asset["id"])))
+		outliner_list.add_child(button)
+
+
+func _select_asset(asset_id: String) -> void:
+	selected_asset_id = asset_id
+	_render_outliner()
+	_render_inspector()
+
+
+func _render_inspector() -> void:
+	_clear(inspector_content)
+	inspector_content.add_child(_create_panel_label("Inspector"))
+	var asset := _get_asset(selected_asset_id)
+	if asset.is_empty():
+		return
+	inspector_content.add_child(_create_panel_label("Asset"))
+	asset_name_editor = LineEdit.new()
+	asset_name_editor.text = str(asset["name"])
+	asset_name_editor.custom_minimum_size = Vector2(0, 30)
+	asset_name_editor.placeholder_text = "Asset name"
+	asset_name_editor.text_submitted.connect(_rename_selected_asset)
+	asset_name_editor.focus_exited.connect(func() -> void:
+		_rename_selected_asset(asset_name_editor.text)
+	)
+	inspector_content.add_child(asset_name_editor)
+
+
+func _rename_selected_asset(new_name: String) -> void:
+	var asset_name := new_name.strip_edges()
+	var asset := _get_asset(selected_asset_id)
+	if asset.is_empty():
+		return
+	if asset_name.is_empty():
+		asset_name_editor.text = str(asset["name"])
+		return
+	asset["name"] = asset_name
+	_render_outliner()
+
+
+func _get_asset(asset_id: String) -> Dictionary:
+	for asset in assets:
+		if str(asset["id"]) == asset_id:
+			return asset
+	return {}
+
+
+func _clear(container: Node) -> void:
+	for child in container.get_children():
+		child.queue_free()
 
 
 func _add_module_section(parent: Container, module_name: String, submodules: Array, open_by_default := false) -> void:

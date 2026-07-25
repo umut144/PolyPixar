@@ -11,9 +11,9 @@ testable vertical slices rather than a complete feature set up front.
 
 ## Current phase
 
-The repository currently contains a reviewed **minimal UI skeleton**. The next
-goal is to begin the first real Create slice while preserving the result-based
-workflow. Empty panes are preferred to invented asset content.
+The repository currently contains the reviewed UI skeleton and the first Asset
+creation flow. The next goal is to add Components while preserving the
+result-based workflow. Empty panes are preferred to invented asset content.
 
 The current implementation target is not a functional morphing engine.
 
@@ -97,10 +97,11 @@ Only Create has modules in the current shell. Style, Motion, Transform,
 Effects, and Export are present as empty category sections until their own
 work begins.
 
-The Main Toolbar currently contains an inert `New ▼` menu with `Asset` and
-`Texture` entries. The explicit arrow distinguishes it from direct-action
-buttons. Selecting either entry has no effect yet; canvas switching is
-deliberately deferred until the menu interaction is reviewed.
+The Main Toolbar contains a `New ▼` menu with `Asset` and `Texture` entries.
+`New → Asset` opens a name dialog with OK/Cancel, Enter, and Escape handling,
+creates an in-memory Asset, lists it in the Outliner, and exposes its editable
+name in the Inspector. `Texture` remains inert. Components and canvas drawing
+are the next phases.
 
 ## Documentation maintenance
 

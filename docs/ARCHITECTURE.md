@@ -147,6 +147,11 @@ Sections form an accordion: opening one category closes the others. The active
 module is highlighted with a yellow background and black text, including its
 hover state.
 
+The current first data flow is `New → Asset`: a name dialog creates an
+in-memory Asset with a stable internal ID, the Asset appears in the Outliner,
+and its display name can be edited in the Inspector. Persistence and Asset
+Components are intentionally deferred to the next phases.
+
 The first skeleton stays visually sparse. Outliner and Inspector have small
 contextual labels; otherwise text is used only where it identifies an
 interactive control or current context.
