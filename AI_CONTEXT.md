@@ -53,7 +53,7 @@ The skeleton should demonstrate the following state changes with placeholder
 content:
 
 ```text
-module rail → expanded submodules → toolbar/context bar → workspace state
+module rail → submodule buttons in the Outliner → toolbar/context bar → workspace state
 ```
 
 It includes a scrollable Outliner, a scrollable Inspector, a central workspace,
@@ -67,9 +67,10 @@ for the module-specific UI.
 Keep the initial skeleton visually sparse: no standalone labels, headings,
 descriptions, or status values. Use text only on interactive buttons.
 
-The Outliner is `ScrollContainer` + vertical button rows, not Godot's `Tree`
-control. Hierarchy is represented initially by non-interactive indentation
-placeholders to the left of child buttons. A parent button toggles visibility
+The Outliner is `ScrollContainer` + an edge-to-edge vertical list of direct
+button rows, not Godot's `Tree` control. The active module's submodules are the
+first buttons in this same list. There are no margins, padding, indentation
+placeholders, or expand/collapse icons. A parent button still toggles visibility
 of its immediate child rows; its first-skeleton click behaviour is therefore
 expand/collapse rather than selection.
 

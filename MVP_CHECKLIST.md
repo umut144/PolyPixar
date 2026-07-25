@@ -23,12 +23,12 @@ implementing real creation tools.
       do not depend on a hand-authored module-specific Control tree.
 - [ ] Show a narrow left module rail with Create, Style, Motion, Transform,
       Effects, and Export.
-- [ ] Selecting a module expands its dummy submodules without adding a second
-      global module menu.
+- [ ] Selecting a module puts its dummy submodule buttons at the top of the
+      current Outliner without adding a second global module menu.
 - [ ] Show a scrollable current-context Outliner in the left workspace panel
       using narrow button rows rather than Godot's `Tree` control.
-- [ ] Represent dummy parent/child hierarchy with non-interactive indentation
-      placeholders to the left of child rows.
+- [ ] Keep every Outliner row as one direct, left-aligned button without
+      margins, padding, indentation placeholders, or expand/collapse icons.
 - [ ] Make a dummy parent row toggle visibility of its immediate child rows and
       show an expanded/collapsed state.
 - [ ] Show a top toolbar whose dummy tools change with the selected submodule.

@@ -92,7 +92,7 @@ The editor is organised around a canvas-first workspace:
 
 ```text
 left module rail        Create / Style / Motion / Transform / Effects
-left context panel      expanded submodules and current-context outliner
+left context panel      submodule buttons and current-context outliner
 top toolbar             tools and direct actions
 context/action bar      settings for the active tool or operation
 centre                  working area
@@ -120,23 +120,15 @@ it identifies a possible action or an Outliner entry.
 
 ### Outliner
 
-The Outliner does not use Godot's `Tree` control. It is a scrollable vertical
-list of narrow button rows created from the current context.
-
-For a child entry, a small non-interactive placeholder is placed to the left of
-its button. Repeating the placeholder for deeper levels creates visual
-indentation.
-
-```text
-Asset
-  ├─ Shape
-  └─ Anchors
-```
+The Outliner does not use Godot's `Tree` control. It is a scrollable,
+edge-to-edge vertical list of narrow button rows created from the current
+context. The active module's submodule buttons appear at the top of this same
+list; there is no separate submodule panel.
 
 An entry with children is a parent button. Clicking it toggles the visibility
-of its immediate child rows and updates its expanded/collapsed visual state.
-The first skeleton does not need to solve separate parent selection behaviour;
-the parent-button click is intentionally reserved for this toggle.
+of its immediate child rows. No icon, glyph, indentation placeholder, margin,
+or padding is added to communicate this in the initial skeleton. The
+parent-button click is intentionally reserved for this toggle.
 
 Tool settings and object properties have separate homes:
 

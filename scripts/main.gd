@@ -80,7 +80,6 @@ var expanded_outline := {
 }
 
 var module_rail: VBoxContainer
-var submodule_list: VBoxContainer
 var outliner_list: VBoxContainer
 var toolbar_tools: HBoxContainer
 var action_controls: HBoxContainer
@@ -136,23 +135,18 @@ func _build_shell() -> void:
 	var context_panel := _panel(PANEL)
 	context_panel.custom_minimum_size = Vector2(230, 0)
 	main_area.add_child(context_panel)
-	var context_margin := _margin(context_panel, 12, 12)
 	var context_stack := VBoxContainer.new()
+	context_stack.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	context_stack.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	context_stack.add_theme_constant_override("separation", 8)
-	context_margin.add_child(context_stack)
-	submodule_list = VBoxContainer.new()
-	submodule_list.add_theme_constant_override("separation", 4)
-	context_stack.add_child(submodule_list)
-	context_stack.add_child(HSeparator.new())
 	var outliner_scroll := ScrollContainer.new()
 	outliner_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	outliner_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	context_stack.add_child(outliner_scroll)
 	outliner_list = VBoxContainer.new()
 	outliner_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	outliner_list.add_theme_constant_override("separation", 2)
+	outliner_list.add_theme_constant_override("separation", 0)
 	outliner_scroll.add_child(outliner_list)
+	context_panel.add_child(context_stack)
 
 	var centre := VBoxContainer.new()
 	centre.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -213,7 +207,6 @@ func _build_shell() -> void:
 
 func _render_all() -> void:
 	_render_module_rail()
-	_render_submodules()
 	_render_toolbar()
 	_render_actions()
 	_render_outliner()
@@ -242,16 +235,6 @@ func _render_module_rail() -> void:
 	module_rail.add_child(export_button)
 
 
-func _render_submodules() -> void:
-	_clear(submodule_list)
-	var module: Dictionary = _active_module()
-	for submodule in module.submodules:
-		var button := _button(submodule, submodule == active_submodule)
-		button.custom_minimum_size = Vector2(0, 30)
-		button.pressed.connect(_activate_submodule.bind(submodule))
-		submodule_list.add_child(button)
-
-
 func _render_toolbar() -> void:
 	_clear(toolbar_tools)
 	var module: Dictionary = _active_module()
@@ -272,6 +255,12 @@ func _render_actions() -> void:
 
 func _render_outliner() -> void:
 	_clear(outliner_list)
+	var module: Dictionary = _active_module()
+	for submodule in module.submodules:
+		var submodule_button := _button(submodule, submodule == active_submodule)
+		submodule_button.custom_minimum_size = Vector2(0, 30)
+		submodule_button.pressed.connect(_activate_submodule.bind(submodule))
+		outliner_list.add_child(submodule_button)
 	var entries := _outline_entries()
 	var entries_by_id := {}
 	for entry in entries:
@@ -279,31 +268,15 @@ func _render_outliner() -> void:
 	for entry in entries:
 		if not _is_outline_entry_visible(entry, entries_by_id):
 			continue
-		var row := HBoxContainer.new()
-		row.custom_minimum_size = Vector2(0, 28)
-		row.add_theme_constant_override("separation", 3)
-		var depth := int(entry.get("depth", 0))
-		if depth > 0:
-			var indent := Control.new()
-			indent.custom_minimum_size = Vector2(depth * 12, 0)
-			row.add_child(indent)
-			var marker := ColorRect.new()
-			marker.color = MUTED
-			marker.custom_minimum_size = Vector2(4, 4)
-			row.add_child(marker)
 		var has_children: bool = entry.has("children") and not entry.children.is_empty()
 		var row_text: String = str(entry.label)
-		if has_children:
-			row_text = ("▾  " if expanded_outline.get(entry.id, true) else "▸  ") + row_text
 		var button := _button(row_text, selected_outline_item == entry.id and not has_children)
-		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.custom_minimum_size = Vector2(0, 28)
 		if has_children:
-			button.tooltip_text = "Toggle child entries"
 			button.pressed.connect(_toggle_outline_parent.bind(entry.id))
 		else:
 			button.pressed.connect(_select_outline_item.bind(entry.id))
-		row.add_child(button)
-		outliner_list.add_child(row)
+		outliner_list.add_child(button)
 
 
 func _render_workspace() -> void:
