@@ -145,6 +145,8 @@ the numeric `schema_version` field; the current schema is version `1`. The
 bottom status bar is divided into 17% program status, 64% contextual tool
 information, and 17% reserved space. `CMD/Ctrl + S` saves the active workspace;
 the canvas suppresses ASDW panning while that modifier is held.
+Workspace `editor_state` also restores the selected Asset, selected Component,
+and expanded Outliner containers when the Workspace is reopened.
 
 ## Documentation maintenance
 

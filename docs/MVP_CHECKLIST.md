@@ -90,6 +90,7 @@ before implementing real creation tools.
 - [x] Split the bottom status bar into 17% / 64% / 17% regions.
 - [x] Save the active Workspace with `CMD/Ctrl + S` and show a temporary yellow
       confirmation in the program-status region.
+- [x] Persist and restore Outliner selection and Asset expansion state.
 - [x] Show an empty, scrollable Inspector on the right.
 - [x] Let users resize the Outliner and Inspector independently with split
       handles while keeping the module rail fixed.

@@ -478,7 +478,8 @@ func _save_workspace() -> void:
 	_write_json("%s/workspace.json" % workspace_root, {
 		"schema_version": 1,
 		"name": workspace_name,
-		"assets": asset_ids
+		"assets": asset_ids,
+		"editor_state": _serialize_editor_state()
 	})
 	_write_json(CONFIG_PATH, {"schema_version": 1, "last_workspace": workspace_name})
 	_show_status_message("Saved Workspace: %s!" % workspace_name)
@@ -528,11 +529,7 @@ func _load_workspace(workspace_entry: String) -> bool:
 		})
 	assets = loaded_assets
 	workspace_name = str(workspace_data.get("name", workspace_entry))
-	selected_asset_id = ""
-	selected_component_id = ""
-	expanded_assets.clear()
-	for asset in assets:
-		expanded_assets[str(asset["id"])] = false
+	_restore_editor_state(workspace_data.get("editor_state", {}))
 	_update_next_ids()
 	active_state = ""
 	_render_outliner()
@@ -540,6 +537,43 @@ func _load_workspace(workspace_entry: String) -> bool:
 	_render_canvas_context()
 	_write_json(CONFIG_PATH, {"schema_version": 1, "last_workspace": workspace_name})
 	return true
+
+
+func _serialize_editor_state() -> Dictionary:
+	var expanded_state := {}
+	for asset in assets:
+		var asset_id := str(asset["id"])
+		expanded_state[asset_id] = bool(expanded_assets.get(asset_id, false))
+	return {
+		"selected_asset_id": selected_asset_id,
+		"selected_component_id": selected_component_id,
+		"expanded_assets": expanded_state
+	}
+
+
+func _restore_editor_state(state) -> void:
+	selected_asset_id = ""
+	selected_component_id = ""
+	expanded_assets.clear()
+	for asset in assets:
+		expanded_assets[str(asset["id"])] = false
+	if not state is Dictionary:
+		return
+	var requested_asset_id := str(state.get("selected_asset_id", ""))
+	var selected_asset := _get_asset(requested_asset_id)
+	if not selected_asset.is_empty():
+		selected_asset_id = requested_asset_id
+		var requested_component_id := str(state.get("selected_component_id", ""))
+		if not _get_component(selected_asset, requested_component_id).is_empty():
+			selected_component_id = requested_component_id
+	var saved_expanded = state.get("expanded_assets", {})
+	if saved_expanded is Dictionary:
+		for asset in assets:
+			var asset_id := str(asset["id"])
+			if saved_expanded.has(asset_id):
+				expanded_assets[asset_id] = bool(saved_expanded[asset_id])
+	if not selected_component_id.is_empty():
+		expanded_assets[selected_asset_id] = true
 
 
 func _serialize_points(points: Array) -> Array:

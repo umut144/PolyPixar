@@ -220,6 +220,11 @@ schema is version `1`. Workspace metadata references Asset IDs, while each
 Asset document stores its Components and their contour points. Display names
 remain editable and are not used as persistent references.
 
+Workspace JSON also contains an `editor_state` object for the restorable editor
+view: selected Asset, selected Component, and the expanded/collapsed state of
+each Asset container. On load, these IDs are validated against the loaded data;
+invalid selections fall back to an empty selection.
+
 `configs/app_config.json` is separate from Workspace content and stores the
 name of the last loaded or saved Workspace. On startup, the application tries
 to restore that Workspace and otherwise starts empty.
