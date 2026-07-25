@@ -618,6 +618,7 @@ func _render_canvas_context() -> void:
 		canvas_context_label.text = ""
 		canvas_view.set_context("")
 		canvas_view.set_interaction_state("")
+		canvas_view.set_tool_mode("")
 		canvas_view.set_reference_shapes([])
 		canvas_view.set_outer_shape([])
 		return
@@ -625,6 +626,7 @@ func _render_canvas_context() -> void:
 		canvas_context_label.text = "Asset: %s" % str(asset["name"])
 		canvas_view.set_context(str(asset["name"]))
 		canvas_view.set_interaction_state("asset")
+		canvas_view.set_tool_mode("")
 		canvas_view.set_reference_shapes(_build_reference_shapes(asset))
 		canvas_view.set_outer_shape([])
 		return
@@ -633,6 +635,7 @@ func _render_canvas_context() -> void:
 		canvas_context_label.text = "Asset: %s" % str(asset["name"])
 		canvas_view.set_context(str(asset["name"]))
 		canvas_view.set_interaction_state("asset")
+		canvas_view.set_tool_mode("")
 		canvas_view.set_reference_shapes(_build_reference_shapes(asset))
 		canvas_view.set_outer_shape([])
 		return
