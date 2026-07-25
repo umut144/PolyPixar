@@ -23,6 +23,8 @@ var canvas_context_label: Label
 var canvas_view: ComponentCanvas
 var context_bar: HBoxContainer
 var active_draw_tool := ""
+var active_state := ""
+var active_edit_mode := "select"
 
 
 func _ready() -> void:
@@ -30,6 +32,17 @@ func _ready() -> void:
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
+
+
+func _unhandled_key_input(event: InputEvent) -> void:
+	if not event is InputEventKey or not event.pressed or event.echo:
+		return
+	if selected_component_id.is_empty():
+		return
+	if event.keycode == KEY_1:
+		_activate_draw_state()
+	elif event.keycode == KEY_2:
+		_activate_edit_state()
 
 
 func _build_ui() -> void:
@@ -131,6 +144,7 @@ func _build_ui() -> void:
 	canvas_column.add_child(canvas_panel)
 	canvas_view = ComponentCanvas.new()
 	canvas_view.line_completed.connect(_on_line_completed)
+	canvas_view.outer_shape_changed.connect(_on_outer_shape_changed)
 	var canvas := canvas_view
 	canvas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -225,19 +239,69 @@ func _render_context_bar() -> void:
 		active_draw_tool = ""
 		return
 	var draw_menu := MenuButton.new()
-	draw_menu.text = "Draw  ▼"
+	draw_menu.text = "1: Draw  ▼"
 	draw_menu.custom_minimum_size = Vector2(88, 32)
 	draw_menu.focus_mode = Control.FOCUS_NONE
+	draw_menu.toggle_mode = true
+	draw_menu.button_pressed = active_state == "draw"
+	draw_menu.pressed.connect(_activate_draw_state)
 	var draw_popup := draw_menu.get_popup()
 	draw_popup.add_item("Line", 0)
 	draw_popup.id_pressed.connect(_on_draw_menu_id)
 	context_bar.add_child(draw_menu)
+	var edit_menu := MenuButton.new()
+	edit_menu.text = "2: Edit  ▼"
+	edit_menu.custom_minimum_size = Vector2(88, 32)
+	edit_menu.focus_mode = Control.FOCUS_NONE
+	edit_menu.toggle_mode = true
+	edit_menu.button_pressed = active_state == "edit"
+	edit_menu.pressed.connect(_activate_edit_state)
+	var edit_popup := edit_menu.get_popup()
+	edit_popup.add_item("Select", 0)
+	edit_popup.add_item("Move", 1)
+	edit_popup.add_item("Delete", 2)
+	edit_popup.id_pressed.connect(_on_edit_menu_id)
+	context_bar.add_child(edit_menu)
 
 
 func _on_draw_menu_id(id: int) -> void:
 	if id == 0:
+		_activate_draw_state()
+
+
+func _on_edit_menu_id(id: int) -> void:
+	_activate_edit_state()
+	if id == 1:
+		active_edit_mode = "move"
+	elif id == 2:
+		active_edit_mode = "delete"
+	canvas_view.set_edit_mode(active_edit_mode)
+
+
+func _activate_draw_state() -> void:
+	_set_active_state("draw")
+
+
+func _activate_edit_state() -> void:
+	_set_active_state("edit")
+
+
+func _set_active_state(state: String) -> void:
+	if selected_component_id.is_empty():
+		return
+	active_state = state
+	if state == "draw":
 		active_draw_tool = "line"
+		active_edit_mode = "select"
+		canvas_view.set_interaction_state("draw")
 		canvas_view.set_tool_mode(active_draw_tool)
+	else:
+		active_draw_tool = ""
+		active_edit_mode = "select"
+		canvas_view.set_interaction_state("edit")
+		canvas_view.set_edit_mode(active_edit_mode)
+		canvas_view.set_tool_mode("")
+	_render_context_bar()
 
 
 func _open_new_asset_dialog() -> void:
@@ -259,6 +323,7 @@ func _confirm_asset_creation() -> void:
 	assets.append({"id": asset_id, "name": asset_name, "components": []})
 	selected_asset_id = asset_id
 	selected_component_id = ""
+	active_state = ""
 	expanded_assets[asset_id] = true
 	asset_dialog.hide()
 	_render_outliner()
@@ -331,6 +396,8 @@ func _render_outliner() -> void:
 func _select_asset(asset_id: String) -> void:
 	selected_asset_id = asset_id
 	selected_component_id = ""
+	active_state = ""
+	canvas_view.set_interaction_state("")
 	expanded_assets[asset_id] = not bool(expanded_assets.get(asset_id, false))
 	_render_outliner()
 	_render_inspector()
@@ -364,6 +431,7 @@ func _confirm_component_creation() -> void:
 	asset["components"].append({"id": component_id, "name": component_name, "outer_shape": []})
 	selected_asset_id = asset_id
 	selected_component_id = component_id
+	active_state = ""
 	expanded_assets[asset_id] = true
 	component_dialog.hide()
 	_render_outliner()
@@ -388,6 +456,8 @@ func _has_component_name(asset: Dictionary, component_name: String) -> bool:
 func _select_component(asset_id: String, component_id: String) -> void:
 	selected_asset_id = asset_id
 	selected_component_id = component_id
+	active_state = ""
+	canvas_view.set_interaction_state("")
 	expanded_assets[asset_id] = true
 	_render_outliner()
 	_render_inspector()
@@ -489,6 +559,18 @@ func _on_line_completed(points: Array[Vector2]) -> void:
 		return
 	component["outer_shape"] = points
 	canvas_view.set_outer_shape(points)
+
+
+func _on_outer_shape_changed(points: Array[Vector2]) -> void:
+	var asset := _get_asset(selected_asset_id)
+	var component := _get_component(asset, selected_component_id)
+	if component.is_empty():
+		return
+	component["outer_shape"] = points.duplicate()
+
+
+func _on_point_selection_changed(_index: int) -> void:
+	pass
 
 
 func _get_asset(asset_id: String) -> Dictionary:

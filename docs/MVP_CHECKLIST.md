@@ -65,6 +65,12 @@ before implementing real creation tools.
       `Escape`.
 - [x] Close a draft by clicking near its first point once it has at least three
       points, then store and display it as the Component's `Outer Shape`.
+- [x] Show Draw and Edit states in the Context Bar with `1`/`2` shortcuts.
+- [x] Select an outer-shape point in Edit and display draggable X/Y move gizmo
+      handles.
+- [x] Move selected points with the gizmo and persist the changed contour.
+- [x] Delete the selected point with `Backspace` while preserving a minimum
+      three-point contour.
 - [x] Show an empty, canvas-first working area without fake asset previews.
 - [x] Show an empty, scrollable Inspector on the right.
 - [x] Let users resize the Outliner and Inspector independently with split
