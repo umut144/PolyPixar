@@ -1039,7 +1039,8 @@ func _render_outliner() -> void:
 			child_placeholder.custom_minimum_size = Vector2(16, 0)
 			component_row.add_child(child_placeholder)
 			var component_button := Button.new()
-			component_button.text = str(component["name"])
+			var component_name := str(component["name"])
+			component_button.text = component_name if bool(component.get("visibility", true)) else _strikethrough_text(component_name)
 			component_button.custom_minimum_size = Vector2(0, 30)
 			component_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			component_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
@@ -1047,6 +1048,14 @@ func _render_outliner() -> void:
 			_style_outliner_button(component_button, component_id == selected_component_id)
 			component_button.pressed.connect(_select_component.bind(asset_id, component_id))
 			component_row.add_child(component_button)
+
+
+func _strikethrough_text(text: String) -> String:
+	var result := ""
+	var strike_mark := String.chr(0x0336)
+	for character in text:
+		result += character + strike_mark
+	return result
 
 
 func _select_asset(asset_id: String) -> void:
@@ -1265,6 +1274,7 @@ func _on_component_visibility_changed(visible: bool) -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	if not component.is_empty():
 		component["visibility"] = visible
+		_render_outliner()
 		_render_canvas_context()
 
 
