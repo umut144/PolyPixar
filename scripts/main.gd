@@ -1349,7 +1349,10 @@ func _render_canvas_context() -> void:
 	canvas_context_label.text = "Component: %s" % str(component["name"])
 	canvas_view.set_context(str(component["name"]))
 	canvas_view.set_interaction_state(active_state)
-	canvas_view.set_component_transform(component.get("transform", _default_component_transform()))
+	var component_transform: Dictionary = component.get("transform", _default_component_transform()).duplicate(true)
+	component_transform["visibility"] = bool(component.get("visibility", true))
+	component_transform["z_index"] = int(component.get("z_index", 0))
+	canvas_view.set_component_transform(component_transform)
 	canvas_view.set_reference_shapes(_build_reference_shapes(asset, selected_component_id))
 	canvas_view.set_outer_shape(component["outer_shape"])
 
