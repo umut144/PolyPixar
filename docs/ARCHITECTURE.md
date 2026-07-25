@@ -138,8 +138,8 @@ transform rendering and gizmos remain separate follow-up steps. Phase 6 now
 exposes `CMD/Ctrl + 3` with Transform, Rotate, and Scale submodes; its initial
 gizmo is positioned at the Component Pivot. The `Transform` submode supports
 free, X-axis, and Y-axis translation with Snap. The `Rotate` submode now uses
-the Pivot-centered ring and Rotation Step; Scale interaction remains a
-follow-up step.
+the Pivot-centered ring and Rotation Step. The `Scale` submode now supports
+X-, Y-, and uniform corner handles around the Pivot.
 
 ## Confirmed UI direction
 
