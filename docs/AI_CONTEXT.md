@@ -94,6 +94,10 @@ Only Create has modules in the current shell. Style, Motion, Transform,
 Effects, and Export are present as empty category sections until their own
 work begins.
 
+The Main Toolbar currently contains an inert `New` menu with `Asset` and
+`Texture` entries. Selecting either entry has no effect yet; canvas switching
+is deliberately deferred until the menu interaction is reviewed.
+
 ## Documentation maintenance
 
 - Update `ARCHITECTURE.md` when a stable product boundary is decided.

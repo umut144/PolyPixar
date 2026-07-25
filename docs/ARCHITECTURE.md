@@ -104,7 +104,8 @@ The editor is organised around a canvas-first workspace:
 ```text
 left module rail        expandable Create / Style / Motion / Transform / Effects sections
 left context panel      current-context outliner
-Main Toolbar            global tools and direct actions
+Main Toolbar            global tools and direct actions; currently `New` with
+                        `Asset` and `Texture` menu entries
 Context Bar             settings and actions for the active tool or operation
 centre                  working area
 right                   inspector for selected objects

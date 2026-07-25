@@ -36,6 +36,14 @@ func _build_ui() -> void:
 	var toolbar := HBoxContainer.new()
 	toolbar.custom_minimum_size = Vector2(0, 32)
 	toolbar_panel.add_child(toolbar)
+	var new_menu := MenuButton.new()
+	new_menu.text = "New"
+	new_menu.custom_minimum_size = Vector2(72, 32)
+	new_menu.focus_mode = Control.FOCUS_NONE
+	var new_popup := new_menu.get_popup()
+	new_popup.add_item("Asset")
+	new_popup.add_item("Texture")
+	toolbar.add_child(new_menu)
 
 	var workspace_row := HBoxContainer.new()
 	workspace_row.size_flags_vertical = Control.SIZE_EXPAND_FILL

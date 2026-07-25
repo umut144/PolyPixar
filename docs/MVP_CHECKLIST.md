@@ -37,6 +37,8 @@ before implementing real creation tools.
       component; reserve the Outliner for real content hierarchy.
 - [x] Show empty structural Main Toolbar and Context Bar areas ready for real
       controls.
+- [x] Add an inert `New` menu to the Main Toolbar with `Asset` and `Texture`
+      entries.
 - [x] Show an empty, canvas-first working area without fake asset previews.
 - [x] Show an empty, scrollable Inspector on the right.
 - [x] Let users resize the Outliner and Inspector independently with split
