@@ -73,8 +73,10 @@ before implementing real creation tools.
 - [x] Select an outer-shape point in Edit and display draggable X/Y move gizmo
       handles.
 - [x] Move selected points with the gizmo and persist the changed contour.
+- [x] Move selected points freely in both axes with the central gizmo handle.
 - [x] Delete the selected point with `Backspace` while preserving a minimum
       three-point contour.
+- [x] Delete the selected point with `Delete` in Select mode.
 - [x] Show an empty, canvas-first working area without fake asset previews.
 - [x] Show an empty, scrollable Inspector on the right.
 - [x] Let users resize the Outliner and Inspector independently with split

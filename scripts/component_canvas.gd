@@ -14,6 +14,7 @@ const BASE_GRID_STEP := 32.0
 const CLOSE_DISTANCE_PIXELS := 14.0
 const GIZMO_AXIS_LENGTH := 42.0
 const HANDLE_HIT_RADIUS := 12.0
+const FREE_HANDLE_RADIUS := 10.0
 
 var view_center := Vector2.ZERO
 var zoom := 1.0
@@ -86,7 +87,7 @@ func _gui_input(event: InputEvent) -> void:
 			outer_shape_changed.emit(outer_shape.duplicate())
 		queue_redraw()
 	if event is InputEventKey and event.pressed and not event.echo:
-		if event.keycode == KEY_BACKSPACE and interaction_state == "edit" and selected_point_index >= 0 and outer_shape.size() > 3:
+		if (event.keycode == KEY_BACKSPACE or event.keycode == KEY_DELETE) and interaction_state == "edit" and selected_point_index >= 0 and outer_shape.size() > 3:
 			outer_shape.remove_at(selected_point_index)
 			selected_point_index = mini(selected_point_index, outer_shape.size() - 1)
 			point_selection_changed.emit(selected_point_index)
@@ -259,6 +260,7 @@ func _draw_move_gizmo(point: Vector2) -> void:
 	draw_line(point, y_end, Color("#6bcB77"), 2.0)
 	draw_circle(x_end, 7.0, Color("#e56b6f"))
 	draw_circle(y_end, 7.0, Color("#6bcB77"))
+	draw_rect(Rect2(point - Vector2(FREE_HANDLE_RADIUS, FREE_HANDLE_RADIUS), Vector2(FREE_HANDLE_RADIUS * 2.0, FREE_HANDLE_RADIUS * 2.0)), Color("#f2c94c"), false, 2.0)
 	draw_circle(point, 5.0, Color("#f2c94c"))
 
 
@@ -266,6 +268,8 @@ func _gizmo_axis_at(screen_position: Vector2) -> String:
 	if selected_point_index < 0 or selected_point_index >= outer_shape.size():
 		return ""
 	var point := _world_to_screen(outer_shape[selected_point_index])
+	if screen_position.distance_to(point) <= FREE_HANDLE_RADIUS:
+		return "free"
 	if screen_position.distance_to(point + Vector2(GIZMO_AXIS_LENGTH, 0.0)) <= HANDLE_HIT_RADIUS:
 		return "x"
 	if screen_position.distance_to(point + Vector2(0.0, -GIZMO_AXIS_LENGTH)) <= HANDLE_HIT_RADIUS:
