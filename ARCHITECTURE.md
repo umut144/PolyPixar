@@ -102,6 +102,35 @@ bottom                  compact status/info grid
 Export is a distinct, terminal action/area. The lower status grid can expand
 inside time-based workspaces when a local timeline needs more space.
 
+### UI construction
+
+The editor UI is assembled dynamically in GDScript from the current editor
+state and small, data-driven module/submodule definitions. This avoids a large,
+hand-maintained Control tree and lets the same state drive the module rail,
+toolbar, context/action bar, workspace, and inspector.
+
+The fixed shell may be created once, while context-sensitive regions are
+rebuilt or updated when the active state changes. The MVP needs only the
+simplest form of this pattern; it does not need a general UI framework.
+
+### Outliner
+
+The Outliner does not use Godot's `Tree` control. It is a scrollable vertical
+list of narrow button rows created from the current context.
+
+For a child entry, a small non-interactive placeholder is placed to the left of
+its button. Repeating the placeholder for deeper levels creates visual
+indentation without implementing tree behaviour in the UI skeleton.
+
+```text
+Asset
+  ├─ Shape
+  └─ Anchors
+```
+
+Expand/collapse behaviour is not part of the initial placeholder; the visual
+hierarchy is sufficient for the UX prototype.
+
 Tool settings and object properties have separate homes:
 
 - The context/action bar configures the active tool or a temporary operation.

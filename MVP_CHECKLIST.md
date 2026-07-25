@@ -19,11 +19,16 @@ Goal: test the navigation and workspace model with dummy content before
 implementing real creation tools.
 
 - [ ] Create the minimal Godot application/project structure.
+- [ ] Create the UI shell dynamically from code and dummy state definitions;
+      do not depend on a hand-authored module-specific Control tree.
 - [ ] Show a narrow left module rail with Create, Style, Motion, Transform,
       Effects, and Export.
 - [ ] Selecting a module expands its dummy submodules without adding a second
       global module menu.
-- [ ] Show a scrollable current-context Outliner in the left workspace panel.
+- [ ] Show a scrollable current-context Outliner in the left workspace panel
+      using narrow button rows rather than Godot's `Tree` control.
+- [ ] Represent dummy parent/child hierarchy with non-interactive indentation
+      placeholders to the left of child rows.
 - [ ] Show a top toolbar whose dummy tools change with the selected submodule.
 - [ ] Show a context/action bar whose dummy contents change with the active
       tool or operation.

@@ -60,6 +60,14 @@ It includes a scrollable Outliner, a scrollable Inspector, a central workspace,
 and a compact bottom status grid. Motion and Transform may display a dummy
 local timeline; Create and Style do not display one by default.
 
+The UI is dynamically assembled in GDScript from editor state and small
+definition lists. Do not build a large, manually maintained Control hierarchy
+for the module-specific UI.
+
+The Outliner is `ScrollContainer` + vertical button rows, not Godot's `Tree`
+control. Hierarchy is represented initially by non-interactive indentation
+placeholders to the left of child buttons.
+
 ## Documentation maintenance
 
 - Update `ARCHITECTURE.md` when a stable product boundary is decided.
