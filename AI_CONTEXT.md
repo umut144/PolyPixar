@@ -54,7 +54,7 @@ The skeleton should demonstrate the following navigation state changes without
 invented asset content:
 
 ```text
-module rail → submodule buttons in the Outliner → toolbar/context bar → workspace state
+module rail sections → submodule selection → toolbar/context bar → workspace state
 ```
 
 It includes a scrollable Outliner, a scrollable Inspector, a central workspace,
@@ -70,18 +70,17 @@ The UI is dynamically assembled in GDScript from editor state and small
 definition lists; the `tscn` scene remains a root host. Do not build a large,
 manually maintained Control hierarchy for the module-specific UI.
 
-Keep the initial skeleton visually sparse: no standalone labels, headings,
-descriptions, or status values. Use text only on interactive buttons.
+Keep the initial skeleton visually sparse. The Outliner and Inspector may have
+small contextual panel labels; avoid decorative descriptions and status values.
 
 Use PolyPixAAA as the visual reference: standard Godot control styling, 12px
 outer margin, 8px layout separation, and resizable split panes. Do not add
 custom button font/hover colours in the initial skeleton.
 
 The Outliner is `ScrollContainer` + an edge-to-edge vertical list of direct
-button rows, not Godot's `Tree` control. The active module's submodules are the
-only buttons in the initial skeleton. There are no margins, padding,
-indentation placeholders, or expand/collapse icons. Parent/child behaviour is
-added only when the first real hierarchy exists.
+button rows, not Godot's `Tree` control. Module navigation is handled by
+reusable expandable sections in the left module rail; submodules do not appear
+in the Outliner. There are no hierarchy icons or indentation placeholders.
 
 Only Create is active in the current shell. Style, Motion, Transform, Effects,
 and Export are inert buttons until their own work begins.

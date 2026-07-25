@@ -94,8 +94,8 @@ tested slice actually requires one.
 The editor is organised around a canvas-first workspace:
 
 ```text
-left module rail        Create / Style / Motion / Transform / Effects
-left context panel      submodule buttons and current-context outliner
+left module rail        expandable Create / Style / Motion / Transform / Effects sections
+left context panel      current-context outliner
 top toolbar             tools and direct actions
 context/action bar      settings for the active tool or operation
 centre                  working area
@@ -125,9 +125,9 @@ The fixed shell is created once, while context-sensitive regions are rebuilt or
 updated when the active state changes. The MVP needs only the simplest form of
 this pattern; it does not need a general UI framework.
 
-The first skeleton intentionally avoids standalone labels, headings,
-descriptions, and status text. Text is used only on interactive buttons where
-it identifies a possible action or an Outliner entry.
+The first skeleton stays visually sparse. Outliner and Inspector have small
+contextual labels; otherwise text is used only where it identifies an
+interactive control or current context.
 
 The visual baseline follows PolyPixAAA: regular Godot controls and their
 native hover/focus/pressed states. Do not add custom per-button colour or font
@@ -137,8 +137,8 @@ overrides unless a real interaction requires them.
 
 The Outliner does not use Godot's `Tree` control. It is a scrollable,
 edge-to-edge vertical list of narrow button rows created from the current
-context. The active module's submodule buttons appear at the top of this same
-list; there is no separate submodule panel.
+context. Module navigation lives in the left rail, so submodule buttons do not
+appear in the Outliner.
 
 An entry with children is a parent button. Clicking it toggles the visibility
 of its immediate child rows. No icon, glyph, indentation placeholder, margin,

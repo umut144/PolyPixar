@@ -4,13 +4,11 @@ const CREATE_SUBMODULES := ["Shapes", "Layers"]
 const INACTIVE_MODULES := ["Style", "Motion", "Transform", "Effects", "Export"]
 
 var active_create_submodule := "Shapes"
-var create_button: Button
 var outliner_list: VBoxContainer
 
 
 func _ready() -> void:
 	_build_ui()
-	_render_create_outliner()
 
 
 func _build_ui() -> void:
@@ -47,12 +45,11 @@ func _build_ui() -> void:
 	module_rail_panel.custom_minimum_size = Vector2(104, 0)
 	workspace_row.add_child(module_rail_panel)
 	var module_rail := VBoxContainer.new()
-	module_rail.custom_minimum_size = Vector2(104, 0)
 	module_rail.add_theme_constant_override("separation", 4)
 	module_rail_panel.add_child(module_rail)
-	create_button = _add_module_button(module_rail, "Create", true)
+	_add_module_section(module_rail, "Create", CREATE_SUBMODULES, true)
 	for module_name in INACTIVE_MODULES:
-		_add_module_button(module_rail, module_name, false)
+		_add_module_section(module_rail, module_name, [])
 
 	var workspace_split := HSplitContainer.new()
 	workspace_split.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -141,43 +138,12 @@ func _create_panel_label(text: String) -> Label:
 	return label
 
 
-func _add_module_button(parent: Container, text: String, is_active: bool) -> Button:
-	var button := Button.new()
-	button.text = text
-	button.custom_minimum_size = Vector2(0, 32)
-	button.focus_mode = Control.FOCUS_NONE
-	button.toggle_mode = is_active
-	button.button_pressed = is_active
-	if is_active:
-		button.pressed.connect(_activate_create)
-	parent.add_child(button)
-	return button
+func _add_module_section(parent: Container, module_name: String, submodules: Array, open_by_default := false) -> void:
+	var section := ModuleSection.new()
+	section.setup(module_name, submodules, open_by_default)
+	section.submodule_pressed.connect(_select_create_submodule)
+	parent.add_child(section)
 
 
-func _activate_create() -> void:
-	create_button.button_pressed = true
-	_render_create_outliner()
-
-
-func _render_create_outliner() -> void:
-	_clear(outliner_list)
-	for submodule in CREATE_SUBMODULES:
-		var button := Button.new()
-		button.text = submodule
-		button.custom_minimum_size = Vector2(0, 30)
-		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		button.focus_mode = Control.FOCUS_NONE
-		button.toggle_mode = true
-		button.button_pressed = submodule == active_create_submodule
-		button.pressed.connect(_select_create_submodule.bind(submodule))
-		outliner_list.add_child(button)
-
-
-func _select_create_submodule(submodule: String) -> void:
+func _select_create_submodule(_module_name: String, submodule: String) -> void:
 	active_create_submodule = submodule
-	_render_create_outliner()
-
-
-func _clear(container: Node) -> void:
-	for child in container.get_children():
-		child.queue_free()

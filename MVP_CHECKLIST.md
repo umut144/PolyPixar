@@ -25,13 +25,14 @@ before implementing real creation tools.
       Effects, and Export.
 - [ ] Keep Create as the only active module; all other main-module buttons are
       intentionally inert until their slice begins.
-- [ ] Selecting a module puts its submodule buttons at the top of the current
-      Outliner without adding a second global module menu.
+- [ ] Use expandable module sections in the left rail so submodules stay with
+      their parent module instead of appearing in the Outliner.
 - [ ] Show a scrollable current-context Outliner in the left workspace panel
       using narrow button rows rather than Godot's `Tree` control.
 - [ ] Keep every Outliner row as one direct, left-aligned button without
       margins, padding, indentation placeholders, or expand/collapse icons.
-- [ ] Add parent/child behaviour only with the first real content hierarchy.
+- [ ] Keep parent/child behaviour in a reusable section component for module
+      navigation; reserve the Outliner for real content hierarchy.
 - [ ] Show empty structural toolbar and context/action strips ready for real
       controls.
 - [ ] Show an empty, canvas-first working area without fake asset previews.
