@@ -22,6 +22,7 @@ var component_dialog: ConfirmationDialog
 var component_name_input: LineEdit
 var asset_name_editor: LineEdit
 var component_name_editor: LineEdit
+var transform_fields: Dictionary = {}
 var canvas_context_label: Label
 var canvas_view: ComponentCanvas
 var context_bar: HBoxContainer
@@ -1150,6 +1151,7 @@ func _style_outliner_button(button: Button, selected: bool) -> void:
 
 func _render_inspector() -> void:
 	_clear(inspector_content)
+	transform_fields.clear()
 	inspector_content.add_child(_create_panel_label("Inspector"))
 	var asset := _get_asset(selected_asset_id)
 	if asset.is_empty():
@@ -1228,6 +1230,7 @@ func _add_transform_field(grid: GridContainer, label_text: String, value: float,
 	field.value = value
 	field.custom_minimum_size = Vector2(96, 28)
 	field.value_changed.connect(_on_transform_value_changed.bind(property_name))
+	transform_fields[property_name] = field
 	grid.add_child(field)
 
 
@@ -1386,6 +1389,22 @@ func _on_transform_changed(transform: Dictionary) -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	if not component.is_empty():
 		component["transform"] = transform.duplicate(true)
+		var position: Vector2 = transform.get("position", Vector2.ZERO)
+		var scale: Vector2 = transform.get("scale", Vector2.ONE)
+		var pivot: Vector2 = transform.get("pivot", Vector2.ZERO)
+		var values := {
+			"position_x": position.x,
+			"position_y": position.y,
+			"rotation": float(transform.get("rotation", 0.0)),
+			"scale_x": scale.x,
+			"scale_y": scale.y,
+			"pivot_x": pivot.x,
+			"pivot_y": pivot.y
+		}
+		for property_name in values:
+			var field = transform_fields.get(property_name)
+			if is_instance_valid(field):
+				field.set_value_no_signal(float(values[property_name]))
 
 
 func _on_reference_component_selected(component_id: String) -> void:
