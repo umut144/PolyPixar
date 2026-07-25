@@ -124,6 +124,12 @@ Clicking near the first point closes a draft with at least three points; the
 closed Polyline is stored as the Component's `Outer Shape` and rendered in
 cyan. This is still in-memory only.
 
+When an Asset (rather than a Component) is selected, the Shapes canvas shows
+all of its completed component contours together. Clicking inside a contour or
+near one of its edges selects that Component. The selected Component then
+renders as the active contour while the other components remain visible as
+transparent background references.
+
 ## Documentation maintenance
 
 - Update `ARCHITECTURE.md` when a stable product boundary is decided.

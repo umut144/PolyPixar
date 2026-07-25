@@ -78,6 +78,9 @@ before implementing real creation tools.
       three-point contour.
 - [x] Delete the selected point with `Delete` in Select mode.
 - [x] Show an empty, canvas-first working area without fake asset previews.
+- [x] Show all completed component contours in the selected Asset canvas.
+- [x] Select a Component by clicking its contour in the Asset canvas and keep
+      other components as transparent references.
 - [x] Show an empty, scrollable Inspector on the right.
 - [x] Let users resize the Outliner and Inspector independently with split
       handles while keeping the module rail fixed.

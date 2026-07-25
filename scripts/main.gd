@@ -158,6 +158,7 @@ func _build_ui() -> void:
 	canvas_view = ComponentCanvas.new()
 	canvas_view.line_completed.connect(_on_line_completed)
 	canvas_view.outer_shape_changed.connect(_on_outer_shape_changed)
+	canvas_view.reference_component_selected.connect(_on_reference_component_selected)
 	var canvas := canvas_view
 	canvas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -596,22 +597,42 @@ func _render_canvas_context() -> void:
 	if asset.is_empty():
 		canvas_context_label.text = ""
 		canvas_view.set_context("")
+		canvas_view.set_interaction_state("")
+		canvas_view.set_reference_shapes([])
 		canvas_view.set_outer_shape([])
 		return
 	if selected_component_id.is_empty():
 		canvas_context_label.text = "Asset: %s" % str(asset["name"])
 		canvas_view.set_context(str(asset["name"]))
+		canvas_view.set_interaction_state("asset")
+		canvas_view.set_reference_shapes(_build_reference_shapes(asset))
 		canvas_view.set_outer_shape([])
 		return
 	var component := _get_component(asset, selected_component_id)
 	if component.is_empty():
 		canvas_context_label.text = "Asset: %s" % str(asset["name"])
 		canvas_view.set_context(str(asset["name"]))
+		canvas_view.set_interaction_state("asset")
+		canvas_view.set_reference_shapes(_build_reference_shapes(asset))
 		canvas_view.set_outer_shape([])
 		return
 	canvas_context_label.text = "Component: %s" % str(component["name"])
 	canvas_view.set_context(str(component["name"]))
+	canvas_view.set_interaction_state(active_state)
+	canvas_view.set_reference_shapes(_build_reference_shapes(asset, selected_component_id))
 	canvas_view.set_outer_shape(component["outer_shape"])
+
+
+func _build_reference_shapes(asset: Dictionary, excluded_component_id := "") -> Array:
+	var shapes: Array = []
+	for component in asset["components"]:
+		if str(component["id"]) == excluded_component_id:
+			continue
+		shapes.append({
+			"id": str(component["id"]),
+			"points": component["outer_shape"].duplicate()
+		})
+	return shapes
 
 
 func _on_line_completed(points: Array[Vector2]) -> void:
@@ -629,6 +650,15 @@ func _on_outer_shape_changed(points: Array[Vector2]) -> void:
 	if component.is_empty():
 		return
 	component["outer_shape"] = points.duplicate()
+
+
+func _on_reference_component_selected(component_id: String) -> void:
+	if selected_asset_id.is_empty():
+		return
+	var component := _get_component(_get_asset(selected_asset_id), component_id)
+	if component.is_empty():
+		return
+	_select_component(selected_asset_id, component_id)
 
 
 func _on_point_selection_changed(_index: int) -> void:

@@ -5,6 +5,7 @@ signal line_draft_changed(points: Array[Vector2])
 signal line_completed(points: Array[Vector2])
 signal point_selection_changed(index: int)
 signal outer_shape_changed(points: Array[Vector2])
+signal reference_component_selected(component_id: String)
 
 const PAN_SPEED := 420.0
 const MIN_ZOOM := 0.25
@@ -24,6 +25,7 @@ var interaction_state := ""
 var edit_mode := "select"
 var line_draft: Array[Vector2] = []
 var outer_shape: Array[Vector2] = []
+var reference_shapes: Array[Dictionary] = []
 var cursor_world := Vector2.ZERO
 var cursor_over_canvas := false
 var selected_point_index := -1
@@ -69,6 +71,10 @@ func _gui_input(event: InputEvent) -> void:
 			else:
 				clear_selection()
 			queue_redraw()
+		elif event.button_index == MOUSE_BUTTON_LEFT and interaction_state == "asset":
+			var component_id := _reference_component_at(_screen_to_world(event.position))
+			if not component_id.is_empty():
+				reference_component_selected.emit(component_id)
 	if event is InputEventMouseButton and not event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		drag_axis = ""
 	if event is InputEventMouseMotion:
@@ -133,6 +139,14 @@ func set_interaction_state(state: String) -> void:
 	interaction_state = state
 	if state != "edit":
 		clear_selection()
+	queue_redraw()
+
+
+func set_reference_shapes(shapes: Array) -> void:
+	reference_shapes.clear()
+	for shape in shapes:
+		if shape is Dictionary:
+			reference_shapes.append(shape.duplicate(true))
 	queue_redraw()
 
 
@@ -231,8 +245,41 @@ func _draw() -> void:
 	var axis_color := Color("#46505e")
 	draw_line(_world_to_screen(Vector2(min_world.x, 0.0)), _world_to_screen(Vector2(max_world.x, 0.0)), axis_color, 1.0)
 	draw_line(_world_to_screen(Vector2(0.0, min_world.y)), _world_to_screen(Vector2(0.0, max_world.y)), axis_color, 1.0)
+	_draw_reference_shapes()
 	_draw_outer_shape()
 	_draw_line_draft()
+
+
+func _draw_reference_shapes() -> void:
+	for shape in reference_shapes:
+		var points: Array = shape.get("points", [])
+		if points.size() < 3:
+			continue
+		var reference_color := Color("#55c7d966")
+		for index in range(points.size()):
+			var next_index := (index + 1) % points.size()
+			draw_line(_world_to_screen(points[index]), _world_to_screen(points[next_index]), reference_color, 2.0)
+		for point in points:
+			draw_circle(_world_to_screen(point), 3.0, reference_color)
+
+
+func _reference_component_at(world_position: Vector2) -> String:
+	var nearest_id := ""
+	var nearest_distance := 14.0
+	for shape in reference_shapes:
+		var points: Array = shape.get("points", [])
+		if points.size() < 3:
+			continue
+		if Geometry2D.is_point_in_polygon(world_position, PackedVector2Array(points)):
+			return str(shape.get("id", ""))
+		for index in range(points.size()):
+			var next_index := (index + 1) % points.size()
+			var closest := Geometry2D.get_closest_point_to_segment(world_position, points[index], points[next_index])
+			var distance := world_position.distance_to(closest)
+			if distance < nearest_distance:
+				nearest_distance = distance
+				nearest_id = str(shape.get("id", ""))
+	return nearest_id
 
 
 func _draw_outer_shape() -> void:
