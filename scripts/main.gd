@@ -207,6 +207,7 @@ func _build_ui() -> void:
 	canvas_view.line_completed.connect(_on_line_completed)
 	canvas_view.outer_shape_changed.connect(_on_outer_shape_changed)
 	canvas_view.reference_component_selected.connect(_on_reference_component_selected)
+	canvas_view.pivot_changed.connect(_on_pivot_changed)
 	var canvas := canvas_view
 	canvas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -1252,6 +1253,7 @@ func _render_canvas_context() -> void:
 		canvas_view.set_context("")
 		canvas_view.set_interaction_state("")
 		canvas_view.set_tool_mode("")
+		canvas_view.set_component_transform({})
 		canvas_view.set_reference_shapes([])
 		canvas_view.set_outer_shape([])
 		return
@@ -1260,6 +1262,7 @@ func _render_canvas_context() -> void:
 		canvas_view.set_context(str(asset["name"]))
 		canvas_view.set_interaction_state("asset")
 		canvas_view.set_tool_mode("")
+		canvas_view.set_component_transform({})
 		canvas_view.set_reference_shapes(_build_reference_shapes(asset))
 		canvas_view.set_outer_shape([])
 		return
@@ -1269,12 +1272,14 @@ func _render_canvas_context() -> void:
 		canvas_view.set_context(str(asset["name"]))
 		canvas_view.set_interaction_state("asset")
 		canvas_view.set_tool_mode("")
+		canvas_view.set_component_transform({})
 		canvas_view.set_reference_shapes(_build_reference_shapes(asset))
 		canvas_view.set_outer_shape([])
 		return
 	canvas_context_label.text = "Component: %s" % str(component["name"])
 	canvas_view.set_context(str(component["name"]))
 	canvas_view.set_interaction_state(active_state)
+	canvas_view.set_component_transform(component.get("transform", _default_component_transform()))
 	canvas_view.set_reference_shapes(_build_reference_shapes(asset, selected_component_id))
 	canvas_view.set_outer_shape(component["outer_shape"])
 
@@ -1306,6 +1311,15 @@ func _on_outer_shape_changed(points: Array[Vector2]) -> void:
 	if component.is_empty():
 		return
 	component["outer_shape"] = points.duplicate()
+
+
+func _on_pivot_changed(pivot: Vector2) -> void:
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if component.is_empty():
+		return
+	var transform: Dictionary = component.get("transform", _default_component_transform())
+	transform["pivot"] = pivot
+	component["transform"] = transform
 
 
 func _on_reference_component_selected(component_id: String) -> void:

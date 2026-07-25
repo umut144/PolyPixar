@@ -97,6 +97,7 @@ before implementing real creation tools.
       in schema-versioned Workspace JSON.
 - [x] Expose Component transform, visibility, and z-index fields in the
       Inspector.
+- [x] Display and drag the selected Component's local Pivot with Snap support.
 - [x] Show an empty, scrollable Inspector on the right.
 - [x] Let users resize the Outliner and Inspector independently with split
       handles while keeping the module rail fixed.

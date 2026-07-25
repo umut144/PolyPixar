@@ -128,11 +128,12 @@ intersection of the full horizontal and vertical axes. Component
 geometry remains in local coordinates; later Transform data will map it into
 the canvas coordinate space without rewriting the stored contour points.
 
-The origin, Snap settings, and Transform data phases are complete. Transform
-data is now stored per Component as position, rotation, scale, and pivot, with
-visibility and z-index alongside it. The Inspector exposes these values as
-numeric fields and a visibility toggle; rendering and gizmos remain separate
-follow-up steps.
+The origin, Snap settings, Transform data, and Pivot phases are complete.
+Transform data is stored per Component as position, rotation, scale, and pivot,
+with visibility and z-index alongside it. The Inspector exposes these values as
+numeric fields and a visibility toggle. The selected Component's local Pivot is
+visible in the Canvas and can be dragged with the active Snap settings; full
+transform rendering and gizmos remain separate follow-up steps.
 
 ## Confirmed UI direction
 

@@ -153,8 +153,8 @@ The current Transform & Snap Foundation milestone begins with the world origin
 left-aligned Snap popover with On/Off, Grid Step, and Rotation Step controls;
 the settings are workspace-persistent. Phase 3 stores Component transform data
 (position, rotation, scale, pivot) plus visibility and z-index. Phase 4 exposes
-these values in the Component Inspector; visual transform rendering remains a
-later step.
+these values in the Component Inspector. Phase 5 displays and edits the local
+Pivot with Snap support; full transform rendering remains a later step.
 
 ## Documentation maintenance
 

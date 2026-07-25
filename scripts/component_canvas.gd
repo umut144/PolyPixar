@@ -6,6 +6,7 @@ signal line_completed(points: Array[Vector2])
 signal point_selection_changed(index: int)
 signal outer_shape_changed(points: Array[Vector2])
 signal reference_component_selected(component_id: String)
+signal pivot_changed(pivot: Vector2)
 
 const PAN_SPEED := 420.0
 const MIN_ZOOM := 0.25
@@ -36,6 +37,13 @@ var add_preview_visible := false
 var snap_enabled := true
 var grid_step := 16.0
 var rotation_step := 15.0
+var component_transform: Dictionary = {
+	"position": Vector2.ZERO,
+	"rotation": 0.0,
+	"scale": Vector2.ONE,
+	"pivot": Vector2.ZERO
+}
+var pivot_dragging := false
 
 
 func _ready() -> void:
@@ -60,7 +68,12 @@ func _gui_input(event: InputEvent) -> void:
 			line_draft.append(snapped_point)
 			line_draft_changed.emit(line_draft)
 			queue_redraw()
-		elif event.button_index == MOUSE_BUTTON_LEFT and interaction_state == "edit":
+		elif event.button_index == MOUSE_BUTTON_LEFT and (interaction_state == "edit" or interaction_state.is_empty()):
+			if _is_near_pivot(event.position):
+				pivot_dragging = true
+				return
+			if interaction_state.is_empty():
+				return
 			if edit_mode == "add":
 				return
 			var gizmo_axis := _gizmo_axis_at(event.position)
@@ -80,9 +93,16 @@ func _gui_input(event: InputEvent) -> void:
 				reference_component_selected.emit(component_id)
 	if event is InputEventMouseButton and not event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		drag_axis = ""
+		pivot_dragging = false
 	if event is InputEventMouseMotion:
 		cursor_over_canvas = true
 		cursor_world = _snap_to_grid(_screen_to_world(event.position))
+		if pivot_dragging:
+			var pivot := _snap_to_grid(_screen_to_world(event.position))
+			component_transform["pivot"] = pivot
+			pivot_changed.emit(pivot)
+			queue_redraw()
+			return
 		if interaction_state == "edit" and edit_mode == "add":
 			_update_add_preview(event.position)
 		if interaction_state == "edit" and selected_point_index >= 0 and drag_axis != "":
@@ -164,6 +184,13 @@ func set_snap_settings(enabled: bool, new_grid_step: float, new_rotation_step: f
 	snap_enabled = enabled
 	grid_step = maxf(new_grid_step, 1.0)
 	rotation_step = maxf(new_rotation_step, 1.0)
+	queue_redraw()
+
+
+func set_component_transform(transform: Dictionary) -> void:
+	component_transform = transform.duplicate(true)
+	if not component_transform.has("pivot") or not component_transform["pivot"] is Vector2:
+		component_transform["pivot"] = Vector2.ZERO
 	queue_redraw()
 
 
@@ -259,7 +286,26 @@ func _draw() -> void:
 	draw_line(_world_to_screen(Vector2(0.0, min_world.y)), _world_to_screen(Vector2(0.0, max_world.y)), y_axis_color, 2.0)
 	_draw_reference_shapes()
 	_draw_outer_shape()
+	_draw_pivot()
 	_draw_line_draft()
+
+
+func _draw_pivot() -> void:
+	if context_name.is_empty() or interaction_state == "asset":
+		return
+	var pivot: Vector2 = component_transform.get("pivot", Vector2.ZERO)
+	var pivot_screen := _world_to_screen(pivot)
+	var pivot_color := Color("#d98cff")
+	draw_circle(pivot_screen, 7.0, pivot_color, false, 2.0)
+	draw_line(pivot_screen - Vector2(11.0, 0.0), pivot_screen + Vector2(11.0, 0.0), pivot_color, 1.0)
+	draw_line(pivot_screen - Vector2(0.0, 11.0), pivot_screen + Vector2(0.0, 11.0), pivot_color, 1.0)
+
+
+func _is_near_pivot(screen_position: Vector2) -> bool:
+	if context_name.is_empty() or interaction_state == "asset":
+		return false
+	var pivot: Vector2 = component_transform.get("pivot", Vector2.ZERO)
+	return screen_position.distance_to(_world_to_screen(pivot)) <= 12.0
 
 
 func _draw_reference_shapes() -> void:
