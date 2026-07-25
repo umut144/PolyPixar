@@ -5,6 +5,7 @@ const INACTIVE_MODULES := ["Style", "Motion", "Transform", "Effects", "Export"]
 const WORKSPACES_ROOT := "res://workspaces"
 const CONFIG_PATH := "res://configs/app_config.json"
 const SCHEMA_VERSION := 2
+const MAX_HISTORY_SIZE := 100
 
 var active_create_submodule := "Shapes"
 var outliner_list: VBoxContainer
@@ -49,10 +50,19 @@ var workspace_name_input: LineEdit
 var load_workspace_dialog: ConfirmationDialog
 var workspace_list: ItemList
 var pending_save_after_new := false
+var undo_history: Array[Dictionary] = []
+var redo_history: Array[Dictionary] = []
+var history_coalesce_timer: Timer
+var history_coalescing := false
 
 
 func _ready() -> void:
 	_build_ui()
+	history_coalesce_timer = Timer.new()
+	history_coalesce_timer.one_shot = true
+	history_coalesce_timer.wait_time = 0.25
+	history_coalesce_timer.timeout.connect(_finish_history_coalescing)
+	add_child(history_coalesce_timer)
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
@@ -73,6 +83,13 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	var has_command_modifier: bool = event.meta_pressed or event.ctrl_pressed
 	if has_command_modifier and event.keycode == KEY_S:
 		_save_workspace()
+		get_viewport().set_input_as_handled()
+		return
+	if has_command_modifier and event.keycode == KEY_Z:
+		if event.shift_pressed:
+			_redo()
+		else:
+			_undo()
 		get_viewport().set_input_as_handled()
 		return
 	if selected_component_id.is_empty():
@@ -590,6 +607,78 @@ func _save_workspace() -> void:
 	_show_status_message("Saved Workspace: %s!" % workspace_name)
 
 
+func _capture_history_snapshot() -> Dictionary:
+	return {
+		"assets": assets.duplicate(true),
+		"next_asset_id": next_asset_id,
+		"next_component_id": next_component_id,
+		"selected_asset_id": selected_asset_id,
+		"selected_component_id": selected_component_id,
+		"expanded_assets": expanded_assets.duplicate(true)
+	}
+
+
+func _push_undo_snapshot() -> void:
+	undo_history.append(_capture_history_snapshot())
+	if undo_history.size() > MAX_HISTORY_SIZE:
+		undo_history.pop_front()
+	redo_history.clear()
+
+
+func _record_direct_change() -> void:
+	history_coalescing = false
+	history_coalesce_timer.stop()
+	_push_undo_snapshot()
+
+
+func _record_coalesced_change() -> void:
+	if not history_coalescing:
+		_push_undo_snapshot()
+		history_coalescing = true
+	history_coalesce_timer.start()
+
+
+func _finish_history_coalescing() -> void:
+	history_coalescing = false
+
+
+func _restore_history_snapshot(snapshot: Dictionary) -> void:
+	assets = snapshot.get("assets", []).duplicate(true)
+	next_asset_id = int(snapshot.get("next_asset_id", 1))
+	next_component_id = int(snapshot.get("next_component_id", 1))
+	selected_asset_id = str(snapshot.get("selected_asset_id", ""))
+	selected_component_id = str(snapshot.get("selected_component_id", ""))
+	expanded_assets = snapshot.get("expanded_assets", {}).duplicate(true)
+	if _get_asset(selected_asset_id).is_empty():
+		selected_asset_id = ""
+		selected_component_id = ""
+	elif not selected_component_id.is_empty() and _get_component(_get_asset(selected_asset_id), selected_component_id).is_empty():
+		selected_component_id = ""
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _undo() -> void:
+	if undo_history.is_empty():
+		return
+	history_coalescing = false
+	history_coalesce_timer.stop()
+	redo_history.append(_capture_history_snapshot())
+	var snapshot: Dictionary = undo_history.pop_back()
+	_restore_history_snapshot(snapshot)
+
+
+func _redo() -> void:
+	if redo_history.is_empty():
+		return
+	history_coalescing = false
+	history_coalesce_timer.stop()
+	undo_history.append(_capture_history_snapshot())
+	var snapshot: Dictionary = redo_history.pop_back()
+	_restore_history_snapshot(snapshot)
+
+
 func _show_status_message(message: String) -> void:
 	if not is_instance_valid(program_status_label):
 		return
@@ -973,6 +1062,7 @@ func _submit_asset_name(_submitted_text: String) -> void:
 
 
 func _confirm_asset_creation() -> void:
+	_record_direct_change()
 	var asset_name := asset_name_input.text.strip_edges()
 	if asset_name.is_empty():
 		asset_name = _next_default_asset_name()
@@ -1090,6 +1180,7 @@ func _confirm_component_creation() -> void:
 	if asset.is_empty():
 		component_dialog.hide()
 		return
+	_record_direct_change()
 	var component_name := component_name_input.text.strip_edges()
 	if component_name.is_empty():
 		component_name = _next_default_component_name(asset)
@@ -1247,6 +1338,7 @@ func _on_transform_value_changed(value: float, property_name: String) -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	if component.is_empty():
 		return
+	_record_direct_change()
 	var transform: Dictionary = component.get("transform", _default_component_transform())
 	var position: Vector2 = transform.get("position", Vector2.ZERO)
 	var scale: Vector2 = transform.get("scale", Vector2.ONE)
@@ -1273,6 +1365,7 @@ func _on_transform_value_changed(value: float, property_name: String) -> void:
 func _on_component_visibility_changed(visible: bool) -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	if not component.is_empty():
+		_record_direct_change()
 		component["visibility"] = visible
 		_render_outliner()
 		_render_canvas_context()
@@ -1281,6 +1374,7 @@ func _on_component_visibility_changed(visible: bool) -> void:
 func _on_component_z_index_changed(value: float) -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	if not component.is_empty():
+		_record_direct_change()
 		component["z_index"] = int(value)
 		_render_canvas_context()
 
@@ -1293,6 +1387,9 @@ func _rename_selected_asset(new_name: String) -> void:
 	if asset_name.is_empty():
 		asset_name_editor.text = str(asset["name"])
 		return
+	if asset_name == str(asset["name"]):
+		return
+	_record_direct_change()
 	asset["name"] = asset_name
 	_render_outliner()
 	_render_canvas_context()
@@ -1307,6 +1404,9 @@ func _rename_selected_component(new_name: String) -> void:
 	if component_name.is_empty():
 		component_name_editor.text = str(component["name"])
 		return
+	if component_name == str(component["name"]):
+		return
+	_record_direct_change()
 	component["name"] = component_name
 	_render_outliner()
 	_render_canvas_context()
@@ -1377,6 +1477,7 @@ func _on_line_completed(points: Array[Vector2]) -> void:
 	var component := _get_component(asset, selected_component_id)
 	if component.is_empty():
 		return
+	_record_direct_change()
 	component["outer_shape"] = points
 	canvas_view.set_outer_shape(points)
 
@@ -1386,6 +1487,7 @@ func _on_outer_shape_changed(points: Array[Vector2]) -> void:
 	var component := _get_component(asset, selected_component_id)
 	if component.is_empty():
 		return
+	_record_coalesced_change()
 	component["outer_shape"] = points.duplicate()
 
 
@@ -1393,6 +1495,7 @@ func _on_pivot_changed(pivot: Vector2) -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	if component.is_empty():
 		return
+	_record_coalesced_change()
 	var transform: Dictionary = component.get("transform", _default_component_transform())
 	transform["pivot"] = pivot
 	component["transform"] = transform
@@ -1401,6 +1504,7 @@ func _on_pivot_changed(pivot: Vector2) -> void:
 func _on_transform_changed(transform: Dictionary) -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	if not component.is_empty():
+		_record_coalesced_change()
 		component["transform"] = transform.duplicate(true)
 		var position: Vector2 = transform.get("position", Vector2.ZERO)
 		var scale: Vector2 = transform.get("scale", Vector2.ONE)

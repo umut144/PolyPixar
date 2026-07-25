@@ -145,6 +145,12 @@ transformed references, hidden components are omitted, and clicking a
 transformed reference selects the corresponding Component. The selected
 Component remains a clear editing overlay in the Canvas.
 
+Undo/Redo is intentionally implicit and has no visible UI controls. The editor
+uses in-memory document snapshots, with `CMD/Ctrl + Z` for Undo and
+`CMD/Ctrl + Shift + Z` for Redo. Continuous contour and transform drags are
+coalesced into one history entry; the history is not persisted with a
+Workspace.
+
 ## Confirmed UI direction
 
 The editor is organised around a canvas-first workspace:

@@ -91,6 +91,9 @@ before implementing real creation tools.
 - [x] Save the active Workspace with `CMD/Ctrl + S` and show a temporary yellow
       confirmation in the program-status region.
 - [x] Persist and restore Outliner selection and Asset expansion state.
+- [x] Add hidden snapshot-based Undo/Redo with `CMD/Ctrl + Z` and
+      `CMD/Ctrl + Shift + Z`; coalesce continuous drag edits and keep the
+      history in memory only.
 - [x] Transform & Snap Foundation: mark the world origin and full canvas axes.
 - [x] Add a persistent Snap popover with On/Off, Grid Step, and Rotation Step.
 - [x] Store Component position, rotation, scale, pivot, visibility, and z-index
