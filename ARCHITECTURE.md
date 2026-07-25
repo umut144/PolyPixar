@@ -15,8 +15,9 @@ only when the next demonstrable result requires it.
 
 ## Technology baseline
 
-The MVP is built with **Godot 4.7.1**. The exact project layout and persistence
-format are still open until the UI skeleton begins.
+The MVP is built with **Godot 4.7.1**. The UI skeleton uses a minimal Godot
+layout: `project.godot`, one root scene, and a dynamic GDScript UI entry point.
+Persistence format remains open.
 
 ## Working rule: minimum necessary capability
 
@@ -155,7 +156,7 @@ Tool settings and object properties have separate homes:
 
 The following topics are intentionally not decided yet:
 
-- Godot project structure and persistence format
+- Persistence format
 - Exact submodule names and which ones are visible in the first prototype
 - Whether a future multi-asset playback container is called Scene, Sequence,
   Stage, or is needed at all

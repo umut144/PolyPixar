@@ -20,7 +20,7 @@ The current implementation target is not a functional morphing engine.
 ## Technology baseline
 
 - Engine: **Godot 4.7.1**
-- Project layout: not decided yet
+- Project layout: `project.godot`, `scenes/main.tscn`, and `scripts/main.gd`
 
 ## Confirmed vocabulary
 
@@ -79,7 +79,6 @@ expand/collapse rather than selection.
 
 ## Current open questions
 
-- Which project layout should the skeleton use?
 - Which exact submodules should appear in the first UI prototype?
 - Should Export appear as a lower rail item, a top-level action, or both?
 - How much of the lower status grid should be interactive in the prototype?
