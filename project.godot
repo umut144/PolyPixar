@@ -11,9 +11,9 @@ config_version=5
 [application]
 
 config/name="AssetFlow2D"
-config/icon="res://assets/assetflow_icon.png"
 run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.7")
+config/icon="res://assets/assetflow_icon.png"
 
 [display]
 
@@ -22,7 +22,7 @@ window/size/viewport_height=1080
 window/size/window_width_override=1920
 window/size/window_height_override=1080
 window/stretch/mode="canvas_items"
-window/stretch/aspect="expand"
+window/stretch/aspect="keep"
 
 [dotnet]
 
