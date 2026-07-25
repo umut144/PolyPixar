@@ -114,6 +114,10 @@ The fixed shell may be created once, while context-sensitive regions are
 rebuilt or updated when the active state changes. The MVP needs only the
 simplest form of this pattern; it does not need a general UI framework.
 
+The first skeleton intentionally avoids standalone labels, headings,
+descriptions, and status text. Text is used only on interactive buttons where
+it identifies a possible action or an Outliner entry.
+
 ### Outliner
 
 The Outliner does not use Godot's `Tree` control. It is a scrollable vertical

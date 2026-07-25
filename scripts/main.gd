@@ -72,7 +72,6 @@ var active_module_id := "create"
 var active_submodule := "Shapes"
 var active_tool := "Select"
 var selected_outline_item := "hat_shape"
-var status_message := "Ready for UX review"
 var expanded_outline := {
 	"hat": true,
 	"star": true,
@@ -87,11 +86,6 @@ var toolbar_tools: HBoxContainer
 var action_controls: HBoxContainer
 var workspace_content: VBoxContainer
 var inspector_content: VBoxContainer
-var status_document: Label
-var status_info: Label
-var status_coordinates: Label
-var toolbar_context: Label
-var action_context: Label
 
 
 func _ready() -> void:
@@ -113,23 +107,13 @@ func _build_shell() -> void:
 	toolbar.add_theme_constant_override("separation", 10)
 	toolbar_margin.add_child(toolbar)
 
-	var app_name := _label("AssetFlow2D", TEXT, 18)
-	app_name.custom_minimum_size = Vector2(138, 0)
-	toolbar.add_child(app_name)
-	var divider := VSeparator.new()
-	toolbar.add_child(divider)
-	toolbar_context = _label("Asset / Wizard Hat", MUTED, 14)
-	toolbar_context.custom_minimum_size = Vector2(190, 0)
-	toolbar.add_child(toolbar_context)
-	var second_divider := VSeparator.new()
-	toolbar.add_child(second_divider)
 	toolbar_tools = HBoxContainer.new()
 	toolbar_tools.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	toolbar_tools.add_theme_constant_override("separation", 6)
 	toolbar.add_child(toolbar_tools)
 	var preview_button := _button("▶ Preview", false)
 	preview_button.tooltip_text = "Placeholder preview action"
-	preview_button.pressed.connect(_set_status.bind("Preview is a UI placeholder."))
+	preview_button.pressed.connect(_noop)
 	toolbar.add_child(preview_button)
 	var export_button := _button("Export", false)
 	export_button.pressed.connect(_activate_module.bind("export"))
@@ -157,12 +141,10 @@ func _build_shell() -> void:
 	context_stack.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	context_stack.add_theme_constant_override("separation", 8)
 	context_margin.add_child(context_stack)
-	context_stack.add_child(_section_heading("WORKSPACE"))
 	submodule_list = VBoxContainer.new()
 	submodule_list.add_theme_constant_override("separation", 4)
 	context_stack.add_child(submodule_list)
 	context_stack.add_child(HSeparator.new())
-	context_stack.add_child(_section_heading("OUTLINER"))
 	var outliner_scroll := ScrollContainer.new()
 	outliner_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	outliner_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -184,9 +166,6 @@ func _build_shell() -> void:
 	var action_row := HBoxContainer.new()
 	action_row.add_theme_constant_override("separation", 8)
 	action_margin.add_child(action_row)
-	action_context = _label("Tool settings", MUTED, 13)
-	action_context.custom_minimum_size = Vector2(130, 0)
-	action_row.add_child(action_context)
 	action_controls = HBoxContainer.new()
 	action_controls.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	action_controls.add_theme_constant_override("separation", 6)
@@ -207,7 +186,6 @@ func _build_shell() -> void:
 	var inspector_stack := VBoxContainer.new()
 	inspector_stack.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	inspector_margin.add_child(inspector_stack)
-	inspector_stack.add_child(_section_heading("INSPECTOR"))
 	var inspector_scroll := ScrollContainer.new()
 	inspector_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	inspector_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -218,19 +196,19 @@ func _build_shell() -> void:
 	inspector_scroll.add_child(inspector_content)
 
 	var status_panel := _panel(PANEL_ALT)
-	status_panel.custom_minimum_size = Vector2(0, 34)
+	status_panel.custom_minimum_size = Vector2(0, 16)
 	root.add_child(status_panel)
 	var status_row := HBoxContainer.new()
 	status_row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	status_row.add_theme_constant_override("separation", 1)
 	status_panel.add_child(status_row)
-	status_document = _status_cell("Document  •  Hat to Star Prototype", 280)
-	status_info = _status_cell("Ready", 0)
-	status_info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	status_coordinates = _status_cell("Zoom 100%   X: 248   Y: 126", 270)
-	status_row.add_child(status_document)
-	status_row.add_child(status_info)
-	status_row.add_child(status_coordinates)
+	var left_status := _status_block(280)
+	var centre_status := _status_block(0)
+	centre_status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var right_status := _status_block(270)
+	status_row.add_child(left_status)
+	status_row.add_child(centre_status)
+	status_row.add_child(right_status)
 
 
 func _render_all() -> void:
@@ -241,7 +219,6 @@ func _render_all() -> void:
 	_render_outliner()
 	_render_workspace()
 	_render_inspector()
-	_render_status()
 
 
 func _render_module_rail() -> void:
@@ -278,7 +255,6 @@ func _render_submodules() -> void:
 func _render_toolbar() -> void:
 	_clear(toolbar_tools)
 	var module: Dictionary = _active_module()
-	toolbar_context.text = "%s / %s" % [module.label, active_submodule]
 	for tool_name in module.tools:
 		var button := _button(tool_name, tool_name == active_tool)
 		button.pressed.connect(_activate_tool.bind(tool_name))
@@ -287,11 +263,10 @@ func _render_toolbar() -> void:
 
 func _render_actions() -> void:
 	_clear(action_controls)
-	action_context.text = "%s settings" % active_tool
 	var module: Dictionary = _active_module()
 	for action_name in module.actions:
 		var button := _button(action_name, false)
-		button.pressed.connect(_set_status.bind("%s is a placeholder action." % action_name))
+		button.pressed.connect(_noop)
 		action_controls.add_child(button)
 
 
@@ -312,10 +287,9 @@ func _render_outliner() -> void:
 			var indent := Control.new()
 			indent.custom_minimum_size = Vector2(depth * 12, 0)
 			row.add_child(indent)
-			var marker := Label.new()
-			marker.text = "·"
-			marker.add_theme_color_override("font_color", MUTED)
-			marker.custom_minimum_size = Vector2(10, 0)
+			var marker := ColorRect.new()
+			marker.color = MUTED
+			marker.custom_minimum_size = Vector2(4, 4)
 			row.add_child(marker)
 		var has_children: bool = entry.has("children") and not entry.children.is_empty()
 		var row_text: String = str(entry.label)
@@ -334,81 +308,68 @@ func _render_outliner() -> void:
 
 func _render_workspace() -> void:
 	_clear(workspace_content)
-	var module: Dictionary = _active_module()
-	var heading := _label(module.title.replace(module.submodules[0], active_submodule), TEXT, 22)
-	workspace_content.add_child(heading)
-	var description := _label(module.description, MUTED, 14)
-	description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	workspace_content.add_child(description)
 	var preview := _panel(PANEL)
 	preview.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	workspace_content.add_child(preview)
-	var preview_margin := _margin(preview, 26, 24)
-	var preview_stack := VBoxContainer.new()
-	preview_stack.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	preview_stack.alignment = BoxContainer.ALIGNMENT_CENTER
-	preview_stack.add_theme_constant_override("separation", 12)
-	preview_margin.add_child(preview_stack)
-	_match_workspace_preview(preview_stack)
+	var preview_margin := _margin(preview, 20, 20)
+	preview_margin.add_child(_workspace_visual())
 	if _shows_time_area():
 		workspace_content.add_child(_time_area())
 
 
-func _match_workspace_preview(container: VBoxContainer) -> void:
+func _workspace_visual() -> Control:
+	var centre := CenterContainer.new()
+	centre.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	centre.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var content: Control
 	match active_module_id:
 		"create":
-			container.add_child(_preview_label("POLYLINE PLACEHOLDER", ACCENT))
-			container.add_child(_preview_label("Wizard Hat  •  8 points", TEXT))
-			container.add_child(_preview_label("Select Polyline to begin a future edit.", MUTED))
+			content = _visual_block(ACCENT_SOFT, Vector2(300, 210))
 		"style":
-			container.add_child(_preview_label("STYLE PREVIEW", ACCENT))
-			container.add_child(_preview_label("Warm amber / cool violet", TEXT))
-			container.add_child(_preview_label("Color and masks are visual placeholders.", MUTED))
+			var colors := HBoxContainer.new()
+			colors.add_theme_constant_override("separation", 12)
+			colors.add_child(_visual_block(Color("#d28c53"), Vector2(96, 180)))
+			colors.add_child(_visual_block(Color("#7463b8"), Vector2(96, 180)))
+			colors.add_child(_visual_block(Color("#2f9c91"), Vector2(96, 180)))
+			content = colors
 		"motion":
-			container.add_child(_preview_label("MOTION PREVIEW", ACCENT))
-			container.add_child(_preview_label("Wizard Hat  ↝  Sway", TEXT))
-			container.add_child(_preview_label("Local asset motion, not a global sequence.", MUTED))
+			var motion := VBoxContainer.new()
+			motion.add_theme_constant_override("separation", 12)
+			motion.add_child(_visual_block(ACCENT_SOFT, Vector2(250, 150)))
+			var sway := HSlider.new()
+			sway.custom_minimum_size = Vector2(250, 0)
+			sway.value = 62.0
+			motion.add_child(sway)
+			content = motion
 		"transform":
 			var pair := HBoxContainer.new()
-			pair.alignment = BoxContainer.ALIGNMENT_CENTER
 			pair.add_theme_constant_override("separation", 22)
-			pair.add_child(_preview_label("Wizard Hat", TEXT))
-			pair.add_child(_preview_label("→", ACCENT))
-			pair.add_child(_preview_label("Star", TEXT))
-			container.add_child(pair)
-			container.add_child(_preview_label("Independent assets linked by a designed morph.", MUTED))
+			pair.add_child(_visual_block(Color("#465a78"), Vector2(132, 170)))
+			pair.add_child(_visual_block(ACCENT, Vector2(18, 170)))
+			pair.add_child(_visual_block(Color("#7962aa"), Vector2(132, 170)))
+			content = pair
 		"effects":
-			container.add_child(_preview_label("EFFECT PREVIEW", ACCENT))
-			container.add_child(_preview_label("%s placeholder" % active_submodule, TEXT))
-			container.add_child(_preview_label("Choose Root Growth to reveal a local growth control.", MUTED))
+			var effect := HBoxContainer.new()
+			effect.add_theme_constant_override("separation", 8)
+			for height in [80, 150, 115, 190, 95]:
+				effect.add_child(_visual_block(GOOD if active_submodule == "Root Growth" else ACCENT_SOFT, Vector2(24, height)))
+			content = effect
 		"export":
-			container.add_child(_preview_label("OUTPUT PREVIEW", ACCENT))
-			container.add_child(_preview_label("1024 × 1024  •  PNG", TEXT))
-			container.add_child(_preview_label("No files are exported by this skeleton.", MUTED))
+			content = _visual_block(Color("#30455e"), Vector2(280, 220))
+	centre.add_child(content)
+	return centre
 
 
 func _render_inspector() -> void:
 	_clear(inspector_content)
-	inspector_content.add_child(_label(_selected_outline_label(), TEXT, 18))
-	inspector_content.add_child(_label("Placeholder properties", MUTED, 13))
-	inspector_content.add_child(HSeparator.new())
-	for property in _inspector_properties():
+	for index in 4:
 		var row := _panel(PANEL_ALT)
-		row.custom_minimum_size = Vector2(0, 38)
+		row.custom_minimum_size = Vector2(0, 42)
 		inspector_content.add_child(row)
-		var margin := _margin(row, 9, 6)
-		var columns := HBoxContainer.new()
-		margin.add_child(columns)
-		var name := _label(property[0], MUTED, 13)
-		name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		columns.add_child(name)
-		columns.add_child(_label(property[1], TEXT, 13))
-
-
-func _render_status() -> void:
-	status_document.text = "Document  •  %s" % _selected_outline_label()
-	status_info.text = "%s  •  %s / %s" % [status_message, _active_module().label, active_submodule]
-	status_coordinates.text = "Zoom 100%%   X: 248   Y: 126"
+		var margin := _margin(row, 8, 8)
+		var slider := HSlider.new()
+		slider.value = 25 + index * 20
+		margin.add_child(slider)
 
 
 func _activate_module(module_id: String) -> void:
@@ -416,40 +377,28 @@ func _activate_module(module_id: String) -> void:
 	var module: Dictionary = _active_module()
 	active_submodule = module.submodules[0]
 	active_tool = module.tools[0]
-	status_message = "%s workspace selected" % module.label
 	_render_all()
 
 
 func _activate_submodule(submodule: String) -> void:
 	active_submodule = submodule
-	status_message = "%s selected" % submodule
 	_render_all()
 
 
 func _activate_tool(tool_name: String) -> void:
 	active_tool = tool_name
-	status_message = "%s tool active" % tool_name
 	_render_all()
 
 
 func _toggle_outline_parent(parent_id: String) -> void:
 	expanded_outline[parent_id] = not expanded_outline.get(parent_id, true)
-	status_message = "%s children %s" % [parent_id.capitalize(), "shown" if expanded_outline[parent_id] else "hidden"]
 	_render_outliner()
-	_render_status()
 
 
 func _select_outline_item(item_id: String) -> void:
 	selected_outline_item = item_id
-	status_message = "%s selected" % _selected_outline_label()
 	_render_outliner()
 	_render_inspector()
-	_render_status()
-
-
-func _set_status(message: String) -> void:
-	status_message = message
-	_render_status()
 
 
 func _active_module() -> Dictionary:
@@ -514,24 +463,6 @@ func _is_outline_entry_visible(entry: Dictionary, entries_by_id: Dictionary) -> 
 	return true
 
 
-func _selected_outline_label() -> String:
-	for entry in _outline_entries():
-		if entry.id == selected_outline_item:
-			return entry.label
-	return "No selection"
-
-
-func _inspector_properties() -> Array:
-	var module_label: String = _active_module().label
-	return [
-		["Context", "%s / %s" % [module_label, active_submodule]],
-		["Selection", _selected_outline_label()],
-		["State", "Dummy"],
-		["Visible", "Yes"],
-		["Notes", "No persistent data yet"],
-	]
-
-
 func _shows_time_area() -> bool:
 	return active_module_id == "motion" or active_module_id == "transform" or (active_module_id == "effects" and active_submodule == "Root Growth")
 
@@ -543,19 +474,14 @@ func _time_area() -> PanelContainer:
 	var stack := VBoxContainer.new()
 	stack.add_theme_constant_override("separation", 8)
 	margin.add_child(stack)
-	var title := "Asset Time / Wizard Hat Sway"
-	if active_module_id == "transform":
-		title = "Transition Time / Hat → Star"
-	if active_module_id == "effects":
-		title = "Effect Time / Root Growth"
-	stack.add_child(_label(title, TEXT, 14))
-	for track in _timeline_tracks():
+	for index in 3:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 10)
 		stack.add_child(row)
-		var label := _label(track, MUTED, 13)
-		label.custom_minimum_size = Vector2(130, 0)
-		row.add_child(label)
+		var marker := ColorRect.new()
+		marker.color = ACCENT if index == 0 else BORDER
+		marker.custom_minimum_size = Vector2(42, 16)
+		row.add_child(marker)
 		var slider := HSlider.new()
 		slider.min_value = 0.0
 		slider.max_value = 100.0
@@ -563,16 +489,11 @@ func _time_area() -> PanelContainer:
 		slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		slider.tooltip_text = "Dummy timeline track"
 		row.add_child(slider)
-		row.add_child(_label("◇", ACCENT, 16))
+		var keyframe := ColorRect.new()
+		keyframe.color = ACCENT
+		keyframe.custom_minimum_size = Vector2(16, 16)
+		row.add_child(keyframe)
 	return panel
-
-
-func _timeline_tracks() -> Array:
-	if active_module_id == "transform":
-		return ["Morph Progress", "Sway Out", "Jitter In"]
-	if active_module_id == "effects":
-		return ["Growth Progress", "Branch Fade"]
-	return ["Sway Strength", "Rotation", "Offset"]
 
 
 func _panel(background: Color) -> PanelContainer:
@@ -620,34 +541,21 @@ func _style(background: Color, border: Color, radius: int) -> StyleBoxFlat:
 	return style
 
 
-func _label(text: String, color: Color, font_size: int) -> Label:
-	var label := Label.new()
-	label.text = text
-	label.add_theme_color_override("font_color", color)
-	label.add_theme_font_size_override("font_size", font_size)
-	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	return label
+func _visual_block(color: Color, size: Vector2) -> PanelContainer:
+	var block := _panel(color)
+	block.custom_minimum_size = size
+	return block
 
 
-func _section_heading(text: String) -> Label:
-	var label := _label(text, MUTED, 11)
-	label.add_theme_constant_override("outline_size", 0)
-	return label
+func _status_block(minimum_width: int) -> ColorRect:
+	var block := ColorRect.new()
+	block.color = BORDER
+	block.custom_minimum_size = Vector2(minimum_width, 0)
+	return block
 
 
-func _preview_label(text: String, color: Color) -> Label:
-	var label := _label(text, color, 18)
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	return label
-
-
-func _status_cell(text: String, minimum_width: int) -> Label:
-	var label := _label(text, MUTED, 12)
-	label.custom_minimum_size = Vector2(minimum_width, 0)
-	label.add_theme_stylebox_override("normal", _style(PANEL_ALT, BORDER, 0))
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	return label
+func _noop() -> void:
+	pass
 
 
 func _clear(container: Node) -> void:

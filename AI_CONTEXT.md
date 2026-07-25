@@ -64,6 +64,9 @@ The UI is dynamically assembled in GDScript from editor state and small
 definition lists. Do not build a large, manually maintained Control hierarchy
 for the module-specific UI.
 
+Keep the initial skeleton visually sparse: no standalone labels, headings,
+descriptions, or status values. Use text only on interactive buttons.
+
 The Outliner is `ScrollContainer` + vertical button rows, not Godot's `Tree`
 control. Hierarchy is represented initially by non-interactive indentation
 placeholders to the left of child buttons. A parent button toggles visibility
