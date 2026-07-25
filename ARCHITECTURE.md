@@ -115,8 +115,9 @@ Export is a distinct, terminal action/area. The lower status grid can expand
 inside time-based workspaces when a local timeline needs more space.
 
 The visual language follows the compact, utilitarian editor style of the
-PolyTexture reference: regular Godot controls, very little decoration, a
-canvas-dominant centre, and no large placeholder cards. The fixed module rail
+PolyTexture reference: regular Godot controls, very little decoration, 2 px
+separation between major panels, a canvas-dominant centre, and no large
+placeholder cards. The fixed module rail
 remains on the left. The Outliner and Inspector are two independently
 resizable panes implemented with nested `HSplitContainer`s.
 
