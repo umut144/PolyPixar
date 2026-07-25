@@ -151,7 +151,9 @@ The current first data flow is `New → Asset`: a name dialog creates an
 in-memory Asset with a stable internal ID, the Asset appears in the Outliner,
 and its display name can be edited in the Inspector. An Asset can now contain
 named Components with stable IDs; Components can be selected and renamed, but
-persistence and Component canvas editing are intentionally deferred.
+persistence and Component contour editing are intentionally deferred. The
+current Component Canvas provides a dynamic grid, keyboard panning with
+`A/S/D/W`, and zooming with `Q/E` (`E` zooms in).
 
 The first skeleton stays visually sparse. Outliner and Inspector have small
 contextual labels; otherwise text is used only where it identifies an

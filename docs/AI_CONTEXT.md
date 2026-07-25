@@ -104,8 +104,9 @@ The Main Toolbar contains a `New ▼` menu with `Asset` and `Texture` entries.
 creates an in-memory Asset, lists it in the Outliner, and exposes its editable
 name in the Inspector. `Texture` remains inert. Components can now be added
 below an Asset, selected, and renamed in the Inspector. The central workspace
-now identifies whether the Asset or a Component is the active context; the
-canvas itself is still intentionally empty.
+identifies whether the Asset or a Component is the active context. The empty
+Shapes canvas now provides a PolyPixAAA-style grid with click-to-focus `A/S/D/W`
+pan and `Q/E` zoom controls (`E` zooms in); it still contains no asset data.
 
 ## Documentation maintenance
 

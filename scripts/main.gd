@@ -20,6 +20,7 @@ var component_name_input: LineEdit
 var asset_name_editor: LineEdit
 var component_name_editor: LineEdit
 var canvas_context_label: Label
+var canvas_view: ComponentCanvas
 
 
 func _ready() -> void:
@@ -125,12 +126,14 @@ func _build_ui() -> void:
 	canvas_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	canvas_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	canvas_column.add_child(canvas_panel)
-	var canvas := Control.new()
+	canvas_view = ComponentCanvas.new()
+	var canvas := canvas_view
 	canvas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	canvas_panel.add_child(canvas)
 	canvas_context_label = Label.new()
 	canvas_context_label.position = Vector2(8, 6)
+	canvas_context_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	canvas_context_label.add_theme_font_size_override("font_size", 11)
 	canvas_context_label.add_theme_color_override("font_color", Color("#9aa3b2"))
 	canvas.add_child(canvas_context_label)
@@ -433,15 +436,19 @@ func _render_canvas_context() -> void:
 	var asset := _get_asset(selected_asset_id)
 	if asset.is_empty():
 		canvas_context_label.text = ""
+		canvas_view.set_context("")
 		return
 	if selected_component_id.is_empty():
 		canvas_context_label.text = "Asset: %s" % str(asset["name"])
+		canvas_view.set_context(str(asset["name"]))
 		return
 	var component := _get_component(asset, selected_component_id)
 	if component.is_empty():
 		canvas_context_label.text = "Asset: %s" % str(asset["name"])
+		canvas_view.set_context(str(asset["name"]))
 		return
 	canvas_context_label.text = "Component: %s" % str(component["name"])
+	canvas_view.set_context(str(component["name"]))
 
 
 func _get_asset(asset_id: String) -> Dictionary:

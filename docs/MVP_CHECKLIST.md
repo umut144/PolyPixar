@@ -52,6 +52,9 @@ before implementing real creation tools.
 - [x] Select Components in the Outliner and edit their `Name` in the Inspector.
 - [x] Reflect the selected Asset or Component as the active central workspace
       context without adding editable canvas content yet.
+- [x] Provide a PolyPixAAA-style Shapes canvas with a dynamic grid.
+- [x] Pan the canvas with `A/S/D/W` after clicking it to focus.
+- [x] Zoom the canvas with `Q/E`, with `E` zooming in.
 - [x] Show an empty, canvas-first working area without fake asset previews.
 - [x] Show an empty, scrollable Inspector on the right.
 - [x] Let users resize the Outliner and Inspector independently with split
