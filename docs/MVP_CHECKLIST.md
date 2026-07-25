@@ -105,6 +105,8 @@ before implementing real creation tools.
 - [x] Rotate a Component around its Pivot with the Rotate ring and Rotation
       Step snapping.
 - [x] Uniformly scale a Component with Scale corner handles.
+- [x] Apply Component transforms, visibility, and z-index to Asset-level
+      composition and select transformed reference contours.
 - [x] Show an empty, scrollable Inspector on the right.
 - [x] Let users resize the Outliner and Inspector independently with split
       handles while keeping the module rail fixed.

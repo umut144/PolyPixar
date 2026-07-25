@@ -257,10 +257,14 @@ func set_component_transform(transform: Dictionary) -> void:
 
 
 func _local_to_world(local_point: Vector2) -> Vector2:
-	var pivot: Vector2 = component_transform.get("pivot", Vector2.ZERO)
-	var position: Vector2 = component_transform.get("position", Vector2.ZERO)
-	var scale: Vector2 = component_transform.get("scale", Vector2.ONE)
-	var rotation := deg_to_rad(float(component_transform.get("rotation", 0.0)))
+	return _local_to_world_with_transform(local_point, component_transform)
+
+
+func _local_to_world_with_transform(local_point: Vector2, transform: Dictionary) -> Vector2:
+	var pivot: Vector2 = transform.get("pivot", Vector2.ZERO)
+	var position: Vector2 = transform.get("position", Vector2.ZERO)
+	var scale: Vector2 = transform.get("scale", Vector2.ONE)
+	var rotation := deg_to_rad(float(transform.get("rotation", 0.0)))
 	return position + ((local_point - pivot) * scale).rotated(rotation)
 
 
@@ -438,30 +442,48 @@ func _is_near_pivot(screen_position: Vector2) -> bool:
 
 
 func _draw_reference_shapes() -> void:
-	for shape in reference_shapes:
+	var ordered_shapes := reference_shapes.duplicate()
+	ordered_shapes.sort_custom(_sort_reference_shapes)
+	for shape in ordered_shapes:
+		if not bool(shape.get("visibility", true)):
+			continue
 		var points: Array = shape.get("points", [])
 		if points.size() < 3:
 			continue
+		var transform: Dictionary = shape.get("transform", {})
 		var reference_color := Color("#55c7d966")
 		for index in range(points.size()):
 			var next_index := (index + 1) % points.size()
-			draw_line(_world_to_screen(points[index]), _world_to_screen(points[next_index]), reference_color, 2.0)
+			draw_line(_world_to_screen(_local_to_world_with_transform(points[index], transform)), _world_to_screen(_local_to_world_with_transform(points[next_index], transform)), reference_color, 2.0)
 		for point in points:
-			draw_circle(_world_to_screen(point), 3.0, reference_color)
+			draw_circle(_world_to_screen(_local_to_world_with_transform(point, transform)), 3.0, reference_color)
+
+
+func _sort_reference_shapes(a: Dictionary, b: Dictionary) -> bool:
+	return int(a.get("z_index", 0)) < int(b.get("z_index", 0))
 
 
 func _reference_component_at(world_position: Vector2) -> String:
 	var nearest_id := ""
 	var nearest_distance := 14.0
-	for shape in reference_shapes:
+	var ordered_shapes := reference_shapes.duplicate()
+	ordered_shapes.sort_custom(_sort_reference_shapes)
+	ordered_shapes.reverse()
+	for shape in ordered_shapes:
+		if not bool(shape.get("visibility", true)):
+			continue
 		var points: Array = shape.get("points", [])
 		if points.size() < 3:
 			continue
-		if Geometry2D.is_point_in_polygon(world_position, PackedVector2Array(points)):
+		var transform: Dictionary = shape.get("transform", {})
+		var world_points: Array[Vector2] = []
+		for point in points:
+			world_points.append(_local_to_world_with_transform(point, transform))
+		if Geometry2D.is_point_in_polygon(world_position, PackedVector2Array(world_points)):
 			return str(shape.get("id", ""))
-		for index in range(points.size()):
-			var next_index := (index + 1) % points.size()
-			var closest := Geometry2D.get_closest_point_to_segment(world_position, points[index], points[next_index])
+		for index in range(world_points.size()):
+			var next_index := (index + 1) % world_points.size()
+			var closest := Geometry2D.get_closest_point_to_segment(world_position, world_points[index], world_points[next_index])
 			var distance := world_position.distance_to(closest)
 			if distance < nearest_distance:
 				nearest_distance = distance
@@ -470,6 +492,8 @@ func _reference_component_at(world_position: Vector2) -> String:
 
 
 func _draw_outer_shape() -> void:
+	if not bool(component_transform.get("visibility", true)):
+		return
 	if outer_shape.size() < 3:
 		return
 	var shape_color := Color("#55c7d9")

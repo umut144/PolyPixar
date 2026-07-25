@@ -1341,7 +1341,10 @@ func _build_reference_shapes(asset: Dictionary, excluded_component_id := "") -> 
 			continue
 		shapes.append({
 			"id": str(component["id"]),
-			"points": component["outer_shape"].duplicate()
+			"points": component["outer_shape"].duplicate(),
+			"transform": component.get("transform", _default_component_transform()).duplicate(true),
+			"visibility": bool(component.get("visibility", true)),
+			"z_index": int(component.get("z_index", 0))
 		})
 	return shapes
 

@@ -161,7 +161,11 @@ Scale interaction remain later steps. Phase 6.3 adds interactive Pivot-ring
 rotation with the configured Rotation Step. Phase 6.4 adds uniform corner
 scaling around the Pivot; non-uniform X/Y scaling is excluded from the MVP.
 Pivot dragging is restricted to Edit state and adjusts the transform position
-to keep the component geometry visually stable.
+to keep the component geometry visually stable. Phase 6.5 applies component
+transforms, visibility, and z-index to Asset-level composition: reference
+contours are rendered in z order, invisible references are skipped, and
+transformed contours remain clickable for Component selection. The selected
+Component is still rendered as the active editing overlay.
 
 ## Documentation maintenance
 

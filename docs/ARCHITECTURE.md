@@ -133,14 +133,17 @@ Transform data is stored per Component as position, rotation, scale, and pivot,
 with visibility and z-index alongside it. The Inspector exposes these values as
 numeric fields and a visibility toggle. The selected Component's local Pivot is
 visible in the Canvas and can be dragged only in Edit state with the active
-Snap settings while preserving the visible geometry; full
-transform rendering and gizmos remain separate follow-up steps. Phase 6 now
+Snap settings while preserving the visible geometry. Phase 6 now
 exposes `CMD/Ctrl + 3` with Transform, Rotate, and Scale submodes; its initial
 gizmo is positioned at the Component Pivot. The `Transform` submode supports
 free, X-axis, and Y-axis translation with Snap. The `Rotate` submode now uses
 the Pivot-centered ring and Rotation Step. The `Scale` submode now supports
 uniform corner scaling around the Pivot; non-uniform X/Y scaling is intentionally
-excluded from the MVP.
+excluded from the MVP. Phase 6.5 applies each Component transform when the
+Asset itself is selected: visible components are rendered as ordered,
+transformed references, hidden components are omitted, and clicking a
+transformed reference selects the corresponding Component. The selected
+Component remains a clear editing overlay in the Canvas.
 
 ## Confirmed UI direction
 
