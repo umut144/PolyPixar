@@ -9,10 +9,16 @@ var inspector_content: VBoxContainer
 var module_sections: Array[ModuleSection] = []
 var assets: Array[Dictionary] = []
 var selected_asset_id := ""
+var selected_component_id := ""
+var expanded_assets: Dictionary = {}
 var next_asset_id := 1
+var next_component_id := 1
 var asset_dialog: ConfirmationDialog
 var asset_name_input: LineEdit
+var component_dialog: ConfirmationDialog
+var component_name_input: LineEdit
 var asset_name_editor: LineEdit
+var component_name_editor: LineEdit
 
 
 func _ready() -> void:
@@ -135,6 +141,7 @@ func _build_ui() -> void:
 	main_layout.add_child(status_bar)
 
 	_create_asset_dialog()
+	_create_component_dialog()
 
 
 func _create_panel(background_color := Color("#20242c")) -> PanelContainer:
@@ -177,6 +184,21 @@ func _create_asset_dialog() -> void:
 	add_child(asset_dialog)
 
 
+func _create_component_dialog() -> void:
+	component_dialog = ConfirmationDialog.new()
+	component_dialog.title = "Add Component"
+	component_dialog.dialog_text = "Enter a component name"
+	component_dialog.size = Vector2i(360, 160)
+	component_dialog.confirmed.connect(_confirm_component_creation)
+	component_name_input = LineEdit.new()
+	component_name_input.placeholder_text = "Component name"
+	component_name_input.custom_minimum_size = Vector2(320, 32)
+	component_name_input.focus_mode = Control.FOCUS_ALL
+	component_name_input.text_submitted.connect(_submit_component_name)
+	component_dialog.add_child(component_name_input)
+	add_child(component_dialog)
+
+
 func _on_new_menu_id(id: int) -> void:
 	if id == 0:
 		_open_new_asset_dialog()
@@ -195,34 +217,126 @@ func _submit_asset_name(_submitted_text: String) -> void:
 func _confirm_asset_creation() -> void:
 	var asset_name := asset_name_input.text.strip_edges()
 	if asset_name.is_empty():
-		asset_dialog.popup_centered()
-		asset_name_input.grab_focus()
-		return
+		asset_name = _next_default_asset_name()
 	var asset_id := "asset_%d" % next_asset_id
 	next_asset_id += 1
-	assets.append({"id": asset_id, "name": asset_name})
+	assets.append({"id": asset_id, "name": asset_name, "components": []})
 	selected_asset_id = asset_id
+	selected_component_id = ""
+	expanded_assets[asset_id] = true
 	asset_dialog.hide()
 	_render_outliner()
 	_render_inspector()
 
 
+func _next_default_asset_name() -> String:
+	var index := 1
+	while _has_asset_name("asset%02d" % index):
+		index += 1
+	return "asset%02d" % index
+
+
+func _has_asset_name(asset_name: String) -> bool:
+	for asset in assets:
+		if str(asset["name"]).to_lower() == asset_name.to_lower():
+			return true
+	return false
+
+
 func _render_outliner() -> void:
 	_clear(outliner_list)
 	for asset in assets:
-		var button := Button.new()
-		button.text = str(asset["name"])
-		button.custom_minimum_size = Vector2(0, 30)
-		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		button.focus_mode = Control.FOCUS_NONE
-		button.toggle_mode = true
-		button.button_pressed = str(asset["id"]) == selected_asset_id
-		button.pressed.connect(_select_asset.bind(str(asset["id"])))
-		outliner_list.add_child(button)
+		var asset_id := str(asset["id"])
+		var asset_button := Button.new()
+		asset_button.text = str(asset["name"])
+		asset_button.custom_minimum_size = Vector2(0, 30)
+		asset_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		asset_button.focus_mode = Control.FOCUS_NONE
+		asset_button.toggle_mode = true
+		asset_button.button_pressed = asset_id == selected_asset_id
+		asset_button.pressed.connect(_select_asset.bind(asset_id))
+		outliner_list.add_child(asset_button)
+		if not bool(expanded_assets.get(asset_id, false)):
+			continue
+		var add_component_button := Button.new()
+		add_component_button.text = "Add Component"
+		add_component_button.custom_minimum_size = Vector2(0, 28)
+		add_component_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		add_component_button.focus_mode = Control.FOCUS_NONE
+		add_component_button.pressed.connect(_open_component_dialog.bind(asset_id))
+		outliner_list.add_child(add_component_button)
+		for component in asset["components"]:
+			var component_id := str(component["id"])
+			var component_button := Button.new()
+			component_button.text = str(component["name"])
+			component_button.custom_minimum_size = Vector2(0, 30)
+			component_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+			component_button.focus_mode = Control.FOCUS_NONE
+			component_button.toggle_mode = true
+			component_button.button_pressed = component_id == selected_component_id
+			component_button.pressed.connect(_select_component.bind(asset_id, component_id))
+			outliner_list.add_child(component_button)
 
 
 func _select_asset(asset_id: String) -> void:
 	selected_asset_id = asset_id
+	selected_component_id = ""
+	expanded_assets[asset_id] = not bool(expanded_assets.get(asset_id, false))
+	_render_outliner()
+	_render_inspector()
+
+
+func _open_component_dialog(asset_id: String) -> void:
+	selected_asset_id = asset_id
+	selected_component_id = ""
+	component_name_input.text = ""
+	component_dialog.set_meta("asset_id", asset_id)
+	component_dialog.popup_centered()
+	component_name_input.grab_focus()
+
+
+func _submit_component_name(_submitted_text: String) -> void:
+	_confirm_component_creation()
+
+
+func _confirm_component_creation() -> void:
+	var asset_id := str(component_dialog.get_meta("asset_id", ""))
+	var asset := _get_asset(asset_id)
+	if asset.is_empty():
+		component_dialog.hide()
+		return
+	var component_name := component_name_input.text.strip_edges()
+	if component_name.is_empty():
+		component_name = _next_default_component_name(asset)
+	var component_id := "component_%d" % next_component_id
+	next_component_id += 1
+	asset["components"].append({"id": component_id, "name": component_name})
+	selected_asset_id = asset_id
+	selected_component_id = component_id
+	expanded_assets[asset_id] = true
+	component_dialog.hide()
+	_render_outliner()
+	_render_inspector()
+
+
+func _next_default_component_name(asset: Dictionary) -> String:
+	var index := 1
+	while _has_component_name(asset, "component%02d" % index):
+		index += 1
+	return "component%02d" % index
+
+
+func _has_component_name(asset: Dictionary, component_name: String) -> bool:
+	for component in asset["components"]:
+		if str(component["name"]).to_lower() == component_name.to_lower():
+			return true
+	return false
+
+
+func _select_component(asset_id: String, component_id: String) -> void:
+	selected_asset_id = asset_id
+	selected_component_id = component_id
+	expanded_assets[asset_id] = true
 	_render_outliner()
 	_render_inspector()
 
@@ -233,16 +347,33 @@ func _render_inspector() -> void:
 	var asset := _get_asset(selected_asset_id)
 	if asset.is_empty():
 		return
-	inspector_content.add_child(_create_panel_label("Asset"))
-	asset_name_editor = LineEdit.new()
-	asset_name_editor.text = str(asset["name"])
-	asset_name_editor.custom_minimum_size = Vector2(0, 30)
-	asset_name_editor.placeholder_text = "Asset name"
-	asset_name_editor.text_submitted.connect(_rename_selected_asset)
-	asset_name_editor.focus_exited.connect(func() -> void:
-		_rename_selected_asset(asset_name_editor.text)
+	if selected_component_id.is_empty():
+		inspector_content.add_child(_create_panel_label("Name"))
+		asset_name_editor = _create_name_editor(str(asset["name"]), "Asset name")
+		asset_name_editor.text_submitted.connect(_rename_selected_asset)
+		asset_name_editor.focus_exited.connect(func() -> void:
+			_rename_selected_asset(asset_name_editor.text)
+		)
+		inspector_content.add_child(asset_name_editor)
+		return
+	var component := _get_component(asset, selected_component_id)
+	if component.is_empty():
+		return
+	inspector_content.add_child(_create_panel_label("Name"))
+	component_name_editor = _create_name_editor(str(component["name"]), "Component name")
+	component_name_editor.text_submitted.connect(_rename_selected_component)
+	component_name_editor.focus_exited.connect(func() -> void:
+		_rename_selected_component(component_name_editor.text)
 	)
-	inspector_content.add_child(asset_name_editor)
+	inspector_content.add_child(component_name_editor)
+
+
+func _create_name_editor(value: String, placeholder: String) -> LineEdit:
+	var editor := LineEdit.new()
+	editor.text = value
+	editor.custom_minimum_size = Vector2(0, 30)
+	editor.placeholder_text = placeholder
+	return editor
 
 
 func _rename_selected_asset(new_name: String) -> void:
@@ -257,10 +388,32 @@ func _rename_selected_asset(new_name: String) -> void:
 	_render_outliner()
 
 
+func _rename_selected_component(new_name: String) -> void:
+	var component_name := new_name.strip_edges()
+	var asset := _get_asset(selected_asset_id)
+	var component := _get_component(asset, selected_component_id)
+	if component.is_empty():
+		return
+	if component_name.is_empty():
+		component_name_editor.text = str(component["name"])
+		return
+	component["name"] = component_name
+	_render_outliner()
+
+
 func _get_asset(asset_id: String) -> Dictionary:
 	for asset in assets:
 		if str(asset["id"]) == asset_id:
 			return asset
+	return {}
+
+
+func _get_component(asset: Dictionary, component_id: String) -> Dictionary:
+	if asset.is_empty():
+		return {}
+	for component in asset["components"]:
+		if str(component["id"]) == component_id:
+			return component
 	return {}
 
 

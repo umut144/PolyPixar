@@ -11,9 +11,10 @@ testable vertical slices rather than a complete feature set up front.
 
 ## Current phase
 
-The repository currently contains the reviewed UI skeleton and the first Asset
-creation flow. The next goal is to add Components while preserving the
-result-based workflow. Empty panes are preferred to invented asset content.
+The repository currently contains the reviewed UI skeleton, the Asset creation
+flow, and the first in-memory Asset/Component hierarchy. The next goal is to
+add the Component Canvas while preserving the result-based workflow. Empty
+panes are preferred to invented asset content.
 
 The current implementation target is not a functional morphing engine.
 
@@ -100,8 +101,9 @@ work begins.
 The Main Toolbar contains a `New ▼` menu with `Asset` and `Texture` entries.
 `New → Asset` opens a name dialog with OK/Cancel, Enter, and Escape handling,
 creates an in-memory Asset, lists it in the Outliner, and exposes its editable
-name in the Inspector. `Texture` remains inert. Components and canvas drawing
-are the next phases.
+name in the Inspector. `Texture` remains inert. Components can now be added
+below an Asset, selected, and renamed in the Inspector. Canvas drawing is the
+next phase.
 
 ## Documentation maintenance
 

@@ -149,8 +149,9 @@ hover state.
 
 The current first data flow is `New → Asset`: a name dialog creates an
 in-memory Asset with a stable internal ID, the Asset appears in the Outliner,
-and its display name can be edited in the Inspector. Persistence and Asset
-Components are intentionally deferred to the next phases.
+and its display name can be edited in the Inspector. An Asset can now contain
+named Components with stable IDs; Components can be selected and renamed, but
+persistence and Component canvas editing are intentionally deferred.
 
 The first skeleton stays visually sparse. Outliner and Inspector have small
 contextual labels; otherwise text is used only where it identifies an

@@ -41,8 +41,14 @@ before implementing real creation tools.
       keep `Texture` inert until its phase begins.
 - [x] Implement `New → Asset` with a name dialog, OK/Cancel controls, Enter
       confirmation, and Escape cancellation.
+- [x] Use `asset01`, `asset02`, and so on when an Asset name is confirmed
+      empty.
 - [x] List created Assets in the Outliner and select them there.
 - [x] Show the selected Asset's name in the Inspector and allow renaming.
+- [x] Show `Add Component` below an Asset and create named Components.
+- [x] Use `component01`, `component02`, and so on when a Component name is
+      confirmed empty.
+- [x] Select Components in the Outliner and edit their `Name` in the Inspector.
 - [x] Show an empty, canvas-first working area without fake asset previews.
 - [x] Show an empty, scrollable Inspector on the right.
 - [x] Let users resize the Outliner and Inspector independently with split
