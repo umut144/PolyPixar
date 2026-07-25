@@ -292,7 +292,7 @@ func _create_workspace_dialogs() -> void:
 
 	load_workspace_dialog = ConfirmationDialog.new()
 	load_workspace_dialog.title = "Load Workspace"
-	load_workspace_dialog.dialog_text = "Select a workspace"
+	load_workspace_dialog.dialog_text = ""
 	load_workspace_dialog.ok_button_text = "Load"
 	load_workspace_dialog.size = Vector2i(420, 320)
 	load_workspace_dialog.confirmed.connect(_load_selected_workspace)
