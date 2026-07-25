@@ -356,9 +356,9 @@ func _confirm_new_workspace() -> void:
 func _open_load_workspace_dialog() -> void:
 	workspace_list.clear()
 	var names := _list_workspace_names()
-	for name in names:
-		workspace_list.add_item(name)
-		workspace_list.set_item_metadata(workspace_list.item_count - 1, name)
+	for workspace_entry in names:
+		workspace_list.add_item(workspace_entry)
+		workspace_list.set_item_metadata(workspace_list.item_count - 1, workspace_entry)
 	if workspace_list.item_count > 0:
 		workspace_list.select(0)
 	load_workspace_dialog.popup_centered()
@@ -370,8 +370,8 @@ func _load_selected_workspace(_index := -1) -> void:
 	if selected_indices.is_empty():
 		return
 	var index := selected_indices[0]
-	var name := str(workspace_list.get_item_metadata(index))
-	if _load_workspace(name):
+	var workspace_entry := str(workspace_list.get_item_metadata(index))
+	if _load_workspace(workspace_entry):
 		load_workspace_dialog.hide()
 
 
@@ -441,8 +441,8 @@ func _save_workspace() -> void:
 	_write_json(CONFIG_PATH, {"schema_version": 1, "last_workspace": workspace_name})
 
 
-func _load_workspace(name: String) -> bool:
-	var workspace_root := "%s/%s" % [WORKSPACES_ROOT, name]
+func _load_workspace(workspace_entry: String) -> bool:
+	var workspace_root := "%s/%s" % [WORKSPACES_ROOT, workspace_entry]
 	var workspace_data = _read_json("%s/workspace.json" % workspace_root)
 	if not _has_supported_schema(workspace_data):
 		return false
@@ -467,7 +467,7 @@ func _load_workspace(name: String) -> bool:
 			"components": components
 		})
 	assets = loaded_assets
-	workspace_name = str(workspace_data.get("name", name))
+	workspace_name = str(workspace_data.get("name", workspace_entry))
 	selected_asset_id = ""
 	selected_component_id = ""
 	expanded_assets.clear()

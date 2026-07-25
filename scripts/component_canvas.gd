@@ -113,8 +113,8 @@ func _gui_input(event: InputEvent) -> void:
 			queue_redraw()
 
 
-func set_context(name: String) -> void:
-	context_name = name
+func set_context(context_label: String) -> void:
+	context_name = context_label
 	queue_redraw()
 
 

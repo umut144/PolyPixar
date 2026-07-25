@@ -12,8 +12,8 @@ var expanded := false
 var active_submodule := ""
 
 
-func setup(name: String, submodules: Array, open_by_default := false) -> void:
-	module_name = name
+func setup(section_name: String, submodules: Array, open_by_default := false) -> void:
+	module_name = section_name
 	header_button = Button.new()
 	header_button.text = module_name
 	header_button.custom_minimum_size = Vector2(0, 32)
