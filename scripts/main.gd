@@ -222,7 +222,7 @@ func _build_ui() -> void:
 	status_bar.add_child(status_layout)
 	var status_left := _create_status_region()
 	status_left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	status_left.size_flags_stretch_ratio = 15.0
+	status_left.size_flags_stretch_ratio = 17.0
 	status_layout.add_child(status_left)
 	program_status_label = Label.new()
 	program_status_label.visible = false
@@ -232,14 +232,14 @@ func _build_ui() -> void:
 	status_left.add_child(program_status_label)
 	var status_middle := _create_status_region()
 	status_middle.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	status_middle.size_flags_stretch_ratio = 70.0
+	status_middle.size_flags_stretch_ratio = 64.0
 	status_layout.add_child(status_middle)
 	info_bar = HBoxContainer.new()
 	info_bar.add_theme_constant_override("separation", 16)
 	status_middle.add_child(info_bar)
 	var status_right := _create_status_region()
 	status_right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	status_right.size_flags_stretch_ratio = 15.0
+	status_right.size_flags_stretch_ratio = 17.0
 	status_layout.add_child(status_right)
 	status_clear_timer = Timer.new()
 	status_clear_timer.one_shot = true

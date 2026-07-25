@@ -87,7 +87,7 @@ before implementing real creation tools.
 - [x] Serialize workspaces and their Assets/Components as versioned JSON files.
 - [x] Include `schema_version` in Workspace, Asset, and app-config JSON files.
 - [x] Store and automatically restore the last workspace through app config.
-- [x] Split the bottom status bar into 15% / 70% / 15% regions.
+- [x] Split the bottom status bar into 17% / 64% / 17% regions.
 - [x] Save the active Workspace with `CMD/Ctrl + S` and show a temporary yellow
       confirmation in the program-status region.
 - [x] Show an empty, scrollable Inspector on the right.
