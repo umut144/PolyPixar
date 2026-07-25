@@ -123,8 +123,8 @@ tested slice actually requires one.
 
 This is a separate milestone from the current asset and contour workflow. Its
 first step establishes the canvas coordinate system before transform data or
-gizmos are added. The world origin is `(0, 0)` and is rendered as a persistent
-marker where the full horizontal and vertical axes intersect. Component
+gizmos are added. The world origin is `(0, 0)` and is defined by the
+intersection of the full horizontal and vertical axes. Component
 geometry remains in local coordinates; later Transform data will map it into
 the canvas coordinate space without rewriting the stored contour points.
 

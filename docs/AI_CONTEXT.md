@@ -148,10 +148,11 @@ the canvas suppresses ASDW panning while that modifier is held.
 Workspace `editor_state` also restores the selected Asset, selected Component,
 and expanded Outliner containers when the Workspace is reopened.
 
-The current Transform & Snap Foundation milestone begins with a persistent
-world-origin marker at `(0, 0)` and full horizontal/vertical canvas axes.
-Transform data and snapping are intentionally not implemented in this first
-step.
+The current Transform & Snap Foundation milestone begins with the world origin
+`(0, 0)` defined by full horizontal/vertical canvas axes. Phase 2 adds the
+left-aligned Snap popover with On/Off, Grid Step, and Rotation Step controls;
+the settings are workspace-persistent. Transform data and gizmos remain later
+steps.
 
 ## Documentation maintenance
 

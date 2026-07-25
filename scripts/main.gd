@@ -31,6 +31,16 @@ var status_clear_timer: Timer
 var active_draw_tool := ""
 var active_state := ""
 var active_edit_mode := "select"
+var snap_enabled := true
+var snap_grid_step := 16.0
+var snap_rotation_step := 15.0
+var snap_button: Button
+var snap_popup: PopupPanel
+var snap_toggle: CheckButton
+var snap_grid_slider: HSlider
+var snap_rotation_slider: HSlider
+var snap_grid_value_label: Label
+var snap_rotation_value_label: Label
 var workspace_name := ""
 var workspace_name_dialog: ConfirmationDialog
 var workspace_name_input: LineEdit
@@ -187,6 +197,7 @@ func _build_ui() -> void:
 	context_bar = HBoxContainer.new()
 	context_bar.custom_minimum_size = Vector2(0, 32)
 	action_bar_panel.add_child(context_bar)
+	_create_snap_popup()
 
 	var canvas_panel := _create_panel(Color("#1b1e24"))
 	canvas_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -285,6 +296,83 @@ func _create_status_region() -> PanelContainer:
 	style.set_border_width_all(1)
 	region.add_theme_stylebox_override("panel", style)
 	return region
+
+
+func _create_snap_popup() -> void:
+	snap_popup = PopupPanel.new()
+	snap_popup.size = Vector2i(250, 170)
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 6)
+	snap_popup.add_child(content)
+	var title := Label.new()
+	title.text = "Snap Settings"
+	content.add_child(title)
+	snap_toggle = CheckButton.new()
+	snap_toggle.text = "Snap On"
+	snap_toggle.button_pressed = snap_enabled
+	snap_toggle.toggled.connect(_on_snap_enabled_toggled)
+	content.add_child(snap_toggle)
+	snap_grid_value_label = Label.new()
+	content.add_child(snap_grid_value_label)
+	snap_grid_slider = _create_snap_slider(1.0, 64.0, 1.0, snap_grid_step)
+	snap_grid_slider.value_changed.connect(_on_snap_grid_changed)
+	content.add_child(snap_grid_slider)
+	snap_rotation_value_label = Label.new()
+	content.add_child(snap_rotation_value_label)
+	snap_rotation_slider = _create_snap_slider(1.0, 90.0, 1.0, snap_rotation_step)
+	snap_rotation_slider.value_changed.connect(_on_snap_rotation_changed)
+	content.add_child(snap_rotation_slider)
+	_update_snap_popup_labels()
+	add_child(snap_popup)
+
+
+func _create_snap_slider(minimum: float, maximum: float, step: float, value: float) -> HSlider:
+	var slider := HSlider.new()
+	slider.min_value = minimum
+	slider.max_value = maximum
+	slider.step = step
+	slider.value = value
+	slider.custom_minimum_size = Vector2(220, 20)
+	return slider
+
+
+func _toggle_snap_popup() -> void:
+	if snap_popup.visible:
+		snap_popup.hide()
+		return
+	var popup_position := snap_button.get_global_rect().position + Vector2(0.0, snap_button.size.y + 2.0)
+	snap_popup.popup(Rect2(popup_position, snap_popup.size))
+
+
+func _on_snap_enabled_toggled(enabled: bool) -> void:
+	snap_enabled = enabled
+	canvas_view.set_snap_settings(snap_enabled, snap_grid_step, snap_rotation_step)
+	_update_snap_popup_labels()
+
+
+func _on_snap_grid_changed(value: float) -> void:
+	snap_grid_step = value
+	canvas_view.set_snap_settings(snap_enabled, snap_grid_step, snap_rotation_step)
+	_update_snap_popup_labels()
+
+
+func _on_snap_rotation_changed(value: float) -> void:
+	snap_rotation_step = value
+	canvas_view.set_snap_settings(snap_enabled, snap_grid_step, snap_rotation_step)
+	_update_snap_popup_labels()
+
+
+func _update_snap_popup_labels() -> void:
+	if is_instance_valid(snap_toggle):
+		snap_toggle.button_pressed = snap_enabled
+	if is_instance_valid(snap_grid_slider):
+		snap_grid_slider.value = snap_grid_step
+	if is_instance_valid(snap_rotation_slider):
+		snap_rotation_slider.value = snap_rotation_step
+	if is_instance_valid(snap_grid_value_label):
+		snap_grid_value_label.text = "Grid Step: %d px" % int(snap_grid_step)
+	if is_instance_valid(snap_rotation_value_label):
+		snap_rotation_value_label.text = "Rotation Step: %d°" % int(snap_rotation_step)
 
 
 func _create_asset_dialog() -> void:
@@ -386,6 +474,7 @@ func _confirm_new_workspace() -> void:
 	next_asset_id = 1
 	next_component_id = 1
 	active_state = ""
+	_apply_snap_settings({})
 	pending_save_after_new = false
 	workspace_name_dialog.hide()
 	_render_outliner()
@@ -547,7 +636,12 @@ func _serialize_editor_state() -> Dictionary:
 	return {
 		"selected_asset_id": selected_asset_id,
 		"selected_component_id": selected_component_id,
-		"expanded_assets": expanded_state
+		"expanded_assets": expanded_state,
+		"snap": {
+			"enabled": snap_enabled,
+			"grid_step": snap_grid_step,
+			"rotation_step": snap_rotation_step
+		}
 	}
 
 
@@ -558,6 +652,7 @@ func _restore_editor_state(state) -> void:
 	for asset in assets:
 		expanded_assets[str(asset["id"])] = false
 	if not state is Dictionary:
+		_apply_snap_settings({})
 		return
 	var requested_asset_id := str(state.get("selected_asset_id", ""))
 	var selected_asset := _get_asset(requested_asset_id)
@@ -574,6 +669,21 @@ func _restore_editor_state(state) -> void:
 				expanded_assets[asset_id] = bool(saved_expanded[asset_id])
 	if not selected_component_id.is_empty():
 		expanded_assets[selected_asset_id] = true
+	_apply_snap_settings(state.get("snap", {}))
+
+
+func _apply_snap_settings(settings) -> void:
+	if settings is Dictionary:
+		snap_enabled = bool(settings.get("enabled", true))
+		snap_grid_step = clampf(float(settings.get("grid_step", 16.0)), 1.0, 64.0)
+		snap_rotation_step = clampf(float(settings.get("rotation_step", 15.0)), 1.0, 90.0)
+	else:
+		snap_enabled = true
+		snap_grid_step = 16.0
+		snap_rotation_step = 15.0
+	if is_instance_valid(canvas_view):
+		canvas_view.set_snap_settings(snap_enabled, snap_grid_step, snap_rotation_step)
+	_update_snap_popup_labels()
 
 
 func _serialize_points(points: Array) -> Array:
@@ -632,6 +742,12 @@ func _render_context_bar() -> void:
 	if not is_instance_valid(context_bar):
 		return
 	_clear(context_bar)
+	snap_button = Button.new()
+	snap_button.text = "Snap: %s  ▼" % ("On" if snap_enabled else "Off")
+	snap_button.custom_minimum_size = Vector2(112, 32)
+	snap_button.focus_mode = Control.FOCUS_NONE
+	snap_button.pressed.connect(_toggle_snap_popup)
+	context_bar.add_child(snap_button)
 	if selected_component_id.is_empty():
 		active_draw_tool = ""
 		_render_info_bar()

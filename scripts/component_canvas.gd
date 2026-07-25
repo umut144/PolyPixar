@@ -16,7 +16,6 @@ const CLOSE_DISTANCE_PIXELS := 14.0
 const GIZMO_AXIS_LENGTH := 42.0
 const HANDLE_HIT_RADIUS := 12.0
 const FREE_HANDLE_RADIUS := 10.0
-const ORIGIN_MARKER_RADIUS := 6.0
 
 var view_center := Vector2.ZERO
 var zoom := 1.0
@@ -34,6 +33,9 @@ var drag_axis := ""
 var add_segment_index := -1
 var add_preview_point := Vector2.ZERO
 var add_preview_visible := false
+var snap_enabled := true
+var grid_step := 16.0
+var rotation_step := 15.0
 
 
 func _ready() -> void:
@@ -158,6 +160,13 @@ func set_edit_mode(mode: String) -> void:
 	queue_redraw()
 
 
+func set_snap_settings(enabled: bool, new_grid_step: float, new_rotation_step: float) -> void:
+	snap_enabled = enabled
+	grid_step = maxf(new_grid_step, 1.0)
+	rotation_step = maxf(new_rotation_step, 1.0)
+	queue_redraw()
+
+
 func clear_selection() -> void:
 	selected_point_index = -1
 	drag_axis = ""
@@ -244,14 +253,10 @@ func _draw() -> void:
 		var world_y := grid_index * grid_step
 		var color := Color("#2a303a") if posmod(grid_index, 4) == 0 else Color("#222730")
 		draw_line(_world_to_screen(Vector2(min_world.x, world_y)), _world_to_screen(Vector2(max_world.x, world_y)), color, 1.0)
-	var origin_screen := _world_to_screen(Vector2.ZERO)
 	var x_axis_color := Color("#6a4d58")
 	var y_axis_color := Color("#4c6a5b")
 	draw_line(_world_to_screen(Vector2(min_world.x, 0.0)), _world_to_screen(Vector2(max_world.x, 0.0)), x_axis_color, 2.0)
 	draw_line(_world_to_screen(Vector2(0.0, min_world.y)), _world_to_screen(Vector2(0.0, max_world.y)), y_axis_color, 2.0)
-	draw_circle(origin_screen, ORIGIN_MARKER_RADIUS, Color("#f2c94c"), false, 2.0)
-	draw_line(origin_screen - Vector2(10.0, 0.0), origin_screen + Vector2(10.0, 0.0), Color("#f2c94c"), 1.0)
-	draw_line(origin_screen - Vector2(0.0, 10.0), origin_screen + Vector2(0.0, 10.0), Color("#f2c94c"), 1.0)
 	_draw_reference_shapes()
 	_draw_outer_shape()
 	_draw_line_draft()
@@ -379,7 +384,8 @@ func _screen_to_world(screen_position: Vector2) -> Vector2:
 
 
 func _snap_to_grid(world_position: Vector2) -> Vector2:
-	var grid_step := _visible_grid_step()
+	if not snap_enabled:
+		return world_position
 	return Vector2(
 		round(world_position.x / grid_step) * grid_step,
 		round(world_position.y / grid_step) * grid_step
