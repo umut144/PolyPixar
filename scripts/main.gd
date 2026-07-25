@@ -2,6 +2,8 @@ extends Control
 
 const CREATE_SUBMODULES := ["Shapes", "Layers"]
 const INACTIVE_MODULES := ["Style", "Motion", "Transform", "Effects", "Export"]
+const WORKSPACES_ROOT := "res://workspaces"
+const CONFIG_PATH := "res://configs/app_config.json"
 
 var active_create_submodule := "Shapes"
 var outliner_list: VBoxContainer
@@ -26,6 +28,12 @@ var info_bar: HBoxContainer
 var active_draw_tool := ""
 var active_state := ""
 var active_edit_mode := "select"
+var workspace_name := ""
+var workspace_name_dialog: ConfirmationDialog
+var workspace_name_input: LineEdit
+var load_workspace_dialog: ConfirmationDialog
+var workspace_list: ItemList
+var pending_save_after_new := false
 
 
 func _ready() -> void:
@@ -33,6 +41,15 @@ func _ready() -> void:
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
+	_load_last_workspace()
+
+
+func _load_last_workspace() -> void:
+	var config_data = _read_json(CONFIG_PATH)
+	if config_data is Dictionary:
+		var last_workspace := str(config_data.get("last_workspace", ""))
+		if not last_workspace.is_empty():
+			_load_workspace(last_workspace)
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
@@ -91,6 +108,19 @@ func _build_ui() -> void:
 	new_popup.add_item("Texture")
 	new_popup.id_pressed.connect(_on_new_menu_id)
 	toolbar.add_child(new_menu)
+	var toolbar_spacer := Control.new()
+	toolbar_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	toolbar.add_child(toolbar_spacer)
+	var workspace_menu := MenuButton.new()
+	workspace_menu.text = "Workspace  ▼"
+	workspace_menu.custom_minimum_size = Vector2(132, 32)
+	workspace_menu.focus_mode = Control.FOCUS_NONE
+	var workspace_popup := workspace_menu.get_popup()
+	workspace_popup.add_item("New")
+	workspace_popup.add_item("Save")
+	workspace_popup.add_item("Load")
+	workspace_popup.id_pressed.connect(_on_workspace_menu_id)
+	toolbar.add_child(workspace_menu)
 
 	var workspace_row := HBoxContainer.new()
 	workspace_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -186,6 +216,7 @@ func _build_ui() -> void:
 
 	_create_asset_dialog()
 	_create_component_dialog()
+	_create_workspace_dialogs()
 
 
 func _create_panel(background_color := Color("#20242c")) -> PanelContainer:
@@ -243,9 +274,256 @@ func _create_component_dialog() -> void:
 	add_child(component_dialog)
 
 
+func _create_workspace_dialogs() -> void:
+	workspace_name_dialog = ConfirmationDialog.new()
+	workspace_name_dialog.title = "New Workspace"
+	workspace_name_dialog.dialog_text = "Enter a workspace name"
+	workspace_name_dialog.ok_button_text = "Create"
+	workspace_name_dialog.size = Vector2i(360, 160)
+	workspace_name_dialog.confirmed.connect(_confirm_new_workspace)
+	workspace_name_input = LineEdit.new()
+	workspace_name_input.placeholder_text = "Workspace name"
+	workspace_name_input.custom_minimum_size = Vector2(320, 32)
+	workspace_name_input.focus_mode = Control.FOCUS_ALL
+	workspace_name_input.text_submitted.connect(_submit_workspace_name)
+	workspace_name_dialog.add_child(workspace_name_input)
+	add_child(workspace_name_dialog)
+
+	load_workspace_dialog = ConfirmationDialog.new()
+	load_workspace_dialog.title = "Load Workspace"
+	load_workspace_dialog.dialog_text = "Select a workspace"
+	load_workspace_dialog.ok_button_text = "Load"
+	load_workspace_dialog.size = Vector2i(420, 320)
+	load_workspace_dialog.confirmed.connect(_load_selected_workspace)
+	workspace_list = ItemList.new()
+	workspace_list.custom_minimum_size = Vector2(380, 220)
+	workspace_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	workspace_list.item_activated.connect(_load_selected_workspace)
+	load_workspace_dialog.add_child(workspace_list)
+	add_child(load_workspace_dialog)
+
+
 func _on_new_menu_id(id: int) -> void:
 	if id == 0:
 		_open_new_asset_dialog()
+
+
+func _on_workspace_menu_id(id: int) -> void:
+	if id == 0:
+		_open_new_workspace_dialog(false)
+	elif id == 1:
+		_save_workspace()
+	elif id == 2:
+		_open_load_workspace_dialog()
+
+
+func _open_new_workspace_dialog(save_after_creation: bool) -> void:
+	pending_save_after_new = save_after_creation
+	workspace_name_input.text = ""
+	workspace_name_dialog.dialog_text = "Enter a workspace name"
+	workspace_name_dialog.popup_centered()
+	workspace_name_input.grab_focus()
+
+
+func _submit_workspace_name(_submitted_text: String) -> void:
+	_confirm_new_workspace()
+
+
+func _confirm_new_workspace() -> void:
+	var should_save := pending_save_after_new
+	var new_name := workspace_name_input.text.strip_edges()
+	if new_name.is_empty():
+		new_name = _next_default_workspace_name()
+	new_name = _sanitize_workspace_name(new_name)
+	workspace_name = new_name
+	assets.clear()
+	selected_asset_id = ""
+	selected_component_id = ""
+	expanded_assets.clear()
+	next_asset_id = 1
+	next_component_id = 1
+	active_state = ""
+	pending_save_after_new = false
+	workspace_name_dialog.hide()
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+	if should_save:
+		_save_workspace()
+
+
+func _open_load_workspace_dialog() -> void:
+	workspace_list.clear()
+	var names := _list_workspace_names()
+	for name in names:
+		workspace_list.add_item(name)
+		workspace_list.set_item_metadata(workspace_list.item_count - 1, name)
+	if workspace_list.item_count > 0:
+		workspace_list.select(0)
+	load_workspace_dialog.popup_centered()
+	workspace_list.grab_focus()
+
+
+func _load_selected_workspace(_index := -1) -> void:
+	var selected_indices := workspace_list.get_selected_items()
+	if selected_indices.is_empty():
+		return
+	var index := selected_indices[0]
+	var name := str(workspace_list.get_item_metadata(index))
+	if _load_workspace(name):
+		load_workspace_dialog.hide()
+
+
+func _list_workspace_names() -> Array[String]:
+	var names: Array[String] = []
+	var directory := DirAccess.open(WORKSPACES_ROOT)
+	if directory == null:
+		return names
+	directory.list_dir_begin()
+	var entry := directory.get_next()
+	while not entry.is_empty():
+		if directory.current_is_dir() and not entry.begins_with(".") and FileAccess.file_exists("%s/%s/workspace.json" % [WORKSPACES_ROOT, entry]):
+			names.append(entry)
+		entry = directory.get_next()
+	directory.list_dir_end()
+	names.sort()
+	return names
+
+
+func _next_default_workspace_name() -> String:
+	var existing := _list_workspace_names()
+	var index := 1
+	while existing.has("workspace%02d" % index):
+		index += 1
+	return "workspace%02d" % index
+
+
+func _sanitize_workspace_name(value: String) -> String:
+	var sanitized := value.strip_edges()
+	for character in ["/", "\\", ":"]:
+		sanitized = sanitized.replace(character, "_")
+	if sanitized == "." or sanitized == ".." or sanitized.is_empty():
+		return _next_default_workspace_name()
+	return sanitized
+
+
+func _save_workspace() -> void:
+	if workspace_name.is_empty():
+		_open_new_workspace_dialog(true)
+		return
+	var workspace_root := "%s/%s" % [WORKSPACES_ROOT, workspace_name]
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("%s/assets" % workspace_root))
+	var asset_ids: Array[String] = []
+	for asset in assets:
+		var asset_id := str(asset["id"])
+		asset_ids.append(asset_id)
+		var asset_root := "%s/assets/%s" % [workspace_root, asset_id]
+		DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(asset_root))
+		var asset_data := {
+			"format_version": 1,
+			"id": asset_id,
+			"name": str(asset["name"]),
+			"components": []
+		}
+		for component in asset["components"]:
+			asset_data["components"].append({
+				"id": str(component["id"]),
+				"name": str(component["name"]),
+				"outer_shape": _serialize_points(component["outer_shape"])
+			})
+		_write_json("%s/asset.json" % asset_root, asset_data)
+	_write_json("%s/workspace.json" % workspace_root, {
+		"format_version": 1,
+		"name": workspace_name,
+		"assets": asset_ids
+	})
+	_write_json(CONFIG_PATH, {"format_version": 1, "last_workspace": workspace_name})
+
+
+func _load_workspace(name: String) -> bool:
+	var workspace_root := "%s/%s" % [WORKSPACES_ROOT, name]
+	var workspace_data = _read_json("%s/workspace.json" % workspace_root)
+	if not workspace_data is Dictionary:
+		return false
+	var loaded_assets: Array[Dictionary] = []
+	for asset_id_variant in workspace_data.get("assets", []):
+		var asset_id := str(asset_id_variant)
+		var asset_data = _read_json("%s/assets/%s/asset.json" % [workspace_root, asset_id])
+		if not asset_data is Dictionary:
+			continue
+		var components: Array[Dictionary] = []
+		for component_data in asset_data.get("components", []):
+			if not component_data is Dictionary:
+				continue
+			components.append({
+				"id": str(component_data.get("id", "")),
+				"name": str(component_data.get("name", "Component")),
+				"outer_shape": _deserialize_points(component_data.get("outer_shape", []))
+			})
+		loaded_assets.append({
+			"id": str(asset_data.get("id", asset_id)),
+			"name": str(asset_data.get("name", asset_id)),
+			"components": components
+		})
+	assets = loaded_assets
+	workspace_name = str(workspace_data.get("name", name))
+	selected_asset_id = ""
+	selected_component_id = ""
+	expanded_assets.clear()
+	for asset in assets:
+		expanded_assets[str(asset["id"])] = false
+	_update_next_ids()
+	active_state = ""
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+	_write_json(CONFIG_PATH, {"format_version": 1, "last_workspace": workspace_name})
+	return true
+
+
+func _serialize_points(points: Array) -> Array:
+	var serialized: Array = []
+	for point in points:
+		serialized.append([point.x, point.y])
+	return serialized
+
+
+func _deserialize_points(points: Array) -> Array[Vector2]:
+	var deserialized: Array[Vector2] = []
+	for point in points:
+		if point is Array and point.size() >= 2:
+			deserialized.append(Vector2(float(point[0]), float(point[1])))
+	return deserialized
+
+
+func _write_json(path: String, data: Dictionary) -> void:
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(path.get_base_dir()))
+	var file := FileAccess.open(path, FileAccess.WRITE)
+	if file != null:
+		file.store_string(JSON.stringify(data, "\t"))
+
+
+func _read_json(path: String):
+	if not FileAccess.file_exists(path):
+		return null
+	var file := FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		return null
+	return JSON.parse_string(file.get_as_text())
+
+
+func _update_next_ids() -> void:
+	next_asset_id = 1
+	next_component_id = 1
+	for asset in assets:
+		next_asset_id = maxi(next_asset_id, _id_suffix_number(str(asset["id"])) + 1)
+		for component in asset["components"]:
+			next_component_id = maxi(next_component_id, _id_suffix_number(str(component["id"])) + 1)
+
+
+func _id_suffix_number(identifier: String) -> int:
+	var suffix := identifier.get_slice("_", identifier.get_slice_count("_") - 1)
+	return suffix.to_int()
 
 
 func _render_context_bar() -> void:

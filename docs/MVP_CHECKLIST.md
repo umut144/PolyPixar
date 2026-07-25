@@ -83,6 +83,9 @@ before implementing real creation tools.
       other components as transparent references.
 - [x] Highlight selected Outliner entries yellow with black text.
 - [x] Require a second click on the selected Asset to toggle its component list.
+- [x] Provide an in-app Workspace menu with New, Save, and Load.
+- [x] Serialize workspaces and their Assets/Components as versioned JSON files.
+- [x] Store and automatically restore the last workspace through app config.
 - [x] Show an empty, scrollable Inspector on the right.
 - [x] Let users resize the Outliner and Inspector independently with split
       handles while keeping the module rail fixed.

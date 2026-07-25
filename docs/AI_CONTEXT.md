@@ -134,6 +134,14 @@ Outliner selection uses explicit yellow/black selected-button styling. Selecting
 an unselected Asset only changes selection; clicking that already selected Asset
 again toggles its component list open or closed.
 
+Workspace persistence uses the project-local `workspaces/` directory. The
+Workspace menu provides `New`, `Save`, and `Load`; New uses an in-app naming
+dialog with `workspace01` fallback, Save overwrites the active workspace, and
+Load uses an in-app list of existing workspace folders. Each workspace has a
+`workspace.json` plus one `assets/<asset_id>/asset.json` per Asset. The latest
+loaded or saved workspace name is stored in `configs/app_config.json` and is
+loaded automatically on startup.
+
 ## Documentation maintenance
 
 - Update `ARCHITECTURE.md` when a stable product boundary is decided.
