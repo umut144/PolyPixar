@@ -185,6 +185,10 @@ func _gui_input(event: InputEvent) -> void:
 			_confirm_add_point()
 		elif event.keycode == KEY_ESCAPE and interaction_state == "edit":
 			clear_selection()
+		elif event.keycode == KEY_ENTER and active_tool == "line" and not line_draft.is_empty():
+			line_draft.clear()
+			line_draft_changed.emit(line_draft)
+			queue_redraw()
 		elif event.keycode == KEY_BACKSPACE and active_tool == "line" and not line_draft.is_empty():
 			line_draft.pop_back()
 			line_shape_changed.emit(line_draft.duplicate(), false)
