@@ -91,6 +91,7 @@ before implementing real creation tools.
 - [x] Save the active Workspace with `CMD/Ctrl + S` and show a temporary yellow
       confirmation in the program-status region.
 - [x] Persist and restore Outliner selection and Asset expansion state.
+- [x] Transform & Snap Foundation: mark the world origin and full canvas axes.
 - [x] Show an empty, scrollable Inspector on the right.
 - [x] Let users resize the Outliner and Inspector independently with split
       handles while keeping the module rail fixed.

@@ -119,6 +119,18 @@ layer.
 The first MVP should not introduce a generic scene or sequence model unless a
 tested slice actually requires one.
 
+## Transform & Snap Foundation
+
+This is a separate milestone from the current asset and contour workflow. Its
+first step establishes the canvas coordinate system before transform data or
+gizmos are added. The world origin is `(0, 0)` and is rendered as a persistent
+marker where the full horizontal and vertical axes intersect. Component
+geometry remains in local coordinates; later Transform data will map it into
+the canvas coordinate space without rewriting the stored contour points.
+
+Planned follow-up steps are Snap settings, Transform data, Inspector fields,
+Pivot editing, Transform gizmos, and finally visibility/z-order composition.
+
 ## Confirmed UI direction
 
 The editor is organised around a canvas-first workspace:
