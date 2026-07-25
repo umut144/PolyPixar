@@ -22,6 +22,7 @@ var component_name_editor: LineEdit
 var canvas_context_label: Label
 var canvas_view: ComponentCanvas
 var context_bar: HBoxContainer
+var info_bar: HBoxContainer
 var active_draw_tool := ""
 var active_state := ""
 var active_edit_mode := "select"
@@ -39,10 +40,20 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		return
 	if selected_component_id.is_empty():
 		return
-	if event.keycode == KEY_1:
+	var has_command_modifier: bool = event.meta_pressed or event.ctrl_pressed
+	if has_command_modifier and event.keycode == KEY_1:
 		_activate_draw_state()
-	elif event.keycode == KEY_2:
+	elif has_command_modifier and event.keycode == KEY_2:
 		_activate_edit_state()
+	elif not has_command_modifier and active_state == "draw" and event.keycode == KEY_1:
+		_activate_draw_line()
+	elif not has_command_modifier and active_state == "edit":
+		if event.keycode == KEY_1:
+			_set_edit_mode("select")
+		elif event.keycode == KEY_2:
+			_set_edit_mode("move")
+		elif event.keycode == KEY_3:
+			_set_edit_mode("delete")
 
 
 func _build_ui() -> void:
@@ -166,6 +177,9 @@ func _build_ui() -> void:
 	var status_bar := _create_panel()
 	status_bar.custom_minimum_size = Vector2(0, 24)
 	main_layout.add_child(status_bar)
+	info_bar = HBoxContainer.new()
+	info_bar.add_theme_constant_override("separation", 16)
+	status_bar.add_child(info_bar)
 
 	_create_asset_dialog()
 	_create_component_dialog()
@@ -237,49 +251,62 @@ func _render_context_bar() -> void:
 	_clear(context_bar)
 	if selected_component_id.is_empty():
 		active_draw_tool = ""
+		_render_info_bar()
 		return
 	var draw_menu := MenuButton.new()
-	draw_menu.text = "1: Draw  ▼"
+	draw_menu.text = "⌘1  Draw  ▼"
 	draw_menu.custom_minimum_size = Vector2(88, 32)
 	draw_menu.focus_mode = Control.FOCUS_NONE
 	draw_menu.toggle_mode = true
 	draw_menu.button_pressed = active_state == "draw"
 	draw_menu.pressed.connect(_activate_draw_state)
 	var draw_popup := draw_menu.get_popup()
-	draw_popup.add_item("Line", 0)
+	draw_popup.add_item("1: Line", 0)
 	draw_popup.id_pressed.connect(_on_draw_menu_id)
 	context_bar.add_child(draw_menu)
 	var edit_menu := MenuButton.new()
-	edit_menu.text = "2: Edit  ▼"
+	edit_menu.text = "⌘2  Edit  ▼"
 	edit_menu.custom_minimum_size = Vector2(88, 32)
 	edit_menu.focus_mode = Control.FOCUS_NONE
 	edit_menu.toggle_mode = true
 	edit_menu.button_pressed = active_state == "edit"
 	edit_menu.pressed.connect(_activate_edit_state)
 	var edit_popup := edit_menu.get_popup()
-	edit_popup.add_item("Select", 0)
-	edit_popup.add_item("Move", 1)
-	edit_popup.add_item("Delete", 2)
+	edit_popup.add_item("1: Select", 0)
+	edit_popup.add_item("2: Move", 1)
+	edit_popup.add_item("3: Delete", 2)
 	edit_popup.id_pressed.connect(_on_edit_menu_id)
 	context_bar.add_child(edit_menu)
 
 
 func _on_draw_menu_id(id: int) -> void:
 	if id == 0:
-		_activate_draw_state()
+		_activate_draw_line()
 
 
 func _on_edit_menu_id(id: int) -> void:
 	_activate_edit_state()
 	if id == 1:
-		active_edit_mode = "move"
+		_set_edit_mode("move")
 	elif id == 2:
-		active_edit_mode = "delete"
-	canvas_view.set_edit_mode(active_edit_mode)
+		_set_edit_mode("delete")
 
 
 func _activate_draw_state() -> void:
 	_set_active_state("draw")
+
+
+func _activate_draw_line() -> void:
+	active_draw_tool = "line"
+	canvas_view.set_interaction_state("draw")
+	canvas_view.set_tool_mode(active_draw_tool)
+	_render_info_bar()
+
+
+func _set_edit_mode(mode: String) -> void:
+	active_edit_mode = mode
+	canvas_view.set_edit_mode(active_edit_mode)
+	_render_info_bar()
 
 
 func _activate_edit_state() -> void:
@@ -302,6 +329,34 @@ func _set_active_state(state: String) -> void:
 		canvas_view.set_edit_mode(active_edit_mode)
 		canvas_view.set_tool_mode("")
 	_render_context_bar()
+	_render_info_bar()
+
+
+func _render_info_bar() -> void:
+	if not is_instance_valid(info_bar):
+		return
+	_clear(info_bar)
+	if selected_component_id.is_empty():
+		return
+	var state_label := Label.new()
+	state_label.text = "State: %s" % ("Draw" if active_state == "draw" else "Edit" if active_state == "edit" else "—")
+	info_bar.add_child(state_label)
+	if active_state == "draw":
+		_add_info_option("1: Line")
+	elif active_state == "edit":
+		_add_info_option("1: Select")
+		_add_info_option("2: Move")
+		_add_info_option("3: Delete")
+	else:
+		_add_info_option("⌘1: Draw")
+		_add_info_option("⌘2: Edit")
+
+
+func _add_info_option(text: String) -> void:
+	var label := Label.new()
+	label.text = text
+	label.add_theme_color_override("font_color", Color("#aab3c2"))
+	info_bar.add_child(label)
 
 
 func _open_new_asset_dialog() -> void:
@@ -528,6 +583,7 @@ func _rename_selected_component(new_name: String) -> void:
 
 func _render_canvas_context() -> void:
 	_render_context_bar()
+	_render_info_bar()
 	if not is_instance_valid(canvas_context_label):
 		return
 	var asset := _get_asset(selected_asset_id)

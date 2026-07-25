@@ -65,7 +65,9 @@ before implementing real creation tools.
       `Escape`.
 - [x] Close a draft by clicking near its first point once it has at least three
       points, then store and display it as the Component's `Outer Shape`.
-- [x] Show Draw and Edit states in the Context Bar with `1`/`2` shortcuts.
+- [x] Show Draw and Edit states in the Context Bar with `⌘1`/`⌘2` (Ctrl on
+      non-macOS) shortcuts and dynamic subcommand hints in the Info Bar.
+- [x] Select Draw/Edit subcommands with unmodified `1`, `2`, and `3` keys.
 - [x] Select an outer-shape point in Edit and display draggable X/Y move gizmo
       handles.
 - [x] Move selected points with the gizmo and persist the changed contour.
