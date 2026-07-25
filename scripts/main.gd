@@ -1122,6 +1122,39 @@ func _render_inspector() -> void:
 		_rename_selected_component(component_name_editor.text)
 	)
 	inspector_content.add_child(component_name_editor)
+	inspector_content.add_child(_create_panel_label("Transform"))
+	var transform_grid := GridContainer.new()
+	transform_grid.columns = 2
+	transform_grid.add_theme_constant_override("h_separation", 8)
+	transform_grid.add_theme_constant_override("v_separation", 4)
+	inspector_content.add_child(transform_grid)
+	var transform: Dictionary = component.get("transform", _default_component_transform())
+	var position: Vector2 = transform.get("position", Vector2.ZERO)
+	var scale: Vector2 = transform.get("scale", Vector2.ONE)
+	var pivot: Vector2 = transform.get("pivot", Vector2.ZERO)
+	_add_transform_field(transform_grid, "Position X", position.x, "position_x", 1.0)
+	_add_transform_field(transform_grid, "Position Y", position.y, "position_y", 1.0)
+	_add_transform_field(transform_grid, "Rotation", float(transform.get("rotation", 0.0)), "rotation", 1.0)
+	_add_transform_field(transform_grid, "Scale X", scale.x, "scale_x", 0.01)
+	_add_transform_field(transform_grid, "Scale Y", scale.y, "scale_y", 0.01)
+	_add_transform_field(transform_grid, "Pivot X", pivot.x, "pivot_x", 1.0)
+	_add_transform_field(transform_grid, "Pivot Y", pivot.y, "pivot_y", 1.0)
+	inspector_content.add_child(_create_panel_label("Visibility / Layer"))
+	var visibility := CheckButton.new()
+	visibility.text = "Visible"
+	visibility.button_pressed = bool(component.get("visibility", true))
+	visibility.toggled.connect(_on_component_visibility_changed)
+	inspector_content.add_child(visibility)
+	var z_index_label := _create_panel_label("Z Index")
+	inspector_content.add_child(z_index_label)
+	var z_index := SpinBox.new()
+	z_index.min_value = -10000
+	z_index.max_value = 10000
+	z_index.step = 1
+	z_index.value = int(component.get("z_index", 0))
+	z_index.custom_minimum_size = Vector2(0, 30)
+	z_index.value_changed.connect(_on_component_z_index_changed)
+	inspector_content.add_child(z_index)
 
 
 func _create_name_editor(value: String, placeholder: String) -> LineEdit:
@@ -1130,6 +1163,55 @@ func _create_name_editor(value: String, placeholder: String) -> LineEdit:
 	editor.custom_minimum_size = Vector2(0, 30)
 	editor.placeholder_text = placeholder
 	return editor
+
+
+func _add_transform_field(grid: GridContainer, label_text: String, value: float, property_name: String, step: float) -> void:
+	var label := Label.new()
+	label.text = label_text
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	grid.add_child(label)
+	var field := SpinBox.new()
+	field.min_value = -100000.0
+	field.max_value = 100000.0
+	field.step = step
+	field.value = value
+	field.custom_minimum_size = Vector2(96, 28)
+	field.value_changed.connect(_on_transform_value_changed.bind(property_name))
+	grid.add_child(field)
+
+
+func _on_transform_value_changed(value: float, property_name: String) -> void:
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if component.is_empty():
+		return
+	var transform: Dictionary = component.get("transform", _default_component_transform())
+	var position: Vector2 = transform.get("position", Vector2.ZERO)
+	var scale: Vector2 = transform.get("scale", Vector2.ONE)
+	var pivot: Vector2 = transform.get("pivot", Vector2.ZERO)
+	match property_name:
+		"position_x": position.x = value
+		"position_y": position.y = value
+		"rotation": transform["rotation"] = value
+		"scale_x": scale.x = value
+		"scale_y": scale.y = value
+		"pivot_x": pivot.x = value
+		"pivot_y": pivot.y = value
+	transform["position"] = position
+	transform["scale"] = scale
+	transform["pivot"] = pivot
+	component["transform"] = transform
+
+
+func _on_component_visibility_changed(visible: bool) -> void:
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if not component.is_empty():
+		component["visibility"] = visible
+
+
+func _on_component_z_index_changed(value: float) -> void:
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if not component.is_empty():
+		component["z_index"] = int(value)
 
 
 func _rename_selected_asset(new_name: String) -> void:
