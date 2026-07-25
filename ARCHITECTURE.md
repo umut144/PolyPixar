@@ -120,7 +120,7 @@ list of narrow button rows created from the current context.
 
 For a child entry, a small non-interactive placeholder is placed to the left of
 its button. Repeating the placeholder for deeper levels creates visual
-indentation without implementing tree behaviour in the UI skeleton.
+indentation.
 
 ```text
 Asset
@@ -128,8 +128,10 @@ Asset
   └─ Anchors
 ```
 
-Expand/collapse behaviour is not part of the initial placeholder; the visual
-hierarchy is sufficient for the UX prototype.
+An entry with children is a parent button. Clicking it toggles the visibility
+of its immediate child rows and updates its expanded/collapsed visual state.
+The first skeleton does not need to solve separate parent selection behaviour;
+the parent-button click is intentionally reserved for this toggle.
 
 Tool settings and object properties have separate homes:
 

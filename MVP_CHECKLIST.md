@@ -29,6 +29,8 @@ implementing real creation tools.
       using narrow button rows rather than Godot's `Tree` control.
 - [ ] Represent dummy parent/child hierarchy with non-interactive indentation
       placeholders to the left of child rows.
+- [ ] Make a dummy parent row toggle visibility of its immediate child rows and
+      show an expanded/collapsed state.
 - [ ] Show a top toolbar whose dummy tools change with the selected submodule.
 - [ ] Show a context/action bar whose dummy contents change with the active
       tool or operation.

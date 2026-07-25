@@ -66,7 +66,9 @@ for the module-specific UI.
 
 The Outliner is `ScrollContainer` + vertical button rows, not Godot's `Tree`
 control. Hierarchy is represented initially by non-interactive indentation
-placeholders to the left of child buttons.
+placeholders to the left of child buttons. A parent button toggles visibility
+of its immediate child rows; its first-skeleton click behaviour is therefore
+expand/collapse rather than selection.
 
 ## Documentation maintenance
 
