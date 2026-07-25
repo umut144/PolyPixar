@@ -23,6 +23,9 @@ The editor workspace and default output window are 1920×1200 (16:10). The
 preview uses preserved aspect ratio (`keep`) so non-16:10 windows show
 letterboxing. This keeps the editor proportions stable across displays.
 
+The project icon is stored at `assets/assetflow_icon.png` and is configured as
+the Godot application icon.
+
 ## Working rule: minimum necessary capability
 
 For every step, define the visible outcome first and then implement only the
@@ -50,6 +53,10 @@ works*, not necessarily objects stored in a project.
 | Export | Preview and output a chosen result; a dedicated final area. |
 
 The labels may gain or lose submodules as the MVP proves what is necessary.
+
+In the UI, these areas are called **categories**. A category contains one or
+more **modules** that provide the concrete working context. For example,
+`Create` is a category and `Shapes` / `Layers` are its current modules.
 
 ## Confirmed domain relationship
 
@@ -126,17 +133,18 @@ The fixed shell is created once, while context-sensitive regions are rebuilt or
 updated when the active state changes. The MVP needs only the simplest form of
 this pattern; it does not need a general UI framework.
 
-Module navigation uses an accordion rule: only one category section may be
-expanded at a time. The selected module inside that category is the active
-working context and is highlighted with a yellow background and black text.
+Module navigation is implemented by the reusable `ModuleSection` component.
+Sections form an accordion: opening one category closes the others. The active
+module is highlighted with a yellow background and black text, including its
+hover state.
 
 The first skeleton stays visually sparse. Outliner and Inspector have small
 contextual labels; otherwise text is used only where it identifies an
 interactive control or current context.
 
 The visual baseline follows PolyPixAAA: regular Godot controls and their
-native hover/focus/pressed states. Do not add custom per-button colour or font
-overrides unless a real interaction requires them.
+native hover/focus/pressed states. The active-module highlight is the current
+intentional exception because it communicates the working context.
 
 ### Outliner
 

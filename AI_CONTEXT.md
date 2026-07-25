@@ -11,9 +11,9 @@ testable vertical slices rather than a complete feature set up front.
 
 ## Current phase
 
-The repository has just been initialised. The immediate goal is a **minimal UI
-skeleton** so that the interaction model can be reviewed before real asset
-functionality is built. Empty panes are preferred to invented asset content.
+The repository currently contains a reviewed **minimal UI skeleton**. The next
+goal is to begin the first real Create slice while preserving the result-based
+workflow. Empty panes are preferred to invented asset content.
 
 The current implementation target is not a functional morphing engine.
 
@@ -23,13 +23,17 @@ The current implementation target is not a functional morphing engine.
 - Project layout: `project.godot`, `scenes/main.tscn`, and `scripts/main.gd`
 - Editor workspace and default window: 1920×1200 (16:10); preview uses preserved
   aspect ratio (`keep`) so the UI proportions remain stable
+- Project icon: `assets/assetflow_icon.png`
 
 ## Confirmed vocabulary
 
 - **Asset:** An independently editable visual object.
 - **Morph:** A separately designed transition between a source and a target
   asset.
-- **Create / Style / Motion / Transform / Effects:** Visible creative areas.
+- **Category:** A visible creative area such as Create, Style, or Motion.
+- **Module:** A concrete working context inside a category, such as Shapes or
+  Layers.
+- **Create / Style / Motion / Transform / Effects:** Current categories.
 - **Export:** A dedicated final output area.
 - **Timeline:** A contextual view owned by the active time-based work area,
   never a permanent global UI level.
@@ -55,7 +59,7 @@ The skeleton should demonstrate the following navigation state changes without
 invented asset content:
 
 ```text
-module rail sections → submodule selection → toolbar/context bar → workspace state
+category accordion → module selection → toolbar/context bar → workspace state
 ```
 
 It includes a scrollable Outliner, a scrollable Inspector, a central workspace,
@@ -80,14 +84,15 @@ custom button font/hover colours in the initial skeleton.
 
 The Outliner is `ScrollContainer` + an edge-to-edge vertical list of direct
 button rows, not Godot's `Tree` control. Module navigation is handled by
-reusable expandable sections in the left module rail; submodules do not appear
-in the Outliner. The rail behaves as an accordion: at most one category is
-expanded at a time. The active submodule uses a yellow background with black
-text, including its hover state. There are no hierarchy icons or indentation
+reusable expandable sections in the left module rail; modules do not appear in
+the Outliner. The rail behaves as an accordion: at most one category is
+expanded at a time. The active module uses a yellow background with black text,
+including its hover state. There are no hierarchy icons or indentation
 placeholders.
 
-Only Create is active in the current shell. Style, Motion, Transform, Effects,
-and Export are inert buttons until their own work begins.
+Only Create has modules in the current shell. Style, Motion, Transform,
+Effects, and Export are present as empty category sections until their own
+work begins.
 
 ## Documentation maintenance
 
@@ -98,6 +103,8 @@ and Export are inert buttons until their own work begins.
 
 ## Current open questions
 
-- Which exact submodules should appear in the first UI prototype?
-- Should Export appear as a lower rail item, a top-level action, or both?
+- Should empty future categories remain non-expandable until they receive their
+  first module?
 - How much of the lower status grid should be interactive in the prototype?
+- What fixed minimum and maximum pane widths should be used around the 16:10
+  reference layout?
