@@ -98,6 +98,8 @@ before implementing real creation tools.
 - [x] Expose Component transform, visibility, and z-index fields in the
       Inspector.
 - [x] Display and drag the selected Component's local Pivot with Snap support.
+- [x] Add the Transform state with `CMD/Ctrl + 3` and Transform/Rotate/Scale
+      submodes, displaying the initial gizmo at the Pivot.
 - [x] Show an empty, scrollable Inspector on the right.
 - [x] Let users resize the Outliner and Inspector independently with split
       handles while keeping the module rail fixed.

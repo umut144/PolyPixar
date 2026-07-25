@@ -31,6 +31,7 @@ var status_clear_timer: Timer
 var active_draw_tool := ""
 var active_state := ""
 var active_edit_mode := "select"
+var active_transform_mode := "transform"
 var snap_enabled := true
 var snap_grid_step := 16.0
 var snap_rotation_step := 15.0
@@ -79,6 +80,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		_activate_draw_state()
 	elif has_command_modifier and event.keycode == KEY_2:
 		_activate_edit_state()
+	elif has_command_modifier and event.keycode == KEY_3:
+		_activate_transform_state()
 	elif not has_command_modifier and active_state == "draw" and event.keycode == KEY_1:
 		_activate_draw_line()
 	elif not has_command_modifier and active_state == "edit":
@@ -90,6 +93,13 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			_set_edit_mode("move")
 		elif event.keycode == KEY_4:
 			_set_edit_mode("delete")
+	elif not has_command_modifier and active_state == "transform":
+		if event.keycode == KEY_1:
+			_set_transform_mode("transform")
+		elif event.keycode == KEY_2:
+			_set_transform_mode("rotate")
+		elif event.keycode == KEY_3:
+			_set_transform_mode("scale")
 
 
 func _build_ui() -> void:
@@ -826,6 +836,19 @@ func _render_context_bar() -> void:
 	edit_popup.add_item("4: Delete", 3)
 	edit_popup.id_pressed.connect(_on_edit_menu_id)
 	context_bar.add_child(edit_menu)
+	var transform_menu := MenuButton.new()
+	transform_menu.text = "⌘3  Transform  ▼"
+	transform_menu.custom_minimum_size = Vector2(118, 32)
+	transform_menu.focus_mode = Control.FOCUS_NONE
+	transform_menu.toggle_mode = true
+	transform_menu.button_pressed = active_state == "transform"
+	transform_menu.pressed.connect(_activate_transform_state)
+	var transform_popup := transform_menu.get_popup()
+	transform_popup.add_item("1: Transform", 0)
+	transform_popup.add_item("2: Rotate", 1)
+	transform_popup.add_item("3: Scale", 2)
+	transform_popup.id_pressed.connect(_on_transform_menu_id)
+	context_bar.add_child(transform_menu)
 
 
 func _on_draw_menu_id(id: int) -> void:
@@ -841,6 +864,14 @@ func _on_edit_menu_id(id: int) -> void:
 		_set_edit_mode("move")
 	elif id == 3:
 		_set_edit_mode("delete")
+
+
+func _on_transform_menu_id(id: int) -> void:
+	_activate_transform_state()
+	if id == 1:
+		_set_transform_mode("rotate")
+	elif id == 2:
+		_set_transform_mode("scale")
 
 
 func _activate_draw_state() -> void:
@@ -864,6 +895,16 @@ func _activate_edit_state() -> void:
 	_set_active_state("edit")
 
 
+func _activate_transform_state() -> void:
+	_set_active_state("transform")
+
+
+func _set_transform_mode(mode: String) -> void:
+	active_transform_mode = mode
+	canvas_view.set_transform_mode(active_transform_mode)
+	_render_info_bar()
+
+
 func _set_active_state(state: String) -> void:
 	if selected_component_id.is_empty():
 		return
@@ -876,8 +917,12 @@ func _set_active_state(state: String) -> void:
 	else:
 		active_draw_tool = ""
 		active_edit_mode = "select"
-		canvas_view.set_interaction_state("edit")
-		canvas_view.set_edit_mode(active_edit_mode)
+		active_transform_mode = "transform"
+		canvas_view.set_interaction_state("edit" if state == "edit" else "transform")
+		if state == "edit":
+			canvas_view.set_edit_mode(active_edit_mode)
+		else:
+			canvas_view.set_transform_mode(active_transform_mode)
 		canvas_view.set_tool_mode("")
 	_render_context_bar()
 	_render_info_bar()
@@ -899,6 +944,10 @@ func _render_info_bar() -> void:
 		_add_info_option("2: Add")
 		_add_info_option("3: Move")
 		_add_info_option("4: Delete")
+	elif active_state == "transform":
+		_add_info_option("1: Transform")
+		_add_info_option("2: Rotate")
+		_add_info_option("3: Scale")
 	else:
 		_add_info_option("⌘1: Draw")
 		_add_info_option("⌘2: Edit")

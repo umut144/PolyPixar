@@ -24,6 +24,7 @@ var context_name := ""
 var active_tool := ""
 var interaction_state := ""
 var edit_mode := "select"
+var transform_mode := "transform"
 var line_draft: Array[Vector2] = []
 var outer_shape: Array[Vector2] = []
 var reference_shapes: Array[Dictionary] = []
@@ -180,6 +181,11 @@ func set_edit_mode(mode: String) -> void:
 	queue_redraw()
 
 
+func set_transform_mode(mode: String) -> void:
+	transform_mode = mode
+	queue_redraw()
+
+
 func set_snap_settings(enabled: bool, new_grid_step: float, new_rotation_step: float) -> void:
 	snap_enabled = enabled
 	grid_step = maxf(new_grid_step, 1.0)
@@ -287,6 +293,7 @@ func _draw() -> void:
 	_draw_reference_shapes()
 	_draw_outer_shape()
 	_draw_pivot()
+	_draw_transform_gizmo()
 	_draw_line_draft()
 
 
@@ -299,6 +306,27 @@ func _draw_pivot() -> void:
 	draw_circle(pivot_screen, 7.0, pivot_color, false, 2.0)
 	draw_line(pivot_screen - Vector2(11.0, 0.0), pivot_screen + Vector2(11.0, 0.0), pivot_color, 1.0)
 	draw_line(pivot_screen - Vector2(0.0, 11.0), pivot_screen + Vector2(0.0, 11.0), pivot_color, 1.0)
+
+
+func _draw_transform_gizmo() -> void:
+	if interaction_state != "transform" or context_name.is_empty():
+		return
+	var pivot: Vector2 = component_transform.get("pivot", Vector2.ZERO)
+	var center := _world_to_screen(pivot)
+	if transform_mode == "rotate":
+		draw_arc(center, 34.0, 0.0, TAU, 48, Color("#f2c94c"), 2.0)
+		draw_circle(center + Vector2(0.0, -34.0), 7.0, Color("#f2c94c"))
+	elif transform_mode == "scale":
+		var box := Rect2(center - Vector2(30.0, 30.0), Vector2(60.0, 60.0))
+		draw_rect(box, Color("#8ab4f8"), false, 2.0)
+		for corner in [box.position, box.position + Vector2(box.size.x, 0.0), box.position + Vector2(0.0, box.size.y), box.end]:
+			draw_circle(corner, 6.0, Color("#8ab4f8"))
+	else:
+		draw_line(center, center + Vector2(44.0, 0.0), Color("#e56b6f"), 2.0)
+		draw_line(center, center + Vector2(0.0, -44.0), Color("#6bcB77"), 2.0)
+		draw_circle(center + Vector2(44.0, 0.0), 7.0, Color("#e56b6f"))
+		draw_circle(center + Vector2(0.0, -44.0), 7.0, Color("#6bcB77"))
+		draw_rect(Rect2(center - Vector2(7.0, 7.0), Vector2(14.0, 14.0)), Color("#f2c94c"), false, 2.0)
 
 
 func _is_near_pivot(screen_position: Vector2) -> bool:
