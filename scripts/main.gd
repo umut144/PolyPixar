@@ -4,7 +4,7 @@ const CREATE_SUBMODULES := ["Shapes", "Layers"]
 const INACTIVE_MODULES := ["Style", "Motion", "Transform", "Effects", "Export"]
 const WORKSPACES_ROOT := "res://workspaces"
 const CONFIG_PATH := "res://configs/app_config.json"
-const SCHEMA_VERSION := 1
+const SCHEMA_VERSION := 2
 
 var active_create_submodule := "Shapes"
 var outliner_list: VBoxContainer
@@ -552,7 +552,7 @@ func _save_workspace() -> void:
 		var asset_root := "%s/assets/%s" % [workspace_root, asset_id]
 		DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(asset_root))
 		var asset_data := {
-			"schema_version": 1,
+			"schema_version": SCHEMA_VERSION,
 			"id": asset_id,
 			"name": str(asset["name"]),
 			"components": []
@@ -561,16 +561,19 @@ func _save_workspace() -> void:
 			asset_data["components"].append({
 				"id": str(component["id"]),
 				"name": str(component["name"]),
-				"outer_shape": _serialize_points(component["outer_shape"])
+				"outer_shape": _serialize_points(component["outer_shape"]),
+				"transform": _serialize_transform(component.get("transform", {})),
+				"visibility": bool(component.get("visibility", true)),
+				"z_index": int(component.get("z_index", 0))
 			})
 		_write_json("%s/asset.json" % asset_root, asset_data)
 	_write_json("%s/workspace.json" % workspace_root, {
-		"schema_version": 1,
+		"schema_version": SCHEMA_VERSION,
 		"name": workspace_name,
 		"assets": asset_ids,
 		"editor_state": _serialize_editor_state()
 	})
-	_write_json(CONFIG_PATH, {"schema_version": 1, "last_workspace": workspace_name})
+	_write_json(CONFIG_PATH, {"schema_version": SCHEMA_VERSION, "last_workspace": workspace_name})
 	_show_status_message("Saved Workspace: %s!" % workspace_name)
 
 
@@ -609,7 +612,10 @@ func _load_workspace(workspace_entry: String) -> bool:
 			components.append({
 				"id": str(component_data.get("id", "")),
 				"name": str(component_data.get("name", "Component")),
-				"outer_shape": _deserialize_points(component_data.get("outer_shape", []))
+				"outer_shape": _deserialize_points(component_data.get("outer_shape", [])),
+				"transform": _deserialize_transform(component_data.get("transform", {})),
+				"visibility": bool(component_data.get("visibility", true)),
+				"z_index": int(component_data.get("z_index", 0))
 			})
 		loaded_assets.append({
 			"id": str(asset_data.get("id", asset_id)),
@@ -624,7 +630,7 @@ func _load_workspace(workspace_entry: String) -> bool:
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
-	_write_json(CONFIG_PATH, {"schema_version": 1, "last_workspace": workspace_name})
+	_write_json(CONFIG_PATH, {"schema_version": SCHEMA_VERSION, "last_workspace": workspace_name})
 	return true
 
 
@@ -691,6 +697,48 @@ func _serialize_points(points: Array) -> Array:
 	for point in points:
 		serialized.append([point.x, point.y])
 	return serialized
+
+
+func _default_component_transform() -> Dictionary:
+	return {
+		"position": Vector2.ZERO,
+		"rotation": 0.0,
+		"scale": Vector2.ONE,
+		"pivot": Vector2.ZERO
+	}
+
+
+func _serialize_transform(transform: Dictionary) -> Dictionary:
+	var normalized := _deserialize_transform(transform)
+	return {
+		"position": _serialize_vector(normalized["position"]),
+		"rotation": float(normalized["rotation"]),
+		"scale": _serialize_vector(normalized["scale"]),
+		"pivot": _serialize_vector(normalized["pivot"])
+	}
+
+
+func _deserialize_transform(transform) -> Dictionary:
+	var result := _default_component_transform()
+	if not transform is Dictionary:
+		return result
+	result["position"] = _deserialize_vector(transform.get("position", [0.0, 0.0]), Vector2.ZERO)
+	result["rotation"] = float(transform.get("rotation", 0.0))
+	result["scale"] = _deserialize_vector(transform.get("scale", [1.0, 1.0]), Vector2.ONE)
+	result["pivot"] = _deserialize_vector(transform.get("pivot", [0.0, 0.0]), Vector2.ZERO)
+	return result
+
+
+func _serialize_vector(value: Vector2) -> Array:
+	return [value.x, value.y]
+
+
+func _deserialize_vector(value, fallback: Vector2) -> Vector2:
+	if value is Vector2:
+		return value
+	if value is Array and value.size() >= 2:
+		return Vector2(float(value[0]), float(value[1]))
+	return fallback
 
 
 func _deserialize_points(points: Array) -> Array[Vector2]:
@@ -986,7 +1034,14 @@ func _confirm_component_creation() -> void:
 		component_name = _next_default_component_name(asset)
 	var component_id := "component_%d" % next_component_id
 	next_component_id += 1
-	asset["components"].append({"id": component_id, "name": component_name, "outer_shape": []})
+	asset["components"].append({
+		"id": component_id,
+		"name": component_name,
+		"outer_shape": [],
+		"transform": _default_component_transform(),
+		"visibility": true,
+		"z_index": 0
+	})
 	selected_asset_id = asset_id
 	selected_component_id = component_id
 	active_state = ""

@@ -93,6 +93,8 @@ before implementing real creation tools.
 - [x] Persist and restore Outliner selection and Asset expansion state.
 - [x] Transform & Snap Foundation: mark the world origin and full canvas axes.
 - [x] Add a persistent Snap popover with On/Off, Grid Step, and Rotation Step.
+- [x] Store Component position, rotation, scale, pivot, visibility, and z-index
+      in schema-versioned Workspace JSON.
 - [x] Show an empty, scrollable Inspector on the right.
 - [x] Let users resize the Outliner and Inspector independently with split
       handles while keeping the module rail fixed.

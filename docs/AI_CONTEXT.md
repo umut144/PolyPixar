@@ -141,7 +141,7 @@ Load uses an in-app list of existing workspace folders. Each workspace has a
 `workspace.json` plus one `assets/<asset_id>/asset.json` per Asset. The latest
 loaded or saved workspace name is stored in `configs/app_config.json` and is
 loaded automatically on startup. Every workspace, asset, and config JSON uses
-the numeric `schema_version` field; the current schema is version `1`. The
+the numeric `schema_version` field; the current schema is version `2`. The
 bottom status bar is divided into 17% program status, 64% contextual tool
 information, and 17% reserved space. `CMD/Ctrl + S` saves the active workspace;
 the canvas suppresses ASDW panning while that modifier is held.
@@ -151,8 +151,9 @@ and expanded Outliner containers when the Workspace is reopened.
 The current Transform & Snap Foundation milestone begins with the world origin
 `(0, 0)` defined by full horizontal/vertical canvas axes. Phase 2 adds the
 left-aligned Snap popover with On/Off, Grid Step, and Rotation Step controls;
-the settings are workspace-persistent. Transform data and gizmos remain later
-steps.
+the settings are workspace-persistent. Phase 3 stores Component transform data
+(position, rotation, scale, pivot) plus visibility and z-index; rendering and
+Inspector editing remain later steps.
 
 ## Documentation maintenance
 
