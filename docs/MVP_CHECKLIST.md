@@ -50,6 +50,8 @@ before implementing real creation tools.
 - [x] Use `component01`, `component02`, and so on when a Component name is
       confirmed empty.
 - [x] Select Components in the Outliner and edit their `Name` in the Inspector.
+- [x] Reflect the selected Asset or Component as the active central workspace
+      context without adding editable canvas content yet.
 - [x] Show an empty, canvas-first working area without fake asset previews.
 - [x] Show an empty, scrollable Inspector on the right.
 - [x] Let users resize the Outliner and Inspector independently with split

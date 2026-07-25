@@ -103,8 +103,9 @@ The Main Toolbar contains a `New ▼` menu with `Asset` and `Texture` entries.
 `New → Asset` opens a name dialog with OK/Cancel, Enter, and Escape handling,
 creates an in-memory Asset, lists it in the Outliner, and exposes its editable
 name in the Inspector. `Texture` remains inert. Components can now be added
-below an Asset, selected, and renamed in the Inspector. Canvas drawing is the
-next phase.
+below an Asset, selected, and renamed in the Inspector. The central workspace
+now identifies whether the Asset or a Component is the active context; the
+canvas itself is still intentionally empty.
 
 ## Documentation maintenance
 

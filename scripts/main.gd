@@ -19,6 +19,7 @@ var component_dialog: ConfirmationDialog
 var component_name_input: LineEdit
 var asset_name_editor: LineEdit
 var component_name_editor: LineEdit
+var canvas_context_label: Label
 
 
 func _ready() -> void:
@@ -128,6 +129,11 @@ func _build_ui() -> void:
 	canvas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	canvas_panel.add_child(canvas)
+	canvas_context_label = Label.new()
+	canvas_context_label.position = Vector2(8, 6)
+	canvas_context_label.add_theme_font_size_override("font_size", 11)
+	canvas_context_label.add_theme_color_override("font_color", Color("#9aa3b2"))
+	canvas.add_child(canvas_context_label)
 
 	var inspector_panel := _create_panel()
 	inspector_panel.custom_minimum_size = Vector2(260, 0)
@@ -227,6 +233,8 @@ func _confirm_asset_creation() -> void:
 	asset_dialog.hide()
 	_render_outliner()
 	_render_inspector()
+	_render_canvas_context()
+	_render_canvas_context()
 
 
 func _next_default_asset_name() -> String:
@@ -297,6 +305,7 @@ func _select_asset(asset_id: String) -> void:
 	expanded_assets[asset_id] = not bool(expanded_assets.get(asset_id, false))
 	_render_outliner()
 	_render_inspector()
+	_render_canvas_context()
 
 
 func _open_component_dialog(asset_id: String) -> void:
@@ -330,6 +339,7 @@ func _confirm_component_creation() -> void:
 	component_dialog.hide()
 	_render_outliner()
 	_render_inspector()
+	_render_canvas_context()
 
 
 func _next_default_component_name(asset: Dictionary) -> String:
@@ -352,6 +362,7 @@ func _select_component(asset_id: String, component_id: String) -> void:
 	expanded_assets[asset_id] = true
 	_render_outliner()
 	_render_inspector()
+	_render_canvas_context()
 
 
 func _render_inspector() -> void:
@@ -399,6 +410,7 @@ func _rename_selected_asset(new_name: String) -> void:
 		return
 	asset["name"] = asset_name
 	_render_outliner()
+	_render_canvas_context()
 
 
 func _rename_selected_component(new_name: String) -> void:
@@ -412,6 +424,24 @@ func _rename_selected_component(new_name: String) -> void:
 		return
 	component["name"] = component_name
 	_render_outliner()
+	_render_canvas_context()
+
+
+func _render_canvas_context() -> void:
+	if not is_instance_valid(canvas_context_label):
+		return
+	var asset := _get_asset(selected_asset_id)
+	if asset.is_empty():
+		canvas_context_label.text = ""
+		return
+	if selected_component_id.is_empty():
+		canvas_context_label.text = "Asset: %s" % str(asset["name"])
+		return
+	var component := _get_component(asset, selected_component_id)
+	if component.is_empty():
+		canvas_context_label.text = "Asset: %s" % str(asset["name"])
+		return
+	canvas_context_label.text = "Component: %s" % str(component["name"])
 
 
 func _get_asset(asset_id: String) -> Dictionary:
