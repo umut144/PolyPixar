@@ -89,10 +89,11 @@ custom button font/hover colours in the initial skeleton.
 The Outliner is `ScrollContainer` + an edge-to-edge vertical list of direct
 button rows, not Godot's `Tree` control. Module navigation is handled by
 reusable expandable sections in the left module rail; modules do not appear in
-the Outliner. The rail behaves as an accordion: at most one category is
-expanded at a time. The active module uses a yellow background with black text,
-including its hover state. There are no hierarchy icons or indentation
-placeholders.
+the Outliner. The Outliner uses vertical Asset containers with a name header,
+an `Add` button, and Component child rows with an empty indentation placeholder.
+The rail behaves as an accordion: at most one category is expanded at a time.
+The active module uses a yellow background with black text, including its
+hover state. No tree icons or glyphs are used.
 
 Only Create has modules in the current shell. Style, Motion, Transform,
 Effects, and Export are present as empty category sections until their own

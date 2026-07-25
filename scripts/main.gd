@@ -247,35 +247,48 @@ func _render_outliner() -> void:
 	_clear(outliner_list)
 	for asset in assets:
 		var asset_id := str(asset["id"])
+		var asset_container := VBoxContainer.new()
+		asset_container.add_theme_constant_override("separation", 0)
+		outliner_list.add_child(asset_container)
+		var asset_header := HBoxContainer.new()
+		asset_header.add_theme_constant_override("separation", 2)
+		asset_container.add_child(asset_header)
 		var asset_button := Button.new()
 		asset_button.text = str(asset["name"])
 		asset_button.custom_minimum_size = Vector2(0, 30)
+		asset_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		asset_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		asset_button.focus_mode = Control.FOCUS_NONE
 		asset_button.toggle_mode = true
 		asset_button.button_pressed = asset_id == selected_asset_id
 		asset_button.pressed.connect(_select_asset.bind(asset_id))
-		outliner_list.add_child(asset_button)
+		asset_header.add_child(asset_button)
+		var add_button := Button.new()
+		add_button.text = "Add"
+		add_button.custom_minimum_size = Vector2(48, 30)
+		add_button.focus_mode = Control.FOCUS_NONE
+		add_button.pressed.connect(_open_component_dialog.bind(asset_id))
+		asset_header.add_child(add_button)
 		if not bool(expanded_assets.get(asset_id, false)):
 			continue
-		var add_component_button := Button.new()
-		add_component_button.text = "Add Component"
-		add_component_button.custom_minimum_size = Vector2(0, 28)
-		add_component_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		add_component_button.focus_mode = Control.FOCUS_NONE
-		add_component_button.pressed.connect(_open_component_dialog.bind(asset_id))
-		outliner_list.add_child(add_component_button)
 		for component in asset["components"]:
 			var component_id := str(component["id"])
+			var component_row := HBoxContainer.new()
+			component_row.add_theme_constant_override("separation", 0)
+			asset_container.add_child(component_row)
+			var child_placeholder := Control.new()
+			child_placeholder.custom_minimum_size = Vector2(16, 0)
+			component_row.add_child(child_placeholder)
 			var component_button := Button.new()
 			component_button.text = str(component["name"])
 			component_button.custom_minimum_size = Vector2(0, 30)
+			component_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			component_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 			component_button.focus_mode = Control.FOCUS_NONE
 			component_button.toggle_mode = true
 			component_button.button_pressed = component_id == selected_component_id
 			component_button.pressed.connect(_select_component.bind(asset_id, component_id))
-			outliner_list.add_child(component_button)
+			component_row.add_child(component_button)
 
 
 func _select_asset(asset_id: String) -> void:

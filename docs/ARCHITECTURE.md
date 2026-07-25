@@ -163,15 +163,16 @@ intentional exception because it communicates the working context.
 
 ### Outliner
 
-The Outliner does not use Godot's `Tree` control. It is a scrollable,
-edge-to-edge vertical list of narrow button rows created from the current
-context. Module navigation lives in the left rail, so submodule buttons do not
-appear in the Outliner.
+The Outliner does not use Godot's `Tree` control. It is a scrollable list of
+data-driven Asset containers. Each Asset uses a vertical container with a
+header row: the name button expands/selects the Asset and a compact `Add`
+button creates a Component. Component rows appear below it with an empty left
+placeholder to make the parent/child relationship visible. Module navigation
+lives in the left rail, so category modules do not appear in the Outliner.
 
-An entry with children is a parent button. Clicking it toggles the visibility
-of its immediate child rows. No icon, glyph, indentation placeholder, margin,
-or padding is added to communicate this in the initial skeleton. The
-parent-button click is intentionally reserved for this toggle.
+An Asset name button is a parent button. Clicking it selects the Asset and
+toggles the visibility of its immediate Component rows. The empty placeholder
+is the only intentional indentation aid; no tree icon or glyph is used.
 
 Tool settings and object properties have separate homes:
 

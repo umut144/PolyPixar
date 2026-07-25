@@ -31,8 +31,9 @@ before implementing real creation tools.
       active module with a yellow background and black text.
 - [x] Show a scrollable current-context Outliner in the left workspace panel
       using narrow button rows rather than Godot's `Tree` control.
-- [x] Keep every Outliner row as one direct, left-aligned button without
-      margins, padding, indentation placeholders, or expand/collapse icons.
+- [x] Keep Asset headers as compact rows with a left-aligned name and a right
+      `Add` button; show Component children with an empty indentation
+      placeholder and no tree icons.
 - [x] Keep category navigation behaviour in a reusable `ModuleSection`
       component; reserve the Outliner for real content hierarchy.
 - [x] Show empty structural Main Toolbar and Context Bar areas ready for real
