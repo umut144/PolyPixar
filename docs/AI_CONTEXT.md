@@ -140,7 +140,8 @@ dialog with `workspace01` fallback, Save overwrites the active workspace, and
 Load uses an in-app list of existing workspace folders. Each workspace has a
 `workspace.json` plus one `assets/<asset_id>/asset.json` per Asset. The latest
 loaded or saved workspace name is stored in `configs/app_config.json` and is
-loaded automatically on startup.
+loaded automatically on startup. Every workspace, asset, and config JSON uses
+the numeric `schema_version` field; the current schema is version `1`.
 
 ## Documentation maintenance
 

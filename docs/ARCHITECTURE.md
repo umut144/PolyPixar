@@ -4,6 +4,19 @@
 **Purpose:** Records the product decisions that are currently confirmed. It is
 not a promise of every future feature and not an implementation blueprint.
 
+## Contents
+
+1. [Product intent](#product-intent)
+2. [Technology baseline](#technology-baseline)
+3. [Working rule](#working-rule-minimum-necessary-capability)
+4. [Creative areas](#confirmed-creative-areas)
+5. [Domain relationships](#confirmed-domain-relationship)
+6. [Time and timelines](#time-and-timelines)
+7. [UI architecture](#confirmed-ui-direction)
+8. [Data and persistence](#data-and-persistence)
+9. [MVP constraints](#architecture-constraints-for-the-mvp)
+10. [Open decisions](#explicitly-open-decisions)
+
 ## Product intent
 
 AssetFlow2D is a creative 2D asset tool. It should make the creation of
@@ -17,7 +30,9 @@ only when the next demonstrable result requires it.
 
 The MVP is built with **Godot 4.7.1**. The UI skeleton uses a minimal Godot
 layout: `project.godot`, one root scene, and a dynamic GDScript UI entry point.
-Persistence format remains open.
+Workspace persistence uses versioned JSON files in the project-local
+`workspaces/` directory. Application-level startup state is stored in
+`configs/app_config.json`.
 
 The editor workspace and default output window are 1920×1200 (16:10). The
 preview uses preserved aspect ratio (`keep`) so non-16:10 windows show
@@ -112,7 +127,8 @@ The editor is organised around a canvas-first workspace:
 left module rail        expandable Create / Style / Motion / Transform / Effects sections
 left context panel      current-context outliner
 Main Toolbar            global tools and direct actions; currently `New ▼` with
-                        `Asset` and `Texture` menu entries
+                        `Asset` and `Texture` entries, plus a right-aligned
+                        `Workspace ▼` menu with `New`, `Save`, and `Load`
 Context Bar             settings and actions for the active tool or operation
 centre                  working area
 right                   inspector for selected objects
@@ -150,10 +166,10 @@ hover state.
 The current first data flow is `New → Asset`: a name dialog creates an
 in-memory Asset with a stable internal ID, the Asset appears in the Outliner,
 and its display name can be edited in the Inspector. An Asset can now contain
-named Components with stable IDs; Components can be selected and renamed, but
-persistence and Component contour editing are intentionally deferred. The
-current Component Canvas provides a dynamic grid, keyboard panning with
-`A/S/D/W`, and zooming with `Q/E` (`E` zooms in).
+named Components with stable IDs. Workspace persistence stores these Assets
+and their completed Component contours. The current Component Canvas provides
+a dynamic grid, keyboard panning with `A/S/D/W`, and zooming with `Q/E`
+(`E` zooms in).
 
 The first skeleton stays visually sparse. Outliner and Inspector have small
 contextual labels; otherwise text is used only where it identifies an
@@ -183,6 +199,30 @@ Tool settings and object properties have separate homes:
 - A direct action executes once; it must not create an unnecessary persistent
   editor state.
 
+## Data and persistence
+
+The editor works on one active Workspace. A Workspace is the unit that is
+created, saved, and loaded; Assets are contents of a Workspace and are not
+loaded or saved independently through the top-level menu.
+
+```text
+workspaces/<workspace_name>/
+├── workspace.json
+└── assets/<asset_id>/asset.json
+```
+
+Every JSON document contains a numeric `schema_version`. The current MVP
+schema is version `1`. Workspace metadata references Asset IDs, while each
+Asset document stores its Components and their contour points. Display names
+remain editable and are not used as persistent references.
+
+`configs/app_config.json` is separate from Workspace content and stores the
+name of the last loaded or saved Workspace. On startup, the application tries
+to restore that Workspace and otherwise starts empty.
+
+The MVP uses an in-app New dialog and an in-app Load list; it does not depend on
+the operating system's file picker. Save overwrites the active Workspace.
+
 ## Architecture constraints for the MVP
 
 - UI prototypes may use only the smallest dummy data needed to exercise a
@@ -199,7 +239,6 @@ Tool settings and object properties have separate homes:
 
 The following topics are intentionally not decided yet:
 
-- Persistence format
 - Exact submodule names and which ones are visible in the first prototype
 - Whether a future multi-asset playback container is called Scene, Sequence,
   Stage, or is needed at all

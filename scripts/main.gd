@@ -4,6 +4,7 @@ const CREATE_SUBMODULES := ["Shapes", "Layers"]
 const INACTIVE_MODULES := ["Style", "Motion", "Transform", "Effects", "Export"]
 const WORKSPACES_ROOT := "res://workspaces"
 const CONFIG_PATH := "res://configs/app_config.json"
+const SCHEMA_VERSION := 1
 
 var active_create_submodule := "Shapes"
 var outliner_list: VBoxContainer
@@ -46,7 +47,7 @@ func _ready() -> void:
 
 func _load_last_workspace() -> void:
 	var config_data = _read_json(CONFIG_PATH)
-	if config_data is Dictionary:
+	if _has_supported_schema(config_data):
 		var last_workspace := str(config_data.get("last_workspace", ""))
 		if not last_workspace.is_empty():
 			_load_workspace(last_workspace)
@@ -420,7 +421,7 @@ func _save_workspace() -> void:
 		var asset_root := "%s/assets/%s" % [workspace_root, asset_id]
 		DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(asset_root))
 		var asset_data := {
-			"format_version": 1,
+			"schema_version": 1,
 			"id": asset_id,
 			"name": str(asset["name"]),
 			"components": []
@@ -433,23 +434,23 @@ func _save_workspace() -> void:
 			})
 		_write_json("%s/asset.json" % asset_root, asset_data)
 	_write_json("%s/workspace.json" % workspace_root, {
-		"format_version": 1,
+		"schema_version": 1,
 		"name": workspace_name,
 		"assets": asset_ids
 	})
-	_write_json(CONFIG_PATH, {"format_version": 1, "last_workspace": workspace_name})
+	_write_json(CONFIG_PATH, {"schema_version": 1, "last_workspace": workspace_name})
 
 
 func _load_workspace(name: String) -> bool:
 	var workspace_root := "%s/%s" % [WORKSPACES_ROOT, name]
 	var workspace_data = _read_json("%s/workspace.json" % workspace_root)
-	if not workspace_data is Dictionary:
+	if not _has_supported_schema(workspace_data):
 		return false
 	var loaded_assets: Array[Dictionary] = []
 	for asset_id_variant in workspace_data.get("assets", []):
 		var asset_id := str(asset_id_variant)
 		var asset_data = _read_json("%s/assets/%s/asset.json" % [workspace_root, asset_id])
-		if not asset_data is Dictionary:
+		if not _has_supported_schema(asset_data):
 			continue
 		var components: Array[Dictionary] = []
 		for component_data in asset_data.get("components", []):
@@ -477,7 +478,7 @@ func _load_workspace(name: String) -> bool:
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
-	_write_json(CONFIG_PATH, {"format_version": 1, "last_workspace": workspace_name})
+	_write_json(CONFIG_PATH, {"schema_version": 1, "last_workspace": workspace_name})
 	return true
 
 
@@ -510,6 +511,13 @@ func _read_json(path: String):
 	if file == null:
 		return null
 	return JSON.parse_string(file.get_as_text())
+
+
+func _has_supported_schema(data) -> bool:
+	if not data is Dictionary:
+		return false
+	var version := int(data.get("schema_version", data.get("format_version", 0)))
+	return version > 0 and version <= SCHEMA_VERSION
 
 
 func _update_next_ids() -> void:
