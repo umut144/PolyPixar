@@ -73,11 +73,9 @@ func _gui_input(event: InputEvent) -> void:
 			line_draft.append(snapped_point)
 			line_draft_changed.emit(line_draft)
 			queue_redraw()
-		elif event.button_index == MOUSE_BUTTON_LEFT and (interaction_state == "edit" or interaction_state.is_empty()):
+		elif event.button_index == MOUSE_BUTTON_LEFT and interaction_state == "edit":
 			if _is_near_pivot(event.position):
 				pivot_dragging = true
-				return
-			if interaction_state.is_empty():
 				return
 			if edit_mode == "add":
 				return
@@ -111,9 +109,16 @@ func _gui_input(event: InputEvent) -> void:
 		cursor_over_canvas = true
 		cursor_world = _snap_to_grid(_world_to_local(_screen_to_world(event.position)))
 		if pivot_dragging:
-			var pivot := _snap_to_grid(_world_to_local(_screen_to_world(event.position)))
-			component_transform["pivot"] = pivot
-			pivot_changed.emit(pivot)
+			var old_pivot: Vector2 = component_transform.get("pivot", Vector2.ZERO)
+			var new_pivot := _snap_to_grid(_world_to_local(_screen_to_world(event.position)))
+			var scale: Vector2 = component_transform.get("scale", Vector2.ONE)
+			var rotation := deg_to_rad(float(component_transform.get("rotation", 0.0)))
+			var position: Vector2 = component_transform.get("position", Vector2.ZERO)
+			position += ((new_pivot - old_pivot) * scale).rotated(rotation)
+			component_transform["pivot"] = new_pivot
+			component_transform["position"] = position
+			pivot_changed.emit(new_pivot)
+			transform_changed.emit(component_transform.duplicate(true))
 			queue_redraw()
 			return
 		if interaction_state == "transform" and transform_drag_axis != "":

@@ -158,6 +158,8 @@ Pivot with Snap support. Phase 6 exposes `CMD/Ctrl + 3` with `1: Transform`,
 `2: Rotate`, and `3: Scale`; the gizmo is drawn at the Pivot and the Transform
 submode supports free, X-axis, and Y-axis translation with Snap. Rotate and
 Scale interaction remain later steps.
+Pivot dragging is restricted to Edit state and adjusts the transform position
+to keep the component geometry visually stable.
 
 ## Documentation maintenance
 

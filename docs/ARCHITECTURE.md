@@ -132,7 +132,8 @@ The origin, Snap settings, Transform data, and Pivot phases are complete.
 Transform data is stored per Component as position, rotation, scale, and pivot,
 with visibility and z-index alongside it. The Inspector exposes these values as
 numeric fields and a visibility toggle. The selected Component's local Pivot is
-visible in the Canvas and can be dragged with the active Snap settings; full
+visible in the Canvas and can be dragged only in Edit state with the active
+Snap settings while preserving the visible geometry; full
 transform rendering and gizmos remain separate follow-up steps. Phase 6 now
 exposes `CMD/Ctrl + 3` with Transform, Rotate, and Scale submodes; its initial
 gizmo is positioned at the Component Pivot. The `Transform` submode now
