@@ -47,6 +47,9 @@ need and name are open.
 - Prefer the smallest usable implementation over a general framework.
 - Keep data types generic enough to avoid example-specific code. A closed
   `PolylineContour` is appropriate; a `WizardHatShape` is not.
+- Assets contain independently editable Components. The `Line` tool in
+  `Create → Shapes` creates closed Polyline contours on the selected Component;
+  it does not draw directly on the Asset container.
 - Do not add Bézier editing, maps, full materials, a node graph, generic
   rigging, or export pipelines until a confirmed checklist item requires them.
 - Treat dummy UI data as dummy UI data. Do not let it quietly become a rigid

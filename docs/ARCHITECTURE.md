@@ -58,6 +58,13 @@ In the UI, these areas are called **categories**. A category contains one or
 more **modules** that provide the concrete working context. For example,
 `Create` is a category and `Shapes` / `Layers` are its current modules.
 
+An Asset is a container for independently editable Components. Drawing is
+performed on a selected Component, never directly on the Asset container. The
+first `Create → Shapes` drawing tool is named `Line`; despite the name, it is a
+Polyline tool that places ordered points and produces a closed contour marked
+as an outer shape when confirmed. Bézier editing and other contour types are
+deferred.
+
 ## Confirmed domain relationship
 
 An asset is independently editable. A morph is a deliberately designed
