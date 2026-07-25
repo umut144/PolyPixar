@@ -10,6 +10,7 @@ const BASE_GRID_STEP := 32.0
 var view_center := Vector2.ZERO
 var zoom := 1.0
 var context_name := ""
+var active_tool := ""
 
 
 func _ready() -> void:
@@ -26,6 +27,10 @@ func _gui_input(event: InputEvent) -> void:
 func set_context(name: String) -> void:
 	context_name = name
 	queue_redraw()
+
+
+func set_tool_mode(tool_name: String) -> void:
+	active_tool = tool_name
 
 
 func _process(delta: float) -> void:

@@ -21,12 +21,15 @@ var asset_name_editor: LineEdit
 var component_name_editor: LineEdit
 var canvas_context_label: Label
 var canvas_view: ComponentCanvas
+var context_bar: HBoxContainer
+var active_draw_tool := ""
 
 
 func _ready() -> void:
 	_build_ui()
 	_render_outliner()
 	_render_inspector()
+	_render_canvas_context()
 
 
 func _build_ui() -> void:
@@ -118,9 +121,9 @@ func _build_ui() -> void:
 
 	var action_bar_panel := _create_panel()
 	canvas_column.add_child(action_bar_panel)
-	var action_bar := HBoxContainer.new()
-	action_bar.custom_minimum_size = Vector2(0, 32)
-	action_bar_panel.add_child(action_bar)
+	context_bar = HBoxContainer.new()
+	context_bar.custom_minimum_size = Vector2(0, 32)
+	action_bar_panel.add_child(context_bar)
 
 	var canvas_panel := _create_panel(Color("#1b1e24"))
 	canvas_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -213,6 +216,29 @@ func _on_new_menu_id(id: int) -> void:
 		_open_new_asset_dialog()
 
 
+func _render_context_bar() -> void:
+	if not is_instance_valid(context_bar):
+		return
+	_clear(context_bar)
+	if selected_component_id.is_empty():
+		active_draw_tool = ""
+		return
+	var draw_menu := MenuButton.new()
+	draw_menu.text = "Draw  ▼"
+	draw_menu.custom_minimum_size = Vector2(88, 32)
+	draw_menu.focus_mode = Control.FOCUS_NONE
+	var draw_popup := draw_menu.get_popup()
+	draw_popup.add_item("Line", 0)
+	draw_popup.id_pressed.connect(_on_draw_menu_id)
+	context_bar.add_child(draw_menu)
+
+
+func _on_draw_menu_id(id: int) -> void:
+	if id == 0:
+		active_draw_tool = "line"
+		canvas_view.set_tool_mode(active_draw_tool)
+
+
 func _open_new_asset_dialog() -> void:
 	asset_name_input.text = ""
 	asset_dialog.popup_centered()
@@ -236,7 +262,6 @@ func _confirm_asset_creation() -> void:
 	asset_dialog.hide()
 	_render_outliner()
 	_render_inspector()
-	_render_canvas_context()
 	_render_canvas_context()
 
 
@@ -431,6 +456,7 @@ func _rename_selected_component(new_name: String) -> void:
 
 
 func _render_canvas_context() -> void:
+	_render_context_bar()
 	if not is_instance_valid(canvas_context_label):
 		return
 	var asset := _get_asset(selected_asset_id)

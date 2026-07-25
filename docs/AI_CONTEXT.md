@@ -107,6 +107,9 @@ below an Asset, selected, and renamed in the Inspector. The central workspace
 identifies whether the Asset or a Component is the active context. The empty
 Shapes canvas now provides a PolyPixAAA-style grid with click-to-focus `A/S/D/W`
 pan and `Q/E` zoom controls (`E` zooms in); it still contains no asset data.
+When a Component is selected, the Context Bar shows `Draw ▼` with a `Line`
+entry. Selecting `Line` only records the active tool for now; point input is the
+next step.
 
 ## Documentation maintenance
 

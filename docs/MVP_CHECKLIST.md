@@ -55,6 +55,8 @@ before implementing real creation tools.
 - [x] Provide a PolyPixAAA-style Shapes canvas with a dynamic grid.
 - [x] Pan the canvas with `A/S/D/W` after clicking it to focus.
 - [x] Zoom the canvas with `Q/E`, with `E` zooming in.
+- [x] Show `Draw ▼` with a `Line` entry in the Context Bar for selected
+      Components; record the selected tool without drawing yet.
 - [x] Show an empty, canvas-first working area without fake asset previews.
 - [x] Show an empty, scrollable Inspector on the right.
 - [x] Let users resize the Outliner and Inspector independently with split
