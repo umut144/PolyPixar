@@ -151,6 +151,11 @@ uses in-memory document snapshots, with `CMD/Ctrl + Z` for Undo and
 coalesced into one history entry; the history is not persisted with a
 Workspace.
 
+Create/Line stores each placed point immediately on the Component. A Line may
+remain open; clicking the first point after at least three points marks the
+stored shape as `closed`, which enables polygon semantics without making
+closure a prerequisite for persistence or Undo.
+
 ## Confirmed UI direction
 
 The editor is organised around a canvas-first workspace:

@@ -232,7 +232,7 @@ func _build_ui() -> void:
 	canvas_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	canvas_column.add_child(canvas_panel)
 	canvas_view = ComponentCanvas.new()
-	canvas_view.line_completed.connect(_on_line_completed)
+	canvas_view.line_shape_changed.connect(_on_line_shape_changed)
 	canvas_view.outer_shape_changed.connect(_on_outer_shape_changed)
 	canvas_view.reference_component_selected.connect(_on_reference_component_selected)
 	canvas_view.pivot_changed.connect(_on_pivot_changed)
@@ -592,6 +592,7 @@ func _save_workspace() -> void:
 				"id": str(component["id"]),
 				"name": str(component["name"]),
 				"outer_shape": _serialize_points(component["outer_shape"]),
+				"closed": bool(component.get("closed", component["outer_shape"].size() >= 3)),
 				"transform": _serialize_transform(component.get("transform", {})),
 				"visibility": bool(component.get("visibility", true)),
 				"z_index": int(component.get("z_index", 0))
@@ -715,6 +716,7 @@ func _load_workspace(workspace_entry: String) -> bool:
 				"id": str(component_data.get("id", "")),
 				"name": str(component_data.get("name", "Component")),
 				"outer_shape": _deserialize_points(component_data.get("outer_shape", [])),
+				"closed": bool(component_data.get("closed", component_data.get("outer_shape", []).size() >= 3)),
 				"transform": _deserialize_transform(component_data.get("transform", {})),
 				"visibility": bool(component_data.get("visibility", true)),
 				"z_index": int(component_data.get("z_index", 0))
@@ -1190,6 +1192,7 @@ func _confirm_component_creation() -> void:
 		"id": component_id,
 		"name": component_name,
 		"outer_shape": [],
+		"closed": false,
 		"transform": _default_component_transform(),
 		"visibility": true,
 		"z_index": 0
@@ -1454,7 +1457,10 @@ func _render_canvas_context() -> void:
 	component_transform["z_index"] = int(component.get("z_index", 0))
 	canvas_view.set_component_transform(component_transform)
 	canvas_view.set_reference_shapes(_build_reference_shapes(asset, selected_component_id))
-	canvas_view.set_outer_shape(component["outer_shape"])
+	var component_closed := bool(component.get("closed", component["outer_shape"].size() >= 3))
+	canvas_view.set_outer_shape(component["outer_shape"], component_closed)
+	if active_state == "draw" and not component_closed:
+		canvas_view.set_line_draft(component["outer_shape"])
 
 
 func _build_reference_shapes(asset: Dictionary, excluded_component_id := "") -> Array:
@@ -1465,6 +1471,7 @@ func _build_reference_shapes(asset: Dictionary, excluded_component_id := "") -> 
 		shapes.append({
 			"id": str(component["id"]),
 			"points": component["outer_shape"].duplicate(),
+			"closed": bool(component.get("closed", component["outer_shape"].size() >= 3)),
 			"transform": component.get("transform", _default_component_transform()).duplicate(true),
 			"visibility": bool(component.get("visibility", true)),
 			"z_index": int(component.get("z_index", 0))
@@ -1472,14 +1479,15 @@ func _build_reference_shapes(asset: Dictionary, excluded_component_id := "") -> 
 	return shapes
 
 
-func _on_line_completed(points: Array[Vector2]) -> void:
+func _on_line_shape_changed(points: Array[Vector2], closed: bool) -> void:
 	var asset := _get_asset(selected_asset_id)
 	var component := _get_component(asset, selected_component_id)
 	if component.is_empty():
 		return
 	_record_direct_change()
-	component["outer_shape"] = points
-	canvas_view.set_outer_shape(points)
+	component["outer_shape"] = points.duplicate()
+	component["closed"] = closed
+	canvas_view.set_outer_shape(points, closed)
 
 
 func _on_outer_shape_changed(points: Array[Vector2]) -> void:

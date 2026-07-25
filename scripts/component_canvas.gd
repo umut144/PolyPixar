@@ -2,7 +2,7 @@ class_name ComponentCanvas
 extends Control
 
 signal line_draft_changed(points: Array[Vector2])
-signal line_completed(points: Array[Vector2])
+signal line_shape_changed(points: Array[Vector2], closed: bool)
 signal point_selection_changed(index: int)
 signal outer_shape_changed(points: Array[Vector2])
 signal reference_component_selected(component_id: String)
@@ -28,6 +28,7 @@ var edit_mode := "select"
 var transform_mode := "transform"
 var line_draft: Array[Vector2] = []
 var outer_shape: Array[Vector2] = []
+var outer_shape_closed := false
 var reference_shapes: Array[Dictionary] = []
 var cursor_world := Vector2.ZERO
 var cursor_over_canvas := false
@@ -68,12 +69,13 @@ func _gui_input(event: InputEvent) -> void:
 		if event.button_index == MOUSE_BUTTON_LEFT and active_tool == "line":
 			var snapped_point := _snap_to_grid(_world_to_local(_screen_to_world(event.position)))
 			if line_draft.size() >= 3 and _is_near_first_point(snapped_point):
-				line_completed.emit(line_draft.duplicate())
+				line_shape_changed.emit(line_draft.duplicate(), true)
 				line_draft.clear()
 				line_draft_changed.emit(line_draft)
 				queue_redraw()
 				return
 			line_draft.append(snapped_point)
+			line_shape_changed.emit(line_draft.duplicate(), false)
 			line_draft_changed.emit(line_draft)
 			queue_redraw()
 		elif event.button_index == MOUSE_BUTTON_LEFT and interaction_state == "edit":
@@ -185,10 +187,12 @@ func _gui_input(event: InputEvent) -> void:
 			clear_selection()
 		elif event.keycode == KEY_BACKSPACE and active_tool == "line" and not line_draft.is_empty():
 			line_draft.pop_back()
+			line_shape_changed.emit(line_draft.duplicate(), false)
 			line_draft_changed.emit(line_draft)
 			queue_redraw()
 		elif event.keycode == KEY_ESCAPE and active_tool == "line":
 			line_draft.clear()
+			line_shape_changed.emit(line_draft.duplicate(), false)
 			line_draft_changed.emit(line_draft)
 			queue_redraw()
 
@@ -212,6 +216,13 @@ func set_tool_mode(tool_name: String) -> void:
 	active_tool = tool_name
 	line_draft.clear()
 	line_draft_changed.emit(line_draft)
+	queue_redraw()
+
+
+func set_line_draft(points: Array) -> void:
+	line_draft.clear()
+	for point in points:
+		line_draft.append(point)
 	queue_redraw()
 
 
@@ -327,10 +338,11 @@ func _confirm_add_point() -> void:
 	queue_redraw()
 
 
-func set_outer_shape(points: Array) -> void:
+func set_outer_shape(points: Array, closed := true) -> void:
 	outer_shape.clear()
 	for point in points:
 		outer_shape.append(point)
+	outer_shape_closed = closed
 	queue_redraw()
 
 
@@ -448,11 +460,13 @@ func _draw_reference_shapes() -> void:
 		if not bool(shape.get("visibility", true)):
 			continue
 		var points: Array = shape.get("points", [])
-		if points.size() < 3:
+		if points.is_empty():
 			continue
 		var transform: Dictionary = shape.get("transform", {})
+		var closed := bool(shape.get("closed", points.size() >= 3))
 		var reference_color := Color("#55c7d966")
-		for index in range(points.size()):
+		var edge_count := points.size() if closed and points.size() >= 3 else maxi(points.size() - 1, 0)
+		for index in range(edge_count):
 			var next_index := (index + 1) % points.size()
 			draw_line(_world_to_screen(_local_to_world_with_transform(points[index], transform)), _world_to_screen(_local_to_world_with_transform(points[next_index], transform)), reference_color, 2.0)
 		for point in points:
@@ -473,13 +487,13 @@ func _reference_component_at(world_position: Vector2) -> String:
 		if not bool(shape.get("visibility", true)):
 			continue
 		var points: Array = shape.get("points", [])
-		if points.size() < 3:
+		if points.size() < 2:
 			continue
 		var transform: Dictionary = shape.get("transform", {})
 		var world_points: Array[Vector2] = []
 		for point in points:
 			world_points.append(_local_to_world_with_transform(point, transform))
-		if Geometry2D.is_point_in_polygon(world_position, PackedVector2Array(world_points)):
+		if bool(shape.get("closed", points.size() >= 3)) and Geometry2D.is_point_in_polygon(world_position, PackedVector2Array(world_points)):
 			return str(shape.get("id", ""))
 		for index in range(world_points.size()):
 			var next_index := (index + 1) % world_points.size()
@@ -494,10 +508,11 @@ func _reference_component_at(world_position: Vector2) -> String:
 func _draw_outer_shape() -> void:
 	if not bool(component_transform.get("visibility", true)):
 		return
-	if outer_shape.size() < 3:
+	if outer_shape.is_empty():
 		return
 	var shape_color := Color("#55c7d9")
-	for index in range(outer_shape.size()):
+	var edge_count := outer_shape.size() if outer_shape_closed and outer_shape.size() >= 3 else maxi(outer_shape.size() - 1, 0)
+	for index in range(edge_count):
 		var next_index := (index + 1) % outer_shape.size()
 		draw_line(_world_to_screen(_local_to_world(outer_shape[index])), _world_to_screen(_local_to_world(outer_shape[next_index])), shape_color, 2.0)
 	for point in outer_shape:

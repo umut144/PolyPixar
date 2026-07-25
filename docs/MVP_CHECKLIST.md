@@ -118,8 +118,9 @@ before implementing real creation tools.
       AssetFlow2D project icon.
 - [ ] Add a contextual time area only with the first real time-based feature.
 - [ ] Review the skeleton UX before implementing real asset editing.
-- [ ] Create an Asset, add a Component, select `Draw → Line`, and create a
-      closed Polyline contour recognized as an outer shape.
+- [ ] Create an Asset, add a Component, select `Draw → Line`, and draw a
+      Polyline whose points persist immediately; optionally close it to mark
+      the shape as an outer contour.
 
 ## Slice 1 – Wizard Hat to Star
 
