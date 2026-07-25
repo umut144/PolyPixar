@@ -112,17 +112,23 @@ resizable panes implemented with nested `HSplitContainer`s.
 ### UI construction
 
 The editor UI is assembled dynamically in GDScript from the current editor
-state and small, data-driven module/submodule definitions. This avoids a large,
-hand-maintained Control tree and lets the same state drive the module rail,
-toolbar, context/action bar, workspace, and inspector.
+state and small, data-driven module/submodule definitions. The `tscn` scene is
+only a root host; the editor shell and context-sensitive controls are created
+in code. This avoids a large, hand-maintained Control tree and lets the same
+state drive the module rail, toolbar, context/action bar, workspace, and
+inspector.
 
-The fixed shell may be created once, while context-sensitive regions are
-rebuilt or updated when the active state changes. The MVP needs only the
-simplest form of this pattern; it does not need a general UI framework.
+The fixed shell is created once, while context-sensitive regions are rebuilt or
+updated when the active state changes. The MVP needs only the simplest form of
+this pattern; it does not need a general UI framework.
 
 The first skeleton intentionally avoids standalone labels, headings,
 descriptions, and status text. Text is used only on interactive buttons where
 it identifies a possible action or an Outliner entry.
+
+The visual baseline follows PolyPixAAA: regular Godot controls and their
+native hover/focus/pressed states. Do not add custom per-button colour or font
+overrides unless a real interaction requires them.
 
 ### Outliner
 

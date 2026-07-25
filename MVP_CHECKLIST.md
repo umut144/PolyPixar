@@ -23,6 +23,8 @@ before implementing real creation tools.
       do not depend on a hand-authored module-specific Control tree.
 - [ ] Show a narrow left module rail with Create, Style, Motion, Transform,
       Effects, and Export.
+- [ ] Keep Create as the only active module; all other main-module buttons are
+      intentionally inert until their slice begins.
 - [ ] Selecting a module puts its submodule buttons at the top of the current
       Outliner without adding a second global module menu.
 - [ ] Show a scrollable current-context Outliner in the left workspace panel

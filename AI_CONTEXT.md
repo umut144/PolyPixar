@@ -66,17 +66,24 @@ Outliner, centre workspace, and Inspector. Avoid decorative cards; the canvas
 must be the visual focus.
 
 The UI is dynamically assembled in GDScript from editor state and small
-definition lists. Do not build a large, manually maintained Control hierarchy
-for the module-specific UI.
+definition lists; the `tscn` scene remains a root host. Do not build a large,
+manually maintained Control hierarchy for the module-specific UI.
 
 Keep the initial skeleton visually sparse: no standalone labels, headings,
 descriptions, or status values. Use text only on interactive buttons.
+
+Use PolyPixAAA as the visual reference: standard Godot control styling, 12px
+outer margin, 8px layout separation, and resizable split panes. Do not add
+custom button font/hover colours in the initial skeleton.
 
 The Outliner is `ScrollContainer` + an edge-to-edge vertical list of direct
 button rows, not Godot's `Tree` control. The active module's submodules are the
 only buttons in the initial skeleton. There are no margins, padding,
 indentation placeholders, or expand/collapse icons. Parent/child behaviour is
 added only when the first real hierarchy exists.
+
+Only Create is active in the current shell. Style, Motion, Transform, Effects,
+and Export are inert buttons until their own work begins.
 
 ## Documentation maintenance
 

@@ -1,72 +1,57 @@
 extends Control
 
-const BACKGROUND := Color("#2b2b2b")
-const PANEL := Color("#202020")
-const PANEL_ALT := Color("#252525")
-const PANEL_HOVER := Color("#343434")
-const TEXT := Color("#d6d6d6")
-const ACCENT := Color("#ffcc2d")
+const CREATE_SUBMODULES := ["Shapes", "Layers"]
+const INACTIVE_MODULES := ["Style", "Motion", "Transform", "Effects", "Export"]
 
-const MODULES := [
-	{"id": "create", "label": "Create", "submodules": ["Shapes", "Layers"]},
-	{"id": "style", "label": "Style", "submodules": ["Color", "Masks"]},
-	{"id": "motion", "label": "Motion", "submodules": ["Presets", "Paths", "Timeline"]},
-	{"id": "transform", "label": "Transform", "submodules": ["Mapping", "Shape", "Timing"]},
-	{"id": "effects", "label": "Effects", "submodules": ["Trails", "Root Growth"]},
-	{"id": "export", "label": "Export", "submodules": ["Preview", "Spritesheet"]},
-]
-
-var active_module_id := "create"
-var active_submodule := "Shapes"
-
-var module_rail: VBoxContainer
+var active_create_submodule := "Shapes"
+var create_button: Button
 var outliner_list: VBoxContainer
 
 
 func _ready() -> void:
-	_build_shell()
-	_render_navigation()
+	_build_ui()
+	_render_create_outliner()
 
 
-func _build_shell() -> void:
-	var frame := _panel(BACKGROUND)
-	frame.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(frame)
+func _build_ui() -> void:
+	var root_margin := MarginContainer.new()
+	root_margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	root_margin.add_theme_constant_override("margin_left", 12)
+	root_margin.add_theme_constant_override("margin_top", 12)
+	root_margin.add_theme_constant_override("margin_right", 12)
+	root_margin.add_theme_constant_override("margin_bottom", 12)
+	add_child(root_margin)
 
-	var root_margin := _margin(frame, 4, 4)
-	var root := VBoxContainer.new()
-	root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	root.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	root.add_theme_constant_override("separation", 4)
-	root_margin.add_child(root)
+	var main_layout := VBoxContainer.new()
+	main_layout.add_theme_constant_override("separation", 8)
+	root_margin.add_child(main_layout)
 
-	var toolbar_strip := _panel(PANEL)
-	toolbar_strip.custom_minimum_size = Vector2(0, 28)
-	root.add_child(toolbar_strip)
+	var toolbar := HBoxContainer.new()
+	toolbar.custom_minimum_size = Vector2(0, 32)
+	main_layout.add_child(toolbar)
 
-	var main_area := HBoxContainer.new()
-	main_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	main_area.add_theme_constant_override("separation", 4)
-	root.add_child(main_area)
+	var workspace_row := HBoxContainer.new()
+	workspace_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	workspace_row.add_theme_constant_override("separation", 8)
+	main_layout.add_child(workspace_row)
 
-	var rail_panel := _panel(PANEL_ALT)
-	rail_panel.custom_minimum_size = Vector2(84, 0)
-	main_area.add_child(rail_panel)
-	var rail_margin := _margin(rail_panel, 4, 4)
-	module_rail = VBoxContainer.new()
-	module_rail.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	module_rail.add_theme_constant_override("separation", 2)
-	rail_margin.add_child(module_rail)
+	var module_rail := VBoxContainer.new()
+	module_rail.custom_minimum_size = Vector2(104, 0)
+	module_rail.add_theme_constant_override("separation", 4)
+	workspace_row.add_child(module_rail)
+	create_button = _add_module_button(module_rail, "Create", true)
+	for module_name in INACTIVE_MODULES:
+		_add_module_button(module_rail, module_name, false)
 
-	var outer_split := HSplitContainer.new()
-	outer_split.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	outer_split.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	outer_split.split_offset = 220
-	main_area.add_child(outer_split)
+	var workspace_split := HSplitContainer.new()
+	workspace_split.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	workspace_split.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	workspace_split.split_offset = 220
+	workspace_row.add_child(workspace_split)
 
-	var outliner_panel := _panel(PANEL)
-	outliner_panel.custom_minimum_size = Vector2(170, 0)
-	outer_split.add_child(outliner_panel)
+	var outliner_panel := PanelContainer.new()
+	outliner_panel.custom_minimum_size = Vector2(180, 0)
+	workspace_split.add_child(outliner_panel)
 	var outliner_scroll := ScrollContainer.new()
 	outliner_scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	outliner_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -76,117 +61,70 @@ func _build_shell() -> void:
 	outliner_list.add_theme_constant_override("separation", 0)
 	outliner_scroll.add_child(outliner_list)
 
-	var workspace_split := HSplitContainer.new()
-	workspace_split.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	workspace_split.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	workspace_split.split_offset = 820
-	outer_split.add_child(workspace_split)
+	var canvas_split := HSplitContainer.new()
+	canvas_split.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	canvas_split.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	canvas_split.split_offset = 820
+	workspace_split.add_child(canvas_split)
 
-	var centre := VBoxContainer.new()
-	centre.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	centre.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	centre.add_theme_constant_override("separation", 4)
-	workspace_split.add_child(centre)
-	var action_strip := _panel(PANEL_ALT)
-	action_strip.custom_minimum_size = Vector2(0, 28)
-	centre.add_child(action_strip)
-	var workspace := _panel(BACKGROUND)
-	workspace.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	centre.add_child(workspace)
+	var canvas_column := VBoxContainer.new()
+	canvas_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	canvas_column.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	canvas_column.add_theme_constant_override("separation", 8)
+	canvas_split.add_child(canvas_column)
 
-	var inspector := _panel(PANEL)
-	inspector.custom_minimum_size = Vector2(210, 0)
-	workspace_split.add_child(inspector)
+	var action_bar := HBoxContainer.new()
+	action_bar.custom_minimum_size = Vector2(0, 32)
+	canvas_column.add_child(action_bar)
 
-	var status_strip := _panel(PANEL_ALT)
-	status_strip.custom_minimum_size = Vector2(0, 18)
-	root.add_child(status_strip)
+	var canvas := Control.new()
+	canvas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	canvas_column.add_child(canvas)
 
+	var inspector_panel := PanelContainer.new()
+	inspector_panel.custom_minimum_size = Vector2(260, 0)
+	canvas_split.add_child(inspector_panel)
 
-func _render_navigation() -> void:
-	_clear(module_rail)
-	for module in MODULES:
-		if module.id == "export":
-			continue
-		var button := _button(module.label, module.id == active_module_id)
-		button.custom_minimum_size = Vector2(0, 34)
-		button.pressed.connect(_activate_module.bind(module.id))
-		module_rail.add_child(button)
-
-	var spacer := Control.new()
-	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	module_rail.add_child(spacer)
-	var export_module: Dictionary = _module_by_id("export")
-	var export_button := _button(export_module.label, active_module_id == "export")
-	export_button.custom_minimum_size = Vector2(0, 34)
-	export_button.pressed.connect(_activate_module.bind("export"))
-	module_rail.add_child(export_button)
-
-	_clear(outliner_list)
-	var active_module: Dictionary = _active_module()
-	for submodule in active_module.submodules:
-		var submodule_button := _button(submodule, submodule == active_submodule)
-		submodule_button.custom_minimum_size = Vector2(0, 30)
-		submodule_button.pressed.connect(_activate_submodule.bind(submodule))
-		outliner_list.add_child(submodule_button)
+	var status_bar := PanelContainer.new()
+	status_bar.custom_minimum_size = Vector2(0, 24)
+	main_layout.add_child(status_bar)
 
 
-func _activate_module(module_id: String) -> void:
-	active_module_id = module_id
-	active_submodule = _active_module().submodules[0]
-	_render_navigation()
-
-
-func _activate_submodule(submodule: String) -> void:
-	active_submodule = submodule
-	_render_navigation()
-
-
-func _active_module() -> Dictionary:
-	return _module_by_id(active_module_id)
-
-
-func _module_by_id(module_id: String) -> Dictionary:
-	for module in MODULES:
-		if module.id == module_id:
-			return module
-	return MODULES[0]
-
-
-func _panel(background: Color) -> PanelContainer:
-	var panel := PanelContainer.new()
-	panel.add_theme_stylebox_override("panel", _style(background))
-	return panel
-
-
-func _margin(parent: Control, horizontal: int, vertical: int) -> MarginContainer:
-	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", horizontal)
-	margin.add_theme_constant_override("margin_right", horizontal)
-	margin.add_theme_constant_override("margin_top", vertical)
-	margin.add_theme_constant_override("margin_bottom", vertical)
-	parent.add_child(margin)
-	return margin
-
-
-func _button(text: String, active: bool) -> Button:
+func _add_module_button(parent: Container, text: String, is_active: bool) -> Button:
 	var button := Button.new()
 	button.text = text
-	button.flat = true
+	button.custom_minimum_size = Vector2(0, 32)
 	button.focus_mode = Control.FOCUS_NONE
-	button.add_theme_font_size_override("font_size", 14)
-	button.add_theme_color_override("font_color", Color("#202020") if active else TEXT)
-	button.add_theme_color_override("font_hover_color", Color("#f0f0f0"))
-	button.add_theme_stylebox_override("normal", _style(ACCENT if active else PANEL))
-	button.add_theme_stylebox_override("hover", _style(PANEL_HOVER))
-	button.add_theme_stylebox_override("pressed", _style(PANEL_ALT))
+	button.toggle_mode = is_active
+	button.button_pressed = is_active
+	if is_active:
+		button.pressed.connect(_activate_create)
+	parent.add_child(button)
 	return button
 
 
-func _style(background: Color) -> StyleBoxFlat:
-	var style := StyleBoxFlat.new()
-	style.bg_color = background
-	return style
+func _activate_create() -> void:
+	create_button.button_pressed = true
+	_render_create_outliner()
+
+
+func _render_create_outliner() -> void:
+	_clear(outliner_list)
+	for submodule in CREATE_SUBMODULES:
+		var button := Button.new()
+		button.text = submodule
+		button.custom_minimum_size = Vector2(0, 30)
+		button.focus_mode = Control.FOCUS_NONE
+		button.toggle_mode = true
+		button.button_pressed = submodule == active_create_submodule
+		button.pressed.connect(_select_create_submodule.bind(submodule))
+		outliner_list.add_child(button)
+
+
+func _select_create_submodule(submodule: String) -> void:
+	active_create_submodule = submodule
+	_render_create_outliner()
 
 
 func _clear(container: Node) -> void:
