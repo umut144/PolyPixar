@@ -36,7 +36,7 @@ general animation/VFX framework.
 - Editor workspace and default window: 1920×1200 (16:10); preview uses preserved
   aspect ratio (`keep`) so the UI proportions remain stable
 - Project icon: `assets/assetflow_icon.png`
-- Current JSON schema version: **4**
+- Current JSON schema version: **5**
 
 ## Confirmed vocabulary
 
@@ -94,8 +94,8 @@ it into a general scene or animation-graph abstraction prematurely.
   ink/alpha data for a Material, and judge repeatability with a tile preview.
 - Texture Elements follow an output contract: Generator Elements may produce a
   valid output directly, while Import Elements must distinguish raw source,
-  processing preview, and valid final output. The Texture parent consumes only
-  the latter.
+  processing preview, and valid final output. The current Phase 4 state is
+  explicitly `not_ready`; the Texture parent consumes only `ready` output.
 - `Style → Material` is Slice 4's first Style module. It binds a Workspace
   Texture to a Component by stable reference and exposes only repeat, scale,
   offset, base tint, ink strength, and glow values.

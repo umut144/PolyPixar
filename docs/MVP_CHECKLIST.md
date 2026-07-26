@@ -218,6 +218,8 @@ system, particle system, or universal animation graph.
 
 - [ ] Define the smallest common Element output contract needed by the Texture
       parent (valid image/output state plus UV dimensions).
+- [ ] Persist the initial `not_ready` output state for Import and Generator
+      Elements and show it in the relevant Inspector context.
 - [ ] Keep raw Import Element source data separate from its final output state;
       a raw source must not be treated as a completed parent Texture.
 - [ ] Show a dedicated Import Element preview with the original source.

@@ -5,7 +5,7 @@ const INACTIVE_MODULES := ["Style", "Motion", "Transform", "Effects", "Export"]
 const WORKSPACES_ROOT := "res://workspaces"
 const IMPORT_TEXTURES_ROOT := "res://imports/textures"
 const CONFIG_PATH := "res://configs/app_config.json"
-const SCHEMA_VERSION := 4
+const SCHEMA_VERSION := 5
 const MAX_HISTORY_SIZE := 100
 
 var active_create_submodule := "Shapes"
@@ -1195,14 +1195,16 @@ func _on_texture_import_file_selected(source_path: String) -> void:
 			"id": "element_%d" % _next_element_id(texture),
 			"name": import_name if not import_name.is_empty() else "Import Element",
 			"type": "import",
-			"source": {}
+			"source": {},
+			"output": {"state": "not_ready", "file": ""}
 		}
-	texture["elements"].append(import_element)
+		texture["elements"].append(import_element)
 	import_element["type"] = "import"
 	import_element["source"] = {
 		"file": destination_filename,
 		"original_name": source_path.get_file()
 	}
+	import_element["output"] = {"state": "not_ready", "file": ""}
 	_show_status_message("Imported Texture: %s" % source_path.get_file())
 	_render_inspector()
 	_render_canvas_context()
@@ -1246,6 +1248,16 @@ func _normalize_texture_elements(raw_elements, legacy_import_source) -> Array:
 				has_import_element = true
 				if not element.get("source", {}) is Dictionary:
 					element["source"] = {}
+			var output = element.get("output", {})
+			if not output is Dictionary:
+				output = {}
+			var output_state := str(output.get("state", "not_ready"))
+			if output_state != "ready":
+				output_state = "not_ready"
+			output["state"] = output_state
+			if output_state != "ready":
+				output["file"] = ""
+			element["output"] = output
 			normalized.append(element)
 	if legacy_import_source is Dictionary and not legacy_import_source.is_empty() and not has_import_element:
 		var original_name := str(legacy_import_source.get("original_name", "Imported Texture"))
@@ -1256,7 +1268,8 @@ func _normalize_texture_elements(raw_elements, legacy_import_source) -> Array:
 			"id": "element_%d" % _next_element_id_from_list(normalized),
 			"name": import_name,
 			"type": "import",
-			"source": legacy_import_source.duplicate(true)
+			"source": legacy_import_source.duplicate(true),
+			"output": {"state": "not_ready", "file": ""}
 		})
 	return normalized
 
@@ -1271,16 +1284,33 @@ func _find_import_element(texture: Dictionary) -> Dictionary:
 func _get_texture_final_path(texture: Dictionary) -> String:
 	if workspace_name.is_empty():
 		return ""
-	var import_element := _find_import_element(texture)
-	if import_element.is_empty():
+	var output_file := ""
+	for element in texture.get("elements", []):
+		var output = element.get("output", {})
+		if output is Dictionary and str(output.get("state", "not_ready")) == "ready":
+			output_file = str(output.get("file", "")).get_file()
+			if not output_file.is_empty():
+				break
+	if output_file.is_empty():
 		return ""
-	var source = import_element.get("source", {})
-	if not source is Dictionary:
-		return ""
-	var source_file := str(source.get("file", "")).get_file()
+	var source_file := output_file
 	if source_file.is_empty():
 		return ""
 	return "%s/%s/textures/%s/%s" % [WORKSPACES_ROOT, workspace_name, str(texture.get("id", "")), source_file]
+
+
+func _element_output_state(element: Dictionary) -> String:
+	var output = element.get("output", {})
+	if output is Dictionary and str(output.get("state", "not_ready")) == "ready":
+		return "ready"
+	return "not_ready"
+
+
+func _texture_output_state(texture: Dictionary) -> String:
+	for element in texture.get("elements", []):
+		if _element_output_state(element) == "ready":
+			return "ready"
+	return "not_ready"
 
 
 func _on_draw_menu_id(id: int) -> void:
@@ -1501,7 +1531,12 @@ func _confirm_element_creation() -> void:
 	if element_name.is_empty():
 		element_name = _next_default_element_name(texture)
 	var element_id := "element_%d" % _next_element_id(texture)
-	texture["elements"].append({"id": element_id, "name": element_name, "type": "generator"})
+	texture["elements"].append({
+		"id": element_id,
+		"name": element_name,
+		"type": "generator",
+		"output": {"state": "not_ready", "file": ""}
+	})
 	selected_texture_id = texture_id
 	selected_element_id = element_id
 	expanded_textures[texture_id] = true
@@ -1944,6 +1979,13 @@ func _render_inspector() -> void:
 			texture_name_editor.text_submitted.connect(_rename_selected_element)
 			texture_name_editor.focus_exited.connect(func() -> void: _rename_selected_element(texture_name_editor.text))
 		inspector_content.add_child(texture_name_editor)
+		var output_element := _get_element(texture, selected_element_id) if not selected_element_id.is_empty() else _find_import_element(texture)
+		inspector_content.add_child(_create_panel_label("Output State"))
+		var output_state_label := Label.new()
+		output_state_label.text = _element_output_state(output_element) if not output_element.is_empty() else _texture_output_state(texture)
+		output_state_label.add_theme_font_size_override("font_size", 11)
+		output_state_label.add_theme_color_override("font_color", Color("#9aa3b2"))
+		inspector_content.add_child(output_state_label)
 		if selected_element_id.is_empty():
 			var import_element := _find_import_element(texture)
 			var import_source = import_element.get("source", {}) if not import_element.is_empty() else {}
