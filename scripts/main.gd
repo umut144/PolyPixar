@@ -2347,9 +2347,12 @@ func _has_asset_name(asset_name: String) -> bool:
 func _render_outliner() -> void:
 	_clear(outliner_list)
 	if is_instance_valid(outliner_filter_option):
-		outliner_filter_option.visible = active_module != "Style"
+		outliner_filter_option.visible = active_module != "Style" and active_module != "Export"
 	if active_module == "Style":
 		_render_material_outliner()
+		return
+	if active_module == "Export":
+		_render_export_outliner()
 		return
 	var search_text := outliner_search_input.text.strip_edges().to_lower() if is_instance_valid(outliner_search_input) else ""
 	var show_assets := outliner_filter == "all" or outliner_filter == "assets"
@@ -2392,6 +2395,41 @@ func _render_material_outliner() -> void:
 		_style_outliner_button(material_button, str(material.get("id", "")) == selected_material_id)
 		material_button.pressed.connect(_select_material.bind(str(material.get("id", ""))))
 		outliner_list.add_child(material_button)
+
+
+func _render_export_outliner() -> void:
+	var search_text := outliner_search_input.text.strip_edges().to_lower() if is_instance_valid(outliner_search_input) else ""
+	var source_assets: Array[Dictionary] = []
+	for asset in assets:
+		if search_text.is_empty() or str(asset.get("name", "")).to_lower().contains(search_text):
+			source_assets.append(asset)
+	source_assets.sort_custom(_sort_named_documents)
+	outliner_list.add_child(_create_outliner_group_label("Source Assets"))
+	for asset in source_assets:
+		var asset_id := str(asset.get("id", ""))
+		var source_button := Button.new()
+		source_button.text = str(asset.get("name", "Asset"))
+		source_button.custom_minimum_size = Vector2(0, 30)
+		source_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		source_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		source_button.focus_mode = Control.FOCUS_NONE
+		_style_outliner_button(source_button, asset_id == selected_asset_id)
+		source_button.pressed.connect(_select_export_source_asset.bind(asset_id))
+		outliner_list.add_child(source_button)
+
+
+func _select_export_source_asset(asset_id: String) -> void:
+	if _get_asset(asset_id).is_empty():
+		return
+	selected_asset_id = asset_id
+	selected_component_id = ""
+	selected_texture_id = ""
+	selected_element_id = ""
+	selected_material_id = ""
+	active_state = ""
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
 
 
 func _render_lookdev_outliner() -> void:
@@ -3739,6 +3777,11 @@ func _on_category_pressed(_module_name: String) -> void:
 	active_module = _module_name
 	if active_module != "Style":
 		selected_material_id = ""
+	if active_module == "Export":
+		selected_component_id = ""
+		selected_texture_id = ""
+		selected_element_id = ""
+		active_state = ""
 	var pressed_section := _find_section(_module_name)
 	for section in module_sections:
 		section.set_expanded(section == pressed_section and section.expanded)

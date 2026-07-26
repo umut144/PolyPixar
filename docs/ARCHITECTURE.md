@@ -367,10 +367,11 @@ the normal Asset Component Inspector and is stored as the Component's optional
 `material_id`; the selected Component canvas uses that assignment directly.
 
 Export is a build workflow rather than a creative canvas. The first build
-workspace presents `Source Asset → Validate → Godot Scene`; its context bar
-offers Validate and Build actions, and its Inspector displays the source,
-format, and output location. Validation requires closed, triangulable contours
-and valid ready Material Texture references before Build is enabled.
+workspace uses its own UI logic: a flat Source Asset Outliner without Create
+hierarchies, a dedicated Build surface presenting `Source Asset → Validate →
+Godot Scene`, a Build Inspector, and only Validate/Build actions in the
+Context Bar. Validation requires closed, triangulable contours and valid ready
+Material Texture references before Build is enabled.
 
 The first build writes a minimal Godot 4 `.tscn` scene below `res://exports/`
 for the selected Asset. It uses Godot's `Node2D`, `Polygon2D`, `PackedScene`,

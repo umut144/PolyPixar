@@ -117,9 +117,11 @@ it into a general scene or animation-graph abstraction prematurely.
   authoritative end-look validation path. The first export action writes a
   minimal `res://exports/<asset>.tscn` with Polygon2D nodes and ready Texture
   references. Export is now a compact Build workspace: `Source Asset →
-  Validate → Godot Scene`. It validates closed, triangulable contours and
-  ready Material Texture references, then uses `PackedScene` plus
-  `ResourceSaver` instead of composing `.tscn` text.
+  Validate → Godot Scene`. It uses a flat Source Asset Outliner and dedicated
+  Build surface/Inspector instead of reusing Create hierarchies or canvas
+  interactions. It validates closed, triangulable contours and ready Material
+  Texture references, then uses `PackedScene` plus `ResourceSaver` instead of
+  composing `.tscn` text.
 - `Style → Material` is Slice 4's first Style module. It binds a Workspace
   Texture to a Component by stable reference and exposes only repeat, scale,
   offset, base tint, ink strength, and glow values.
