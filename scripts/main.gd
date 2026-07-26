@@ -94,7 +94,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		return
 	if selected_component_id.is_empty():
 		return
-	if not has_command_modifier and event.keycode == KEY_DELETE and active_state.is_empty():
+	if not has_command_modifier and event.keycode == KEY_BACKSPACE and active_state.is_empty():
 		_delete_selected_component()
 		get_viewport().set_input_as_handled()
 		return

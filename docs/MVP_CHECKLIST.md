@@ -50,7 +50,7 @@ before implementing real creation tools.
 - [x] Use `component01`, `component02`, and so on when a Component name is
       confirmed empty.
 - [x] Select Components in the Outliner and edit their `Name` in the Inspector.
-- [x] Delete the selected Component with `Delete` when no editing state is
+- [x] Delete the selected Component with `Backspace` when no editing state is
       active; keep point deletion available inside Edit state.
 - [x] Reflect the selected Asset or Component as the active central workspace
       context without adding editable canvas content yet.
