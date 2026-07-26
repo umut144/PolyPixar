@@ -5,7 +5,7 @@ const INACTIVE_MODULES := ["Style", "Motion", "Transform", "Effects", "Export"]
 const WORKSPACES_ROOT := "res://workspaces"
 const IMPORT_TEXTURES_ROOT := "res://imports/textures"
 const CONFIG_PATH := "res://configs/app_config.json"
-const SCHEMA_VERSION := 6
+const SCHEMA_VERSION := 7
 const MAX_HISTORY_SIZE := 100
 # Kept available for a later Outliner presentation, but processed outputs are
 # currently reached through the Import Preview instead of additional rows.
@@ -770,6 +770,7 @@ func _save_workspace() -> void:
 				"height": int(texture.get("canvas_height", 512))
 			},
 			"origin_mode": str(texture.get("origin_mode", "bottom_left")),
+			"final_output_element_id": str(texture.get("final_output_element_id", "")),
 			"elements": texture.get("elements", []).duplicate(true)
 		})
 	_write_json("%s/workspace.json" % workspace_root, {
@@ -917,13 +918,15 @@ func _load_workspace(workspace_entry: String) -> bool:
 			continue
 		var canvas_data = texture_data.get("canvas", {})
 		var legacy_import_source = texture_data.get("import_source", {})
+		var normalized_elements := _normalize_texture_elements(texture_data.get("elements", []), legacy_import_source)
 		loaded_textures.append({
 			"id": str(texture_data.get("id", texture_id)),
 			"name": str(texture_data.get("name", texture_id)),
 			"canvas_width": int(canvas_data.get("width", 512)) if canvas_data is Dictionary else 512,
 			"canvas_height": int(canvas_data.get("height", 512)) if canvas_data is Dictionary else 512,
 			"origin_mode": str(texture_data.get("origin_mode", "bottom_left")),
-			"elements": _normalize_texture_elements(texture_data.get("elements", []), legacy_import_source)
+			"elements": normalized_elements,
+			"final_output_element_id": _normalize_final_output_element_id(normalized_elements, str(texture_data.get("final_output_element_id", "")))
 		})
 	assets = loaded_assets
 	textures = loaded_textures
@@ -1352,6 +1355,7 @@ func _process_selected_import_element() -> void:
 	_record_direct_change()
 	element["pipeline"] = {"mode": "white_to_alpha", "threshold": threshold}
 	element["output"] = {"state": "ready", "file": output_filename}
+	texture["final_output_element_id"] = str(element.get("id", ""))
 	_show_status_message("Processed Texture: White to Alpha")
 	active_import_preview_mode = "white_to_alpha"
 	_render_inspector()
@@ -1429,7 +1433,28 @@ func _normalize_texture_elements(raw_elements, legacy_import_source) -> Array:
 
 func _find_import_element(texture: Dictionary) -> Dictionary:
 	for element in texture.get("elements", []):
-		if SHOW_PROCESSED_OUTLINER and str(element.get("type", "generator")) == "import":
+		if str(element.get("type", "generator")) == "import":
+			return element
+	return {}
+
+
+func _normalize_final_output_element_id(elements: Array, requested_id: String) -> String:
+	for element in elements:
+		if str(element.get("id", "")) == requested_id and _element_output_state(element) == "ready":
+			return requested_id
+	for element in elements:
+		if _element_output_state(element) == "ready":
+			return str(element.get("id", ""))
+	return ""
+
+
+func _get_texture_final_output_element(texture: Dictionary) -> Dictionary:
+	var requested_id := str(texture.get("final_output_element_id", ""))
+	var requested_element := _get_element(texture, requested_id)
+	if not requested_element.is_empty() and _element_output_state(requested_element) == "ready":
+		return requested_element
+	for element in texture.get("elements", []):
+		if _element_output_state(element) == "ready":
 			return element
 	return {}
 
@@ -1437,19 +1462,14 @@ func _find_import_element(texture: Dictionary) -> Dictionary:
 func _get_texture_final_path(texture: Dictionary) -> String:
 	if workspace_name.is_empty():
 		return ""
-	var output_file := ""
-	for element in texture.get("elements", []):
-		var output = element.get("output", {})
-		if output is Dictionary and str(output.get("state", "not_ready")) == "ready":
-			output_file = str(output.get("file", "")).get_file()
-			if not output_file.is_empty():
-				break
+	var final_output_element := _get_texture_final_output_element(texture)
+	if final_output_element.is_empty():
+		return ""
+	var output = final_output_element.get("output", {})
+	var output_file := str(output.get("file", "")).get_file() if output is Dictionary else ""
 	if output_file.is_empty():
 		return ""
-	var source_file := output_file
-	if source_file.is_empty():
-		return ""
-	return "%s/%s/textures/%s/%s" % [WORKSPACES_ROOT, workspace_name, str(texture.get("id", "")), source_file]
+	return "%s/%s/textures/%s/%s" % [WORKSPACES_ROOT, workspace_name, str(texture.get("id", "")), output_file]
 
 
 func _get_texture_source_path(texture: Dictionary, element: Dictionary) -> String:
@@ -1662,6 +1682,7 @@ func _confirm_texture_creation() -> void:
 		"canvas_width": 512,
 		"canvas_height": 512,
 		"origin_mode": "bottom_left",
+		"final_output_element_id": "",
 		"elements": []
 	})
 	selected_texture_id = texture_id
@@ -2214,7 +2235,7 @@ func _render_inspector() -> void:
 			texture_name_editor.text_submitted.connect(_rename_selected_element)
 			texture_name_editor.focus_exited.connect(func() -> void: _rename_selected_element(texture_name_editor.text))
 		inspector_content.add_child(texture_name_editor)
-		var output_element := _get_element(texture, selected_element_id) if not selected_element_id.is_empty() else _find_import_element(texture)
+		var output_element := _get_element(texture, selected_element_id) if not selected_element_id.is_empty() else _get_texture_final_output_element(texture)
 		inspector_content.add_child(_create_inspector_section("Output"))
 		var output_state_label := Label.new()
 		output_state_label.text = _element_output_state(output_element) if not output_element.is_empty() else _texture_output_state(texture)
@@ -2223,6 +2244,13 @@ func _render_inspector() -> void:
 		output_state_label.add_theme_color_override("font_color", Color("#f2c94c") if output_state_label.text == "not_ready" else Color("#75b88a"))
 		inspector_content.add_child(output_state_label)
 		if selected_element_id.is_empty():
+			if not output_element.is_empty():
+				inspector_content.add_child(_create_inspector_field_label("Final Output"))
+				var final_output_label := Label.new()
+				final_output_label.text = str(output_element.get("name", "Element"))
+				final_output_label.add_theme_font_size_override("font_size", 11)
+				final_output_label.add_theme_color_override("font_color", Color("#9aa3b2"))
+				inspector_content.add_child(final_output_label)
 			var import_element := _find_import_element(texture)
 			var import_source = import_element.get("source", {}) if not import_element.is_empty() else {}
 			if import_source is Dictionary and not import_source.is_empty():
