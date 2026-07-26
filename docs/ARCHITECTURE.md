@@ -134,7 +134,9 @@ separate U/V colors; it intentionally does not yet provide drawing or
 generator operations. The Texture parent is the final UV output context: it may
 consume only outputs that satisfy the Element output contract. A raw Import
 Element source is not itself a final output; it belongs in the Import Element
-preview and processing context until its pipeline produces a valid output.
+preview and processing context until its pipeline produces a valid output. The
+current Import Element preview displays the copied source image without yet
+claiming `ready` output status.
 The viewport supports focused `A/S/D/W` panning and `Q/E` zooming.
 
 ### Stone Floor Bloom relationship

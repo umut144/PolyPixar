@@ -23,8 +23,8 @@ opens directly in `res://imports/textures`. The source is copied into that
 Texture's active Workspace directory and persisted as a relative
 `source` reference inside a typed `import` element. The Texture parent is
 reserved for valid final Element outputs; the raw import source belongs in the
-Import Element preview and must pass through processing before contributing to
-the parent output.
+Import Element preview, which is now implemented as a separate image context,
+and must pass through processing before contributing to the parent output.
 
 The current implementation target is not a functional morphing engine or a
 general animation/VFX framework.

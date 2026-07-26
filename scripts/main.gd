@@ -41,7 +41,9 @@ var transform_fields: Dictionary = {}
 var canvas_context_label: Label
 var canvas_view: ComponentCanvas
 var texture_canvas: TextureCanvas
+var import_preview: ImportPreview
 var texture_context_label: Label
+var import_preview_context_label: Label
 var context_bar: HBoxContainer
 var info_bar: HBoxContainer
 var program_status_label: Label
@@ -282,6 +284,17 @@ func _build_ui() -> void:
 	texture_canvas.visible = false
 	texture_canvas.origin_changed.connect(_on_texture_origin_changed)
 	canvas_panel.add_child(texture_canvas)
+	import_preview = ImportPreview.new()
+	import_preview.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	import_preview.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	import_preview.visible = false
+	canvas_panel.add_child(import_preview)
+	import_preview_context_label = Label.new()
+	import_preview_context_label.position = Vector2(8, 6)
+	import_preview_context_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	import_preview_context_label.add_theme_font_size_override("font_size", 11)
+	import_preview_context_label.add_theme_color_override("font_color", Color("#9aa3b2"))
+	import_preview.add_child(import_preview_context_label)
 	texture_context_label = Label.new()
 	texture_context_label.position = Vector2(8, 6)
 	texture_context_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1299,6 +1312,18 @@ func _get_texture_final_path(texture: Dictionary) -> String:
 	return "%s/%s/textures/%s/%s" % [WORKSPACES_ROOT, workspace_name, str(texture.get("id", "")), source_file]
 
 
+func _get_texture_source_path(texture: Dictionary, element: Dictionary) -> String:
+	if workspace_name.is_empty() or texture.is_empty() or element.is_empty():
+		return ""
+	var source = element.get("source", {})
+	if not source is Dictionary:
+		return ""
+	var source_file := str(source.get("file", "")).get_file()
+	if source_file.is_empty():
+		return ""
+	return "%s/%s/textures/%s/%s" % [WORKSPACES_ROOT, workspace_name, str(texture.get("id", "")), source_file]
+
+
 func _element_output_state(element: Dictionary) -> String:
 	var output = element.get("output", {})
 	if output is Dictionary and str(output.get("state", "not_ready")) == "ready":
@@ -2189,16 +2214,23 @@ func _render_canvas_context() -> void:
 		if texture.is_empty():
 			return
 		canvas_view.visible = false
-		texture_canvas.visible = true
-		texture_context_label.text = "Texture: %s" % str(texture["name"]) if selected_element_id.is_empty() else "Element: %s" % str(_get_element(texture, selected_element_id).get("name", "Element"))
+		var selected_element := _get_element(texture, selected_element_id)
+		var is_import_element := not selected_element.is_empty() and str(selected_element.get("type", "generator")) == "import"
+		texture_canvas.visible = not is_import_element
+		import_preview.visible = is_import_element
+		texture_context_label.text = "Texture: %s" % str(texture["name"]) if selected_element_id.is_empty() else "Element: %s" % str(selected_element.get("name", "Element"))
+		import_preview_context_label.text = "Import Element: %s" % str(selected_element.get("name", "Element")) if is_import_element else ""
 		texture_canvas.set_origin_mode(str(texture.get("origin_mode", "bottom_left")))
 		texture_canvas.set_final_texture_path(_get_texture_final_path(texture) if selected_element_id.is_empty() else "")
-		var element := _get_element(texture, selected_element_id)
-		texture_canvas.set_selected_element(str(element.get("name", "")) if not element.is_empty() else "")
-	return
+		texture_canvas.set_selected_element(str(selected_element.get("name", "")) if not selected_element.is_empty() else "")
+		import_preview.set_preview_path(_get_texture_source_path(texture, selected_element) if is_import_element else "")
+		return
 	canvas_view.visible = true
 	texture_canvas.visible = false
+	import_preview.visible = false
 	texture_context_label.text = ""
+	import_preview_context_label.text = ""
+	import_preview.set_preview_path("")
 	var asset := _get_asset(selected_asset_id)
 	if asset.is_empty():
 		canvas_context_label.text = ""
