@@ -38,6 +38,7 @@ var component_name_editor: LineEdit
 var transform_fields: Dictionary = {}
 var canvas_context_label: Label
 var canvas_view: ComponentCanvas
+var texture_canvas: TextureCanvas
 var context_bar: HBoxContainer
 var info_bar: HBoxContainer
 var program_status_label: Label
@@ -272,6 +273,12 @@ func _build_ui() -> void:
 	canvas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	canvas_panel.add_child(canvas)
+	texture_canvas = TextureCanvas.new()
+	texture_canvas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	texture_canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	texture_canvas.visible = false
+	texture_canvas.origin_changed.connect(_on_texture_origin_changed)
+	canvas_panel.add_child(texture_canvas)
 	canvas_context_label = Label.new()
 	canvas_context_label.position = Vector2(8, 6)
 	canvas_context_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -677,6 +684,7 @@ func _save_workspace() -> void:
 				"width": int(texture.get("canvas_width", 512)),
 				"height": int(texture.get("canvas_height", 512))
 			},
+			"origin_mode": str(texture.get("origin_mode", "bottom_left")),
 			"elements": texture.get("elements", []).duplicate(true)
 		})
 	_write_json("%s/workspace.json" % workspace_root, {
@@ -828,6 +836,7 @@ func _load_workspace(workspace_entry: String) -> bool:
 			"name": str(texture_data.get("name", texture_id)),
 			"canvas_width": int(canvas_data.get("width", 512)) if canvas_data is Dictionary else 512,
 			"canvas_height": int(canvas_data.get("height", 512)) if canvas_data is Dictionary else 512,
+			"origin_mode": str(texture_data.get("origin_mode", "bottom_left")),
 			"elements": texture_data.get("elements", []).duplicate(true)
 		})
 	assets = loaded_assets
@@ -1079,16 +1088,47 @@ func _render_context_bar() -> void:
 
 
 func _render_texture_context_bar() -> void:
-	var draw_menu := MenuButton.new()
-	draw_menu.text = "Draw  ▼"
-	draw_menu.custom_minimum_size = Vector2(88, 32)
-	draw_menu.focus_mode = Control.FOCUS_NONE
-	context_bar.add_child(draw_menu)
-	var generate_menu := MenuButton.new()
-	generate_menu.text = "Generate  ▼"
-	generate_menu.custom_minimum_size = Vector2(108, 32)
-	generate_menu.focus_mode = Control.FOCUS_NONE
-	context_bar.add_child(generate_menu)
+	var texture := _get_texture(selected_texture_id)
+	if texture.is_empty():
+		return
+	var origin_menu := MenuButton.new()
+	origin_menu.text = "Origin: %s  ▼" % _origin_mode_label(str(texture.get("origin_mode", "bottom_left")))
+	origin_menu.custom_minimum_size = Vector2(150, 32)
+	origin_menu.focus_mode = Control.FOCUS_NONE
+	var origin_popup := origin_menu.get_popup()
+	origin_popup.add_item("Bottom Left", 0)
+	origin_popup.add_item("Top Left", 1)
+	origin_popup.add_item("Center", 2)
+	origin_popup.id_pressed.connect(_on_texture_origin_menu_id)
+	context_bar.add_child(origin_menu)
+
+
+func _origin_mode_label(mode: String) -> String:
+	return {
+		"bottom_left": "Bottom Left",
+		"top_left": "Top Left",
+		"center": "Center"
+	}.get(mode, "Bottom Left")
+
+
+func _on_texture_origin_menu_id(id: int) -> void:
+	var modes := ["bottom_left", "top_left", "center"]
+	if id < 0 or id >= modes.size():
+		return
+	_on_texture_origin_changed(modes[id])
+
+
+func _on_texture_origin_changed(mode: String) -> void:
+	var texture := _get_texture(selected_texture_id)
+	if texture.is_empty():
+		return
+	if texture.get("origin_mode", "bottom_left") == mode:
+		return
+	_record_direct_change()
+	texture["origin_mode"] = mode
+	texture_canvas.set_origin_mode(mode)
+	_render_context_bar()
+	_render_info_bar()
 
 
 func _on_draw_menu_id(id: int) -> void:
@@ -1179,8 +1219,7 @@ func _render_info_bar() -> void:
 		var texture_label := Label.new()
 		texture_label.text = "Texture: %s" % str(texture["name"])
 		info_bar.add_child(texture_label)
-		_add_info_option("Draw")
-		_add_info_option("Generate")
+		_add_info_option("Origin: %s" % _origin_mode_label(str(texture.get("origin_mode", "bottom_left"))))
 		return
 	if selected_component_id.is_empty():
 		return
@@ -1262,6 +1301,7 @@ func _confirm_texture_creation() -> void:
 		"name": texture_name,
 		"canvas_width": 512,
 		"canvas_height": 512,
+		"origin_mode": "bottom_left",
 		"elements": []
 	})
 	selected_texture_id = texture_id
@@ -1876,6 +1916,19 @@ func _render_canvas_context() -> void:
 	_render_info_bar()
 	if not is_instance_valid(canvas_context_label):
 		return
+	if not selected_texture_id.is_empty():
+		var texture := _get_texture(selected_texture_id)
+		if texture.is_empty():
+			return
+		canvas_view.visible = false
+		texture_canvas.visible = true
+		canvas_context_label.text = "Texture: %s" % str(texture["name"])
+		texture_canvas.set_origin_mode(str(texture.get("origin_mode", "bottom_left")))
+		var element := _get_element(texture, selected_element_id)
+		texture_canvas.set_selected_element(str(element.get("name", "")) if not element.is_empty() else "")
+		return
+	canvas_view.visible = true
+	texture_canvas.visible = false
 	var asset := _get_asset(selected_asset_id)
 	if asset.is_empty():
 		canvas_context_label.text = ""
