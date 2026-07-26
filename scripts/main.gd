@@ -12,11 +12,13 @@ var outliner_list: VBoxContainer
 var inspector_content: VBoxContainer
 var module_sections: Array[ModuleSection] = []
 var assets: Array[Dictionary] = []
+var textures: Array[Dictionary] = []
 var selected_asset_id := ""
 var selected_component_id := ""
 var expanded_assets: Dictionary = {}
 var next_asset_id := 1
 var next_component_id := 1
+var next_texture_id := 1
 var asset_dialog: ConfirmationDialog
 var asset_name_input: LineEdit
 var component_dialog: ConfirmationDialog
@@ -579,7 +581,9 @@ func _save_workspace() -> void:
 		return
 	var workspace_root := "%s/%s" % [WORKSPACES_ROOT, workspace_name]
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("%s/assets" % workspace_root))
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("%s/textures" % workspace_root))
 	var asset_ids: Array[String] = []
+	var texture_ids: Array[String] = []
 	for asset in assets:
 		var asset_id := str(asset["id"])
 		asset_ids.append(asset_id)
@@ -602,10 +606,25 @@ func _save_workspace() -> void:
 				"z_index": int(component.get("z_index", 0))
 			})
 		_write_json("%s/asset.json" % asset_root, asset_data)
+	for texture in textures:
+		var texture_id := str(texture["id"])
+		texture_ids.append(texture_id)
+		var texture_root := "%s/textures/%s" % [workspace_root, texture_id]
+		_write_json("%s/texture.json" % texture_root, {
+			"schema_version": SCHEMA_VERSION,
+			"id": texture_id,
+			"name": str(texture["name"]),
+			"canvas": {
+				"width": int(texture.get("canvas_width", 512)),
+				"height": int(texture.get("canvas_height", 512))
+			},
+			"elements": texture.get("elements", []).duplicate(true)
+		})
 	_write_json("%s/workspace.json" % workspace_root, {
 		"schema_version": SCHEMA_VERSION,
 		"name": workspace_name,
 		"assets": asset_ids,
+		"textures": texture_ids,
 		"editor_state": _serialize_editor_state()
 	})
 	_write_json(CONFIG_PATH, {"schema_version": SCHEMA_VERSION, "last_workspace": workspace_name})
@@ -617,6 +636,8 @@ func _capture_history_snapshot() -> Dictionary:
 		"assets": assets.duplicate(true),
 		"next_asset_id": next_asset_id,
 		"next_component_id": next_component_id,
+		"textures": textures.duplicate(true),
+		"next_texture_id": next_texture_id,
 		"selected_asset_id": selected_asset_id,
 		"selected_component_id": selected_component_id,
 		"expanded_assets": expanded_assets.duplicate(true)
@@ -649,8 +670,10 @@ func _finish_history_coalescing() -> void:
 
 func _restore_history_snapshot(snapshot: Dictionary) -> void:
 	assets = snapshot.get("assets", []).duplicate(true)
+	textures = snapshot.get("textures", []).duplicate(true)
 	next_asset_id = int(snapshot.get("next_asset_id", 1))
 	next_component_id = int(snapshot.get("next_component_id", 1))
+	next_texture_id = int(snapshot.get("next_texture_id", 1))
 	selected_asset_id = str(snapshot.get("selected_asset_id", ""))
 	selected_component_id = str(snapshot.get("selected_component_id", ""))
 	expanded_assets = snapshot.get("expanded_assets", {}).duplicate(true)
@@ -707,6 +730,7 @@ func _load_workspace(workspace_entry: String) -> bool:
 	if not _has_supported_schema(workspace_data):
 		return false
 	var loaded_assets: Array[Dictionary] = []
+	var loaded_textures: Array[Dictionary] = []
 	for asset_id_variant in workspace_data.get("assets", []):
 		var asset_id := str(asset_id_variant)
 		var asset_data = _read_json("%s/assets/%s/asset.json" % [workspace_root, asset_id])
@@ -730,7 +754,21 @@ func _load_workspace(workspace_entry: String) -> bool:
 			"name": str(asset_data.get("name", asset_id)),
 			"components": components
 		})
+	for texture_id_variant in workspace_data.get("textures", []):
+		var texture_id := str(texture_id_variant)
+		var texture_data = _read_json("%s/textures/%s/texture.json" % [workspace_root, texture_id])
+		if not _has_supported_schema(texture_data):
+			continue
+		var canvas_data = texture_data.get("canvas", {})
+		loaded_textures.append({
+			"id": str(texture_data.get("id", texture_id)),
+			"name": str(texture_data.get("name", texture_id)),
+			"canvas_width": int(canvas_data.get("width", 512)) if canvas_data is Dictionary else 512,
+			"canvas_height": int(canvas_data.get("height", 512)) if canvas_data is Dictionary else 512,
+			"elements": texture_data.get("elements", []).duplicate(true)
+		})
 	assets = loaded_assets
+	textures = loaded_textures
 	workspace_name = str(workspace_data.get("name", workspace_entry))
 	_restore_editor_state(workspace_data.get("editor_state", {}))
 	_update_next_ids()
@@ -883,10 +921,13 @@ func _has_supported_schema(data) -> bool:
 func _update_next_ids() -> void:
 	next_asset_id = 1
 	next_component_id = 1
+	next_texture_id = 1
 	for asset in assets:
 		next_asset_id = maxi(next_asset_id, _id_suffix_number(str(asset["id"])) + 1)
 		for component in asset["components"]:
 			next_component_id = maxi(next_component_id, _id_suffix_number(str(component["id"])) + 1)
+	for texture in textures:
+		next_texture_id = maxi(next_texture_id, _id_suffix_number(str(texture["id"])) + 1)
 
 
 func _id_suffix_number(identifier: String) -> int:

@@ -52,6 +52,9 @@ need and name are open.
   `Create → Shapes` stores Polyline points on the selected Component and can
   optionally mark the result closed; it does not draw directly on the Asset
   container.
+- Textures are a separate Workspace document type. They will contain
+  `elements`, not Components, and have their own canvas dimensions and
+  PolyTexture-style editing context.
 - Do not add Bézier editing, maps, full materials, a node graph, generic
   rigging, or export pipelines until a confirmed checklist item requires them.
 - Treat dummy UI data as dummy UI data. Do not let it quietly become a rigid

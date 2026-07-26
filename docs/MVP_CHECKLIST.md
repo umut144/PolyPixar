@@ -52,6 +52,8 @@ before implementing real creation tools.
 - [x] Select Components in the Outliner and edit their `Name` in the Inspector.
 - [x] Delete the selected Component with `Backspace` when no editing state is
       active; keep point deletion available inside Edit state.
+- [x] Add the initial Texture document model with independent `elements`,
+      canvas dimensions, versioned serialization, and workspace loading.
 - [x] Reflect the selected Asset or Component as the active central workspace
       context without adding editable canvas content yet.
 - [x] Provide a PolyPixAAA-style Shapes canvas with a dynamic grid.

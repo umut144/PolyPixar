@@ -87,6 +87,12 @@ An asset is independently editable. A morph is a deliberately designed
 relationship between two assets; it is not a permanent property or a form
 state of either asset.
 
+Textures are a second, independent Workspace document type. A Texture owns
+`elements` rather than Asset Components and stores its own canvas width and
+height. Texture data is persisted below `workspaces/<name>/textures/<id>/` in
+`texture.json`; the Texture canvas and element semantics are intentionally
+implemented in later Create phases.
+
 ```text
 source Asset  <── Morph ──>  target Asset
 ```
