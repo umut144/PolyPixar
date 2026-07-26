@@ -54,6 +54,8 @@ before implementing real creation tools.
       active; keep point deletion available inside Edit state.
 - [x] Add the initial Texture document model with independent `elements`,
       canvas dimensions, versioned serialization, and workspace loading.
+- [x] Add separate Assets and Textures Outliner groups with alphabetical
+      ordering, search filtering, and an All/Assets/Textures filter.
 - [x] Reflect the selected Asset or Component as the active central workspace
       context without adding editable canvas content yet.
 - [x] Provide a PolyPixAAA-style Shapes canvas with a dynamic grid.

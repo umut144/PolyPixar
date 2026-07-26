@@ -55,6 +55,8 @@ need and name are open.
 - Textures are a separate Workspace document type. They will contain
   `elements`, not Components, and have their own canvas dimensions and
   PolyTexture-style editing context.
+- The Outliner now has separate alphabetized Assets and Textures groups with a
+  shared search field and All/Assets/Textures filter.
 - Do not add Bézier editing, maps, full materials, a node graph, generic
   rigging, or export pipelines until a confirmed checklist item requires them.
 - Treat dummy UI data as dummy UI data. Do not let it quietly become a rigid

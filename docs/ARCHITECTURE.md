@@ -93,6 +93,10 @@ height. Texture data is persisted below `workspaces/<name>/textures/<id>/` in
 `texture.json`; the Texture canvas and element semantics are intentionally
 implemented in later Create phases.
 
+The Outliner presents Assets and Textures in separate groups. Both groups are
+alphabetically ordered and share a compact search field plus `All`, `Assets`,
+and `Textures` filters.
+
 ```text
 source Asset  <── Morph ──>  target Asset
 ```
