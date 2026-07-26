@@ -1389,11 +1389,11 @@ func _on_transform_value_changed(value: float, property_name: String) -> void:
 	_render_canvas_context()
 
 
-func _on_component_visibility_changed(is_visible: bool) -> void:
+func _on_component_visibility_changed(visibility_enabled: bool) -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	if not component.is_empty():
 		_record_direct_change()
-		component["visibility"] = is_visible
+		component["visibility"] = visibility_enabled
 		_render_outliner()
 		_render_canvas_context()
 
