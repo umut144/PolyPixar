@@ -28,6 +28,8 @@ var selected_component_id := ""
 var selected_texture_id := ""
 var selected_element_id := ""
 var selected_material_id := ""
+# Legacy workspace fields are retained for backwards-compatible JSON loading.
+# The active Material workflow is now always the Graph workspace.
 var material_view_mode := "graph"
 var lookdev_target_asset_id := ""
 var lookdev_target_component_id := ""
@@ -993,9 +995,9 @@ func _restore_history_snapshot(snapshot: Dictionary) -> void:
 	selected_element_id = str(snapshot.get("selected_element_id", ""))
 	selected_material_id = str(snapshot.get("selected_material_id", ""))
 	active_module = str(snapshot.get("active_module", "Create"))
-	material_view_mode = str(snapshot.get("material_view_mode", "graph"))
-	lookdev_target_asset_id = str(snapshot.get("lookdev_target_asset_id", ""))
-	lookdev_target_component_id = str(snapshot.get("lookdev_target_component_id", ""))
+	material_view_mode = "graph"
+	lookdev_target_asset_id = ""
+	lookdev_target_component_id = ""
 	expanded_assets = snapshot.get("expanded_assets", {}).duplicate(true)
 	if _get_asset(selected_asset_id).is_empty():
 		selected_asset_id = ""
@@ -1184,14 +1186,11 @@ func _restore_editor_state(state) -> void:
 	if selected_asset_id.is_empty() and selected_texture_id.is_empty() and not _get_material(requested_material_id).is_empty():
 		selected_material_id = requested_material_id
 		active_module = "Style"
-		material_view_mode = str(state.get("material_view_mode", "graph"))
-		lookdev_target_asset_id = str(state.get("lookdev_target_asset_id", ""))
-		lookdev_target_component_id = str(state.get("lookdev_target_component_id", ""))
-		if _get_asset(lookdev_target_asset_id).is_empty():
-			lookdev_target_asset_id = ""
-			lookdev_target_component_id = ""
-		elif _get_component(_get_asset(lookdev_target_asset_id), lookdev_target_component_id).is_empty():
-			lookdev_target_component_id = ""
+	# Older editor_state files may contain View/LookDev fields. They are read
+	# only for compatibility; the current workflow always opens the Graph.
+	material_view_mode = "graph"
+	lookdev_target_asset_id = ""
+	lookdev_target_component_id = ""
 		var style_section := _find_section("Style")
 		if style_section != null:
 			style_section.set_expanded(true)
