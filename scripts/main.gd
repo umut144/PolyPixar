@@ -1801,6 +1801,11 @@ func _texture_matches_search(texture: Dictionary, search_text: String) -> bool:
 	for element in texture.get("elements", []):
 		if str(element.get("name", "")).to_lower().contains(search_text):
 			return true
+		if str(element.get("type", "generator")) == "import":
+			# Processed outputs are derived children of an Import Element, but
+			# remain searchable so a pipeline stage can be found directly.
+			if "processed elements".contains(search_text) or "white to alpha".contains(search_text):
+				return true
 	return false
 
 
@@ -1815,11 +1820,11 @@ func _create_outliner_group_label(text: String) -> Label:
 	return label
 
 
-func _create_outliner_child_group_label(text: String) -> HBoxContainer:
+func _create_outliner_child_group_label(text: String, indent := 16) -> HBoxContainer:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 0)
 	var placeholder := Control.new()
-	placeholder.custom_minimum_size = Vector2(16, 0)
+	placeholder.custom_minimum_size = Vector2(indent, 0)
 	row.add_child(placeholder)
 	var label := Label.new()
 	label.text = text
@@ -1962,6 +1967,49 @@ func _render_texture_element_row(texture_container: VBoxContainer, texture_id: S
 	_style_outliner_button(element_button, texture_id == selected_texture_id and str(element.get("id", "")) == selected_element_id)
 	element_button.pressed.connect(_select_element.bind(texture_id, str(element.get("id", ""))))
 	element_row.add_child(element_button)
+	if str(element.get("type", "generator")) == "import":
+		# Processing results are derived from the import and therefore shown as
+		# nested rows instead of independent texture elements.
+		texture_container.add_child(_create_outliner_child_group_label("Processed Elements", 32))
+		_render_processed_element_row(texture_container, texture_id, element)
+
+
+func _render_processed_element_row(texture_container: VBoxContainer, texture_id: String, import_element: Dictionary) -> void:
+	var processed_row := HBoxContainer.new()
+	processed_row.add_theme_constant_override("separation", 0)
+	texture_container.add_child(processed_row)
+	var processed_placeholder := Control.new()
+	processed_placeholder.custom_minimum_size = Vector2(32, 0)
+	processed_row.add_child(processed_placeholder)
+	var processed_button := Button.new()
+	processed_button.text = "White to Alpha"
+	processed_button.custom_minimum_size = Vector2(0, 28)
+	processed_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	processed_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	processed_button.focus_mode = Control.FOCUS_NONE
+	var is_selected := texture_id == selected_texture_id \
+		and str(import_element.get("id", "")) == selected_element_id \
+		and active_import_preview_mode == "white_to_alpha"
+	_style_outliner_button(processed_button, is_selected)
+	processed_button.pressed.connect(_select_processed_preview.bind(texture_id, str(import_element.get("id", ""))))
+	if _element_output_state(import_element) != "ready":
+		processed_button.add_theme_color_override("font_color", Color("#737f91"))
+		processed_button.add_theme_color_override("font_hover_color", Color("#aab3c2"))
+		processed_button.tooltip_text = "Not ready — process the Import Element first"
+	processed_row.add_child(processed_button)
+
+
+func _select_processed_preview(texture_id: String, element_id: String) -> void:
+	selected_texture_id = texture_id
+	selected_element_id = element_id
+	selected_asset_id = ""
+	selected_component_id = ""
+	active_state = ""
+	active_import_preview_mode = "white_to_alpha"
+	expanded_textures[texture_id] = true
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
 
 
 func _on_outliner_filter_selected(index: int) -> void:
