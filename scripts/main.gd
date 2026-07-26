@@ -1087,7 +1087,7 @@ func _render_context_bar() -> void:
 	transform_menu.button_pressed = active_state == "transform"
 	transform_menu.pressed.connect(_activate_transform_state)
 	var transform_popup := transform_menu.get_popup()
-	transform_popup.add_item("1: Transform", 0)
+	transform_popup.add_item("1: Translate", 0)
 	transform_popup.add_item("2: Rotate", 1)
 	transform_popup.add_item("3: Scale", 2)
 	transform_popup.id_pressed.connect(_on_transform_menu_id)
@@ -1220,18 +1220,11 @@ func _render_info_bar() -> void:
 		return
 	_clear(info_bar)
 	if not selected_texture_id.is_empty():
-		var texture := _get_texture(selected_texture_id)
-		if texture.is_empty():
-			return
-		var texture_label := Label.new()
-		texture_label.text = "Texture: %s" % str(texture["name"])
-		info_bar.add_child(texture_label)
-		_add_info_option("Origin: %s" % _origin_mode_label(str(texture.get("origin_mode", "bottom_left"))))
 		return
 	if selected_component_id.is_empty():
 		return
 	var state_label := Label.new()
-	state_label.text = "State: %s" % ("Draw" if active_state == "draw" else "Edit" if active_state == "edit" else "—")
+	state_label.text = "State: %s" % ("Draw" if active_state == "draw" else "Edit" if active_state == "edit" else "Transform" if active_state == "transform" else "—")
 	info_bar.add_child(state_label)
 	if active_state == "draw":
 		_add_info_option("1: Line")
@@ -1241,7 +1234,7 @@ func _render_info_bar() -> void:
 		_add_info_option("3: Move")
 		_add_info_option("4: Delete")
 	elif active_state == "transform":
-		_add_info_option("1: Transform")
+		_add_info_option("1: Translate")
 		_add_info_option("2: Rotate")
 		_add_info_option("3: Scale")
 	else:
