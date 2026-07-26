@@ -55,6 +55,7 @@ var active_draw_tool := ""
 var active_state := ""
 var active_import_preview_mode := "original"
 var pending_import_threshold := 0.05
+var import_threshold_field: SpinBox
 var active_edit_mode := "select"
 var active_transform_mode := "transform"
 var snap_enabled := true
@@ -1337,7 +1338,7 @@ func _process_selected_import_element() -> void:
 	var pipeline = element.get("pipeline", {})
 	if not pipeline is Dictionary:
 		pipeline = {}
-	var threshold := clampf(pending_import_threshold, 0.0, 1.0)
+	var threshold := _read_import_threshold()
 	var output_image = _create_white_to_alpha_image(source_image, threshold)
 	if output_image == null or output_image.is_empty():
 		_show_status_message("Texture processing failed.")
@@ -2241,6 +2242,7 @@ func _render_inspector() -> void:
 			var threshold_label := _create_inspector_field_label("Threshold")
 			inspector_content.add_child(threshold_label)
 			var threshold_field := SpinBox.new()
+			import_threshold_field = threshold_field
 			threshold_field.min_value = 0.0
 			threshold_field.max_value = 1.0
 			threshold_field.step = 0.01
@@ -2462,8 +2464,12 @@ func _on_import_threshold_text_changed(text: String) -> void:
 		pending_import_threshold = clampf(float(text), 0.0, 1.0)
 
 
-func _update_import_threshold(value: float) -> void:
-	pending_import_threshold = clampf(value, 0.0, 1.0)
+func _read_import_threshold() -> float:
+	if is_instance_valid(import_threshold_field):
+		var entered_text := import_threshold_field.get_line_edit().text.strip_edges().replace(",", ".")
+		if entered_text.is_valid_float():
+			return clampf(float(entered_text), 0.0, 1.0)
+	return clampf(pending_import_threshold, 0.0, 1.0)
 
 
 func _render_canvas_context() -> void:
