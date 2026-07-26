@@ -61,11 +61,18 @@ func _draw() -> void:
 		var y := canvas_rect.position.y + canvas_size * fraction
 		draw_line(Vector2(x, canvas_rect.position.y), Vector2(x, canvas_rect.end.y), Color("#d8dde5"), 1.0)
 		draw_line(Vector2(canvas_rect.position.x, y), Vector2(canvas_rect.end.x, y), Color("#d8dde5"), 1.0)
-	var axis_color := Color("#68727f")
 	var horizontal_y := canvas_rect.end.y if origin_mode == "bottom_left" else canvas_rect.position.y if origin_mode == "top_left" else canvas_rect.get_center().y
 	var vertical_x := canvas_rect.position.x if origin_mode != "center" else canvas_rect.get_center().x
-	draw_line(Vector2(canvas_rect.position.x, horizontal_y), Vector2(canvas_rect.end.x, horizontal_y), axis_color, 3.0)
-	draw_line(Vector2(vertical_x, canvas_rect.position.y), Vector2(vertical_x, canvas_rect.end.y), axis_color, 3.0)
+	var origin := Vector2(vertical_x, horizontal_y)
+	var u_color := Color("#d9828b")
+	var v_color := Color("#75b88a")
+	var u_direction := Vector2.RIGHT
+	var v_direction := Vector2.UP if origin_mode != "top_left" else Vector2.DOWN
+	draw_line(origin, origin + u_direction * 28.0, u_color, 3.0)
+	draw_line(origin, origin + v_direction * 28.0, v_color, 3.0)
+	draw_circle(origin, 4.0, Color("#d8dde5"))
+	draw_string(ThemeDB.fallback_font, origin + u_direction * 32.0 + Vector2(-2, 4), "U", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, u_color)
+	draw_string(ThemeDB.fallback_font, origin + v_direction * 32.0 + Vector2(-3, 4), "V", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, v_color)
 	draw_string(ThemeDB.fallback_font, canvas_rect.position + Vector2(8, 20), "UV 0..1", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#697482"))
 	draw_string(ThemeDB.fallback_font, Vector2(canvas_rect.position.x, canvas_rect.end.y + 20), "Origin: %s" % origin_mode.replace("_", " ").capitalize(), HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#707985"))
 	if not selected_element_name.is_empty():
