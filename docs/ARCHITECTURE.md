@@ -362,7 +362,9 @@ in-editor LookDev mode. The Preview shows the selected ready Texture with
 Material tint, opacity, scale, and offset. The active Material remains selected
 in the Outliner and is shown in the right status-bar region. Material mapping
 will later become a graph concern; exporting real Godot artifacts is the
-authoritative end-look validation path.
+authoritative end-look validation path. Material assignment is performed in
+the normal Asset Component Inspector and is stored as the Component's optional
+`material_id`; the selected Component canvas uses that assignment directly.
 
 An imported raster source is selected from the project-local
 `imports/textures/` intake folder, copied into its Texture directory, and

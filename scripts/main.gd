@@ -2963,6 +2963,37 @@ func _render_inspector() -> void:
 	z_index_field.add_theme_font_size_override("font_size", 11)
 	z_index_field.value_changed.connect(_on_component_z_index_changed)
 	inspector_content.add_child(z_index_field)
+	inspector_content.add_child(_create_inspector_section("Material"))
+	var material_option := OptionButton.new()
+	material_option.custom_minimum_size = Vector2(0, 26)
+	material_option.add_item("None")
+	material_option.set_item_metadata(0, "")
+	var sorted_materials: Array[Dictionary] = materials.duplicate(true)
+	sorted_materials.sort_custom(_sort_named_documents)
+	for material in sorted_materials:
+		material_option.add_item(str(material.get("name", "Material")))
+		material_option.set_item_metadata(material_option.item_count - 1, str(material.get("id", "")))
+	var assigned_material_id := str(component.get("material_id", ""))
+	for index in range(material_option.item_count):
+		if str(material_option.get_item_metadata(index)) == assigned_material_id:
+			material_option.select(index)
+			break
+	material_option.item_selected.connect(_on_component_material_selected.bind(material_option))
+	inspector_content.add_child(material_option)
+
+
+func _on_component_material_selected(index: int, option: OptionButton) -> void:
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if component.is_empty() or index < 0 or index >= option.item_count:
+		return
+	var material_id := str(option.get_item_metadata(index))
+	if str(component.get("material_id", "")) == material_id:
+		return
+	_record_direct_change()
+	component["material_id"] = material_id
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
 
 
 func _create_name_editor(value: String, placeholder: String) -> LineEdit:
@@ -3176,6 +3207,7 @@ func _render_lookdev_canvas() -> void:
 		canvas_view.set_interaction_state("")
 		canvas_view.set_tool_mode("")
 		canvas_view.set_component_transform({})
+		canvas_view.set_component_material(null)
 		canvas_view.set_reference_shapes([])
 		canvas_view.set_outer_shape([])
 		return
@@ -3187,6 +3219,7 @@ func _render_lookdev_canvas() -> void:
 		canvas_view.set_interaction_state("asset")
 		canvas_view.set_tool_mode("")
 		canvas_view.set_component_transform({})
+		canvas_view.set_component_material(null)
 		canvas_view.set_reference_shapes(_build_reference_shapes(asset))
 		canvas_view.set_outer_shape([])
 		return
@@ -3283,6 +3316,7 @@ func _render_canvas_context() -> void:
 		canvas_view.set_interaction_state("asset")
 		canvas_view.set_tool_mode("")
 		canvas_view.set_component_transform({})
+		canvas_view.set_component_material(null)
 		canvas_view.set_reference_shapes(_build_reference_shapes(asset))
 		canvas_view.set_outer_shape([])
 		return
@@ -3303,6 +3337,11 @@ func _render_canvas_context() -> void:
 	component_transform["visibility"] = bool(component.get("visibility", true))
 	component_transform["z_index"] = int(component.get("z_index", 0))
 	canvas_view.set_component_transform(component_transform)
+	var component_material := _get_material(str(component.get("material_id", "")))
+	if component_material.is_empty():
+		canvas_view.set_component_material(null)
+	else:
+		canvas_view.set_component_material(_load_material_canvas_texture(component_material), component_material.get("tint", Color.WHITE), float(component_material.get("opacity", 1.0)), component_material.get("mapping_scale", Vector2.ONE), component_material.get("mapping_offset", Vector2.ZERO))
 	canvas_view.set_reference_shapes(_build_reference_shapes(asset, selected_component_id))
 	var component_closed := bool(component.get("closed", component["outer_shape"].size() >= 3))
 	canvas_view.set_outer_shape(component["outer_shape"], component_closed)

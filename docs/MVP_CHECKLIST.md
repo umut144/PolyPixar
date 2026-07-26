@@ -245,7 +245,8 @@ system, particle system, or universal animation graph.
       Material Graph workspace.
 - [x] Remove the Material Views switcher and in-editor LookDev workflow from
       the active UI; preserve legacy state fields only for compatibility.
-- [ ] Move permanent Material assignment to the Asset/Component workflow.
+- [x] Move permanent Material assignment to the Asset/Component workflow and
+      render the assigned Material on the selected Component canvas.
 - [ ] Export a real Godot artifact for authoritative end-look validation.
 
 - [x] Add the first `Material` module under Style.
