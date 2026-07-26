@@ -2031,7 +2031,10 @@ func _build_selected_asset_scene() -> void:
 			var texture := _get_texture(str(material.get("texture_id", "")))
 			var texture_path := _get_texture_final_path(texture) if not texture.is_empty() else ""
 			if not texture_path.is_empty():
-				polygon.texture = load(texture_path) as Texture2D
+				var texture_resource := load(texture_path) as Texture2D
+				polygon.texture = texture_resource
+				if texture_resource != null:
+					polygon.uv = _build_export_uvs(component.get("outer_shape", []), texture_resource.get_size(), material.get("mapping_scale", Vector2.ONE), material.get("mapping_offset", Vector2.ZERO))
 		root.add_child(polygon)
 		polygon.owner = root
 	var scene := PackedScene.new()
@@ -2050,6 +2053,32 @@ func _build_selected_asset_scene() -> void:
 		return
 	_show_status_message("Built Godot Scene: %s" % scene_path)
 	_render_export_workspace()
+
+
+func _build_export_uvs(points: Array, texture_size: Vector2, mapping_scale: Vector2, mapping_offset: Vector2) -> PackedVector2Array:
+	var uvs := PackedVector2Array()
+	if points.is_empty():
+		return uvs
+	var min_point: Vector2 = points[0] if points[0] is Vector2 else Vector2.ZERO
+	var max_point := min_point
+	for point in points:
+		if not point is Vector2:
+			continue
+		min_point.x = minf(min_point.x, point.x)
+		min_point.y = minf(min_point.y, point.y)
+		max_point.x = maxf(max_point.x, point.x)
+		max_point.y = maxf(max_point.y, point.y)
+	var extent := max_point - min_point
+	if is_zero_approx(extent.x):
+		extent.x = 1.0
+	if is_zero_approx(extent.y):
+		extent.y = 1.0
+	var safe_scale := Vector2(maxf(mapping_scale.x, 0.01), maxf(mapping_scale.y, 0.01))
+	for point in points:
+		var local_point: Vector2 = point if point is Vector2 else Vector2.ZERO
+		var normalized_uv := Vector2((local_point.x - min_point.x) / extent.x, (local_point.y - min_point.y) / extent.y)
+		uvs.append((normalized_uv * safe_scale + mapping_offset) * texture_size)
+	return uvs
 
 
 func _export_selected_asset_scene_legacy() -> void:

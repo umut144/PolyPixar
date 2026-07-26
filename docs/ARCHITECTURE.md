@@ -377,8 +377,10 @@ The first build writes a minimal Godot 4 `.tscn` scene below `res://exports/`
 for the selected Asset. It uses Godot's `Node2D`, `Polygon2D`, `PackedScene`,
 and `ResourceSaver` APIs instead of manually composing `.tscn` text.
 Components carry their contour, transform, visibility, z-index, and ready
-Material Texture references. Mesh resources, advanced UV mapping, and reusable
-external material resources follow later.
+Material Texture references. The initial export derives explicit UVs from each
+Component's local bounding box, preventing Godot from treating contour
+coordinates as texture coordinates. Mesh resources, advanced UV mapping, and
+reusable external material resources follow later.
 
 An imported raster source is selected from the project-local
 `imports/textures/` intake folder, copied into its Texture directory, and

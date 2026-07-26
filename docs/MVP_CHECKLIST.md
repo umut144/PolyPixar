@@ -253,7 +253,7 @@ system, particle system, or universal animation graph.
       Texture references before building.
 - [x] Build a minimal Godot 4 `.tscn` using `PackedScene` and `ResourceSaver`
       with Polygon2D components, transforms, visibility, z-index, and ready
-      Texture paths.
+      Texture paths, plus initial bounding-box UVs.
 
 - [x] Add the first `Material` module under Style.
 - [x] Bind a Workspace Texture to the Stone Floor Component without embedding
