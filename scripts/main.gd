@@ -924,7 +924,10 @@ func _save_workspace() -> void:
 			"name": str(material.get("name", material_id)),
 			"texture_id": str(material.get("texture_id", "")),
 			"tint": _serialize_color(material.get("tint", Color.WHITE)),
-			"opacity": clampf(float(material.get("opacity", 1.0)), 0.0, 1.0)
+			"opacity": clampf(float(material.get("opacity", 1.0)), 0.0, 1.0),
+			"mapping_scale": _serialize_vector(material.get("mapping_scale", Vector2.ONE)),
+			"mapping_offset": _serialize_vector(material.get("mapping_offset", Vector2.ZERO)),
+			"mapping_repeat": bool(material.get("mapping_repeat", false))
 		})
 	_write_json("%s/workspace.json" % workspace_root, {
 		"schema_version": SCHEMA_VERSION,
@@ -1698,7 +1701,10 @@ func _normalize_material(raw_material, fallback_id: String) -> Dictionary:
 		"name": str(data.get("name", fallback_id)),
 		"texture_id": str(data.get("texture_id", "")),
 		"tint": _deserialize_color(data.get("tint", [1.0, 1.0, 1.0, 1.0]), Color.WHITE),
-		"opacity": clampf(float(data.get("opacity", 1.0)), 0.0, 1.0)
+		"opacity": clampf(float(data.get("opacity", 1.0)), 0.0, 1.0),
+		"mapping_scale": _deserialize_vector(data.get("mapping_scale", [1.0, 1.0]), Vector2.ONE),
+		"mapping_offset": _deserialize_vector(data.get("mapping_offset", [0.0, 0.0]), Vector2.ZERO),
+		"mapping_repeat": bool(data.get("mapping_repeat", false))
 	}
 
 
@@ -2010,7 +2016,10 @@ func _confirm_material_creation() -> void:
 		"name": material_name,
 		"texture_id": "",
 		"tint": Color.WHITE,
-		"opacity": 1.0
+		"opacity": 1.0,
+		"mapping_scale": Vector2.ONE,
+		"mapping_offset": Vector2.ZERO,
+		"mapping_repeat": false
 	})
 	material_dialog.hide()
 	_enter_material_context(material_id)
@@ -2657,6 +2666,25 @@ func _render_material_inspector() -> void:
 	opacity_field.value_changed.connect(_on_material_opacity_changed)
 	inspector_content.add_child(opacity_field)
 
+	inspector_content.add_child(_create_inspector_section("Mapping"))
+	var mapping_grid := GridContainer.new()
+	mapping_grid.columns = 2
+	mapping_grid.add_theme_constant_override("h_separation", 8)
+	mapping_grid.add_theme_constant_override("v_separation", 4)
+	inspector_content.add_child(mapping_grid)
+	var mapping_scale: Vector2 = material.get("mapping_scale", Vector2.ONE)
+	_add_material_mapping_field(mapping_grid, "Scale X", mapping_scale.x, "scale_x")
+	_add_material_mapping_field(mapping_grid, "Scale Y", mapping_scale.y, "scale_y")
+	var mapping_offset: Vector2 = material.get("mapping_offset", Vector2.ZERO)
+	_add_material_mapping_field(mapping_grid, "Offset X", mapping_offset.x, "offset_x")
+	_add_material_mapping_field(mapping_grid, "Offset Y", mapping_offset.y, "offset_y")
+	var repeat_toggle := CheckButton.new()
+	repeat_toggle.text = "Repeat"
+	repeat_toggle.custom_minimum_size = Vector2(0, 26)
+	repeat_toggle.button_pressed = bool(material.get("mapping_repeat", false))
+	repeat_toggle.toggled.connect(_on_material_repeat_changed)
+	inspector_content.add_child(repeat_toggle)
+
 
 func _render_lookdev_material_target_inspector() -> void:
 	var material := _get_material(selected_material_id)
@@ -2691,6 +2719,47 @@ func _render_lookdev_material_target_inspector() -> void:
 	assign_button.disabled = assigned_id == selected_material_id
 	assign_button.pressed.connect(_assign_selected_material_to_lookdev_target)
 	inspector_content.add_child(assign_button)
+
+
+func _add_material_mapping_field(grid: GridContainer, label_text: String, value: float, property_name: String) -> void:
+	grid.add_child(_create_inspector_field_label(label_text))
+	var field := SpinBox.new()
+	field.min_value = -100.0 if property_name.begins_with("offset") else 0.01
+	field.max_value = 100.0
+	field.step = 0.01
+	field.custom_minimum_size = Vector2(96, 26)
+	field.set_value_no_signal(value)
+	field.value_changed.connect(_on_material_mapping_changed.bind(property_name))
+	grid.add_child(field)
+
+
+func _on_material_mapping_changed(value: float, property_name: String) -> void:
+	var material := _get_material(selected_material_id)
+	if material.is_empty():
+		return
+	_record_direct_change()
+	var scale: Vector2 = material.get("mapping_scale", Vector2.ONE)
+	var offset: Vector2 = material.get("mapping_offset", Vector2.ZERO)
+	if property_name == "scale_x":
+		scale.x = maxf(value, 0.01)
+	elif property_name == "scale_y":
+		scale.y = maxf(value, 0.01)
+	elif property_name == "offset_x":
+		offset.x = value
+	elif property_name == "offset_y":
+		offset.y = value
+	material["mapping_scale"] = scale
+	material["mapping_offset"] = offset
+	_render_canvas_context()
+
+
+func _on_material_repeat_changed(enabled: bool) -> void:
+	var material := _get_material(selected_material_id)
+	if material.is_empty():
+		return
+	_record_direct_change()
+	material["mapping_repeat"] = enabled
+	_render_canvas_context()
 
 
 func _render_lookdev_asset_inspector() -> void:
@@ -3076,6 +3145,7 @@ func _render_material_preview() -> void:
 	var texture := _get_texture(str(material.get("texture_id", "")))
 	var texture_path := _get_texture_final_path(texture) if not texture.is_empty() else ""
 	material_preview_texture.texture = null
+	material_preview_texture.region_enabled = false
 	material_preview_texture.modulate = Color(
 		Color(material.get("tint", Color.WHITE)).r,
 		Color(material.get("tint", Color.WHITE)).g,
@@ -3100,6 +3170,10 @@ func _render_material_preview() -> void:
 	material_preview_content.custom_minimum_size = fitted_size
 	material_preview_texture.custom_minimum_size = fitted_size
 	material_preview_texture.texture = ImageTexture.create_from_image(image)
+	var mapping_scale: Vector2 = material.get("mapping_scale", Vector2.ONE)
+	var mapping_offset: Vector2 = material.get("mapping_offset", Vector2.ZERO)
+	material_preview_texture.region_enabled = true
+	material_preview_texture.region_rect = Rect2(mapping_offset * image_size, image_size / Vector2(maxf(mapping_scale.x, 0.01), maxf(mapping_scale.y, 0.01)))
 	material_preview_label.visible = false
 
 
@@ -3154,7 +3228,7 @@ func _render_lookdev_canvas() -> void:
 	if material.is_empty():
 		canvas_view.set_component_material(null)
 	else:
-		canvas_view.set_component_material(_load_material_canvas_texture(material), material.get("tint", Color.WHITE), float(material.get("opacity", 1.0)))
+		canvas_view.set_component_material(_load_material_canvas_texture(material), material.get("tint", Color.WHITE), float(material.get("opacity", 1.0)), material.get("mapping_scale", Vector2.ONE), material.get("mapping_offset", Vector2.ZERO))
 	canvas_view.set_reference_shapes(_build_reference_shapes(asset, lookdev_target_component_id))
 	canvas_view.set_outer_shape(component.get("outer_shape", []), bool(component.get("closed", false)))
 

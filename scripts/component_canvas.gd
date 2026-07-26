@@ -48,6 +48,8 @@ var component_transform: Dictionary = {
 }
 var material_texture: Texture2D
 var material_modulate := Color.WHITE
+var material_mapping_scale := Vector2.ONE
+var material_mapping_offset := Vector2.ZERO
 var pivot_dragging := false
 var transform_drag_axis := ""
 var transform_drag_start_world := Vector2.ZERO
@@ -273,9 +275,11 @@ func set_component_transform(transform: Dictionary) -> void:
 	queue_redraw()
 
 
-func set_component_material(texture: Texture2D, tint := Color.WHITE, opacity := 1.0) -> void:
+func set_component_material(texture: Texture2D, tint := Color.WHITE, opacity := 1.0, mapping_scale := Vector2.ONE, mapping_offset := Vector2.ZERO) -> void:
 	material_texture = texture
 	material_modulate = Color(tint.r, tint.g, tint.b, clampf(float(opacity), 0.0, 1.0))
+	material_mapping_scale = Vector2(maxf(mapping_scale.x, 0.01), maxf(mapping_scale.y, 0.01))
+	material_mapping_offset = mapping_offset
 	queue_redraw()
 
 
@@ -558,7 +562,8 @@ func _draw_material_polygon() -> void:
 	var colors := PackedColorArray()
 	for point in outer_shape:
 		screen_points.append(_world_to_screen(_local_to_world(point)))
-		uvs.append(Vector2((point.x - min_point.x) / extent.x, (point.y - min_point.y) / extent.y))
+		var base_uv := Vector2((point.x - min_point.x) / extent.x, (point.y - min_point.y) / extent.y)
+		uvs.append(base_uv * material_mapping_scale + material_mapping_offset)
 		colors.append(material_modulate)
 	draw_polygon(screen_points, colors, uvs, material_texture)
 

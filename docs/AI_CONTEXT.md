@@ -115,7 +115,8 @@ it into a general scene or animation-graph abstraction prematurely.
   offers an explicit Assign Material action; the optional Component
   `material_id` is persisted and included in history. Assigned textures now
   project onto closed Component polygons with normalized local bounding-box
-  UVs; repeat, offset, and scale controls remain a later phase.
+  UVs. Material Mapping now stores scale, offset, and repeat intent and applies
+  scale/offset in LookDev and the neutral Preview.
 - Graph and Preview share one selected Material state. View changes refresh
   the Inspector without losing that selection; LookDev keeps the Material
   active while selecting an independent Asset/Component target. The active

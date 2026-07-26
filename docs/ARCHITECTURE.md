@@ -368,8 +368,9 @@ the right status-bar region. When a Component is
 selected, the Inspector switches to that Component context and offers an
 explicit `Assign Material` action. Assignment is stored as the Component's
 optional `material_id`; assigned textures now project onto closed Component
-polygons using normalized local bounding-box UVs. Repeat, offset, and scale
-controls remain deferred. The graph is not yet a free-form shader editor.
+polygons using normalized local bounding-box UVs. Material Mapping now exposes
+scale and offset values (with a persisted Repeat intent) for the LookDev and
+neutral Preview contexts. The graph is not yet a free-form shader editor.
 
 An imported raster source is selected from the project-local
 `imports/textures/` intake folder, copied into its Texture directory, and
