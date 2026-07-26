@@ -97,6 +97,10 @@ it into a general scene or animation-graph abstraction prematurely.
   processing preview, and valid final output. The current Phase 4 state is
   explicitly `not_ready`; Phase 6 adds the first `White to Alpha` processing
   action, which can produce a `ready` output for the Texture parent.
+- A Texture persists `final_output_element_id`. The parent UV Canvas consumes
+  only that ready Element output; successful processing selects the processed
+  Import Element as the final output. Legacy Textures resolve a first ready
+  output on load.
 - `Style → Material` is Slice 4's first Style module. It binds a Workspace
   Texture to a Component by stable reference and exposes only repeat, scale,
   offset, base tint, ink strength, and glow values.

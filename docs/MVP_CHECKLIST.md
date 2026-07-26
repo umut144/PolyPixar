@@ -202,13 +202,13 @@ system, particle system, or universal animation graph.
 
 ### B. Create → Texture: import pipeline
 
-- [ ] Add `Import Texture` to the Texture Context Bar; importing a raster image
+- [x] Add `Import Texture` to the Texture Context Bar; importing a raster image
       must not require creating Texture Elements.
-- [ ] Preserve an imported texture as a named Workspace Texture and restore it
+- [x] Preserve an imported texture as a named Workspace Texture and restore it
       when the Workspace is loaded.
-- [ ] Display the composed final UV output when the Texture parent is selected;
+- [x] Display the composed final UV output when the Texture parent is selected;
       only output-valid Elements may contribute to it.
-- [ ] Provide a first background treatment that can isolate the dark ink from a
+- [x] Provide a first background treatment that can isolate the dark ink from a
       light paper/background (for example, a white-to-alpha or ink-mask mode).
 - [ ] Retain the derived ink/alpha information separately from the base colour
       wherever that is necessary for later material shading.
@@ -216,22 +216,22 @@ system, particle system, or universal animation graph.
 
 ### C. Element output contract and Import preview
 
-- [ ] Define the smallest common Element output contract needed by the Texture
+- [x] Define the smallest common Element output contract needed by the Texture
       parent (valid image/output state plus UV dimensions).
-- [ ] Persist the initial `not_ready` output state for Import and Generator
+- [x] Persist the initial `not_ready` output state for Import and Generator
       Elements and show it in the relevant Inspector context.
-- [ ] Keep raw Import Element source data separate from its final output state;
+- [x] Keep raw Import Element source data separate from its final output state;
       a raw source must not be treated as a completed parent Texture.
-- [ ] Show a dedicated Import Element preview with the original source.
-- [ ] Add an Import Element `⌘1 Previews` menu with `1: Original` and
+- [x] Show a dedicated Import Element preview with the original source.
+- [x] Add an Import Element `⌘1 Previews` menu with `1: Original` and
       `2: White to Alpha`, including direct number-key shortcuts.
-- [ ] Add the first processing preview stage for an Import Element, such as
+- [x] Add the first processing preview stage for an Import Element, such as
       white-background removal or ink-mask extraction.
-- [ ] Provide a minimal `White to Alpha` processing action with a persisted
+- [x] Provide a minimal `White to Alpha` processing action with a persisted
       threshold parameter.
-- [ ] Write the processed output into the Workspace and transition the Element
+- [x] Write the processed output into the Workspace and transition the Element
       state from `not_ready` to `ready` only after processing succeeds.
-- [ ] Feed the processed Import Element output into the Texture parent's final
+- [x] Feed the processed Import Element output into the Texture parent's final
       UV composition only after that output is valid.
 
 ### D. Style → Material

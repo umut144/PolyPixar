@@ -108,6 +108,12 @@ slice. Texture data is persisted below
 `import` or `generator`; the Outliner may group these types without requiring
 separate data collections.
 
+The Texture parent stores `final_output_element_id`. It points to one ready
+Element output and is the only output shown in the parent's UV Canvas. The
+first processing action that succeeds selects its Element as the final output.
+Older Texture documents without that field resolve their first ready Element on
+load, preserving their existing result without treating a raw source as ready.
+
 The Outliner presents Assets and Textures in separate groups. Both groups are
 alphabetically ordered and share a compact search field plus `All`, `Assets`,
 and `Textures` filters. Expanded Assets display `Components` and, when Guide
@@ -341,10 +347,11 @@ workspaces/<workspace_name>/
 ```
 
 Every JSON document contains a numeric `schema_version`. The current MVP
-schema is version `6`. Workspace metadata references Asset and Texture IDs.
+schema is version `7`. Workspace metadata references Asset and Texture IDs.
 Each Asset document stores its Components and their contour points; each Texture
-document stores its dimensions, origin convention, and Elements. Display names
-remain editable and are not used as persistent references.
+document stores its dimensions, origin convention, Elements, and an optional
+`final_output_element_id`. Display names remain editable and are not used as
+persistent references.
 
 An imported raster source is selected from the project-local
 `imports/textures/` intake folder, copied into its Texture directory, and
@@ -355,7 +362,8 @@ depending on the intake file. Older Texture JSONs with a Texture-level
 `import_source` field are migrated when loaded. New Elements carry an explicit
 output state, initially `not_ready`; Phase 6's White-to-Alpha processing may
 produce a `ready` output file, and only `ready` output files can contribute to
-the Texture parent.
+the Texture parent. The selected final output is persisted and restored with
+the Texture document.
 
 Workspace JSON also contains an `editor_state` object for the restorable editor
 view: selected Asset, Component, Texture, or Element and the expanded/collapsed
