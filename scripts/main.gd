@@ -54,6 +54,7 @@ var status_clear_timer: Timer
 var active_draw_tool := ""
 var active_state := ""
 var active_import_preview_mode := "original"
+var pending_import_threshold := 0.05
 var active_edit_mode := "select"
 var active_transform_mode := "transform"
 var snap_enabled := true
@@ -1336,7 +1337,7 @@ func _process_selected_import_element() -> void:
 	var pipeline = element.get("pipeline", {})
 	if not pipeline is Dictionary:
 		pipeline = {}
-	var threshold := clampf(float(pipeline.get("threshold", 0.05)), 0.0, 1.0)
+	var threshold := clampf(pending_import_threshold, 0.0, 1.0)
 	var output_image = _create_white_to_alpha_image(source_image, threshold)
 	if output_image == null or output_image.is_empty():
 		_show_status_message("Texture processing failed.")
@@ -2245,9 +2246,10 @@ func _render_inspector() -> void:
 			threshold_field.step = 0.01
 			threshold_field.custom_minimum_size = Vector2(0, 26)
 			threshold_field.add_theme_font_size_override("font_size", 11)
+			pending_import_threshold = clampf(float(pipeline.get("threshold", 0.05)), 0.0, 1.0)
 			# Rebuilding the Inspector must not emit value_changed and overwrite
 			# the user's current threshold with the default value.
-			threshold_field.set_value_no_signal(clampf(float(pipeline.get("threshold", 0.05)), 0.0, 1.0))
+			threshold_field.set_value_no_signal(pending_import_threshold)
 			# SpinBox text entry can commit without a reliable value_changed event;
 			# listen to the embedded LineEdit as the source of truth as well.
 			threshold_field.get_line_edit().text_changed.connect(_on_import_threshold_text_changed)
@@ -2452,23 +2454,16 @@ func _rename_selected_element(new_name: String) -> void:
 
 
 func _on_import_threshold_changed(value: float) -> void:
-	_update_import_threshold(value)
+	pending_import_threshold = clampf(value, 0.0, 1.0)
 
 
 func _on_import_threshold_text_changed(text: String) -> void:
 	if text.is_valid_float():
-		_update_import_threshold(float(text))
+		pending_import_threshold = clampf(float(text), 0.0, 1.0)
 
 
 func _update_import_threshold(value: float) -> void:
-	var texture := _get_texture(selected_texture_id)
-	var element := _get_element(texture, selected_element_id)
-	if texture.is_empty() or element.is_empty() or str(element.get("type", "")) != "import":
-		return
-	_record_direct_change()
-	element["pipeline"] = {"mode": "white_to_alpha", "threshold": clampf(value, 0.0, 1.0)}
-	element["output"] = {"state": "not_ready", "file": ""}
-	_render_canvas_context()
+	pending_import_threshold = clampf(value, 0.0, 1.0)
 
 
 func _render_canvas_context() -> void:
