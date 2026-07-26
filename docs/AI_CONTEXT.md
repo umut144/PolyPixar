@@ -71,6 +71,10 @@ it into a general scene or animation-graph abstraction prematurely.
   PolyTexture-style editing context.
 - The Outliner now has separate alphabetized Assets and Textures groups with a
   shared search field and All/Assets/Textures filter.
+- Expanded Asset entries group children under `Components` and optional
+  `Guides`; expanded Texture entries group typed children under `Import
+  Elements` and `Generator Elements`. These are visual groups over unified
+  typed child lists.
 - `New → Texture` now creates a 512×512 Texture; its Outliner `Add` action
   creates named Elements with fallback names. Texture and Element selection
   and renaming are available. The UV Texture Canvas is also implemented.

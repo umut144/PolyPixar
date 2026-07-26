@@ -1566,6 +1566,9 @@ func _asset_matches_search(asset: Dictionary, search_text: String) -> bool:
 	for component in asset.get("components", []):
 		if str(component.get("name", "")).to_lower().contains(search_text):
 			return true
+	for guide in asset.get("guides", []):
+		if str(guide.get("name", "")).to_lower().contains(search_text):
+			return true
 	return false
 
 
@@ -1589,49 +1592,93 @@ func _create_outliner_group_label(text: String) -> Label:
 	return label
 
 
+func _create_outliner_child_group_label(text: String) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 0)
+	var placeholder := Control.new()
+	placeholder.custom_minimum_size = Vector2(16, 0)
+	row.add_child(placeholder)
+	var label := Label.new()
+	label.text = text
+	label.custom_minimum_size = Vector2(0, 24)
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", 10)
+	label.add_theme_color_override("font_color", Color("#737f91"))
+	row.add_child(label)
+	return row
+
+
 func _render_asset_outliner_entry(asset: Dictionary, force_expand := false) -> void:
-		var asset_id := str(asset["id"])
-		var asset_container := VBoxContainer.new()
-		asset_container.add_theme_constant_override("separation", 0)
-		outliner_list.add_child(asset_container)
-		var asset_header := HBoxContainer.new()
-		asset_header.add_theme_constant_override("separation", 2)
-		asset_container.add_child(asset_header)
-		var asset_button := Button.new()
-		asset_button.text = str(asset["name"])
-		asset_button.custom_minimum_size = Vector2(0, 30)
-		asset_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		asset_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		asset_button.focus_mode = Control.FOCUS_NONE
-		_style_outliner_button(asset_button, asset_id == selected_asset_id and selected_component_id.is_empty())
-		asset_button.pressed.connect(_select_asset.bind(asset_id))
-		asset_header.add_child(asset_button)
-		var add_button := Button.new()
-		add_button.text = "Add"
-		add_button.custom_minimum_size = Vector2(48, 30)
-		add_button.focus_mode = Control.FOCUS_NONE
-		add_button.pressed.connect(_open_component_dialog.bind(asset_id))
-		asset_header.add_child(add_button)
-		if not force_expand and not bool(expanded_assets.get(asset_id, false)):
-			return
-		for component in asset["components"]:
-			var component_id := str(component["id"])
-			var component_row := HBoxContainer.new()
-			component_row.add_theme_constant_override("separation", 0)
-			asset_container.add_child(component_row)
-			var child_placeholder := Control.new()
-			child_placeholder.custom_minimum_size = Vector2(16, 0)
-			component_row.add_child(child_placeholder)
-			var component_button := Button.new()
-			var component_name := str(component["name"])
-			component_button.text = component_name if bool(component.get("visibility", true)) else _strikethrough_text(component_name)
-			component_button.custom_minimum_size = Vector2(0, 30)
-			component_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			component_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-			component_button.focus_mode = Control.FOCUS_NONE
-			_style_outliner_button(component_button, component_id == selected_component_id)
-			component_button.pressed.connect(_select_component.bind(asset_id, component_id))
-			component_row.add_child(component_button)
+	var asset_id := str(asset["id"])
+	var asset_container := VBoxContainer.new()
+	asset_container.add_theme_constant_override("separation", 0)
+	outliner_list.add_child(asset_container)
+	var asset_header := HBoxContainer.new()
+	asset_header.add_theme_constant_override("separation", 2)
+	asset_container.add_child(asset_header)
+	var asset_button := Button.new()
+	asset_button.text = str(asset["name"])
+	asset_button.custom_minimum_size = Vector2(0, 30)
+	asset_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	asset_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	asset_button.focus_mode = Control.FOCUS_NONE
+	_style_outliner_button(asset_button, asset_id == selected_asset_id and selected_component_id.is_empty())
+	asset_button.pressed.connect(_select_asset.bind(asset_id))
+	asset_header.add_child(asset_button)
+	var add_button := Button.new()
+	add_button.text = "Add"
+	add_button.custom_minimum_size = Vector2(48, 30)
+	add_button.focus_mode = Control.FOCUS_NONE
+	add_button.pressed.connect(_open_component_dialog.bind(asset_id))
+	asset_header.add_child(add_button)
+	if not force_expand and not bool(expanded_assets.get(asset_id, false)):
+		return
+	var components: Array = []
+	var guides: Array = asset.get("guides", []).duplicate(true)
+	for component in asset.get("components", []):
+		if str(component.get("type", "component")) == "guide":
+			guides.append(component)
+		else:
+			components.append(component)
+	components.sort_custom(_sort_named_documents)
+	guides.sort_custom(_sort_named_documents)
+	asset_container.add_child(_create_outliner_child_group_label("Components"))
+	for component in components:
+		var component_id := str(component["id"])
+		var component_row := HBoxContainer.new()
+		component_row.add_theme_constant_override("separation", 0)
+		asset_container.add_child(component_row)
+		var child_placeholder := Control.new()
+		child_placeholder.custom_minimum_size = Vector2(16, 0)
+		component_row.add_child(child_placeholder)
+		var component_button := Button.new()
+		var component_name := str(component["name"])
+		component_button.text = component_name if bool(component.get("visibility", true)) else _strikethrough_text(component_name)
+		component_button.custom_minimum_size = Vector2(0, 30)
+		component_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		component_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		component_button.focus_mode = Control.FOCUS_NONE
+		_style_outliner_button(component_button, component_id == selected_component_id)
+		component_button.pressed.connect(_select_component.bind(asset_id, component_id))
+		component_row.add_child(component_button)
+	if not guides.is_empty():
+		asset_container.add_child(_create_outliner_child_group_label("Guides"))
+		for guide in guides:
+			var guide_row := HBoxContainer.new()
+			guide_row.add_theme_constant_override("separation", 0)
+			var guide_placeholder := Control.new()
+			guide_placeholder.custom_minimum_size = Vector2(16, 0)
+			guide_row.add_child(guide_placeholder)
+			var guide_button := Button.new()
+			guide_button.text = str(guide.get("name", "Guide"))
+			guide_button.custom_minimum_size = Vector2(0, 30)
+			guide_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			guide_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+			guide_button.focus_mode = Control.FOCUS_NONE
+			_style_outliner_button(guide_button, str(guide.get("id", "")) == selected_component_id)
+			guide_row.add_child(guide_button)
+			asset_container.add_child(guide_row)
 
 
 func _render_texture_outliner_entry(texture: Dictionary, force_expand := false) -> void:
@@ -1659,22 +1706,39 @@ func _render_texture_outliner_entry(texture: Dictionary, force_expand := false) 
 	texture_header.add_child(add_button)
 	if not force_expand and not bool(expanded_textures.get(texture_id, false)):
 		return
+	var import_elements: Array = []
+	var generator_elements: Array = []
 	for element in texture.get("elements", []):
-		var element_row := HBoxContainer.new()
-		element_row.add_theme_constant_override("separation", 0)
-		texture_container.add_child(element_row)
-		var child_placeholder := Control.new()
-		child_placeholder.custom_minimum_size = Vector2(16, 0)
-		element_row.add_child(child_placeholder)
-		var element_button := Button.new()
-		element_button.text = str(element.get("name", "Element"))
-		element_button.custom_minimum_size = Vector2(0, 30)
-		element_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		element_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		element_button.focus_mode = Control.FOCUS_NONE
-		_style_outliner_button(element_button, str(element.get("id", "")) == selected_element_id)
-		element_button.pressed.connect(_select_element.bind(texture_id, str(element.get("id", ""))))
-		element_row.add_child(element_button)
+		if str(element.get("type", "generator")) == "import":
+			import_elements.append(element)
+		else:
+			generator_elements.append(element)
+	import_elements.sort_custom(_sort_named_documents)
+	generator_elements.sort_custom(_sort_named_documents)
+	texture_container.add_child(_create_outliner_child_group_label("Import Elements"))
+	for element in import_elements:
+		_render_texture_element_row(texture_container, texture_id, element)
+	texture_container.add_child(_create_outliner_child_group_label("Generator Elements"))
+	for element in generator_elements:
+		_render_texture_element_row(texture_container, texture_id, element)
+
+
+func _render_texture_element_row(texture_container: VBoxContainer, texture_id: String, element: Dictionary) -> void:
+	var element_row := HBoxContainer.new()
+	element_row.add_theme_constant_override("separation", 0)
+	texture_container.add_child(element_row)
+	var child_placeholder := Control.new()
+	child_placeholder.custom_minimum_size = Vector2(16, 0)
+	element_row.add_child(child_placeholder)
+	var element_button := Button.new()
+	element_button.text = str(element.get("name", "Element"))
+	element_button.custom_minimum_size = Vector2(0, 30)
+	element_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	element_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	element_button.focus_mode = Control.FOCUS_NONE
+	_style_outliner_button(element_button, str(element.get("id", "")) == selected_element_id)
+	element_button.pressed.connect(_select_element.bind(texture_id, str(element.get("id", ""))))
+	element_row.add_child(element_button)
 
 
 func _on_outliner_filter_selected(index: int) -> void:

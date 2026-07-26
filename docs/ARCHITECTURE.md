@@ -110,7 +110,10 @@ separate data collections.
 
 The Outliner presents Assets and Textures in separate groups. Both groups are
 alphabetically ordered and share a compact search field plus `All`, `Assets`,
-and `Textures` filters.
+and `Textures` filters. Expanded Assets display `Components` and, when Guide
+data exists, a separate `Guides` group. Expanded Textures display separate
+`Import Elements` and `Generator Elements` groups. These are navigation groups
+over one typed child collection, not separate persistence models.
 
 `New → Texture` creates a named Texture with the default 512×512 canvas. Each
 Texture exposes an `Add` action for named Elements, which are selected and
