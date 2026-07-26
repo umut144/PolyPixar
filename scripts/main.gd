@@ -29,6 +29,8 @@ var selected_texture_id := ""
 var selected_element_id := ""
 var selected_material_id := ""
 var material_view_mode := "graph"
+var lookdev_target_asset_id := ""
+var lookdev_target_component_id := ""
 var expanded_assets: Dictionary = {}
 var expanded_textures: Dictionary = {}
 var next_asset_id := 1
@@ -136,6 +138,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 		elif event.keycode == KEY_2:
 			_set_material_view("preview")
+			get_viewport().set_input_as_handled()
+		elif event.keycode == KEY_3:
+			_set_material_view("lookdev")
 			get_viewport().set_input_as_handled()
 		return
 	if selected_component_id.is_empty():
@@ -939,6 +944,9 @@ func _capture_history_snapshot() -> Dictionary:
 		"selected_element_id": selected_element_id,
 		"selected_material_id": selected_material_id,
 		"active_module": active_module,
+		"material_view_mode": material_view_mode,
+		"lookdev_target_asset_id": lookdev_target_asset_id,
+		"lookdev_target_component_id": lookdev_target_component_id,
 		"expanded_assets": expanded_assets.duplicate(true)
 	}
 
@@ -981,6 +989,9 @@ func _restore_history_snapshot(snapshot: Dictionary) -> void:
 	selected_element_id = str(snapshot.get("selected_element_id", ""))
 	selected_material_id = str(snapshot.get("selected_material_id", ""))
 	active_module = str(snapshot.get("active_module", "Create"))
+	material_view_mode = str(snapshot.get("material_view_mode", "graph"))
+	lookdev_target_asset_id = str(snapshot.get("lookdev_target_asset_id", ""))
+	lookdev_target_component_id = str(snapshot.get("lookdev_target_component_id", ""))
 	expanded_assets = snapshot.get("expanded_assets", {}).duplicate(true)
 	if _get_asset(selected_asset_id).is_empty():
 		selected_asset_id = ""
@@ -1109,6 +1120,9 @@ func _serialize_editor_state() -> Dictionary:
 		"selected_element_id": selected_element_id,
 		"selected_material_id": selected_material_id,
 		"active_module": active_module,
+		"material_view_mode": material_view_mode,
+		"lookdev_target_asset_id": lookdev_target_asset_id,
+		"lookdev_target_component_id": lookdev_target_component_id,
 		"expanded_assets": expanded_state,
 		"expanded_textures": expanded_textures.duplicate(true),
 		"snap": {
@@ -1126,6 +1140,9 @@ func _restore_editor_state(state) -> void:
 	selected_element_id = ""
 	selected_material_id = ""
 	active_module = "Create"
+	material_view_mode = "graph"
+	lookdev_target_asset_id = ""
+	lookdev_target_component_id = ""
 	expanded_assets.clear()
 	expanded_textures.clear()
 	for asset in assets:
@@ -1162,6 +1179,14 @@ func _restore_editor_state(state) -> void:
 	if selected_asset_id.is_empty() and selected_texture_id.is_empty() and not _get_material(requested_material_id).is_empty():
 		selected_material_id = requested_material_id
 		active_module = "Style"
+		material_view_mode = str(state.get("material_view_mode", "graph"))
+		lookdev_target_asset_id = str(state.get("lookdev_target_asset_id", ""))
+		lookdev_target_component_id = str(state.get("lookdev_target_component_id", ""))
+		if _get_asset(lookdev_target_asset_id).is_empty():
+			lookdev_target_asset_id = ""
+			lookdev_target_component_id = ""
+		elif _get_component(_get_asset(lookdev_target_asset_id), lookdev_target_component_id).is_empty():
+			lookdev_target_component_id = ""
 		var style_section := _find_section("Style")
 		if style_section != null:
 			style_section.set_expanded(true)
@@ -1373,14 +1398,10 @@ func _render_material_context_bar() -> void:
 	material_menu.text = "⌘1  Views  ▼"
 	material_menu.custom_minimum_size = Vector2(122, 32)
 	material_menu.focus_mode = Control.FOCUS_NONE
-	material_menu.toggle_mode = true
-	material_menu.button_pressed = material_view_mode == "graph"
-	material_menu.pressed.connect(func() -> void: _set_material_view("graph"))
 	var material_popup := material_menu.get_popup()
 	material_popup.add_item("1: Graph", 0)
 	material_popup.add_item("2: Preview", 1)
 	material_popup.add_item("3: LookDev", 2)
-	material_popup.set_item_disabled(2, true)
 	material_popup.id_pressed.connect(_on_material_view_menu_id)
 	context_bar.add_child(material_menu)
 
@@ -1391,9 +1412,10 @@ func _on_material_view_menu_id(id: int) -> void:
 
 
 func _set_material_view(mode: String) -> void:
-	if mode != "graph" and mode != "preview":
+	if mode != "graph" and mode != "preview" and mode != "lookdev":
 		return
 	material_view_mode = mode
+	_render_outliner()
 	_render_context_bar()
 	_render_info_bar()
 	_render_canvas_context()
@@ -1827,7 +1849,8 @@ func _render_info_bar() -> void:
 	_clear(info_bar)
 	if active_module == "Style" and not selected_material_id.is_empty():
 		var material_state_label := Label.new()
-		material_state_label.text = "State: Material / %s" % ("Preview" if material_view_mode == "preview" else "Graph")
+		var material_view_label := "Preview" if material_view_mode == "preview" else "LookDev" if material_view_mode == "lookdev" else "Graph"
+		material_state_label.text = "State: Material / %s" % material_view_label
 		info_bar.add_child(material_state_label)
 		_add_info_option("1: Graph")
 		_add_info_option("2: Preview")
@@ -2086,7 +2109,10 @@ func _render_outliner() -> void:
 	if is_instance_valid(outliner_filter_option):
 		outliner_filter_option.visible = active_module != "Style"
 	if active_module == "Style":
-		_render_material_outliner()
+		if material_view_mode == "lookdev":
+			_render_lookdev_outliner()
+		else:
+			_render_material_outliner()
 		return
 	var search_text := outliner_search_input.text.strip_edges().to_lower() if is_instance_valid(outliner_search_input) else ""
 	var show_assets := outliner_filter == "all" or outliner_filter == "assets"
@@ -2129,6 +2155,18 @@ func _render_material_outliner() -> void:
 		_style_outliner_button(material_button, str(material.get("id", "")) == selected_material_id)
 		material_button.pressed.connect(_select_material.bind(str(material.get("id", ""))))
 		outliner_list.add_child(material_button)
+
+
+func _render_lookdev_outliner() -> void:
+	var search_text := outliner_search_input.text.strip_edges().to_lower() if is_instance_valid(outliner_search_input) else ""
+	var visible_assets: Array[Dictionary] = []
+	for asset in assets:
+		if _asset_matches_search(asset, search_text):
+			visible_assets.append(asset)
+	visible_assets.sort_custom(_sort_named_documents)
+	outliner_list.add_child(_create_outliner_group_label("Assets"))
+	for asset in visible_assets:
+		_render_asset_outliner_entry(asset, not search_text.is_empty(), true)
 
 
 func _asset_matches_search(asset: Dictionary, search_text: String) -> bool:
@@ -2185,7 +2223,7 @@ func _create_outliner_child_group_label(text: String, indent := 16) -> HBoxConta
 	return row
 
 
-func _render_asset_outliner_entry(asset: Dictionary, force_expand := false) -> void:
+func _render_asset_outliner_entry(asset: Dictionary, force_expand := false, lookdev := false) -> void:
 	var asset_id := str(asset["id"])
 	var asset_container := VBoxContainer.new()
 	asset_container.add_theme_constant_override("separation", 0)
@@ -2199,8 +2237,13 @@ func _render_asset_outliner_entry(asset: Dictionary, force_expand := false) -> v
 	asset_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	asset_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	asset_button.focus_mode = Control.FOCUS_NONE
-	_style_outliner_button(asset_button, asset_id == selected_asset_id and selected_component_id.is_empty())
-	asset_button.pressed.connect(_select_asset.bind(asset_id))
+	var active_asset_id := lookdev_target_asset_id if lookdev else selected_asset_id
+	var active_component_id := lookdev_target_component_id if lookdev else selected_component_id
+	_style_outliner_button(asset_button, asset_id == active_asset_id and active_component_id.is_empty())
+	if lookdev:
+		asset_button.pressed.connect(_select_lookdev_asset.bind(asset_id))
+	else:
+		asset_button.pressed.connect(_select_asset.bind(asset_id))
 	asset_header.add_child(asset_button)
 	var add_button := Button.new()
 	add_button.text = "Add"
@@ -2235,8 +2278,11 @@ func _render_asset_outliner_entry(asset: Dictionary, force_expand := false) -> v
 		component_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		component_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		component_button.focus_mode = Control.FOCUS_NONE
-		_style_outliner_button(component_button, component_id == selected_component_id)
-		component_button.pressed.connect(_select_component.bind(asset_id, component_id))
+		_style_outliner_button(component_button, component_id == (lookdev_target_component_id if lookdev else selected_component_id) and asset_id == (lookdev_target_asset_id if lookdev else selected_asset_id))
+		if lookdev:
+			component_button.pressed.connect(_select_lookdev_component.bind(asset_id, component_id))
+		else:
+			component_button.pressed.connect(_select_component.bind(asset_id, component_id))
 		component_row.add_child(component_button)
 	if not guides.is_empty():
 		asset_container.add_child(_create_outliner_child_group_label("Guides"))
@@ -2940,12 +2986,53 @@ func _render_material_preview() -> void:
 	material_preview_label.visible = false
 
 
+func _render_lookdev_canvas() -> void:
+	canvas_view.visible = true
+	texture_canvas.visible = false
+	import_preview.visible = false
+	var asset := _get_asset(lookdev_target_asset_id)
+	if asset.is_empty():
+		canvas_context_label.text = "LookDev: Select an Asset"
+		canvas_view.set_context("")
+		canvas_view.set_interaction_state("")
+		canvas_view.set_tool_mode("")
+		canvas_view.set_component_transform({})
+		canvas_view.set_reference_shapes([])
+		canvas_view.set_outer_shape([])
+		return
+	var component := _get_component(asset, lookdev_target_component_id)
+	if component.is_empty():
+		canvas_context_label.text = "LookDev: %s" % str(asset.get("name", "Asset"))
+		canvas_view.set_context(str(asset.get("name", "Asset")))
+		canvas_view.set_interaction_state("asset")
+		canvas_view.set_tool_mode("")
+		canvas_view.set_component_transform({})
+		canvas_view.set_reference_shapes(_build_reference_shapes(asset))
+		canvas_view.set_outer_shape([])
+		return
+	canvas_context_label.text = "LookDev: %s / %s" % [str(asset.get("name", "Asset")), str(component.get("name", "Component"))]
+	canvas_view.set_context(str(component.get("name", "Component")))
+	canvas_view.set_interaction_state("")
+	canvas_view.set_tool_mode("")
+	var component_transform: Dictionary = component.get("transform", _default_component_transform()).duplicate(true)
+	component_transform["visibility"] = bool(component.get("visibility", true))
+	component_transform["z_index"] = int(component.get("z_index", 0))
+	canvas_view.set_component_transform(component_transform)
+	canvas_view.set_reference_shapes(_build_reference_shapes(asset, lookdev_target_component_id))
+	canvas_view.set_outer_shape(component.get("outer_shape", []), bool(component.get("closed", false)))
+
+
 func _render_canvas_context() -> void:
 	_render_context_bar()
 	_render_info_bar()
 	if not is_instance_valid(canvas_context_label):
 		return
 	if active_module == "Style":
+		if material_view_mode == "lookdev":
+			material_graph.visible = false
+			material_preview_container.visible = false
+			_render_lookdev_canvas()
+			return
 		canvas_view.visible = false
 		texture_canvas.visible = false
 		import_preview.visible = false
@@ -3235,3 +3322,28 @@ func _select_material(material_id: String) -> void:
 	if _get_material(material_id).is_empty():
 		return
 	_enter_material_context(material_id)
+
+
+func _select_lookdev_asset(asset_id: String) -> void:
+	var was_selected := lookdev_target_asset_id == asset_id and lookdev_target_component_id.is_empty()
+	lookdev_target_asset_id = asset_id
+	lookdev_target_component_id = ""
+	if was_selected:
+		var expanded := bool(expanded_assets.get(asset_id, false))
+		expanded_assets[asset_id] = not expanded
+	else:
+		expanded_assets[asset_id] = true
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _select_lookdev_component(asset_id: String, component_id: String) -> void:
+	if _get_component(_get_asset(asset_id), component_id).is_empty():
+		return
+	lookdev_target_asset_id = asset_id
+	lookdev_target_component_id = component_id
+	expanded_assets[asset_id] = true
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
