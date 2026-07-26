@@ -42,7 +42,7 @@ func _process(delta: float) -> void:
 		float(Input.is_key_pressed(KEY_S)) - float(Input.is_key_pressed(KEY_W))
 	)
 	if pan_input.length_squared() > 0.0:
-		view_offset += pan_input.normalized() * 420.0 * delta / zoom
+		view_offset -= pan_input.normalized() * 420.0 * delta / zoom
 	var zoom_input := float(Input.is_key_pressed(KEY_E)) - float(Input.is_key_pressed(KEY_Q))
 	if not is_zero_approx(zoom_input):
 		zoom = clampf(zoom * pow(1.8, zoom_input * delta), 0.25, 8.0)

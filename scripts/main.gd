@@ -1662,6 +1662,8 @@ func _has_component_name(asset: Dictionary, component_name: String) -> bool:
 func _select_component(asset_id: String, component_id: String) -> void:
 	selected_asset_id = asset_id
 	selected_component_id = component_id
+	selected_texture_id = ""
+	selected_element_id = ""
 	active_state = ""
 	canvas_view.set_interaction_state("")
 	expanded_assets[asset_id] = true
