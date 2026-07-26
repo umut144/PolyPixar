@@ -66,7 +66,8 @@ need and name are open.
   Outliner search also matches child Component and Element names.
 - The initial UV Canvas is now available for Texture and Element contexts; it
   shows the normalized field and origin-aware axes, while drawing and generation
-  remain deferred.
+  remain deferred. The canvas supports focused `A/S/D/W` panning and `Q/E`
+  zooming, with subdued Origin annotation and stronger axes.
 - Do not add Bézier editing, maps, full materials, a node graph, generic
   rigging, or export pipelines until a confirmed checklist item requires them.
 - Treat dummy UI data as dummy UI data. Do not let it quietly become a rigid

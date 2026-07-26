@@ -112,7 +112,9 @@ active.
 
 The initial UV Canvas is a dedicated Texture workspace. It displays a normalized
 0..1 texture field, origin-aware axes, and a lightweight grid; it intentionally
-does not yet provide drawing or generator operations.
+does not yet provide drawing or generator operations. The viewport supports
+focused `A/S/D/W` panning and `Q/E` zooming; Origin labels remain deliberately
+subtle while the axes use stronger strokes.
 
 ```text
 source Asset  <── Morph ──>  target Asset

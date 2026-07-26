@@ -63,6 +63,8 @@ before implementing real creation tools.
       Component/Element child names, expanding matching parents.
 - [x] Add the initial UV Texture Canvas with `Bottom Left`, `Top Left`, and
       `Center` Origin modes and persist the selected mode per Texture.
+- [x] Keep UV Origin presentation subtle while emphasizing the canvas axes;
+      pan with `A/S/D/W` and zoom with `Q/E` after focusing the Texture canvas.
 - [x] Reflect the selected Asset or Component as the active central workspace
       context without adding editable canvas content yet.
 - [x] Provide a PolyPixAAA-style Shapes canvas with a dynamic grid.
