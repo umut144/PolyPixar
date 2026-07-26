@@ -2693,6 +2693,35 @@ func _render_lookdev_material_target_inspector() -> void:
 	inspector_content.add_child(assign_button)
 
 
+func _render_lookdev_asset_inspector() -> void:
+	var asset := _get_asset(lookdev_target_asset_id)
+	if asset.is_empty():
+		_render_material_inspector()
+		return
+	inspector_content.add_child(_create_inspector_section("Asset"))
+	inspector_content.add_child(_create_inspector_field_label("Name"))
+	var name_editor := _create_name_editor(str(asset.get("name", "Asset")), "Asset name")
+	name_editor.text_submitted.connect(_rename_lookdev_asset)
+	name_editor.focus_exited.connect(func() -> void: _rename_lookdev_asset(name_editor.text))
+	inspector_content.add_child(name_editor)
+	inspector_content.add_child(_create_inspector_field_label("Components"))
+	var component_count := _create_inspector_field_label(str(asset.get("components", []).size()))
+	component_count.add_theme_color_override("font_color", Color("#9aa3b2"))
+	inspector_content.add_child(component_count)
+
+
+func _rename_lookdev_asset(new_name: String) -> void:
+	var asset := _get_asset(lookdev_target_asset_id)
+	var asset_name := new_name.strip_edges()
+	if asset.is_empty() or asset_name.is_empty() or asset_name == str(asset.get("name", "")):
+		return
+	_record_direct_change()
+	asset["name"] = asset_name
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
 func _assign_selected_material_to_lookdev_target() -> void:
 	var material := _get_material(selected_material_id)
 	var asset := _get_asset(lookdev_target_asset_id)
@@ -2756,6 +2785,8 @@ func _render_inspector() -> void:
 	if active_module == "Style":
 		if material_view_mode == "lookdev" and not lookdev_target_component_id.is_empty():
 			_render_lookdev_material_target_inspector()
+		elif material_view_mode == "lookdev" and not lookdev_target_asset_id.is_empty():
+			_render_lookdev_asset_inspector()
 		else:
 			_render_material_inspector()
 		return
