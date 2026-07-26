@@ -54,6 +54,10 @@ var canvas_view: ComponentCanvas
 var texture_canvas: TextureCanvas
 var import_preview: ImportPreview
 var material_graph: GraphEdit
+var material_preview_container: CenterContainer
+var material_preview_surface: PanelContainer
+var material_preview_texture: TextureRect
+var material_preview_label: Label
 var texture_context_label: Label
 var import_preview_context_label: Label
 var context_bar: HBoxContainer
@@ -128,6 +132,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if active_module == "Style" and not selected_material_id.is_empty():
 		if event.keycode == KEY_1:
 			_set_material_view("graph")
+			get_viewport().set_input_as_handled()
+		elif event.keycode == KEY_2:
+			_set_material_view("preview")
 			get_viewport().set_input_as_handled()
 		return
 	if selected_component_id.is_empty():
@@ -340,6 +347,7 @@ func _build_ui() -> void:
 	material_graph.visible = false
 	canvas_panel.add_child(material_graph)
 	_create_material_graph()
+	_create_material_preview()
 	texture_context_label = Label.new()
 	texture_context_label.position = Vector2(8, 6)
 	texture_context_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -425,6 +433,39 @@ func _create_material_graph() -> void:
 	output_node.set_slot(0, true, 0, Color("#f2c94c"), false, 0, Color.WHITE)
 	material_graph.add_child(output_node)
 	material_graph.connect_node("texture_source", 0, "material_output", 0)
+
+
+func _create_material_preview() -> void:
+	material_preview_container = CenterContainer.new()
+	material_preview_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	material_preview_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	material_preview_container.visible = false
+	material_graph.get_parent().add_child(material_preview_container)
+	material_preview_surface = PanelContainer.new()
+	material_preview_surface.custom_minimum_size = Vector2(360, 360)
+	var surface_style := StyleBoxFlat.new()
+	surface_style.bg_color = Color("#d9dde4")
+	surface_style.border_color = Color("#697386")
+	surface_style.set_border_width_all(1)
+	material_preview_surface.add_theme_stylebox_override("panel", surface_style)
+	material_preview_container.add_child(material_preview_surface)
+	var preview_stack := VBoxContainer.new()
+	preview_stack.alignment = BoxContainer.ALIGNMENT_CENTER
+	material_preview_surface.add_child(preview_stack)
+	var preview_center := CenterContainer.new()
+	preview_center.custom_minimum_size = Vector2(320, 320)
+	preview_stack.add_child(preview_center)
+	material_preview_texture = TextureRect.new()
+	material_preview_texture.custom_minimum_size = Vector2(320, 320)
+	material_preview_texture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	material_preview_texture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	preview_center.add_child(material_preview_texture)
+	material_preview_label = Label.new()
+	material_preview_label.text = "No ready Texture"
+	material_preview_label.add_theme_color_override("font_color", Color("#5c6675"))
+	material_preview_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	material_preview_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	preview_stack.add_child(material_preview_label)
 
 
 func _create_panel(background_color := Color("#20242c")) -> PanelContainer:
@@ -1312,7 +1353,7 @@ func _render_context_bar() -> void:
 
 func _render_material_context_bar() -> void:
 	var material_menu := MenuButton.new()
-	material_menu.text = "⌘1  Material  ▼"
+	material_menu.text = "⌘1  Views  ▼"
 	material_menu.custom_minimum_size = Vector2(122, 32)
 	material_menu.focus_mode = Control.FOCUS_NONE
 	material_menu.toggle_mode = true
@@ -1322,7 +1363,6 @@ func _render_material_context_bar() -> void:
 	material_popup.add_item("1: Graph", 0)
 	material_popup.add_item("2: Preview", 1)
 	material_popup.add_item("3: LookDev", 2)
-	material_popup.set_item_disabled(1, true)
 	material_popup.set_item_disabled(2, true)
 	material_popup.id_pressed.connect(_on_material_view_menu_id)
 	context_bar.add_child(material_menu)
@@ -1334,7 +1374,7 @@ func _on_material_view_menu_id(id: int) -> void:
 
 
 func _set_material_view(mode: String) -> void:
-	if mode != "graph":
+	if mode != "graph" and mode != "preview":
 		return
 	material_view_mode = mode
 	_render_context_bar()
@@ -1770,7 +1810,7 @@ func _render_info_bar() -> void:
 	_clear(info_bar)
 	if active_module == "Style" and not selected_material_id.is_empty():
 		var material_state_label := Label.new()
-		material_state_label.text = "State: Material / Graph"
+		material_state_label.text = "State: Material / %s" % ("Preview" if material_view_mode == "preview" else "Graph")
 		info_bar.add_child(material_state_label)
 		_add_info_option("1: Graph")
 		_add_info_option("2: Preview")
@@ -2854,6 +2894,30 @@ func _read_import_threshold() -> float:
 	return clampf(pending_import_threshold, 0.0, 1.0)
 
 
+func _render_material_preview() -> void:
+	var material := _get_material(selected_material_id)
+	if material.is_empty():
+		return
+	var texture := _get_texture(str(material.get("texture_id", "")))
+	var texture_path := _get_texture_final_path(texture) if not texture.is_empty() else ""
+	material_preview_texture.texture = null
+	material_preview_texture.modulate = Color(
+		Color(material.get("tint", Color.WHITE)).r,
+		Color(material.get("tint", Color.WHITE)).g,
+		Color(material.get("tint", Color.WHITE)).b,
+		clampf(float(material.get("opacity", 1.0)), 0.0, 1.0)
+	)
+	material_preview_label.visible = texture_path.is_empty()
+	if texture_path.is_empty():
+		return
+	var image := Image.new()
+	if image.load(ProjectSettings.globalize_path(texture_path)) != OK or image.is_empty():
+		material_preview_label.visible = true
+		return
+	material_preview_texture.texture = ImageTexture.create_from_image(image)
+	material_preview_label.visible = false
+
+
 func _render_canvas_context() -> void:
 	_render_context_bar()
 	_render_info_bar()
@@ -2864,11 +2928,15 @@ func _render_canvas_context() -> void:
 		texture_canvas.visible = false
 		import_preview.visible = false
 		material_graph.visible = not selected_material_id.is_empty() and material_view_mode == "graph"
+		material_preview_container.visible = not selected_material_id.is_empty() and material_view_mode == "preview"
+		if material_preview_container.visible:
+			_render_material_preview()
 		canvas_context_label.text = "Material: %s" % str(_get_material(selected_material_id).get("name", "")) if not selected_material_id.is_empty() else ""
 		texture_context_label.text = ""
 		import_preview_context_label.text = ""
 		return
 	material_graph.visible = false
+	material_preview_container.visible = false
 	if not selected_texture_id.is_empty():
 		var texture := _get_texture(selected_texture_id)
 		if texture.is_empty():
