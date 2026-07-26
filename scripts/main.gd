@@ -5,7 +5,7 @@ const INACTIVE_MODULES := ["Style", "Motion", "Transform", "Effects", "Export"]
 const WORKSPACES_ROOT := "res://workspaces"
 const IMPORT_TEXTURES_ROOT := "res://imports/textures"
 const CONFIG_PATH := "res://configs/app_config.json"
-const SCHEMA_VERSION := 7
+const SCHEMA_VERSION := 8
 const MAX_HISTORY_SIZE := 100
 # Kept available for a later Outliner presentation, but processed outputs are
 # currently reached through the Import Preview instead of additional rows.
@@ -20,6 +20,7 @@ var inspector_content: VBoxContainer
 var module_sections: Array[ModuleSection] = []
 var assets: Array[Dictionary] = []
 var textures: Array[Dictionary] = []
+var materials: Array[Dictionary] = []
 var selected_asset_id := ""
 var selected_component_id := ""
 var selected_texture_id := ""
@@ -29,6 +30,7 @@ var expanded_textures: Dictionary = {}
 var next_asset_id := 1
 var next_component_id := 1
 var next_texture_id := 1
+var next_material_id := 1
 var asset_dialog: ConfirmationDialog
 var asset_name_input: LineEdit
 var component_dialog: ConfirmationDialog
@@ -655,11 +657,15 @@ func _confirm_new_workspace() -> void:
 	new_name = _sanitize_workspace_name(new_name)
 	workspace_name = new_name
 	assets.clear()
+	textures.clear()
+	materials.clear()
 	selected_asset_id = ""
 	selected_component_id = ""
 	expanded_assets.clear()
 	next_asset_id = 1
 	next_component_id = 1
+	next_texture_id = 1
+	next_material_id = 1
 	active_state = ""
 	_apply_snap_settings({})
 	pending_save_after_new = false
@@ -733,8 +739,10 @@ func _save_workspace() -> void:
 	var workspace_root := "%s/%s" % [WORKSPACES_ROOT, workspace_name]
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("%s/assets" % workspace_root))
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("%s/textures" % workspace_root))
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("%s/materials" % workspace_root))
 	var asset_ids: Array[String] = []
 	var texture_ids: Array[String] = []
+	var material_ids: Array[String] = []
 	for asset in assets:
 		var asset_id := str(asset["id"])
 		asset_ids.append(asset_id)
@@ -773,11 +781,24 @@ func _save_workspace() -> void:
 			"final_output_element_id": str(texture.get("final_output_element_id", "")),
 			"elements": texture.get("elements", []).duplicate(true)
 		})
+	for material in materials:
+		var material_id := str(material["id"])
+		material_ids.append(material_id)
+		var material_root := "%s/materials/%s" % [workspace_root, material_id]
+		_write_json("%s/material.json" % material_root, {
+			"schema_version": SCHEMA_VERSION,
+			"id": material_id,
+			"name": str(material.get("name", material_id)),
+			"texture_id": str(material.get("texture_id", "")),
+			"tint": _serialize_color(material.get("tint", Color.WHITE)),
+			"opacity": clampf(float(material.get("opacity", 1.0)), 0.0, 1.0)
+		})
 	_write_json("%s/workspace.json" % workspace_root, {
 		"schema_version": SCHEMA_VERSION,
 		"name": workspace_name,
 		"assets": asset_ids,
 		"textures": texture_ids,
+		"materials": material_ids,
 		"editor_state": _serialize_editor_state()
 	})
 	_write_json(CONFIG_PATH, {"schema_version": SCHEMA_VERSION, "last_workspace": workspace_name})
@@ -791,6 +812,8 @@ func _capture_history_snapshot() -> Dictionary:
 		"next_component_id": next_component_id,
 		"textures": textures.duplicate(true),
 		"next_texture_id": next_texture_id,
+		"materials": materials.duplicate(true),
+		"next_material_id": next_material_id,
 		"selected_asset_id": selected_asset_id,
 		"selected_component_id": selected_component_id,
 		"selected_texture_id": selected_texture_id,
@@ -826,9 +849,11 @@ func _finish_history_coalescing() -> void:
 func _restore_history_snapshot(snapshot: Dictionary) -> void:
 	assets = snapshot.get("assets", []).duplicate(true)
 	textures = snapshot.get("textures", []).duplicate(true)
+	materials = snapshot.get("materials", []).duplicate(true)
 	next_asset_id = int(snapshot.get("next_asset_id", 1))
 	next_component_id = int(snapshot.get("next_component_id", 1))
 	next_texture_id = int(snapshot.get("next_texture_id", 1))
+	next_material_id = int(snapshot.get("next_material_id", 1))
 	selected_asset_id = str(snapshot.get("selected_asset_id", ""))
 	selected_component_id = str(snapshot.get("selected_component_id", ""))
 	selected_texture_id = str(snapshot.get("selected_texture_id", ""))
@@ -928,8 +953,16 @@ func _load_workspace(workspace_entry: String) -> bool:
 			"elements": normalized_elements,
 			"final_output_element_id": _normalize_final_output_element_id(normalized_elements, str(texture_data.get("final_output_element_id", "")))
 		})
+	var loaded_materials: Array[Dictionary] = []
+	for material_id_variant in workspace_data.get("materials", []):
+		var material_id := str(material_id_variant)
+		var material_data = _read_json("%s/materials/%s/material.json" % [workspace_root, material_id])
+		if not _has_supported_schema(material_data):
+			continue
+		loaded_materials.append(_normalize_material(material_data, material_id))
 	assets = loaded_assets
 	textures = loaded_textures
+	materials = loaded_materials
 	workspace_name = str(workspace_data.get("name", workspace_entry))
 	_restore_editor_state(workspace_data.get("editor_state", {}))
 	_update_next_ids()
@@ -1062,6 +1095,19 @@ func _serialize_vector(value: Vector2) -> Array:
 	return [value.x, value.y]
 
 
+func _serialize_color(value) -> Array:
+	var color := Color.WHITE
+	if value is Color:
+		color = value
+	return [color.r, color.g, color.b, color.a]
+
+
+func _deserialize_color(value, fallback: Color) -> Color:
+	if value is Array and value.size() >= 3:
+		return Color(float(value[0]), float(value[1]), float(value[2]), float(value[3]) if value.size() >= 4 else 1.0)
+	return fallback
+
+
 func _deserialize_vector(value, fallback: Vector2) -> Vector2:
 	if value is Vector2:
 		return value
@@ -1111,6 +1157,8 @@ func _update_next_ids() -> void:
 			next_component_id = maxi(next_component_id, _id_suffix_number(str(component["id"])) + 1)
 	for texture in textures:
 		next_texture_id = maxi(next_texture_id, _id_suffix_number(str(texture["id"])) + 1)
+	for material in materials:
+		next_material_id = maxi(next_material_id, _id_suffix_number(str(material["id"])) + 1)
 
 
 func _id_suffix_number(identifier: String) -> int:
@@ -1429,6 +1477,17 @@ func _normalize_texture_elements(raw_elements, legacy_import_source) -> Array:
 			"output": {"state": "not_ready", "file": ""}
 		})
 	return normalized
+
+
+func _normalize_material(raw_material, fallback_id: String) -> Dictionary:
+	var data: Dictionary = raw_material if raw_material is Dictionary else {}
+	return {
+		"id": str(data.get("id", fallback_id)),
+		"name": str(data.get("name", fallback_id)),
+		"texture_id": str(data.get("texture_id", "")),
+		"tint": _deserialize_color(data.get("tint", [1.0, 1.0, 1.0, 1.0]), Color.WHITE),
+		"opacity": clampf(float(data.get("opacity", 1.0)), 0.0, 1.0)
+	}
 
 
 func _find_import_element(texture: Dictionary) -> Dictionary:
