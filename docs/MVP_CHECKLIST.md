@@ -243,7 +243,9 @@ system, particle system, or universal animation graph.
       `Texture Source → Material Output`.
 - [x] Add the neutral Material Preview using the selected ready Texture,
       tint, and opacity.
-- [ ] Add the Asset LookDev view.
+- [x] Add the Asset LookDev view with a temporary Asset/Component target while
+      keeping the Material selected.
+- [ ] Project the Material Texture onto the LookDev component polygon.
 
 - [x] Add the first `Material` module under Style.
 - [ ] Bind a Workspace Texture to the Stone Floor Component without embedding

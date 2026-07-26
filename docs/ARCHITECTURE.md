@@ -359,8 +359,10 @@ The first Material editing context is intentionally narrow: `⌘1: Views`
 exposes `1: Graph`, `2: Preview`, and `3: LookDev`. The Graph view currently
 contains a fixed `Texture Source → Material Output` GraphEdit skeleton. Preview
 shows the selected ready Texture on a neutral surface with the Material tint
-and opacity. LookDev remains reserved until its respective phase is started;
-the graph is not yet a free-form shader editor.
+and opacity. LookDev switches the Outliner to Assets and Components while
+keeping the Material selected as the active look target. It currently previews
+the target geometry without permanent assignment or texture projection; the
+graph is not yet a free-form shader editor.
 
 An imported raster source is selected from the project-local
 `imports/textures/` intake folder, copied into its Texture directory, and
