@@ -111,10 +111,10 @@ and child Component/Element names, expanding matching parents while a query is
 active.
 
 The initial UV Canvas is a dedicated Texture workspace. It displays a normalized
-0..1 texture field, origin-aware axes, and a lightweight grid; it intentionally
-does not yet provide drawing or generator operations. The viewport supports
-focused `A/S/D/W` panning and `Q/E` zooming; Origin labels remain deliberately
-subtle while the axes use stronger strokes.
+0..1 texture field, a lightweight grid, and a compact origin gizmo with
+separate U/V colors; it intentionally does not yet provide drawing or
+generator operations. The viewport supports focused `A/S/D/W` panning and
+`Q/E` zooming.
 
 ```text
 source Asset  <── Morph ──>  target Asset
