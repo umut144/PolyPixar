@@ -5,7 +5,7 @@ const INACTIVE_MODULES := ["Style", "Motion", "Transform", "Effects", "Export"]
 const WORKSPACES_ROOT := "res://workspaces"
 const IMPORT_TEXTURES_ROOT := "res://imports/textures"
 const CONFIG_PATH := "res://configs/app_config.json"
-const SCHEMA_VERSION := 5
+const SCHEMA_VERSION := 6
 const MAX_HISTORY_SIZE := 100
 
 var active_create_submodule := "Shapes"
@@ -1209,6 +1209,7 @@ func _on_texture_import_file_selected(source_path: String) -> void:
 			"name": import_name if not import_name.is_empty() else "Import Element",
 			"type": "import",
 			"source": {},
+			"pipeline": {"mode": "white_to_alpha", "threshold": 0.05},
 			"output": {"state": "not_ready", "file": ""}
 		}
 		texture["elements"].append(import_element)
@@ -1217,6 +1218,7 @@ func _on_texture_import_file_selected(source_path: String) -> void:
 		"file": destination_filename,
 		"original_name": source_path.get_file()
 	}
+	import_element["pipeline"] = {"mode": "white_to_alpha", "threshold": 0.05}
 	import_element["output"] = {"state": "not_ready", "file": ""}
 	_show_status_message("Imported Texture: %s" % source_path.get_file())
 	_render_inspector()
@@ -1245,6 +1247,51 @@ func _copy_external_file(source_path: String, destination_path: String) -> bool:
 	return true
 
 
+func _process_selected_import_element() -> void:
+	var texture := _get_texture(selected_texture_id)
+	var element := _get_element(texture, selected_element_id)
+	if texture.is_empty() or element.is_empty() or str(element.get("type", "")) != "import":
+		return
+	var source_path := _get_texture_source_path(texture, element)
+	if source_path.is_empty() or not FileAccess.file_exists(source_path):
+		_show_status_message("Import source is missing.")
+		return
+	var source_image := Image.new()
+	if source_image.load(source_path) != OK or source_image.is_empty():
+		_show_status_message("Import source could not be read.")
+		return
+	var pipeline = element.get("pipeline", {})
+	if not pipeline is Dictionary:
+		pipeline = {}
+	var threshold := clampf(float(pipeline.get("threshold", 0.05)), 0.0, 1.0)
+	var output_image := Image.create(source_image.get_width(), source_image.get_height(), false, Image.FORMAT_RGBA8)
+	for y in range(source_image.get_height()):
+		for x in range(source_image.get_width()):
+			var source_color := source_image.get_pixel(x, y)
+			var darkness := 1.0 - (source_color.r + source_color.g + source_color.b) / 3.0
+			var alpha := clampf((darkness - threshold) / maxf(1.0 - threshold, 0.001), 0.0, 1.0)
+			output_image.set_pixel(x, y, Color(source_color.r, source_color.g, source_color.b, alpha))
+	var texture_root := "%s/%s/textures/%s" % [WORKSPACES_ROOT, workspace_name, str(texture["id"])]
+	var output_filename := _next_texture_output_filename(texture_root)
+	var output_path := "%s/%s" % [texture_root, output_filename]
+	if output_image.save_png(ProjectSettings.globalize_path(output_path)) != OK:
+		_show_status_message("Texture processing failed.")
+		return
+	_record_direct_change()
+	element["pipeline"] = {"mode": "white_to_alpha", "threshold": threshold}
+	element["output"] = {"state": "ready", "file": output_filename}
+	_show_status_message("Processed Texture: White to Alpha")
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _next_texture_output_filename(texture_root: String) -> String:
+	var index := 1
+	while FileAccess.file_exists("%s/output_%03d.png" % [texture_root, index]):
+		index += 1
+	return "output_%03d.png" % index
+
+
 func _normalize_texture_elements(raw_elements, legacy_import_source) -> Array:
 	var normalized: Array = []
 	var has_import_element := false
@@ -1261,11 +1308,17 @@ func _normalize_texture_elements(raw_elements, legacy_import_source) -> Array:
 				has_import_element = true
 				if not element.get("source", {}) is Dictionary:
 					element["source"] = {}
+				var pipeline = element.get("pipeline", {})
+				if not pipeline is Dictionary:
+					pipeline = {}
+				pipeline["mode"] = "white_to_alpha"
+				pipeline["threshold"] = clampf(float(pipeline.get("threshold", 0.05)), 0.0, 1.0)
+				element["pipeline"] = pipeline
 			var output = element.get("output", {})
 			if not output is Dictionary:
 				output = {}
 			var output_state := str(output.get("state", "not_ready"))
-			if output_state != "ready":
+			if output_state != "ready" or str(output.get("file", "")).get_file().is_empty():
 				output_state = "not_ready"
 			output["state"] = output_state
 			if output_state != "ready":
@@ -1282,6 +1335,7 @@ func _normalize_texture_elements(raw_elements, legacy_import_source) -> Array:
 			"name": import_name,
 			"type": "import",
 			"source": legacy_import_source.duplicate(true),
+			"pipeline": {"mode": "white_to_alpha", "threshold": 0.05},
 			"output": {"state": "not_ready", "file": ""}
 		})
 	return normalized
@@ -1324,9 +1378,21 @@ func _get_texture_source_path(texture: Dictionary, element: Dictionary) -> Strin
 	return "%s/%s/textures/%s/%s" % [WORKSPACES_ROOT, workspace_name, str(texture.get("id", "")), source_file]
 
 
-func _element_output_state(element: Dictionary) -> String:
+func _get_texture_preview_path(texture: Dictionary, element: Dictionary) -> String:
+	if element.is_empty():
+		return ""
 	var output = element.get("output", {})
 	if output is Dictionary and str(output.get("state", "not_ready")) == "ready":
+		var output_file := str(output.get("file", "")).get_file()
+		var output_path := "%s/%s/textures/%s/%s" % [WORKSPACES_ROOT, workspace_name, str(texture.get("id", "")), output_file]
+		if not output_file.is_empty() and FileAccess.file_exists(output_path):
+			return output_path
+	return _get_texture_source_path(texture, element)
+
+
+func _element_output_state(element: Dictionary) -> String:
+	var output = element.get("output", {})
+	if output is Dictionary and str(output.get("state", "not_ready")) == "ready" and not str(output.get("file", "")).get_file().is_empty():
 		return "ready"
 	return "not_ready"
 
@@ -2021,6 +2087,29 @@ func _render_inspector() -> void:
 				source_label.add_theme_font_size_override("font_size", 11)
 				source_label.add_theme_color_override("font_color", Color("#9aa3b2"))
 				inspector_content.add_child(source_label)
+		elif not output_element.is_empty() and str(output_element.get("type", "generator")) == "import":
+			inspector_content.add_child(_create_panel_label("Processing"))
+			var pipeline = output_element.get("pipeline", {})
+			if not pipeline is Dictionary:
+				pipeline = {}
+			var processing_label := _create_panel_label("White to Alpha")
+			inspector_content.add_child(processing_label)
+			var threshold_label := _create_panel_label("Threshold")
+			inspector_content.add_child(threshold_label)
+			var threshold_field := SpinBox.new()
+			threshold_field.min_value = 0.0
+			threshold_field.max_value = 1.0
+			threshold_field.step = 0.01
+			threshold_field.value = clampf(float(pipeline.get("threshold", 0.05)), 0.0, 1.0)
+			threshold_field.custom_minimum_size = Vector2(0, 30)
+			threshold_field.value_changed.connect(_on_import_threshold_changed)
+			inspector_content.add_child(threshold_field)
+			var process_button := Button.new()
+			process_button.text = "Process"
+			process_button.custom_minimum_size = Vector2(0, 30)
+			process_button.focus_mode = Control.FOCUS_NONE
+			process_button.pressed.connect(_process_selected_import_element)
+			inspector_content.add_child(process_button)
 		return
 	var asset := _get_asset(selected_asset_id)
 	if asset.is_empty():
@@ -2204,6 +2293,18 @@ func _rename_selected_element(new_name: String) -> void:
 	_render_inspector()
 
 
+func _on_import_threshold_changed(value: float) -> void:
+	var texture := _get_texture(selected_texture_id)
+	var element := _get_element(texture, selected_element_id)
+	if texture.is_empty() or element.is_empty() or str(element.get("type", "")) != "import":
+		return
+	_record_direct_change()
+	element["pipeline"] = {"mode": "white_to_alpha", "threshold": clampf(value, 0.0, 1.0)}
+	element["output"] = {"state": "not_ready", "file": ""}
+	_render_inspector()
+	_render_canvas_context()
+
+
 func _render_canvas_context() -> void:
 	_render_context_bar()
 	_render_info_bar()
@@ -2223,7 +2324,7 @@ func _render_canvas_context() -> void:
 		texture_canvas.set_origin_mode(str(texture.get("origin_mode", "bottom_left")))
 		texture_canvas.set_final_texture_path(_get_texture_final_path(texture) if selected_element_id.is_empty() else "")
 		texture_canvas.set_selected_element(str(selected_element.get("name", "")) if not selected_element.is_empty() else "")
-		import_preview.set_preview_path(_get_texture_source_path(texture, selected_element) if is_import_element else "")
+		import_preview.set_preview_path(_get_texture_preview_path(texture, selected_element) if is_import_element else "")
 		return
 	canvas_view.visible = true
 	texture_canvas.visible = false

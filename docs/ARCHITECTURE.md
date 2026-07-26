@@ -338,7 +338,7 @@ workspaces/<workspace_name>/
 ```
 
 Every JSON document contains a numeric `schema_version`. The current MVP
-schema is version `5`. Workspace metadata references Asset and Texture IDs.
+schema is version `6`. Workspace metadata references Asset and Texture IDs.
 Each Asset document stores its Components and their contour points; each Texture
 document stores its dimensions, origin convention, and Elements. Display names
 remain editable and are not used as persistent references.
@@ -350,7 +350,8 @@ its original display name. Re-importing retains prior copied sources so
 Undo/Redo can safely restore an earlier Texture source reference without
 depending on the intake file. Older Texture JSONs with a Texture-level
 `import_source` field are migrated when loaded. New Elements carry an explicit
-output state, initially `not_ready`; only `ready` output files can contribute to
+output state, initially `not_ready`; Phase 6's White-to-Alpha processing may
+produce a `ready` output file, and only `ready` output files can contribute to
 the Texture parent.
 
 Workspace JSON also contains an `editor_state` object for the restorable editor

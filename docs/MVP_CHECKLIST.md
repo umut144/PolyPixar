@@ -225,6 +225,10 @@ system, particle system, or universal animation graph.
 - [ ] Show a dedicated Import Element preview with the original source.
 - [ ] Add the first processing preview stage for an Import Element, such as
       white-background removal or ink-mask extraction.
+- [ ] Provide a minimal `White to Alpha` processing action with a persisted
+      threshold parameter.
+- [ ] Write the processed output into the Workspace and transition the Element
+      state from `not_ready` to `ready` only after processing succeeds.
 - [ ] Feed the processed Import Element output into the Texture parent's final
       UV composition only after that output is valid.
 
