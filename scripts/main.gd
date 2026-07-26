@@ -9,6 +9,9 @@ const MAX_HISTORY_SIZE := 100
 
 var active_create_submodule := "Shapes"
 var outliner_list: VBoxContainer
+var outliner_search_input: LineEdit
+var outliner_filter_option: OptionButton
+var outliner_filter := "all"
 var inspector_content: VBoxContainer
 var module_sections: Array[ModuleSection] = []
 var assets: Array[Dictionary] = []
@@ -202,7 +205,22 @@ func _build_ui() -> void:
 	var outliner_content := VBoxContainer.new()
 	outliner_content.add_theme_constant_override("separation", 4)
 	outliner_panel.add_child(outliner_content)
-	outliner_content.add_child(_create_panel_label("Outliner"))
+	var outliner_tools := HBoxContainer.new()
+	outliner_tools.add_theme_constant_override("separation", 2)
+	outliner_content.add_child(outliner_tools)
+	outliner_search_input = LineEdit.new()
+	outliner_search_input.placeholder_text = "Search"
+	outliner_search_input.custom_minimum_size = Vector2(0, 26)
+	outliner_search_input.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	outliner_search_input.text_changed.connect(func(_text: String) -> void: _render_outliner())
+	outliner_tools.add_child(outliner_search_input)
+	outliner_filter_option = OptionButton.new()
+	outliner_filter_option.custom_minimum_size = Vector2(72, 26)
+	outliner_filter_option.add_item("All", 0)
+	outliner_filter_option.add_item("Assets", 1)
+	outliner_filter_option.add_item("Textures", 2)
+	outliner_filter_option.item_selected.connect(_on_outliner_filter_selected)
+	outliner_tools.add_child(outliner_filter_option)
 	var outliner_scroll := ScrollContainer.new()
 	outliner_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	outliner_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -1142,7 +1160,41 @@ func _has_asset_name(asset_name: String) -> bool:
 
 func _render_outliner() -> void:
 	_clear(outliner_list)
-	for asset in assets:
+	var search_text := outliner_search_input.text.strip_edges().to_lower() if is_instance_valid(outliner_search_input) else ""
+	var show_assets := outliner_filter == "all" or outliner_filter == "assets"
+	var show_textures := outliner_filter == "all" or outliner_filter == "textures"
+	if show_assets:
+		var visible_assets: Array = []
+		for asset in assets:
+			if search_text.is_empty() or str(asset["name"]).to_lower().contains(search_text):
+				visible_assets.append(asset)
+		visible_assets.sort_custom(_sort_named_documents)
+		outliner_list.add_child(_create_outliner_group_label("Assets"))
+		for asset in visible_assets:
+			_render_asset_outliner_entry(asset)
+	if show_textures:
+		var visible_textures: Array = []
+		for texture in textures:
+			if search_text.is_empty() or str(texture["name"]).to_lower().contains(search_text):
+				visible_textures.append(texture)
+		visible_textures.sort_custom(_sort_named_documents)
+		outliner_list.add_child(_create_outliner_group_label("Textures"))
+		for texture in visible_textures:
+			_render_texture_outliner_entry(texture)
+
+
+func _sort_named_documents(a: Dictionary, b: Dictionary) -> bool:
+	return str(a.get("name", "")).to_lower() < str(b.get("name", "")).to_lower()
+
+
+func _create_outliner_group_label(text: String) -> Label:
+	var label := _create_panel_label(text)
+	label.add_theme_color_override("font_color", Color("#737f91"))
+	label.add_theme_font_size_override("font_size", 10)
+	return label
+
+
+func _render_asset_outliner_entry(asset: Dictionary) -> void:
 		var asset_id := str(asset["id"])
 		var asset_container := VBoxContainer.new()
 		asset_container.add_theme_constant_override("separation", 0)
@@ -1166,7 +1218,7 @@ func _render_outliner() -> void:
 		add_button.pressed.connect(_open_component_dialog.bind(asset_id))
 		asset_header.add_child(add_button)
 		if not bool(expanded_assets.get(asset_id, false)):
-			continue
+			return
 		for component in asset["components"]:
 			var component_id := str(component["id"])
 			var component_row := HBoxContainer.new()
@@ -1185,6 +1237,22 @@ func _render_outliner() -> void:
 			_style_outliner_button(component_button, component_id == selected_component_id)
 			component_button.pressed.connect(_select_component.bind(asset_id, component_id))
 			component_row.add_child(component_button)
+
+
+func _render_texture_outliner_entry(texture: Dictionary) -> void:
+	var texture_button := Button.new()
+	texture_button.text = str(texture["name"])
+	texture_button.custom_minimum_size = Vector2(0, 30)
+	texture_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	texture_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	texture_button.focus_mode = Control.FOCUS_NONE
+	_style_outliner_button(texture_button, false)
+	outliner_list.add_child(texture_button)
+
+
+func _on_outliner_filter_selected(index: int) -> void:
+	outliner_filter = ["all", "assets", "textures"][index]
+	_render_outliner()
 
 
 func _strikethrough_text(text: String) -> String:
