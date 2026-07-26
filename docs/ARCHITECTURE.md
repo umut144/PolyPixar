@@ -102,10 +102,11 @@ Texture exposes an `Add` action for named Elements, which are selected and
 renamed independently in the Outliner/Inspector. Element drawing semantics are
 deferred to the Texture canvas phase.
 
-When a Texture or Element is selected, the Context Bar switches to Texture
-tools: `Draw`, `Generate`, and `Sample`. These menus establish the Texture
+When a Texture or Element is selected, the Context Bar switches to two empty
+Texture tools: `Draw` and `Generate`. These menus establish the Texture
 workflow vocabulary; their operations remain inert until the Texture canvas
-phase.
+phase. Outliner search matches document names and child Component/Element
+names, expanding matching parents while a query is active.
 
 ```text
 source Asset  <── Morph ──>  target Asset
