@@ -4,7 +4,7 @@ const CREATE_SUBMODULES := ["Shapes", "Layers"]
 const INACTIVE_MODULES := ["Style", "Motion", "Transform", "Effects", "Export"]
 const WORKSPACES_ROOT := "res://workspaces"
 const CONFIG_PATH := "res://configs/app_config.json"
-const SCHEMA_VERSION := 2
+const SCHEMA_VERSION := 3
 const MAX_HISTORY_SIZE := 100
 
 var active_create_submodule := "Shapes"
@@ -31,6 +31,7 @@ var component_dialog: ConfirmationDialog
 var component_name_input: LineEdit
 var texture_dialog: ConfirmationDialog
 var texture_name_input: LineEdit
+var texture_import_dialog: FileDialog
 var element_dialog: ConfirmationDialog
 var element_name_input: LineEdit
 var asset_name_editor: LineEdit
@@ -336,6 +337,7 @@ func _build_ui() -> void:
 	_create_asset_dialog()
 	_create_component_dialog()
 	_create_texture_dialog()
+	_create_texture_import_dialog()
 	_create_element_dialog()
 	_create_workspace_dialogs()
 
@@ -495,6 +497,19 @@ func _create_texture_dialog() -> void:
 	texture_name_input.text_submitted.connect(_submit_texture_name)
 	texture_dialog.add_child(texture_name_input)
 	add_child(texture_dialog)
+
+
+func _create_texture_import_dialog() -> void:
+	texture_import_dialog = FileDialog.new()
+	texture_import_dialog.title = "Import Texture"
+	texture_import_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
+	texture_import_dialog.access = FileDialog.ACCESS_FILESYSTEM
+	texture_import_dialog.use_native_dialog = true
+	texture_import_dialog.filters = PackedStringArray([
+		"*.png, *.jpg, *.jpeg, *.webp ; Image files"
+	])
+	texture_import_dialog.file_selected.connect(_on_texture_import_file_selected)
+	add_child(texture_import_dialog)
 
 
 func _create_element_dialog() -> void:
@@ -692,6 +707,7 @@ func _save_workspace() -> void:
 				"height": int(texture.get("canvas_height", 512))
 			},
 			"origin_mode": str(texture.get("origin_mode", "bottom_left")),
+			"import_source": texture.get("import_source", {}).duplicate(true),
 			"elements": texture.get("elements", []).duplicate(true)
 		})
 	_write_json("%s/workspace.json" % workspace_root, {
@@ -844,6 +860,7 @@ func _load_workspace(workspace_entry: String) -> bool:
 			"canvas_width": int(canvas_data.get("width", 512)) if canvas_data is Dictionary else 512,
 			"canvas_height": int(canvas_data.get("height", 512)) if canvas_data is Dictionary else 512,
 			"origin_mode": str(texture_data.get("origin_mode", "bottom_left")),
+			"import_source": texture_data.get("import_source", {}).duplicate(true) if texture_data.get("import_source", {}) is Dictionary else {},
 			"elements": texture_data.get("elements", []).duplicate(true)
 		})
 	assets = loaded_assets
@@ -1098,6 +1115,12 @@ func _render_texture_context_bar() -> void:
 	var texture := _get_texture(selected_texture_id)
 	if texture.is_empty():
 		return
+	var import_button := Button.new()
+	import_button.text = "Import Texture"
+	import_button.custom_minimum_size = Vector2(116, 32)
+	import_button.focus_mode = Control.FOCUS_NONE
+	import_button.pressed.connect(_open_texture_import_dialog)
+	context_bar.add_child(import_button)
 	var origin_menu := MenuButton.new()
 	origin_menu.text = "Origin: %s  ▼" % _origin_mode_label(str(texture.get("origin_mode", "bottom_left")))
 	origin_menu.custom_minimum_size = Vector2(150, 32)
@@ -1136,6 +1159,60 @@ func _on_texture_origin_changed(mode: String) -> void:
 	texture_canvas.set_origin_mode(mode)
 	_render_context_bar()
 	_render_info_bar()
+
+
+func _open_texture_import_dialog() -> void:
+	if selected_texture_id.is_empty() or _get_texture(selected_texture_id).is_empty():
+		return
+	if workspace_name.is_empty():
+		_show_status_message("Create or load a Workspace before importing.")
+		return
+	texture_import_dialog.popup_centered_ratio(0.75)
+
+
+func _on_texture_import_file_selected(source_path: String) -> void:
+	var texture := _get_texture(selected_texture_id)
+	if texture.is_empty() or workspace_name.is_empty():
+		return
+	var source_extension := source_path.get_extension().to_lower()
+	if not ["png", "jpg", "jpeg", "webp"].has(source_extension):
+		_show_status_message("Unsupported texture format.")
+		return
+	var texture_root := "%s/%s/textures/%s" % [WORKSPACES_ROOT, workspace_name, str(texture["id"])]
+	var destination_filename := _next_texture_source_filename(texture_root, source_extension)
+	var destination_path := "%s/%s" % [texture_root, destination_filename]
+	if not _copy_external_file(source_path, destination_path):
+		_show_status_message("Texture import failed.")
+		return
+	_record_direct_change()
+	texture["import_source"] = {
+		"file": destination_filename,
+		"original_name": source_path.get_file()
+	}
+	_show_status_message("Imported Texture: %s" % source_path.get_file())
+	_render_inspector()
+
+
+func _next_texture_source_filename(texture_root: String, extension: String) -> String:
+	var index := 1
+	while FileAccess.file_exists("%s/source_%03d.%s" % [texture_root, index, extension]):
+		index += 1
+	return "source_%03d.%s" % [index, extension]
+
+
+func _copy_external_file(source_path: String, destination_path: String) -> bool:
+	var source_file := FileAccess.open(source_path, FileAccess.READ)
+	if source_file == null:
+		return false
+	var contents := source_file.get_buffer(source_file.get_length())
+	source_file.close()
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(destination_path.get_base_dir()))
+	var destination_file := FileAccess.open(destination_path, FileAccess.WRITE)
+	if destination_file == null:
+		return false
+	destination_file.store_buffer(contents)
+	destination_file.close()
+	return true
 
 
 func _on_draw_menu_id(id: int) -> void:
@@ -1302,6 +1379,7 @@ func _confirm_texture_creation() -> void:
 		"canvas_width": 512,
 		"canvas_height": 512,
 		"origin_mode": "bottom_left",
+		"import_source": {},
 		"elements": []
 	})
 	selected_texture_id = texture_id
@@ -1730,6 +1808,15 @@ func _render_inspector() -> void:
 			texture_name_editor.text_submitted.connect(_rename_selected_element)
 			texture_name_editor.focus_exited.connect(func() -> void: _rename_selected_element(texture_name_editor.text))
 		inspector_content.add_child(texture_name_editor)
+		if selected_element_id.is_empty():
+			var import_source = texture.get("import_source", {})
+			if import_source is Dictionary and not import_source.is_empty():
+				inspector_content.add_child(_create_panel_label("Source"))
+				var source_label := Label.new()
+				source_label.text = str(import_source.get("original_name", import_source.get("file", "")))
+				source_label.add_theme_font_size_override("font_size", 11)
+				source_label.add_theme_color_override("font_color", Color("#9aa3b2"))
+				inspector_content.add_child(source_label)
 		return
 	var asset := _get_asset(selected_asset_id)
 	if asset.is_empty():

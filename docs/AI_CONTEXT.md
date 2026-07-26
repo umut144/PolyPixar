@@ -17,6 +17,11 @@ implementation target is Slice 4: **Stone Floor Bloom**. It validates imported
 Texture processing, a first Style Material binding, and a deliberately narrow
 Motion Sequence. Empty panes remain preferable to invented functionality.
 
+Slice 4 Phase 1 is implemented and awaiting manual verification: a selected
+Texture can import a PNG, JPEG, or WebP through the native image picker. The
+source is copied into that Texture's active Workspace directory and persisted
+as a relative `import_source` reference; Canvas image preview remains Phase 2.
+
 The current implementation target is not a functional morphing engine or a
 general animation/VFX framework.
 
@@ -27,6 +32,7 @@ general animation/VFX framework.
 - Editor workspace and default window: 1920×1200 (16:10); preview uses preserved
   aspect ratio (`keep`) so the UI proportions remain stable
 - Project icon: `assets/assetflow_icon.png`
+- Current JSON schema version: **3**
 
 ## Confirmed vocabulary
 
@@ -174,15 +180,16 @@ Workspace persistence uses the project-local `workspaces/` directory. The
 Workspace menu provides `New`, `Save`, and `Load`; New uses an in-app naming
 dialog with `workspace01` fallback, Save overwrites the active workspace, and
 Load uses an in-app list of existing workspace folders. Each workspace has a
-`workspace.json` plus one `assets/<asset_id>/asset.json` per Asset. The latest
-loaded or saved workspace name is stored in `configs/app_config.json` and is
-loaded automatically on startup. Every workspace, asset, and config JSON uses
-the numeric `schema_version` field; the current schema is version `2`. The
-bottom status bar is divided into 17% program status, 64% contextual tool
-information, and 17% reserved space. `CMD/Ctrl + S` saves the active workspace;
-the canvas suppresses ASDW panning while that modifier is held.
-Workspace `editor_state` also restores the selected Asset, selected Component,
-and expanded Outliner containers when the Workspace is reopened.
+`workspace.json`, one `assets/<asset_id>/asset.json` per Asset, and one
+`textures/<texture_id>/texture.json` per Texture. The latest loaded or saved
+workspace name is stored in `configs/app_config.json` and is loaded
+automatically on startup. Every workspace, asset, texture, and config JSON
+uses the numeric `schema_version` field; the current schema is version `3`.
+The bottom status bar is divided into 17% program status, 64% contextual tool
+information, and 17% reserved space. `CMD/Ctrl + S` saves the active Workspace;
+the canvas suppresses ASDW panning while that modifier is held. Workspace
+`editor_state` also restores selected Asset/Component/Texture/Element and
+expanded Outliner containers when the Workspace is reopened.
 
 The current Transform & Snap Foundation milestone begins with the world origin
 `(0, 0)` defined by full horizontal/vertical canvas axes. Phase 2 adds the

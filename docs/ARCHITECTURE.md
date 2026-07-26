@@ -319,10 +319,15 @@ workspaces/<workspace_name>/
 ```
 
 Every JSON document contains a numeric `schema_version`. The current MVP
-schema is version `2`. Workspace metadata references Asset and Texture IDs.
+schema is version `3`. Workspace metadata references Asset and Texture IDs.
 Each Asset document stores its Components and their contour points; each Texture
 document stores its dimensions, origin convention, and Elements. Display names
 remain editable and are not used as persistent references.
+
+An imported raster source is copied into its Texture directory and referenced
+from `texture.json` by a relative source filename plus its original display
+name. Re-importing retains prior copied sources so Undo/Redo can safely restore
+an earlier Texture source reference without depending on the external file.
 
 Workspace JSON also contains an `editor_state` object for the restorable editor
 view: selected Asset, Component, Texture, or Element and the expanded/collapsed
