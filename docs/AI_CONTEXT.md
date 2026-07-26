@@ -60,9 +60,10 @@ need and name are open.
 - `New → Texture` now creates a 512×512 Texture; its Outliner `Add` action
   creates named Elements with fallback names. Texture and Element selection
   and renaming are available, but the Texture canvas is not implemented yet.
-- Texture selection replaces the Asset context menus with empty `Draw` and
-  `Generate` menus; these are currently context-only and do not execute canvas
-  operations. Outliner search also matches child Component and Element names.
+- Phase 5 Texture work will use an `Origin` menu with only `Bottom Left`,
+  `Top Left`, and `Center` in the initial MVP. Draw/Generate menus are removed.
+  Origin is a presentation/export convention over canonical normalized UV data;
+  Outliner search also matches child Component and Element names.
 - Do not add Bézier editing, maps, full materials, a node graph, generic
   rigging, or export pipelines until a confirmed checklist item requires them.
 - Treat dummy UI data as dummy UI data. Do not let it quietly become a rigid

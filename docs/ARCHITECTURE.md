@@ -102,11 +102,13 @@ Texture exposes an `Add` action for named Elements, which are selected and
 renamed independently in the Outliner/Inspector. Element drawing semantics are
 deferred to the Texture canvas phase.
 
-When a Texture or Element is selected, the Context Bar switches to two empty
-Texture tools: `Draw` and `Generate`. These menus establish the Texture
-workflow vocabulary; their operations remain inert until the Texture canvas
-phase. Outliner search matches document names and child Component/Element
-names, expanding matching parents while a query is active.
+When a Texture or Element is selected, the Context Bar will provide the
+Texture UV canvas' `Origin` menu. The initial MVP modes are `Bottom Left`,
+`Top Left`, and `Center`; Draw/Generate controls are not part of this phase.
+Origin changes affect the canvas coordinate presentation and export convention,
+not the canonical normalized UV data. Outliner search matches document names
+and child Component/Element names, expanding matching parents while a query is
+active.
 
 ```text
 source Asset  <── Morph ──>  target Asset
