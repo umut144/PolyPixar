@@ -56,6 +56,8 @@ before implementing real creation tools.
       canvas dimensions, versioned serialization, and workspace loading.
 - [x] Add separate Assets and Textures Outliner groups with alphabetical
       ordering, search filtering, and an All/Assets/Textures filter.
+- [x] Create Textures through `New → Texture`, add named Elements with
+      fallback names, select them in the Outliner, and persist their names.
 - [x] Reflect the selected Asset or Component as the active central workspace
       context without adding editable canvas content yet.
 - [x] Provide a PolyPixAAA-style Shapes canvas with a dynamic grid.

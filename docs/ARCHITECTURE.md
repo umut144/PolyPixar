@@ -97,6 +97,11 @@ The Outliner presents Assets and Textures in separate groups. Both groups are
 alphabetically ordered and share a compact search field plus `All`, `Assets`,
 and `Textures` filters.
 
+`New → Texture` creates a named Texture with the default 512×512 canvas. Each
+Texture exposes an `Add` action for named Elements, which are selected and
+renamed independently in the Outliner/Inspector. Element drawing semantics are
+deferred to the Texture canvas phase.
+
 ```text
 source Asset  <── Morph ──>  target Asset
 ```

@@ -57,6 +57,9 @@ need and name are open.
   PolyTexture-style editing context.
 - The Outliner now has separate alphabetized Assets and Textures groups with a
   shared search field and All/Assets/Textures filter.
+- `New → Texture` now creates a 512×512 Texture; its Outliner `Add` action
+  creates named Elements with fallback names. Texture and Element selection
+  and renaming are available, but the Texture canvas is not implemented yet.
 - Do not add Bézier editing, maps, full materials, a node graph, generic
   rigging, or export pipelines until a confirmed checklist item requires them.
 - Treat dummy UI data as dummy UI data. Do not let it quietly become a rigid
