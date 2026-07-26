@@ -2491,17 +2491,13 @@ func _render_canvas_context() -> void:
 		texture_canvas.set_final_texture_path(_get_texture_final_path(texture) if selected_element_id.is_empty() else "")
 		texture_canvas.set_selected_element(str(selected_element.get("name", "")) if not selected_element.is_empty() else "")
 		if is_import_element:
-			if active_import_preview_mode == "white_to_alpha" and _element_output_state(selected_element) != "ready":
-				var source_path := _get_texture_source_path(texture, selected_element)
-				var source_image := Image.new()
-				var pipeline = selected_element.get("pipeline", {})
-				var threshold := float(pipeline.get("threshold", 0.05)) if pipeline is Dictionary else 0.05
-				if not source_path.is_empty() and source_image.load(source_path) == OK:
-					import_preview.set_preview_image(_create_white_to_alpha_image(source_image, clampf(threshold, 0.0, 1.0)))
-				else:
-					import_preview.set_preview_path("")
+			# Processing is an explicit action. Until Process is pressed, the
+			# White to Alpha preview must not change live with the threshold field.
+			# Show the source until a ready processed output exists.
+			if active_import_preview_mode == "white_to_alpha" and _element_output_state(selected_element) == "ready":
+				import_preview.set_preview_path(_get_texture_preview_path(texture, selected_element))
 			else:
-				import_preview.set_preview_path(_get_texture_source_path(texture, selected_element) if active_import_preview_mode == "original" else _get_texture_preview_path(texture, selected_element))
+				import_preview.set_preview_path(_get_texture_source_path(texture, selected_element))
 		else:
 			import_preview.set_preview_path("")
 		return
