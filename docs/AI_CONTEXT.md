@@ -60,6 +60,9 @@ need and name are open.
 - `New → Texture` now creates a 512×512 Texture; its Outliner `Add` action
   creates named Elements with fallback names. Texture and Element selection
   and renaming are available, but the Texture canvas is not implemented yet.
+- Texture selection replaces the Asset context menus with `Draw`, `Generate`,
+  and `Sample`; these are currently context-only and do not execute canvas
+  operations.
 - Do not add Bézier editing, maps, full materials, a node graph, generic
   rigging, or export pipelines until a confirmed checklist item requires them.
 - Treat dummy UI data as dummy UI data. Do not let it quietly become a rigid
