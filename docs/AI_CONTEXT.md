@@ -64,6 +64,9 @@ need and name are open.
   `Top Left`, and `Center` in the initial MVP. Draw/Generate menus are removed.
   Origin is a presentation/export convention over canonical normalized UV data;
   Outliner search also matches child Component and Element names.
+- The initial UV Canvas is now available for Texture and Element contexts; it
+  shows the normalized field and origin-aware axes, while drawing and generation
+  remain deferred.
 - Do not add Bézier editing, maps, full materials, a node graph, generic
   rigging, or export pipelines until a confirmed checklist item requires them.
 - Treat dummy UI data as dummy UI data. Do not let it quietly become a rigid

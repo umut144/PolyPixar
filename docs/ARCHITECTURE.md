@@ -110,6 +110,10 @@ not the canonical normalized UV data. Outliner search matches document names
 and child Component/Element names, expanding matching parents while a query is
 active.
 
+The initial UV Canvas is a dedicated Texture workspace. It displays a normalized
+0..1 texture field, origin-aware axes, and a lightweight grid; it intentionally
+does not yet provide drawing or generator operations.
+
 ```text
 source Asset  <── Morph ──>  target Asset
 ```

@@ -61,6 +61,8 @@ before implementing real creation tools.
 - [x] Show empty Texture-specific `Draw` and `Generate` Context Bar menus.
 - [x] Filter Outliner searches by Asset/Texture names and their
       Component/Element child names, expanding matching parents.
+- [x] Add the initial UV Texture Canvas with `Bottom Left`, `Top Left`, and
+      `Center` Origin modes and persist the selected mode per Texture.
 - [x] Reflect the selected Asset or Component as the active central workspace
       context without adding editable canvas content yet.
 - [x] Provide a PolyPixAAA-style Shapes canvas with a dynamic grid.
