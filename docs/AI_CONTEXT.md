@@ -165,12 +165,13 @@ The rail behaves as an accordion: at most one category is expanded at a time.
 The active module uses a yellow background with black text, including its
 hover state. No tree icons or glyphs are used.
 
-Only Create has modules in the current shell. Style, Motion, Transform,
-Effects, and Export are present as empty category sections until their own
-work begins.
+Create exposes `Shapes` and an intentionally empty `Layers` module. Style
+exposes `Materials`; the remaining categories are present as empty sections.
 
-The Main Toolbar contains a `New ▼` menu with `Asset` and `Texture` entries.
-Both open name dialogs with fallback names and create Workspace documents.
+The Main Toolbar's `New ▼` menu is category-aware: Create offers `Asset` and
+`Texture`, Style offers `Material`, and inactive categories expose no action.
+Each action opens a name dialog with a fallback name and creates a Workspace
+document.
 Assets contain Components; Textures contain optional Elements. Both document
 types are listed, searched, filtered, renamed, persisted, and restored through
 the Outliner/Inspector. The central workspace identifies whether an Asset,

@@ -297,8 +297,9 @@ Sections form an accordion: opening one category closes the others. The active
 module is highlighted with a yellow background and black text, including its
 hover state.
 
-The current first data flow is `New → Asset`: a name dialog creates an
-in-memory Asset with a stable internal ID, the Asset appears in the Outliner,
+The current first data flow is `New → Asset` or category-aware `New → Material`:
+a name dialog creates an in-memory document with a stable internal ID, the
+document appears in the Outliner,
 and its display name can be edited in the Inspector. An Asset can now contain
 named Components with stable IDs. Workspace persistence stores these Assets
 and their completed Component contours. The current Component Canvas provides
