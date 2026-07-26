@@ -101,6 +101,10 @@ it into a general scene or animation-graph abstraction prematurely.
   only that ready Element output; successful processing selects the processed
   Import Element as the final output. Legacy Textures resolve a first ready
   output on load.
+- Phase 1 of Style Materials adds an independent `materials/<id>/material.json`
+  resource with `texture_id`, `tint`, and `opacity`. Materials are included in
+  workspace metadata, save/load, and history snapshots; no Material UI exists
+  yet.
 - `Style → Material` is Slice 4's first Style module. It binds a Workspace
   Texture to a Component by stable reference and exposes only repeat, scale,
   offset, base tint, ink strength, and glow values.

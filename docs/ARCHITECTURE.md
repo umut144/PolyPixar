@@ -347,11 +347,12 @@ workspaces/<workspace_name>/
 ```
 
 Every JSON document contains a numeric `schema_version`. The current MVP
-schema is version `7`. Workspace metadata references Asset and Texture IDs.
-Each Asset document stores its Components and their contour points; each Texture
-document stores its dimensions, origin convention, Elements, and an optional
-`final_output_element_id`. Display names remain editable and are not used as
-persistent references.
+schema is version `8`. Workspace metadata references Asset, Texture, and
+Material IDs. Each Asset document stores its Components and their contour
+points; each Texture document stores its dimensions, origin convention,
+Elements, and an optional `final_output_element_id`. Each Material is an
+independent Workspace resource with a Texture reference, tint, and opacity.
+Display names remain editable and are not used as persistent references.
 
 An imported raster source is selected from the project-local
 `imports/textures/` intake folder, copied into its Texture directory, and
