@@ -7,6 +7,9 @@ const IMPORT_TEXTURES_ROOT := "res://imports/textures"
 const CONFIG_PATH := "res://configs/app_config.json"
 const SCHEMA_VERSION := 6
 const MAX_HISTORY_SIZE := 100
+# Kept available for a later Outliner presentation, but processed outputs are
+# currently reached through the Import Preview instead of additional rows.
+const SHOW_PROCESSED_OUTLINER := false
 
 var active_create_submodule := "Shapes"
 var outliner_list: VBoxContainer
@@ -1424,7 +1427,7 @@ func _normalize_texture_elements(raw_elements, legacy_import_source) -> Array:
 
 func _find_import_element(texture: Dictionary) -> Dictionary:
 	for element in texture.get("elements", []):
-		if str(element.get("type", "generator")) == "import":
+		if SHOW_PROCESSED_OUTLINER and str(element.get("type", "generator")) == "import":
 			return element
 	return {}
 
@@ -1967,7 +1970,7 @@ func _render_texture_element_row(texture_container: VBoxContainer, texture_id: S
 	_style_outliner_button(element_button, texture_id == selected_texture_id and str(element.get("id", "")) == selected_element_id)
 	element_button.pressed.connect(_select_element.bind(texture_id, str(element.get("id", ""))))
 	element_row.add_child(element_button)
-	if str(element.get("type", "generator")) == "import":
+	if SHOW_PROCESSED_OUTLINER and str(element.get("type", "generator")) == "import":
 		# Processing results are derived from the import and therefore shown as
 		# nested rows instead of independent texture elements.
 		texture_container.add_child(_create_outliner_child_group_label("Processed Elements", 32))
