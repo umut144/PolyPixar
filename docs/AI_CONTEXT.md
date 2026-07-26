@@ -36,7 +36,7 @@ general animation/VFX framework.
 - Editor workspace and default window: 1920×1200 (16:10); preview uses preserved
   aspect ratio (`keep`) so the UI proportions remain stable
 - Project icon: `assets/assetflow_icon.png`
-- Current JSON schema version: **6**
+- Current JSON schema version: **8**
 
 ## Confirmed vocabulary
 
@@ -101,10 +101,13 @@ it into a general scene or animation-graph abstraction prematurely.
   only that ready Element output; successful processing selects the processed
   Import Element as the final output. Legacy Textures resolve a first ready
   output on load.
-- Phase 1 of Style Materials adds an independent `materials/<id>/material.json`
-  resource with `texture_id`, `tint`, and `opacity`. Materials are included in
-  workspace metadata, save/load, and history snapshots; no Material UI exists
-  yet.
+- Style now exposes `Materials` as its first submodule. Materials can be
+  created through `New → Material`, searched and selected in the Material
+  Outliner, and edited in the Inspector with a ready Texture reference, tint,
+  and opacity.
+- Materials are included in workspace metadata, save/load, and history
+  snapshots. Graph, neutral Preview, LookDev, and Component assignment remain
+  later phases.
 - `Style → Material` is Slice 4's first Style module. It binds a Workspace
   Texture to a Component by stable reference and exposes only repeat, scale,
   offset, base tint, ink strength, and glow values.
@@ -208,7 +211,9 @@ Load uses an in-app list of existing workspace folders. Each workspace has a
 `textures/<texture_id>/texture.json` per Texture. The latest loaded or saved
 workspace name is stored in `configs/app_config.json` and is loaded
 automatically on startup. Every workspace, asset, texture, and config JSON
-uses the numeric `schema_version` field; the current schema is version `3`.
+uses the numeric `schema_version` field; the current schema is version `8`.
+Materials are independent Workspace resources stored below
+`materials/<material_id>/material.json` and listed by ID in `workspace.json`.
 The bottom status bar is divided into 17% program status, 64% contextual tool
 information, and 17% reserved space. `CMD/Ctrl + S` saves the active Workspace;
 the canvas suppresses ASDW panning while that modifier is held. Workspace
