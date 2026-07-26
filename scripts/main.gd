@@ -63,6 +63,7 @@ var material_preview_surface: PanelContainer
 var material_preview_content: CenterContainer
 var material_preview_texture: TextureRect
 var material_preview_label: Label
+var material_preview_shader: ShaderMaterial
 var export_workspace: VBoxContainer
 var export_summary_label: Label
 var export_validation_label: Label
@@ -470,6 +471,23 @@ func _create_material_preview() -> void:
 	material_preview_texture.custom_minimum_size = Vector2(320, 320)
 	material_preview_texture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	material_preview_texture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	var preview_shader := Shader.new()
+	preview_shader.code = """shader_type canvas_item;
+uniform vec2 mapping_scale = vec2(1.0);
+uniform vec2 mapping_offset = vec2(0.0);
+uniform int wrap_mode = 1;
+void fragment() {
+	vec2 uv = UV;
+	if (wrap_mode == 1) {
+		uv = clamp(UV / max(mapping_scale, vec2(0.0001)) + mapping_offset, vec2(0.0), vec2(1.0));
+	} else if (wrap_mode == 2) {
+		uv = fract(UV / max(mapping_scale, vec2(0.0001)) + mapping_offset);
+	}
+	COLOR = texture(TEXTURE, uv) * COLOR;
+}"""
+	material_preview_shader = ShaderMaterial.new()
+	material_preview_shader.shader = preview_shader
+	material_preview_texture.material = material_preview_shader
 	material_preview_content.add_child(material_preview_texture)
 	material_preview_label = Label.new()
 	material_preview_label.text = "No ready Texture"
@@ -948,6 +966,7 @@ func _save_workspace() -> void:
 			"opacity": clampf(float(material.get("opacity", 1.0)), 0.0, 1.0),
 			"mapping_scale": _serialize_vector(material.get("mapping_scale", Vector2.ONE)),
 			"mapping_offset": _serialize_vector(material.get("mapping_offset", Vector2.ZERO)),
+			"mapping_wrap_mode": str(material.get("mapping_wrap_mode", "clamp")),
 			"mapping_repeat": bool(material.get("mapping_repeat", false))
 		})
 	_write_json("%s/workspace.json" % workspace_root, {
@@ -1731,8 +1750,14 @@ func _normalize_material(raw_material, fallback_id: String) -> Dictionary:
 		"opacity": clampf(float(data.get("opacity", 1.0)), 0.0, 1.0),
 		"mapping_scale": _deserialize_vector(data.get("mapping_scale", [1.0, 1.0]), Vector2.ONE),
 		"mapping_offset": _deserialize_vector(data.get("mapping_offset", [0.0, 0.0]), Vector2.ZERO),
+		"mapping_wrap_mode": str(data.get("mapping_wrap_mode", "repeat" if bool(data.get("mapping_repeat", false)) else "clamp")),
 		"mapping_repeat": bool(data.get("mapping_repeat", false))
 	}
+
+
+func _material_wrap_mode(material: Dictionary) -> String:
+	var mode := str(material.get("mapping_wrap_mode", "repeat" if bool(material.get("mapping_repeat", false)) else "clamp"))
+	return mode if mode == "fit" or mode == "clamp" or mode == "repeat" else "clamp"
 
 
 func _find_import_element(texture: Dictionary) -> Dictionary:
@@ -2034,7 +2059,8 @@ func _build_selected_asset_scene() -> void:
 				var texture_resource := load(texture_path) as Texture2D
 				polygon.texture = texture_resource
 				if texture_resource != null:
-					polygon.uv = _build_export_uvs(component.get("outer_shape", []), texture_resource.get_size(), material.get("mapping_scale", Vector2.ONE), material.get("mapping_offset", Vector2.ZERO))
+					polygon.uv = _build_export_uvs(component.get("outer_shape", []), texture_resource.get_size(), material.get("mapping_scale", Vector2.ONE), material.get("mapping_offset", Vector2.ZERO), _material_wrap_mode(material))
+					polygon.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED if _material_wrap_mode(material) == "repeat" else CanvasItem.TEXTURE_REPEAT_DISABLED
 		root.add_child(polygon)
 		polygon.owner = root
 	var scene := PackedScene.new()
@@ -2055,7 +2081,7 @@ func _build_selected_asset_scene() -> void:
 	_render_export_workspace()
 
 
-func _build_export_uvs(points: Array, texture_size: Vector2, mapping_scale: Vector2, mapping_offset: Vector2) -> PackedVector2Array:
+func _build_export_uvs(points: Array, texture_size: Vector2, mapping_scale: Vector2, mapping_offset: Vector2, wrap_mode: String) -> PackedVector2Array:
 	var uvs := PackedVector2Array()
 	if points.is_empty():
 		return uvs
@@ -2077,7 +2103,7 @@ func _build_export_uvs(points: Array, texture_size: Vector2, mapping_scale: Vect
 	for point in points:
 		var local_point: Vector2 = point if point is Vector2 else Vector2.ZERO
 		var normalized_uv := Vector2((local_point.x - min_point.x) / extent.x, (local_point.y - min_point.y) / extent.y)
-		uvs.append((normalized_uv / safe_scale + mapping_offset) * texture_size)
+		uvs.append((normalized_uv if wrap_mode == "fit" else normalized_uv / safe_scale + mapping_offset) * texture_size)
 	return uvs
 
 
@@ -2258,6 +2284,7 @@ func _confirm_material_creation() -> void:
 		"opacity": 1.0,
 		"mapping_scale": Vector2.ONE,
 		"mapping_offset": Vector2.ZERO,
+		"mapping_wrap_mode": "clamp",
 		"mapping_repeat": false
 	})
 	material_dialog.hide()
@@ -2952,12 +2979,22 @@ func _render_material_inspector() -> void:
 	var mapping_offset: Vector2 = material.get("mapping_offset", Vector2.ZERO)
 	_add_material_mapping_field(mapping_grid, "Offset X", mapping_offset.x, "offset_x")
 	_add_material_mapping_field(mapping_grid, "Offset Y", mapping_offset.y, "offset_y")
-	var repeat_toggle := CheckButton.new()
-	repeat_toggle.text = "Repeat"
-	repeat_toggle.custom_minimum_size = Vector2(0, 26)
-	repeat_toggle.button_pressed = bool(material.get("mapping_repeat", false))
-	repeat_toggle.toggled.connect(_on_material_repeat_changed)
-	inspector_content.add_child(repeat_toggle)
+	inspector_content.add_child(_create_inspector_field_label("Wrap Mode"))
+	var wrap_option := OptionButton.new()
+	wrap_option.custom_minimum_size = Vector2(0, 26)
+	wrap_option.add_item("Fit")
+	wrap_option.set_item_metadata(0, "fit")
+	wrap_option.add_item("Clamp")
+	wrap_option.set_item_metadata(1, "clamp")
+	wrap_option.add_item("Repeat")
+	wrap_option.set_item_metadata(2, "repeat")
+	var wrap_mode := _material_wrap_mode(material)
+	for index in range(wrap_option.item_count):
+		if str(wrap_option.get_item_metadata(index)) == wrap_mode:
+			wrap_option.select(index)
+			break
+	wrap_option.item_selected.connect(_on_material_wrap_mode_selected.bind(wrap_option))
+	inspector_content.add_child(wrap_option)
 
 
 func _render_lookdev_material_target_inspector() -> void:
@@ -3027,12 +3064,16 @@ func _on_material_mapping_changed(value: float, property_name: String) -> void:
 	_render_canvas_context()
 
 
-func _on_material_repeat_changed(enabled: bool) -> void:
+func _on_material_wrap_mode_selected(index: int, option: OptionButton) -> void:
 	var material := _get_material(selected_material_id)
-	if material.is_empty():
+	if material.is_empty() or index < 0 or index >= option.item_count:
+		return
+	var wrap_mode := str(option.get_item_metadata(index))
+	if _material_wrap_mode(material) == wrap_mode:
 		return
 	_record_direct_change()
-	material["mapping_repeat"] = enabled
+	material["mapping_wrap_mode"] = wrap_mode
+	material["mapping_repeat"] = wrap_mode == "repeat"
 	_render_canvas_context()
 
 
@@ -3477,13 +3518,12 @@ func _render_material_preview() -> void:
 	material_preview_surface.custom_minimum_size = fitted_size + Vector2(40, 64)
 	material_preview_content.custom_minimum_size = fitted_size
 	material_preview_texture.custom_minimum_size = fitted_size
-	var source_texture := ImageTexture.create_from_image(image)
-	var mapping_scale: Vector2 = material.get("mapping_scale", Vector2.ONE)
-	var mapping_offset: Vector2 = material.get("mapping_offset", Vector2.ZERO)
-	var atlas_texture := AtlasTexture.new()
-	atlas_texture.atlas = source_texture
-	atlas_texture.region = Rect2(mapping_offset * image_size, image_size / Vector2(maxf(mapping_scale.x, 0.01), maxf(mapping_scale.y, 0.01)))
-	material_preview_texture.texture = atlas_texture
+	material_preview_texture.texture = ImageTexture.create_from_image(image)
+	if is_instance_valid(material_preview_shader):
+		var wrap_mode := _material_wrap_mode(material)
+		material_preview_shader.set_shader_parameter("mapping_scale", material.get("mapping_scale", Vector2.ONE))
+		material_preview_shader.set_shader_parameter("mapping_offset", material.get("mapping_offset", Vector2.ZERO))
+		material_preview_shader.set_shader_parameter("wrap_mode", 0 if wrap_mode == "fit" else 2 if wrap_mode == "repeat" else 1)
 	material_preview_label.visible = false
 
 
@@ -3540,7 +3580,7 @@ func _render_lookdev_canvas() -> void:
 	if material.is_empty():
 		canvas_view.set_component_material(null)
 	else:
-		canvas_view.set_component_material(_load_material_canvas_texture(material), material.get("tint", Color.WHITE), float(material.get("opacity", 1.0)), material.get("mapping_scale", Vector2.ONE), material.get("mapping_offset", Vector2.ZERO))
+		canvas_view.set_component_material(_load_material_canvas_texture(material), material.get("tint", Color.WHITE), float(material.get("opacity", 1.0)), material.get("mapping_scale", Vector2.ONE), material.get("mapping_offset", Vector2.ZERO), _material_wrap_mode(material))
 	canvas_view.set_reference_shapes(_build_reference_shapes(asset, lookdev_target_component_id))
 	canvas_view.set_outer_shape(component.get("outer_shape", []), bool(component.get("closed", false)))
 
@@ -3659,7 +3699,7 @@ func _render_canvas_context() -> void:
 	if component_material.is_empty():
 		canvas_view.set_component_material(null)
 	else:
-		canvas_view.set_component_material(_load_material_canvas_texture(component_material), component_material.get("tint", Color.WHITE), float(component_material.get("opacity", 1.0)), component_material.get("mapping_scale", Vector2.ONE), component_material.get("mapping_offset", Vector2.ZERO))
+		canvas_view.set_component_material(_load_material_canvas_texture(component_material), component_material.get("tint", Color.WHITE), float(component_material.get("opacity", 1.0)), component_material.get("mapping_scale", Vector2.ONE), component_material.get("mapping_offset", Vector2.ZERO), _material_wrap_mode(component_material))
 	canvas_view.set_reference_shapes(_build_reference_shapes(asset, selected_component_id))
 	var component_closed := bool(component.get("closed", component["outer_shape"].size() >= 3))
 	canvas_view.set_outer_shape(component["outer_shape"], component_closed)

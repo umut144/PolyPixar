@@ -381,7 +381,9 @@ Material Texture references. The initial export derives explicit UVs from each
 Component's local bounding box, preventing Godot from treating contour
 coordinates as texture coordinates. Mapping Scale uses one shared semantic:
 larger values make the texture appear larger in the Preview, editor canvas,
-and exported scene. Mesh resources, advanced UV mapping, and
+and exported scene. The initial Wrap Modes are `Fit` (one normalized texture),
+`Clamp` (edge pixels outside the texture), and `Repeat` (tiled texture).
+Mesh resources, advanced UV mapping, and
 reusable external material resources follow later.
 
 An imported raster source is selected from the project-local

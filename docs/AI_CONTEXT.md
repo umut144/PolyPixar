@@ -122,6 +122,9 @@ it into a general scene or animation-graph abstraction prematurely.
   interactions. It validates closed, triangulable contours and ready Material
   Texture references, then uses `PackedScene` plus `ResourceSaver` instead of
   composing `.tscn` text.
+- Material Mapping provides `Fit`, `Clamp`, and `Repeat` wrap modes. Repeat is
+  applied in the Material Preview, Component canvas, and exported Polygon2D
+  scene; it is required when a scale below 1 should tile a texture.
 - `Style → Material` is Slice 4's first Style module. It binds a Workspace
   Texture to a Component by stable reference and exposes only repeat, scale,
   offset, base tint, ink strength, and glow values.

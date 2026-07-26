@@ -258,8 +258,9 @@ system, particle system, or universal animation graph.
 - [x] Add the first `Material` module under Style.
 - [x] Bind a Workspace Texture to the Stone Floor Component without embedding
       or copying the Texture into the Asset.
-- [x] Provide the smallest useful texture mapping controls: scale and offset;
-      persist a Repeat intent for the next texture-sampling refinement.
+- [x] Provide the smallest useful texture mapping controls: scale and offset.
+- [x] Replace the Repeat intent with concrete `Fit`, `Clamp`, and `Repeat`
+      wrap modes in the Preview, canvas, and export path.
 - [ ] Provide a base colour/tint and an independent ink/line strength control.
 - [ ] Provide a glow colour and intensity parameter that can be targeted by the
       first Sequence.
