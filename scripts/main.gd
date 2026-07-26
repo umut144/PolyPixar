@@ -67,6 +67,7 @@ var context_bar: HBoxContainer
 var new_menu_popup: PopupMenu
 var info_bar: HBoxContainer
 var program_status_label: Label
+var active_material_status_label: Label
 var status_clear_timer: Timer
 var active_draw_tool := ""
 var active_state := ""
@@ -401,6 +402,12 @@ func _build_ui() -> void:
 	status_right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	status_right.size_flags_stretch_ratio = 17.0
 	status_layout.add_child(status_right)
+	active_material_status_label = Label.new()
+	active_material_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	active_material_status_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	active_material_status_label.add_theme_font_size_override("font_size", 11)
+	active_material_status_label.add_theme_color_override("font_color", Color("#9aa3b2"))
+	status_right.add_child(active_material_status_label)
 	status_clear_timer = Timer.new()
 	status_clear_timer.one_shot = true
 	status_clear_timer.wait_time = 2.5
@@ -1412,6 +1419,10 @@ func _render_material_context_bar() -> void:
 func _on_material_view_menu_id(id: int) -> void:
 	if id == 0:
 		_set_material_view("graph")
+	elif id == 1:
+		_set_material_view("preview")
+	elif id == 2:
+		_set_material_view("lookdev")
 
 
 func _set_material_view(mode: String) -> void:
@@ -1420,6 +1431,7 @@ func _set_material_view(mode: String) -> void:
 	material_view_mode = mode
 	_render_outliner()
 	_render_context_bar()
+	_render_inspector()
 	_render_info_bar()
 	_render_canvas_context()
 
@@ -1849,6 +1861,12 @@ func _set_active_state(state: String) -> void:
 func _render_info_bar() -> void:
 	if not is_instance_valid(info_bar):
 		return
+	if is_instance_valid(active_material_status_label):
+		if active_module == "Style" and not selected_material_id.is_empty():
+			var active_material := _get_material(selected_material_id)
+			active_material_status_label.text = "Material: %s" % str(active_material.get("name", "Material")) if not active_material.is_empty() else ""
+		else:
+			active_material_status_label.text = ""
 	_clear(info_bar)
 	if active_module == "Style" and not selected_material_id.is_empty():
 		var material_state_label := Label.new()

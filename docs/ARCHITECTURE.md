@@ -361,7 +361,10 @@ contains a fixed `Texture Source → Material Output` GraphEdit skeleton. Previe
 shows the selected ready Texture immediately on a neutral surface with the
 Material tint and opacity; the surface adapts to the source image aspect ratio
 within bounded preview dimensions. LookDev switches the Outliner to Assets and Components while
-keeping the Material selected as the active look target. When a Component is
+keeping the Material selected as the active look target. The Material
+selection is shared between Graph and Preview; switching Views refreshes the
+Inspector and preserves the selection. The active Material is also shown in
+the right status-bar region. When a Component is
 selected, the Inspector switches to that Component context and offers an
 explicit `Assign Material` action. Assignment is stored as the Component's
 optional `material_id`; assigned textures now project onto closed Component
