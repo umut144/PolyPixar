@@ -28,6 +28,7 @@ var selected_component_id := ""
 var selected_texture_id := ""
 var selected_element_id := ""
 var selected_material_id := ""
+var material_view_mode := "graph"
 var expanded_assets: Dictionary = {}
 var expanded_textures: Dictionary = {}
 var next_asset_id := 1
@@ -52,6 +53,7 @@ var canvas_context_label: Label
 var canvas_view: ComponentCanvas
 var texture_canvas: TextureCanvas
 var import_preview: ImportPreview
+var material_graph: GraphEdit
 var texture_context_label: Label
 var import_preview_context_label: Label
 var context_bar: HBoxContainer
@@ -122,6 +124,11 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		else:
 			_undo()
 		get_viewport().set_input_as_handled()
+		return
+	if active_module == "Style" and not selected_material_id.is_empty():
+		if event.keycode == KEY_1:
+			_set_material_view("graph")
+			get_viewport().set_input_as_handled()
 		return
 	if selected_component_id.is_empty():
 		if not selected_texture_id.is_empty() and not selected_element_id.is_empty():
@@ -326,6 +333,13 @@ func _build_ui() -> void:
 	import_preview_context_label.add_theme_font_size_override("font_size", 11)
 	import_preview_context_label.add_theme_color_override("font_color", Color("#9aa3b2"))
 	import_preview.add_child(import_preview_context_label)
+	material_graph = GraphEdit.new()
+	material_graph.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	material_graph.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	material_graph.show_grid = true
+	material_graph.visible = false
+	canvas_panel.add_child(material_graph)
+	_create_material_graph()
 	texture_context_label = Label.new()
 	texture_context_label.position = Vector2(8, 6)
 	texture_context_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -386,6 +400,31 @@ func _build_ui() -> void:
 	_create_texture_import_dialog()
 	_create_element_dialog()
 	_create_workspace_dialogs()
+
+
+func _create_material_graph() -> void:
+	var source_node := GraphNode.new()
+	source_node.name = "texture_source"
+	source_node.title = "Texture Source"
+	source_node.position_offset = Vector2(180, 220)
+	source_node.size = Vector2(190, 76)
+	var source_label := Label.new()
+	source_label.text = "Ready Texture reference"
+	source_node.add_child(source_label)
+	source_node.set_slot(0, false, 0, Color.WHITE, true, 0, Color("#f2c94c"))
+	material_graph.add_child(source_node)
+
+	var output_node := GraphNode.new()
+	output_node.name = "material_output"
+	output_node.title = "Material Output"
+	output_node.position_offset = Vector2(520, 220)
+	output_node.size = Vector2(190, 76)
+	var output_label := Label.new()
+	output_label.text = "Final Material"
+	output_node.add_child(output_label)
+	output_node.set_slot(0, true, 0, Color("#f2c94c"), false, 0, Color.WHITE)
+	material_graph.add_child(output_node)
+	material_graph.connect_node("texture_source", 0, "material_output", 0)
 
 
 func _create_panel(background_color := Color("#20242c")) -> PanelContainer:
@@ -1213,6 +1252,10 @@ func _render_context_bar() -> void:
 	if not is_instance_valid(context_bar):
 		return
 	_clear(context_bar)
+	if active_module == "Style" and not selected_material_id.is_empty():
+		_render_material_context_bar()
+		_render_info_bar()
+		return
 	if not selected_texture_id.is_empty():
 		_render_texture_context_bar()
 		_render_info_bar()
@@ -1265,6 +1308,38 @@ func _render_context_bar() -> void:
 	transform_popup.add_item("3: Scale", 2)
 	transform_popup.id_pressed.connect(_on_transform_menu_id)
 	context_bar.add_child(transform_menu)
+
+
+func _render_material_context_bar() -> void:
+	var material_menu := MenuButton.new()
+	material_menu.text = "⌘1  Material  ▼"
+	material_menu.custom_minimum_size = Vector2(122, 32)
+	material_menu.focus_mode = Control.FOCUS_NONE
+	material_menu.toggle_mode = true
+	material_menu.button_pressed = material_view_mode == "graph"
+	material_menu.pressed.connect(func() -> void: _set_material_view("graph"))
+	var material_popup := material_menu.get_popup()
+	material_popup.add_item("1: Graph", 0)
+	material_popup.add_item("2: Preview", 1)
+	material_popup.add_item("3: LookDev", 2)
+	material_popup.set_item_disabled(1, true)
+	material_popup.set_item_disabled(2, true)
+	material_popup.id_pressed.connect(_on_material_view_menu_id)
+	context_bar.add_child(material_menu)
+
+
+func _on_material_view_menu_id(id: int) -> void:
+	if id == 0:
+		_set_material_view("graph")
+
+
+func _set_material_view(mode: String) -> void:
+	if mode != "graph":
+		return
+	material_view_mode = mode
+	_render_context_bar()
+	_render_info_bar()
+	_render_canvas_context()
 
 
 func _render_texture_context_bar() -> void:
@@ -1693,6 +1768,14 @@ func _render_info_bar() -> void:
 	if not is_instance_valid(info_bar):
 		return
 	_clear(info_bar)
+	if active_module == "Style" and not selected_material_id.is_empty():
+		var material_state_label := Label.new()
+		material_state_label.text = "State: Material / Graph"
+		info_bar.add_child(material_state_label)
+		_add_info_option("1: Graph")
+		_add_info_option("2: Preview")
+		_add_info_option("3: LookDev")
+		return
 	if not selected_texture_id.is_empty():
 		var texture := _get_texture(selected_texture_id)
 		var selected_element := _get_element(texture, selected_element_id)
@@ -2776,6 +2859,16 @@ func _render_canvas_context() -> void:
 	_render_info_bar()
 	if not is_instance_valid(canvas_context_label):
 		return
+	if active_module == "Style":
+		canvas_view.visible = false
+		texture_canvas.visible = false
+		import_preview.visible = false
+		material_graph.visible = not selected_material_id.is_empty() and material_view_mode == "graph"
+		canvas_context_label.text = "Material: %s" % str(_get_material(selected_material_id).get("name", "")) if not selected_material_id.is_empty() else ""
+		texture_context_label.text = ""
+		import_preview_context_label.text = ""
+		return
+	material_graph.visible = false
 	if not selected_texture_id.is_empty():
 		var texture := _get_texture(selected_texture_id)
 		if texture.is_empty():
@@ -3016,6 +3109,7 @@ func _enter_material_context(material_id: String = "") -> void:
 	selected_texture_id = ""
 	selected_element_id = ""
 	selected_material_id = material_id
+	material_view_mode = "graph"
 	var style_section := _find_section("Style")
 	if style_section != null:
 		style_section.set_expanded(true)
