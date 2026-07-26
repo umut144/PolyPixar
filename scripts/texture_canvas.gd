@@ -75,5 +75,3 @@ func _draw() -> void:
 	draw_string(ThemeDB.fallback_font, origin + v_direction * 32.0 + Vector2(-3, 4), "V", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, v_color)
 	draw_string(ThemeDB.fallback_font, canvas_rect.position + Vector2(8, 20), "UV 0..1", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#697482"))
 	draw_string(ThemeDB.fallback_font, Vector2(canvas_rect.position.x, canvas_rect.end.y + 20), "Origin: %s" % origin_mode.replace("_", " ").capitalize(), HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#707985"))
-	if not selected_element_name.is_empty():
-		draw_string(ThemeDB.fallback_font, Vector2(12, 24), "Element: %s" % selected_element_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color("#f2c94c"))

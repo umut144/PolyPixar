@@ -39,6 +39,7 @@ var transform_fields: Dictionary = {}
 var canvas_context_label: Label
 var canvas_view: ComponentCanvas
 var texture_canvas: TextureCanvas
+var texture_context_label: Label
 var context_bar: HBoxContainer
 var info_bar: HBoxContainer
 var program_status_label: Label
@@ -279,6 +280,12 @@ func _build_ui() -> void:
 	texture_canvas.visible = false
 	texture_canvas.origin_changed.connect(_on_texture_origin_changed)
 	canvas_panel.add_child(texture_canvas)
+	texture_context_label = Label.new()
+	texture_context_label.position = Vector2(8, 6)
+	texture_context_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	texture_context_label.add_theme_font_size_override("font_size", 11)
+	texture_context_label.add_theme_color_override("font_color", Color("#9aa3b2"))
+	texture_canvas.add_child(texture_context_label)
 	canvas_context_label = Label.new()
 	canvas_context_label.position = Vector2(8, 6)
 	canvas_context_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1924,13 +1931,14 @@ func _render_canvas_context() -> void:
 			return
 		canvas_view.visible = false
 		texture_canvas.visible = true
-		canvas_context_label.text = "Texture: %s" % str(texture["name"])
+		texture_context_label.text = "Texture: %s" % str(texture["name"]) if selected_element_id.is_empty() else "Element: %s" % str(_get_element(texture, selected_element_id).get("name", "Element"))
 		texture_canvas.set_origin_mode(str(texture.get("origin_mode", "bottom_left")))
 		var element := _get_element(texture, selected_element_id)
 		texture_canvas.set_selected_element(str(element.get("name", "")) if not element.is_empty() else "")
 		return
 	canvas_view.visible = true
 	texture_canvas.visible = false
+	texture_context_label.text = ""
 	var asset := _get_asset(selected_asset_id)
 	if asset.is_empty():
 		canvas_context_label.text = ""
