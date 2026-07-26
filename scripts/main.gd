@@ -1,7 +1,8 @@
 extends Control
 
 const CREATE_SUBMODULES := ["Shapes", "Layers"]
-const INACTIVE_MODULES := ["Style", "Motion", "Transform", "Effects", "Export"]
+const STYLE_SUBMODULES := ["Materials"]
+const INACTIVE_MODULES := ["Motion", "Transform", "Effects", "Export"]
 const WORKSPACES_ROOT := "res://workspaces"
 const IMPORT_TEXTURES_ROOT := "res://imports/textures"
 const CONFIG_PATH := "res://configs/app_config.json"
@@ -12,6 +13,7 @@ const MAX_HISTORY_SIZE := 100
 const SHOW_PROCESSED_OUTLINER := false
 
 var active_create_submodule := "Shapes"
+var active_module := "Create"
 var outliner_list: VBoxContainer
 var outliner_search_input: LineEdit
 var outliner_filter_option: OptionButton
@@ -25,6 +27,7 @@ var selected_asset_id := ""
 var selected_component_id := ""
 var selected_texture_id := ""
 var selected_element_id := ""
+var selected_material_id := ""
 var expanded_assets: Dictionary = {}
 var expanded_textures: Dictionary = {}
 var next_asset_id := 1
@@ -37,6 +40,8 @@ var component_dialog: ConfirmationDialog
 var component_name_input: LineEdit
 var texture_dialog: ConfirmationDialog
 var texture_name_input: LineEdit
+var material_dialog: ConfirmationDialog
+var material_name_input: LineEdit
 var texture_import_dialog: FileDialog
 var element_dialog: ConfirmationDialog
 var element_name_input: LineEdit
@@ -197,6 +202,7 @@ func _build_ui() -> void:
 	var new_popup := new_menu.get_popup()
 	new_popup.add_item("Asset")
 	new_popup.add_item("Texture")
+	new_popup.add_item("Material")
 	new_popup.id_pressed.connect(_on_new_menu_id)
 	toolbar.add_child(new_menu)
 	var toolbar_spacer := Control.new()
@@ -225,6 +231,7 @@ func _build_ui() -> void:
 	module_rail.add_theme_constant_override("separation", 4)
 	module_rail_panel.add_child(module_rail)
 	_add_module_section(module_rail, "Create", CREATE_SUBMODULES, true)
+	_add_module_section(module_rail, "Style", STYLE_SUBMODULES)
 	for module_name in INACTIVE_MODULES:
 		_add_module_section(module_rail, module_name, [])
 
@@ -375,6 +382,7 @@ func _build_ui() -> void:
 	_create_asset_dialog()
 	_create_component_dialog()
 	_create_texture_dialog()
+	_create_material_dialog()
 	_create_texture_import_dialog()
 	_create_element_dialog()
 	_create_workspace_dialogs()
@@ -563,6 +571,21 @@ func _create_texture_dialog() -> void:
 	add_child(texture_dialog)
 
 
+func _create_material_dialog() -> void:
+	material_dialog = ConfirmationDialog.new()
+	material_dialog.title = "New Material"
+	material_dialog.dialog_text = "Enter a material name"
+	material_dialog.size = Vector2i(360, 160)
+	material_dialog.confirmed.connect(_confirm_material_creation)
+	material_name_input = LineEdit.new()
+	material_name_input.placeholder_text = "Material name"
+	material_name_input.custom_minimum_size = Vector2(320, 32)
+	material_name_input.focus_mode = Control.FOCUS_ALL
+	material_name_input.text_submitted.connect(_submit_material_name)
+	material_dialog.add_child(material_name_input)
+	add_child(material_dialog)
+
+
 func _create_texture_import_dialog() -> void:
 	texture_import_dialog = FileDialog.new()
 	texture_import_dialog.title = "Import Texture"
@@ -626,6 +649,8 @@ func _on_new_menu_id(id: int) -> void:
 		_open_new_asset_dialog()
 	elif id == 1:
 		_open_new_texture_dialog()
+	elif id == 2:
+		_open_new_material_dialog()
 
 
 func _on_workspace_menu_id(id: int) -> void:
@@ -818,6 +843,8 @@ func _capture_history_snapshot() -> Dictionary:
 		"selected_component_id": selected_component_id,
 		"selected_texture_id": selected_texture_id,
 		"selected_element_id": selected_element_id,
+		"selected_material_id": selected_material_id,
+		"active_module": active_module,
 		"expanded_assets": expanded_assets.duplicate(true)
 	}
 
@@ -858,6 +885,8 @@ func _restore_history_snapshot(snapshot: Dictionary) -> void:
 	selected_component_id = str(snapshot.get("selected_component_id", ""))
 	selected_texture_id = str(snapshot.get("selected_texture_id", ""))
 	selected_element_id = str(snapshot.get("selected_element_id", ""))
+	selected_material_id = str(snapshot.get("selected_material_id", ""))
+	active_module = str(snapshot.get("active_module", "Create"))
 	expanded_assets = snapshot.get("expanded_assets", {}).duplicate(true)
 	if _get_asset(selected_asset_id).is_empty():
 		selected_asset_id = ""
@@ -984,6 +1013,8 @@ func _serialize_editor_state() -> Dictionary:
 		"selected_component_id": selected_component_id,
 		"selected_texture_id": selected_texture_id,
 		"selected_element_id": selected_element_id,
+		"selected_material_id": selected_material_id,
+		"active_module": active_module,
 		"expanded_assets": expanded_state,
 		"expanded_textures": expanded_textures.duplicate(true),
 		"snap": {
@@ -999,6 +1030,8 @@ func _restore_editor_state(state) -> void:
 	selected_component_id = ""
 	selected_texture_id = ""
 	selected_element_id = ""
+	selected_material_id = ""
+	active_module = "Create"
 	expanded_assets.clear()
 	expanded_textures.clear()
 	for asset in assets:
@@ -1031,6 +1064,16 @@ func _restore_editor_state(state) -> void:
 		else:
 			selected_element_id = ""
 		expanded_textures[selected_texture_id] = true
+	var requested_material_id := str(state.get("selected_material_id", ""))
+	if selected_asset_id.is_empty() and selected_texture_id.is_empty() and not _get_material(requested_material_id).is_empty():
+		selected_material_id = requested_material_id
+		active_module = "Style"
+		var style_section := _find_section("Style")
+		if style_section != null:
+			style_section.set_expanded(true)
+			style_section.set_active_submodule("Materials")
+	else:
+		active_module = "Create"
 	var saved_expanded_textures = state.get("expanded_textures", {})
 	if saved_expanded_textures is Dictionary:
 		for texture in textures:
@@ -1756,6 +1799,48 @@ func _confirm_texture_creation() -> void:
 	_render_canvas_context()
 
 
+func _open_new_material_dialog() -> void:
+	material_name_input.text = ""
+	material_dialog.popup_centered()
+	material_name_input.grab_focus()
+
+
+func _submit_material_name(_submitted_text: String) -> void:
+	_confirm_material_creation()
+
+
+func _confirm_material_creation() -> void:
+	_record_direct_change()
+	var material_name := material_name_input.text.strip_edges()
+	if material_name.is_empty():
+		material_name = _next_default_material_name()
+	var material_id := "material_%d" % next_material_id
+	next_material_id += 1
+	materials.append({
+		"id": material_id,
+		"name": material_name,
+		"texture_id": "",
+		"tint": Color.WHITE,
+		"opacity": 1.0
+	})
+	material_dialog.hide()
+	_enter_material_context(material_id)
+
+
+func _next_default_material_name() -> String:
+	var index := 1
+	while _has_material_name("material%02d" % index):
+		index += 1
+	return "material%02d" % index
+
+
+func _has_material_name(material_name: String) -> bool:
+	for material in materials:
+		if str(material.get("name", "")).to_lower() == material_name.to_lower():
+			return true
+	return false
+
+
 func _next_default_texture_name() -> String:
 	var index := 1
 	while _has_texture_name("texture%02d" % index):
@@ -1853,6 +1938,11 @@ func _has_asset_name(asset_name: String) -> bool:
 
 func _render_outliner() -> void:
 	_clear(outliner_list)
+	if is_instance_valid(outliner_filter_option):
+		outliner_filter_option.visible = active_module != "Style"
+	if active_module == "Style":
+		_render_material_outliner()
+		return
 	var search_text := outliner_search_input.text.strip_edges().to_lower() if is_instance_valid(outliner_search_input) else ""
 	var show_assets := outliner_filter == "all" or outliner_filter == "assets"
 	var show_textures := outliner_filter == "all" or outliner_filter == "textures"
@@ -1874,6 +1964,26 @@ func _render_outliner() -> void:
 		outliner_list.add_child(_create_outliner_group_label("Textures"))
 		for texture in visible_textures:
 			_render_texture_outliner_entry(texture, not search_text.is_empty())
+
+
+func _render_material_outliner() -> void:
+	var search_text := outliner_search_input.text.strip_edges().to_lower() if is_instance_valid(outliner_search_input) else ""
+	var visible_materials: Array[Dictionary] = []
+	for material in materials:
+		if search_text.is_empty() or str(material.get("name", "")).to_lower().contains(search_text):
+			visible_materials.append(material)
+	visible_materials.sort_custom(_sort_named_documents)
+	outliner_list.add_child(_create_outliner_group_label("Materials"))
+	for material in visible_materials:
+		var material_button := Button.new()
+		material_button.text = str(material.get("name", "Material"))
+		material_button.custom_minimum_size = Vector2(0, 30)
+		material_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		material_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		material_button.focus_mode = Control.FOCUS_NONE
+		_style_outliner_button(material_button, str(material.get("id", "")) == selected_material_id)
+		material_button.pressed.connect(_select_material.bind(str(material.get("id", ""))))
+		outliner_list.add_child(material_button)
 
 
 func _asset_matches_search(asset: Dictionary, search_text: String) -> bool:
@@ -2120,10 +2230,12 @@ func _strikethrough_text(text: String) -> String:
 
 func _select_asset(asset_id: String) -> void:
 	var was_selected := selected_asset_id == asset_id and selected_component_id.is_empty()
+	active_module = "Create"
 	selected_asset_id = asset_id
 	selected_component_id = ""
 	selected_texture_id = ""
 	selected_element_id = ""
+	selected_material_id = ""
 	active_state = ""
 	canvas_view.set_interaction_state("")
 	if was_selected:
@@ -2135,11 +2247,13 @@ func _select_asset(asset_id: String) -> void:
 
 func _select_texture(texture_id: String) -> void:
 	var was_selected := selected_texture_id == texture_id and selected_element_id.is_empty()
+	active_module = "Create"
 	active_import_preview_mode = "original"
 	selected_texture_id = texture_id
 	selected_element_id = ""
 	selected_asset_id = ""
 	selected_component_id = ""
+	selected_material_id = ""
 	active_state = ""
 	if was_selected:
 		expanded_textures[texture_id] = not bool(expanded_textures.get(texture_id, false))
@@ -2150,10 +2264,12 @@ func _select_texture(texture_id: String) -> void:
 
 func _select_element(texture_id: String, element_id: String) -> void:
 	active_import_preview_mode = "original"
+	active_module = "Create"
 	selected_texture_id = texture_id
 	selected_element_id = element_id
 	selected_asset_id = ""
 	selected_component_id = ""
+	selected_material_id = ""
 	active_state = ""
 	expanded_textures[texture_id] = true
 	_render_outliner()
@@ -2224,10 +2340,12 @@ func _has_component_name(asset: Dictionary, component_name: String) -> bool:
 
 
 func _select_component(asset_id: String, component_id: String) -> void:
+	active_module = "Create"
 	selected_asset_id = asset_id
 	selected_component_id = component_id
 	selected_texture_id = ""
 	selected_element_id = ""
+	selected_material_id = ""
 	active_state = ""
 	canvas_view.set_interaction_state("")
 	expanded_assets[asset_id] = true
@@ -2276,10 +2394,104 @@ func _style_outliner_button(button: Button, selected: bool) -> void:
 	button.add_theme_color_override("font_focus_color", text_color)
 
 
+func _render_material_inspector() -> void:
+	var material := _get_material(selected_material_id)
+	if material.is_empty():
+		return
+	inspector_content.add_child(_create_inspector_section("Material"))
+	inspector_content.add_child(_create_inspector_field_label("Name"))
+	var name_editor := _create_name_editor(str(material.get("name", "Material")), "Material name")
+	name_editor.text_submitted.connect(_rename_selected_material)
+	name_editor.focus_exited.connect(func() -> void: _rename_selected_material(name_editor.text))
+	inspector_content.add_child(name_editor)
+
+	inspector_content.add_child(_create_inspector_section("Appearance"))
+	inspector_content.add_child(_create_inspector_field_label("Texture"))
+	var texture_option := OptionButton.new()
+	texture_option.custom_minimum_size = Vector2(0, 26)
+	texture_option.add_item("None")
+	texture_option.set_item_metadata(0, "")
+	var ready_textures: Array[Dictionary] = []
+	for texture in textures:
+		if _texture_output_state(texture) == "ready":
+			ready_textures.append(texture)
+	ready_textures.sort_custom(_sort_named_documents)
+	for texture in ready_textures:
+		texture_option.add_item(str(texture.get("name", "Texture")))
+		texture_option.set_item_metadata(texture_option.item_count - 1, str(texture.get("id", "")))
+	var material_texture_id := str(material.get("texture_id", ""))
+	for index in range(texture_option.item_count):
+		if str(texture_option.get_item_metadata(index)) == material_texture_id:
+			texture_option.select(index)
+			break
+	texture_option.item_selected.connect(_on_material_texture_selected.bind(texture_option))
+	inspector_content.add_child(texture_option)
+
+	inspector_content.add_child(_create_inspector_field_label("Tint"))
+	var tint_button := ColorPickerButton.new()
+	tint_button.custom_minimum_size = Vector2(0, 26)
+	tint_button.color = material.get("tint", Color.WHITE)
+	tint_button.color_changed.connect(_on_material_tint_changed)
+	inspector_content.add_child(tint_button)
+
+	inspector_content.add_child(_create_inspector_field_label("Opacity"))
+	var opacity_field := SpinBox.new()
+	opacity_field.min_value = 0.0
+	opacity_field.max_value = 1.0
+	opacity_field.step = 0.01
+	opacity_field.custom_minimum_size = Vector2(0, 26)
+	opacity_field.set_value_no_signal(clampf(float(material.get("opacity", 1.0)), 0.0, 1.0))
+	opacity_field.value_changed.connect(_on_material_opacity_changed)
+	inspector_content.add_child(opacity_field)
+
+
+func _rename_selected_material(new_name: String) -> void:
+	var material := _get_material(selected_material_id)
+	var material_name := new_name.strip_edges()
+	if material.is_empty():
+		return
+	if material_name.is_empty() or material_name == str(material.get("name", "")):
+		return
+	_record_direct_change()
+	material["name"] = material_name
+	_render_outliner()
+	_render_inspector()
+
+
+func _on_material_texture_selected(index: int, option: OptionButton) -> void:
+	var material := _get_material(selected_material_id)
+	if material.is_empty():
+		return
+	if index < 0 or index >= option.item_count:
+		return
+	_record_direct_change()
+	material["texture_id"] = str(option.get_item_metadata(index))
+	_render_inspector()
+
+
+func _on_material_tint_changed(color: Color) -> void:
+	var material := _get_material(selected_material_id)
+	if material.is_empty():
+		return
+	_record_direct_change()
+	material["tint"] = color
+
+
+func _on_material_opacity_changed(value: float) -> void:
+	var material := _get_material(selected_material_id)
+	if material.is_empty():
+		return
+	_record_direct_change()
+	material["opacity"] = clampf(value, 0.0, 1.0)
+
+
 func _render_inspector() -> void:
 	_clear(inspector_content)
 	transform_fields.clear()
 	inspector_content.add_child(_create_panel_label("Inspector"))
+	if active_module == "Style":
+		_render_material_inspector()
+		return
 	if not selected_texture_id.is_empty():
 		var texture := _get_texture(selected_texture_id)
 		if texture.is_empty():
@@ -2743,6 +2955,13 @@ func _get_texture(texture_id: String) -> Dictionary:
 	return {}
 
 
+func _get_material(material_id: String) -> Dictionary:
+	for material in materials:
+		if str(material.get("id", "")) == material_id:
+			return material
+	return {}
+
+
 func _get_element(texture: Dictionary, element_id: String) -> Dictionary:
 	if texture.is_empty():
 		return {}
@@ -2781,5 +3000,32 @@ func _find_section(module_name: String) -> ModuleSection:
 
 func _select_submodule(module_name: String, submodule: String, section: ModuleSection) -> void:
 	section.set_active_submodule(submodule)
+	active_module = module_name
 	if module_name == "Create":
 		active_create_submodule = submodule
+		selected_material_id = ""
+	elif module_name == "Style" and submodule == "Materials":
+		_enter_material_context(selected_material_id)
+	return
+
+
+func _enter_material_context(material_id: String = "") -> void:
+	active_module = "Style"
+	selected_asset_id = ""
+	selected_component_id = ""
+	selected_texture_id = ""
+	selected_element_id = ""
+	selected_material_id = material_id
+	var style_section := _find_section("Style")
+	if style_section != null:
+		style_section.set_expanded(true)
+		style_section.set_active_submodule("Materials")
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _select_material(material_id: String) -> void:
+	if _get_material(material_id).is_empty():
+		return
+	_enter_material_context(material_id)
