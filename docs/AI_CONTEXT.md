@@ -21,9 +21,10 @@ Slice 4 Phase 1 is implemented and awaiting manual verification: a selected
 Texture can import a PNG, JPEG, or WebP through the native image picker, which
 opens directly in `res://imports/textures`. The source is copied into that
 Texture's active Workspace directory and persisted as a relative
-`source` reference inside a typed `import` element; the Texture parent now shows
-that source in the final UV Canvas. A dedicated Import Element preview remains
-the next phase.
+`source` reference inside a typed `import` element. The Texture parent is
+reserved for valid final Element outputs; the raw import source belongs in the
+Import Element preview and must pass through processing before contributing to
+the parent output.
 
 The current implementation target is not a functional morphing engine or a
 general animation/VFX framework.
@@ -91,6 +92,10 @@ it into a general scene or animation-graph abstraction prematurely.
   Textures do not require Elements. Its smallest pipeline is: retain the source
   in the Workspace, isolate dark ink from a light background, retain useful
   ink/alpha data for a Material, and judge repeatability with a tile preview.
+- Texture Elements follow an output contract: Generator Elements may produce a
+  valid output directly, while Import Elements must distinguish raw source,
+  processing preview, and valid final output. The Texture parent consumes only
+  the latter.
 - `Style → Material` is Slice 4's first Style module. It binds a Workspace
   Texture to a Component by stable reference and exposes only repeat, scale,
   offset, base tint, ink strength, and glow values.

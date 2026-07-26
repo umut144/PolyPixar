@@ -131,10 +131,11 @@ active.
 The initial UV Canvas is a dedicated Texture workspace. It displays a normalized
 0..1 texture field, a lightweight grid, and a compact origin gizmo with
 separate U/V colors; it intentionally does not yet provide drawing or
-generator operations. When the Texture parent is selected, its current final
-source is displayed in this UV field; selecting an Element remains a separate
-editing context for a later source-preview phase. The viewport supports
-focused `A/S/D/W` panning and `Q/E` zooming.
+generator operations. The Texture parent is the final UV output context: it may
+consume only outputs that satisfy the Element output contract. A raw Import
+Element source is not itself a final output; it belongs in the Import Element
+preview and processing context until its pipeline produces a valid output.
+The viewport supports focused `A/S/D/W` panning and `Q/E` zooming.
 
 ### Stone Floor Bloom relationship
 
@@ -155,6 +156,15 @@ than either Asset, owns the staged relation and references all participants by
 stable IDs. Its first required tracks are a local glow value and the Flower's
 visibility/uniform-scale growth; broader effects and animation abstractions
 remain deferred.
+
+### Texture element output contract
+
+`Texture` is the high-level final-texture document. Its child Elements are
+producers, not alternate parent documents. A Generator Element can produce a
+valid texture output directly. An Import Element first exposes a raw source and
+must pass through its processing pipeline before it contributes to the Parent's
+final UV output. The parent composition must never silently treat a raw source
+preview as a completed final texture.
 
 ```text
 source Asset  <── Morph ──>  target Asset

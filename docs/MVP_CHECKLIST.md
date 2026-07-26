@@ -206,15 +206,27 @@ system, particle system, or universal animation graph.
       must not require creating Texture Elements.
 - [ ] Preserve an imported texture as a named Workspace Texture and restore it
       when the Workspace is loaded.
-- [ ] Display the imported source as the final output when its Texture parent
-      is selected in the UV Canvas.
+- [ ] Display the composed final UV output when the Texture parent is selected;
+      only output-valid Elements may contribute to it.
 - [ ] Provide a first background treatment that can isolate the dark ink from a
       light paper/background (for example, a white-to-alpha or ink-mask mode).
 - [ ] Retain the derived ink/alpha information separately from the base colour
       wherever that is necessary for later material shading.
 - [ ] Show a repeat/tile preview so a floor texture can be judged in context.
 
-### C. Style → Material
+### C. Element output contract and Import preview
+
+- [ ] Define the smallest common Element output contract needed by the Texture
+      parent (valid image/output state plus UV dimensions).
+- [ ] Keep raw Import Element source data separate from its final output state;
+      a raw source must not be treated as a completed parent Texture.
+- [ ] Show a dedicated Import Element preview with the original source.
+- [ ] Add the first processing preview stage for an Import Element, such as
+      white-background removal or ink-mask extraction.
+- [ ] Feed the processed Import Element output into the Texture parent's final
+      UV composition only after that output is valid.
+
+### D. Style → Material
 
 - [ ] Add the first `Material` module under Style.
 - [ ] Bind a Workspace Texture to the Stone Floor Component without embedding
@@ -225,7 +237,7 @@ system, particle system, or universal animation graph.
 - [ ] Provide a glow colour and intensity parameter that can be targeted by the
       first Sequence.
 
-### D. Motion → Sequence
+### E. Motion → Sequence
 
 - [ ] Add the first `Sequence` module under Motion and show its contextual time
       area only while that module is active.
