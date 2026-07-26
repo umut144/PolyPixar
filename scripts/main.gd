@@ -58,6 +58,7 @@ var import_preview: ImportPreview
 var material_graph: GraphEdit
 var material_preview_container: CenterContainer
 var material_preview_surface: PanelContainer
+var material_preview_content: CenterContainer
 var material_preview_texture: TextureRect
 var material_preview_label: Label
 var texture_context_label: Label
@@ -457,14 +458,14 @@ func _create_material_preview() -> void:
 	var preview_stack := VBoxContainer.new()
 	preview_stack.alignment = BoxContainer.ALIGNMENT_CENTER
 	material_preview_surface.add_child(preview_stack)
-	var preview_center := CenterContainer.new()
-	preview_center.custom_minimum_size = Vector2(320, 320)
-	preview_stack.add_child(preview_center)
+	material_preview_content = CenterContainer.new()
+	material_preview_content.custom_minimum_size = Vector2(320, 320)
+	preview_stack.add_child(material_preview_content)
 	material_preview_texture = TextureRect.new()
 	material_preview_texture.custom_minimum_size = Vector2(320, 320)
 	material_preview_texture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	material_preview_texture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	preview_center.add_child(material_preview_texture)
+	material_preview_content.add_child(material_preview_texture)
 	material_preview_label = Label.new()
 	material_preview_label.text = "No ready Texture"
 	material_preview_label.add_theme_color_override("font_color", Color("#5c6675"))
@@ -2658,6 +2659,7 @@ func _on_material_texture_selected(index: int, option: OptionButton) -> void:
 	_record_direct_change()
 	material["texture_id"] = str(option.get_item_metadata(index))
 	_render_inspector()
+	_render_canvas_context()
 
 
 func _on_material_tint_changed(color: Color) -> void:
@@ -2666,6 +2668,7 @@ func _on_material_tint_changed(color: Color) -> void:
 		return
 	_record_direct_change()
 	material["tint"] = color
+	_render_canvas_context()
 
 
 func _on_material_opacity_changed(value: float) -> void:
@@ -2674,6 +2677,7 @@ func _on_material_opacity_changed(value: float) -> void:
 		return
 	_record_direct_change()
 	material["opacity"] = clampf(value, 0.0, 1.0)
+	_render_canvas_context()
 
 
 func _render_inspector() -> void:
@@ -2977,11 +2981,21 @@ func _render_material_preview() -> void:
 	)
 	material_preview_label.visible = texture_path.is_empty()
 	if texture_path.is_empty():
+		material_preview_surface.custom_minimum_size = Vector2(360, 360)
+		material_preview_content.custom_minimum_size = Vector2(320, 320)
+		material_preview_texture.custom_minimum_size = Vector2(320, 320)
 		return
 	var image := Image.new()
 	if image.load(ProjectSettings.globalize_path(texture_path)) != OK or image.is_empty():
 		material_preview_label.visible = true
 		return
+	var image_size := Vector2(image.get_width(), image.get_height())
+	var max_preview_size := Vector2(520, 360)
+	var fit_scale := minf(max_preview_size.x / maxf(image_size.x, 1.0), max_preview_size.y / maxf(image_size.y, 1.0))
+	var fitted_size := image_size * fit_scale
+	material_preview_surface.custom_minimum_size = fitted_size + Vector2(40, 64)
+	material_preview_content.custom_minimum_size = fitted_size
+	material_preview_texture.custom_minimum_size = fitted_size
 	material_preview_texture.texture = ImageTexture.create_from_image(image)
 	material_preview_label.visible = false
 
