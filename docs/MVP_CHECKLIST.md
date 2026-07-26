@@ -245,6 +245,10 @@ system, particle system, or universal animation graph.
       tint, and opacity.
 - [x] Add the Asset LookDev view with a temporary Asset/Component target while
       keeping the Material selected.
+- [x] Switch the LookDev Inspector to the selected Component context and add
+      explicit Material assignment via an optional Component `material_id`.
+- [x] Persist the Component material assignment in Workspace JSON and
+      snapshot history.
 - [ ] Project the Material Texture onto the LookDev component polygon.
 
 - [x] Add the first `Material` module under Style.

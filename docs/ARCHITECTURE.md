@@ -349,8 +349,8 @@ workspaces/<workspace_name>/
 
 Every JSON document contains a numeric `schema_version`. The current MVP
 schema is version `8`. Workspace metadata references Asset, Texture, and
-Material IDs. Each Asset document stores its Components and their contour
-points; each Texture document stores its dimensions, origin convention,
+Material IDs. Each Asset document stores its Components, their contour
+points, and optional Material IDs; each Texture document stores its dimensions, origin convention,
 Elements, and an optional `final_output_element_id`. Each Material is an
 independent Workspace resource with a Texture reference, tint, and opacity.
 Display names remain editable and are not used as persistent references.
@@ -361,9 +361,11 @@ contains a fixed `Texture Source → Material Output` GraphEdit skeleton. Previe
 shows the selected ready Texture immediately on a neutral surface with the
 Material tint and opacity; the surface adapts to the source image aspect ratio
 within bounded preview dimensions. LookDev switches the Outliner to Assets and Components while
-keeping the Material selected as the active look target. It currently previews
-the target geometry without permanent assignment or texture projection; the
-graph is not yet a free-form shader editor.
+keeping the Material selected as the active look target. When a Component is
+selected, the Inspector switches to that Component context and offers an
+explicit `Assign Material` action. Assignment is stored as the Component's
+optional `material_id`; texture projection onto the polygon is still a later
+phase. The graph is not yet a free-form shader editor.
 
 An imported raster source is selected from the project-local
 `imports/textures/` intake folder, copied into its Texture directory, and

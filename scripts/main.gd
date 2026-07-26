@@ -887,7 +887,8 @@ func _save_workspace() -> void:
 				"closed": bool(component.get("closed", component["outer_shape"].size() >= 3)),
 				"transform": _serialize_transform(component.get("transform", {})),
 				"visibility": bool(component.get("visibility", true)),
-				"z_index": int(component.get("z_index", 0))
+				"z_index": int(component.get("z_index", 0)),
+				"material_id": str(component.get("material_id", ""))
 			})
 		_write_json("%s/asset.json" % asset_root, asset_data)
 	for texture in textures:
@@ -1064,7 +1065,8 @@ func _load_workspace(workspace_entry: String) -> bool:
 				"closed": bool(component_data.get("closed", component_data.get("outer_shape", []).size() >= 3)),
 				"transform": _deserialize_transform(component_data.get("transform", {})),
 				"visibility": bool(component_data.get("visibility", true)),
-				"z_index": int(component_data.get("z_index", 0))
+				"z_index": int(component_data.get("z_index", 0)),
+				"material_id": str(component_data.get("material_id", ""))
 			})
 		loaded_assets.append({
 			"id": str(asset_data.get("id", asset_id)),
@@ -2503,7 +2505,8 @@ func _confirm_component_creation() -> void:
 		"closed": false,
 		"transform": _default_component_transform(),
 		"visibility": true,
-		"z_index": 0
+		"z_index": 0,
+		"material_id": ""
 	})
 	selected_asset_id = asset_id
 	selected_component_id = component_id
@@ -2637,6 +2640,54 @@ func _render_material_inspector() -> void:
 	inspector_content.add_child(opacity_field)
 
 
+func _render_lookdev_material_target_inspector() -> void:
+	var material := _get_material(selected_material_id)
+	var asset := _get_asset(lookdev_target_asset_id)
+	var component := _get_component(asset, lookdev_target_component_id)
+	if material.is_empty() or asset.is_empty() or component.is_empty():
+		_render_material_inspector()
+		return
+	inspector_content.add_child(_create_inspector_section("Component"))
+	inspector_content.add_child(_create_inspector_field_label("Name"))
+	var component_name := _create_inspector_field_label(str(component.get("name", "Component")))
+	component_name.add_theme_color_override("font_color", Color("#d7dce5"))
+	inspector_content.add_child(component_name)
+	inspector_content.add_child(_create_inspector_field_label("Asset"))
+	var asset_name := _create_inspector_field_label(str(asset.get("name", "Asset")))
+	asset_name.add_theme_color_override("font_color", Color("#9aa3b2"))
+	inspector_content.add_child(asset_name)
+	inspector_content.add_child(_create_inspector_section("Material Assignment"))
+	inspector_content.add_child(_create_inspector_field_label("Selected Material"))
+	var selected_name := _create_inspector_field_label(str(material.get("name", "Material")))
+	selected_name.add_theme_color_override("font_color", Color("#d7dce5"))
+	inspector_content.add_child(selected_name)
+	var assigned_id := str(component.get("material_id", ""))
+	var assigned_name := "None"
+	if not assigned_id.is_empty():
+		assigned_name = str(_get_material(assigned_id).get("name", assigned_id))
+	inspector_content.add_child(_create_inspector_field_label("Assigned: %s" % assigned_name))
+	var assign_button := Button.new()
+	assign_button.text = "Assign Material"
+	assign_button.custom_minimum_size = Vector2(0, 26)
+	assign_button.focus_mode = Control.FOCUS_NONE
+	assign_button.disabled = assigned_id == selected_material_id
+	assign_button.pressed.connect(_assign_selected_material_to_lookdev_target)
+	inspector_content.add_child(assign_button)
+
+
+func _assign_selected_material_to_lookdev_target() -> void:
+	var material := _get_material(selected_material_id)
+	var asset := _get_asset(lookdev_target_asset_id)
+	var component := _get_component(asset, lookdev_target_component_id)
+	if material.is_empty() or component.is_empty() or str(component.get("material_id", "")) == selected_material_id:
+		return
+	_record_direct_change()
+	component["material_id"] = selected_material_id
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
 func _rename_selected_material(new_name: String) -> void:
 	var material := _get_material(selected_material_id)
 	var material_name := new_name.strip_edges()
@@ -2685,7 +2736,10 @@ func _render_inspector() -> void:
 	transform_fields.clear()
 	inspector_content.add_child(_create_panel_label("Inspector"))
 	if active_module == "Style":
-		_render_material_inspector()
+		if material_view_mode == "lookdev" and not lookdev_target_component_id.is_empty():
+			_render_lookdev_material_target_inspector()
+		else:
+			_render_material_inspector()
 		return
 	if not selected_texture_id.is_empty():
 		var texture := _get_texture(selected_texture_id)
