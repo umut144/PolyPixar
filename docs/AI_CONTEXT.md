@@ -106,10 +106,10 @@ it into a general scene or animation-graph abstraction prematurely.
   Outliner, and edited in the Inspector with a ready Texture reference, tint,
   and opacity.
 - Materials are included in workspace metadata, save/load, and history
-  snapshots. Graph, neutral Preview, LookDev, and Component assignment remain
-  later phases. The current Graph phase exposes a fixed GraphEdit skeleton with
-  `Texture Source → Material Output`; Preview and LookDev entries are visible
-  but intentionally disabled.
+  snapshots. The current Views context exposes a fixed GraphEdit skeleton with
+  `Texture Source → Material Output` and a neutral Preview that displays the
+  selected ready Texture with tint and opacity. LookDev and Component
+  assignment remain later phases.
 - `Style → Material` is Slice 4's first Style module. It binds a Workspace
   Texture to a Component by stable reference and exposes only repeat, scale,
   offset, base tint, ink strength, and glow values.

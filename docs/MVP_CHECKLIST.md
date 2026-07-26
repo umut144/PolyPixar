@@ -241,7 +241,9 @@ system, particle system, or universal animation graph.
 - [x] Add Material creation and the Style Material Outliner.
 - [x] Add the initial Material Graph state as a fixed GraphEdit skeleton with
       `Texture Source → Material Output`.
-- [ ] Add the neutral Preview and Asset LookDev views.
+- [x] Add the neutral Material Preview using the selected ready Texture,
+      tint, and opacity.
+- [ ] Add the Asset LookDev view.
 
 - [x] Add the first `Material` module under Style.
 - [ ] Bind a Workspace Texture to the Stone Floor Component without embedding

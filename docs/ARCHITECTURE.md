@@ -354,10 +354,11 @@ Elements, and an optional `final_output_element_id`. Each Material is an
 independent Workspace resource with a Texture reference, tint, and opacity.
 Display names remain editable and are not used as persistent references.
 
-The first Material editing context is intentionally narrow: `⌘1: Material`
+The first Material editing context is intentionally narrow: `⌘1: Views`
 exposes `1: Graph`, `2: Preview`, and `3: LookDev`. The Graph view currently
 contains a fixed `Texture Source → Material Output` GraphEdit skeleton. Preview
-and LookDev remain reserved states until their respective phases are started;
+shows the selected ready Texture on a neutral surface with the Material tint
+and opacity. LookDev remains reserved until its respective phase is started;
 the graph is not yet a free-form shader editor.
 
 An imported raster source is selected from the project-local
