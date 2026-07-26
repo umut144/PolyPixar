@@ -355,22 +355,14 @@ Elements, and an optional `final_output_element_id`. Each Material is an
 independent Workspace resource with a Texture reference, tint, and opacity.
 Display names remain editable and are not used as persistent references.
 
-The first Material editing context is intentionally narrow: `⌘1: Views`
-exposes `1: Graph`, `2: Preview`, and `3: LookDev`. The Graph view currently
-contains a fixed `Texture Source → Material Output` GraphEdit skeleton. Preview
-shows the selected ready Texture immediately on a neutral surface with the
-Material tint and opacity; the surface adapts to the source image aspect ratio
-within bounded preview dimensions. LookDev switches the Outliner to Assets and Components while
-keeping the Material selected as the active look target. The Material
-selection is shared between Graph and Preview; switching Views refreshes the
-Inspector and preserves the selection. The active Material is also shown in
-the right status-bar region. When a Component is
-selected, the Inspector switches to that Component context and offers an
-explicit `Assign Material` action. Assignment is stored as the Component's
-optional `material_id`; assigned textures now project onto closed Component
-polygons using normalized local bounding-box UVs. Material Mapping now exposes
-scale and offset values (with a persisted Repeat intent) for the LookDev and
-neutral Preview contexts. The graph is not yet a free-form shader editor.
+The Material editing context opens directly as one Graph workspace containing
+a fixed `Texture Source → Material Output` GraphEdit skeleton and a small
+integrated neutral Preview panel. There is no Material View switcher or
+in-editor LookDev mode. The Preview shows the selected ready Texture with
+Material tint, opacity, scale, and offset. The active Material remains selected
+in the Outliner and is shown in the right status-bar region. Material mapping
+will later become a graph concern; exporting real Godot artifacts is the
+authoritative end-look validation path.
 
 An imported raster source is selected from the project-local
 `imports/textures/` intake folder, copied into its Texture directory, and

@@ -241,16 +241,12 @@ system, particle system, or universal animation graph.
 - [x] Add Material creation and the Style Material Outliner.
 - [x] Add the initial Material Graph state as a fixed GraphEdit skeleton with
       `Texture Source → Material Output`.
-- [x] Add the neutral Material Preview using the selected ready Texture,
-      tint, and opacity.
-- [x] Add the Asset LookDev view with a temporary Asset/Component target while
-      keeping the Material selected.
-- [x] Switch the LookDev Inspector to the selected Component context and add
-      explicit Material assignment via an optional Component `material_id`.
-- [x] Persist the Component material assignment in Workspace JSON and
-      snapshot history.
-- [x] Project the assigned Material Texture onto a closed LookDev Component
-      polygon using normalized local bounding-box UVs.
+- [x] Add the neutral Material Preview as a small panel integrated into the
+      Material Graph workspace.
+- [x] Remove the Material Views switcher and in-editor LookDev workflow from
+      the active UI; preserve legacy state fields only for compatibility.
+- [ ] Move permanent Material assignment to the Asset/Component workflow.
+- [ ] Export a real Godot artifact for authoritative end-look validation.
 
 - [x] Add the first `Material` module under Style.
 - [x] Bind a Workspace Texture to the Stone Floor Component without embedding

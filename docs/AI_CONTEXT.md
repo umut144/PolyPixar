@@ -106,21 +106,13 @@ it into a general scene or animation-graph abstraction prematurely.
   Outliner, and edited in the Inspector with a ready Texture reference, tint,
   and opacity.
 - Materials are included in workspace metadata, save/load, and history
-  snapshots. The current Views context exposes a fixed GraphEdit skeleton with
-  `Texture Source → Material Output` and a neutral Preview that displays the
-  selected ready Texture immediately with tint and opacity; its surface adapts
-  to the image aspect ratio. LookDev switches the Outliner
-  to Assets/Components and keeps the Material active as a temporary target.
-  Selecting a Component switches the Inspector to that Component context and
-  offers an explicit Assign Material action; the optional Component
-  `material_id` is persisted and included in history. Assigned textures now
-  project onto closed Component polygons with normalized local bounding-box
-  UVs. Material Mapping now stores scale, offset, and repeat intent and applies
-  scale/offset in LookDev and the neutral Preview.
-- Graph and Preview share one selected Material state. View changes refresh
-  the Inspector without losing that selection; LookDev keeps the Material
-  active while selecting an independent Asset/Component target. The active
-  Material is shown in the right status-bar region.
+  snapshots. The Material workspace opens directly as a fixed GraphEdit
+  skeleton with `Texture Source → Material Output` plus a small integrated
+  neutral Preview. There is no Material View switcher or in-editor LookDev.
+  The selected Material remains active in the Outliner, Inspector, and right
+  status-bar region. Mapping scale/offset are currently editable parameters;
+  mapping will later become a graph concern. Exported Godot artifacts are the
+  authoritative end-look validation path.
 - `Style → Material` is Slice 4's first Style module. It binds a Workspace
   Texture to a Component by stable reference and exposes only repeat, scale,
   offset, base tint, ink strength, and glow values.

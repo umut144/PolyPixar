@@ -134,17 +134,6 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			_undo()
 		get_viewport().set_input_as_handled()
 		return
-	if active_module == "Style" and not selected_material_id.is_empty():
-		if event.keycode == KEY_1:
-			_set_material_view("graph")
-			get_viewport().set_input_as_handled()
-		elif event.keycode == KEY_2:
-			_set_material_view("preview")
-			get_viewport().set_input_as_handled()
-		elif event.keycode == KEY_3:
-			_set_material_view("lookdev")
-			get_viewport().set_input_as_handled()
-		return
 	if selected_component_id.is_empty():
 		if not selected_texture_id.is_empty() and not selected_element_id.is_empty():
 			var selected_texture := _get_texture(selected_texture_id)
@@ -450,12 +439,15 @@ func _create_material_graph() -> void:
 
 func _create_material_preview() -> void:
 	material_preview_container = CenterContainer.new()
-	material_preview_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	material_preview_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	material_preview_container.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	material_preview_container.offset_left = -292.0
+	material_preview_container.offset_top = 12.0
+	material_preview_container.offset_right = -12.0
+	material_preview_container.offset_bottom = 192.0
 	material_preview_container.visible = false
 	material_graph.get_parent().add_child(material_preview_container)
 	material_preview_surface = PanelContainer.new()
-	material_preview_surface.custom_minimum_size = Vector2(360, 360)
+	material_preview_surface.custom_minimum_size = Vector2(280, 180)
 	var surface_style := StyleBoxFlat.new()
 	surface_style.bg_color = Color("#d9dde4")
 	surface_style.border_color = Color("#697386")
@@ -1407,16 +1399,9 @@ func _render_context_bar() -> void:
 
 
 func _render_material_context_bar() -> void:
-	var material_menu := MenuButton.new()
-	material_menu.text = "⌘1  Views  ▼"
-	material_menu.custom_minimum_size = Vector2(122, 32)
-	material_menu.focus_mode = Control.FOCUS_NONE
-	var material_popup := material_menu.get_popup()
-	material_popup.add_item("1: Graph", 0)
-	material_popup.add_item("2: Preview", 1)
-	material_popup.add_item("3: LookDev", 2)
-	material_popup.id_pressed.connect(_on_material_view_menu_id)
-	context_bar.add_child(material_menu)
+	# Reserved for future Material Graph node actions. The material workspace
+	# opens directly into the graph and has no view-switching menu.
+	return
 
 
 func _on_material_view_menu_id(id: int) -> void:
@@ -1876,12 +1861,8 @@ func _render_info_bar() -> void:
 	_clear(info_bar)
 	if active_module == "Style" and not selected_material_id.is_empty():
 		var material_state_label := Label.new()
-		var material_view_label := "Preview" if material_view_mode == "preview" else "LookDev" if material_view_mode == "lookdev" else "Graph"
-		material_state_label.text = "State: Material / %s" % material_view_label
+		material_state_label.text = "Material Graph"
 		info_bar.add_child(material_state_label)
-		_add_info_option("1: Graph")
-		_add_info_option("2: Preview")
-		_add_info_option("3: LookDev")
 		return
 	if active_module == "Create" and active_create_submodule == "Layers":
 		var layers_state_label := Label.new()
@@ -2139,10 +2120,7 @@ func _render_outliner() -> void:
 	if is_instance_valid(outliner_filter_option):
 		outliner_filter_option.visible = active_module != "Style"
 	if active_module == "Style":
-		if material_view_mode == "lookdev":
-			_render_lookdev_outliner()
-		else:
-			_render_material_outliner()
+		_render_material_outliner()
 		return
 	var search_text := outliner_search_input.text.strip_edges().to_lower() if is_instance_valid(outliner_search_input) else ""
 	var show_assets := outliner_filter == "all" or outliner_filter == "assets"
@@ -2852,12 +2830,7 @@ func _render_inspector() -> void:
 	transform_fields.clear()
 	inspector_content.add_child(_create_panel_label("Inspector"))
 	if active_module == "Style":
-		if material_view_mode == "lookdev" and not lookdev_target_component_id.is_empty():
-			_render_lookdev_material_target_inspector()
-		elif material_view_mode == "lookdev" and not lookdev_target_asset_id.is_empty():
-			_render_lookdev_asset_inspector()
-		else:
-			_render_material_inspector()
+		_render_material_inspector()
 		return
 	if not selected_texture_id.is_empty():
 		var texture := _get_texture(selected_texture_id)
@@ -3154,15 +3127,15 @@ func _render_material_preview() -> void:
 	material_preview_label.visible = texture_path.is_empty()
 	if texture_path.is_empty():
 		material_preview_surface.custom_minimum_size = Vector2(360, 360)
-		material_preview_content.custom_minimum_size = Vector2(320, 320)
-		material_preview_texture.custom_minimum_size = Vector2(320, 320)
+	material_preview_content.custom_minimum_size = Vector2(240, 140)
+	material_preview_texture.custom_minimum_size = Vector2(240, 140)
 		return
 	var image := Image.new()
 	if image.load(ProjectSettings.globalize_path(texture_path)) != OK or image.is_empty():
 		material_preview_label.visible = true
 		return
 	var image_size := Vector2(image.get_width(), image.get_height())
-	var max_preview_size := Vector2(520, 360)
+	var max_preview_size := Vector2(240, 140)
 	var fit_scale := minf(max_preview_size.x / maxf(image_size.x, 1.0), max_preview_size.y / maxf(image_size.y, 1.0))
 	var fitted_size := image_size * fit_scale
 	material_preview_surface.custom_minimum_size = fitted_size + Vector2(40, 64)
@@ -3240,16 +3213,11 @@ func _render_canvas_context() -> void:
 	if not is_instance_valid(canvas_context_label):
 		return
 	if active_module == "Style":
-		if material_view_mode == "lookdev":
-			material_graph.visible = false
-			material_preview_container.visible = false
-			_render_lookdev_canvas()
-			return
 		canvas_view.visible = false
 		texture_canvas.visible = false
 		import_preview.visible = false
-		material_graph.visible = not selected_material_id.is_empty() and material_view_mode == "graph"
-		material_preview_container.visible = not selected_material_id.is_empty() and material_view_mode == "preview"
+		material_graph.visible = not selected_material_id.is_empty()
+		material_preview_container.visible = not selected_material_id.is_empty()
 		if material_preview_container.visible:
 			_render_material_preview()
 		canvas_context_label.text = "Material: %s" % str(_get_material(selected_material_id).get("name", "")) if not selected_material_id.is_empty() else ""
