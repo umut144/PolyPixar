@@ -50,6 +50,7 @@ var program_status_label: Label
 var status_clear_timer: Timer
 var active_draw_tool := ""
 var active_state := ""
+var active_import_preview_mode := "original"
 var active_edit_mode := "select"
 var active_transform_mode := "transform"
 var snap_enabled := true
@@ -111,6 +112,22 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 	if selected_component_id.is_empty():
+		if not selected_texture_id.is_empty() and not selected_element_id.is_empty():
+			var selected_texture := _get_texture(selected_texture_id)
+			var selected_element := _get_element(selected_texture, selected_element_id)
+			if not selected_element.is_empty() and str(selected_element.get("type", "generator")) == "import":
+				if has_command_modifier and event.keycode == KEY_1:
+					_render_context_bar()
+					get_viewport().set_input_as_handled()
+					return
+				if not has_command_modifier and event.keycode == KEY_1:
+					_set_import_preview_mode("original")
+					get_viewport().set_input_as_handled()
+					return
+				if not has_command_modifier and event.keycode == KEY_2:
+					_set_import_preview_mode("white_to_alpha")
+					get_viewport().set_input_as_handled()
+					return
 		return
 	if not has_command_modifier and event.keycode == KEY_BACKSPACE and active_state.is_empty():
 		_delete_selected_component()
@@ -1155,6 +1172,18 @@ func _render_texture_context_bar() -> void:
 	var texture := _get_texture(selected_texture_id)
 	if texture.is_empty():
 		return
+	var selected_element := _get_element(texture, selected_element_id)
+	if not selected_element.is_empty() and str(selected_element.get("type", "generator")) == "import":
+		var preview_menu := MenuButton.new()
+		preview_menu.text = "⌘1  Previews  ▼"
+		preview_menu.custom_minimum_size = Vector2(132, 32)
+		preview_menu.focus_mode = Control.FOCUS_NONE
+		var preview_popup := preview_menu.get_popup()
+		preview_popup.add_item("1: Original", 0)
+		preview_popup.add_item("2: White to Alpha", 1)
+		preview_popup.id_pressed.connect(_on_import_preview_menu_id)
+		context_bar.add_child(preview_menu)
+		return
 	var import_button := Button.new()
 	import_button.text = "Import Texture"
 	import_button.custom_minimum_size = Vector2(116, 32)
@@ -1199,6 +1228,21 @@ func _on_texture_origin_changed(mode: String) -> void:
 	texture_canvas.set_origin_mode(mode)
 	_render_context_bar()
 	_render_info_bar()
+
+
+func _on_import_preview_menu_id(id: int) -> void:
+	if id == 0:
+		_set_import_preview_mode("original")
+	elif id == 1:
+		_set_import_preview_mode("white_to_alpha")
+
+
+func _set_import_preview_mode(mode: String) -> void:
+	if mode != "original" and mode != "white_to_alpha":
+		mode = "original"
+	active_import_preview_mode = mode
+	_render_context_bar()
+	_render_canvas_context()
 
 
 func _open_texture_import_dialog() -> void:
@@ -1290,13 +1334,10 @@ func _process_selected_import_element() -> void:
 	if not pipeline is Dictionary:
 		pipeline = {}
 	var threshold := clampf(float(pipeline.get("threshold", 0.05)), 0.0, 1.0)
-	var output_image := Image.create(source_image.get_width(), source_image.get_height(), false, Image.FORMAT_RGBA8)
-	for y in range(source_image.get_height()):
-		for x in range(source_image.get_width()):
-			var source_color := source_image.get_pixel(x, y)
-			var darkness := 1.0 - (source_color.r + source_color.g + source_color.b) / 3.0
-			var alpha := clampf((darkness - threshold) / maxf(1.0 - threshold, 0.001), 0.0, 1.0)
-			output_image.set_pixel(x, y, Color(source_color.r, source_color.g, source_color.b, alpha))
+	var output_image = _create_white_to_alpha_image(source_image, threshold)
+	if output_image == null or output_image.is_empty():
+		_show_status_message("Texture processing failed.")
+		return
 	var texture_root := "%s/%s/textures/%s" % [WORKSPACES_ROOT, workspace_name, str(texture["id"])]
 	var output_filename := _next_texture_output_filename(texture_root)
 	var output_path := "%s/%s" % [texture_root, output_filename]
@@ -1307,6 +1348,7 @@ func _process_selected_import_element() -> void:
 	element["pipeline"] = {"mode": "white_to_alpha", "threshold": threshold}
 	element["output"] = {"state": "ready", "file": output_filename}
 	_show_status_message("Processed Texture: White to Alpha")
+	active_import_preview_mode = "white_to_alpha"
 	_render_inspector()
 	_render_canvas_context()
 
@@ -1316,6 +1358,19 @@ func _next_texture_output_filename(texture_root: String) -> String:
 	while FileAccess.file_exists("%s/output_%03d.png" % [texture_root, index]):
 		index += 1
 	return "output_%03d.png" % index
+
+
+func _create_white_to_alpha_image(source_image: Image, threshold: float):
+	if source_image == null or source_image.is_empty():
+		return null
+	var output_image := Image.create(source_image.get_width(), source_image.get_height(), false, Image.FORMAT_RGBA8)
+	for y in range(source_image.get_height()):
+		for x in range(source_image.get_width()):
+			var source_color := source_image.get_pixel(x, y)
+			var darkness := 1.0 - (source_color.r + source_color.g + source_color.b) / 3.0
+			var alpha := clampf((darkness - threshold) / maxf(1.0 - threshold, 0.001), 0.0, 1.0)
+			output_image.set_pixel(x, y, Color(source_color.r, source_color.g, source_color.b, alpha))
+	return output_image
 
 
 func _normalize_texture_elements(raw_elements, legacy_import_source) -> Array:
@@ -1939,6 +1994,7 @@ func _select_asset(asset_id: String) -> void:
 
 func _select_texture(texture_id: String) -> void:
 	var was_selected := selected_texture_id == texture_id and selected_element_id.is_empty()
+	active_import_preview_mode = "original"
 	selected_texture_id = texture_id
 	selected_element_id = ""
 	selected_asset_id = ""
@@ -1952,6 +2008,7 @@ func _select_texture(texture_id: String) -> void:
 
 
 func _select_element(texture_id: String, element_id: String) -> void:
+	active_import_preview_mode = "original"
 	selected_texture_id = texture_id
 	selected_element_id = element_id
 	selected_asset_id = ""
@@ -2362,7 +2419,20 @@ func _render_canvas_context() -> void:
 		texture_canvas.set_origin_mode(str(texture.get("origin_mode", "bottom_left")))
 		texture_canvas.set_final_texture_path(_get_texture_final_path(texture) if selected_element_id.is_empty() else "")
 		texture_canvas.set_selected_element(str(selected_element.get("name", "")) if not selected_element.is_empty() else "")
-		import_preview.set_preview_path(_get_texture_preview_path(texture, selected_element) if is_import_element else "")
+		if is_import_element:
+			if active_import_preview_mode == "white_to_alpha" and _element_output_state(selected_element) != "ready":
+				var source_path := _get_texture_source_path(texture, selected_element)
+				var source_image := Image.new()
+				var pipeline = selected_element.get("pipeline", {})
+				var threshold := float(pipeline.get("threshold", 0.05)) if pipeline is Dictionary else 0.05
+				if not source_path.is_empty() and source_image.load(source_path) == OK:
+					import_preview.set_preview_image(_create_white_to_alpha_image(source_image, clampf(threshold, 0.0, 1.0)))
+				else:
+					import_preview.set_preview_path("")
+			else:
+				import_preview.set_preview_path(_get_texture_source_path(texture, selected_element) if active_import_preview_mode == "original" else _get_texture_preview_path(texture, selected_element))
+		else:
+			import_preview.set_preview_path("")
 		return
 	canvas_view.visible = true
 	texture_canvas.visible = false

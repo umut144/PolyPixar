@@ -23,6 +23,14 @@ func set_preview_path(path: String) -> void:
 	queue_redraw()
 
 
+func set_preview_image(image: Image) -> void:
+	preview_path = ""
+	preview_texture = null
+	if image != null and not image.is_empty():
+		preview_texture = ImageTexture.create_from_image(image)
+	queue_redraw()
+
+
 func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), Color("#161a20"), true)
 	if preview_texture == null:

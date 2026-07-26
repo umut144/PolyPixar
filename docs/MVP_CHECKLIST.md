@@ -223,6 +223,8 @@ system, particle system, or universal animation graph.
 - [ ] Keep raw Import Element source data separate from its final output state;
       a raw source must not be treated as a completed parent Texture.
 - [ ] Show a dedicated Import Element preview with the original source.
+- [ ] Add an Import Element `⌘1 Previews` menu with `1: Original` and
+      `2: White to Alpha`, including direct number-key shortcuts.
 - [ ] Add the first processing preview stage for an Import Element, such as
       white-background removal or ink-mask extraction.
 - [ ] Provide a minimal `White to Alpha` processing action with a persisted

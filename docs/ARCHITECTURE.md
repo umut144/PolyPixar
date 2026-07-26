@@ -137,6 +137,9 @@ Element source is not itself a final output; it belongs in the Import Element
 preview and processing context until its pipeline produces a valid output. The
 current Import Element preview displays the copied source image without yet
 claiming `ready` output status.
+Its Context Bar exposes `⌘1 Previews` with `Original` and `White to Alpha`
+entries. Preview selection is non-destructive; only an explicit processing
+action can create a `ready` Element output.
 The viewport supports focused `A/S/D/W` panning and `Q/E` zooming.
 
 ### Stone Floor Bloom relationship

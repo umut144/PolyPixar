@@ -104,6 +104,9 @@ it into a general scene or animation-graph abstraction prematurely.
   staged relation between the floor Asset, its non-rendered local Guide Shape,
   and the independent Flower Asset. Do not make the Flower store a permanent
   link to the floor or Guide.
+- An Import Element's Context Bar uses `⌘1 Previews` with `1: Original` and
+  `2: White to Alpha`; unmodified `1`/`2` switch the preview directly. Preview
+  selection does not by itself change `not_ready` to `ready`.
 - Do not add Bézier editing, maps, material features beyond Slice 4's narrow
   binding/shading needs, a node graph, generic rigging, or export pipelines
   until a confirmed checklist item requires them.
