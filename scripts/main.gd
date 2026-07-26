@@ -46,7 +46,6 @@ var active_draw_tool := ""
 var active_state := ""
 var active_edit_mode := "select"
 var active_transform_mode := "transform"
-var active_texture_tool := ""
 var snap_enabled := true
 var snap_grid_step := 16.0
 var snap_rotation_step := 15.0
@@ -869,7 +868,6 @@ func _restore_editor_state(state) -> void:
 	selected_component_id = ""
 	selected_texture_id = ""
 	selected_element_id = ""
-	active_texture_tool = ""
 	expanded_assets.clear()
 	expanded_textures.clear()
 	for asset in assets:
@@ -1085,41 +1083,12 @@ func _render_texture_context_bar() -> void:
 	draw_menu.text = "Draw  ▼"
 	draw_menu.custom_minimum_size = Vector2(88, 32)
 	draw_menu.focus_mode = Control.FOCUS_NONE
-	var draw_popup := draw_menu.get_popup()
-	draw_popup.add_item("Element", 0)
-	draw_popup.id_pressed.connect(_on_texture_draw_menu_id)
 	context_bar.add_child(draw_menu)
 	var generate_menu := MenuButton.new()
 	generate_menu.text = "Generate  ▼"
 	generate_menu.custom_minimum_size = Vector2(108, 32)
 	generate_menu.focus_mode = Control.FOCUS_NONE
-	var generate_popup := generate_menu.get_popup()
-	generate_popup.add_item("Generator", 0)
-	generate_popup.id_pressed.connect(_on_texture_generate_menu_id)
 	context_bar.add_child(generate_menu)
-	var sample_menu := MenuButton.new()
-	sample_menu.text = "Sample  ▼"
-	sample_menu.custom_minimum_size = Vector2(96, 32)
-	sample_menu.focus_mode = Control.FOCUS_NONE
-	var sample_popup := sample_menu.get_popup()
-	sample_popup.add_item("Sampler", 0)
-	sample_popup.id_pressed.connect(_on_texture_sample_menu_id)
-	context_bar.add_child(sample_menu)
-
-
-func _on_texture_draw_menu_id(_id: int) -> void:
-	active_texture_tool = "draw"
-	_render_info_bar()
-
-
-func _on_texture_generate_menu_id(_id: int) -> void:
-	active_texture_tool = "generate"
-	_render_info_bar()
-
-
-func _on_texture_sample_menu_id(_id: int) -> void:
-	active_texture_tool = "sample"
-	_render_info_bar()
 
 
 func _on_draw_menu_id(id: int) -> void:
@@ -1212,9 +1181,6 @@ func _render_info_bar() -> void:
 		info_bar.add_child(texture_label)
 		_add_info_option("Draw")
 		_add_info_option("Generate")
-		_add_info_option("Sample")
-		if not active_texture_tool.is_empty():
-			_add_info_option("Active: %s" % active_texture_tool.capitalize())
 		return
 	if selected_component_id.is_empty():
 		return
@@ -1267,7 +1233,6 @@ func _confirm_asset_creation() -> void:
 	selected_texture_id = ""
 	selected_element_id = ""
 	active_state = ""
-	active_texture_tool = ""
 	expanded_assets[asset_id] = true
 	asset_dialog.hide()
 	_render_outliner()
@@ -1304,8 +1269,6 @@ func _confirm_texture_creation() -> void:
 	selected_asset_id = ""
 	selected_component_id = ""
 	active_state = ""
-	active_texture_tool = ""
-	active_texture_tool = ""
 	expanded_textures[texture_id] = true
 	texture_dialog.hide()
 	_render_outliner()
@@ -1406,21 +1369,39 @@ func _render_outliner() -> void:
 	if show_assets:
 		var visible_assets: Array = []
 		for asset in assets:
-			if search_text.is_empty() or str(asset["name"]).to_lower().contains(search_text):
+			if _asset_matches_search(asset, search_text):
 				visible_assets.append(asset)
 		visible_assets.sort_custom(_sort_named_documents)
 		outliner_list.add_child(_create_outliner_group_label("Assets"))
 		for asset in visible_assets:
-			_render_asset_outliner_entry(asset)
+			_render_asset_outliner_entry(asset, not search_text.is_empty())
 	if show_textures:
 		var visible_textures: Array = []
 		for texture in textures:
-			if search_text.is_empty() or str(texture["name"]).to_lower().contains(search_text):
+			if _texture_matches_search(texture, search_text):
 				visible_textures.append(texture)
 		visible_textures.sort_custom(_sort_named_documents)
 		outliner_list.add_child(_create_outliner_group_label("Textures"))
 		for texture in visible_textures:
-			_render_texture_outliner_entry(texture)
+			_render_texture_outliner_entry(texture, not search_text.is_empty())
+
+
+func _asset_matches_search(asset: Dictionary, search_text: String) -> bool:
+	if search_text.is_empty() or str(asset.get("name", "")).to_lower().contains(search_text):
+		return true
+	for component in asset.get("components", []):
+		if str(component.get("name", "")).to_lower().contains(search_text):
+			return true
+	return false
+
+
+func _texture_matches_search(texture: Dictionary, search_text: String) -> bool:
+	if search_text.is_empty() or str(texture.get("name", "")).to_lower().contains(search_text):
+		return true
+	for element in texture.get("elements", []):
+		if str(element.get("name", "")).to_lower().contains(search_text):
+			return true
+	return false
 
 
 func _sort_named_documents(a: Dictionary, b: Dictionary) -> bool:
@@ -1434,7 +1415,7 @@ func _create_outliner_group_label(text: String) -> Label:
 	return label
 
 
-func _render_asset_outliner_entry(asset: Dictionary) -> void:
+func _render_asset_outliner_entry(asset: Dictionary, force_expand := false) -> void:
 		var asset_id := str(asset["id"])
 		var asset_container := VBoxContainer.new()
 		asset_container.add_theme_constant_override("separation", 0)
@@ -1457,7 +1438,7 @@ func _render_asset_outliner_entry(asset: Dictionary) -> void:
 		add_button.focus_mode = Control.FOCUS_NONE
 		add_button.pressed.connect(_open_component_dialog.bind(asset_id))
 		asset_header.add_child(add_button)
-		if not bool(expanded_assets.get(asset_id, false)):
+		if not force_expand and not bool(expanded_assets.get(asset_id, false)):
 			return
 		for component in asset["components"]:
 			var component_id := str(component["id"])
@@ -1479,7 +1460,7 @@ func _render_asset_outliner_entry(asset: Dictionary) -> void:
 			component_row.add_child(component_button)
 
 
-func _render_texture_outliner_entry(texture: Dictionary) -> void:
+func _render_texture_outliner_entry(texture: Dictionary, force_expand := false) -> void:
 	var texture_id := str(texture["id"])
 	var texture_container := VBoxContainer.new()
 	texture_container.add_theme_constant_override("separation", 0)
@@ -1502,7 +1483,7 @@ func _render_texture_outliner_entry(texture: Dictionary) -> void:
 	add_button.focus_mode = Control.FOCUS_NONE
 	add_button.pressed.connect(_open_element_dialog.bind(texture_id))
 	texture_header.add_child(add_button)
-	if not bool(expanded_textures.get(texture_id, false)):
+	if not force_expand and not bool(expanded_textures.get(texture_id, false)):
 		return
 	for element in texture.get("elements", []):
 		var element_row := HBoxContainer.new()
@@ -1557,7 +1538,6 @@ func _select_texture(texture_id: String) -> void:
 	selected_asset_id = ""
 	selected_component_id = ""
 	active_state = ""
-	active_texture_tool = ""
 	if was_selected:
 		expanded_textures[texture_id] = not bool(expanded_textures.get(texture_id, false))
 	_render_outliner()
