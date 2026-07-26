@@ -206,6 +206,8 @@ system, particle system, or universal animation graph.
       must not require creating Texture Elements.
 - [ ] Preserve an imported texture as a named Workspace Texture and restore it
       when the Workspace is loaded.
+- [ ] Display the imported source as the final output when its Texture parent
+      is selected in the UV Canvas.
 - [ ] Provide a first background treatment that can isolate the dark ink from a
       light paper/background (for example, a white-to-alpha or ink-mask mode).
 - [ ] Retain the derived ink/alpha information separately from the base colour

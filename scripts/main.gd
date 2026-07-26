@@ -1197,7 +1197,7 @@ func _on_texture_import_file_selected(source_path: String) -> void:
 			"type": "import",
 			"source": {}
 		}
-		texture["elements"].append(import_element)
+	texture["elements"].append(import_element)
 	import_element["type"] = "import"
 	import_element["source"] = {
 		"file": destination_filename,
@@ -1205,6 +1205,7 @@ func _on_texture_import_file_selected(source_path: String) -> void:
 	}
 	_show_status_message("Imported Texture: %s" % source_path.get_file())
 	_render_inspector()
+	_render_canvas_context()
 
 
 func _next_texture_source_filename(texture_root: String, extension: String) -> String:
@@ -1265,6 +1266,21 @@ func _find_import_element(texture: Dictionary) -> Dictionary:
 		if str(element.get("type", "generator")) == "import":
 			return element
 	return {}
+
+
+func _get_texture_final_path(texture: Dictionary) -> String:
+	if workspace_name.is_empty():
+		return ""
+	var import_element := _find_import_element(texture)
+	if import_element.is_empty():
+		return ""
+	var source = import_element.get("source", {})
+	if not source is Dictionary:
+		return ""
+	var source_file := str(source.get("file", "")).get_file()
+	if source_file.is_empty():
+		return ""
+	return "%s/%s/textures/%s/%s" % [WORKSPACES_ROOT, workspace_name, str(texture.get("id", "")), source_file]
 
 
 func _on_draw_menu_id(id: int) -> void:
@@ -2134,9 +2150,10 @@ func _render_canvas_context() -> void:
 		texture_canvas.visible = true
 		texture_context_label.text = "Texture: %s" % str(texture["name"]) if selected_element_id.is_empty() else "Element: %s" % str(_get_element(texture, selected_element_id).get("name", "Element"))
 		texture_canvas.set_origin_mode(str(texture.get("origin_mode", "bottom_left")))
+		texture_canvas.set_final_texture_path(_get_texture_final_path(texture) if selected_element_id.is_empty() else "")
 		var element := _get_element(texture, selected_element_id)
 		texture_canvas.set_selected_element(str(element.get("name", "")) if not element.is_empty() else "")
-		return
+	return
 	canvas_view.visible = true
 	texture_canvas.visible = false
 	texture_context_label.text = ""

@@ -131,8 +131,10 @@ active.
 The initial UV Canvas is a dedicated Texture workspace. It displays a normalized
 0..1 texture field, a lightweight grid, and a compact origin gizmo with
 separate U/V colors; it intentionally does not yet provide drawing or
-generator operations. The viewport supports focused `A/S/D/W` panning and
-`Q/E` zooming.
+generator operations. When the Texture parent is selected, its current final
+source is displayed in this UV field; selecting an Element remains a separate
+editing context for a later source-preview phase. The viewport supports
+focused `A/S/D/W` panning and `Q/E` zooming.
 
 ### Stone Floor Bloom relationship
 

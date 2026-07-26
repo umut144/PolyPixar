@@ -9,6 +9,8 @@ var origin_mode := "bottom_left"
 var selected_element_name := ""
 var view_offset := Vector2.ZERO
 var zoom := 1.0
+var final_texture: Texture2D
+var final_texture_path := ""
 
 
 func _ready() -> void:
@@ -34,6 +36,19 @@ func set_selected_element(name: String) -> void:
 	queue_redraw()
 
 
+func set_final_texture_path(path: String) -> void:
+	if path == final_texture_path:
+		return
+	final_texture_path = path
+	final_texture = null
+	if not path.is_empty() and FileAccess.file_exists(path):
+		var image := Image.new()
+		var load_error := image.load(path)
+		if load_error == OK and not image.is_empty():
+			final_texture = ImageTexture.create_from_image(image)
+	queue_redraw()
+
+
 func _process(delta: float) -> void:
 	if not has_focus():
 		return
@@ -54,6 +69,8 @@ func _draw() -> void:
 	var canvas_origin := size * 0.5 + view_offset - Vector2(canvas_size, canvas_size) * 0.5
 	var canvas_rect := Rect2(canvas_origin, Vector2(canvas_size, canvas_size))
 	draw_rect(canvas_rect, Color("#f5f6f8"), true)
+	if final_texture != null:
+		draw_texture_rect(final_texture, canvas_rect, false)
 	draw_rect(canvas_rect, Color("#697383"), false, 2.0)
 	for index in range(1, 4):
 		var fraction := float(index) / 4.0
