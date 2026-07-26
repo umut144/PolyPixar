@@ -18,7 +18,10 @@ var assets: Array[Dictionary] = []
 var textures: Array[Dictionary] = []
 var selected_asset_id := ""
 var selected_component_id := ""
+var selected_texture_id := ""
+var selected_element_id := ""
 var expanded_assets: Dictionary = {}
+var expanded_textures: Dictionary = {}
 var next_asset_id := 1
 var next_component_id := 1
 var next_texture_id := 1
@@ -26,6 +29,10 @@ var asset_dialog: ConfirmationDialog
 var asset_name_input: LineEdit
 var component_dialog: ConfirmationDialog
 var component_name_input: LineEdit
+var texture_dialog: ConfirmationDialog
+var texture_name_input: LineEdit
+var element_dialog: ConfirmationDialog
+var element_name_input: LineEdit
 var asset_name_editor: LineEdit
 var component_name_editor: LineEdit
 var transform_fields: Dictionary = {}
@@ -314,6 +321,8 @@ func _build_ui() -> void:
 
 	_create_asset_dialog()
 	_create_component_dialog()
+	_create_texture_dialog()
+	_create_element_dialog()
 	_create_workspace_dialogs()
 
 
@@ -459,6 +468,36 @@ func _create_component_dialog() -> void:
 	add_child(component_dialog)
 
 
+func _create_texture_dialog() -> void:
+	texture_dialog = ConfirmationDialog.new()
+	texture_dialog.title = "New Texture"
+	texture_dialog.dialog_text = "Enter a texture name"
+	texture_dialog.size = Vector2i(360, 160)
+	texture_dialog.confirmed.connect(_confirm_texture_creation)
+	texture_name_input = LineEdit.new()
+	texture_name_input.placeholder_text = "Texture name"
+	texture_name_input.custom_minimum_size = Vector2(320, 32)
+	texture_name_input.focus_mode = Control.FOCUS_ALL
+	texture_name_input.text_submitted.connect(_submit_texture_name)
+	texture_dialog.add_child(texture_name_input)
+	add_child(texture_dialog)
+
+
+func _create_element_dialog() -> void:
+	element_dialog = ConfirmationDialog.new()
+	element_dialog.title = "Add Element"
+	element_dialog.dialog_text = "Enter an element name"
+	element_dialog.size = Vector2i(360, 160)
+	element_dialog.confirmed.connect(_confirm_element_creation)
+	element_name_input = LineEdit.new()
+	element_name_input.placeholder_text = "Element name"
+	element_name_input.custom_minimum_size = Vector2(320, 32)
+	element_name_input.focus_mode = Control.FOCUS_ALL
+	element_name_input.text_submitted.connect(_submit_element_name)
+	element_dialog.add_child(element_name_input)
+	add_child(element_dialog)
+
+
 func _create_workspace_dialogs() -> void:
 	workspace_name_dialog = ConfirmationDialog.new()
 	workspace_name_dialog.title = "New Workspace"
@@ -491,6 +530,8 @@ func _create_workspace_dialogs() -> void:
 func _on_new_menu_id(id: int) -> void:
 	if id == 0:
 		_open_new_asset_dialog()
+	elif id == 1:
+		_open_new_texture_dialog()
 
 
 func _on_workspace_menu_id(id: int) -> void:
@@ -658,6 +699,8 @@ func _capture_history_snapshot() -> Dictionary:
 		"next_texture_id": next_texture_id,
 		"selected_asset_id": selected_asset_id,
 		"selected_component_id": selected_component_id,
+		"selected_texture_id": selected_texture_id,
+		"selected_element_id": selected_element_id,
 		"expanded_assets": expanded_assets.duplicate(true)
 	}
 
@@ -694,6 +737,8 @@ func _restore_history_snapshot(snapshot: Dictionary) -> void:
 	next_texture_id = int(snapshot.get("next_texture_id", 1))
 	selected_asset_id = str(snapshot.get("selected_asset_id", ""))
 	selected_component_id = str(snapshot.get("selected_component_id", ""))
+	selected_texture_id = str(snapshot.get("selected_texture_id", ""))
+	selected_element_id = str(snapshot.get("selected_element_id", ""))
 	expanded_assets = snapshot.get("expanded_assets", {}).duplicate(true)
 	if _get_asset(selected_asset_id).is_empty():
 		selected_asset_id = ""
@@ -806,7 +851,10 @@ func _serialize_editor_state() -> Dictionary:
 	return {
 		"selected_asset_id": selected_asset_id,
 		"selected_component_id": selected_component_id,
+		"selected_texture_id": selected_texture_id,
+		"selected_element_id": selected_element_id,
 		"expanded_assets": expanded_state,
+		"expanded_textures": expanded_textures.duplicate(true),
 		"snap": {
 			"enabled": snap_enabled,
 			"grid_step": snap_grid_step,
@@ -818,7 +866,10 @@ func _serialize_editor_state() -> Dictionary:
 func _restore_editor_state(state) -> void:
 	selected_asset_id = ""
 	selected_component_id = ""
+	selected_texture_id = ""
+	selected_element_id = ""
 	expanded_assets.clear()
+	expanded_textures.clear()
 	for asset in assets:
 		expanded_assets[str(asset["id"])] = false
 	if not state is Dictionary:
@@ -839,6 +890,22 @@ func _restore_editor_state(state) -> void:
 				expanded_assets[asset_id] = bool(saved_expanded[asset_id])
 	if not selected_component_id.is_empty():
 		expanded_assets[selected_asset_id] = true
+	var requested_texture_id := str(state.get("selected_texture_id", ""))
+	var selected_texture := _get_texture(requested_texture_id)
+	if not selected_texture.is_empty() and selected_asset_id.is_empty():
+		selected_texture_id = requested_texture_id
+		var requested_element_id := str(state.get("selected_element_id", ""))
+		if not _get_element(selected_texture, requested_element_id).is_empty():
+			selected_element_id = requested_element_id
+		else:
+			selected_element_id = ""
+		expanded_textures[selected_texture_id] = true
+	var saved_expanded_textures = state.get("expanded_textures", {})
+	if saved_expanded_textures is Dictionary:
+		for texture in textures:
+			var texture_id := str(texture["id"])
+			if saved_expanded_textures.has(texture_id):
+				expanded_textures[texture_id] = bool(saved_expanded_textures[texture_id])
 	_apply_snap_settings(state.get("snap", {}))
 
 
@@ -1136,12 +1203,121 @@ func _confirm_asset_creation() -> void:
 	assets.append({"id": asset_id, "name": asset_name, "components": []})
 	selected_asset_id = asset_id
 	selected_component_id = ""
+	selected_texture_id = ""
+	selected_element_id = ""
 	active_state = ""
 	expanded_assets[asset_id] = true
 	asset_dialog.hide()
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
+
+
+func _open_new_texture_dialog() -> void:
+	texture_name_input.text = ""
+	texture_dialog.popup_centered()
+	texture_name_input.grab_focus()
+
+
+func _submit_texture_name(_submitted_text: String) -> void:
+	_confirm_texture_creation()
+
+
+func _confirm_texture_creation() -> void:
+	_record_direct_change()
+	var texture_name := texture_name_input.text.strip_edges()
+	if texture_name.is_empty():
+		texture_name = _next_default_texture_name()
+	var texture_id := "texture_%d" % next_texture_id
+	next_texture_id += 1
+	textures.append({
+		"id": texture_id,
+		"name": texture_name,
+		"canvas_width": 512,
+		"canvas_height": 512,
+		"elements": []
+	})
+	selected_texture_id = texture_id
+	selected_element_id = ""
+	selected_asset_id = ""
+	selected_component_id = ""
+	active_state = ""
+	expanded_textures[texture_id] = true
+	texture_dialog.hide()
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _next_default_texture_name() -> String:
+	var index := 1
+	while _has_texture_name("texture%02d" % index):
+		index += 1
+	return "texture%02d" % index
+
+
+func _has_texture_name(texture_name: String) -> bool:
+	for texture in textures:
+		if str(texture["name"]).to_lower() == texture_name.to_lower():
+			return true
+	return false
+
+
+func _open_element_dialog(texture_id: String) -> void:
+	selected_texture_id = texture_id
+	selected_element_id = ""
+	selected_asset_id = ""
+	selected_component_id = ""
+	element_name_input.text = ""
+	element_dialog.set_meta("texture_id", texture_id)
+	element_dialog.popup_centered()
+	element_name_input.grab_focus()
+
+
+func _submit_element_name(_submitted_text: String) -> void:
+	_confirm_element_creation()
+
+
+func _confirm_element_creation() -> void:
+	var texture_id := str(element_dialog.get_meta("texture_id", ""))
+	var texture := _get_texture(texture_id)
+	if texture.is_empty():
+		element_dialog.hide()
+		return
+	_record_direct_change()
+	var element_name := element_name_input.text.strip_edges()
+	if element_name.is_empty():
+		element_name = _next_default_element_name(texture)
+	var element_id := "element_%d" % _next_element_id(texture)
+	texture["elements"].append({"id": element_id, "name": element_name})
+	selected_texture_id = texture_id
+	selected_element_id = element_id
+	expanded_textures[texture_id] = true
+	element_dialog.hide()
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _next_element_id(texture: Dictionary) -> int:
+	var next_id := 1
+	for element in texture.get("elements", []):
+		next_id = maxi(next_id, _id_suffix_number(str(element.get("id", ""))) + 1)
+	return next_id
+
+
+func _next_default_element_name(texture: Dictionary) -> String:
+	var index := 1
+	while _has_element_name(texture, "element%02d" % index):
+		index += 1
+	return "element%02d" % index
+
+
+func _has_element_name(texture: Dictionary, element_name: String) -> bool:
+	for element in texture.get("elements", []):
+		if str(element.get("name", "")).to_lower() == element_name.to_lower():
+			return true
+	return false
 
 
 func _next_default_asset_name() -> String:
@@ -1240,14 +1416,46 @@ func _render_asset_outliner_entry(asset: Dictionary) -> void:
 
 
 func _render_texture_outliner_entry(texture: Dictionary) -> void:
+	var texture_id := str(texture["id"])
+	var texture_container := VBoxContainer.new()
+	texture_container.add_theme_constant_override("separation", 0)
+	outliner_list.add_child(texture_container)
+	var texture_header := HBoxContainer.new()
+	texture_header.add_theme_constant_override("separation", 2)
+	texture_container.add_child(texture_header)
 	var texture_button := Button.new()
 	texture_button.text = str(texture["name"])
 	texture_button.custom_minimum_size = Vector2(0, 30)
 	texture_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	texture_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	texture_button.focus_mode = Control.FOCUS_NONE
-	_style_outliner_button(texture_button, false)
-	outliner_list.add_child(texture_button)
+	_style_outliner_button(texture_button, texture_id == selected_texture_id and selected_element_id.is_empty())
+	texture_button.pressed.connect(_select_texture.bind(texture_id))
+	texture_header.add_child(texture_button)
+	var add_button := Button.new()
+	add_button.text = "Add"
+	add_button.custom_minimum_size = Vector2(48, 30)
+	add_button.focus_mode = Control.FOCUS_NONE
+	add_button.pressed.connect(_open_element_dialog.bind(texture_id))
+	texture_header.add_child(add_button)
+	if not bool(expanded_textures.get(texture_id, false)):
+		return
+	for element in texture.get("elements", []):
+		var element_row := HBoxContainer.new()
+		element_row.add_theme_constant_override("separation", 0)
+		texture_container.add_child(element_row)
+		var child_placeholder := Control.new()
+		child_placeholder.custom_minimum_size = Vector2(16, 0)
+		element_row.add_child(child_placeholder)
+		var element_button := Button.new()
+		element_button.text = str(element.get("name", "Element"))
+		element_button.custom_minimum_size = Vector2(0, 30)
+		element_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		element_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		element_button.focus_mode = Control.FOCUS_NONE
+		_style_outliner_button(element_button, str(element.get("id", "")) == selected_element_id)
+		element_button.pressed.connect(_select_element.bind(texture_id, str(element.get("id", ""))))
+		element_row.add_child(element_button)
 
 
 func _on_outliner_filter_selected(index: int) -> void:
@@ -1267,6 +1475,8 @@ func _select_asset(asset_id: String) -> void:
 	var was_selected := selected_asset_id == asset_id and selected_component_id.is_empty()
 	selected_asset_id = asset_id
 	selected_component_id = ""
+	selected_texture_id = ""
+	selected_element_id = ""
 	active_state = ""
 	canvas_view.set_interaction_state("")
 	if was_selected:
@@ -1276,9 +1486,37 @@ func _select_asset(asset_id: String) -> void:
 	_render_canvas_context()
 
 
+func _select_texture(texture_id: String) -> void:
+	var was_selected := selected_texture_id == texture_id and selected_element_id.is_empty()
+	selected_texture_id = texture_id
+	selected_element_id = ""
+	selected_asset_id = ""
+	selected_component_id = ""
+	active_state = ""
+	if was_selected:
+		expanded_textures[texture_id] = not bool(expanded_textures.get(texture_id, false))
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _select_element(texture_id: String, element_id: String) -> void:
+	selected_texture_id = texture_id
+	selected_element_id = element_id
+	selected_asset_id = ""
+	selected_component_id = ""
+	active_state = ""
+	expanded_textures[texture_id] = true
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
 func _open_component_dialog(asset_id: String) -> void:
 	selected_asset_id = asset_id
 	selected_component_id = ""
+	selected_texture_id = ""
+	selected_element_id = ""
 	component_name_input.text = ""
 	component_dialog.set_meta("asset_id", asset_id)
 	component_dialog.popup_centered()
@@ -1312,6 +1550,8 @@ func _confirm_component_creation() -> void:
 	})
 	selected_asset_id = asset_id
 	selected_component_id = component_id
+	selected_texture_id = ""
+	selected_element_id = ""
 	active_state = ""
 	expanded_assets[asset_id] = true
 	component_dialog.hide()
@@ -1389,6 +1629,21 @@ func _render_inspector() -> void:
 	_clear(inspector_content)
 	transform_fields.clear()
 	inspector_content.add_child(_create_panel_label("Inspector"))
+	if not selected_texture_id.is_empty():
+		var texture := _get_texture(selected_texture_id)
+		if texture.is_empty():
+			return
+		inspector_content.add_child(_create_panel_label("Texture" if selected_element_id.is_empty() else "Element"))
+		inspector_content.add_child(_create_panel_label("Name"))
+		var texture_name_editor := _create_name_editor(str(texture["name"] if selected_element_id.is_empty() else _get_element(texture, selected_element_id).get("name", "Element")), "Texture name")
+		if selected_element_id.is_empty():
+			texture_name_editor.text_submitted.connect(_rename_selected_texture)
+			texture_name_editor.focus_exited.connect(func() -> void: _rename_selected_texture(texture_name_editor.text))
+		else:
+			texture_name_editor.text_submitted.connect(_rename_selected_element)
+			texture_name_editor.focus_exited.connect(func() -> void: _rename_selected_element(texture_name_editor.text))
+		inspector_content.add_child(texture_name_editor)
+		return
 	var asset := _get_asset(selected_asset_id)
 	if asset.is_empty():
 		return
@@ -1548,6 +1803,29 @@ func _rename_selected_component(new_name: String) -> void:
 	_render_canvas_context()
 
 
+func _rename_selected_texture(new_name: String) -> void:
+	var texture_name := new_name.strip_edges()
+	var texture := _get_texture(selected_texture_id)
+	if texture.is_empty() or texture_name.is_empty() or texture_name == str(texture["name"]):
+		return
+	_record_direct_change()
+	texture["name"] = texture_name
+	_render_outliner()
+	_render_inspector()
+
+
+func _rename_selected_element(new_name: String) -> void:
+	var element_name := new_name.strip_edges()
+	var texture := _get_texture(selected_texture_id)
+	var element := _get_element(texture, selected_element_id)
+	if element.is_empty() or element_name.is_empty() or element_name == str(element.get("name", "")):
+		return
+	_record_direct_change()
+	element["name"] = element_name
+	_render_outliner()
+	_render_inspector()
+
+
 func _render_canvas_context() -> void:
 	_render_context_bar()
 	_render_info_bar()
@@ -1691,6 +1969,22 @@ func _get_component(asset: Dictionary, component_id: String) -> Dictionary:
 	for component in asset["components"]:
 		if str(component["id"]) == component_id:
 			return component
+	return {}
+
+
+func _get_texture(texture_id: String) -> Dictionary:
+	for texture in textures:
+		if str(texture["id"]) == texture_id:
+			return texture
+	return {}
+
+
+func _get_element(texture: Dictionary, element_id: String) -> Dictionary:
+	if texture.is_empty():
+		return {}
+	for element in texture.get("elements", []):
+		if str(element.get("id", "")) == element_id:
+			return element
 	return {}
 
 
