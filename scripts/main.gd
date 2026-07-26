@@ -3145,7 +3145,6 @@ func _render_material_preview() -> void:
 	var texture := _get_texture(str(material.get("texture_id", "")))
 	var texture_path := _get_texture_final_path(texture) if not texture.is_empty() else ""
 	material_preview_texture.texture = null
-	material_preview_texture.region_enabled = false
 	material_preview_texture.modulate = Color(
 		Color(material.get("tint", Color.WHITE)).r,
 		Color(material.get("tint", Color.WHITE)).g,
@@ -3169,11 +3168,13 @@ func _render_material_preview() -> void:
 	material_preview_surface.custom_minimum_size = fitted_size + Vector2(40, 64)
 	material_preview_content.custom_minimum_size = fitted_size
 	material_preview_texture.custom_minimum_size = fitted_size
-	material_preview_texture.texture = ImageTexture.create_from_image(image)
+	var source_texture := ImageTexture.create_from_image(image)
 	var mapping_scale: Vector2 = material.get("mapping_scale", Vector2.ONE)
 	var mapping_offset: Vector2 = material.get("mapping_offset", Vector2.ZERO)
-	material_preview_texture.region_enabled = true
-	material_preview_texture.region_rect = Rect2(mapping_offset * image_size, image_size / Vector2(maxf(mapping_scale.x, 0.01), maxf(mapping_scale.y, 0.01)))
+	var atlas_texture := AtlasTexture.new()
+	atlas_texture.atlas = source_texture
+	atlas_texture.region = Rect2(mapping_offset * image_size, image_size / Vector2(maxf(mapping_scale.x, 0.01), maxf(mapping_scale.y, 0.01)))
+	material_preview_texture.texture = atlas_texture
 	material_preview_label.visible = false
 
 
