@@ -2245,10 +2245,12 @@ func _render_inspector() -> void:
 			threshold_field.step = 0.01
 			threshold_field.custom_minimum_size = Vector2(0, 26)
 			threshold_field.add_theme_font_size_override("font_size", 11)
-			threshold_field.value_changed.connect(_on_import_threshold_changed)
 			# Rebuilding the Inspector must not emit value_changed and overwrite
 			# the user's current threshold with the default value.
 			threshold_field.set_value_no_signal(clampf(float(pipeline.get("threshold", 0.05)), 0.0, 1.0))
+			# SpinBox text entry can commit without a reliable value_changed event;
+			# listen to the embedded LineEdit as the source of truth as well.
+			threshold_field.get_line_edit().text_changed.connect(_on_import_threshold_text_changed)
 			inspector_content.add_child(threshold_field)
 			var process_button := Button.new()
 			process_button.text = "Process"
@@ -2450,6 +2452,15 @@ func _rename_selected_element(new_name: String) -> void:
 
 
 func _on_import_threshold_changed(value: float) -> void:
+	_update_import_threshold(value)
+
+
+func _on_import_threshold_text_changed(text: String) -> void:
+	if text.is_valid_float():
+		_update_import_threshold(float(text))
+
+
+func _update_import_threshold(value: float) -> void:
 	var texture := _get_texture(selected_texture_id)
 	var element := _get_element(texture, selected_element_id)
 	if texture.is_empty() or element.is_empty() or str(element.get("type", "")) != "import":
@@ -2457,7 +2468,6 @@ func _on_import_threshold_changed(value: float) -> void:
 	_record_direct_change()
 	element["pipeline"] = {"mode": "white_to_alpha", "threshold": clampf(value, 0.0, 1.0)}
 	element["output"] = {"state": "not_ready", "file": ""}
-	_render_inspector()
 	_render_canvas_context()
 
 
