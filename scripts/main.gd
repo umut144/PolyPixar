@@ -1186,17 +1186,17 @@ func _restore_editor_state(state) -> void:
 	if selected_asset_id.is_empty() and selected_texture_id.is_empty() and not _get_material(requested_material_id).is_empty():
 		selected_material_id = requested_material_id
 		active_module = "Style"
-	# Older editor_state files may contain View/LookDev fields. They are read
-	# only for compatibility; the current workflow always opens the Graph.
-	material_view_mode = "graph"
-	lookdev_target_asset_id = ""
-	lookdev_target_component_id = ""
 		var style_section := _find_section("Style")
 		if style_section != null:
 			style_section.set_expanded(true)
 			style_section.set_active_submodule("Materials")
 	else:
 		active_module = "Create"
+	# Older editor_state files may contain View/LookDev fields. They are read
+	# only for compatibility; the current workflow always opens the Graph.
+	material_view_mode = "graph"
+	lookdev_target_asset_id = ""
+	lookdev_target_component_id = ""
 	var saved_expanded_textures = state.get("expanded_textures", {})
 	if saved_expanded_textures is Dictionary:
 		for texture in textures:
