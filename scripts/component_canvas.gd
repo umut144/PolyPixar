@@ -563,7 +563,7 @@ func _draw_material_polygon() -> void:
 	for point in outer_shape:
 		screen_points.append(_world_to_screen(_local_to_world(point)))
 		var base_uv := Vector2((point.x - min_point.x) / extent.x, (point.y - min_point.y) / extent.y)
-		uvs.append(base_uv * material_mapping_scale + material_mapping_offset)
+		uvs.append(base_uv / material_mapping_scale + material_mapping_offset)
 		colors.append(material_modulate)
 	draw_polygon(screen_points, colors, uvs, material_texture)
 

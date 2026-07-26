@@ -2077,7 +2077,7 @@ func _build_export_uvs(points: Array, texture_size: Vector2, mapping_scale: Vect
 	for point in points:
 		var local_point: Vector2 = point if point is Vector2 else Vector2.ZERO
 		var normalized_uv := Vector2((local_point.x - min_point.x) / extent.x, (local_point.y - min_point.y) / extent.y)
-		uvs.append((normalized_uv * safe_scale + mapping_offset) * texture_size)
+		uvs.append((normalized_uv / safe_scale + mapping_offset) * texture_size)
 	return uvs
 
 

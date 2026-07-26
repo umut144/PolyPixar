@@ -379,7 +379,9 @@ and `ResourceSaver` APIs instead of manually composing `.tscn` text.
 Components carry their contour, transform, visibility, z-index, and ready
 Material Texture references. The initial export derives explicit UVs from each
 Component's local bounding box, preventing Godot from treating contour
-coordinates as texture coordinates. Mesh resources, advanced UV mapping, and
+coordinates as texture coordinates. Mapping Scale uses one shared semantic:
+larger values make the texture appear larger in the Preview, editor canvas,
+and exported scene. Mesh resources, advanced UV mapping, and
 reusable external material resources follow later.
 
 An imported raster source is selected from the project-local
