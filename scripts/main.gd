@@ -1309,32 +1309,32 @@ func _render_inspector() -> void:
 	transform_grid.add_theme_constant_override("v_separation", 4)
 	inspector_content.add_child(transform_grid)
 	var transform: Dictionary = component.get("transform", _default_component_transform())
-	var position: Vector2 = transform.get("position", Vector2.ZERO)
-	var scale: Vector2 = transform.get("scale", Vector2.ONE)
+	var transform_position: Vector2 = transform.get("position", Vector2.ZERO)
+	var transform_scale: Vector2 = transform.get("scale", Vector2.ONE)
 	var pivot: Vector2 = transform.get("pivot", Vector2.ZERO)
-	_add_transform_field(transform_grid, "Position X", position.x, "position_x", 1.0)
-	_add_transform_field(transform_grid, "Position Y", position.y, "position_y", 1.0)
+	_add_transform_field(transform_grid, "Position X", transform_position.x, "position_x", 1.0)
+	_add_transform_field(transform_grid, "Position Y", transform_position.y, "position_y", 1.0)
 	_add_transform_field(transform_grid, "Rotation", float(transform.get("rotation", 0.0)), "rotation", 1.0)
-	_add_transform_field(transform_grid, "Scale X", scale.x, "scale_x", 0.01)
-	_add_transform_field(transform_grid, "Scale Y", scale.y, "scale_y", 0.01)
+	_add_transform_field(transform_grid, "Scale X", transform_scale.x, "scale_x", 0.01)
+	_add_transform_field(transform_grid, "Scale Y", transform_scale.y, "scale_y", 0.01)
 	_add_transform_field(transform_grid, "Pivot X", pivot.x, "pivot_x", 1.0)
 	_add_transform_field(transform_grid, "Pivot Y", pivot.y, "pivot_y", 1.0)
 	inspector_content.add_child(_create_panel_label("Visibility / Layer"))
-	var visibility := CheckButton.new()
-	visibility.text = "Visible"
-	visibility.button_pressed = bool(component.get("visibility", true))
-	visibility.toggled.connect(_on_component_visibility_changed)
-	inspector_content.add_child(visibility)
+	var visibility_toggle := CheckButton.new()
+	visibility_toggle.text = "Visible"
+	visibility_toggle.button_pressed = bool(component.get("visibility", true))
+	visibility_toggle.toggled.connect(_on_component_visibility_changed)
+	inspector_content.add_child(visibility_toggle)
 	var z_index_label := _create_panel_label("Z Index")
 	inspector_content.add_child(z_index_label)
-	var z_index := SpinBox.new()
-	z_index.min_value = -10000
-	z_index.max_value = 10000
-	z_index.step = 1
-	z_index.value = int(component.get("z_index", 0))
-	z_index.custom_minimum_size = Vector2(0, 30)
-	z_index.value_changed.connect(_on_component_z_index_changed)
-	inspector_content.add_child(z_index)
+	var z_index_field := SpinBox.new()
+	z_index_field.min_value = -10000
+	z_index_field.max_value = 10000
+	z_index_field.step = 1
+	z_index_field.value = int(component.get("z_index", 0))
+	z_index_field.custom_minimum_size = Vector2(0, 30)
+	z_index_field.value_changed.connect(_on_component_z_index_changed)
+	inspector_content.add_child(z_index_field)
 
 
 func _create_name_editor(value: String, placeholder: String) -> LineEdit:
@@ -1367,33 +1367,33 @@ func _on_transform_value_changed(value: float, property_name: String) -> void:
 		return
 	_record_direct_change()
 	var transform: Dictionary = component.get("transform", _default_component_transform())
-	var position: Vector2 = transform.get("position", Vector2.ZERO)
-	var scale: Vector2 = transform.get("scale", Vector2.ONE)
+	var transform_position: Vector2 = transform.get("position", Vector2.ZERO)
+	var transform_scale: Vector2 = transform.get("scale", Vector2.ONE)
 	var pivot: Vector2 = transform.get("pivot", Vector2.ZERO)
 	var previous_pivot := pivot
 	match property_name:
-		"position_x": position.x = value
-		"position_y": position.y = value
+		"position_x": transform_position.x = value
+		"position_y": transform_position.y = value
 		"rotation": transform["rotation"] = value
-		"scale_x": scale.x = value
-		"scale_y": scale.y = value
+		"scale_x": transform_scale.x = value
+		"scale_y": transform_scale.y = value
 		"pivot_x": pivot.x = value
 		"pivot_y": pivot.y = value
 	if property_name == "pivot_x" or property_name == "pivot_y":
-		var rotation := deg_to_rad(float(transform.get("rotation", 0.0)))
-		position += ((pivot - previous_pivot) * scale).rotated(rotation)
-	transform["position"] = position
-	transform["scale"] = scale
+		var pivot_rotation := deg_to_rad(float(transform.get("rotation", 0.0)))
+		transform_position += ((pivot - previous_pivot) * transform_scale).rotated(pivot_rotation)
+	transform["position"] = transform_position
+	transform["scale"] = transform_scale
 	transform["pivot"] = pivot
 	component["transform"] = transform
 	_render_canvas_context()
 
 
-func _on_component_visibility_changed(visible: bool) -> void:
+func _on_component_visibility_changed(is_visible: bool) -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	if not component.is_empty():
 		_record_direct_change()
-		component["visibility"] = visible
+		component["visibility"] = is_visible
 		_render_outliner()
 		_render_canvas_context()
 
@@ -1538,15 +1538,15 @@ func _on_transform_changed(transform: Dictionary) -> void:
 	if not component.is_empty():
 		_record_coalesced_change()
 		component["transform"] = transform.duplicate(true)
-		var position: Vector2 = transform.get("position", Vector2.ZERO)
-		var scale: Vector2 = transform.get("scale", Vector2.ONE)
+		var transform_position: Vector2 = transform.get("position", Vector2.ZERO)
+		var transform_scale: Vector2 = transform.get("scale", Vector2.ONE)
 		var pivot: Vector2 = transform.get("pivot", Vector2.ZERO)
 		var values := {
-			"position_x": position.x,
-			"position_y": position.y,
+			"position_x": transform_position.x,
+			"position_y": transform_position.y,
 			"rotation": float(transform.get("rotation", 0.0)),
-			"scale_x": scale.x,
-			"scale_y": scale.y,
+			"scale_x": transform_scale.x,
+			"scale_y": transform_scale.y,
 			"pivot_x": pivot.x,
 			"pivot_y": pivot.y
 		}

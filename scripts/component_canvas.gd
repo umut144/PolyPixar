@@ -119,12 +119,12 @@ func _gui_input(event: InputEvent) -> void:
 		if pivot_dragging:
 			var old_pivot: Vector2 = component_transform.get("pivot", Vector2.ZERO)
 			var new_pivot := _snap_to_grid(_world_to_local(_screen_to_world(event.position)))
-			var scale: Vector2 = component_transform.get("scale", Vector2.ONE)
-			var rotation := deg_to_rad(float(component_transform.get("rotation", 0.0)))
-			var position: Vector2 = component_transform.get("position", Vector2.ZERO)
-			position += ((new_pivot - old_pivot) * scale).rotated(rotation)
+			var transform_scale: Vector2 = component_transform.get("scale", Vector2.ONE)
+			var transform_rotation := deg_to_rad(float(component_transform.get("rotation", 0.0)))
+			var transform_position: Vector2 = component_transform.get("position", Vector2.ZERO)
+			transform_position += ((new_pivot - old_pivot) * transform_scale).rotated(transform_rotation)
 			component_transform["pivot"] = new_pivot
-			component_transform["position"] = position
+			component_transform["position"] = transform_position
 			pivot_changed.emit(new_pivot)
 			transform_changed.emit(component_transform.duplicate(true))
 			queue_redraw()
@@ -277,22 +277,22 @@ func _local_to_world(local_point: Vector2) -> Vector2:
 
 func _local_to_world_with_transform(local_point: Vector2, transform: Dictionary) -> Vector2:
 	var pivot: Vector2 = transform.get("pivot", Vector2.ZERO)
-	var position: Vector2 = transform.get("position", Vector2.ZERO)
-	var scale: Vector2 = transform.get("scale", Vector2.ONE)
-	var rotation := deg_to_rad(float(transform.get("rotation", 0.0)))
-	return position + ((local_point - pivot) * scale).rotated(rotation)
+	var transform_position: Vector2 = transform.get("position", Vector2.ZERO)
+	var transform_scale: Vector2 = transform.get("scale", Vector2.ONE)
+	var transform_rotation := deg_to_rad(float(transform.get("rotation", 0.0)))
+	return transform_position + ((local_point - pivot) * transform_scale).rotated(transform_rotation)
 
 
 func _world_to_local(world_point: Vector2) -> Vector2:
 	var pivot: Vector2 = component_transform.get("pivot", Vector2.ZERO)
-	var position: Vector2 = component_transform.get("position", Vector2.ZERO)
-	var scale: Vector2 = component_transform.get("scale", Vector2.ONE)
-	var rotation := deg_to_rad(float(component_transform.get("rotation", 0.0)))
-	var local_offset := (world_point - position).rotated(-rotation)
-	if not is_zero_approx(scale.x):
-		local_offset.x /= scale.x
-	if not is_zero_approx(scale.y):
-		local_offset.y /= scale.y
+	var transform_position: Vector2 = component_transform.get("position", Vector2.ZERO)
+	var transform_scale: Vector2 = component_transform.get("scale", Vector2.ONE)
+	var transform_rotation := deg_to_rad(float(component_transform.get("rotation", 0.0)))
+	var local_offset := (world_point - transform_position).rotated(-transform_rotation)
+	if not is_zero_approx(transform_scale.x):
+		local_offset.x /= transform_scale.x
+	if not is_zero_approx(transform_scale.y):
+		local_offset.y /= transform_scale.y
 	return pivot + local_offset
 
 
@@ -367,20 +367,20 @@ func _process(delta: float) -> void:
 
 
 func _draw() -> void:
-	var grid_step := _visible_grid_step()
+	var visible_grid_step := _visible_grid_step()
 	var half_view := size / (2.0 * zoom)
 	var min_world := view_center - half_view
 	var max_world := view_center + half_view
-	var first_x := floori(min_world.x / grid_step)
-	var last_x := ceili(max_world.x / grid_step)
-	var first_y := floori(min_world.y / grid_step)
-	var last_y := ceili(max_world.y / grid_step)
+	var first_x := floori(min_world.x / visible_grid_step)
+	var last_x := ceili(max_world.x / visible_grid_step)
+	var first_y := floori(min_world.y / visible_grid_step)
+	var last_y := ceili(max_world.y / visible_grid_step)
 	for grid_index in range(first_x, last_x + 1):
-		var world_x := grid_index * grid_step
+		var world_x := grid_index * visible_grid_step
 		var color := Color("#2a303a") if posmod(grid_index, 4) == 0 else Color("#222730")
 		draw_line(_world_to_screen(Vector2(world_x, min_world.y)), _world_to_screen(Vector2(world_x, max_world.y)), color, 1.0)
 	for grid_index in range(first_y, last_y + 1):
-		var world_y := grid_index * grid_step
+		var world_y := grid_index * visible_grid_step
 		var color := Color("#2a303a") if posmod(grid_index, 4) == 0 else Color("#222730")
 		draw_line(_world_to_screen(Vector2(min_world.x, world_y)), _world_to_screen(Vector2(max_world.x, world_y)), color, 1.0)
 	var x_axis_color := Color("#6a4d58")
@@ -585,12 +585,12 @@ func _draw_line_draft() -> void:
 
 
 func _visible_grid_step() -> float:
-	var grid_step := BASE_GRID_STEP
-	while grid_step * zoom < 16.0:
-		grid_step *= 2.0
-	while grid_step * zoom > 80.0:
-		grid_step *= 0.5
-	return grid_step
+	var visible_step := BASE_GRID_STEP
+	while visible_step * zoom < 16.0:
+		visible_step *= 2.0
+	while visible_step * zoom > 80.0:
+		visible_step *= 0.5
+	return visible_step
 
 
 func _world_to_screen(world_position: Vector2) -> Vector2:
