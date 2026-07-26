@@ -61,6 +61,7 @@ var material_preview_label: Label
 var texture_context_label: Label
 var import_preview_context_label: Label
 var context_bar: HBoxContainer
+var new_menu_popup: PopupMenu
 var info_bar: HBoxContainer
 var program_status_label: Label
 var status_clear_timer: Timer
@@ -214,9 +215,8 @@ func _build_ui() -> void:
 	new_menu.custom_minimum_size = Vector2(72, 32)
 	new_menu.focus_mode = Control.FOCUS_NONE
 	var new_popup := new_menu.get_popup()
-	new_popup.add_item("Asset")
-	new_popup.add_item("Texture")
-	new_popup.add_item("Material")
+	new_menu_popup = new_popup
+	new_popup.about_to_popup.connect(_refresh_new_menu)
 	new_popup.id_pressed.connect(_on_new_menu_id)
 	toolbar.add_child(new_menu)
 	var toolbar_spacer := Control.new()
@@ -725,12 +725,26 @@ func _create_workspace_dialogs() -> void:
 
 
 func _on_new_menu_id(id: int) -> void:
-	if id == 0:
+	if active_module == "Create" and id == 0:
 		_open_new_asset_dialog()
-	elif id == 1:
+	elif active_module == "Create" and id == 1:
 		_open_new_texture_dialog()
-	elif id == 2:
+	elif active_module == "Style" and id == 0:
 		_open_new_material_dialog()
+
+
+func _refresh_new_menu() -> void:
+	if not is_instance_valid(new_menu_popup):
+		return
+	new_menu_popup.clear()
+	if active_module == "Create":
+		new_menu_popup.add_item("Asset", 0)
+		new_menu_popup.add_item("Texture", 1)
+	elif active_module == "Style":
+		new_menu_popup.add_item("Material", 0)
+	else:
+		new_menu_popup.add_item("No actions available", 0)
+		new_menu_popup.set_item_disabled(0, true)
 
 
 func _on_workspace_menu_id(id: int) -> void:
@@ -1301,6 +1315,9 @@ func _render_context_bar() -> void:
 		_render_texture_context_bar()
 		_render_info_bar()
 		return
+	if active_module == "Create" and active_create_submodule == "Layers":
+		_render_info_bar()
+		return
 	snap_button = Button.new()
 	snap_button.text = "Snap: %s  ▼" % ("On" if snap_enabled else "Off")
 	snap_button.custom_minimum_size = Vector2(112, 32)
@@ -1815,6 +1832,11 @@ func _render_info_bar() -> void:
 		_add_info_option("1: Graph")
 		_add_info_option("2: Preview")
 		_add_info_option("3: LookDev")
+		return
+	if active_module == "Create" and active_create_submodule == "Layers":
+		var layers_state_label := Label.new()
+		layers_state_label.text = "Layers: Empty"
+		info_bar.add_child(layers_state_label)
 		return
 	if not selected_texture_id.is_empty():
 		var texture := _get_texture(selected_texture_id)
@@ -2935,6 +2957,16 @@ func _render_canvas_context() -> void:
 		texture_context_label.text = ""
 		import_preview_context_label.text = ""
 		return
+	if active_module == "Create" and active_create_submodule == "Layers":
+		canvas_view.visible = false
+		texture_canvas.visible = false
+		import_preview.visible = false
+		material_graph.visible = false
+		material_preview_container.visible = false
+		canvas_context_label.text = "Layers"
+		texture_context_label.text = ""
+		import_preview_context_label.text = ""
+		return
 	material_graph.visible = false
 	material_preview_container.visible = false
 	if not selected_texture_id.is_empty():
@@ -3147,9 +3179,18 @@ func _add_module_section(parent: Container, module_name: String, submodules: Arr
 
 
 func _on_category_pressed(_module_name: String) -> void:
+	active_module = _module_name
+	if active_module != "Style":
+		selected_material_id = ""
 	var pressed_section := _find_section(_module_name)
 	for section in module_sections:
 		section.set_expanded(section == pressed_section and section.expanded)
+	if pressed_section != null and not pressed_section.active_submodule.is_empty():
+		if active_module == "Create":
+			active_create_submodule = pressed_section.active_submodule
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
 
 
 func _find_section(module_name: String) -> ModuleSection:
@@ -3165,6 +3206,9 @@ func _select_submodule(module_name: String, submodule: String, section: ModuleSe
 	if module_name == "Create":
 		active_create_submodule = submodule
 		selected_material_id = ""
+		_render_outliner()
+		_render_inspector()
+		_render_canvas_context()
 	elif module_name == "Style" and submodule == "Materials":
 		_enter_material_context(selected_material_id)
 	return
