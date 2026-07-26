@@ -312,7 +312,7 @@ func _build_ui() -> void:
 	inspector_panel.custom_minimum_size = Vector2(260, 0)
 	canvas_split.add_child(inspector_panel)
 	inspector_content = VBoxContainer.new()
-	inspector_content.add_theme_constant_override("separation", 4)
+	inspector_content.add_theme_constant_override("separation", 2)
 	inspector_panel.add_child(inspector_content)
 
 	var status_bar := _create_panel()
@@ -378,6 +378,32 @@ func _create_panel_label(text: String) -> Label:
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	label.add_theme_font_size_override("font_size", 11)
 	label.add_theme_color_override("font_color", Color("#9aa3b2"))
+	return label
+
+
+func _create_inspector_section(text: String) -> VBoxContainer:
+	var section := VBoxContainer.new()
+	section.add_theme_constant_override("separation", 0)
+	var separator := HSeparator.new()
+	separator.modulate = Color("#3a424f")
+	section.add_child(separator)
+	var label := Label.new()
+	label.text = text
+	label.custom_minimum_size = Vector2(0, 20)
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", 10)
+	label.add_theme_color_override("font_color", Color("#c0c8d5"))
+	section.add_child(label)
+	return section
+
+
+func _create_inspector_field_label(text: String) -> Label:
+	var label := Label.new()
+	label.text = text
+	label.custom_minimum_size = Vector2(0, 18)
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", 10)
+	label.add_theme_color_override("font_color", Color("#7f8a9b"))
 	return label
 
 
@@ -2060,8 +2086,8 @@ func _render_inspector() -> void:
 		var texture := _get_texture(selected_texture_id)
 		if texture.is_empty():
 			return
-		inspector_content.add_child(_create_panel_label("Texture" if selected_element_id.is_empty() else "Element"))
-		inspector_content.add_child(_create_panel_label("Name"))
+		inspector_content.add_child(_create_inspector_section("Texture" if selected_element_id.is_empty() else "Element"))
+		inspector_content.add_child(_create_inspector_field_label("Name"))
 		var texture_name_editor := _create_name_editor(str(texture["name"] if selected_element_id.is_empty() else _get_element(texture, selected_element_id).get("name", "Element")), "Texture name")
 		if selected_element_id.is_empty():
 			texture_name_editor.text_submitted.connect(_rename_selected_texture)
@@ -2071,42 +2097,45 @@ func _render_inspector() -> void:
 			texture_name_editor.focus_exited.connect(func() -> void: _rename_selected_element(texture_name_editor.text))
 		inspector_content.add_child(texture_name_editor)
 		var output_element := _get_element(texture, selected_element_id) if not selected_element_id.is_empty() else _find_import_element(texture)
-		inspector_content.add_child(_create_panel_label("Output State"))
+		inspector_content.add_child(_create_inspector_section("Output"))
 		var output_state_label := Label.new()
 		output_state_label.text = _element_output_state(output_element) if not output_element.is_empty() else _texture_output_state(texture)
+		output_state_label.custom_minimum_size = Vector2(0, 20)
 		output_state_label.add_theme_font_size_override("font_size", 11)
-		output_state_label.add_theme_color_override("font_color", Color("#9aa3b2"))
+		output_state_label.add_theme_color_override("font_color", Color("#f2c94c") if output_state_label.text == "not_ready" else Color("#75b88a"))
 		inspector_content.add_child(output_state_label)
 		if selected_element_id.is_empty():
 			var import_element := _find_import_element(texture)
 			var import_source = import_element.get("source", {}) if not import_element.is_empty() else {}
 			if import_source is Dictionary and not import_source.is_empty():
-				inspector_content.add_child(_create_panel_label("Source"))
+				inspector_content.add_child(_create_inspector_field_label("Source"))
 				var source_label := Label.new()
 				source_label.text = str(import_source.get("original_name", import_source.get("file", "")))
 				source_label.add_theme_font_size_override("font_size", 11)
 				source_label.add_theme_color_override("font_color", Color("#9aa3b2"))
 				inspector_content.add_child(source_label)
 		elif not output_element.is_empty() and str(output_element.get("type", "generator")) == "import":
-			inspector_content.add_child(_create_panel_label("Processing"))
+			inspector_content.add_child(_create_inspector_section("Processing"))
 			var pipeline = output_element.get("pipeline", {})
 			if not pipeline is Dictionary:
 				pipeline = {}
-			var processing_label := _create_panel_label("White to Alpha")
+			var processing_label := _create_inspector_field_label("White to Alpha")
 			inspector_content.add_child(processing_label)
-			var threshold_label := _create_panel_label("Threshold")
+			var threshold_label := _create_inspector_field_label("Threshold")
 			inspector_content.add_child(threshold_label)
 			var threshold_field := SpinBox.new()
 			threshold_field.min_value = 0.0
 			threshold_field.max_value = 1.0
 			threshold_field.step = 0.01
 			threshold_field.value = clampf(float(pipeline.get("threshold", 0.05)), 0.0, 1.0)
-			threshold_field.custom_minimum_size = Vector2(0, 30)
+			threshold_field.custom_minimum_size = Vector2(0, 26)
+			threshold_field.add_theme_font_size_override("font_size", 11)
 			threshold_field.value_changed.connect(_on_import_threshold_changed)
 			inspector_content.add_child(threshold_field)
 			var process_button := Button.new()
 			process_button.text = "Process"
-			process_button.custom_minimum_size = Vector2(0, 30)
+			process_button.custom_minimum_size = Vector2(0, 26)
+			process_button.add_theme_font_size_override("font_size", 11)
 			process_button.focus_mode = Control.FOCUS_NONE
 			process_button.pressed.connect(_process_selected_import_element)
 			inspector_content.add_child(process_button)
@@ -2115,7 +2144,8 @@ func _render_inspector() -> void:
 	if asset.is_empty():
 		return
 	if selected_component_id.is_empty():
-		inspector_content.add_child(_create_panel_label("Name"))
+		inspector_content.add_child(_create_inspector_section("Asset"))
+		inspector_content.add_child(_create_inspector_field_label("Name"))
 		asset_name_editor = _create_name_editor(str(asset["name"]), "Asset name")
 		asset_name_editor.text_submitted.connect(_rename_selected_asset)
 		asset_name_editor.focus_exited.connect(func() -> void:
@@ -2126,14 +2156,15 @@ func _render_inspector() -> void:
 	var component := _get_component(asset, selected_component_id)
 	if component.is_empty():
 		return
-	inspector_content.add_child(_create_panel_label("Name"))
+	inspector_content.add_child(_create_inspector_section("Component"))
+	inspector_content.add_child(_create_inspector_field_label("Name"))
 	component_name_editor = _create_name_editor(str(component["name"]), "Component name")
 	component_name_editor.text_submitted.connect(_rename_selected_component)
 	component_name_editor.focus_exited.connect(func() -> void:
 		_rename_selected_component(component_name_editor.text)
 	)
 	inspector_content.add_child(component_name_editor)
-	inspector_content.add_child(_create_panel_label("Transform"))
+	inspector_content.add_child(_create_inspector_section("Transform"))
 	var transform_grid := GridContainer.new()
 	transform_grid.columns = 2
 	transform_grid.add_theme_constant_override("h_separation", 8)
@@ -2150,20 +2181,23 @@ func _render_inspector() -> void:
 	_add_transform_field(transform_grid, "Scale Y", transform_scale.y, "scale_y", 0.01)
 	_add_transform_field(transform_grid, "Pivot X", pivot.x, "pivot_x", 1.0)
 	_add_transform_field(transform_grid, "Pivot Y", pivot.y, "pivot_y", 1.0)
-	inspector_content.add_child(_create_panel_label("Visibility / Layer"))
+	inspector_content.add_child(_create_inspector_section("Visibility / Layer"))
 	var visibility_toggle := CheckButton.new()
 	visibility_toggle.text = "Visible"
+	visibility_toggle.custom_minimum_size = Vector2(0, 26)
+	visibility_toggle.add_theme_font_size_override("font_size", 11)
 	visibility_toggle.button_pressed = bool(component.get("visibility", true))
 	visibility_toggle.toggled.connect(_on_component_visibility_changed)
 	inspector_content.add_child(visibility_toggle)
-	var z_index_label := _create_panel_label("Z Index")
+	var z_index_label := _create_inspector_field_label("Z Index")
 	inspector_content.add_child(z_index_label)
 	var z_index_field := SpinBox.new()
 	z_index_field.min_value = -10000
 	z_index_field.max_value = 10000
 	z_index_field.step = 1
 	z_index_field.value = int(component.get("z_index", 0))
-	z_index_field.custom_minimum_size = Vector2(0, 30)
+	z_index_field.custom_minimum_size = Vector2(0, 26)
+	z_index_field.add_theme_font_size_override("font_size", 11)
 	z_index_field.value_changed.connect(_on_component_z_index_changed)
 	inspector_content.add_child(z_index_field)
 
@@ -2171,14 +2205,17 @@ func _render_inspector() -> void:
 func _create_name_editor(value: String, placeholder: String) -> LineEdit:
 	var editor := LineEdit.new()
 	editor.text = value
-	editor.custom_minimum_size = Vector2(0, 30)
+	editor.custom_minimum_size = Vector2(0, 26)
 	editor.placeholder_text = placeholder
+	editor.add_theme_font_size_override("font_size", 12)
 	return editor
 
 
 func _add_transform_field(grid: GridContainer, label_text: String, value: float, property_name: String, step: float) -> void:
 	var label := Label.new()
 	label.text = label_text
+	label.add_theme_font_size_override("font_size", 10)
+	label.add_theme_color_override("font_color", Color("#7f8a9b"))
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	grid.add_child(label)
 	var field := SpinBox.new()
@@ -2186,7 +2223,8 @@ func _add_transform_field(grid: GridContainer, label_text: String, value: float,
 	field.max_value = 100000.0
 	field.step = step
 	field.value = value
-	field.custom_minimum_size = Vector2(96, 28)
+	field.custom_minimum_size = Vector2(96, 26)
+	field.add_theme_font_size_override("font_size", 11)
 	field.value_changed.connect(_on_transform_value_changed.bind(property_name))
 	transform_fields[property_name] = field
 	grid.add_child(field)
