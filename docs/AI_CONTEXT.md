@@ -18,9 +18,10 @@ Texture processing, a first Style Material binding, and a deliberately narrow
 Motion Sequence. Empty panes remain preferable to invented functionality.
 
 Slice 4 Phase 1 is implemented and awaiting manual verification: a selected
-Texture can import a PNG, JPEG, or WebP through the native image picker. The
-source is copied into that Texture's active Workspace directory and persisted
-as a relative `import_source` reference; Canvas image preview remains Phase 2.
+Texture can import a PNG, JPEG, or WebP through the native image picker, which
+opens directly in `res://imports/textures`. The source is copied into that
+Texture's active Workspace directory and persisted as a relative
+`import_source` reference; Canvas image preview remains Phase 2.
 
 The current implementation target is not a functional morphing engine or a
 general animation/VFX framework.

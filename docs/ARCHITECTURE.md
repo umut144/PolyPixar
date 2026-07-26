@@ -324,10 +324,12 @@ Each Asset document stores its Components and their contour points; each Texture
 document stores its dimensions, origin convention, and Elements. Display names
 remain editable and are not used as persistent references.
 
-An imported raster source is copied into its Texture directory and referenced
-from `texture.json` by a relative source filename plus its original display
-name. Re-importing retains prior copied sources so Undo/Redo can safely restore
-an earlier Texture source reference without depending on the external file.
+An imported raster source is selected from the project-local
+`imports/textures/` intake folder, copied into its Texture directory, and
+referenced from `texture.json` by a relative source filename plus its original
+display name. Re-importing retains prior copied sources so Undo/Redo can safely
+restore an earlier Texture source reference without depending on the intake
+file.
 
 Workspace JSON also contains an `editor_state` object for the restorable editor
 view: selected Asset, Component, Texture, or Element and the expanded/collapsed

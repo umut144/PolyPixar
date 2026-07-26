@@ -3,6 +3,7 @@ extends Control
 const CREATE_SUBMODULES := ["Shapes", "Layers"]
 const INACTIVE_MODULES := ["Style", "Motion", "Transform", "Effects", "Export"]
 const WORKSPACES_ROOT := "res://workspaces"
+const IMPORT_TEXTURES_ROOT := "res://imports/textures"
 const CONFIG_PATH := "res://configs/app_config.json"
 const SCHEMA_VERSION := 3
 const MAX_HISTORY_SIZE := 100
@@ -508,6 +509,7 @@ func _create_texture_import_dialog() -> void:
 	texture_import_dialog.filters = PackedStringArray([
 		"*.png, *.jpg, *.jpeg, *.webp ; Image files"
 	])
+	texture_import_dialog.current_dir = ProjectSettings.globalize_path(IMPORT_TEXTURES_ROOT)
 	texture_import_dialog.file_selected.connect(_on_texture_import_file_selected)
 	add_child(texture_import_dialog)
 
@@ -1167,6 +1169,8 @@ func _open_texture_import_dialog() -> void:
 	if workspace_name.is_empty():
 		_show_status_message("Create or load a Workspace before importing.")
 		return
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(IMPORT_TEXTURES_ROOT))
+	texture_import_dialog.current_dir = ProjectSettings.globalize_path(IMPORT_TEXTURES_ROOT)
 	texture_import_dialog.popup_centered_ratio(0.75)
 
 
