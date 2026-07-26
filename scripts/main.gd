@@ -46,6 +46,7 @@ var active_draw_tool := ""
 var active_state := ""
 var active_edit_mode := "select"
 var active_transform_mode := "transform"
+var active_texture_tool := ""
 var snap_enabled := true
 var snap_grid_step := 16.0
 var snap_rotation_step := 15.0
@@ -868,6 +869,7 @@ func _restore_editor_state(state) -> void:
 	selected_component_id = ""
 	selected_texture_id = ""
 	selected_element_id = ""
+	active_texture_tool = ""
 	expanded_assets.clear()
 	expanded_textures.clear()
 	for asset in assets:
@@ -1024,6 +1026,10 @@ func _render_context_bar() -> void:
 	if not is_instance_valid(context_bar):
 		return
 	_clear(context_bar)
+	if not selected_texture_id.is_empty():
+		_render_texture_context_bar()
+		_render_info_bar()
+		return
 	snap_button = Button.new()
 	snap_button.text = "Snap: %s  ▼" % ("On" if snap_enabled else "Off")
 	snap_button.custom_minimum_size = Vector2(112, 32)
@@ -1072,6 +1078,48 @@ func _render_context_bar() -> void:
 	transform_popup.add_item("3: Scale", 2)
 	transform_popup.id_pressed.connect(_on_transform_menu_id)
 	context_bar.add_child(transform_menu)
+
+
+func _render_texture_context_bar() -> void:
+	var draw_menu := MenuButton.new()
+	draw_menu.text = "Draw  ▼"
+	draw_menu.custom_minimum_size = Vector2(88, 32)
+	draw_menu.focus_mode = Control.FOCUS_NONE
+	var draw_popup := draw_menu.get_popup()
+	draw_popup.add_item("Element", 0)
+	draw_popup.id_pressed.connect(_on_texture_draw_menu_id)
+	context_bar.add_child(draw_menu)
+	var generate_menu := MenuButton.new()
+	generate_menu.text = "Generate  ▼"
+	generate_menu.custom_minimum_size = Vector2(108, 32)
+	generate_menu.focus_mode = Control.FOCUS_NONE
+	var generate_popup := generate_menu.get_popup()
+	generate_popup.add_item("Generator", 0)
+	generate_popup.id_pressed.connect(_on_texture_generate_menu_id)
+	context_bar.add_child(generate_menu)
+	var sample_menu := MenuButton.new()
+	sample_menu.text = "Sample  ▼"
+	sample_menu.custom_minimum_size = Vector2(96, 32)
+	sample_menu.focus_mode = Control.FOCUS_NONE
+	var sample_popup := sample_menu.get_popup()
+	sample_popup.add_item("Sampler", 0)
+	sample_popup.id_pressed.connect(_on_texture_sample_menu_id)
+	context_bar.add_child(sample_menu)
+
+
+func _on_texture_draw_menu_id(_id: int) -> void:
+	active_texture_tool = "draw"
+	_render_info_bar()
+
+
+func _on_texture_generate_menu_id(_id: int) -> void:
+	active_texture_tool = "generate"
+	_render_info_bar()
+
+
+func _on_texture_sample_menu_id(_id: int) -> void:
+	active_texture_tool = "sample"
+	_render_info_bar()
 
 
 func _on_draw_menu_id(id: int) -> void:
@@ -1155,6 +1203,19 @@ func _render_info_bar() -> void:
 	if not is_instance_valid(info_bar):
 		return
 	_clear(info_bar)
+	if not selected_texture_id.is_empty():
+		var texture := _get_texture(selected_texture_id)
+		if texture.is_empty():
+			return
+		var texture_label := Label.new()
+		texture_label.text = "Texture: %s" % str(texture["name"])
+		info_bar.add_child(texture_label)
+		_add_info_option("Draw")
+		_add_info_option("Generate")
+		_add_info_option("Sample")
+		if not active_texture_tool.is_empty():
+			_add_info_option("Active: %s" % active_texture_tool.capitalize())
+		return
 	if selected_component_id.is_empty():
 		return
 	var state_label := Label.new()
@@ -1206,6 +1267,7 @@ func _confirm_asset_creation() -> void:
 	selected_texture_id = ""
 	selected_element_id = ""
 	active_state = ""
+	active_texture_tool = ""
 	expanded_assets[asset_id] = true
 	asset_dialog.hide()
 	_render_outliner()
@@ -1242,6 +1304,8 @@ func _confirm_texture_creation() -> void:
 	selected_asset_id = ""
 	selected_component_id = ""
 	active_state = ""
+	active_texture_tool = ""
+	active_texture_tool = ""
 	expanded_textures[texture_id] = true
 	texture_dialog.hide()
 	_render_outliner()
@@ -1493,6 +1557,7 @@ func _select_texture(texture_id: String) -> void:
 	selected_asset_id = ""
 	selected_component_id = ""
 	active_state = ""
+	active_texture_tool = ""
 	if was_selected:
 		expanded_textures[texture_id] = not bool(expanded_textures.get(texture_id, false))
 	_render_outliner()
