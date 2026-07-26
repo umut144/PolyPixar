@@ -81,17 +81,30 @@ open line, while clicking the first point after at least three points marks it
 as a closed contour for outer-shape semantics. Bézier editing and other contour
 types are deferred.
 
+The next validated use of the currently empty categories is the **Stone Floor
+Bloom** slice. It introduces one deliberately narrow module in each of two
+areas:
+
+- `Style → Material` binds a Workspace Texture to a Component and exposes only
+  the mapping and appearance values required by that slice.
+- `Motion → Sequence` stages time-based relationships between independently
+  editable Assets, a local Guide Shape, and Material parameters.
+
+These names are confirmed for the slice, not a commitment to a universal
+material system or general animation graph.
+
 ## Confirmed domain relationship
 
 An asset is independently editable. A morph is a deliberately designed
 relationship between two assets; it is not a permanent property or a form
 state of either asset.
 
-Textures are a second, independent Workspace document type. A Texture owns
-`elements` rather than Asset Components and stores its own canvas width and
-height. Texture data is persisted below `workspaces/<name>/textures/<id>/` in
-`texture.json`; the Texture canvas and element semantics are intentionally
-implemented in later Create phases.
+Textures are a second, independent Workspace document type. A Texture stores
+its own canvas width and height and may contain Elements for future procedural
+authoring. An imported raster Texture does **not** require Elements: it is a
+source image passed through the small import pipeline required by the current
+slice. Texture data is persisted below
+`workspaces/<name>/textures/<id>/texture.json`.
 
 The Outliner presents Assets and Textures in separate groups. Both groups are
 alphabetically ordered and share a compact search field plus `All`, `Assets`,
@@ -99,8 +112,8 @@ and `Textures` filters.
 
 `New → Texture` creates a named Texture with the default 512×512 canvas. Each
 Texture exposes an `Add` action for named Elements, which are selected and
-renamed independently in the Outliner/Inspector. Element drawing semantics are
-deferred to the Texture canvas phase.
+renamed independently in the Outliner/Inspector. Their drawing and generation
+semantics remain deferred.
 
 When a Texture or Element is selected, the Context Bar will provide the
 Texture UV canvas' `Origin` menu. The initial MVP modes are `Bottom Left`,
@@ -115,6 +128,26 @@ The initial UV Canvas is a dedicated Texture workspace. It displays a normalized
 separate U/V colors; it intentionally does not yet provide drawing or
 generator operations. The viewport supports focused `A/S/D/W` panning and
 `Q/E` zooming.
+
+### Stone Floor Bloom relationship
+
+The fourth vertical slice adds the first intentionally small cross-domain
+relationship:
+
+```text
+Imported Texture ──binds to──> Floor Component
+                                 │
+                                 ├── owns local, non-rendered Guide Shape
+                                 │
+Sequence ──references───────────┴──> Glow parameter + independent Flower Asset
+```
+
+The Guide Shape belongs locally to the floor Asset and marks *where* the bloom
+event occurs. The Flower remains an independent Asset. The Sequence, rather
+than either Asset, owns the staged relation and references all participants by
+stable IDs. Its first required tracks are a local glow value and the Flower's
+visibility/uniform-scale growth; broader effects and animation abstractions
+remain deferred.
 
 ```text
 source Asset  <── Morph ──>  target Asset
@@ -141,13 +174,15 @@ layer.
 | --- | --- |
 | Create | Not shown by default. |
 | Style | Not shown by default; may be needed later for animated style values. |
-| Motion | Shows an asset-local time view when editing movement. |
+| Motion | Shows an asset-local time view when editing movement; Slice 4 adds a contextual Sequence time view for a staged multi-object event. |
 | Transform | Shows a transition-local time view when editing a morph. |
 | Effects | Shows time controls only when an effect needs them. |
 | Export | Does not own a timeline. |
 
-The first MVP should not introduce a generic scene or sequence model unless a
-tested slice actually requires one.
+The first MVP should not introduce a generic scene or universal animation model
+until a tested slice requires one. Slice 4 is the first bounded use of a
+Sequence and must implement only the references and tracks needed for its
+floor-glow-to-flower-growth outcome.
 
 ## Transform & Snap Foundation
 
@@ -279,18 +314,20 @@ loaded or saved independently through the top-level menu.
 ```text
 workspaces/<workspace_name>/
 ├── workspace.json
-└── assets/<asset_id>/asset.json
+├── assets/<asset_id>/asset.json
+└── textures/<texture_id>/texture.json
 ```
 
 Every JSON document contains a numeric `schema_version`. The current MVP
-schema is version `2`. Workspace metadata references Asset IDs, while each
-Asset document stores its Components and their contour points. Display names
+schema is version `2`. Workspace metadata references Asset and Texture IDs.
+Each Asset document stores its Components and their contour points; each Texture
+document stores its dimensions, origin convention, and Elements. Display names
 remain editable and are not used as persistent references.
 
 Workspace JSON also contains an `editor_state` object for the restorable editor
-view: selected Asset, selected Component, and the expanded/collapsed state of
-each Asset container. On load, these IDs are validated against the loaded data;
-invalid selections fall back to an empty selection.
+view: selected Asset, Component, Texture, or Element and the expanded/collapsed
+state of Asset and Texture containers. On load, these IDs are validated against
+the loaded data; invalid selections fall back to an empty selection.
 
 `configs/app_config.json` is separate from Workspace content and stores the
 name of the last loaded or saved Workspace. On startup, the application tries
@@ -316,10 +353,11 @@ the operating system's file picker. Save overwrites the active Workspace.
 The following topics are intentionally not decided yet:
 
 - Exact submodule names and which ones are visible in the first prototype
-- Whether a future multi-asset playback container is called Scene, Sequence,
-  Stage, or is needed at all
+- Whether a future multi-asset playback container extends the first Sequence
+  model or needs a distinct concept
 - How animation clips are represented and stored
-- Where a time-based effect stores its keyframes in later slices
+- How later Motion clips, Effects, and multiple Sequences share or separate
+  their time data
 - Export formats and packing behaviour
 - Rigging depth required by the Stone-to-Monster slice
 

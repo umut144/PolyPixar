@@ -1,6 +1,7 @@
 # AssetFlow2D – MVP Checklist
 
-**Status:** UI skeleton reviewed; first functional slice pending.
+**Status:** Asset, Component, Transform, Workspace, and UV-Texture foundations
+are functional. The next implementation target is Slice 4: Stone Floor Bloom.
 **Rule:** A box is checked only after the result can be demonstrated in the
 editor. Writing code alone is not completion.
 
@@ -39,7 +40,7 @@ before implementing real creation tools.
 - [x] Show empty structural Main Toolbar and Context Bar areas ready for real
       controls.
 - [x] Add a `New` menu to the Main Toolbar with `Asset` and `Texture` entries;
-      keep `Texture` inert until its phase begins.
+      Texture initially remained inert until its own phase began.
 - [x] Implement `New → Asset` with a name dialog, OK/Cancel controls, Enter
       confirmation, and Escape cancellation.
 - [x] Use `asset01`, `asset02`, and so on when an Asset name is confirmed
@@ -58,7 +59,8 @@ before implementing real creation tools.
       ordering, search filtering, and an All/Assets/Textures filter.
 - [x] Create Textures through `New → Texture`, add named Elements with
       fallback names, select them in the Outliner, and persist their names.
-- [x] Show empty Texture-specific `Draw` and `Generate` Context Bar menus.
+- [x] Keep the initial Texture Context Bar limited to the UV `Origin` menu;
+      drawing and generation are intentionally deferred.
 - [x] Filter Outliner searches by Asset/Texture names and their
       Component/Element child names, expanding matching parents.
 - [x] Add the initial UV Texture Canvas with `Bottom Left`, `Top Left`, and
@@ -179,15 +181,72 @@ different visible structure.
 - [ ] Give the Monster a local post-transition motion.
 - [ ] Preview the complete transition and post-transition motion.
 
+## Slice 4 – Stone Floor Bloom
+
+Goal: demonstrate an imported, hand-drawn texture used as a material on an
+independent floor Asset, then use a local Guide to stage a glow followed by a
+separately authored flower growing from that place.
+
+This slice deliberately validates the connection between `Create → Texture`,
+`Style → Material`, and `Motion → Sequence`. It does not require a general VFX
+system, particle system, or universal animation graph.
+
+### A. Source assets and guide
+
+- [ ] Create a simple Stone Floor Asset with a rectangular floor Component.
+- [ ] Create an independent Flower Asset with its own editable Components.
+- [ ] Add a non-rendered Guide Shape to the Stone Floor that defines the local
+      bloom area; it must remain editable and persist with the floor Asset.
+- [ ] Keep the Flower independent of the Stone Floor: it must not store a
+      permanent dependency on the Guide or floor Asset.
+
+### B. Create → Texture: import pipeline
+
+- [ ] Add `Import Texture` to the Texture Context Bar; importing a raster image
+      must not require creating Texture Elements.
+- [ ] Preserve an imported texture as a named Workspace Texture and restore it
+      when the Workspace is loaded.
+- [ ] Provide a first background treatment that can isolate the dark ink from a
+      light paper/background (for example, a white-to-alpha or ink-mask mode).
+- [ ] Retain the derived ink/alpha information separately from the base colour
+      wherever that is necessary for later material shading.
+- [ ] Show a repeat/tile preview so a floor texture can be judged in context.
+
+### C. Style → Material
+
+- [ ] Add the first `Material` module under Style.
+- [ ] Bind a Workspace Texture to the Stone Floor Component without embedding
+      or copying the Texture into the Asset.
+- [ ] Provide the smallest useful texture mapping controls: repeat, scale, and
+      offset.
+- [ ] Provide a base colour/tint and an independent ink/line strength control.
+- [ ] Provide a glow colour and intensity parameter that can be targeted by the
+      first Sequence.
+
+### D. Motion → Sequence
+
+- [ ] Add the first `Sequence` module under Motion and show its contextual time
+      area only while that module is active.
+- [ ] Create a Sequence that deliberately references the Stone Floor, its
+      Guide Shape, and the independent Flower Asset by stable IDs.
+- [ ] Animate the Guide-area glow from inactive to visible and back down.
+- [ ] Animate the Flower from hidden/small to visible at the Guide location
+      using its pivot and uniform scale.
+- [ ] Preview the intended order: floor is normal → local guide area glows →
+      flower grows from that area.
+- [ ] Save and reload the Workspace; the imported Texture, Material binding,
+      Guide reference, and Sequence must restore correctly.
+
 ## Explicitly deferred
 
 These may become valuable later, but they are not implementation targets until
 a verified slice requires them.
 
 - Bézier curve editing
-- Full material, map, and texture authoring
+- Full material, map, and texture authoring beyond Slice 4's import, material,
+  and tile-preview requirements
 - General-purpose rigging
 - Universal particle or node-graph systems
-- Generic scene/sequence data model
+- Generic scene, multi-sequence, or universal animation-graph data model
 - Production export formats, atlases, and spritesheets
 - Advanced undo/redo and project version migration

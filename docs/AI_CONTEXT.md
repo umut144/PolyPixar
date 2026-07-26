@@ -11,12 +11,14 @@ testable vertical slices rather than a complete feature set up front.
 
 ## Current phase
 
-The repository currently contains the reviewed UI skeleton, the Asset creation
-flow, and the first in-memory Asset/Component hierarchy. The next goal is to
-add the Component Canvas while preserving the result-based workflow. Empty
-panes are preferred to invented asset content.
+The repository contains the reviewed editor shell, Asset/Component drawing and
+transforms, Workspace persistence, and the initial UV Texture Canvas. The next
+implementation target is Slice 4: **Stone Floor Bloom**. It validates imported
+Texture processing, a first Style Material binding, and a deliberately narrow
+Motion Sequence. Empty panes remain preferable to invented functionality.
 
-The current implementation target is not a functional morphing engine.
+The current implementation target is not a functional morphing engine or a
+general animation/VFX framework.
 
 ## Technology baseline
 
@@ -36,11 +38,15 @@ The current implementation target is not a functional morphing engine.
   Layers.
 - **Create / Style / Motion / Transform / Effects:** Current categories.
 - **Export:** A dedicated final output area.
+- **Sequence:** The first bounded Motion container for a staged event involving
+  stable references to Assets, Guides, and selected parameters. It is not yet
+  a general scene or animation-graph model.
 - **Timeline:** A contextual view owned by the active time-based work area,
   never a permanent global UI level.
 
-Do not use `Scene`, `Sequence`, or `Stage` as a settled data-model term. Their
-need and name are open.
+Do not use `Scene` or `Stage` as a settled data-model term. `Sequence` is the
+confirmed, deliberately narrow name for Slice 4's Motion module; do not expand
+it into a general scene or animation-graph abstraction prematurely.
 
 ## Scope guardrails
 
@@ -59,7 +65,7 @@ need and name are open.
   shared search field and All/Assets/Textures filter.
 - `New → Texture` now creates a 512×512 Texture; its Outliner `Add` action
   creates named Elements with fallback names. Texture and Element selection
-  and renaming are available, but the Texture canvas is not implemented yet.
+  and renaming are available. The UV Texture Canvas is also implemented.
 - Phase 5 Texture work will use an `Origin` menu with only `Bottom Left`,
   `Top Left`, and `Center` in the initial MVP. Draw/Generate menus are removed.
   Origin is a presentation/export convention over canonical normalized UV data;
@@ -68,8 +74,20 @@ need and name are open.
   shows the normalized field and a compact origin gizmo with separate U/V
   colors, while drawing and generation remain deferred. The canvas supports
   focused `A/S/D/W` panning and `Q/E` zooming.
-- Do not add Bézier editing, maps, full materials, a node graph, generic
-  rigging, or export pipelines until a confirmed checklist item requires them.
+- Slice 4 will add `Import Texture` to the Texture Context Bar. Imported raster
+  Textures do not require Elements. Its smallest pipeline is: retain the source
+  in the Workspace, isolate dark ink from a light background, retain useful
+  ink/alpha data for a Material, and judge repeatability with a tile preview.
+- `Style → Material` is Slice 4's first Style module. It binds a Workspace
+  Texture to a Component by stable reference and exposes only repeat, scale,
+  offset, base tint, ink strength, and glow values.
+- `Motion → Sequence` is Slice 4's first Motion module. It owns the deliberate
+  staged relation between the floor Asset, its non-rendered local Guide Shape,
+  and the independent Flower Asset. Do not make the Flower store a permanent
+  link to the floor or Guide.
+- Do not add Bézier editing, maps, material features beyond Slice 4's narrow
+  binding/shading needs, a node graph, generic rigging, or export pipelines
+  until a confirmed checklist item requires them.
 - Treat dummy UI data as dummy UI data. Do not let it quietly become a rigid
   domain model.
 - When a product or UX decision is unclear, ask before deciding it in code.
@@ -117,13 +135,13 @@ Effects, and Export are present as empty category sections until their own
 work begins.
 
 The Main Toolbar contains a `New ▼` menu with `Asset` and `Texture` entries.
-`New → Asset` opens a name dialog with OK/Cancel, Enter, and Escape handling,
-creates an in-memory Asset, lists it in the Outliner, and exposes its editable
-name in the Inspector. `Texture` remains inert. Components can now be added
-below an Asset, selected, and renamed in the Inspector. The central workspace
-identifies whether the Asset or a Component is the active context. The empty
-Shapes canvas now provides a PolyPixAAA-style grid with click-to-focus `A/S/D/W`
-pan and `Q/E` zoom controls (`E` zooms in); it still contains no asset data.
+Both open name dialogs with fallback names and create Workspace documents.
+Assets contain Components; Textures contain optional Elements. Both document
+types are listed, searched, filtered, renamed, persisted, and restored through
+the Outliner/Inspector. The central workspace identifies whether an Asset,
+Component, Texture, or Element is the active context. The Shapes canvas uses a
+PolyPixAAA-style grid with click-to-focus `A/S/D/W` pan and `Q/E` zoom controls
+(`E` zooms in).
 When a Component is selected, the Context Bar shows `⌘1 Draw ▼` and `⌘2 Edit ▼`
 (Ctrl is accepted as the equivalent modifier on non-macOS systems). The lower
 Info Bar lists the available subcommands dynamically. Draw exposes `1: Line`;
