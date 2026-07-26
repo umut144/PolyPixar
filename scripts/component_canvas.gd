@@ -46,6 +46,8 @@ var component_transform: Dictionary = {
 	"scale": Vector2.ONE,
 	"pivot": Vector2.ZERO
 }
+var material_texture: Texture2D
+var material_modulate := Color.WHITE
 var pivot_dragging := false
 var transform_drag_axis := ""
 var transform_drag_start_world := Vector2.ZERO
@@ -268,6 +270,12 @@ func set_component_transform(transform: Dictionary) -> void:
 	component_transform = transform.duplicate(true)
 	if not component_transform.has("pivot") or not component_transform["pivot"] is Vector2:
 		component_transform["pivot"] = Vector2.ZERO
+	queue_redraw()
+
+
+func set_component_material(texture: Texture2D, tint := Color.WHITE, opacity := 1.0) -> void:
+	material_texture = texture
+	material_modulate = Color(tint.r, tint.g, tint.b, clampf(float(opacity), 0.0, 1.0))
 	queue_redraw()
 
 
@@ -514,6 +522,8 @@ func _draw_outer_shape() -> void:
 		return
 	if outer_shape.is_empty():
 		return
+	if outer_shape_closed and outer_shape.size() >= 3 and is_instance_valid(material_texture):
+		_draw_material_polygon()
 	var shape_color := Color("#55c7d9")
 	var edge_count := outer_shape.size() if outer_shape_closed and outer_shape.size() >= 3 else maxi(outer_shape.size() - 1, 0)
 	for index in range(edge_count):
@@ -528,6 +538,29 @@ func _draw_outer_shape() -> void:
 	if interaction_state == "edit" and edit_mode == "add" and add_preview_visible:
 		draw_circle(_world_to_screen(_local_to_world(add_preview_point)), 8.0, Color("#f2c94c"), false, 2.0)
 		draw_circle(_world_to_screen(_local_to_world(add_preview_point)), 3.0, Color("#f2c94c"))
+
+
+func _draw_material_polygon() -> void:
+	var min_point := outer_shape[0]
+	var max_point := outer_shape[0]
+	for point in outer_shape:
+		min_point.x = minf(min_point.x, point.x)
+		min_point.y = minf(min_point.y, point.y)
+		max_point.x = maxf(max_point.x, point.x)
+		max_point.y = maxf(max_point.y, point.y)
+	var extent := max_point - min_point
+	if is_zero_approx(extent.x):
+		extent.x = 1.0
+	if is_zero_approx(extent.y):
+		extent.y = 1.0
+	var screen_points := PackedVector2Array()
+	var uvs := PackedVector2Array()
+	var colors := PackedColorArray()
+	for point in outer_shape:
+		screen_points.append(_world_to_screen(_local_to_world(point)))
+		uvs.append(Vector2((point.x - min_point.x) / extent.x, (point.y - min_point.y) / extent.y))
+		colors.append(material_modulate)
+	draw_polygon(screen_points, colors, uvs, material_texture)
 
 
 func _draw_move_gizmo(point: Vector2) -> void:

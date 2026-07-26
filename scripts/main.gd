@@ -3054,12 +3054,26 @@ func _render_material_preview() -> void:
 	material_preview_label.visible = false
 
 
+func _load_material_canvas_texture(material: Dictionary) -> Texture2D:
+	var texture := _get_texture(str(material.get("texture_id", "")))
+	if texture.is_empty():
+		return null
+	var texture_path := _get_texture_final_path(texture)
+	if texture_path.is_empty():
+		return null
+	var image := Image.new()
+	if image.load(ProjectSettings.globalize_path(texture_path)) != OK or image.is_empty():
+		return null
+	return ImageTexture.create_from_image(image)
+
+
 func _render_lookdev_canvas() -> void:
 	canvas_view.visible = true
 	texture_canvas.visible = false
 	import_preview.visible = false
 	var asset := _get_asset(lookdev_target_asset_id)
 	if asset.is_empty():
+		canvas_view.set_component_material(null)
 		canvas_context_label.text = "LookDev: Select an Asset"
 		canvas_view.set_context("")
 		canvas_view.set_interaction_state("")
@@ -3070,6 +3084,7 @@ func _render_lookdev_canvas() -> void:
 		return
 	var component := _get_component(asset, lookdev_target_component_id)
 	if component.is_empty():
+		canvas_view.set_component_material(null)
 		canvas_context_label.text = "LookDev: %s" % str(asset.get("name", "Asset"))
 		canvas_view.set_context(str(asset.get("name", "Asset")))
 		canvas_view.set_interaction_state("asset")
@@ -3086,6 +3101,11 @@ func _render_lookdev_canvas() -> void:
 	component_transform["visibility"] = bool(component.get("visibility", true))
 	component_transform["z_index"] = int(component.get("z_index", 0))
 	canvas_view.set_component_transform(component_transform)
+	var material := _get_material(str(component.get("material_id", "")))
+	if material.is_empty():
+		canvas_view.set_component_material(null)
+	else:
+		canvas_view.set_component_material(_load_material_canvas_texture(material), material.get("tint", Color.WHITE), float(material.get("opacity", 1.0)))
 	canvas_view.set_reference_shapes(_build_reference_shapes(asset, lookdev_target_component_id))
 	canvas_view.set_outer_shape(component.get("outer_shape", []), bool(component.get("closed", false)))
 

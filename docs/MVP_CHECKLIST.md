@@ -249,10 +249,11 @@ system, particle system, or universal animation graph.
       explicit Material assignment via an optional Component `material_id`.
 - [x] Persist the Component material assignment in Workspace JSON and
       snapshot history.
-- [ ] Project the Material Texture onto the LookDev component polygon.
+- [x] Project the assigned Material Texture onto a closed LookDev Component
+      polygon using normalized local bounding-box UVs.
 
 - [x] Add the first `Material` module under Style.
-- [ ] Bind a Workspace Texture to the Stone Floor Component without embedding
+- [x] Bind a Workspace Texture to the Stone Floor Component without embedding
       or copying the Texture into the Asset.
 - [ ] Provide the smallest useful texture mapping controls: repeat, scale, and
       offset.

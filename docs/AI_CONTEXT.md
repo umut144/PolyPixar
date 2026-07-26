@@ -113,8 +113,9 @@ it into a general scene or animation-graph abstraction prematurely.
   to Assets/Components and keeps the Material active as a temporary target.
   Selecting a Component switches the Inspector to that Component context and
   offers an explicit Assign Material action; the optional Component
-  `material_id` is persisted and included in history. Texture projection
-  remains a later phase.
+  `material_id` is persisted and included in history. Assigned textures now
+  project onto closed Component polygons with normalized local bounding-box
+  UVs; repeat, offset, and scale controls remain a later phase.
 - `Style → Material` is Slice 4's first Style module. It binds a Workspace
   Texture to a Component by stable reference and exposes only repeat, scale,
   offset, base tint, ink strength, and glow values.

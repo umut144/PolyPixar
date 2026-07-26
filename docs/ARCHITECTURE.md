@@ -364,8 +364,9 @@ within bounded preview dimensions. LookDev switches the Outliner to Assets and C
 keeping the Material selected as the active look target. When a Component is
 selected, the Inspector switches to that Component context and offers an
 explicit `Assign Material` action. Assignment is stored as the Component's
-optional `material_id`; texture projection onto the polygon is still a later
-phase. The graph is not yet a free-form shader editor.
+optional `material_id`; assigned textures now project onto closed Component
+polygons using normalized local bounding-box UVs. Repeat, offset, and scale
+controls remain deferred. The graph is not yet a free-form shader editor.
 
 An imported raster source is selected from the project-local
 `imports/textures/` intake folder, copied into its Texture directory, and
