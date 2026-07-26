@@ -5,7 +5,7 @@ const INACTIVE_MODULES := ["Style", "Motion", "Transform", "Effects", "Export"]
 const WORKSPACES_ROOT := "res://workspaces"
 const IMPORT_TEXTURES_ROOT := "res://imports/textures"
 const CONFIG_PATH := "res://configs/app_config.json"
-const SCHEMA_VERSION := 3
+const SCHEMA_VERSION := 4
 const MAX_HISTORY_SIZE := 100
 
 var active_create_submodule := "Shapes"
@@ -709,7 +709,6 @@ func _save_workspace() -> void:
 				"height": int(texture.get("canvas_height", 512))
 			},
 			"origin_mode": str(texture.get("origin_mode", "bottom_left")),
-			"import_source": texture.get("import_source", {}).duplicate(true),
 			"elements": texture.get("elements", []).duplicate(true)
 		})
 	_write_json("%s/workspace.json" % workspace_root, {
@@ -856,14 +855,14 @@ func _load_workspace(workspace_entry: String) -> bool:
 		if not _has_supported_schema(texture_data):
 			continue
 		var canvas_data = texture_data.get("canvas", {})
+		var legacy_import_source = texture_data.get("import_source", {})
 		loaded_textures.append({
 			"id": str(texture_data.get("id", texture_id)),
 			"name": str(texture_data.get("name", texture_id)),
 			"canvas_width": int(canvas_data.get("width", 512)) if canvas_data is Dictionary else 512,
 			"canvas_height": int(canvas_data.get("height", 512)) if canvas_data is Dictionary else 512,
 			"origin_mode": str(texture_data.get("origin_mode", "bottom_left")),
-			"import_source": texture_data.get("import_source", {}).duplicate(true) if texture_data.get("import_source", {}) is Dictionary else {},
-			"elements": texture_data.get("elements", []).duplicate(true)
+			"elements": _normalize_texture_elements(texture_data.get("elements", []), legacy_import_source)
 		})
 	assets = loaded_assets
 	textures = loaded_textures
@@ -1189,7 +1188,18 @@ func _on_texture_import_file_selected(source_path: String) -> void:
 		_show_status_message("Texture import failed.")
 		return
 	_record_direct_change()
-	texture["import_source"] = {
+	var import_element := _find_import_element(texture)
+	if import_element.is_empty():
+		var import_name := source_path.get_file().get_basename()
+		import_element = {
+			"id": "element_%d" % _next_element_id(texture),
+			"name": import_name if not import_name.is_empty() else "Import Element",
+			"type": "import",
+			"source": {}
+		}
+		texture["elements"].append(import_element)
+	import_element["type"] = "import"
+	import_element["source"] = {
 		"file": destination_filename,
 		"original_name": source_path.get_file()
 	}
@@ -1217,6 +1227,44 @@ func _copy_external_file(source_path: String, destination_path: String) -> bool:
 	destination_file.store_buffer(contents)
 	destination_file.close()
 	return true
+
+
+func _normalize_texture_elements(raw_elements, legacy_import_source) -> Array:
+	var normalized: Array = []
+	var has_import_element := false
+	if raw_elements is Array:
+		for element_variant in raw_elements:
+			if not element_variant is Dictionary:
+				continue
+			var element: Dictionary = element_variant.duplicate(true)
+			var element_type := str(element.get("type", "generator"))
+			if element_type != "import" and element_type != "generator":
+				element_type = "generator"
+			element["type"] = element_type
+			if element_type == "import":
+				has_import_element = true
+				if not element.get("source", {}) is Dictionary:
+					element["source"] = {}
+			normalized.append(element)
+	if legacy_import_source is Dictionary and not legacy_import_source.is_empty() and not has_import_element:
+		var original_name := str(legacy_import_source.get("original_name", "Imported Texture"))
+		var import_name := original_name.get_basename()
+		if import_name.is_empty():
+			import_name = "Import Element"
+		normalized.append({
+			"id": "element_%d" % _next_element_id_from_list(normalized),
+			"name": import_name,
+			"type": "import",
+			"source": legacy_import_source.duplicate(true)
+		})
+	return normalized
+
+
+func _find_import_element(texture: Dictionary) -> Dictionary:
+	for element in texture.get("elements", []):
+		if str(element.get("type", "generator")) == "import":
+			return element
+	return {}
 
 
 func _on_draw_menu_id(id: int) -> void:
@@ -1383,7 +1431,6 @@ func _confirm_texture_creation() -> void:
 		"canvas_width": 512,
 		"canvas_height": 512,
 		"origin_mode": "bottom_left",
-		"import_source": {},
 		"elements": []
 	})
 	selected_texture_id = texture_id
@@ -1438,7 +1485,7 @@ func _confirm_element_creation() -> void:
 	if element_name.is_empty():
 		element_name = _next_default_element_name(texture)
 	var element_id := "element_%d" % _next_element_id(texture)
-	texture["elements"].append({"id": element_id, "name": element_name})
+	texture["elements"].append({"id": element_id, "name": element_name, "type": "generator"})
 	selected_texture_id = texture_id
 	selected_element_id = element_id
 	expanded_textures[texture_id] = true
@@ -1449,9 +1496,14 @@ func _confirm_element_creation() -> void:
 
 
 func _next_element_id(texture: Dictionary) -> int:
+	return _next_element_id_from_list(texture.get("elements", []))
+
+
+func _next_element_id_from_list(elements: Array) -> int:
 	var next_id := 1
-	for element in texture.get("elements", []):
-		next_id = maxi(next_id, _id_suffix_number(str(element.get("id", ""))) + 1)
+	for element in elements:
+		if element is Dictionary:
+			next_id = maxi(next_id, _id_suffix_number(str(element.get("id", ""))) + 1)
 	return next_id
 
 
@@ -1813,7 +1865,8 @@ func _render_inspector() -> void:
 			texture_name_editor.focus_exited.connect(func() -> void: _rename_selected_element(texture_name_editor.text))
 		inspector_content.add_child(texture_name_editor)
 		if selected_element_id.is_empty():
-			var import_source = texture.get("import_source", {})
+			var import_element := _find_import_element(texture)
+			var import_source = import_element.get("source", {}) if not import_element.is_empty() else {}
 			if import_source is Dictionary and not import_source.is_empty():
 				inspector_content.add_child(_create_panel_label("Source"))
 				var source_label := Label.new()

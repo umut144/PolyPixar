@@ -104,7 +104,9 @@ its own canvas width and height and may contain Elements for future procedural
 authoring. An imported raster Texture does **not** require Elements: it is a
 source image passed through the small import pipeline required by the current
 slice. Texture data is persisted below
-`workspaces/<name>/textures/<id>/texture.json`.
+`workspaces/<name>/textures/<id>/texture.json`. Each Element has a `type` of
+`import` or `generator`; the Outliner may group these types without requiring
+separate data collections.
 
 The Outliner presents Assets and Textures in separate groups. Both groups are
 alphabetically ordered and share a compact search field plus `All`, `Assets`,
@@ -319,17 +321,18 @@ workspaces/<workspace_name>/
 ```
 
 Every JSON document contains a numeric `schema_version`. The current MVP
-schema is version `3`. Workspace metadata references Asset and Texture IDs.
+schema is version `4`. Workspace metadata references Asset and Texture IDs.
 Each Asset document stores its Components and their contour points; each Texture
 document stores its dimensions, origin convention, and Elements. Display names
 remain editable and are not used as persistent references.
 
 An imported raster source is selected from the project-local
 `imports/textures/` intake folder, copied into its Texture directory, and
-referenced from `texture.json` by a relative source filename plus its original
-display name. Re-importing retains prior copied sources so Undo/Redo can safely
-restore an earlier Texture source reference without depending on the intake
-file.
+referenced by its typed `import` Element with a relative source filename plus
+its original display name. Re-importing retains prior copied sources so
+Undo/Redo can safely restore an earlier Texture source reference without
+depending on the intake file. Older Texture JSONs with a Texture-level
+`import_source` field are migrated when loaded.
 
 Workspace JSON also contains an `editor_state` object for the restorable editor
 view: selected Asset, Component, Texture, or Element and the expanded/collapsed
