@@ -239,7 +239,9 @@ system, particle system, or universal animation graph.
 - [x] Add the initial independent Material data resource with a Texture
       reference, tint, and opacity; persist it in Workspace JSON and history.
 - [x] Add Material creation and the Style Material Outliner.
-- [ ] Add the minimal Material Graph, neutral Preview, and Asset LookDev views.
+- [x] Add the initial Material Graph state as a fixed GraphEdit skeleton with
+      `Texture Source → Material Output`.
+- [ ] Add the neutral Preview and Asset LookDev views.
 
 - [x] Add the first `Material` module under Style.
 - [ ] Bind a Workspace Texture to the Stone Floor Component without embedding
