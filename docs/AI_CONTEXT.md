@@ -108,7 +108,8 @@ it into a general scene or animation-graph abstraction prematurely.
 - Materials are included in workspace metadata, save/load, and history
   snapshots. The current Views context exposes a fixed GraphEdit skeleton with
   `Texture Source → Material Output` and a neutral Preview that displays the
-  selected ready Texture with tint and opacity. LookDev switches the Outliner
+  selected ready Texture immediately with tint and opacity; its surface adapts
+  to the image aspect ratio. LookDev switches the Outliner
   to Assets/Components and keeps the Material active as a temporary target;
   permanent assignment and texture projection remain later phases.
 - `Style → Material` is Slice 4's first Style module. It binds a Workspace
