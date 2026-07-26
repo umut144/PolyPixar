@@ -288,3 +288,6 @@ a verified slice requires them.
 - Generic scene, multi-sequence, or universal animation-graph data model
 - Production export formats, atlases, and spritesheets
 - Advanced undo/redo and project version migration
+- User-facing mesh editing or mesh-debug tooling. Meshing remains internal;
+  a future optional Advanced area may expose diagnostics, manual overrides,
+  and triangulation/UV guides.

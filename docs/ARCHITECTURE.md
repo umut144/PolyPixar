@@ -398,6 +398,19 @@ the operating system's file picker. Save overwrites the active Workspace.
 
 ## Architecture constraints for the MVP
 
+### Internal meshing and future Advanced tooling
+
+Meshing is shared implementation infrastructure, not a creative category. The
+authored Component contour remains authoritative; an internal triangulator and
+UV mapper derive a render mesh whenever the contour, transform, morph, or
+mapping changes. Invalid contours must fail visibly and safely rather than
+crashing or silently replacing the authored data.
+
+A future optional `Advanced` area may expose mesh diagnostics, triangle and
+vertex inspection, manual mesh overrides, and manually authored triangulation
+or UV guides. These are overrides and debugging aids; they do not replace the
+standard contour workflow and are outside the MVP.
+
 - UI prototypes may use only the smallest dummy data needed to exercise a
   specific interaction. Prefer empty panes over invented asset content.
 - Real functionality must be developed as vertical, user-testable slices.

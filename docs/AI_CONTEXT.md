@@ -255,6 +255,12 @@ Component is still rendered as the active editing overlay.
 
 ## Documentation maintenance
 
+Meshing is intentionally internal infrastructure. Components store authored
+contours; triangulation, UV generation, and render-mesh rebuilding are derived
+services shared by rendering, deformation, and morphing. A future optional
+Advanced area may expose mesh diagnostics, manual mesh overrides, and
+triangulation/UV guides, but this is not an MVP creative category.
+
 - Update `ARCHITECTURE.md` when a stable product boundary is decided.
 - Update `MVP_CHECKLIST.md` when a result is accepted, changed, or split.
 - Keep this file short and current; it is operational context, not history.
