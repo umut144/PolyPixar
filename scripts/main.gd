@@ -94,6 +94,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		return
 	if selected_component_id.is_empty():
 		return
+	if not has_command_modifier and event.keycode == KEY_DELETE and active_state.is_empty():
+		_delete_selected_component()
+		get_viewport().set_input_as_handled()
+		return
 	if has_command_modifier and event.keycode == KEY_1:
 		_activate_draw_state()
 	elif has_command_modifier and event.keycode == KEY_2:
@@ -1227,6 +1231,26 @@ func _select_component(asset_id: String, component_id: String) -> void:
 	active_state = ""
 	canvas_view.set_interaction_state("")
 	expanded_assets[asset_id] = true
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _delete_selected_component() -> void:
+	var asset := _get_asset(selected_asset_id)
+	if asset.is_empty() or selected_component_id.is_empty():
+		return
+	var component_index := -1
+	for index in range(asset["components"].size()):
+		if str(asset["components"][index]["id"]) == selected_component_id:
+			component_index = index
+			break
+	if component_index < 0:
+		return
+	_record_direct_change()
+	asset["components"].remove_at(component_index)
+	selected_component_id = ""
+	active_state = ""
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
