@@ -1736,7 +1736,7 @@ func _render_texture_element_row(texture_container: VBoxContainer, texture_id: S
 	element_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	element_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	element_button.focus_mode = Control.FOCUS_NONE
-	_style_outliner_button(element_button, str(element.get("id", "")) == selected_element_id)
+	_style_outliner_button(element_button, texture_id == selected_texture_id and str(element.get("id", "")) == selected_element_id)
 	element_button.pressed.connect(_select_element.bind(texture_id, str(element.get("id", ""))))
 	element_row.add_child(element_button)
 
