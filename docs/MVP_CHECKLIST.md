@@ -247,8 +247,13 @@ system, particle system, or universal animation graph.
       the active UI; preserve legacy state fields only for compatibility.
 - [x] Move permanent Material assignment to the Asset/Component workflow and
       render the assigned Material on the selected Component canvas.
-- [x] Export a minimal Godot 4 `.tscn` for the selected Asset with Polygon2D
-      components, transforms, visibility, z-index, and ready Texture paths.
+- [x] Add the first Export Build workspace with selected Asset, validation,
+      and Build actions.
+- [x] Validate closed, triangulable Component contours and ready Material
+      Texture references before building.
+- [x] Build a minimal Godot 4 `.tscn` using `PackedScene` and `ResourceSaver`
+      with Polygon2D components, transforms, visibility, z-index, and ready
+      Texture paths.
 
 - [x] Add the first `Material` module under Style.
 - [x] Bind a Workspace Texture to the Stone Floor Component without embedding

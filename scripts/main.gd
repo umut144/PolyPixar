@@ -63,6 +63,9 @@ var material_preview_surface: PanelContainer
 var material_preview_content: CenterContainer
 var material_preview_texture: TextureRect
 var material_preview_label: Label
+var export_workspace: VBoxContainer
+var export_summary_label: Label
+var export_validation_label: Label
 var texture_context_label: Label
 var import_preview_context_label: Label
 var context_bar: HBoxContainer
@@ -346,6 +349,7 @@ func _build_ui() -> void:
 	canvas_panel.add_child(material_graph)
 	_create_material_graph()
 	_create_material_preview()
+	_create_export_workspace(canvas_panel)
 	texture_context_label = Label.new()
 	texture_context_label.position = Vector2(8, 6)
 	texture_context_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -473,6 +477,29 @@ func _create_material_preview() -> void:
 	material_preview_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	material_preview_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	preview_stack.add_child(material_preview_label)
+
+
+func _create_export_workspace(parent: Control) -> void:
+	export_workspace = VBoxContainer.new()
+	export_workspace.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	export_workspace.add_theme_constant_override("separation", 8)
+	export_workspace.visible = false
+	parent.add_child(export_workspace)
+	var title := Label.new()
+	title.text = "Build"
+	title.add_theme_font_size_override("font_size", 16)
+	export_workspace.add_child(title)
+	export_summary_label = Label.new()
+	export_summary_label.add_theme_font_size_override("font_size", 12)
+	export_workspace.add_child(export_summary_label)
+	var pipeline := Label.new()
+	pipeline.text = "Source Asset  →  Validate  →  Godot Scene"
+	pipeline.add_theme_color_override("font_color", Color("#9aa3b2"))
+	export_workspace.add_child(pipeline)
+	export_validation_label = Label.new()
+	export_validation_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	export_validation_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	export_workspace.add_child(export_validation_label)
 
 
 func _create_panel(background_color := Color("#20242c")) -> PanelContainer:
@@ -1337,13 +1364,19 @@ func _render_context_bar() -> void:
 		return
 	_clear(context_bar)
 	if active_module == "Export":
-		var export_button := Button.new()
-		export_button.text = "Export Godot Scene"
-		export_button.custom_minimum_size = Vector2(150, 32)
-		export_button.focus_mode = Control.FOCUS_NONE
-		export_button.disabled = selected_asset_id.is_empty() or _get_asset(selected_asset_id).is_empty()
-		export_button.pressed.connect(_export_selected_asset_scene)
-		context_bar.add_child(export_button)
+		var validate_button := Button.new()
+		validate_button.text = "Validate"
+		validate_button.custom_minimum_size = Vector2(92, 32)
+		validate_button.focus_mode = Control.FOCUS_NONE
+		validate_button.pressed.connect(_validate_selected_export_asset)
+		context_bar.add_child(validate_button)
+		var build_button := Button.new()
+		build_button.text = "Build Godot Scene"
+		build_button.custom_minimum_size = Vector2(144, 32)
+		build_button.focus_mode = Control.FOCUS_NONE
+		build_button.disabled = not _export_validation_errors(_get_asset(selected_asset_id)).is_empty()
+		build_button.pressed.connect(_build_selected_asset_scene)
+		context_bar.add_child(build_button)
 		_render_info_bar()
 		return
 	if active_module == "Style" and not selected_material_id.is_empty():
@@ -1873,6 +1906,13 @@ func _render_info_bar() -> void:
 		material_state_label.text = "Material Graph"
 		info_bar.add_child(material_state_label)
 		return
+	if active_module == "Export":
+		var build_state := Label.new()
+		build_state.text = "Build: %s" % (str(_get_asset(selected_asset_id).get("name", "None")))
+		info_bar.add_child(build_state)
+		_add_info_option("Validate")
+		_add_info_option("Build")
+		return
 	if active_module == "Create" and active_create_submodule == "Layers":
 		var layers_state_label := Label.new()
 		layers_state_label.text = "Layers: Empty"
@@ -1909,7 +1949,110 @@ func _render_info_bar() -> void:
 		_add_info_option("⌘2: Edit")
 
 
-func _export_selected_asset_scene() -> void:
+func _validate_selected_export_asset() -> void:
+	_render_export_workspace()
+
+
+func _export_validation_errors(asset: Dictionary) -> Array[String]:
+	var errors: Array[String] = []
+	if asset.is_empty():
+		errors.append("Select an Asset source.")
+		return errors
+	for component in asset.get("components", []):
+		var component_name := str(component.get("name", "Component"))
+		var points: Array = component.get("outer_shape", [])
+		if not bool(component.get("closed", false)):
+			errors.append("%s: contour is not closed." % component_name)
+			continue
+		if points.size() < 3:
+			errors.append("%s: contour needs at least 3 points." % component_name)
+			continue
+		var packed_points := PackedVector2Array()
+		for point in points:
+			if point is Vector2:
+				packed_points.append(point)
+		if packed_points.size() != points.size() or Geometry2D.triangulate_polygon(packed_points).is_empty():
+			errors.append("%s: contour cannot be triangulated." % component_name)
+		var material_id := str(component.get("material_id", ""))
+		if material_id.is_empty():
+			continue
+		var material := _get_material(material_id)
+		if material.is_empty():
+			errors.append("%s: assigned Material is missing." % component_name)
+			continue
+		var texture_id := str(material.get("texture_id", ""))
+		if not texture_id.is_empty() and _texture_output_state(_get_texture(texture_id)) != "ready":
+			errors.append("%s: Material Texture is not ready." % component_name)
+	return errors
+
+
+func _render_export_workspace() -> void:
+	if not is_instance_valid(export_workspace):
+		return
+	var asset := _get_asset(selected_asset_id)
+	if asset.is_empty():
+		export_summary_label.text = "No Source Asset selected"
+		export_validation_label.text = "Select an Asset in the Outliner, then validate it before building."
+		export_validation_label.add_theme_color_override("font_color", Color("#9aa3b2"))
+		return
+	export_summary_label.text = "Source Asset: %s" % str(asset.get("name", "Asset"))
+	var errors := _export_validation_errors(asset)
+	if errors.is_empty():
+		export_validation_label.text = "Validation passed. Ready to build Godot Scene."
+		export_validation_label.add_theme_color_override("font_color", Color("#75b88a"))
+	else:
+		export_validation_label.text = "Validation\n• %s" % "\n• ".join(errors)
+		export_validation_label.add_theme_color_override("font_color", Color("#e56b6f"))
+
+
+func _build_selected_asset_scene() -> void:
+	var asset := _get_asset(selected_asset_id)
+	var errors := _export_validation_errors(asset)
+	if not errors.is_empty():
+		_show_status_message("Build blocked: validation failed.")
+		_render_export_workspace()
+		return
+	var root := Node2D.new()
+	root.name = _tscn_name(str(asset.get("name", "Asset")))
+	for component in asset.get("components", []):
+		var polygon := Polygon2D.new()
+		polygon.name = _tscn_name(str(component.get("name", "Component")))
+		polygon.polygon = PackedVector2Array(component.get("outer_shape", []))
+		var transform: Dictionary = component.get("transform", _default_component_transform())
+		polygon.position = transform.get("position", Vector2.ZERO)
+		polygon.rotation = deg_to_rad(float(transform.get("rotation", 0.0)))
+		polygon.scale = transform.get("scale", Vector2.ONE)
+		polygon.visible = bool(component.get("visibility", true))
+		polygon.z_index = int(component.get("z_index", 0))
+		var material := _get_material(str(component.get("material_id", "")))
+		if not material.is_empty():
+			var tint: Color = material.get("tint", Color.WHITE)
+			polygon.color = Color(tint.r, tint.g, tint.b, tint.a * float(material.get("opacity", 1.0)))
+			var texture := _get_texture(str(material.get("texture_id", "")))
+			var texture_path := _get_texture_final_path(texture) if not texture.is_empty() else ""
+			if not texture_path.is_empty():
+				polygon.texture = load(texture_path) as Texture2D
+		root.add_child(polygon)
+		polygon.owner = root
+	var scene := PackedScene.new()
+	var pack_error := scene.pack(root)
+	if pack_error != OK:
+		root.free()
+		_show_status_message("Build failed: could not pack scene.")
+		return
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://exports"))
+	var safe_name := _tscn_name(str(asset.get("name", "Asset")).to_lower().replace(" ", "_"))
+	var scene_path := "res://exports/%s.tscn" % safe_name
+	var save_error := ResourceSaver.save(scene, scene_path)
+	root.free()
+	if save_error != OK:
+		_show_status_message("Build failed: could not save scene.")
+		return
+	_show_status_message("Built Godot Scene: %s" % scene_path)
+	_render_export_workspace()
+
+
+func _export_selected_asset_scene_legacy() -> void:
 	var asset := _get_asset(selected_asset_id)
 	if asset.is_empty():
 		_show_status_message("Select an Asset before exporting.")
@@ -2915,6 +3058,15 @@ func _render_inspector() -> void:
 	_clear(inspector_content)
 	transform_fields.clear()
 	inspector_content.add_child(_create_panel_label("Inspector"))
+	if active_module == "Export":
+		inspector_content.add_child(_create_inspector_section("Build"))
+		inspector_content.add_child(_create_inspector_field_label("Source Asset"))
+		inspector_content.add_child(_create_inspector_field_label(str(_get_asset(selected_asset_id).get("name", "None"))))
+		inspector_content.add_child(_create_inspector_field_label("Output Path"))
+		inspector_content.add_child(_create_inspector_field_label("res://exports/"))
+		inspector_content.add_child(_create_inspector_field_label("Format"))
+		inspector_content.add_child(_create_inspector_field_label("Godot Scene (.tscn)"))
+		return
 	if active_module == "Style":
 		_render_material_inspector()
 		return
@@ -3331,6 +3483,19 @@ func _render_canvas_context() -> void:
 	_render_info_bar()
 	if not is_instance_valid(canvas_context_label):
 		return
+	if active_module == "Export":
+		canvas_view.visible = false
+		texture_canvas.visible = false
+		import_preview.visible = false
+		material_graph.visible = false
+		material_preview_container.visible = false
+		export_workspace.visible = true
+		_render_export_workspace()
+		canvas_context_label.text = ""
+		texture_context_label.text = ""
+		import_preview_context_label.text = ""
+		return
+	export_workspace.visible = false
 	if active_module == "Style":
 		canvas_view.visible = false
 		texture_canvas.visible = false

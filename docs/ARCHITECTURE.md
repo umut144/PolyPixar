@@ -366,11 +366,18 @@ authoritative end-look validation path. Material assignment is performed in
 the normal Asset Component Inspector and is stored as the Component's optional
 `material_id`; the selected Component canvas uses that assignment directly.
 
-The first export path writes a minimal Godot 4 `.tscn` scene below
-`res://exports/` for the selected Asset. Components become `Polygon2D` nodes
-with their contour, transform, visibility, z-index, and ready Material Texture
-references. This is an intentionally small export slice; mesh resources,
-advanced UV mapping, and reusable external material resources follow later.
+Export is a build workflow rather than a creative canvas. The first build
+workspace presents `Source Asset → Validate → Godot Scene`; its context bar
+offers Validate and Build actions, and its Inspector displays the source,
+format, and output location. Validation requires closed, triangulable contours
+and valid ready Material Texture references before Build is enabled.
+
+The first build writes a minimal Godot 4 `.tscn` scene below `res://exports/`
+for the selected Asset. It uses Godot's `Node2D`, `Polygon2D`, `PackedScene`,
+and `ResourceSaver` APIs instead of manually composing `.tscn` text.
+Components carry their contour, transform, visibility, z-index, and ready
+Material Texture references. Mesh resources, advanced UV mapping, and reusable
+external material resources follow later.
 
 An imported raster source is selected from the project-local
 `imports/textures/` intake folder, copied into its Texture directory, and
