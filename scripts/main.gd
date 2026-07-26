@@ -1570,6 +1570,14 @@ func _render_info_bar() -> void:
 		return
 	_clear(info_bar)
 	if not selected_texture_id.is_empty():
+		var texture := _get_texture(selected_texture_id)
+		var selected_element := _get_element(texture, selected_element_id)
+		if not selected_element.is_empty() and str(selected_element.get("type", "generator")) == "import":
+			var state_label := Label.new()
+			state_label.text = "State: Preview"
+			info_bar.add_child(state_label)
+			_add_info_option("1: Original")
+			_add_info_option("2: White to Alpha")
 		return
 	if selected_component_id.is_empty():
 		return
