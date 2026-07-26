@@ -3126,9 +3126,9 @@ func _render_material_preview() -> void:
 	)
 	material_preview_label.visible = texture_path.is_empty()
 	if texture_path.is_empty():
-		material_preview_surface.custom_minimum_size = Vector2(360, 360)
-	material_preview_content.custom_minimum_size = Vector2(240, 140)
-	material_preview_texture.custom_minimum_size = Vector2(240, 140)
+		material_preview_surface.custom_minimum_size = Vector2(280, 180)
+		material_preview_content.custom_minimum_size = Vector2(240, 140)
+		material_preview_texture.custom_minimum_size = Vector2(240, 140)
 		return
 	var image := Image.new()
 	if image.load(ProjectSettings.globalize_path(texture_path)) != OK or image.is_empty():
