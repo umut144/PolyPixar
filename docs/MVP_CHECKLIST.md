@@ -247,7 +247,8 @@ system, particle system, or universal animation graph.
       the active UI; preserve legacy state fields only for compatibility.
 - [x] Move permanent Material assignment to the Asset/Component workflow and
       render the assigned Material on the selected Component canvas.
-- [ ] Export a real Godot artifact for authoritative end-look validation.
+- [x] Export a minimal Godot 4 `.tscn` for the selected Asset with Polygon2D
+      components, transforms, visibility, z-index, and ready Texture paths.
 
 - [x] Add the first `Material` module under Style.
 - [x] Bind a Workspace Texture to the Stone Floor Component without embedding

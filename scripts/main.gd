@@ -1336,6 +1336,16 @@ func _render_context_bar() -> void:
 	if not is_instance_valid(context_bar):
 		return
 	_clear(context_bar)
+	if active_module == "Export":
+		var export_button := Button.new()
+		export_button.text = "Export Godot Scene"
+		export_button.custom_minimum_size = Vector2(150, 32)
+		export_button.focus_mode = Control.FOCUS_NONE
+		export_button.disabled = selected_asset_id.is_empty() or _get_asset(selected_asset_id).is_empty()
+		export_button.pressed.connect(_export_selected_asset_scene)
+		context_bar.add_child(export_button)
+		_render_info_bar()
+		return
 	if active_module == "Style" and not selected_material_id.is_empty():
 		_render_material_context_bar()
 		_render_info_bar()
@@ -1897,6 +1907,83 @@ func _render_info_bar() -> void:
 	else:
 		_add_info_option("⌘1: Draw")
 		_add_info_option("⌘2: Edit")
+
+
+func _export_selected_asset_scene() -> void:
+	var asset := _get_asset(selected_asset_id)
+	if asset.is_empty():
+		_show_status_message("Select an Asset before exporting.")
+		return
+	var export_dir := "res://exports"
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(export_dir))
+	var safe_name := str(asset.get("name", "Asset")).strip_edges().to_lower().replace(" ", "_")
+	if safe_name.is_empty():
+		safe_name = str(asset.get("id", "asset"))
+	var scene_path := "%s/%s.tscn" % [export_dir, safe_name]
+	var lines: Array[String] = []
+	lines.append("[gd_scene load_steps=%d format=3]" % (1 + _export_texture_resource_count(asset)))
+	var resource_id := 1
+	var texture_resources := {}
+	for component in asset.get("components", []):
+		var material := _get_material(str(component.get("material_id", "")))
+		var texture := _get_texture(str(material.get("texture_id", ""))) if not material.is_empty() else {}
+		var texture_path := _get_texture_final_path(texture) if not texture.is_empty() else ""
+		if texture_path.is_empty() or texture_resources.has(texture_path):
+			continue
+		texture_resources[texture_path] = resource_id
+		lines.append("[ext_resource type=\"Texture2D\" path=\"%s\" id=\"%d_tex\"]" % [texture_path, resource_id])
+		resource_id += 1
+	for component in asset.get("components", []):
+		var material := _get_material(str(component.get("material_id", "")))
+		var texture := _get_texture(str(material.get("texture_id", ""))) if not material.is_empty() else {}
+		var texture_path := _get_texture_final_path(texture) if not texture.is_empty() else ""
+		var node_name := _tscn_name(str(component.get("name", "Component")))
+		var transform: Dictionary = component.get("transform", _default_component_transform())
+		var position: Vector2 = transform.get("position", Vector2.ZERO)
+		var scale: Vector2 = transform.get("scale", Vector2.ONE)
+		var rotation := deg_to_rad(float(transform.get("rotation", 0.0)))
+		lines.append("\n[node name=\"%s\" type=\"Polygon2D\" parent=\".\"]" % node_name)
+		lines.append("polygon = %s" % _tscn_vector2_array(component.get("outer_shape", [])))
+		lines.append("position = Vector2(%s, %s)" % [str(position.x), str(position.y)])
+		lines.append("rotation = %s" % str(rotation))
+		lines.append("scale = Vector2(%s, %s)" % [str(scale.x), str(scale.y)])
+		lines.append("visible = %s" % str(bool(component.get("visibility", true))).to_lower())
+		lines.append("z_index = %d" % int(component.get("z_index", 0)))
+		if not material.is_empty():
+			var tint: Color = material.get("tint", Color.WHITE)
+			lines.append("color = Color(%s, %s, %s, %s)" % [str(tint.r), str(tint.g), str(tint.b), str(tint.a * float(material.get("opacity", 1.0)))])
+		if texture_resources.has(texture_path):
+			lines.append("texture = ExtResource(\"%d_tex\")" % int(texture_resources[texture_path]))
+	var file := FileAccess.open(scene_path, FileAccess.WRITE)
+	if file == null:
+		_show_status_message("Export failed.")
+		return
+	file.store_string("\n".join(lines) + "\n")
+	file.close()
+	_show_status_message("Exported: %s" % scene_path)
+
+
+func _export_texture_resource_count(asset: Dictionary) -> int:
+	var paths := {}
+	for component in asset.get("components", []):
+		var material := _get_material(str(component.get("material_id", "")))
+		var texture := _get_texture(str(material.get("texture_id", ""))) if not material.is_empty() else {}
+		var texture_path := _get_texture_final_path(texture) if not texture.is_empty() else ""
+		if not texture_path.is_empty():
+			paths[texture_path] = true
+	return paths.size()
+
+
+func _tscn_name(value: String) -> String:
+	return value.replace("\"", "'") if not value.is_empty() else "Component"
+
+
+func _tscn_vector2_array(points: Array) -> String:
+	var values: Array[String] = []
+	for point in points:
+		var vector: Vector2 = point if point is Vector2 else Vector2.ZERO
+		values.append("%s, %s" % [str(vector.x), str(vector.y)])
+	return "PackedVector2Array(%s)" % ", ".join(values)
 
 
 func _add_info_option(text: String) -> void:

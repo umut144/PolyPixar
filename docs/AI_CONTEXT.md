@@ -114,7 +114,9 @@ it into a general scene or animation-graph abstraction prematurely.
   mapping will later become a graph concern. Material assignment is performed
   in the normal Asset Component Inspector and the selected Component canvas
   uses its optional `material_id`. Exported Godot artifacts are the
-  authoritative end-look validation path.
+  authoritative end-look validation path. The first export action writes a
+  minimal `res://exports/<asset>.tscn` with Polygon2D nodes and ready Texture
+  references.
 - `Style → Material` is Slice 4's first Style module. It binds a Workspace
   Texture to a Component by stable reference and exposes only repeat, scale,
   offset, base tint, ink strength, and glow values.
