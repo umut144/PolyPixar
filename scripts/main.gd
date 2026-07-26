@@ -2243,10 +2243,12 @@ func _render_inspector() -> void:
 			threshold_field.min_value = 0.0
 			threshold_field.max_value = 1.0
 			threshold_field.step = 0.01
-			threshold_field.value = clampf(float(pipeline.get("threshold", 0.05)), 0.0, 1.0)
 			threshold_field.custom_minimum_size = Vector2(0, 26)
 			threshold_field.add_theme_font_size_override("font_size", 11)
 			threshold_field.value_changed.connect(_on_import_threshold_changed)
+			# Rebuilding the Inspector must not emit value_changed and overwrite
+			# the user's current threshold with the default value.
+			threshold_field.set_value_no_signal(clampf(float(pipeline.get("threshold", 0.05)), 0.0, 1.0))
 			inspector_content.add_child(threshold_field)
 			var process_button := Button.new()
 			process_button.text = "Process"
