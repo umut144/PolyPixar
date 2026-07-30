@@ -51,6 +51,11 @@ var material_modulate := Color.WHITE
 var material_mapping_scale := Vector2.ONE
 var material_mapping_offset := Vector2.ZERO
 var material_wrap_mode := "clamp"
+var reference_image: Texture2D
+var reference_image_visible := true
+var reference_image_opacity := 0.5
+var reference_image_position := Vector2.ZERO
+var reference_image_scale := 1.0
 var pivot_dragging := false
 var transform_drag_axis := ""
 var transform_drag_start_world := Vector2.ZERO
@@ -285,6 +290,15 @@ func set_component_material(texture: Texture2D, tint := Color.WHITE, opacity := 
 	queue_redraw()
 
 
+func set_reference_image(texture: Texture2D, image_visible := true, image_opacity := 0.5, image_position := Vector2.ZERO, image_scale := 1.0) -> void:
+	reference_image = texture
+	reference_image_visible = image_visible
+	reference_image_opacity = clampf(float(image_opacity), 0.0, 1.0)
+	reference_image_position = image_position
+	reference_image_scale = maxf(float(image_scale), 0.01)
+	queue_redraw()
+
+
 func _local_to_world(local_point: Vector2) -> Vector2:
 	return _local_to_world_with_transform(local_point, component_transform)
 
@@ -401,11 +415,23 @@ func _draw() -> void:
 	var y_axis_color := Color("#4c6a5b")
 	draw_line(_world_to_screen(Vector2(min_world.x, 0.0)), _world_to_screen(Vector2(max_world.x, 0.0)), x_axis_color, 2.0)
 	draw_line(_world_to_screen(Vector2(0.0, min_world.y)), _world_to_screen(Vector2(0.0, max_world.y)), y_axis_color, 2.0)
+	_draw_reference_image()
 	_draw_reference_shapes()
 	_draw_outer_shape()
 	_draw_pivot()
 	_draw_transform_gizmo()
 	_draw_line_draft()
+
+
+func _draw_reference_image() -> void:
+	if not is_instance_valid(reference_image) or not reference_image_visible:
+		return
+	var image_size := Vector2(reference_image.get_width(), reference_image.get_height()) * reference_image_scale * zoom
+	if image_size.x <= 0.0 or image_size.y <= 0.0:
+		return
+	var image_center := _world_to_screen(reference_image_position)
+	var image_rect := Rect2(image_center - image_size * 0.5, image_size)
+	draw_texture_rect(reference_image, image_rect, false, Color(1.0, 1.0, 1.0, reference_image_opacity))
 
 
 func _draw_pivot() -> void:

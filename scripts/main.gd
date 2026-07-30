@@ -46,6 +46,7 @@ var texture_name_input: LineEdit
 var material_dialog: ConfirmationDialog
 var material_name_input: LineEdit
 var texture_import_dialog: FileDialog
+var reference_image_dialog: FileDialog
 var element_dialog: ConfirmationDialog
 var element_name_input: LineEdit
 var asset_name_editor: LineEdit
@@ -402,6 +403,7 @@ func _build_ui() -> void:
 	_create_texture_dialog()
 	_create_material_dialog()
 	_create_texture_import_dialog()
+	_create_reference_image_dialog()
 	_create_element_dialog()
 	_create_workspace_dialogs()
 
@@ -719,6 +721,20 @@ func _create_texture_import_dialog() -> void:
 	add_child(texture_import_dialog)
 
 
+func _create_reference_image_dialog() -> void:
+	reference_image_dialog = FileDialog.new()
+	reference_image_dialog.title = "Load Reference Image"
+	reference_image_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
+	reference_image_dialog.access = FileDialog.ACCESS_FILESYSTEM
+	reference_image_dialog.use_native_dialog = true
+	reference_image_dialog.filters = PackedStringArray([
+		"*.png, *.jpg, *.jpeg, *.webp ; Image files"
+	])
+	reference_image_dialog.current_dir = ProjectSettings.globalize_path(IMPORT_TEXTURES_ROOT)
+	reference_image_dialog.file_selected.connect(_on_reference_image_file_selected)
+	add_child(reference_image_dialog)
+
+
 func _create_element_dialog() -> void:
 	element_dialog = ConfirmationDialog.new()
 	element_dialog.title = "Add Element"
@@ -909,6 +925,7 @@ func _save_workspace() -> void:
 			"id": asset_id,
 			"name": str(asset["name"]),
 			"visibility": bool(asset.get("visibility", true)),
+			"reference_image": _serialize_reference_image(asset.get("reference_image", {})),
 			"components": []
 		}
 		for component in asset["components"]:
@@ -1112,6 +1129,7 @@ func _load_workspace(workspace_entry: String) -> bool:
 			"id": str(asset_data.get("id", asset_id)),
 			"name": str(asset_data.get("name", asset_id)),
 			"visibility": bool(asset_data.get("visibility", true)),
+			"reference_image": _normalize_reference_image(asset_data.get("reference_image", {})),
 			"components": components
 		})
 	for texture_id_variant in workspace_data.get("textures", []):
@@ -1283,6 +1301,47 @@ func _serialize_transform(transform: Dictionary) -> Dictionary:
 		"scale": _serialize_vector(normalized["scale"]),
 		"pivot": _serialize_vector(normalized["pivot"])
 	}
+
+
+func _default_reference_image() -> Dictionary:
+	return {
+		"file": "",
+		"visible": true,
+		"opacity": 0.5,
+		"position": Vector2.ZERO,
+		"scale": 1.0
+	}
+
+
+func _normalize_reference_image(raw_reference) -> Dictionary:
+	var result := _default_reference_image()
+	if not raw_reference is Dictionary:
+		return result
+	result["file"] = str(raw_reference.get("file", "")).get_file()
+	result["visible"] = bool(raw_reference.get("visible", true))
+	result["opacity"] = clampf(float(raw_reference.get("opacity", 0.5)), 0.0, 1.0)
+	result["position"] = _deserialize_vector(raw_reference.get("position", [0.0, 0.0]), Vector2.ZERO)
+	result["scale"] = maxf(float(raw_reference.get("scale", 1.0)), 0.01)
+	return result
+
+
+func _serialize_reference_image(raw_reference) -> Dictionary:
+	var normalized := _normalize_reference_image(raw_reference)
+	return {
+		"file": str(normalized["file"]),
+		"visible": bool(normalized["visible"]),
+		"opacity": float(normalized["opacity"]),
+		"position": _serialize_vector(normalized["position"]),
+		"scale": float(normalized["scale"])
+	}
+
+
+func _reference_image_path(asset: Dictionary) -> String:
+	var reference_image := _normalize_reference_image(asset.get("reference_image", {}))
+	var reference_file := str(reference_image.get("file", ""))
+	if workspace_name.is_empty() or reference_file.is_empty():
+		return ""
+	return "%s/%s/assets/%s/%s" % [WORKSPACES_ROOT, workspace_name, str(asset.get("id", "")), reference_file]
 
 
 func _deserialize_transform(transform) -> Dictionary:
@@ -2196,7 +2255,7 @@ func _confirm_asset_creation() -> void:
 		asset_name = _next_default_asset_name()
 	var asset_id := "asset_%d" % next_asset_id
 	next_asset_id += 1
-	assets.append({"id": asset_id, "name": asset_name, "visibility": true, "components": []})
+	assets.append({"id": asset_id, "name": asset_name, "visibility": true, "reference_image": _default_reference_image(), "components": []})
 	selected_asset_id = asset_id
 	selected_component_id = ""
 	selected_texture_id = ""
@@ -2205,6 +2264,98 @@ func _confirm_asset_creation() -> void:
 	expanded_assets[asset_id] = true
 	asset_dialog.hide()
 	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _open_reference_image_dialog() -> void:
+	if _get_asset(selected_asset_id).is_empty():
+		return
+	if workspace_name.is_empty():
+		_show_status_message("Create or load a Workspace before loading a Reference Image.")
+		return
+	reference_image_dialog.current_dir = ProjectSettings.globalize_path(IMPORT_TEXTURES_ROOT)
+	reference_image_dialog.popup_centered_ratio()
+
+
+func _on_reference_image_file_selected(source_path: String) -> void:
+	var asset := _get_asset(selected_asset_id)
+	if asset.is_empty() or workspace_name.is_empty():
+		return
+	var extension := source_path.get_extension().to_lower()
+	if extension.is_empty():
+		_show_status_message("Reference Image has no supported file extension.")
+		return
+	var reference_filename := "reference.%s" % extension
+	var asset_root := "%s/%s/assets/%s" % [WORKSPACES_ROOT, workspace_name, str(asset.get("id", ""))]
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(asset_root))
+	var source_file := FileAccess.open(source_path, FileAccess.READ)
+	var destination_path := "%s/%s" % [asset_root, reference_filename]
+	var destination_file := FileAccess.open(ProjectSettings.globalize_path(destination_path), FileAccess.WRITE)
+	if source_file == null or destination_file == null:
+		_show_status_message("Reference Image could not be copied.")
+		return
+	destination_file.store_buffer(source_file.get_buffer(source_file.get_length()))
+	source_file.close()
+	destination_file.close()
+	var reference_image := _normalize_reference_image(asset.get("reference_image", {}))
+	reference_image["file"] = reference_filename
+	_record_direct_change()
+	asset["reference_image"] = reference_image
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _clear_reference_image() -> void:
+	var asset := _get_asset(selected_asset_id)
+	if asset.is_empty():
+		return
+	var reference_image := _normalize_reference_image(asset.get("reference_image", {}))
+	if str(reference_image.get("file", "")).is_empty():
+		return
+	_record_direct_change()
+	reference_image["file"] = ""
+	asset["reference_image"] = reference_image
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _on_reference_image_visibility_changed(image_visible: bool) -> void:
+	_update_reference_image_property("visible", image_visible)
+
+
+func _on_reference_image_property_changed(value: float, property_name: String) -> void:
+	var asset := _get_asset(selected_asset_id)
+	if asset.is_empty():
+		return
+	var reference_image := _normalize_reference_image(asset.get("reference_image", {}))
+	if property_name == "opacity":
+		reference_image["opacity"] = clampf(value, 0.0, 1.0)
+	elif property_name == "position_x":
+		var reference_position: Vector2 = reference_image["position"]
+		reference_position.x = value
+		reference_image["position"] = reference_position
+	elif property_name == "position_y":
+		var reference_position: Vector2 = reference_image["position"]
+		reference_position.y = value
+		reference_image["position"] = reference_position
+	elif property_name == "scale":
+		reference_image["scale"] = maxf(value, 0.01)
+	else:
+		return
+	_record_direct_change()
+	asset["reference_image"] = reference_image
+	_render_canvas_context()
+
+
+func _update_reference_image_property(property_name: String, value) -> void:
+	var asset := _get_asset(selected_asset_id)
+	if asset.is_empty():
+		return
+	var reference_image := _normalize_reference_image(asset.get("reference_image", {}))
+	reference_image[property_name] = value
+	_record_direct_change()
+	asset["reference_image"] = reference_image
 	_render_inspector()
 	_render_canvas_context()
 
@@ -3269,6 +3420,53 @@ func _render_inspector() -> void:
 			_rename_selected_asset(asset_name_editor.text)
 		)
 		inspector_content.add_child(asset_name_editor)
+		var reference_image := _normalize_reference_image(asset.get("reference_image", {}))
+		inspector_content.add_child(_create_inspector_section("Reference Image"))
+		var reference_buttons := HBoxContainer.new()
+		var load_reference_button := Button.new()
+		load_reference_button.text = "Load Image" if str(reference_image.get("file", "")).is_empty() else "Replace Image"
+		load_reference_button.custom_minimum_size = Vector2(0, 26)
+		load_reference_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		load_reference_button.focus_mode = Control.FOCUS_NONE
+		load_reference_button.pressed.connect(_open_reference_image_dialog)
+		reference_buttons.add_child(load_reference_button)
+		if not str(reference_image.get("file", "")).is_empty():
+			var clear_reference_button := Button.new()
+			clear_reference_button.text = "Clear"
+			clear_reference_button.custom_minimum_size = Vector2(64, 26)
+			clear_reference_button.focus_mode = Control.FOCUS_NONE
+			clear_reference_button.pressed.connect(_clear_reference_image)
+			reference_buttons.add_child(clear_reference_button)
+		inspector_content.add_child(reference_buttons)
+		if not str(reference_image.get("file", "")).is_empty():
+			var reference_file_label := _create_inspector_field_label(str(reference_image.get("file", "")))
+			reference_file_label.add_theme_color_override("font_color", Color("#9aa3b2"))
+			inspector_content.add_child(reference_file_label)
+		var reference_visibility := CheckBox.new()
+		reference_visibility.text = "Visible"
+		reference_visibility.focus_mode = Control.FOCUS_NONE
+		reference_visibility.button_pressed = bool(reference_image.get("visible", true))
+		reference_visibility.toggled.connect(_on_reference_image_visibility_changed)
+		inspector_content.add_child(reference_visibility)
+		var reference_opacity := SpinBox.new()
+		reference_opacity.name = "ReferenceImageOpacity"
+		reference_opacity.min_value = 0.0
+		reference_opacity.max_value = 1.0
+		reference_opacity.step = 0.01
+		reference_opacity.custom_minimum_size = Vector2(0, 26)
+		reference_opacity.value = float(reference_image.get("opacity", 0.5))
+		reference_opacity.value_changed.connect(_on_reference_image_property_changed.bind("opacity"))
+		inspector_content.add_child(_create_inspector_field_label("Opacity"))
+		inspector_content.add_child(reference_opacity)
+		var reference_transform_grid := GridContainer.new()
+		reference_transform_grid.columns = 2
+		reference_transform_grid.add_theme_constant_override("h_separation", 8)
+		reference_transform_grid.add_theme_constant_override("v_separation", 4)
+		var reference_position: Vector2 = reference_image.get("position", Vector2.ZERO)
+		_add_reference_image_field(reference_transform_grid, "Position X", reference_position.x, "position_x")
+		_add_reference_image_field(reference_transform_grid, "Position Y", reference_position.y, "position_y")
+		_add_reference_image_field(reference_transform_grid, "Scale", float(reference_image.get("scale", 1.0)), "scale")
+		inspector_content.add_child(reference_transform_grid)
 		return
 	var component := _get_component(asset, selected_component_id)
 	if component.is_empty():
@@ -3355,6 +3553,24 @@ func _create_name_editor(value: String, placeholder: String) -> LineEdit:
 	editor.placeholder_text = placeholder
 	editor.add_theme_font_size_override("font_size", 12)
 	return editor
+
+
+func _add_reference_image_field(grid: GridContainer, label_text: String, value: float, property_name: String) -> void:
+	var label := Label.new()
+	label.text = label_text
+	label.add_theme_font_size_override("font_size", 10)
+	label.add_theme_color_override("font_color", Color("#7f8a9b"))
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	grid.add_child(label)
+	var field := SpinBox.new()
+	field.min_value = 0.01 if property_name == "scale" else -100000.0
+	field.max_value = 100000.0
+	field.step = 0.01 if property_name == "scale" else 1.0
+	field.value = value
+	field.custom_minimum_size = Vector2(96, 26)
+	field.add_theme_font_size_override("font_size", 11)
+	field.value_changed.connect(_on_reference_image_property_changed.bind(property_name))
+	grid.add_child(field)
 
 
 func _add_transform_field(grid: GridContainer, label_text: String, value: float, property_name: String, step: float) -> void:
@@ -3655,6 +3871,7 @@ func _render_canvas_context() -> void:
 	_render_info_bar()
 	if not is_instance_valid(canvas_context_label):
 		return
+	canvas_view.set_reference_image(null)
 	if active_module == "Export":
 		canvas_view.visible = false
 		texture_canvas.visible = false
@@ -3728,6 +3945,7 @@ func _render_canvas_context() -> void:
 		canvas_view.set_reference_shapes([])
 		canvas_view.set_outer_shape([])
 		return
+	_set_reference_image_canvas(asset)
 	if selected_component_id.is_empty():
 		canvas_context_label.text = "Asset: %s" % str(asset["name"])
 		canvas_view.set_context(str(asset["name"]))
@@ -3765,6 +3983,21 @@ func _render_canvas_context() -> void:
 	canvas_view.set_outer_shape(component["outer_shape"], component_closed)
 	if active_state == "draw" and not component_closed:
 		canvas_view.set_line_draft(component["outer_shape"])
+
+
+func _set_reference_image_canvas(asset: Dictionary) -> void:
+	var reference_image := _normalize_reference_image(asset.get("reference_image", {}))
+	var reference_path := _reference_image_path(asset)
+	var reference_texture: Texture2D = null
+	if not reference_path.is_empty() and FileAccess.file_exists(ProjectSettings.globalize_path(reference_path)):
+		reference_texture = load(reference_path) as Texture2D
+	canvas_view.set_reference_image(
+		reference_texture,
+		bool(reference_image.get("visible", true)),
+		float(reference_image.get("opacity", 0.5)),
+		reference_image.get("position", Vector2.ZERO),
+		float(reference_image.get("scale", 1.0))
+	)
 
 
 func _build_reference_shapes(asset: Dictionary, excluded_component_id := "") -> Array:
