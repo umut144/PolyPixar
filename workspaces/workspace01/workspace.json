@@ -5,15 +5,13 @@
 	"editor_state": {
 		"active_module": "Create",
 		"expanded_assets": {
-			"asset_1": false
+			"asset_1": true
 		},
-		"expanded_textures": {
-			"texture_1": true,
-			"texture_2": true
-		},
+		"expanded_textures": {},
 		"lookdev_target_asset_id": "",
 		"lookdev_target_component_id": "",
 		"material_view_mode": "graph",
+		"paper_level": 0,
 		"selected_asset_id": "asset_1",
 		"selected_component_id": "",
 		"selected_element_id": "",
@@ -21,17 +19,16 @@
 		"selected_texture_id": "",
 		"snap": {
 			"enabled": true,
-			"grid_step": 16.0,
+			"grid_step": 0.5,
 			"rotation_step": 15.0
+		},
+		"world_scale": {
+			"grid_size": 0.5,
+			"unit": "cm"
 		}
 	},
-	"materials": [
-		"material_1"
-	],
+	"materials": [],
 	"name": "workspace01",
 	"schema_version": 8,
-	"textures": [
-		"texture_1",
-		"texture_2"
-	]
+	"textures": []
 }

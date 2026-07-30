@@ -11,7 +11,10 @@ signal transform_changed(transform: Dictionary)
 
 const PAN_SPEED := 420.0
 const MIN_ZOOM := 0.25
-const MAX_ZOOM := 8.0
+const MAX_ZOOM := 256.0
+const DEFAULT_ZOOM := 1.0
+const DEFAULT_PAPER_SIZE_CM := Vector2(14.8, 21.0) # DIN A5, portrait
+const DEFAULT_PAPER_MARGIN := 0.9
 const ZOOM_RATE := 1.8
 const CLOSE_DISTANCE_PIXELS := 14.0
 const GIZMO_AXIS_LENGTH := 42.0
@@ -20,9 +23,10 @@ const FREE_HANDLE_RADIUS := 10.0
 const MEASUREMENT_DASH_LENGTH := 7.0
 const MEASUREMENT_GAP_LENGTH := 5.0
 const MEASUREMENT_FONT_SIZE := 14
+const GRID_PACKAGE_MIN_PIXELS := 12.0
 
 var view_center := Vector2.ZERO
-var zoom := 1.0
+var zoom := DEFAULT_ZOOM
 var context_name := ""
 var active_tool := ""
 var interaction_state := ""
@@ -42,8 +46,7 @@ var add_preview_visible := false
 var snap_enabled := true
 var grid_step := 16.0
 var rotation_step := 15.0
-var world_grid_size := 0.05
-var godot_units_per_world_unit := 100.0
+var world_grid_size := 0.5
 var component_transform: Dictionary = {
 	"position": Vector2.ZERO,
 	"rotation": 0.0,
@@ -60,6 +63,8 @@ var reference_image_visible := true
 var reference_image_opacity := 0.5
 var reference_image_position := Vector2.ZERO
 var reference_image_scale := 1.0
+var paper_frame_visible := false
+var paper_frame_size := Vector2.ZERO
 var pivot_dragging := false
 var transform_drag_axis := ""
 var transform_drag_start_world := Vector2.ZERO
@@ -71,9 +76,21 @@ var transform_drag_start_scale := Vector2.ONE
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	focus_mode = Control.FOCUS_CLICK
+	focus_mode = Control.FOCUS_ALL
 	mouse_entered.connect(_on_mouse_entered)
 	mouse_exited.connect(_on_mouse_exited)
+	call_deferred("_apply_default_zoom")
+	queue_redraw()
+
+
+func _apply_default_zoom() -> void:
+	if size.x <= 0.0 or size.y <= 0.0:
+		return
+	var fit_zoom := minf(
+		size.x / DEFAULT_PAPER_SIZE_CM.x,
+		size.y / DEFAULT_PAPER_SIZE_CM.y
+	) * DEFAULT_PAPER_MARGIN
+	zoom = clampf(fit_zoom, MIN_ZOOM, MAX_ZOOM)
 	queue_redraw()
 
 
@@ -273,15 +290,14 @@ func set_transform_mode(mode: String) -> void:
 
 func set_snap_settings(enabled: bool, new_grid_step: float, new_rotation_step: float) -> void:
 	snap_enabled = enabled
-	grid_step = maxf(new_grid_step, 1.0)
+	grid_step = maxf(new_grid_step, 0.0001)
 	rotation_step = maxf(new_rotation_step, 1.0)
 	queue_redraw()
 
 
-func set_world_scale(new_grid_size: float, new_godot_units_per_world_unit: float) -> void:
+func set_world_scale(new_grid_size: float) -> void:
 	world_grid_size = maxf(new_grid_size, 0.0001)
-	godot_units_per_world_unit = maxf(new_godot_units_per_world_unit, 0.0001)
-	grid_step = world_grid_size * godot_units_per_world_unit
+	grid_step = world_grid_size
 	queue_redraw()
 
 
@@ -306,7 +322,16 @@ func set_reference_image(texture: Texture2D, image_visible := true, image_opacit
 	reference_image_visible = image_visible
 	reference_image_opacity = clampf(float(image_opacity), 0.0, 1.0)
 	reference_image_position = image_position
-	reference_image_scale = maxf(float(image_scale), 0.01)
+	# Normalized reference images can require scales below 0.01 when their
+	# source resolution is large. Keep the positive guard, but do not impose a
+	# centimeter-scale minimum that changes the requested target height.
+	reference_image_scale = maxf(float(image_scale), 0.000001)
+	queue_redraw()
+
+
+func set_paper_frame(frame_size: Vector2, frame_visible: bool) -> void:
+	paper_frame_size = frame_size
+	paper_frame_visible = frame_visible and frame_size.x > 0.0 and frame_size.y > 0.0
 	queue_redraw()
 
 
@@ -406,22 +431,11 @@ func _process(delta: float) -> void:
 
 
 func _draw() -> void:
-	var visible_grid_step := _visible_grid_step()
+	_draw_fixed_grid()
 	var half_view := size / (2.0 * zoom)
 	var min_world := view_center - half_view
 	var max_world := view_center + half_view
-	var first_x := floori(min_world.x / visible_grid_step)
-	var last_x := ceili(max_world.x / visible_grid_step)
-	var first_y := floori(min_world.y / visible_grid_step)
-	var last_y := ceili(max_world.y / visible_grid_step)
-	for grid_index in range(first_x, last_x + 1):
-		var world_x := grid_index * visible_grid_step
-		var color := Color("#2a303a") if posmod(grid_index, 4) == 0 else Color("#222730")
-		draw_line(_world_to_screen(Vector2(world_x, min_world.y)), _world_to_screen(Vector2(world_x, max_world.y)), color, 1.0)
-	for grid_index in range(first_y, last_y + 1):
-		var world_y := grid_index * visible_grid_step
-		var color := Color("#2a303a") if posmod(grid_index, 4) == 0 else Color("#222730")
-		draw_line(_world_to_screen(Vector2(min_world.x, world_y)), _world_to_screen(Vector2(max_world.x, world_y)), color, 1.0)
+	_draw_paper_frame()
 	var x_axis_color := Color("#6a4d58")
 	var y_axis_color := Color("#4c6a5b")
 	draw_line(_world_to_screen(Vector2(min_world.x, 0.0)), _world_to_screen(Vector2(max_world.x, 0.0)), x_axis_color, 2.0)
@@ -433,6 +447,62 @@ func _draw() -> void:
 	_draw_transform_gizmo()
 	_draw_line_draft()
 	_draw_measurement_guides()
+
+
+func _draw_fixed_grid() -> void:
+	var main_grid_step := maxf(world_grid_size, 0.0001)
+	var fine_grid_step := main_grid_step / 5.0
+	var main_pixel_step := main_grid_step * zoom
+	var fine_pixel_step := fine_grid_step * zoom
+	if fine_pixel_step >= 1.0:
+		_draw_grid_lines(fine_grid_step, Color("#20262f"), 1.0)
+	if main_pixel_step >= 0.25:
+		_draw_grid_lines(main_grid_step, Color("#303844"), 1.0)
+	var package_level := _active_grid_package_level()
+	var package_step := main_grid_step * pow(5.0, package_level)
+	if package_level > 0:
+		_draw_grid_lines(package_step, Color("#465263"), 1.5)
+
+
+func _active_grid_package_level() -> int:
+	var package_level := 0
+	var package_step := maxf(world_grid_size, 0.0001)
+	while package_step * zoom < GRID_PACKAGE_MIN_PIXELS:
+		package_step *= 5.0
+		package_level += 1
+	return package_level
+
+
+func _draw_grid_lines(step: float, line_color: Color, line_width: float) -> void:
+	var half_view := size / (2.0 * zoom)
+	var min_world := view_center - half_view
+	var max_world := view_center + half_view
+	var first_x := floori(min_world.x / step)
+	var last_x := ceili(max_world.x / step)
+	var first_y := floori(min_world.y / step)
+	var last_y := ceili(max_world.y / step)
+	for grid_index in range(first_x, last_x + 1):
+		var world_x := grid_index * step
+		draw_line(_world_to_screen(Vector2(world_x, min_world.y)), _world_to_screen(Vector2(world_x, max_world.y)), line_color, line_width)
+	for grid_index in range(first_y, last_y + 1):
+		var world_y := grid_index * step
+		draw_line(_world_to_screen(Vector2(min_world.x, world_y)), _world_to_screen(Vector2(max_world.x, world_y)), line_color, line_width)
+
+
+func _draw_paper_frame() -> void:
+	if not paper_frame_visible:
+		return
+	var half_width := paper_frame_size.x * 0.5
+	var half_height := paper_frame_size.y * 0.5
+	var bottom_left := _world_to_screen(Vector2(-half_width, -half_height))
+	var bottom_right := _world_to_screen(Vector2(half_width, -half_height))
+	var top_right := _world_to_screen(Vector2(half_width, half_height))
+	var top_left := _world_to_screen(Vector2(-half_width, half_height))
+	var frame_color := Color("#f2c94caa")
+	draw_line(bottom_left, bottom_right, frame_color, 2.0)
+	draw_line(bottom_right, top_right, frame_color, 2.0)
+	draw_line(top_right, top_left, frame_color, 2.0)
+	draw_line(top_left, bottom_left, frame_color, 2.0)
 
 
 func _draw_measurement_guides() -> void:
@@ -455,8 +525,8 @@ func _draw_measurement_guides() -> void:
 	_draw_dashed_line(x_guide_start, cursor_screen, guide_color)
 	_draw_dashed_line(y_guide_start, cursor_screen, guide_color)
 	draw_circle(cursor_screen, 3.0, guide_color)
-	_draw_measurement_label("x: %.2f" % ((cursor_position_world.x - origin_world.x) / godot_units_per_world_unit), (y_guide_start + cursor_screen) * 0.5 + Vector2(0.0, -8.0), guide_color)
-	_draw_measurement_label("y: %.2f" % ((cursor_position_world.y - origin_world.y) / godot_units_per_world_unit), (x_guide_start + cursor_screen) * 0.5 + Vector2(8.0, 0.0), guide_color)
+	_draw_measurement_label("x: %.2f cm" % (cursor_position_world.x - origin_world.x), (y_guide_start + cursor_screen) * 0.5 + Vector2(0.0, -8.0), guide_color)
+	_draw_measurement_label("y: %.2f cm" % (cursor_position_world.y - origin_world.y), (x_guide_start + cursor_screen) * 0.5 + Vector2(8.0, 0.0), guide_color)
 
 
 func _draw_dashed_line(line_start: Vector2, line_end: Vector2, line_color: Color) -> void:
@@ -709,15 +779,6 @@ func _draw_line_draft() -> void:
 			draw_circle(_world_to_screen(_local_to_world(line_draft[0])), 7.0, Color("#76e0a5"), false, 2.0)
 
 
-func _visible_grid_step() -> float:
-	var visible_step := maxf(grid_step, 0.0001)
-	while visible_step * zoom < 16.0:
-		visible_step *= 2.0
-	while visible_step * zoom > 80.0:
-		visible_step *= 0.5
-	return visible_step
-
-
 func _world_to_screen(world_position: Vector2) -> Vector2:
 	return size * 0.5 + Vector2(world_position.x - view_center.x, -(world_position.y - view_center.y)) * zoom
 
@@ -730,9 +791,10 @@ func _screen_to_world(screen_position: Vector2) -> Vector2:
 func _snap_to_grid(world_position: Vector2) -> Vector2:
 	if not snap_enabled:
 		return world_position
+	var snap_step := maxf(world_grid_size, 0.0001) * pow(5.0, _active_grid_package_level())
 	return Vector2(
-		round(world_position.x / grid_step) * grid_step,
-		round(world_position.y / grid_step) * grid_step
+		round(world_position.x / snap_step) * snap_step,
+		round(world_position.y / snap_step) * snap_step
 	)
 
 

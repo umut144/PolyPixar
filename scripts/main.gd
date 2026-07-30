@@ -8,6 +8,10 @@ const IMPORT_TEXTURES_ROOT := "res://imports/textures"
 const CONFIG_PATH := "res://configs/app_config.json"
 const SCHEMA_VERSION := 8
 const MAX_HISTORY_SIZE := 100
+const PAPER_SIZES_CM := [Vector2(21.0, 29.7), Vector2(29.7, 42.0), Vector2(42.0, 59.4), Vector2(59.4, 84.1), Vector2(84.1, 118.9)]
+const PAPER_LABELS := ["A4", "A3", "A2", "A1", "A0"]
+const PAPER_NONE_LEVEL := -1
+const PAPER_NONE_LABEL := "Kein Rahmen"
 # Kept available for a later Outliner presentation, but processed outputs are
 # currently reached through the Import Preview instead of additional rows.
 const SHOW_PROCESSED_OUTLINER := false
@@ -88,15 +92,14 @@ var snap_rotation_step := 15.0
 var snap_button: Button
 var snap_popup: PopupPanel
 var snap_toggle: CheckButton
-var snap_grid_slider: HSlider
 var snap_rotation_slider: HSlider
-var snap_grid_value_label: Label
 var snap_rotation_value_label: Label
+var paper_menu: MenuButton
+var paper_level := 0
 var world_scale_menu: Button
 var world_scale_popup: PopupPanel
 var world_unit_option: OptionButton
 var world_grid_size_field: SpinBox
-var godot_units_field: SpinBox
 var world_scale_summary_label: Label
 var workspace_name := ""
 var workspace_name_dialog: ConfirmationDialog
@@ -108,9 +111,8 @@ var undo_history: Array[Dictionary] = []
 var redo_history: Array[Dictionary] = []
 var history_coalesce_timer: Timer
 var history_coalescing := false
-var world_unit := "m"
-var world_grid_size := 0.05
-var godot_units_per_world_unit := 100.0
+var world_unit := "cm"
+var world_grid_size := 0.5
 
 
 func _ready() -> void:
@@ -125,6 +127,7 @@ func _ready() -> void:
 	_render_inspector()
 	_render_canvas_context()
 	_load_last_workspace()
+	call_deferred("_focus_active_canvas_after_startup")
 
 
 func _load_last_workspace() -> void:
@@ -133,6 +136,16 @@ func _load_last_workspace() -> void:
 		var last_workspace := str(config_data.get("last_workspace", ""))
 		if not last_workspace.is_empty():
 			_load_workspace(last_workspace)
+
+
+func _focus_active_canvas_after_startup() -> void:
+	# Let the workspace restore finish creating/focusing its controls first.
+	await get_tree().process_frame
+	await get_tree().process_frame
+	if active_module == "Create" and active_create_submodule == "Texture" and is_instance_valid(texture_canvas) and texture_canvas.visible:
+		texture_canvas.grab_focus()
+	elif is_instance_valid(canvas_view) and canvas_view.visible:
+		canvas_view.grab_focus()
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
@@ -154,6 +167,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			_undo()
 		get_viewport().set_input_as_handled()
 		return
+	if not has_command_modifier and (event.keycode == KEY_BACKSPACE or event.keycode == KEY_DELETE) and active_state.is_empty():
+		_delete_current_outliner_selection()
+		get_viewport().set_input_as_handled()
+		return
 	if selected_component_id.is_empty():
 		if not selected_texture_id.is_empty() and not selected_element_id.is_empty():
 			var selected_texture := _get_texture(selected_texture_id)
@@ -171,10 +188,6 @@ func _unhandled_key_input(event: InputEvent) -> void:
 					_set_import_preview_mode("white_to_alpha")
 					get_viewport().set_input_as_handled()
 					return
-		return
-	if not has_command_modifier and event.keycode == KEY_BACKSPACE and active_state.is_empty():
-		_delete_selected_component()
-		get_viewport().set_input_as_handled()
 		return
 	if has_command_modifier and event.keycode == KEY_1:
 		_activate_draw_state()
@@ -331,6 +344,10 @@ func _build_ui() -> void:
 	_create_snap_popup()
 
 	var canvas_panel := _create_panel(Color("#1b1e24"))
+	# Canvas drawing can legitimately extend beyond its Control rect while
+	# panning/zooming. Clip it at the workspace panel so it never paints over
+	# the outliner, toolbar, or inspector.
+	canvas_panel.clip_contents = true
 	canvas_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	canvas_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	canvas_column.add_child(canvas_panel)
@@ -619,11 +636,10 @@ func _create_snap_popup() -> void:
 	snap_toggle.button_pressed = snap_enabled
 	snap_toggle.toggled.connect(_on_snap_enabled_toggled)
 	content.add_child(snap_toggle)
-	snap_grid_value_label = Label.new()
-	content.add_child(snap_grid_value_label)
-	snap_grid_slider = _create_snap_slider(1.0, 1000.0, 1.0, snap_grid_step)
-	snap_grid_slider.value_changed.connect(_on_snap_grid_changed)
-	content.add_child(snap_grid_slider)
+	var snap_grid_info := Label.new()
+	snap_grid_info.text = "Grid snap follows the active 5× package."
+	snap_grid_info.add_theme_color_override("font_color", Color("#9aa3b2"))
+	content.add_child(snap_grid_info)
 	snap_rotation_value_label = Label.new()
 	content.add_child(snap_rotation_value_label)
 	snap_rotation_slider = _create_snap_slider(1.0, 90.0, 1.0, snap_rotation_step)
@@ -640,22 +656,24 @@ func _create_world_scale_popup() -> void:
 	world_scale_menu.focus_mode = Control.FOCUS_NONE
 	world_scale_popup = PopupPanel.new()
 	world_scale_popup.size = Vector2i(300, 240)
+	var popup_style := StyleBoxFlat.new()
+	popup_style.bg_color = Color("#20242c")
+	popup_style.border_color = Color("#363d48")
+	popup_style.set_border_width_all(1)
+	world_scale_popup.add_theme_stylebox_override("panel", popup_style)
 	var content := VBoxContainer.new()
 	content.add_theme_constant_override("separation", 6)
 	world_scale_popup.add_child(content)
-	var title := Label.new()
-	title.text = "World Scale"
-	content.add_child(title)
 	var world_unit_label := Label.new()
-	world_unit_label.text = "World Unit"
+	world_unit_label.text = "Working Unit"
 	content.add_child(world_unit_label)
 	world_unit_option = OptionButton.new()
-	world_unit_option.add_item("Meter (m)")
+	world_unit_option.add_item("Centimeter (cm)")
 	world_unit_option.select(0)
 	world_unit_option.disabled = true
 	content.add_child(world_unit_option)
 	var grid_size_label := Label.new()
-	grid_size_label.text = "Grid Size per Tile (m)"
+	grid_size_label.text = "Grid Size per Tile (cm)"
 	content.add_child(grid_size_label)
 	world_grid_size_field = SpinBox.new()
 	world_grid_size_field.min_value = 0.0001
@@ -665,17 +683,6 @@ func _create_world_scale_popup() -> void:
 	world_grid_size_field.custom_minimum_size = Vector2(260, 26)
 	world_grid_size_field.value_changed.connect(_on_world_grid_size_changed)
 	content.add_child(world_grid_size_field)
-	var godot_units_label := Label.new()
-	godot_units_label.text = "Godot Units per World Unit"
-	content.add_child(godot_units_label)
-	godot_units_field = SpinBox.new()
-	godot_units_field.min_value = 0.01
-	godot_units_field.max_value = 100000.0
-	godot_units_field.step = 1.0
-	godot_units_field.value = godot_units_per_world_unit
-	godot_units_field.custom_minimum_size = Vector2(260, 26)
-	godot_units_field.value_changed.connect(_on_godot_units_per_world_unit_changed)
-	content.add_child(godot_units_field)
 	world_scale_summary_label = Label.new()
 	world_scale_summary_label.add_theme_color_override("font_color", Color("#9aa3b2"))
 	content.add_child(world_scale_summary_label)
@@ -697,16 +704,11 @@ func _on_world_grid_size_changed(value: float) -> void:
 	_apply_world_scale()
 
 
-func _on_godot_units_per_world_unit_changed(value: float) -> void:
-	godot_units_per_world_unit = maxf(value, 0.01)
-	_apply_world_scale()
-
-
 func _apply_world_scale() -> void:
-	snap_grid_step = world_grid_size * godot_units_per_world_unit
+	snap_grid_step = world_grid_size
 	if is_instance_valid(canvas_view):
 		canvas_view.set_snap_settings(snap_enabled, snap_grid_step, snap_rotation_step)
-		canvas_view.set_world_scale(world_grid_size, godot_units_per_world_unit)
+		canvas_view.set_world_scale(world_grid_size)
 	_update_world_scale_popup()
 	_update_snap_popup_labels()
 	_render_canvas_context()
@@ -715,19 +717,26 @@ func _apply_world_scale() -> void:
 func _update_world_scale_popup() -> void:
 	if is_instance_valid(world_grid_size_field):
 		world_grid_size_field.set_value_no_signal(world_grid_size)
-	if is_instance_valid(godot_units_field):
-		godot_units_field.set_value_no_signal(godot_units_per_world_unit)
 	if is_instance_valid(world_scale_summary_label):
-		var tiles_per_world_unit := 1.0 / world_grid_size
-		world_scale_summary_label.text = "1 Tile = %.4f m\n1 m = %.2f Tiles\n1 m = %.2f Godot Units" % [world_grid_size, tiles_per_world_unit, godot_units_per_world_unit]
+		var tiles_per_meter := 100.0 / world_grid_size
+		world_scale_summary_label.text = "1 Tile = %s cm\n10 cm = 1 m\n1 m = %.0f Tiles" % [_format_scale_value(world_grid_size), tiles_per_meter]
+
+
+func _format_scale_value(value: float) -> String:
+	var formatted := "%.2f" % value
+	while formatted.ends_with("0"):
+		formatted = formatted.substr(0, formatted.length() - 1)
+	if formatted.ends_with("."):
+		formatted = formatted.substr(0, formatted.length() - 1)
+	return formatted
 
 
 func _editor_units_to_world(value: float) -> float:
-	return value / maxf(godot_units_per_world_unit, 0.0001)
+	return value
 
 
 func _world_to_editor_units(value: float) -> float:
-	return value * godot_units_per_world_unit
+	return value
 
 
 func _create_snap_slider(minimum: float, maximum: float, step: float, value: float) -> HSlider:
@@ -754,11 +763,6 @@ func _on_snap_enabled_toggled(enabled: bool) -> void:
 	_update_snap_popup_labels()
 
 
-func _on_snap_grid_changed(value: float) -> void:
-	world_grid_size = maxf(value / godot_units_per_world_unit, 0.0001)
-	_apply_world_scale()
-
-
 func _on_snap_rotation_changed(value: float) -> void:
 	snap_rotation_step = value
 	canvas_view.set_snap_settings(snap_enabled, snap_grid_step, snap_rotation_step)
@@ -768,12 +772,8 @@ func _on_snap_rotation_changed(value: float) -> void:
 func _update_snap_popup_labels() -> void:
 	if is_instance_valid(snap_toggle):
 		snap_toggle.button_pressed = snap_enabled
-	if is_instance_valid(snap_grid_slider):
-		snap_grid_slider.set_value_no_signal(snap_grid_step)
 	if is_instance_valid(snap_rotation_slider):
 		snap_rotation_slider.set_value_no_signal(snap_rotation_step)
-	if is_instance_valid(snap_grid_value_label):
-		snap_grid_value_label.text = "Grid Size: %.3f m" % world_grid_size
 	if is_instance_valid(snap_rotation_value_label):
 		snap_rotation_value_label.text = "Rotation Step: %d°" % int(snap_rotation_step)
 
@@ -1291,6 +1291,9 @@ func _load_workspace(workspace_entry: String) -> bool:
 	assets = loaded_assets
 	textures = loaded_textures
 	materials = loaded_materials
+	var saved_editor_state = workspace_data.get("editor_state", {})
+	if saved_editor_state is Dictionary and str(saved_editor_state.get("world_scale", {}).get("unit", "")) == "m":
+		_convert_asset_units(assets, 100.0)
 	workspace_name = str(workspace_data.get("name", workspace_entry))
 	_restore_editor_state(workspace_data.get("editor_state", {}))
 	_update_next_ids()
@@ -1319,10 +1322,10 @@ func _serialize_editor_state() -> Dictionary:
 		"lookdev_target_component_id": lookdev_target_component_id,
 		"expanded_assets": expanded_state,
 		"expanded_textures": expanded_textures.duplicate(true),
+		"paper_level": paper_level,
 		"world_scale": {
 			"unit": world_unit,
-			"grid_size": world_grid_size,
-			"godot_units_per_world_unit": godot_units_per_world_unit
+			"grid_size": world_grid_size
 		},
 		"snap": {
 			"enabled": snap_enabled,
@@ -1397,19 +1400,45 @@ func _restore_editor_state(state) -> void:
 			if saved_expanded_textures.has(texture_id):
 				expanded_textures[texture_id] = bool(saved_expanded_textures[texture_id])
 	_apply_world_scale_settings(state.get("world_scale", {}))
+	paper_level = clampi(int(state.get("paper_level", 0)), PAPER_NONE_LEVEL, PAPER_SIZES_CM.size() - 1)
 	_apply_snap_settings(state.get("snap", {}))
 
 
 func _apply_world_scale_settings(settings) -> void:
 	if settings is Dictionary:
-		world_unit = str(settings.get("unit", "m"))
-		world_grid_size = maxf(float(settings.get("grid_size", 0.05)), 0.0001)
-		godot_units_per_world_unit = maxf(float(settings.get("godot_units_per_world_unit", 100.0)), 0.01)
+		var saved_unit := str(settings.get("unit", "cm"))
+		if saved_unit == "m":
+			world_unit = "cm"
+			world_grid_size = 0.5
+		else:
+			world_unit = "cm"
+			world_grid_size = maxf(float(settings.get("grid_size", 0.5)), 0.0001)
 	else:
-		world_unit = "m"
-		world_grid_size = 0.05
-		godot_units_per_world_unit = 100.0
+		world_unit = "cm"
+		world_grid_size = 0.5
 	_apply_world_scale()
+
+
+func _convert_asset_units(loaded_assets: Array[Dictionary], conversion_factor: float) -> void:
+	for asset in loaded_assets:
+		var reference_image := _normalize_reference_image(asset.get("reference_image", {}))
+		var reference_position: Vector2 = reference_image.get("position", Vector2.ZERO)
+		reference_position *= conversion_factor
+		reference_image["position"] = reference_position
+		reference_image["scale"] = float(reference_image.get("scale", 1.0)) * conversion_factor
+		asset["reference_image"] = reference_image
+		for component in asset.get("components", []):
+			var converted_points: Array[Vector2] = []
+			for point in component.get("outer_shape", []):
+				if point is Vector2:
+					converted_points.append(point * conversion_factor)
+			component["outer_shape"] = converted_points
+			var transform: Dictionary = component.get("transform", _default_component_transform()).duplicate(true)
+			var transform_position: Vector2 = transform.get("position", Vector2.ZERO)
+			var transform_pivot: Vector2 = transform.get("pivot", Vector2.ZERO)
+			transform["position"] = transform_position * conversion_factor
+			transform["pivot"] = transform_pivot * conversion_factor
+			component["transform"] = transform
 
 
 func _apply_snap_settings(settings) -> void:
@@ -1419,10 +1448,10 @@ func _apply_snap_settings(settings) -> void:
 	else:
 		snap_enabled = true
 		snap_rotation_step = 15.0
-	snap_grid_step = world_grid_size * godot_units_per_world_unit
+	snap_grid_step = world_grid_size
 	if is_instance_valid(canvas_view):
 		canvas_view.set_snap_settings(snap_enabled, snap_grid_step, snap_rotation_step)
-		canvas_view.set_world_scale(world_grid_size, godot_units_per_world_unit)
+		canvas_view.set_world_scale(world_grid_size)
 	_update_snap_popup_labels()
 
 
@@ -1458,7 +1487,10 @@ func _default_reference_image() -> Dictionary:
 		"visible": true,
 		"opacity": 0.5,
 		"position": Vector2.ZERO,
-		"scale": 1.0
+		"scale": 1.0,
+		"normalize_height": false,
+		"target_height_cm": 13.0,
+		"pivot_mode": "bottom_center"
 	}
 
 
@@ -1471,6 +1503,9 @@ func _normalize_reference_image(raw_reference) -> Dictionary:
 	result["opacity"] = clampf(float(raw_reference.get("opacity", 0.5)), 0.0, 1.0)
 	result["position"] = _deserialize_vector(raw_reference.get("position", [0.0, 0.0]), Vector2.ZERO)
 	result["scale"] = maxf(float(raw_reference.get("scale", 1.0)), 0.01)
+	result["normalize_height"] = bool(raw_reference.get("normalize_height", false))
+	result["target_height_cm"] = maxf(float(raw_reference.get("target_height_cm", 13.0)), 0.01)
+	result["pivot_mode"] = "center" if str(raw_reference.get("pivot_mode", "bottom_center")) == "center" else "bottom_center"
 	return result
 
 
@@ -1481,7 +1516,10 @@ func _serialize_reference_image(raw_reference) -> Dictionary:
 		"visible": bool(normalized["visible"]),
 		"opacity": float(normalized["opacity"]),
 		"position": _serialize_vector(normalized["position"]),
-		"scale": float(normalized["scale"])
+		"scale": float(normalized["scale"]),
+		"normalize_height": bool(normalized["normalize_height"]),
+		"target_height_cm": float(normalized["target_height_cm"]),
+		"pivot_mode": str(normalized["pivot_mode"])
 	}
 
 
@@ -1588,6 +1626,42 @@ func _id_suffix_number(identifier: String) -> int:
 	return suffix.to_int()
 
 
+func _create_paper_menu() -> MenuButton:
+	paper_menu = MenuButton.new()
+	paper_menu.text = "Paper: %s  ▼" % _paper_label()
+	paper_menu.custom_minimum_size = Vector2(118, 32)
+	paper_menu.focus_mode = Control.FOCUS_NONE
+	var paper_popup := paper_menu.get_popup()
+	paper_popup.add_item(PAPER_NONE_LABEL, PAPER_NONE_LEVEL)
+	for paper_index in range(PAPER_LABELS.size()):
+		paper_popup.add_item(PAPER_LABELS[paper_index], paper_index)
+	paper_popup.id_pressed.connect(_on_paper_size_id)
+	return paper_menu
+
+
+func _on_paper_size_id(id: int) -> void:
+	if id == PAPER_NONE_LEVEL:
+		paper_level = PAPER_NONE_LEVEL
+		_render_context_bar()
+		_render_canvas_context()
+		return
+	if id < 0 or id >= PAPER_SIZES_CM.size():
+		return
+	paper_level = id
+	_render_context_bar()
+	_render_canvas_context()
+
+
+func _paper_label() -> String:
+	return PAPER_NONE_LABEL if paper_level == PAPER_NONE_LEVEL else PAPER_LABELS[paper_level]
+
+
+func _paper_frame_size(level: int) -> Vector2:
+	var din_size: Vector2 = PAPER_SIZES_CM[level]
+	var doubled_short_side := minf(din_size.x, din_size.y) * 2.0
+	return Vector2(doubled_short_side, doubled_short_side)
+
+
 func _render_context_bar() -> void:
 	if not is_instance_valid(context_bar):
 		return
@@ -1616,13 +1690,17 @@ func _render_context_bar() -> void:
 		_render_texture_context_bar()
 		_render_info_bar()
 		return
-	snap_button = Button.new()
-	snap_button.text = "Snap: %s  ▼" % ("On" if snap_enabled else "Off")
-	snap_button.custom_minimum_size = Vector2(112, 32)
-	snap_button.focus_mode = Control.FOCUS_NONE
-	snap_button.pressed.connect(_toggle_snap_popup)
-	context_bar.add_child(snap_button)
+	if active_module == "Create" and active_create_submodule == "Texture":
+		_render_info_bar()
+		return
 	if selected_component_id.is_empty():
+		snap_button = Button.new()
+		snap_button.text = "Snap: %s  ▼" % ("On" if snap_enabled else "Off")
+		snap_button.custom_minimum_size = Vector2(112, 32)
+		snap_button.focus_mode = Control.FOCUS_NONE
+		snap_button.pressed.connect(_toggle_snap_popup)
+		context_bar.add_child(snap_button)
+		context_bar.add_child(_create_paper_menu())
 		active_draw_tool = ""
 		_render_info_bar()
 		return
@@ -2397,22 +2475,24 @@ func _tscn_vector2_array(points: Array) -> String:
 
 
 func _godot_export_points(points: Array) -> Array[Vector2]:
+	const CENTIMETERS_TO_METERS := 0.1
 	var converted: Array[Vector2] = []
 	for point in points:
 		if point is Vector2:
-			converted.append(Vector2(point.x, -point.y))
+			converted.append(Vector2(point.x * CENTIMETERS_TO_METERS, -point.y * CENTIMETERS_TO_METERS))
 	return converted
 
 
 func _godot_export_transform(transform: Dictionary) -> Dictionary:
+	const CENTIMETERS_TO_METERS := 0.1
 	var normalized := _deserialize_transform(transform)
 	var export_position_value: Vector2 = normalized["position"]
 	var export_pivot_value: Vector2 = normalized["pivot"]
 	return {
-		"position": Vector2(export_position_value.x, -export_position_value.y),
+		"position": Vector2(export_position_value.x * CENTIMETERS_TO_METERS, -export_position_value.y * CENTIMETERS_TO_METERS),
 		"rotation": -float(normalized["rotation"]),
 		"scale": normalized["scale"],
-		"pivot": Vector2(export_pivot_value.x, -export_pivot_value.y)
+		"pivot": Vector2(export_pivot_value.x * CENTIMETERS_TO_METERS, -export_pivot_value.y * CENTIMETERS_TO_METERS)
 	}
 
 
@@ -2509,6 +2589,20 @@ func _clear_reference_image() -> void:
 
 func _on_reference_image_visibility_changed(image_visible: bool) -> void:
 	_update_reference_image_property("visible", image_visible)
+
+
+func _on_reference_image_normalization_changed(enabled: bool) -> void:
+	_update_reference_image_property("normalize_height", enabled)
+
+
+func _on_reference_image_target_height_changed(value: float) -> void:
+	_update_reference_image_property("target_height_cm", maxf(value, 0.01))
+
+
+func _on_reference_image_pivot_selected(index: int, option: OptionButton) -> void:
+	if index < 0 or index >= option.item_count:
+		return
+	_update_reference_image_property("pivot_mode", str(option.get_item_metadata(index)))
 
 
 func _on_reference_image_property_changed(value: float, property_name: String) -> void:
@@ -3249,6 +3343,106 @@ func _delete_selected_component() -> void:
 	_render_canvas_context()
 
 
+func _delete_current_outliner_selection() -> void:
+	if not selected_component_id.is_empty():
+		_delete_selected_component()
+	elif not selected_element_id.is_empty():
+		_delete_selected_element()
+	elif not selected_texture_id.is_empty():
+		_delete_selected_texture()
+	elif not selected_material_id.is_empty():
+		_delete_selected_material()
+	elif not selected_asset_id.is_empty():
+		_delete_selected_asset()
+
+
+func _delete_selected_element() -> void:
+	var texture := _get_texture(selected_texture_id)
+	if texture.is_empty() or selected_element_id.is_empty():
+		return
+	var element_index := -1
+	for index in range(texture.get("elements", []).size()):
+		if str(texture["elements"][index].get("id", "")) == selected_element_id:
+			element_index = index
+			break
+	if element_index < 0:
+		return
+	_record_direct_change()
+	texture["elements"].remove_at(element_index)
+	selected_element_id = ""
+	active_import_preview_mode = "original"
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _delete_selected_texture() -> void:
+	if selected_texture_id.is_empty():
+		return
+	var texture_index := -1
+	for index in range(textures.size()):
+		if str(textures[index].get("id", "")) == selected_texture_id:
+			texture_index = index
+			break
+	if texture_index < 0:
+		return
+	_record_direct_change()
+	for material_record in materials:
+		if str(material_record.get("texture_id", "")) == selected_texture_id:
+			material_record["texture_id"] = ""
+	textures.remove_at(texture_index)
+	expanded_textures.erase(selected_texture_id)
+	selected_texture_id = ""
+	selected_element_id = ""
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _delete_selected_material() -> void:
+	if selected_material_id.is_empty():
+		return
+	var material_index := -1
+	for index in range(materials.size()):
+		if str(materials[index].get("id", "")) == selected_material_id:
+			material_index = index
+			break
+	if material_index < 0:
+		return
+	_record_direct_change()
+	for asset in assets:
+		for component in asset.get("components", []):
+			if str(component.get("material_id", "")) == selected_material_id:
+				component["material_id"] = ""
+	materials.remove_at(material_index)
+	selected_material_id = ""
+	active_module = "Style"
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _delete_selected_asset() -> void:
+	if selected_asset_id.is_empty():
+		return
+	var asset_index := -1
+	for index in range(assets.size()):
+		if str(assets[index].get("id", "")) == selected_asset_id:
+			asset_index = index
+			break
+	if asset_index < 0:
+		return
+	_record_direct_change()
+	assets.remove_at(asset_index)
+	expanded_assets.erase(selected_asset_id)
+	selected_asset_id = ""
+	selected_component_id = ""
+	active_state = ""
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
 func _style_outliner_button(button: Button, selected: bool) -> void:
 	var normal := StyleBoxFlat.new()
 	normal.bg_color = Color("#f2c94c") if selected else Color("#252a33")
@@ -3645,15 +3839,47 @@ func _render_inspector() -> void:
 		reference_opacity.value_changed.connect(_on_reference_image_property_changed.bind("opacity"))
 		inspector_content.add_child(_create_inspector_field_label("Opacity"))
 		inspector_content.add_child(reference_opacity)
+		var normalize_height := CheckBox.new()
+		normalize_height.text = "Normalize Height"
+		normalize_height.focus_mode = Control.FOCUS_NONE
+		normalize_height.button_pressed = bool(reference_image.get("normalize_height", false))
+		normalize_height.toggled.connect(_on_reference_image_normalization_changed)
+		inspector_content.add_child(normalize_height)
+		if bool(reference_image.get("normalize_height", false)):
+			var target_height := SpinBox.new()
+			target_height.min_value = 0.01
+			target_height.max_value = 100000.0
+			target_height.step = 0.1
+			target_height.custom_minimum_size = Vector2(0, 26)
+			target_height.value = float(reference_image.get("target_height_cm", 13.0))
+			target_height.value_changed.connect(_on_reference_image_target_height_changed)
+			inspector_content.add_child(_create_inspector_field_label("Target Height (cm)"))
+			inspector_content.add_child(target_height)
+		var pivot_label := _create_inspector_field_label("Pivot")
+		inspector_content.add_child(pivot_label)
+		var pivot_option := OptionButton.new()
+		pivot_option.custom_minimum_size = Vector2(0, 26)
+		pivot_option.add_item("Center")
+		pivot_option.set_item_metadata(0, "center")
+		pivot_option.add_item("Bottom Center")
+		pivot_option.set_item_metadata(1, "bottom_center")
+		var pivot_mode := str(reference_image.get("pivot_mode", "bottom_center"))
+		for pivot_index in range(pivot_option.item_count):
+			if str(pivot_option.get_item_metadata(pivot_index)) == pivot_mode:
+				pivot_option.select(pivot_index)
+				break
+		pivot_option.item_selected.connect(_on_reference_image_pivot_selected.bind(pivot_option))
+		inspector_content.add_child(pivot_option)
 		var reference_transform_grid := GridContainer.new()
 		reference_transform_grid.columns = 2
 		reference_transform_grid.add_theme_constant_override("h_separation", 8)
 		reference_transform_grid.add_theme_constant_override("v_separation", 4)
-		var reference_position: Vector2 = reference_image.get("position", Vector2.ZERO)
-		_add_reference_image_field(reference_transform_grid, "Position X (m)", _editor_units_to_world(reference_position.x), "position_x")
-		_add_reference_image_field(reference_transform_grid, "Position Y (m)", _editor_units_to_world(reference_position.y), "position_y")
-		_add_reference_image_field(reference_transform_grid, "Scale", float(reference_image.get("scale", 1.0)), "scale")
-		inspector_content.add_child(reference_transform_grid)
+		if not bool(reference_image.get("normalize_height", false)):
+			var reference_position: Vector2 = reference_image.get("position", Vector2.ZERO)
+			_add_reference_image_field(reference_transform_grid, "Position X (cm)", _editor_units_to_world(reference_position.x), "position_x")
+			_add_reference_image_field(reference_transform_grid, "Position Y (cm)", _editor_units_to_world(reference_position.y), "position_y")
+			_add_reference_image_field(reference_transform_grid, "Scale", float(reference_image.get("scale", 1.0)), "scale")
+			inspector_content.add_child(reference_transform_grid)
 		return
 	var component := _get_component(asset, selected_component_id)
 	if component.is_empty():
@@ -3675,13 +3901,13 @@ func _render_inspector() -> void:
 	var transform_position: Vector2 = transform.get("position", Vector2.ZERO)
 	var transform_scale: Vector2 = transform.get("scale", Vector2.ONE)
 	var pivot: Vector2 = transform.get("pivot", Vector2.ZERO)
-	_add_transform_field(transform_grid, "Position X (m)", _editor_units_to_world(transform_position.x), "position_x", 0.01)
-	_add_transform_field(transform_grid, "Position Y (m)", _editor_units_to_world(transform_position.y), "position_y", 0.01)
+	_add_transform_field(transform_grid, "Position X (cm)", _editor_units_to_world(transform_position.x), "position_x", 0.01)
+	_add_transform_field(transform_grid, "Position Y (cm)", _editor_units_to_world(transform_position.y), "position_y", 0.01)
 	_add_transform_field(transform_grid, "Rotation", float(transform.get("rotation", 0.0)), "rotation", 1.0)
 	_add_transform_field(transform_grid, "Scale X", transform_scale.x, "scale_x", 0.01)
 	_add_transform_field(transform_grid, "Scale Y", transform_scale.y, "scale_y", 0.01)
-	_add_transform_field(transform_grid, "Pivot X (m)", _editor_units_to_world(pivot.x), "pivot_x", 0.01)
-	_add_transform_field(transform_grid, "Pivot Y (m)", _editor_units_to_world(pivot.y), "pivot_y", 0.01)
+	_add_transform_field(transform_grid, "Pivot X (cm)", _editor_units_to_world(pivot.x), "pivot_x", 0.01)
+	_add_transform_field(transform_grid, "Pivot Y (cm)", _editor_units_to_world(pivot.y), "pivot_y", 0.01)
 	inspector_content.add_child(_create_inspector_section("Visibility / Layer"))
 	var visibility_toggle := CheckButton.new()
 	visibility_toggle.text = "Visible"
@@ -4061,6 +4287,7 @@ func _render_canvas_context() -> void:
 	if not is_instance_valid(canvas_context_label):
 		return
 	canvas_view.set_reference_image(null)
+	canvas_view.set_paper_frame(Vector2.ZERO, false)
 	if active_module == "Export":
 		canvas_view.visible = false
 		texture_canvas.visible = false
@@ -4118,6 +4345,16 @@ func _render_canvas_context() -> void:
 		else:
 			import_preview.set_preview_path("")
 		return
+	if active_module == "Create" and active_create_submodule == "Texture":
+		canvas_view.visible = false
+		texture_canvas.visible = true
+		import_preview.visible = false
+		texture_canvas.set_final_texture_path("")
+		texture_canvas.set_selected_element("")
+		texture_context_label.text = "Texture: Select a Texture"
+		import_preview_context_label.text = ""
+		texture_canvas.call_deferred("grab_focus")
+		return
 	canvas_view.visible = true
 	texture_canvas.visible = false
 	import_preview.visible = false
@@ -4139,21 +4376,25 @@ func _render_canvas_context() -> void:
 		canvas_context_label.text = "Asset: %s" % str(asset["name"])
 		canvas_view.set_context(str(asset["name"]))
 		canvas_view.set_interaction_state("asset")
+		canvas_view.set_paper_frame(_paper_frame_size(paper_level) if paper_level >= 0 else Vector2.ZERO, paper_level >= 0)
 		canvas_view.set_tool_mode("")
 		canvas_view.set_component_transform({})
 		canvas_view.set_component_material(null)
 		canvas_view.set_reference_shapes(_build_reference_shapes(asset))
 		canvas_view.set_outer_shape([])
+		canvas_view.call_deferred("grab_focus")
 		return
 	var component := _get_component(asset, selected_component_id)
 	if component.is_empty():
 		canvas_context_label.text = "Asset: %s" % str(asset["name"])
 		canvas_view.set_context(str(asset["name"]))
 		canvas_view.set_interaction_state("asset")
+		canvas_view.set_paper_frame(_paper_frame_size(paper_level) if paper_level >= 0 else Vector2.ZERO, paper_level >= 0)
 		canvas_view.set_tool_mode("")
 		canvas_view.set_component_transform({})
 		canvas_view.set_reference_shapes(_build_reference_shapes(asset))
 		canvas_view.set_outer_shape([])
+		canvas_view.call_deferred("grab_focus")
 		return
 	canvas_context_label.text = "Component: %s" % str(component["name"])
 	canvas_view.set_context(str(component["name"]))
@@ -4170,6 +4411,7 @@ func _render_canvas_context() -> void:
 	canvas_view.set_reference_shapes(_build_reference_shapes(asset, selected_component_id))
 	var component_closed := bool(component.get("closed", component["outer_shape"].size() >= 3))
 	canvas_view.set_outer_shape(component["outer_shape"], component_closed)
+	canvas_view.call_deferred("grab_focus")
 	if active_state == "draw" and not component_closed:
 		canvas_view.set_line_draft(component["outer_shape"])
 
@@ -4182,12 +4424,21 @@ func _set_reference_image_canvas(asset: Dictionary) -> void:
 		var reference_source := Image.new()
 		if reference_source.load(ProjectSettings.globalize_path(reference_path)) == OK and not reference_source.is_empty():
 			reference_texture = ImageTexture.create_from_image(reference_source)
+	var reference_position: Vector2 = reference_image.get("position", Vector2.ZERO)
+	var reference_scale := float(reference_image.get("scale", 1.0))
+	if bool(reference_image.get("normalize_height", false)) and is_instance_valid(reference_texture) and reference_texture.get_height() > 0:
+		var target_height := float(reference_image.get("target_height_cm", 13.0))
+		reference_scale = target_height / float(reference_texture.get_height())
+		if str(reference_image.get("pivot_mode", "bottom_center")) == "bottom_center":
+			reference_position = Vector2(0.0, target_height * 0.5)
+		else:
+			reference_position = Vector2.ZERO
 	canvas_view.set_reference_image(
 		reference_texture,
 		bool(reference_image.get("visible", true)),
 		float(reference_image.get("opacity", 0.5)),
-		reference_image.get("position", Vector2.ZERO),
-		float(reference_image.get("scale", 1.0))
+		reference_position,
+		reference_scale
 	)
 
 

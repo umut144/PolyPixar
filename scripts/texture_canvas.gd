@@ -15,7 +15,7 @@ var final_texture_path := ""
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	focus_mode = Control.FOCUS_CLICK
+	focus_mode = Control.FOCUS_ALL
 	queue_redraw()
 
 
