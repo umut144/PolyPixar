@@ -1,7 +1,7 @@
 extends Control
 
 const CREATE_SUBMODULES := ["Asset", "Texture"]
-const STYLE_SUBMODULES := ["Materials"]
+const STYLE_SUBMODULES := ["Material"]
 const INACTIVE_MODULES := ["Motion", "Transform", "Effects", "Export"]
 const WORKSPACES_ROOT := "res://workspaces"
 const IMPORT_TEXTURES_ROOT := "res://imports/textures"
@@ -1227,7 +1227,7 @@ func _restore_editor_state(state) -> void:
 		var style_section := _find_section("Style")
 		if style_section != null:
 			style_section.set_expanded(true)
-			style_section.set_active_submodule("Materials")
+			style_section.set_active_submodule("Material")
 	else:
 		active_module = "Create"
 		_set_create_submodule_context("Texture" if not selected_texture_id.is_empty() else "Asset")
@@ -2430,7 +2430,7 @@ func _render_material_outliner() -> void:
 		if search_text.is_empty() or str(material_record.get("name", "")).to_lower().contains(search_text):
 			visible_materials.append(material_record)
 	visible_materials.sort_custom(_sort_named_documents)
-	outliner_list.add_child(_create_outliner_group_label("Materials"))
+	outliner_list.add_child(_create_outliner_group_label("Material"))
 	for material_record in visible_materials:
 		var material_row := HBoxContainer.new()
 		material_row.add_theme_constant_override("separation", 2)
@@ -2935,7 +2935,6 @@ func _render_material_inspector() -> void:
 	var material_data := _get_material(selected_material_id)
 	if material_data.is_empty():
 		return
-	inspector_content.add_child(_create_inspector_section("Material"))
 	inspector_content.add_child(_create_inspector_field_label("Name"))
 	var name_editor := _create_name_editor(str(material_data.get("name", "Material")), "Material name")
 	name_editor.text_submitted.connect(_rename_selected_material)
@@ -3018,7 +3017,6 @@ func _render_lookdev_material_target_inspector() -> void:
 	if material_data.is_empty() or asset.is_empty() or component.is_empty():
 		_render_material_inspector()
 		return
-	inspector_content.add_child(_create_inspector_section("Component"))
 	inspector_content.add_child(_create_inspector_field_label("Name"))
 	var component_name := _create_inspector_field_label(str(component.get("name", "Component")))
 	component_name.add_theme_color_override("font_color", Color("#d7dce5"))
@@ -3096,7 +3094,6 @@ func _render_lookdev_asset_inspector() -> void:
 	if asset.is_empty():
 		_render_material_inspector()
 		return
-	inspector_content.add_child(_create_inspector_section("Asset"))
 	inspector_content.add_child(_create_inspector_field_label("Name"))
 	var name_editor := _create_name_editor(str(asset.get("name", "Asset")), "Asset name")
 	name_editor.text_submitted.connect(_rename_lookdev_asset)
@@ -3179,7 +3176,6 @@ func _on_material_opacity_changed(value: float) -> void:
 func _render_inspector() -> void:
 	_clear(inspector_content)
 	transform_fields.clear()
-	inspector_content.add_child(_create_panel_label("Inspector"))
 	if active_module == "Export":
 		inspector_content.add_child(_create_inspector_section("Build"))
 		inspector_content.add_child(_create_inspector_field_label("Source Asset"))
@@ -3196,7 +3192,6 @@ func _render_inspector() -> void:
 		var texture := _get_texture(selected_texture_id)
 		if texture.is_empty():
 			return
-		inspector_content.add_child(_create_inspector_section("Texture" if selected_element_id.is_empty() else "Element"))
 		inspector_content.add_child(_create_inspector_field_label("Name"))
 		var texture_name_editor := _create_name_editor(str(texture["name"] if selected_element_id.is_empty() else _get_element(texture, selected_element_id).get("name", "Element")), "Texture name")
 		if selected_element_id.is_empty():
@@ -3267,8 +3262,7 @@ func _render_inspector() -> void:
 	if asset.is_empty():
 		return
 	if selected_component_id.is_empty():
-		inspector_content.add_child(_create_inspector_section("Asset"))
-		inspector_content.add_child(_create_inspector_field_label("Name"))
+	inspector_content.add_child(_create_inspector_field_label("Name"))
 		asset_name_editor = _create_name_editor(str(asset["name"]), "Asset name")
 		asset_name_editor.text_submitted.connect(_rename_selected_asset)
 		asset_name_editor.focus_exited.connect(func() -> void:
@@ -3279,7 +3273,6 @@ func _render_inspector() -> void:
 	var component := _get_component(asset, selected_component_id)
 	if component.is_empty():
 		return
-	inspector_content.add_child(_create_inspector_section("Component"))
 	inspector_content.add_child(_create_inspector_field_label("Name"))
 	component_name_editor = _create_name_editor(str(component["name"]), "Component name")
 	component_name_editor.text_submitted.connect(_rename_selected_component)
@@ -3323,7 +3316,6 @@ func _render_inspector() -> void:
 	z_index_field.add_theme_font_size_override("font_size", 11)
 	z_index_field.value_changed.connect(_on_component_z_index_changed)
 	inspector_content.add_child(z_index_field)
-	inspector_content.add_child(_create_inspector_section("Material"))
 	var material_option := OptionButton.new()
 	material_option.custom_minimum_size = Vector2(0, 26)
 	material_option.add_item("None")
@@ -3952,7 +3944,7 @@ func _select_submodule(module_name: String, submodule: String, section: ModuleSe
 		_render_outliner()
 		_render_inspector()
 		_render_canvas_context()
-	elif module_name == "Style" and submodule == "Materials":
+	elif module_name == "Style" and submodule == "Material":
 		_enter_material_context(selected_material_id)
 	return
 
@@ -3983,7 +3975,7 @@ func _enter_material_context(material_id: String = "") -> void:
 	var style_section := _find_section("Style")
 	if style_section != null:
 		style_section.set_expanded(true)
-		style_section.set_active_submodule("Materials")
+		style_section.set_active_submodule("Material")
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()

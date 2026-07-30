@@ -101,7 +101,7 @@ it into a general scene or animation-graph abstraction prematurely.
   only that ready Element output; successful processing selects the processed
   Import Element as the final output. Legacy Textures resolve a first ready
   output on load.
-- Style now exposes `Materials` as its first submodule. Materials can be
+- Style now exposes `Material` as its first submodule. Materials can be
   created through `Create Material`, searched and selected in the Material
   Outliner, and edited in the Inspector with a ready Texture reference, tint,
   and opacity.
@@ -184,11 +184,11 @@ The active module uses a yellow background with black text, including its
 hover state. No tree icons or glyphs are used.
 
 Create exposes `Asset` and `Texture`. Style
-exposes `Materials`; the remaining categories are present as empty sections.
+exposes `Material`; the remaining categories are present as empty sections.
 
 The Main Toolbar has one context-specific action button: `Create Asset` in the
 Asset module, `Create Texture` in the Texture module, and `Create Material` in
-the Materials module. Each action opens a name dialog with a fallback name and
+the Material module. Each action opens a name dialog with a fallback name and
 creates a Workspace document.
 Assets contain Components; Textures contain optional Elements. Both document
 types are listed, searched, filtered, renamed, persisted, and restored through
