@@ -3262,7 +3262,7 @@ func _render_inspector() -> void:
 	if asset.is_empty():
 		return
 	if selected_component_id.is_empty():
-	inspector_content.add_child(_create_inspector_field_label("Name"))
+		inspector_content.add_child(_create_inspector_field_label("Name"))
 		asset_name_editor = _create_name_editor(str(asset["name"]), "Asset name")
 		asset_name_editor.text_submitted.connect(_rename_selected_asset)
 		asset_name_editor.focus_exited.connect(func() -> void:
