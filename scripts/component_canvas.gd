@@ -13,11 +13,13 @@ const PAN_SPEED := 420.0
 const MIN_ZOOM := 0.25
 const MAX_ZOOM := 8.0
 const ZOOM_RATE := 1.8
-const BASE_GRID_STEP := 32.0
 const CLOSE_DISTANCE_PIXELS := 14.0
 const GIZMO_AXIS_LENGTH := 42.0
 const HANDLE_HIT_RADIUS := 12.0
 const FREE_HANDLE_RADIUS := 10.0
+const MEASUREMENT_DASH_LENGTH := 7.0
+const MEASUREMENT_GAP_LENGTH := 5.0
+const MEASUREMENT_FONT_SIZE := 14
 
 var view_center := Vector2.ZERO
 var zoom := 1.0
@@ -40,6 +42,8 @@ var add_preview_visible := false
 var snap_enabled := true
 var grid_step := 16.0
 var rotation_step := 15.0
+var world_grid_size := 0.05
+var godot_units_per_world_unit := 100.0
 var component_transform: Dictionary = {
 	"position": Vector2.ZERO,
 	"rotation": 0.0,
@@ -274,6 +278,13 @@ func set_snap_settings(enabled: bool, new_grid_step: float, new_rotation_step: f
 	queue_redraw()
 
 
+func set_world_scale(new_grid_size: float, new_godot_units_per_world_unit: float) -> void:
+	world_grid_size = maxf(new_grid_size, 0.0001)
+	godot_units_per_world_unit = maxf(new_godot_units_per_world_unit, 0.0001)
+	grid_step = world_grid_size * godot_units_per_world_unit
+	queue_redraw()
+
+
 func set_component_transform(transform: Dictionary) -> void:
 	component_transform = transform.duplicate(true)
 	if not component_transform.has("pivot") or not component_transform["pivot"] is Vector2:
@@ -421,6 +432,52 @@ func _draw() -> void:
 	_draw_pivot()
 	_draw_transform_gizmo()
 	_draw_line_draft()
+	_draw_measurement_guides()
+
+
+func _draw_measurement_guides() -> void:
+	if not cursor_over_canvas or context_name.is_empty():
+		return
+	if interaction_state != "asset" and not interaction_state.is_empty():
+		return
+	var origin_world := Vector2.ZERO
+	var cursor_position_world := cursor_world
+	if interaction_state.is_empty():
+		origin_world = component_transform.get("position", Vector2.ZERO)
+		cursor_position_world = _local_to_world(cursor_world)
+	var origin_screen := _world_to_screen(origin_world)
+	var cursor_screen := _world_to_screen(cursor_position_world)
+	var guide_color := Color("#f2c94c")
+	var x_guide_start := Vector2(origin_screen.x, cursor_screen.y)
+	var y_guide_start := Vector2(cursor_screen.x, origin_screen.y)
+	_draw_dashed_line(origin_screen, x_guide_start, guide_color)
+	_draw_dashed_line(origin_screen, y_guide_start, guide_color)
+	_draw_dashed_line(x_guide_start, cursor_screen, guide_color)
+	_draw_dashed_line(y_guide_start, cursor_screen, guide_color)
+	draw_circle(cursor_screen, 3.0, guide_color)
+	_draw_measurement_label("x: %.2f" % ((cursor_position_world.x - origin_world.x) / godot_units_per_world_unit), (y_guide_start + cursor_screen) * 0.5 + Vector2(0.0, -8.0), guide_color)
+	_draw_measurement_label("y: %.2f" % ((cursor_position_world.y - origin_world.y) / godot_units_per_world_unit), (x_guide_start + cursor_screen) * 0.5 + Vector2(8.0, 0.0), guide_color)
+
+
+func _draw_dashed_line(line_start: Vector2, line_end: Vector2, line_color: Color) -> void:
+	var line_vector := line_end - line_start
+	var line_length := line_vector.length()
+	if line_length <= 0.5:
+		return
+	var direction := line_vector / line_length
+	var distance := 0.0
+	while distance < line_length:
+		var dash_end := minf(distance + MEASUREMENT_DASH_LENGTH, line_length)
+		draw_line(line_start + direction * distance, line_start + direction * dash_end, line_color, 1.0)
+		distance = dash_end + MEASUREMENT_GAP_LENGTH
+
+
+func _draw_measurement_label(label_text: String, label_center: Vector2, label_color: Color) -> void:
+	var label_font := ThemeDB.fallback_font
+	var text_size := label_font.get_string_size(label_text, HORIZONTAL_ALIGNMENT_LEFT, -1, MEASUREMENT_FONT_SIZE)
+	var label_rect := Rect2(label_center - text_size * 0.5 - Vector2(4.0, 2.0), text_size + Vector2(8.0, 4.0))
+	draw_rect(label_rect, Color("#181a1fcc"))
+	draw_string(label_font, label_rect.position + Vector2(4.0, text_size.y), label_text, HORIZONTAL_ALIGNMENT_LEFT, -1, MEASUREMENT_FONT_SIZE, label_color)
 
 
 func _draw_reference_image() -> void:
@@ -653,7 +710,7 @@ func _draw_line_draft() -> void:
 
 
 func _visible_grid_step() -> float:
-	var visible_step := BASE_GRID_STEP
+	var visible_step := maxf(grid_step, 0.0001)
 	while visible_step * zoom < 16.0:
 		visible_step *= 2.0
 	while visible_step * zoom > 80.0:

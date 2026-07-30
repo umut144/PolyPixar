@@ -92,6 +92,12 @@ var snap_grid_slider: HSlider
 var snap_rotation_slider: HSlider
 var snap_grid_value_label: Label
 var snap_rotation_value_label: Label
+var world_scale_menu: Button
+var world_scale_popup: PopupPanel
+var world_unit_option: OptionButton
+var world_grid_size_field: SpinBox
+var godot_units_field: SpinBox
+var world_scale_summary_label: Label
 var workspace_name := ""
 var workspace_name_dialog: ConfirmationDialog
 var workspace_name_input: LineEdit
@@ -102,6 +108,9 @@ var undo_history: Array[Dictionary] = []
 var redo_history: Array[Dictionary] = []
 var history_coalesce_timer: Timer
 var history_coalescing := false
+var world_unit := "m"
+var world_grid_size := 0.05
+var godot_units_per_world_unit := 100.0
 
 
 func _ready() -> void:
@@ -111,6 +120,7 @@ func _ready() -> void:
 	history_coalesce_timer.wait_time = 0.25
 	history_coalesce_timer.timeout.connect(_finish_history_coalescing)
 	add_child(history_coalesce_timer)
+	_apply_world_scale()
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
@@ -247,6 +257,8 @@ func _build_ui() -> void:
 	workspace_popup.add_item("Save")
 	workspace_popup.add_item("Load")
 	workspace_popup.id_pressed.connect(_on_workspace_menu_id)
+	_create_world_scale_popup()
+	toolbar.add_child(world_scale_menu)
 	toolbar.add_child(workspace_menu)
 
 	var workspace_row := HBoxContainer.new()
@@ -609,7 +621,7 @@ func _create_snap_popup() -> void:
 	content.add_child(snap_toggle)
 	snap_grid_value_label = Label.new()
 	content.add_child(snap_grid_value_label)
-	snap_grid_slider = _create_snap_slider(1.0, 64.0, 1.0, snap_grid_step)
+	snap_grid_slider = _create_snap_slider(1.0, 1000.0, 1.0, snap_grid_step)
 	snap_grid_slider.value_changed.connect(_on_snap_grid_changed)
 	content.add_child(snap_grid_slider)
 	snap_rotation_value_label = Label.new()
@@ -619,6 +631,103 @@ func _create_snap_popup() -> void:
 	content.add_child(snap_rotation_slider)
 	_update_snap_popup_labels()
 	add_child(snap_popup)
+
+
+func _create_world_scale_popup() -> void:
+	world_scale_menu = Button.new()
+	world_scale_menu.text = "World Scale  ▼"
+	world_scale_menu.custom_minimum_size = Vector2(144, 32)
+	world_scale_menu.focus_mode = Control.FOCUS_NONE
+	world_scale_popup = PopupPanel.new()
+	world_scale_popup.size = Vector2i(300, 240)
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 6)
+	world_scale_popup.add_child(content)
+	var title := Label.new()
+	title.text = "World Scale"
+	content.add_child(title)
+	var world_unit_label := Label.new()
+	world_unit_label.text = "World Unit"
+	content.add_child(world_unit_label)
+	world_unit_option = OptionButton.new()
+	world_unit_option.add_item("Meter (m)")
+	world_unit_option.select(0)
+	world_unit_option.disabled = true
+	content.add_child(world_unit_option)
+	var grid_size_label := Label.new()
+	grid_size_label.text = "Grid Size per Tile (m)"
+	content.add_child(grid_size_label)
+	world_grid_size_field = SpinBox.new()
+	world_grid_size_field.min_value = 0.0001
+	world_grid_size_field.max_value = 1000.0
+	world_grid_size_field.step = 0.001
+	world_grid_size_field.value = world_grid_size
+	world_grid_size_field.custom_minimum_size = Vector2(260, 26)
+	world_grid_size_field.value_changed.connect(_on_world_grid_size_changed)
+	content.add_child(world_grid_size_field)
+	var godot_units_label := Label.new()
+	godot_units_label.text = "Godot Units per World Unit"
+	content.add_child(godot_units_label)
+	godot_units_field = SpinBox.new()
+	godot_units_field.min_value = 0.01
+	godot_units_field.max_value = 100000.0
+	godot_units_field.step = 1.0
+	godot_units_field.value = godot_units_per_world_unit
+	godot_units_field.custom_minimum_size = Vector2(260, 26)
+	godot_units_field.value_changed.connect(_on_godot_units_per_world_unit_changed)
+	content.add_child(godot_units_field)
+	world_scale_summary_label = Label.new()
+	world_scale_summary_label.add_theme_color_override("font_color", Color("#9aa3b2"))
+	content.add_child(world_scale_summary_label)
+	world_scale_menu.pressed.connect(_toggle_world_scale_popup)
+	add_child(world_scale_popup)
+	_update_world_scale_popup()
+
+
+func _toggle_world_scale_popup() -> void:
+	if world_scale_popup.visible:
+		world_scale_popup.hide()
+		return
+	var popup_position := world_scale_menu.get_global_rect().position + Vector2(0.0, world_scale_menu.size.y + 2.0)
+	world_scale_popup.popup(Rect2(popup_position, world_scale_popup.size))
+
+
+func _on_world_grid_size_changed(value: float) -> void:
+	world_grid_size = maxf(value, 0.0001)
+	_apply_world_scale()
+
+
+func _on_godot_units_per_world_unit_changed(value: float) -> void:
+	godot_units_per_world_unit = maxf(value, 0.01)
+	_apply_world_scale()
+
+
+func _apply_world_scale() -> void:
+	snap_grid_step = world_grid_size * godot_units_per_world_unit
+	if is_instance_valid(canvas_view):
+		canvas_view.set_snap_settings(snap_enabled, snap_grid_step, snap_rotation_step)
+		canvas_view.set_world_scale(world_grid_size, godot_units_per_world_unit)
+	_update_world_scale_popup()
+	_update_snap_popup_labels()
+	_render_canvas_context()
+
+
+func _update_world_scale_popup() -> void:
+	if is_instance_valid(world_grid_size_field):
+		world_grid_size_field.set_value_no_signal(world_grid_size)
+	if is_instance_valid(godot_units_field):
+		godot_units_field.set_value_no_signal(godot_units_per_world_unit)
+	if is_instance_valid(world_scale_summary_label):
+		var tiles_per_world_unit := 1.0 / world_grid_size
+		world_scale_summary_label.text = "1 Tile = %.4f m\n1 m = %.2f Tiles\n1 m = %.2f Godot Units" % [world_grid_size, tiles_per_world_unit, godot_units_per_world_unit]
+
+
+func _editor_units_to_world(value: float) -> float:
+	return value / maxf(godot_units_per_world_unit, 0.0001)
+
+
+func _world_to_editor_units(value: float) -> float:
+	return value * godot_units_per_world_unit
 
 
 func _create_snap_slider(minimum: float, maximum: float, step: float, value: float) -> HSlider:
@@ -646,9 +755,8 @@ func _on_snap_enabled_toggled(enabled: bool) -> void:
 
 
 func _on_snap_grid_changed(value: float) -> void:
-	snap_grid_step = value
-	canvas_view.set_snap_settings(snap_enabled, snap_grid_step, snap_rotation_step)
-	_update_snap_popup_labels()
+	world_grid_size = maxf(value / godot_units_per_world_unit, 0.0001)
+	_apply_world_scale()
 
 
 func _on_snap_rotation_changed(value: float) -> void:
@@ -661,11 +769,11 @@ func _update_snap_popup_labels() -> void:
 	if is_instance_valid(snap_toggle):
 		snap_toggle.button_pressed = snap_enabled
 	if is_instance_valid(snap_grid_slider):
-		snap_grid_slider.value = snap_grid_step
+		snap_grid_slider.set_value_no_signal(snap_grid_step)
 	if is_instance_valid(snap_rotation_slider):
-		snap_rotation_slider.value = snap_rotation_step
+		snap_rotation_slider.set_value_no_signal(snap_rotation_step)
 	if is_instance_valid(snap_grid_value_label):
-		snap_grid_value_label.text = "Grid Step: %d px" % int(snap_grid_step)
+		snap_grid_value_label.text = "Grid Size: %.3f m" % world_grid_size
 	if is_instance_valid(snap_rotation_value_label):
 		snap_rotation_value_label.text = "Rotation Step: %d°" % int(snap_rotation_step)
 
@@ -1211,6 +1319,11 @@ func _serialize_editor_state() -> Dictionary:
 		"lookdev_target_component_id": lookdev_target_component_id,
 		"expanded_assets": expanded_state,
 		"expanded_textures": expanded_textures.duplicate(true),
+		"world_scale": {
+			"unit": world_unit,
+			"grid_size": world_grid_size,
+			"godot_units_per_world_unit": godot_units_per_world_unit
+		},
 		"snap": {
 			"enabled": snap_enabled,
 			"grid_step": snap_grid_step,
@@ -1283,20 +1396,33 @@ func _restore_editor_state(state) -> void:
 			var texture_id := str(texture["id"])
 			if saved_expanded_textures.has(texture_id):
 				expanded_textures[texture_id] = bool(saved_expanded_textures[texture_id])
+	_apply_world_scale_settings(state.get("world_scale", {}))
 	_apply_snap_settings(state.get("snap", {}))
+
+
+func _apply_world_scale_settings(settings) -> void:
+	if settings is Dictionary:
+		world_unit = str(settings.get("unit", "m"))
+		world_grid_size = maxf(float(settings.get("grid_size", 0.05)), 0.0001)
+		godot_units_per_world_unit = maxf(float(settings.get("godot_units_per_world_unit", 100.0)), 0.01)
+	else:
+		world_unit = "m"
+		world_grid_size = 0.05
+		godot_units_per_world_unit = 100.0
+	_apply_world_scale()
 
 
 func _apply_snap_settings(settings) -> void:
 	if settings is Dictionary:
 		snap_enabled = bool(settings.get("enabled", true))
-		snap_grid_step = clampf(float(settings.get("grid_step", 16.0)), 1.0, 64.0)
 		snap_rotation_step = clampf(float(settings.get("rotation_step", 15.0)), 1.0, 90.0)
 	else:
 		snap_enabled = true
-		snap_grid_step = 16.0
 		snap_rotation_step = 15.0
+	snap_grid_step = world_grid_size * godot_units_per_world_unit
 	if is_instance_valid(canvas_view):
 		canvas_view.set_snap_settings(snap_enabled, snap_grid_step, snap_rotation_step)
+		canvas_view.set_world_scale(world_grid_size, godot_units_per_world_unit)
 	_update_snap_popup_labels()
 
 
@@ -2394,11 +2520,11 @@ func _on_reference_image_property_changed(value: float, property_name: String) -
 		reference_image["opacity"] = clampf(value, 0.0, 1.0)
 	elif property_name == "position_x":
 		var reference_position: Vector2 = reference_image["position"]
-		reference_position.x = value
+		reference_position.x = _world_to_editor_units(value)
 		reference_image["position"] = reference_position
 	elif property_name == "position_y":
 		var reference_position: Vector2 = reference_image["position"]
-		reference_position.y = value
+		reference_position.y = _world_to_editor_units(value)
 		reference_image["position"] = reference_position
 	elif property_name == "scale":
 		reference_image["scale"] = maxf(value, 0.01)
@@ -3524,8 +3650,8 @@ func _render_inspector() -> void:
 		reference_transform_grid.add_theme_constant_override("h_separation", 8)
 		reference_transform_grid.add_theme_constant_override("v_separation", 4)
 		var reference_position: Vector2 = reference_image.get("position", Vector2.ZERO)
-		_add_reference_image_field(reference_transform_grid, "Position X", reference_position.x, "position_x")
-		_add_reference_image_field(reference_transform_grid, "Position Y", reference_position.y, "position_y")
+		_add_reference_image_field(reference_transform_grid, "Position X (m)", _editor_units_to_world(reference_position.x), "position_x")
+		_add_reference_image_field(reference_transform_grid, "Position Y (m)", _editor_units_to_world(reference_position.y), "position_y")
 		_add_reference_image_field(reference_transform_grid, "Scale", float(reference_image.get("scale", 1.0)), "scale")
 		inspector_content.add_child(reference_transform_grid)
 		return
@@ -3549,13 +3675,13 @@ func _render_inspector() -> void:
 	var transform_position: Vector2 = transform.get("position", Vector2.ZERO)
 	var transform_scale: Vector2 = transform.get("scale", Vector2.ONE)
 	var pivot: Vector2 = transform.get("pivot", Vector2.ZERO)
-	_add_transform_field(transform_grid, "Position X", transform_position.x, "position_x", 1.0)
-	_add_transform_field(transform_grid, "Position Y", transform_position.y, "position_y", 1.0)
+	_add_transform_field(transform_grid, "Position X (m)", _editor_units_to_world(transform_position.x), "position_x", 0.01)
+	_add_transform_field(transform_grid, "Position Y (m)", _editor_units_to_world(transform_position.y), "position_y", 0.01)
 	_add_transform_field(transform_grid, "Rotation", float(transform.get("rotation", 0.0)), "rotation", 1.0)
 	_add_transform_field(transform_grid, "Scale X", transform_scale.x, "scale_x", 0.01)
 	_add_transform_field(transform_grid, "Scale Y", transform_scale.y, "scale_y", 0.01)
-	_add_transform_field(transform_grid, "Pivot X", pivot.x, "pivot_x", 1.0)
-	_add_transform_field(transform_grid, "Pivot Y", pivot.y, "pivot_y", 1.0)
+	_add_transform_field(transform_grid, "Pivot X (m)", _editor_units_to_world(pivot.x), "pivot_x", 0.01)
+	_add_transform_field(transform_grid, "Pivot Y (m)", _editor_units_to_world(pivot.y), "pivot_y", 0.01)
 	inspector_content.add_child(_create_inspector_section("Visibility / Layer"))
 	var visibility_toggle := CheckButton.new()
 	visibility_toggle.text = "Visible"
@@ -3663,6 +3789,8 @@ func _on_transform_value_changed(value: float, property_name: String) -> void:
 	var transform_scale: Vector2 = transform.get("scale", Vector2.ONE)
 	var pivot: Vector2 = transform.get("pivot", Vector2.ZERO)
 	var previous_pivot := pivot
+	if property_name == "position_x" or property_name == "position_y" or property_name == "pivot_x" or property_name == "pivot_y":
+		value = _world_to_editor_units(value)
 	match property_name:
 		"position_x": transform_position.x = value
 		"position_y": transform_position.y = value
