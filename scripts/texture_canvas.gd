@@ -28,11 +28,12 @@ func set_origin_mode(mode: String) -> void:
 	if not ORIGIN_MODES.has(mode):
 		mode = "bottom_left"
 	origin_mode = mode
+	origin_changed.emit(origin_mode)
 	queue_redraw()
 
 
-func set_selected_element(name: String) -> void:
-	selected_element_name = name
+func set_selected_element(element_name: String) -> void:
+	selected_element_name = element_name
 	queue_redraw()
 
 

@@ -39,9 +39,10 @@ before implementing real creation tools.
       component; reserve the Outliner for real content hierarchy.
 - [x] Show empty structural Main Toolbar and Context Bar areas ready for real
       controls.
-- [x] Add a `New` menu to the Main Toolbar with `Asset` and `Texture` entries;
+- [x] Add context-specific `Create Asset` and `Create Texture` actions to the
+      Main Toolbar;
       Texture initially remained inert until its own phase began.
-- [x] Implement `New → Asset` with a name dialog, OK/Cancel controls, Enter
+- [x] Implement `Create Asset` with a name dialog, OK/Cancel controls, Enter
       confirmation, and Escape cancellation.
 - [x] Use `asset01`, `asset02`, and so on when an Asset name is confirmed
       empty.
@@ -55,9 +56,9 @@ before implementing real creation tools.
       active; keep point deletion available inside Edit state.
 - [x] Add the initial Texture document model with independent `elements`,
       canvas dimensions, versioned serialization, and workspace loading.
-- [x] Add separate Assets and Textures Outliner groups with alphabetical
-      ordering, search filtering, and an All/Assets/Textures filter.
-- [x] Create Textures through `New → Texture`, add named Elements with
+- [x] Add separate Asset and Texture module Outliners with alphabetical
+      ordering and search filtering.
+- [x] Create Textures through `Create Texture`, add named Elements with
       fallback names, select them in the Outliner, and persist their names.
 - [x] Keep the initial Texture Context Bar limited to the UV `Origin` menu;
       drawing and generation are intentionally deferred.

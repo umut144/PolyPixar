@@ -71,11 +71,12 @@ The labels may gain or lose submodules as the MVP proves what is necessary.
 
 In the UI, these areas are called **categories**. A category contains one or
 more **modules** that provide the concrete working context. For example,
-`Create` is a category and `Shapes` / `Layers` are its current modules.
+`Create` is a category with `Asset` and `Texture` modules. Shapes editing is
+the canvas workflow used by the Asset module.
 
 An Asset is a container for independently editable Components. Drawing is
 performed on a selected Component, never directly on the Asset container. The
-first `Create → Shapes` drawing tool is named `Line`; despite the name, it is a
+first `Create → Asset` drawing tool is named `Line`; despite the name, it is a
 Polyline tool that stores each ordered point immediately. `Enter` confirms an
 open line, while clicking the first point after at least three points marks it
 as a closed contour for outer-shape semantics. Bézier editing and other contour
@@ -114,14 +115,15 @@ first processing action that succeeds selects its Element as the final output.
 Older Texture documents without that field resolve their first ready Element on
 load, preserving their existing result without treating a raw source as ready.
 
-The Outliner presents Assets and Textures in separate groups. Both groups are
-alphabetically ordered and share a compact search field plus `All`, `Assets`,
-and `Textures` filters. Expanded Assets display `Components` and, when Guide
+The Outliner presents Assets and Textures in separate groups. The Asset module
+shows only Assets, while the Texture module shows only Textures. Both groups are
+alphabetically ordered and share a compact search field. Expanded Assets display
+`Components` and, when Guide
 data exists, a separate `Guides` group. Expanded Textures display separate
 `Import Elements` and `Generator Elements` groups. These are navigation groups
 over one typed child collection, not separate persistence models.
 
-`New → Texture` creates a named Texture with the default 512×512 canvas. Each
+`Create Texture` creates a named Texture with the default 512×512 canvas. Each
 Texture exposes an `Add` action for named Elements, which are selected and
 renamed independently in the Outliner/Inspector. Their drawing and generation
 semantics remain deferred.
@@ -256,8 +258,8 @@ The editor is organised around a canvas-first workspace:
 ```text
 left module rail        expandable Create / Style / Motion / Transform / Effects sections
 left context panel      current-context outliner
-Main Toolbar            global tools and direct actions; currently `New ▼` with
-                        `Asset` and `Texture` entries, plus a right-aligned
+Main Toolbar            context-specific create action (`Create Asset`,
+                        `Create Texture`, or `Create Material`), plus a right-aligned
                         `Workspace ▼` menu with `New`, `Save`, and `Load`
 Context Bar             settings and actions for the active tool or operation
 centre                  working area
@@ -297,7 +299,7 @@ Sections form an accordion: opening one category closes the others. The active
 module is highlighted with a yellow background and black text, including its
 hover state.
 
-The current first data flow is `New → Asset` or category-aware `New → Material`:
+The current first data flow is `Create Asset` or category-aware `Create Material`:
 a name dialog creates an in-memory document with a stable internal ID, the
 document appears in the Outliner,
 and its display name can be edited in the Inspector. An Asset can now contain
@@ -318,14 +320,15 @@ intentional exception because it communicates the working context.
 
 The Outliner does not use Godot's `Tree` control. It is a scrollable list of
 data-driven Asset containers. Each Asset uses a vertical container with a
-header row: the name button expands/selects the Asset and a compact `Add`
-button creates a Component. Component rows appear below it with an empty left
-placeholder to make the parent/child relationship visible. Module navigation
+header row: a visibility checkbox, the name button, and a compact `Add` button
+that creates a Component. Component rows appear below it with an indentation
+placeholder and their own visibility checkbox. Module navigation
 lives in the left rail, so category modules do not appear in the Outliner.
 
-An Asset name button is a parent button. Clicking it selects the Asset and
-toggles the visibility of its immediate Component rows. The empty placeholder
-is the only intentional indentation aid; no tree icon or glyph is used.
+An Asset name button is a parent button. Its visibility checkbox overrides the
+effective visibility of its immediate Component rows without changing their
+stored visibility values. Re-enabling the Asset restores each child's own
+visibility state. The same parent/child rule applies to Texture Elements.
 
 Tool settings and object properties have separate homes:
 

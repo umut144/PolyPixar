@@ -44,8 +44,8 @@ general animation/VFX framework.
 - **Morph:** A separately designed transition between a source and a target
   asset.
 - **Category:** A visible creative area such as Create, Style, or Motion.
-- **Module:** A concrete working context inside a category, such as Shapes or
-  Layers.
+- **Module:** A concrete working context inside a category, such as Asset or
+  Texture.
 - **Create / Style / Motion / Transform / Effects:** Current categories.
 - **Export:** A dedicated final output area.
 - **Sequence:** The first bounded Motion container for a staged event involving
@@ -65,19 +65,19 @@ it into a general scene or animation-graph abstraction prematurely.
 - Keep data types generic enough to avoid example-specific code. A closed
   `PolylineContour` is appropriate; a `WizardHatShape` is not.
 - Assets contain independently editable Components. The `Line` tool in
-  `Create → Shapes` stores Polyline points on the selected Component and can
+	`Create → Asset` stores Polyline points on the selected Component and can
   optionally mark the result closed; it does not draw directly on the Asset
   container.
 - Textures are a separate Workspace document type. They will contain
   `elements`, not Components, and have their own canvas dimensions and
   PolyTexture-style editing context.
-- The Outliner now has separate alphabetized Assets and Textures groups with a
-  shared search field and All/Assets/Textures filter.
+- The Create category exposes separate Asset and Texture modules. Each module's
+  Outliner shows only its own document type, with a shared search field.
 - Expanded Asset entries group children under `Components` and optional
   `Guides`; expanded Texture entries group typed children under `Import
   Elements` and `Generator Elements`. These are visual groups over unified
   typed child lists.
-- `New → Texture` now creates a 512×512 Texture; its Outliner `Add` action
+- `Create Texture` now creates a 512×512 Texture; its Outliner `Add` action
   creates named Elements with fallback names. Texture and Element selection
   and renaming are available. The UV Texture Canvas is also implemented.
 - Phase 5 Texture work will use an `Origin` menu with only `Bottom Left`,
@@ -102,7 +102,7 @@ it into a general scene or animation-graph abstraction prematurely.
   Import Element as the final output. Legacy Textures resolve a first ready
   output on load.
 - Style now exposes `Materials` as its first submodule. Materials can be
-  created through `New → Material`, searched and selected in the Material
+  created through `Create Material`, searched and selected in the Material
   Outliner, and edited in the Inspector with a ready Texture reference, tint,
   and opacity.
 - Materials are included in workspace metadata, save/load, and history
@@ -174,19 +174,22 @@ custom button font/hover colours in the initial skeleton.
 The Outliner is `ScrollContainer` + an edge-to-edge vertical list of direct
 button rows, not Godot's `Tree` control. Module navigation is handled by
 reusable expandable sections in the left module rail; modules do not appear in
-the Outliner. The Outliner uses vertical Asset containers with a name header,
-an `Add` button, and Component child rows with an empty indentation placeholder.
+the Outliner. The Outliner uses vertical Asset containers with a visibility
+checkbox, name header, `Add` button, and Component child rows with their own
+visibility checkboxes. Parent visibility overrides child visibility only
+effectively; it does not modify stored child states. The same rule applies to
+Texture Elements.
 The rail behaves as an accordion: at most one category is expanded at a time.
 The active module uses a yellow background with black text, including its
 hover state. No tree icons or glyphs are used.
 
-Create exposes `Shapes` and an intentionally empty `Layers` module. Style
+Create exposes `Asset` and `Texture`. Style
 exposes `Materials`; the remaining categories are present as empty sections.
 
-The Main Toolbar's `New ▼` menu is category-aware: Create offers `Asset` and
-`Texture`, Style offers `Material`, and inactive categories expose no action.
-Each action opens a name dialog with a fallback name and creates a Workspace
-document.
+The Main Toolbar has one context-specific action button: `Create Asset` in the
+Asset module, `Create Texture` in the Texture module, and `Create Material` in
+the Materials module. Each action opens a name dialog with a fallback name and
+creates a Workspace document.
 Assets contain Components; Textures contain optional Elements. Both document
 types are listed, searched, filtered, renamed, persisted, and restored through
 the Outliner/Inspector. The central workspace identifies whether an Asset,
