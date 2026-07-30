@@ -242,7 +242,9 @@ the canvas suppresses ASDW panning while that modifier is held. Workspace
 expanded Outliner containers when the Workspace is reopened.
 
 The current Transform & Snap Foundation milestone begins with the world origin
-`(0, 0)` defined by full horizontal/vertical canvas axes. Phase 2 adds the
+`(0, 0)` defined by full horizontal/vertical canvas axes. The editor uses
+Y-positive-up coordinates and converts to Godot's Y-down convention on export.
+Phase 2 adds the
 left-aligned Snap popover with On/Off, Grid Step, and Rotation Step controls;
 the settings are workspace-persistent. Phase 3 stores Component transform data
 (position, rotation, scale, pivot) plus visibility and z-index. Phase 4 exposes

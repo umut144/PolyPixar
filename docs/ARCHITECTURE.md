@@ -219,7 +219,10 @@ floor-glow-to-flower-growth outcome.
 This is a separate milestone from the current asset and contour workflow. Its
 first step establishes the canvas coordinate system before transform data or
 gizmos are added. The world origin is `(0, 0)` and is defined by the
-intersection of the full horizontal and vertical axes. Component
+intersection of the full horizontal and vertical axes. The editor uses
+X-positive-right and Y-positive-up coordinates; Godot Scene export converts
+positions, contours, and rotation direction back to Godot's Y-down convention.
+Component
 geometry remains in local coordinates; later Transform data will map it into
 the canvas coordinate space without rewriting the stored contour points.
 

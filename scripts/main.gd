@@ -47,6 +47,7 @@ var material_dialog: ConfirmationDialog
 var material_name_input: LineEdit
 var texture_import_dialog: FileDialog
 var reference_image_dialog: FileDialog
+var reference_image_crop_dialog: ReferenceImageCropDialog
 var element_dialog: ConfirmationDialog
 var element_name_input: LineEdit
 var asset_name_editor: LineEdit
@@ -128,6 +129,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if not event is InputEventKey or not event.pressed or event.echo:
 		return
 	var has_command_modifier: bool = event.meta_pressed or event.ctrl_pressed
+	if event.keycode == KEY_ESCAPE:
+		_reset_to_default_state()
+		get_viewport().set_input_as_handled()
+		return
 	if has_command_modifier and event.keycode == KEY_S:
 		_save_workspace()
 		get_viewport().set_input_as_handled()
@@ -185,6 +190,20 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			_set_transform_mode("rotate")
 		elif event.keycode == KEY_3:
 			_set_transform_mode("scale")
+
+
+func _reset_to_default_state() -> void:
+	active_state = ""
+	active_draw_tool = ""
+	active_edit_mode = "select"
+	active_transform_mode = "transform"
+	active_import_preview_mode = "original"
+	if is_instance_valid(canvas_view):
+		canvas_view.set_interaction_state("")
+		canvas_view.set_tool_mode("")
+		canvas_view.set_edit_mode(active_edit_mode)
+		canvas_view.set_transform_mode(active_transform_mode)
+	_render_canvas_context()
 
 
 func _build_ui() -> void:
@@ -404,6 +423,10 @@ func _build_ui() -> void:
 	_create_material_dialog()
 	_create_texture_import_dialog()
 	_create_reference_image_dialog()
+	reference_image_crop_dialog = ReferenceImageCropDialog.new()
+	reference_image_crop_dialog.image_accepted.connect(_save_reference_image_result)
+	reference_image_crop_dialog.image_cropped.connect(_save_reference_image_result)
+	add_child(reference_image_crop_dialog)
 	_create_element_dialog()
 	_create_workspace_dialogs()
 
@@ -1344,6 +1367,15 @@ func _reference_image_path(asset: Dictionary) -> String:
 	return "%s/%s/assets/%s/%s" % [WORKSPACES_ROOT, workspace_name, str(asset.get("id", "")), reference_file]
 
 
+func _reference_image_filename(asset: Dictionary) -> String:
+	var safe_name := str(asset.get("name", asset.get("id", "asset"))).strip_edges().to_lower().replace(" ", "_")
+	for character in ["/", "\\", ":", "*", "?", "\"", "<", ">", "|"]:
+		safe_name = safe_name.replace(character, "_")
+	if safe_name.is_empty():
+		safe_name = str(asset.get("id", "asset"))
+	return "%s_ref.png" % safe_name
+
+
 func _deserialize_transform(transform) -> Dictionary:
 	var result := _default_component_transform()
 	if not transform is Dictionary:
@@ -1978,10 +2010,12 @@ func _render_info_bar() -> void:
 		else:
 			active_material_status_label.text = ""
 	_clear(info_bar)
-	if active_module == "Style" and not selected_material_id.is_empty():
+	if active_module == "Style":
 		var material_state_label := Label.new()
-		material_state_label.text = "Material Graph"
+		material_state_label.text = "State: Default"
 		info_bar.add_child(material_state_label)
+		if not selected_material_id.is_empty():
+			_add_info_option("Material Graph")
 		return
 	if active_module == "Export":
 		var build_state := Label.new()
@@ -1993,17 +2027,21 @@ func _render_info_bar() -> void:
 	if not selected_texture_id.is_empty():
 		var texture := _get_texture(selected_texture_id)
 		var selected_element := _get_element(texture, selected_element_id)
+		var texture_state_label := Label.new()
+		texture_state_label.text = "State: Default"
+		info_bar.add_child(texture_state_label)
 		if not selected_element.is_empty() and str(selected_element.get("type", "generator")) == "import":
-			var preview_state_label := Label.new()
-			preview_state_label.text = "State: Preview"
-			info_bar.add_child(preview_state_label)
 			_add_info_option("1: Original")
 			_add_info_option("2: White to Alpha")
 		return
 	if selected_component_id.is_empty():
+		if active_module == "Create":
+			var asset_state_label := Label.new()
+			asset_state_label.text = "State: Default"
+			info_bar.add_child(asset_state_label)
 		return
 	var state_label := Label.new()
-	state_label.text = "State: %s" % ("Draw" if active_state == "draw" else "Edit" if active_state == "edit" else "Transform" if active_state == "transform" else "—")
+	state_label.text = "State: %s" % ("Draw" if active_state == "draw" else "Edit" if active_state == "edit" else "Transform" if active_state == "transform" else "Default")
 	info_bar.add_child(state_label)
 	if active_state == "draw":
 		_add_info_option("1: Line")
@@ -2089,11 +2127,13 @@ func _build_selected_asset_scene() -> void:
 	for component in asset.get("components", []):
 		var polygon := Polygon2D.new()
 		polygon.name = _tscn_name(str(component.get("name", "Component")))
-		polygon.polygon = PackedVector2Array(component.get("outer_shape", []))
+		var export_points := _godot_export_points(component.get("outer_shape", []))
+		polygon.polygon = PackedVector2Array(export_points)
 		var transform: Dictionary = component.get("transform", _default_component_transform())
-		polygon.position = transform.get("position", Vector2.ZERO)
-		polygon.rotation = deg_to_rad(float(transform.get("rotation", 0.0)))
-		polygon.scale = transform.get("scale", Vector2.ONE)
+		var export_transform := _godot_export_transform(transform)
+		polygon.position = export_transform["position"]
+		polygon.rotation = deg_to_rad(float(export_transform["rotation"]))
+		polygon.scale = export_transform["scale"]
 		polygon.visible = bool(asset.get("visibility", true)) and bool(component.get("visibility", true))
 		polygon.z_index = int(component.get("z_index", 0))
 		var material_data := _get_material(str(component.get("material_id", "")))
@@ -2106,7 +2146,7 @@ func _build_selected_asset_scene() -> void:
 				var texture_resource := load(texture_path) as Texture2D
 				polygon.texture = texture_resource
 				if texture_resource != null:
-					polygon.uv = _build_export_uvs(component.get("outer_shape", []), texture_resource.get_size(), material_data.get("mapping_scale", Vector2.ONE), material_data.get("mapping_offset", Vector2.ZERO), _material_wrap_mode(material_data))
+					polygon.uv = _build_export_uvs(export_points, texture_resource.get_size(), material_data.get("mapping_scale", Vector2.ONE), material_data.get("mapping_offset", Vector2.ZERO), _material_wrap_mode(material_data))
 					polygon.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED if _material_wrap_mode(material_data) == "repeat" else CanvasItem.TEXTURE_REPEAT_DISABLED
 		root.add_child(polygon)
 		polygon.owner = root
@@ -2184,15 +2224,14 @@ func _export_selected_asset_scene_legacy() -> void:
 		var texture_path := _get_texture_final_path(texture) if not texture.is_empty() else ""
 		var node_name := _tscn_name(str(component.get("name", "Component")))
 		var transform: Dictionary = component.get("transform", _default_component_transform())
-		var export_position: Vector2 = transform.get("position", Vector2.ZERO)
-		var transform_scale: Vector2 = transform.get("scale", Vector2.ONE)
-		var export_rotation := deg_to_rad(float(transform.get("rotation", 0.0)))
 		lines.append("\n[node name=\"%s\" type=\"Polygon2D\" parent=\".\"]" % node_name)
-		lines.append("polygon = %s" % _tscn_vector2_array(component.get("outer_shape", [])))
-		lines.append("position = Vector2(%s, %s)" % [str(export_position.x), str(export_position.y)])
-		lines.append("rotation = %s" % str(export_rotation))
-		lines.append("scale = Vector2(%s, %s)" % [str(transform_scale.x), str(transform_scale.y)])
-		lines.append("visible = %s" % str(bool(component.get("visibility", true))).to_lower())
+		var export_points := _godot_export_points(component.get("outer_shape", []))
+		var export_transform := _godot_export_transform(transform)
+		lines.append("polygon = %s" % _tscn_vector2_array(export_points))
+		lines.append("position = Vector2(%s, %s)" % [str(export_transform["position"].x), str(export_transform["position"].y)])
+		lines.append("rotation = %s" % str(deg_to_rad(float(export_transform["rotation"]))))
+		lines.append("scale = Vector2(%s, %s)" % [str(export_transform["scale"].x), str(export_transform["scale"].y)])
+		lines.append("visible = %s" % str(bool(asset.get("visibility", true)) and bool(component.get("visibility", true))).to_lower())
 		lines.append("z_index = %d" % int(component.get("z_index", 0)))
 		if not material_data.is_empty():
 			var tint: Color = material_data.get("tint", Color.WHITE)
@@ -2229,6 +2268,26 @@ func _tscn_vector2_array(points: Array) -> String:
 		var vector: Vector2 = point if point is Vector2 else Vector2.ZERO
 		values.append("%s, %s" % [str(vector.x), str(vector.y)])
 	return "PackedVector2Array(%s)" % ", ".join(values)
+
+
+func _godot_export_points(points: Array) -> Array[Vector2]:
+	var converted: Array[Vector2] = []
+	for point in points:
+		if point is Vector2:
+			converted.append(Vector2(point.x, -point.y))
+	return converted
+
+
+func _godot_export_transform(transform: Dictionary) -> Dictionary:
+	var normalized := _deserialize_transform(transform)
+	var export_position_value: Vector2 = normalized["position"]
+	var export_pivot_value: Vector2 = normalized["pivot"]
+	return {
+		"position": Vector2(export_position_value.x, -export_position_value.y),
+		"rotation": -float(normalized["rotation"]),
+		"scale": normalized["scale"],
+		"pivot": Vector2(export_pivot_value.x, -export_pivot_value.y)
+	}
 
 
 func _add_info_option(text: String) -> void:
@@ -2282,22 +2341,24 @@ func _on_reference_image_file_selected(source_path: String) -> void:
 	var asset := _get_asset(selected_asset_id)
 	if asset.is_empty() or workspace_name.is_empty():
 		return
-	var extension := source_path.get_extension().to_lower()
-	if extension.is_empty():
-		_show_status_message("Reference Image has no supported file extension.")
+	var source_image := Image.new()
+	if source_image.load(source_path) != OK or source_image.is_empty():
+		_show_status_message("Reference Image could not be loaded.")
 		return
-	var reference_filename := "reference.%s" % extension
+	reference_image_crop_dialog.open_for_image(source_image)
+
+
+func _save_reference_image_result(reference_image_result: Image) -> void:
+	var asset := _get_asset(selected_asset_id)
+	if asset.is_empty() or workspace_name.is_empty() or reference_image_result == null or reference_image_result.is_empty():
+		return
+	var reference_filename := _reference_image_filename(asset)
 	var asset_root := "%s/%s/assets/%s" % [WORKSPACES_ROOT, workspace_name, str(asset.get("id", ""))]
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(asset_root))
-	var source_file := FileAccess.open(source_path, FileAccess.READ)
 	var destination_path := "%s/%s" % [asset_root, reference_filename]
-	var destination_file := FileAccess.open(ProjectSettings.globalize_path(destination_path), FileAccess.WRITE)
-	if source_file == null or destination_file == null:
+	if reference_image_result.save_png(ProjectSettings.globalize_path(destination_path)) != OK:
 		_show_status_message("Reference Image could not be copied.")
 		return
-	destination_file.store_buffer(source_file.get_buffer(source_file.get_length()))
-	source_file.close()
-	destination_file.close()
 	var reference_image := _normalize_reference_image(asset.get("reference_image", {}))
 	reference_image["file"] = reference_filename
 	_record_direct_change()
@@ -3990,7 +4051,9 @@ func _set_reference_image_canvas(asset: Dictionary) -> void:
 	var reference_path := _reference_image_path(asset)
 	var reference_texture: Texture2D = null
 	if not reference_path.is_empty() and FileAccess.file_exists(ProjectSettings.globalize_path(reference_path)):
-		reference_texture = load(reference_path) as Texture2D
+		var reference_source := Image.new()
+		if reference_source.load(ProjectSettings.globalize_path(reference_path)) == OK and not reference_source.is_empty():
+			reference_texture = ImageTexture.create_from_image(reference_source)
 	canvas_view.set_reference_image(
 		reference_texture,
 		bool(reference_image.get("visible", true)),

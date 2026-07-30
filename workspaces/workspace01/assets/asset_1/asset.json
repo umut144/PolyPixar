@@ -89,5 +89,16 @@
 	],
 	"id": "asset_1",
 	"name": "asset01",
-	"schema_version": 8
+	"reference_image": {
+		"file": "asset01_ref.png",
+		"opacity": 0.5,
+		"position": [
+			0.0,
+			0.0
+		],
+		"scale": 0.2,
+		"visible": true
+	},
+	"schema_version": 8,
+	"visibility": true
 }

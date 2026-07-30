@@ -384,7 +384,7 @@ func _process(delta: float) -> void:
 	var command_modifier: bool = Input.is_key_pressed(KEY_META) or Input.is_key_pressed(KEY_CTRL)
 	var pan_input := Vector2.ZERO if command_modifier else Vector2(
 		float(Input.is_key_pressed(KEY_D)) - float(Input.is_key_pressed(KEY_A)),
-		float(Input.is_key_pressed(KEY_S)) - float(Input.is_key_pressed(KEY_W))
+		float(Input.is_key_pressed(KEY_W)) - float(Input.is_key_pressed(KEY_S))
 	)
 	if pan_input.length_squared() > 0.0:
 		view_center += pan_input.normalized() * PAN_SPEED / zoom * delta
@@ -487,7 +487,8 @@ func _transform_handle_at(screen_position: Vector2) -> String:
 
 func _angle_from_transform_center(screen_position: Vector2) -> float:
 	var center := _world_to_screen(component_transform.get("position", Vector2.ZERO))
-	return (screen_position - center).angle()
+	var screen_offset := screen_position - center
+	return Vector2(screen_offset.x, -screen_offset.y).angle()
 
 
 func _is_near_pivot(screen_position: Vector2) -> bool:
@@ -661,11 +662,12 @@ func _visible_grid_step() -> float:
 
 
 func _world_to_screen(world_position: Vector2) -> Vector2:
-	return size * 0.5 + (world_position - view_center) * zoom
+	return size * 0.5 + Vector2(world_position.x - view_center.x, -(world_position.y - view_center.y)) * zoom
 
 
 func _screen_to_world(screen_position: Vector2) -> Vector2:
-	return view_center + (screen_position - size * 0.5) / zoom
+	var screen_offset := (screen_position - size * 0.5) / zoom
+	return view_center + Vector2(screen_offset.x, -screen_offset.y)
 
 
 func _snap_to_grid(world_position: Vector2) -> Vector2:
