@@ -861,7 +861,7 @@ func _create_reference_image_dialog() -> void:
 	reference_image_dialog.filters = PackedStringArray([
 		"*.png, *.jpg, *.jpeg, *.webp ; Image files"
 	])
-	reference_image_dialog.current_dir = ProjectSettings.globalize_path(IMPORT_TEXTURES_ROOT)
+	reference_image_dialog.current_dir = _reference_art_directory()
 	reference_image_dialog.file_selected.connect(_on_reference_image_file_selected)
 	add_child(reference_image_dialog)
 
@@ -1488,7 +1488,6 @@ func _default_reference_image() -> Dictionary:
 		"opacity": 0.5,
 		"position": Vector2.ZERO,
 		"scale": 1.0,
-		"normalize_height": false,
 		"target_height_cm": 13.0,
 		"pivot_mode": "bottom_center"
 	}
@@ -1503,7 +1502,6 @@ func _normalize_reference_image(raw_reference) -> Dictionary:
 	result["opacity"] = clampf(float(raw_reference.get("opacity", 0.5)), 0.0, 1.0)
 	result["position"] = _deserialize_vector(raw_reference.get("position", [0.0, 0.0]), Vector2.ZERO)
 	result["scale"] = maxf(float(raw_reference.get("scale", 1.0)), 0.01)
-	result["normalize_height"] = bool(raw_reference.get("normalize_height", false))
 	result["target_height_cm"] = maxf(float(raw_reference.get("target_height_cm", 13.0)), 0.01)
 	result["pivot_mode"] = "center" if str(raw_reference.get("pivot_mode", "bottom_center")) == "center" else "bottom_center"
 	return result
@@ -1517,7 +1515,6 @@ func _serialize_reference_image(raw_reference) -> Dictionary:
 		"opacity": float(normalized["opacity"]),
 		"position": _serialize_vector(normalized["position"]),
 		"scale": float(normalized["scale"]),
-		"normalize_height": bool(normalized["normalize_height"]),
 		"target_height_cm": float(normalized["target_height_cm"]),
 		"pivot_mode": str(normalized["pivot_mode"])
 	}
@@ -2539,8 +2536,17 @@ func _open_reference_image_dialog() -> void:
 	if workspace_name.is_empty():
 		_show_status_message("Create or load a Workspace before loading a Reference Image.")
 		return
-	reference_image_dialog.current_dir = ProjectSettings.globalize_path(IMPORT_TEXTURES_ROOT)
+	reference_image_dialog.current_dir = _reference_art_directory()
 	reference_image_dialog.popup_centered_ratio()
+
+
+func _reference_art_directory() -> String:
+	var documents_directory := OS.get_system_dir(OS.SYSTEM_DIR_DOCUMENTS)
+	if documents_directory.is_empty():
+		return ProjectSettings.globalize_path(IMPORT_TEXTURES_ROOT)
+	var reference_art_directory := documents_directory.path_join("RefArt")
+	DirAccess.make_dir_recursive_absolute(reference_art_directory)
+	return reference_art_directory
 
 
 func _on_reference_image_file_selected(source_path: String) -> void:
@@ -2589,10 +2595,6 @@ func _clear_reference_image() -> void:
 
 func _on_reference_image_visibility_changed(image_visible: bool) -> void:
 	_update_reference_image_property("visible", image_visible)
-
-
-func _on_reference_image_normalization_changed(enabled: bool) -> void:
-	_update_reference_image_property("normalize_height", enabled)
 
 
 func _on_reference_image_target_height_changed(value: float) -> void:
@@ -3823,38 +3825,15 @@ func _render_inspector() -> void:
 			var reference_file_label := _create_inspector_field_label(str(reference_image.get("file", "")))
 			reference_file_label.add_theme_color_override("font_color", Color("#9aa3b2"))
 			inspector_content.add_child(reference_file_label)
-		var reference_visibility := CheckBox.new()
-		reference_visibility.text = "Visible"
-		reference_visibility.focus_mode = Control.FOCUS_NONE
-		reference_visibility.button_pressed = bool(reference_image.get("visible", true))
-		reference_visibility.toggled.connect(_on_reference_image_visibility_changed)
-		inspector_content.add_child(reference_visibility)
-		var reference_opacity := SpinBox.new()
-		reference_opacity.name = "ReferenceImageOpacity"
-		reference_opacity.min_value = 0.0
-		reference_opacity.max_value = 1.0
-		reference_opacity.step = 0.01
-		reference_opacity.custom_minimum_size = Vector2(0, 26)
-		reference_opacity.value = float(reference_image.get("opacity", 0.5))
-		reference_opacity.value_changed.connect(_on_reference_image_property_changed.bind("opacity"))
-		inspector_content.add_child(_create_inspector_field_label("Opacity"))
-		inspector_content.add_child(reference_opacity)
-		var normalize_height := CheckBox.new()
-		normalize_height.text = "Normalize Height"
-		normalize_height.focus_mode = Control.FOCUS_NONE
-		normalize_height.button_pressed = bool(reference_image.get("normalize_height", false))
-		normalize_height.toggled.connect(_on_reference_image_normalization_changed)
-		inspector_content.add_child(normalize_height)
-		if bool(reference_image.get("normalize_height", false)):
-			var target_height := SpinBox.new()
-			target_height.min_value = 0.01
-			target_height.max_value = 100000.0
-			target_height.step = 0.1
-			target_height.custom_minimum_size = Vector2(0, 26)
-			target_height.value = float(reference_image.get("target_height_cm", 13.0))
-			target_height.value_changed.connect(_on_reference_image_target_height_changed)
-			inspector_content.add_child(_create_inspector_field_label("Target Height (cm)"))
-			inspector_content.add_child(target_height)
+		var target_height := SpinBox.new()
+		target_height.min_value = 0.01
+		target_height.max_value = 100000.0
+		target_height.step = 0.1
+		target_height.custom_minimum_size = Vector2(0, 26)
+		target_height.value = float(reference_image.get("target_height_cm", 13.0))
+		target_height.value_changed.connect(_on_reference_image_target_height_changed)
+		inspector_content.add_child(_create_inspector_field_label("Target Height (cm)"))
+		inspector_content.add_child(target_height)
 		var pivot_label := _create_inspector_field_label("Pivot")
 		inspector_content.add_child(pivot_label)
 		var pivot_option := OptionButton.new()
@@ -3870,11 +3849,28 @@ func _render_inspector() -> void:
 				break
 		pivot_option.item_selected.connect(_on_reference_image_pivot_selected.bind(pivot_option))
 		inspector_content.add_child(pivot_option)
-		var reference_transform_grid := GridContainer.new()
-		reference_transform_grid.columns = 2
-		reference_transform_grid.add_theme_constant_override("h_separation", 8)
-		reference_transform_grid.add_theme_constant_override("v_separation", 4)
-		if not bool(reference_image.get("normalize_height", false)):
+		if not str(reference_image.get("file", "")).is_empty():
+			inspector_content.add_child(_create_inspector_section("Reference Image Settings"))
+			var reference_visibility := CheckBox.new()
+			reference_visibility.text = "Visible"
+			reference_visibility.focus_mode = Control.FOCUS_NONE
+			reference_visibility.button_pressed = bool(reference_image.get("visible", true))
+			reference_visibility.toggled.connect(_on_reference_image_visibility_changed)
+			inspector_content.add_child(reference_visibility)
+			var reference_opacity := SpinBox.new()
+			reference_opacity.name = "ReferenceImageOpacity"
+			reference_opacity.min_value = 0.0
+			reference_opacity.max_value = 1.0
+			reference_opacity.step = 0.01
+			reference_opacity.custom_minimum_size = Vector2(0, 26)
+			reference_opacity.value = float(reference_image.get("opacity", 0.5))
+			reference_opacity.value_changed.connect(_on_reference_image_property_changed.bind("opacity"))
+			inspector_content.add_child(_create_inspector_field_label("Opacity"))
+			inspector_content.add_child(reference_opacity)
+			var reference_transform_grid := GridContainer.new()
+			reference_transform_grid.columns = 2
+			reference_transform_grid.add_theme_constant_override("h_separation", 8)
+			reference_transform_grid.add_theme_constant_override("v_separation", 4)
 			var reference_position: Vector2 = reference_image.get("position", Vector2.ZERO)
 			_add_reference_image_field(reference_transform_grid, "Position X (cm)", _editor_units_to_world(reference_position.x), "position_x")
 			_add_reference_image_field(reference_transform_grid, "Position Y (cm)", _editor_units_to_world(reference_position.y), "position_y")
@@ -4426,13 +4422,11 @@ func _set_reference_image_canvas(asset: Dictionary) -> void:
 			reference_texture = ImageTexture.create_from_image(reference_source)
 	var reference_position: Vector2 = reference_image.get("position", Vector2.ZERO)
 	var reference_scale := float(reference_image.get("scale", 1.0))
-	if bool(reference_image.get("normalize_height", false)) and is_instance_valid(reference_texture) and reference_texture.get_height() > 0:
+	if is_instance_valid(reference_texture) and reference_texture.get_height() > 0:
 		var target_height := float(reference_image.get("target_height_cm", 13.0))
-		reference_scale = target_height / float(reference_texture.get_height())
+		reference_scale *= target_height / float(reference_texture.get_height())
 		if str(reference_image.get("pivot_mode", "bottom_center")) == "bottom_center":
-			reference_position = Vector2(0.0, target_height * 0.5)
-		else:
-			reference_position = Vector2.ZERO
+			reference_position += Vector2(0.0, target_height * 0.5 * reference_image.get("scale", 1.0))
 	canvas_view.set_reference_image(
 		reference_texture,
 		bool(reference_image.get("visible", true)),
