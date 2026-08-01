@@ -10,6 +10,7 @@ signal bezier_point_added(position: Vector2, point_mode: String, handle_out: Vec
 signal bezier_chain_closed()
 signal edge_selection_changed(edge_id: String)
 signal bezier_point_moved(index: int, position: Vector2)
+signal bezier_points_move_started(indices: Array)
 signal bezier_points_moved(indices: Array, delta: Vector2)
 signal bezier_handle_changed(index: int, handle_side: String, value: Vector2)
 signal bezier_edge_insert_requested(edge_id: String, t: float)
@@ -21,7 +22,9 @@ signal transform_changed(transform: Dictionary)
 
 const PAN_SPEED := 420.0
 const MIN_ZOOM := 0.25
-const MAX_ZOOM := 256.0
+# Allows detailed millimeter-level editing while keeping the existing zoom
+# progression and grid package logic unchanged.
+const MAX_ZOOM := 1024.0
 const DEFAULT_ZOOM := 1.0
 const DEFAULT_PAPER_SIZE_CM := Vector2(14.8, 21.0) # DIN A5, portrait
 const DEFAULT_PAPER_MARGIN := 0.9
@@ -43,6 +46,7 @@ var active_tool := ""
 var interaction_state := ""
 var edit_mode := "select"
 var edit_handles_enabled := false
+var edit_point_set_enabled := false
 var transform_mode := "transform"
 var line_draft: Array[Vector2] = []
 var outer_shape: Array[Vector2] = []
@@ -66,7 +70,7 @@ var point_marquee_current := Vector2.ZERO
 var point_press_edge_hit: Dictionary = {}
 var selection_gizmo_dragging := false
 var selection_gizmo_drag_axis := ""
-var selection_gizmo_last_world := Vector2.ZERO
+var selection_gizmo_drag_start_world := Vector2.ZERO
 var draw_pointer_down := false
 var pending_draw_position := Vector2.ZERO
 var pending_draw_handle_out := Vector2.ZERO
@@ -153,7 +157,7 @@ func _gui_input(event: InputEvent) -> void:
 			command_shortcut_active = false
 	if event is InputEventMouseButton and event.pressed:
 		grab_focus()
-		if event.button_index == MOUSE_BUTTON_LEFT and active_tool == "point":
+		if event.button_index == MOUSE_BUTTON_LEFT and interaction_state == "draw" and active_tool == "point":
 			draw_pointer_down = true
 			pending_draw_position = _snap_to_grid(_world_to_local(_screen_to_world(event.position)))
 			pending_draw_handle_out = Vector2.ZERO
@@ -173,12 +177,13 @@ func _gui_input(event: InputEvent) -> void:
 			line_draft_changed.emit(line_draft)
 			queue_redraw()
 		elif event.button_index == MOUSE_BUTTON_LEFT and interaction_state == "edit":
-			if edit_mode == "point" and not edit_handles_enabled:
+			if edit_mode == "point" and not edit_handles_enabled and not edit_point_set_enabled:
 				var gizmo_axis := _selection_gizmo_at(event.position)
 				if not gizmo_axis.is_empty():
 					selection_gizmo_dragging = true
 					selection_gizmo_drag_axis = gizmo_axis
-					selection_gizmo_last_world = _screen_to_world(event.position)
+					selection_gizmo_drag_start_world = _screen_to_world(event.position)
+					bezier_points_move_started.emit(selected_point_indices.duplicate())
 					return
 			if _is_near_pivot(event.position):
 				pivot_dragging = true
@@ -196,12 +201,21 @@ func _gui_input(event: InputEvent) -> void:
 					face_drag_start_shape = outer_shape.duplicate()
 				return
 			if edit_mode == "point" and not bezier_points.is_empty():
+				if edit_point_set_enabled:
+					var edge_to_insert := _bezier_edge_hit(event.position)
+					if not edge_to_insert.is_empty():
+						bezier_edge_insert_requested.emit(str(edge_to_insert["id"]), float(edge_to_insert["t"]))
+					else:
+						clear_selection()
+					queue_redraw()
+					return
 				if not edit_handles_enabled:
 					var gizmo_axis := _selection_gizmo_at(event.position)
 					if not gizmo_axis.is_empty():
 						selection_gizmo_dragging = true
 						selection_gizmo_drag_axis = gizmo_axis
-						selection_gizmo_last_world = _screen_to_world(event.position)
+						selection_gizmo_drag_start_world = _screen_to_world(event.position)
+						bezier_points_move_started.emit(selected_point_indices.duplicate())
 						return
 				var handle_side := _bezier_handle_at(event.position) if edit_handles_enabled else ""
 				if not handle_side.is_empty():
@@ -247,7 +261,7 @@ func _gui_input(event: InputEvent) -> void:
 			if not component_id.is_empty():
 				reference_component_selected.emit(component_id)
 	if event is InputEventMouseButton and not event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		if draw_pointer_down and active_tool == "point":
+		if draw_pointer_down and interaction_state == "draw" and active_tool == "point":
 			if _is_near_first_chain_point(pending_draw_position):
 				bezier_chain_closed.emit()
 			else:
@@ -264,8 +278,6 @@ func _gui_input(event: InputEvent) -> void:
 		if point_marquee_dragging:
 			if point_marquee_moved:
 				_select_points_in_marquee()
-			elif not point_press_edge_hit.is_empty() and not edit_handles_enabled:
-				bezier_edge_insert_requested.emit(str(point_press_edge_hit["id"]), float(point_press_edge_hit["t"]))
 			else:
 				clear_selection()
 			point_marquee_dragging = false
@@ -290,17 +302,16 @@ func _gui_input(event: InputEvent) -> void:
 			return
 		if selection_gizmo_dragging:
 			var current_world := _screen_to_world(event.position)
-			var move_delta := current_world - selection_gizmo_last_world
+			var move_delta := current_world - selection_gizmo_drag_start_world
 			if selection_gizmo_drag_axis == "x":
 				move_delta.y = 0.0
 			elif selection_gizmo_drag_axis == "y":
 				move_delta.x = 0.0
 			if not is_zero_approx(move_delta.length_squared()):
 				bezier_points_moved.emit(selected_point_indices.duplicate(), move_delta)
-				selection_gizmo_last_world = current_world
 			queue_redraw()
 			return
-		if draw_pointer_down and active_tool == "point" and draw_point_mode != "linear":
+		if draw_pointer_down and interaction_state == "draw" and active_tool == "point" and draw_point_mode != "linear":
 			var raw_draw_handle := _world_to_local(_screen_to_world(event.position)) - pending_draw_position
 			if raw_draw_handle.length() * zoom >= 3.0:
 				pending_draw_handle_out = raw_draw_handle
@@ -428,6 +439,10 @@ func _on_mouse_exited() -> void:
 
 func set_tool_mode(tool_name: String) -> void:
 	active_tool = tool_name
+	if tool_name != "point":
+		draw_pointer_down = false
+		pending_draw_has_handle = false
+		pending_draw_handle_out = Vector2.ZERO
 	line_draft.clear()
 	line_draft_changed.emit(line_draft)
 	queue_redraw()
@@ -449,6 +464,12 @@ func set_line_draft(points: Array) -> void:
 
 func set_interaction_state(state: String) -> void:
 	interaction_state = state
+	if state != "draw":
+		active_tool = ""
+		draw_pointer_down = false
+		pending_draw_has_handle = false
+		pending_draw_handle_out = Vector2.ZERO
+		line_draft.clear()
 	if state != "edit":
 		clear_selection()
 		selected_edge_id = ""
@@ -474,6 +495,11 @@ func set_edit_mode(mode: String) -> void:
 
 func set_edit_handles_enabled(enabled: bool) -> void:
 	edit_handles_enabled = enabled
+	queue_redraw()
+
+
+func set_edit_point_set_enabled(enabled: bool) -> void:
+	edit_point_set_enabled = enabled
 	queue_redraw()
 
 
@@ -512,6 +538,10 @@ func set_snap_settings(enabled: bool, new_grid_step: float, new_rotation_step: f
 	grid_step = maxf(new_grid_step, 0.0001)
 	rotation_step = maxf(new_rotation_step, 1.0)
 	queue_redraw()
+
+
+func snap_position(position: Vector2) -> Vector2:
+	return _snap_to_grid(position)
 
 
 func set_world_scale(new_grid_size: float) -> void:
@@ -1020,7 +1050,7 @@ func _draw_bezier_geometry() -> void:
 		draw_circle(selected_screen, 7.0, Color("#f2c94c"), false, 2.0)
 		if edit_handles_enabled:
 			_draw_bezier_handle_preview(selected_point)
-	if interaction_state == "edit" and edit_mode == "point" and not edit_handles_enabled:
+	if interaction_state == "edit" and edit_mode == "point" and not edit_handles_enabled and not edit_point_set_enabled:
 		for point_index in selected_point_indices:
 			if point_index < 0 or point_index >= bezier_points.size():
 				continue
@@ -1055,7 +1085,7 @@ func _selection_gizmo_at(screen_position: Vector2) -> String:
 
 
 func _draw_selection_gizmo() -> void:
-	if interaction_state != "edit" or edit_mode != "point" or edit_handles_enabled or selected_point_indices.is_empty():
+	if interaction_state != "edit" or edit_mode != "point" or edit_handles_enabled or edit_point_set_enabled or selected_point_indices.is_empty():
 		return
 	var center := _world_to_screen(_local_to_world(_selected_points_center()))
 	draw_line(center, center + Vector2(GIZMO_AXIS_LENGTH, 0.0), Color("#e56b6f"), 2.0)
@@ -1259,7 +1289,7 @@ func _bezier_handle_at(screen_position: Vector2) -> String:
 
 
 func _draw_line_draft() -> void:
-	if active_tool == "point":
+	if interaction_state == "draw" and active_tool == "point":
 		if not cursor_over_canvas:
 			return
 		_draw_draw_point_preview()
@@ -1338,14 +1368,36 @@ func _draw_draw_point_preview() -> void:
 	var points_by_id: Dictionary = {}
 	for point_data in preview_points:
 		points_by_id[str(point_data.get("id", ""))] = point_data
-	# For a normal preview the temporary point is appended, so the previous
-	# point is the penultimate id. During close-chain preview no temporary point
-	# is appended; the preview edge must therefore start at the actual last
-	# chain point and end at the first point.
-	var start_id := str(preview_point_ids.back() if closing_preview else preview_point_ids[preview_point_ids.size() - 2])
-	if not points_by_id.has(start_id) or not points_by_id.has(preview_end_id):
-		return
-	_draw_dashed_polyline(_bezier_curve_screen_points(points_by_id[start_id], points_by_id[preview_end_id]), Color("#f2c94caa"), 1.5)
+	# Automatic handles use both neighbours. Appending a point therefore also
+	# changes the incoming handle of the previous endpoint and with it the
+	# already existing segment before the new one. Closing a chain additionally
+	# changes the first point, so the first segment must be previewed as well.
+	var affected_segments: Array = []
+	if closing_preview:
+		var closing_count := preview_point_ids.size()
+		affected_segments.append([preview_point_ids[closing_count - 2], preview_point_ids[closing_count - 1]])
+		affected_segments.append([preview_point_ids[closing_count - 1], preview_point_ids[0]])
+		affected_segments.append([preview_point_ids[0], preview_point_ids[1]])
+	else:
+		var preview_count := preview_point_ids.size()
+		if preview_count >= 3:
+			affected_segments.append([preview_point_ids[preview_count - 3], preview_point_ids[preview_count - 2]])
+		affected_segments.append([preview_point_ids[preview_count - 2], preview_point_ids[preview_count - 1]])
+	var drawn_segments: Dictionary = {}
+	for segment_data in affected_segments:
+		var segment_start_id := str(segment_data[0])
+		var segment_end_id := str(segment_data[1])
+		var segment_key := "%s>%s" % [segment_start_id, segment_end_id]
+		if drawn_segments.has(segment_key):
+			continue
+		drawn_segments[segment_key] = true
+		if not points_by_id.has(segment_start_id) or not points_by_id.has(segment_end_id):
+			continue
+		_draw_dashed_polyline(
+			_bezier_curve_screen_points(points_by_id[segment_start_id], points_by_id[segment_end_id]),
+			Color("#f2c94caa"),
+			1.5
+		)
 
 
 func _draw_dashed_polyline(points: PackedVector2Array, line_color: Color, line_width: float) -> void:

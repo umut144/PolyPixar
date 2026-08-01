@@ -30,6 +30,8 @@ var selected_component_id := ""
 var selected_edge_id := ""
 var selected_point_index := -1
 var selected_point_indices: Array[int] = []
+var bezier_point_move_start_positions: Dictionary = {}
+var bezier_point_move_component_id := ""
 var selected_texture_id := ""
 var selected_element_id := ""
 var selected_material_id := ""
@@ -90,6 +92,7 @@ var pending_import_threshold := 0.05
 var import_threshold_field: SpinBox
 var active_edit_mode := "point"
 var edit_bezier_handles := false
+var edit_point_set_mode := false
 var active_transform_mode := "transform"
 var snap_enabled := true
 var snap_mode := "coarse"
@@ -122,6 +125,9 @@ var world_grid_size := 0.5
 
 
 func _ready() -> void:
+	# Native macOS quit requests bypass regular key input. Handle them below so
+	# Cmd+Q can be blocked without disabling a normal window close.
+	get_tree().auto_accept_quit = false
 	_build_ui()
 	history_coalesce_timer = Timer.new()
 	history_coalesce_timer.one_shot = true
@@ -138,18 +144,18 @@ func _ready() -> void:
 
 
 func _disable_quit_shortcut() -> void:
-	# On macOS Cmd+Q is owned by the native application menu, before Godot's
-	# regular input dispatch. Remove only its accelerator; quitting via the menu
-	# or window controls remains possible.
-	if OS.get_name() != "macOS":
+	# Cmd+Q is handled as a native quit request on macOS. The request is filtered
+	# in _notification so regular window controls remain available.
+	return
+
+
+func _notification(what: int) -> void:
+	if what != NOTIFICATION_WM_CLOSE_REQUEST:
 		return
-	var application_menu := NativeMenu.get_system_menu(NativeMenu.APPLICATION_MENU_ID)
-	for item_index in range(NativeMenu.get_item_count(application_menu)):
-		if NativeMenu.get_item_text(application_menu, item_index).begins_with("Quit"):
-			NativeMenu.set_item_accelerator(application_menu, item_index, KEY_NONE)
-			return
-
-
+	if Input.is_key_pressed(KEY_META) or Input.is_key_pressed(KEY_CTRL):
+		_show_status_message("Cmd+Q is disabled.")
+		return
+	get_tree().quit()
 func _load_last_workspace() -> void:
 	var config_data = _read_json(CONFIG_PATH)
 	if _has_supported_schema(config_data):
@@ -237,10 +243,13 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	elif has_command_modifier and event.keycode == KEY_4:
 		_activate_edit_face_state()
 	elif not has_command_modifier and active_state == "edit" and active_edit_mode == "point" and event.keycode == KEY_1:
-		_activate_edit_point_state(false)
+		_activate_edit_point_state(false, false)
 		get_viewport().set_input_as_handled()
 	elif not has_command_modifier and active_state == "edit" and active_edit_mode == "point" and event.keycode == KEY_2:
-		_activate_edit_point_state(true)
+		_activate_edit_point_state(true, false)
+		get_viewport().set_input_as_handled()
+	elif not has_command_modifier and active_state == "edit" and active_edit_mode == "point" and event.keycode == KEY_3:
+		_activate_edit_point_state(false, true)
 		get_viewport().set_input_as_handled()
 
 
@@ -249,6 +258,7 @@ func _reset_to_default_state() -> void:
 	active_draw_tool = ""
 	active_edit_mode = "point"
 	edit_bezier_handles = false
+	edit_point_set_mode = false
 	active_transform_mode = "transform"
 	selected_edge_id = ""
 	selected_point_index = -1
@@ -270,11 +280,13 @@ func _ensure_default_edit_point_state() -> void:
 	active_draw_tool = ""
 	active_edit_mode = "point"
 	edit_bezier_handles = false
+	edit_point_set_mode = false
 	active_transform_mode = "transform"
 	selected_edge_id = ""
 	selected_point_index = -1
 	if is_instance_valid(canvas_view):
 		canvas_view.set_edit_handles_enabled(false)
+		canvas_view.set_edit_point_set_enabled(false)
 		canvas_view.set_edit_mode("point")
 		canvas_view.set_transform_mode("transform")
 
@@ -418,6 +430,7 @@ func _build_ui() -> void:
 	canvas_view.point_selection_changed.connect(_on_point_selection_changed)
 	canvas_view.point_selection_set_changed.connect(_on_point_selection_set_changed)
 	canvas_view.bezier_point_moved.connect(_on_bezier_point_moved)
+	canvas_view.bezier_points_move_started.connect(_on_bezier_points_move_started)
 	canvas_view.bezier_points_moved.connect(_on_bezier_points_moved)
 	canvas_view.bezier_handle_changed.connect(_on_bezier_handle_changed)
 	canvas_view.bezier_edge_insert_requested.connect(_on_bezier_edge_insert_requested)
@@ -1320,6 +1333,17 @@ func _finish_history_coalescing() -> void:
 
 
 func _restore_history_snapshot(snapshot: Dictionary) -> void:
+	# Undo/redo restores document data, not the user's currently selected tool.
+	# Keep the interaction state when the same component remains selected.
+	var retained_module := active_module
+	var retained_component_id := selected_component_id
+	var retained_active_state := active_state
+	var retained_draw_tool := active_draw_tool
+	var retained_draw_point_mode := active_draw_point_mode
+	var retained_edit_mode := active_edit_mode
+	var retained_edit_handles := edit_bezier_handles
+	var retained_edit_point_set_mode := edit_point_set_mode
+	var retained_transform_mode := active_transform_mode
 	assets = snapshot.get("assets", []).duplicate(true)
 	textures = snapshot.get("textures", []).duplicate(true)
 	materials = snapshot.get("materials", []).duplicate(true)
@@ -1344,6 +1368,18 @@ func _restore_history_snapshot(snapshot: Dictionary) -> void:
 		selected_component_id = ""
 	if active_module == "Create":
 		_set_create_submodule_context("Texture" if not selected_texture_id.is_empty() else "Asset")
+	var can_retain_component_tool := retained_module == "Create" \
+		and active_module == "Create" \
+		and not selected_component_id.is_empty() \
+		and selected_component_id == retained_component_id
+	if can_retain_component_tool:
+		active_state = retained_active_state
+		active_draw_tool = retained_draw_tool if retained_active_state == "draw" else ""
+		active_draw_point_mode = retained_draw_point_mode
+		active_edit_mode = retained_edit_mode
+		edit_bezier_handles = retained_edit_handles
+		edit_point_set_mode = retained_edit_point_set_mode
+		active_transform_mode = retained_transform_mode
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
@@ -1577,7 +1613,7 @@ func _restore_editor_state(state) -> void:
 	var saved_camera = state.get("camera", {})
 	if saved_camera is Dictionary and not saved_camera.is_empty() and is_instance_valid(canvas_view):
 		var camera_position := _deserialize_vector(saved_camera.get("position", [0.0, 0.0]), Vector2.ZERO)
-		var camera_zoom := clampf(float(saved_camera.get("zoom", 1.0)), 0.25, 256.0)
+		var camera_zoom := clampf(float(saved_camera.get("zoom", 1.0)), 0.25, 1024.0)
 		canvas_view.set_camera_state(camera_position, camera_zoom)
 
 
@@ -1856,7 +1892,7 @@ func _legacy_projection_from_topology(topology: Dictionary, fallback_points: Arr
 
 
 func _sync_linear_topology_from_legacy_shape(component: Dictionary) -> void:
-	var legacy_points: Array[Vector2] = component.get("outer_shape", [])
+	var legacy_points := _deserialize_points(component.get("outer_shape", []))
 	var legacy_closed := bool(component.get("closed", legacy_points.size() >= 3))
 	var existing_points: Array = component.get("points", [])
 	var existing_chains: Array = component.get("chains", [])
@@ -1990,7 +2026,9 @@ func _deserialize_vector(value, fallback: Vector2) -> Vector2:
 func _deserialize_points(points: Array) -> Array[Vector2]:
 	var deserialized: Array[Vector2] = []
 	for point in points:
-		if point is Array and point.size() >= 2:
+		if point is Vector2:
+			deserialized.append(point)
+		elif point is Array and point.size() >= 2:
 			deserialized.append(Vector2(float(point[0]), float(point[1])))
 	return deserialized
 
@@ -2132,6 +2170,7 @@ func _render_context_bar() -> void:
 	edit_point_menu.button_pressed = active_state == "edit" and active_edit_mode == "point"
 	edit_point_menu.get_popup().add_item("1: Select", 0)
 	edit_point_menu.get_popup().add_item("2: Bezier Handle", 1)
+	edit_point_menu.get_popup().add_item("3: Set", 2)
 	_style_popup_menu(edit_point_menu.get_popup())
 	edit_point_menu.get_popup().id_pressed.connect(_on_edit_menu_id)
 	context_bar.add_child(edit_point_menu)
@@ -2551,9 +2590,11 @@ func _on_draw_menu_id(id: int) -> void:
 
 func _on_edit_menu_id(id: int) -> void:
 	if id == 0:
-		_activate_edit_point_state(false)
+		_activate_edit_point_state(false, false)
 	elif id == 1:
-		_activate_edit_point_state(true)
+		_activate_edit_point_state(true, false)
+	elif id == 2:
+		_activate_edit_point_state(false, true)
 
 
 func _on_edit_edge_menu_id(id: int) -> void:
@@ -2611,8 +2652,10 @@ func _set_edit_mode(mode: String) -> void:
 	if mode != "point":
 		selected_point_index = -1
 		edit_bezier_handles = false
+		edit_point_set_mode = false
 	canvas_view.set_edit_mode(active_edit_mode)
 	canvas_view.set_edit_handles_enabled(edit_bezier_handles)
+	canvas_view.set_edit_point_set_enabled(edit_point_set_mode)
 	canvas_view.set_selected_edge_id(selected_edge_id)
 	_render_info_bar()
 
@@ -2621,11 +2664,13 @@ func _activate_edit_state() -> void:
 	_activate_edit_point_state()
 
 
-func _activate_edit_point_state(handle_editing := false) -> void:
+func _activate_edit_point_state(handle_editing := false, set_mode := false) -> void:
 	edit_bezier_handles = handle_editing
+	edit_point_set_mode = set_mode
 	_set_active_state("edit")
 	_set_edit_mode("point")
 	canvas_view.set_edit_handles_enabled(edit_bezier_handles)
+	canvas_view.set_edit_point_set_enabled(edit_point_set_mode)
 
 
 func _activate_edit_edge_state() -> void:
@@ -2728,8 +2773,13 @@ func _render_info_bar() -> void:
 		_add_info_option("Click: Add %s Point" % _draw_point_mode_label(active_draw_point_mode))
 		_add_info_option("1: Linear  2: Aligned  3: Free  4: Mirrored  5: Corner")
 	elif active_state == "edit" and active_edit_mode == "point":
-		_add_info_option("Drag: Bezier Handle" if edit_bezier_handles else "Click: Select")
-		_add_info_option("1: Select  2: Bezier Handle")
+		if edit_point_set_mode:
+			_add_info_option("Click Edge: Set Point")
+		elif edit_bezier_handles:
+			_add_info_option("Drag: Bezier Handle")
+		else:
+			_add_info_option("Click: Select")
+		_add_info_option("1: Select  2: Bezier Handle  3: Set")
 	elif active_state == "edit" and active_edit_mode == "edge":
 		_add_info_option("Click: Select Edge")
 	elif active_state == "edit" and active_edit_mode == "face":
@@ -4397,6 +4447,34 @@ func _render_inspector() -> void:
 	var component := _get_component(asset, selected_component_id)
 	if component.is_empty():
 		return
+	if active_state == "edit" and active_edit_mode == "point":
+		var point_indices := _valid_selected_point_indices(component)
+		if point_indices.is_empty():
+			inspector_content.add_child(_create_inspector_field_label("Edit Point"))
+			inspector_content.add_child(_create_inspector_section("Point Settings"))
+			var selection_hint := _create_inspector_field_label("Select one or more points to edit them.")
+			selection_hint.add_theme_color_override("font_color", Color("#9aa3b2"))
+			inspector_content.add_child(selection_hint)
+			return
+		var is_multi_point_selection := point_indices.size() > 1
+		inspector_content.add_child(_create_inspector_field_label("%d Points" % point_indices.size() if is_multi_point_selection else "Point"))
+		inspector_content.add_child(_create_inspector_section("Transform"))
+		var point_transform_grid := GridContainer.new()
+		point_transform_grid.columns = 2
+		point_transform_grid.add_theme_constant_override("h_separation", 8)
+		point_transform_grid.add_theme_constant_override("v_separation", 4)
+		if is_multi_point_selection:
+			_add_selected_points_delta_field(point_transform_grid, "Delta X (cm)", "position_x")
+			_add_selected_points_delta_field(point_transform_grid, "Delta Y (cm)", "position_y")
+		else:
+			var selected_point := _get_component_point(component, point_indices[0])
+			var point_position: Vector2 = selected_point.get("position", Vector2.ZERO)
+			_add_point_position_field(point_transform_grid, "Position X (cm)", _editor_units_to_world(point_position.x), "position_x")
+			_add_point_position_field(point_transform_grid, "Position Y (cm)", _editor_units_to_world(point_position.y), "position_y")
+		inspector_content.add_child(point_transform_grid)
+		inspector_content.add_child(_create_inspector_section("Point Settings"))
+		_add_selected_point_settings(component, point_indices)
+		return
 	if not selected_edge_id.is_empty():
 		var selected_edge := _get_edge(component, selected_edge_id)
 		if not selected_edge.is_empty():
@@ -4408,37 +4486,6 @@ func _render_inspector() -> void:
 			render_outline.button_pressed = bool(selected_edge.get("render_outline", true))
 			render_outline.toggled.connect(_on_edge_render_outline_changed)
 			inspector_content.add_child(render_outline)
-			return
-	if active_edit_mode == "point" and selected_point_index >= 0:
-		var selected_point := _get_component_point(component, selected_point_index)
-		if not selected_point.is_empty():
-			inspector_content.add_child(_create_inspector_field_label("Point"))
-			inspector_content.add_child(_create_inspector_section("Point Settings"))
-			var point_mode := OptionButton.new()
-			point_mode.custom_minimum_size = Vector2(0, 26)
-			point_mode.add_item("Linear")
-			point_mode.set_item_metadata(0, "linear")
-			point_mode.add_item("Aligned")
-			point_mode.set_item_metadata(1, "aligned")
-			point_mode.add_item("Free")
-			point_mode.set_item_metadata(2, "free")
-			point_mode.add_item("Mirrored")
-			point_mode.set_item_metadata(3, "mirrored")
-			point_mode.add_item("Corner")
-			point_mode.set_item_metadata(4, "corner")
-			for mode_index in range(point_mode.item_count):
-				if str(point_mode.get_item_metadata(mode_index)) == str(selected_point.get("mode", "linear")):
-					point_mode.select(mode_index)
-					break
-			point_mode.item_selected.connect(_on_point_mode_selected.bind(point_mode))
-			inspector_content.add_child(point_mode)
-			var preserve_point := CheckBox.new()
-			preserve_point.text = "Preserve Point for Sampling"
-			preserve_point.button_pressed = bool(selected_point.get("preserve_point", str(selected_point.get("mode", "linear")) == "corner"))
-			preserve_point.toggled.connect(_on_preserve_point_changed)
-			inspector_content.add_child(preserve_point)
-			var handle_source := _create_inspector_field_label("Handles: %s" % ("Manual" if str(selected_point.get("handle_source", "auto")) == "manual" else "Auto"))
-			inspector_content.add_child(handle_source)
 			return
 	inspector_content.add_child(_create_inspector_field_label("Name"))
 	component_name_editor = _create_name_editor(str(component["name"]), "Component name")
@@ -4527,34 +4574,109 @@ func _on_edge_render_outline_changed(enabled: bool) -> void:
 	_render_canvas_context()
 
 
-func _on_point_mode_selected(index: int, option: OptionButton) -> void:
+func _valid_selected_point_indices(component: Dictionary) -> Array[int]:
+	var valid_indices: Array[int] = []
+	for index_value in selected_point_indices:
+		var point_index := int(index_value)
+		if point_index not in valid_indices and not _get_component_point(component, point_index).is_empty():
+			valid_indices.append(point_index)
+	if valid_indices.is_empty() and not _get_component_point(component, selected_point_index).is_empty():
+		valid_indices.append(selected_point_index)
+	return valid_indices
+
+
+func _add_selected_point_settings(component: Dictionary, point_indices: Array[int]) -> void:
+	var shared_mode := ""
+	var mode_mixed := false
+	var shared_preserve := false
+	var preserve_mixed := false
+	var shared_handle_source := ""
+	var shared_handle_in := Vector2.ZERO
+	var shared_handle_out := Vector2.ZERO
+	var handles_mixed := false
+	for selection_index in range(point_indices.size()):
+		var point := _get_component_point(component, point_indices[selection_index])
+		if point.is_empty():
+			continue
+		var point_mode := str(point.get("mode", "linear"))
+		var point_preserve := bool(point.get("preserve_point", point_mode == "corner"))
+		var handle_source := str(point.get("handle_source", "auto"))
+		var handle_in: Vector2 = point.get("handle_in", Vector2.ZERO)
+		var handle_out: Vector2 = point.get("handle_out", Vector2.ZERO)
+		if selection_index == 0:
+			shared_mode = point_mode
+			shared_preserve = point_preserve
+			shared_handle_source = handle_source
+			shared_handle_in = handle_in
+			shared_handle_out = handle_out
+			continue
+		mode_mixed = mode_mixed or point_mode != shared_mode
+		preserve_mixed = preserve_mixed or point_preserve != shared_preserve
+		handles_mixed = handles_mixed \
+			or handle_source != shared_handle_source \
+			or not handle_in.is_equal_approx(shared_handle_in) \
+			or not handle_out.is_equal_approx(shared_handle_out)
+	inspector_content.add_child(_create_inspector_field_label("Handle Mode"))
+	var point_mode_option := OptionButton.new()
+	point_mode_option.custom_minimum_size = Vector2(0, 26)
+	if mode_mixed:
+		point_mode_option.add_item("- Mixed -")
+		point_mode_option.set_item_metadata(0, "")
+		point_mode_option.set_item_disabled(0, true)
+	for mode_data in [["Linear", "linear"], ["Aligned", "aligned"], ["Free", "free"], ["Mirrored", "mirrored"], ["Corner", "corner"]]:
+		point_mode_option.add_item(str(mode_data[0]))
+		point_mode_option.set_item_metadata(point_mode_option.item_count - 1, str(mode_data[1]))
+	if mode_mixed:
+		point_mode_option.select(0)
+	else:
+		for mode_index in range(point_mode_option.item_count):
+			if str(point_mode_option.get_item_metadata(mode_index)) == shared_mode:
+				point_mode_option.select(mode_index)
+				break
+	point_mode_option.item_selected.connect(_on_selected_points_mode_selected.bind(point_mode_option, point_indices.duplicate()))
+	inspector_content.add_child(point_mode_option)
+	var preserve_point := CheckBox.new()
+	preserve_point.text = "Preserve Point" if not preserve_mixed else "Preserve Point: - Mixed -"
+	preserve_point.button_pressed = shared_preserve if not preserve_mixed else false
+	preserve_point.toggled.connect(_on_selected_points_preserve_changed.bind(point_indices.duplicate()))
+	inspector_content.add_child(preserve_point)
+	var handles_label := "Handles: - Mixed -" if handles_mixed else "Handles: %s" % ("Manual" if shared_handle_source == "manual" else "Auto")
+	inspector_content.add_child(_create_inspector_field_label(handles_label))
+
+
+func _on_selected_points_mode_selected(index: int, option: OptionButton, _point_indices: Array) -> void:
+	if index < 0 or index >= option.item_count:
+		return
+	var mode := str(option.get_item_metadata(index))
+	if mode.is_empty():
+		return
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	var point := _get_component_point(component, selected_point_index)
-	if point.is_empty() or index < 0 or index >= option.item_count:
+	var valid_indices := _valid_selected_point_indices(component)
+	if component.is_empty() or valid_indices.is_empty():
 		return
 	_record_direct_change()
-	point["mode"] = str(option.get_item_metadata(index))
-	if point["mode"] == "corner":
-		point["preserve_point"] = true
-	point["handle_source"] = "auto"
+	for point_index in valid_indices:
+		var point := _get_component_point(component, point_index)
+		point["mode"] = mode
+		if mode == "corner":
+			point["preserve_point"] = true
+		point["handle_source"] = "auto"
 	BezierGeometry.resolve_auto_handles(component.get("points", []), component.get("chains", []))
 	_update_legacy_projection(component)
+	canvas_view.set_outer_shape(component.get("outer_shape", []), bool(component.get("closed", false)))
 	canvas_view.set_bezier_geometry(component.get("points", []), component.get("edges", []), component.get("chains", []))
 	_render_inspector()
-	_render_canvas_context()
-	_render_inspector()
-	_render_canvas_context()
 
 
-func _on_preserve_point_changed(enabled: bool) -> void:
+func _on_selected_points_preserve_changed(enabled: bool, _point_indices: Array) -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	var point := _get_component_point(component, selected_point_index)
-	if point.is_empty():
+	var valid_indices := _valid_selected_point_indices(component)
+	if component.is_empty() or valid_indices.is_empty():
 		return
 	_record_direct_change()
-	point["preserve_point"] = enabled
+	for point_index in valid_indices:
+		_get_component_point(component, point_index)["preserve_point"] = enabled
 	_render_inspector()
-	_render_canvas_context()
 
 
 func _create_name_editor(value: String, placeholder: String) -> LineEdit:
@@ -4607,6 +4729,91 @@ func _add_transform_field(grid: GridContainer, label_text: String, value: float,
 	field.value_changed.connect(_on_transform_value_changed.bind(property_name))
 	transform_fields[property_name] = field
 	grid.add_child(field)
+
+
+func _add_point_position_field(grid: GridContainer, label_text: String, value: float, property_name: String) -> void:
+	var label := Label.new()
+	label.text = label_text
+	label.add_theme_font_size_override("font_size", 10)
+	label.add_theme_color_override("font_color", Color("#7f8a9b"))
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	grid.add_child(label)
+	var field := SpinBox.new()
+	field.min_value = -100000.0
+	field.max_value = 100000.0
+	# The arrows move in tenths while text input still supports hundredths.
+	field.step = 0.01
+	field.custom_arrow_step = 0.1
+	field.set_value_no_signal(value)
+	field.custom_minimum_size = Vector2(96, 26)
+	field.add_theme_font_size_override("font_size", 11)
+	field.value_changed.connect(_on_point_position_changed.bind(property_name))
+	grid.add_child(field)
+
+
+func _add_selected_points_delta_field(grid: GridContainer, label_text: String, property_name: String) -> void:
+	var label := Label.new()
+	label.text = label_text
+	label.add_theme_font_size_override("font_size", 10)
+	label.add_theme_color_override("font_color", Color("#7f8a9b"))
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	grid.add_child(label)
+	var field := SpinBox.new()
+	field.min_value = -100000.0
+	field.max_value = 100000.0
+	field.step = 0.01
+	field.custom_arrow_step = 0.1
+	field.set_value_no_signal(0.0)
+	field.custom_minimum_size = Vector2(96, 26)
+	field.add_theme_font_size_override("font_size", 11)
+	field.value_changed.connect(_on_selected_points_delta_changed.bind(property_name, field))
+	grid.add_child(field)
+
+
+func _on_selected_points_delta_changed(value: float, property_name: String, field: SpinBox) -> void:
+	if is_zero_approx(value) or property_name not in ["position_x", "position_y"]:
+		return
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	var point_indices := _valid_selected_point_indices(component)
+	if component.is_empty() or point_indices.size() < 2:
+		return
+	var local_delta := _world_to_editor_units(value)
+	_record_direct_change()
+	for point_index in point_indices:
+		var point := _get_component_point(component, point_index)
+		var point_position: Vector2 = point.get("position", Vector2.ZERO)
+		if property_name == "position_x":
+			point_position.x += local_delta
+		else:
+			point_position.y += local_delta
+		point["position"] = point_position
+	BezierGeometry.resolve_auto_handles(component.get("points", []), component.get("chains", []))
+	_update_legacy_projection(component)
+	canvas_view.set_outer_shape(component.get("outer_shape", []), bool(component.get("closed", false)))
+	canvas_view.set_bezier_geometry(component.get("points", []), component.get("edges", []), component.get("chains", []))
+	field.set_value_no_signal(0.0)
+
+
+func _on_point_position_changed(value: float, property_name: String) -> void:
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	var point := _get_component_point(component, selected_point_index)
+	if component.is_empty() or point.is_empty():
+		return
+	if property_name != "position_x" and property_name != "position_y":
+		return
+	_record_direct_change()
+	var point_position: Vector2 = point.get("position", Vector2.ZERO)
+	value = _world_to_editor_units(value)
+	if property_name == "position_x":
+		point_position.x = value
+	else:
+		point_position.y = value
+	point["position"] = point_position
+	BezierGeometry.resolve_auto_handles(component.get("points", []), component.get("chains", []))
+	_update_legacy_projection(component)
+	canvas_view.set_outer_shape(component.get("outer_shape", []), bool(component.get("closed", false)))
+	canvas_view.set_bezier_geometry(component.get("points", []), component.get("edges", []), component.get("chains", []))
+	_render_inspector()
 
 
 func _on_transform_value_changed(value: float, property_name: String) -> void:
@@ -5007,6 +5214,18 @@ func _render_canvas_context() -> void:
 	canvas_context_label.text = "Component: %s" % str(component["name"])
 	canvas_view.set_context(str(component["name"]))
 	canvas_view.set_interaction_state(active_state)
+	if active_state == "edit":
+		canvas_view.set_edit_mode(active_edit_mode)
+		canvas_view.set_edit_handles_enabled(edit_bezier_handles)
+		canvas_view.set_edit_point_set_enabled(edit_point_set_mode)
+	# Keep the canvas tool synchronized with the restored/editor state. Undo
+	# can rebuild the canvas without going through _set_active_state(), so the
+	# previous draw tool must not remain active while the UI is already in Edit.
+	if active_state == "draw":
+		canvas_view.set_tool_mode(active_draw_tool)
+		canvas_view.set_draw_point_mode(active_draw_point_mode)
+	else:
+		canvas_view.set_tool_mode("")
 	canvas_view.set_paper_frame(Vector2.ZERO, false)
 	var component_transform: Dictionary = component.get("transform", _default_component_transform()).duplicate(true)
 	component_transform["visibility"] = bool(asset.get("visibility", true)) and bool(component.get("visibility", true))
@@ -5205,7 +5424,7 @@ func _update_legacy_projection(component: Dictionary) -> void:
 		"edges": component.get("edges", []),
 		"chains": component.get("chains", [])
 	}
-	var fallback_points: Array[Vector2] = component.get("outer_shape", [])
+	var fallback_points := _deserialize_points(component.get("outer_shape", []))
 	var projection := _legacy_projection_from_topology(topology, fallback_points, bool(component.get("closed", false)))
 	component["outer_shape"] = projection["points"]
 	component["closed"] = projection["closed"]
@@ -5277,10 +5496,25 @@ func _on_bezier_point_moved(point_index: int, position: Vector2) -> void:
 	canvas_view.set_bezier_geometry(component.get("points", []), component.get("edges", []), component.get("chains", []))
 
 
+func _on_bezier_points_move_started(indices: Array) -> void:
+	bezier_point_move_start_positions.clear()
+	bezier_point_move_component_id = selected_component_id
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if component.is_empty():
+		return
+	for index_value in indices:
+		var point_index := int(index_value)
+		var point := _get_component_point(component, point_index)
+		if not point.is_empty():
+			bezier_point_move_start_positions[point_index] = Vector2(point.get("position", Vector2.ZERO))
+
+
 func _on_bezier_points_moved(indices: Array, world_delta: Vector2) -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	if component.is_empty() or indices.is_empty():
 		return
+	if bezier_point_move_component_id != selected_component_id or bezier_point_move_start_positions.is_empty():
+		_on_bezier_points_move_started(indices)
 	var transform: Dictionary = component.get("transform", _default_component_transform())
 	var rotation := deg_to_rad(float(transform.get("rotation", 0.0)))
 	var scale: Vector2 = transform.get("scale", Vector2.ONE)
@@ -5289,12 +5523,18 @@ func _on_bezier_points_moved(indices: Array, world_delta: Vector2) -> void:
 		local_delta.x /= scale.x
 	if not is_zero_approx(scale.y):
 		local_delta.y /= scale.y
+	# Snap the group's anchor position once, then apply the resulting delta to
+	# every selected point so their relative spacing remains unchanged.
+	var anchor_index := int(indices[0])
+	if bezier_point_move_start_positions.has(anchor_index):
+		var anchor_position: Vector2 = bezier_point_move_start_positions[anchor_index]
+		local_delta = canvas_view.snap_position(anchor_position + local_delta) - anchor_position
 	_record_coalesced_change()
 	var points: Array = component.get("points", [])
 	for index_value in indices:
 		var point_index := int(index_value)
-		if point_index >= 0 and point_index < points.size() and points[point_index] is Dictionary:
-			points[point_index]["position"] = Vector2(points[point_index].get("position", Vector2.ZERO)) + local_delta
+		if point_index >= 0 and point_index < points.size() and points[point_index] is Dictionary and bezier_point_move_start_positions.has(point_index):
+			points[point_index]["position"] = Vector2(bezier_point_move_start_positions[point_index]) + local_delta
 	BezierGeometry.resolve_auto_handles(points, component.get("chains", []))
 	_update_legacy_projection(component)
 	canvas_view.set_outer_shape(component.get("outer_shape", []), bool(component.get("closed", false)))

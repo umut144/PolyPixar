@@ -583,20 +583,725 @@
 		{
 			"chains": [
 				{
-					"closed": false,
-					"edge_ids": [],
+					"closed": true,
+					"edge_ids": [
+						"edge_1",
+						"edge_2",
+						"edge_3",
+						"edge_4",
+						"edge_5",
+						"edge_6",
+						"edge_7",
+						"edge_8"
+					],
 					"id": "chain_1",
-					"point_ids": [],
+					"point_ids": [
+						"point_1",
+						"point_2",
+						"point_3",
+						"point_4",
+						"point_5",
+						"point_6",
+						"point_7",
+						"point_8"
+					],
 					"topology_role": "outer"
 				}
 			],
-			"closed": false,
-			"edges": [],
+			"closed": true,
+			"edges": [
+				{
+					"end_point_id": "point_2",
+					"id": "edge_1",
+					"render_outline": true,
+					"start_point_id": "point_1"
+				},
+				{
+					"end_point_id": "point_3",
+					"id": "edge_2",
+					"render_outline": true,
+					"start_point_id": "point_2"
+				},
+				{
+					"end_point_id": "point_4",
+					"id": "edge_3",
+					"render_outline": true,
+					"start_point_id": "point_3"
+				},
+				{
+					"end_point_id": "point_5",
+					"id": "edge_4",
+					"render_outline": true,
+					"start_point_id": "point_4"
+				},
+				{
+					"end_point_id": "point_6",
+					"id": "edge_5",
+					"render_outline": true,
+					"start_point_id": "point_5"
+				},
+				{
+					"end_point_id": "point_7",
+					"id": "edge_6",
+					"render_outline": true,
+					"start_point_id": "point_6"
+				},
+				{
+					"end_point_id": "point_8",
+					"id": "edge_7",
+					"render_outline": true,
+					"start_point_id": "point_7"
+				},
+				{
+					"end_point_id": "point_1",
+					"id": "edge_8",
+					"render_outline": true,
+					"start_point_id": "point_8"
+				}
+			],
 			"id": "component_2",
 			"material_id": "",
 			"name": "Head",
-			"outer_shape": [],
-			"points": [],
+			"outer_shape": [
+				[
+					0.0,
+					8.0
+				],
+				[
+					-1.10000002384186,
+					8.0
+				],
+				[
+					-1.16521811485291,
+					7.0739369392395
+				],
+				[
+					-0.830436706542969,
+					6.24783706665039
+				],
+				[
+					0.0,
+					6.0
+				],
+				[
+					0.830437541007996,
+					6.22174453735352
+				],
+				[
+					1.27826499938965,
+					6.98698568344116
+				],
+				[
+					1.29999995231628,
+					8.0
+				]
+			],
+			"points": [
+				{
+					"handle_in": [
+						0.0,
+						0.0
+					],
+					"handle_out": [
+						0.0,
+						0.0
+					],
+					"handle_source": "auto",
+					"id": "point_1",
+					"mode": "linear",
+					"position": [
+						0.0,
+						8.0
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						0.0,
+						0.0
+					],
+					"handle_out": [
+						0.0,
+						0.0
+					],
+					"handle_source": "auto",
+					"id": "point_2",
+					"mode": "linear",
+					"position": [
+						-1.10000002384186,
+						8.0
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.047054398804903,
+						0.305853843688965
+					],
+					"handle_out": [
+						0.0451791100203991,
+						-0.293664455413818
+					],
+					"handle_source": "auto",
+					"id": "point_3",
+					"mode": "aligned",
+					"position": [
+						-1.16521811485291,
+						7.0739369392395
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.192868009209633,
+						0.197372913360596
+					],
+					"handle_out": [
+						0.195328712463379,
+						-0.199891090393066
+					],
+					"handle_source": "manual",
+					"id": "point_4",
+					"mode": "aligned",
+					"position": [
+						-0.830436706542969,
+						6.24783706665039
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.434445261955261,
+						-0.000123500823974609
+					],
+					"handle_out": [
+						0.434445261955261,
+						0.000123500823974609
+					],
+					"handle_source": "manual",
+					"id": "point_5",
+					"mode": "mirrored",
+					"position": [
+						0.0,
+						6.0
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.226777493953705,
+						-0.175101518630981
+					],
+					"handle_out": [
+						0.233931243419647,
+						0.180625140666962
+					],
+					"handle_source": "auto",
+					"id": "point_6",
+					"mode": "aligned",
+					"position": [
+						0.830437541007996,
+						6.22174453735352
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.0420308001339436,
+						-0.292545229196548
+					],
+					"handle_out": [
+						0.0474745035171509,
+						0.330434799194336
+					],
+					"handle_source": "manual",
+					"id": "point_7",
+					"mode": "aligned",
+					"position": [
+						1.27826499938965,
+						6.98698568344116
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.00724498415365815,
+						-0.337671428918839
+					],
+					"handle_out": [
+						-0.433333307504654,
+						0.0
+					],
+					"handle_source": "auto",
+					"id": "point_8",
+					"mode": "corner",
+					"position": [
+						1.29999995231628,
+						8.0
+					],
+					"preserve_point": true
+				}
+			],
+			"transform": {
+				"pivot": [
+					0.0,
+					0.0
+				],
+				"position": [
+					0.0,
+					0.0
+				],
+				"rotation": 0.0,
+				"scale": [
+					1.0,
+					1.0
+				]
+			},
+			"visibility": true,
+			"z_index": 0
+		},
+		{
+			"chains": [
+				{
+					"closed": true,
+					"edge_ids": [
+						"edge_1",
+						"edge_2",
+						"edge_3",
+						"edge_4",
+						"edge_5",
+						"edge_6",
+						"edge_7",
+						"edge_8",
+						"edge_9",
+						"edge_10",
+						"edge_11",
+						"edge_12",
+						"edge_13",
+						"edge_14"
+					],
+					"id": "chain_1",
+					"point_ids": [
+						"point_1",
+						"point_2",
+						"point_3",
+						"point_4",
+						"point_5",
+						"point_6",
+						"point_7",
+						"point_8",
+						"point_9",
+						"point_10",
+						"point_11",
+						"point_12",
+						"point_13",
+						"point_14"
+					],
+					"topology_role": "outer"
+				}
+			],
+			"closed": true,
+			"edges": [
+				{
+					"end_point_id": "point_2",
+					"id": "edge_1",
+					"render_outline": true,
+					"start_point_id": "point_1"
+				},
+				{
+					"end_point_id": "point_3",
+					"id": "edge_2",
+					"render_outline": true,
+					"start_point_id": "point_2"
+				},
+				{
+					"end_point_id": "point_4",
+					"id": "edge_3",
+					"render_outline": true,
+					"start_point_id": "point_3"
+				},
+				{
+					"end_point_id": "point_5",
+					"id": "edge_4",
+					"render_outline": true,
+					"start_point_id": "point_4"
+				},
+				{
+					"end_point_id": "point_6",
+					"id": "edge_5",
+					"render_outline": true,
+					"start_point_id": "point_5"
+				},
+				{
+					"end_point_id": "point_7",
+					"id": "edge_6",
+					"render_outline": true,
+					"start_point_id": "point_6"
+				},
+				{
+					"end_point_id": "point_8",
+					"id": "edge_7",
+					"render_outline": true,
+					"start_point_id": "point_7"
+				},
+				{
+					"end_point_id": "point_9",
+					"id": "edge_8",
+					"render_outline": true,
+					"start_point_id": "point_8"
+				},
+				{
+					"end_point_id": "point_10",
+					"id": "edge_9",
+					"render_outline": true,
+					"start_point_id": "point_9"
+				},
+				{
+					"end_point_id": "point_11",
+					"id": "edge_10",
+					"render_outline": true,
+					"start_point_id": "point_10"
+				},
+				{
+					"end_point_id": "point_12",
+					"id": "edge_11",
+					"render_outline": true,
+					"start_point_id": "point_11"
+				},
+				{
+					"end_point_id": "point_13",
+					"id": "edge_12",
+					"render_outline": true,
+					"start_point_id": "point_12"
+				},
+				{
+					"end_point_id": "point_14",
+					"id": "edge_13",
+					"render_outline": true,
+					"start_point_id": "point_13"
+				},
+				{
+					"end_point_id": "point_1",
+					"id": "edge_14",
+					"render_outline": true,
+					"start_point_id": "point_14"
+				}
+			],
+			"id": "component_3",
+			"material_id": "",
+			"name": "Body",
+			"outer_shape": [
+				[
+					0.0,
+					6.90000009536743
+				],
+				[
+					-1.5,
+					6.30000019073486
+				],
+				[
+					-2.0,
+					5.30000019073486
+				],
+				[
+					-2.40000009536743,
+					3.70000004768372
+				],
+				[
+					-3.0,
+					2.0
+				],
+				[
+					-4.30000019073486,
+					0.0
+				],
+				[
+					0.0,
+					0.0
+				],
+				[
+					4.5,
+					0.0
+				],
+				[
+					3.59999990463257,
+					0.899999976158142
+				],
+				[
+					3.0,
+					2.09999990463257
+				],
+				[
+					2.70000004768372,
+					3.59999990463257
+				],
+				[
+					2.59999990463257,
+					4.90000009536743
+				],
+				[
+					2.20000004768372,
+					6.0
+				],
+				[
+					1.5,
+					6.69999980926514
+				]
+			],
+			"points": [
+				{
+					"handle_in": [
+						0.431625247001648,
+						0.00258016586303711
+					],
+					"handle_out": [
+						-0.431625247001648,
+						-0.00258016586303711
+					],
+					"handle_source": "manual",
+					"id": "point_1",
+					"mode": "mirrored",
+					"position": [
+						0.0,
+						6.90000009536743
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						0.420510739088058,
+						0.336408585309982
+					],
+					"handle_out": [
+						-0.291012674570084,
+						-0.232810109853745
+					],
+					"handle_source": "auto",
+					"id": "point_2",
+					"mode": "aligned",
+					"position": [
+						-1.5,
+						6.30000019073486
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.121906913816929,
+						0.352175533771515
+					],
+					"handle_out": [
+						-0.179828196763992,
+						-0.519503712654114
+					],
+					"handle_source": "auto",
+					"id": "point_3",
+					"mode": "aligned",
+					"position": [
+						-2.0,
+						5.30000019073486
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.1594308167696,
+						0.526121735572815
+					],
+					"handle_out": [
+						-0.174272745847702,
+						-0.575100064277649
+					],
+					"handle_source": "auto",
+					"id": "point_4",
+					"mode": "aligned",
+					"position": [
+						-2.40000009536743,
+						3.70000004768372
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.274505466222763,
+						0.53456324338913
+					],
+					"handle_out": [
+						-0.363216400146484,
+						-0.707316160202026
+					],
+					"handle_source": "auto",
+					"id": "point_5",
+					"mode": "aligned",
+					"position": [
+						-3.0,
+						2.0
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.0,
+						0.0
+					],
+					"handle_out": [
+						0.0,
+						0.0
+					],
+					"handle_source": "auto",
+					"id": "point_6",
+					"mode": "linear",
+					"position": [
+						-4.30000019073486,
+						0.0
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.0,
+						0.0
+					],
+					"handle_out": [
+						0.0,
+						0.0
+					],
+					"handle_source": "auto",
+					"id": "point_7",
+					"mode": "linear",
+					"position": [
+						0.0,
+						0.0
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.0,
+						0.0
+					],
+					"handle_out": [
+						0.0,
+						0.0
+					],
+					"handle_source": "auto",
+					"id": "point_8",
+					"mode": "linear",
+					"position": [
+						4.5,
+						0.0
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.246598497033119,
+						-0.345237880945206
+					],
+					"handle_out": [
+						-0.259937614202499,
+						0.363912642002106
+					],
+					"handle_source": "auto",
+					"id": "point_9",
+					"mode": "aligned",
+					"position": [
+						3.59999990463257,
+						0.899999976158142
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.141421347856522,
+						-0.424264043569565
+					],
+					"handle_out": [
+						-0.16124515235424,
+						0.483735471963882
+					],
+					"handle_source": "auto",
+					"id": "point_10",
+					"mode": "aligned",
+					"position": [
+						3.0,
+						2.09999990463257
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.0721110329031944,
+						-0.504777133464813
+					],
+					"handle_out": [
+						-0.0614636465907097,
+						0.430245459079742
+					],
+					"handle_source": "auto",
+					"id": "point_11",
+					"mode": "aligned",
+					"position": [
+						2.70000004768372,
+						3.59999990463257
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.0886412784457207,
+						-0.425478160381317
+					],
+					"handle_out": [
+						-0.0795741006731987,
+						0.381955713033676
+					],
+					"handle_source": "auto",
+					"id": "point_12",
+					"mode": "aligned",
+					"position": [
+						2.59999990463257,
+						4.90000009536743
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.203447192907333,
+						-0.332913547754288
+					],
+					"handle_out": [
+						-0.172069728374481,
+						0.281568616628647
+					],
+					"handle_source": "auto",
+					"id": "point_13",
+					"mode": "aligned",
+					"position": [
+						2.20000004768372,
+						6.0
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.305414885282516,
+						-0.124942466616631
+					],
+					"handle_out": [
+						-0.466868907213211,
+						0.190991833806038
+					],
+					"handle_source": "auto",
+					"id": "point_14",
+					"mode": "aligned",
+					"position": [
+						1.5,
+						6.69999980926514
+					],
+					"preserve_point": false
+				}
+			],
 			"transform": {
 				"pivot": [
 					0.0,
@@ -628,7 +1333,7 @@
 		],
 		"scale": 1.08,
 		"target_height_cm": 13.0,
-		"visible": true
+		"visible": false
 	},
 	"schema_version": 9,
 	"visibility": true
