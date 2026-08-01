@@ -53,6 +53,9 @@ func set_final_texture_path(path: String) -> void:
 func _process(delta: float) -> void:
 	if not has_focus():
 		return
+	if Input.is_key_pressed(KEY_META) or Input.is_key_pressed(KEY_CTRL):
+		queue_redraw()
+		return
 	var pan_input := Vector2(
 		float(Input.is_key_pressed(KEY_D)) - float(Input.is_key_pressed(KEY_A)),
 		float(Input.is_key_pressed(KEY_S)) - float(Input.is_key_pressed(KEY_W))

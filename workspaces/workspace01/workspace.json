@@ -4,6 +4,13 @@
 	],
 	"editor_state": {
 		"active_module": "Create",
+		"camera": {
+			"position": [
+				0.0209021344780922,
+				7.46769237518311
+			],
+			"zoom": 132.574305007508
+		},
 		"expanded_assets": {
 			"asset_1": true
 		},
@@ -13,13 +20,14 @@
 		"material_view_mode": "graph",
 		"paper_level": 0,
 		"selected_asset_id": "asset_1",
-		"selected_component_id": "",
+		"selected_component_id": "component_2",
 		"selected_element_id": "",
 		"selected_material_id": "",
 		"selected_texture_id": "",
 		"snap": {
 			"enabled": true,
-			"grid_step": 0.5,
+			"grid_step": 0.1,
+			"mode": "fine",
 			"rotation_step": 15.0
 		},
 		"world_scale": {
@@ -29,6 +37,6 @@
 	},
 	"materials": [],
 	"name": "workspace01",
-	"schema_version": 8,
+	"schema_version": 9,
 	"textures": []
 }

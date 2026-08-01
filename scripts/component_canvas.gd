@@ -4,7 +4,17 @@ extends Control
 signal line_draft_changed(points: Array[Vector2])
 signal line_shape_changed(points: Array[Vector2], closed: bool)
 signal point_selection_changed(index: int)
+signal point_selection_set_changed(indices: Array)
 signal outer_shape_changed(points: Array[Vector2])
+signal bezier_point_added(position: Vector2, point_mode: String, handle_out: Vector2)
+signal bezier_chain_closed()
+signal edge_selection_changed(edge_id: String)
+signal bezier_point_moved(index: int, position: Vector2)
+signal bezier_points_moved(indices: Array, delta: Vector2)
+signal bezier_handle_changed(index: int, handle_side: String, value: Vector2)
+signal bezier_edge_insert_requested(edge_id: String, t: float)
+signal bezier_point_delete_requested(index: int)
+signal bezier_points_delete_requested(indices: Array)
 signal reference_component_selected(component_id: String)
 signal pivot_changed(pivot: Vector2)
 signal transform_changed(transform: Dictionary)
@@ -27,18 +37,40 @@ const GRID_PACKAGE_MIN_PIXELS := 12.0
 
 var view_center := Vector2.ZERO
 var zoom := DEFAULT_ZOOM
+var camera_state_restored := false
 var context_name := ""
 var active_tool := ""
 var interaction_state := ""
 var edit_mode := "select"
+var edit_handles_enabled := false
 var transform_mode := "transform"
 var line_draft: Array[Vector2] = []
 var outer_shape: Array[Vector2] = []
 var outer_shape_closed := false
+var bezier_points: Array[Dictionary] = []
+var bezier_edges: Array[Dictionary] = []
+var bezier_chains: Array[Dictionary] = []
+var draw_point_mode := "linear"
 var reference_shapes: Array[Dictionary] = []
 var cursor_world := Vector2.ZERO
 var cursor_over_canvas := false
 var selected_point_index := -1
+var selected_point_indices: Array[int] = []
+var selected_edge_id := ""
+var bezier_handle_drag_side := ""
+var bezier_point_dragging := false
+var point_marquee_dragging := false
+var point_marquee_moved := false
+var point_marquee_start := Vector2.ZERO
+var point_marquee_current := Vector2.ZERO
+var point_press_edge_hit: Dictionary = {}
+var selection_gizmo_dragging := false
+var selection_gizmo_drag_axis := ""
+var selection_gizmo_last_world := Vector2.ZERO
+var draw_pointer_down := false
+var pending_draw_position := Vector2.ZERO
+var pending_draw_handle_out := Vector2.ZERO
+var pending_draw_has_handle := false
 var drag_axis := ""
 var add_segment_index := -1
 var add_preview_point := Vector2.ZERO
@@ -65,6 +97,8 @@ var reference_image_position := Vector2.ZERO
 var reference_image_scale := 1.0
 var paper_frame_visible := false
 var paper_frame_size := Vector2.ZERO
+var navigation_locked := false
+var command_shortcut_active := false
 var pivot_dragging := false
 var transform_drag_axis := ""
 var transform_drag_start_world := Vector2.ZERO
@@ -72,6 +106,9 @@ var transform_drag_start_position := Vector2.ZERO
 var transform_drag_start_angle := 0.0
 var transform_drag_start_rotation := 0.0
 var transform_drag_start_scale := Vector2.ONE
+var face_dragging := false
+var face_drag_start_local := Vector2.ZERO
+var face_drag_start_shape: Array[Vector2] = []
 
 
 func _ready() -> void:
@@ -84,7 +121,7 @@ func _ready() -> void:
 
 
 func _apply_default_zoom() -> void:
-	if size.x <= 0.0 or size.y <= 0.0:
+	if camera_state_restored or size.x <= 0.0 or size.y <= 0.0:
 		return
 	var fit_zoom := minf(
 		size.x / DEFAULT_PAPER_SIZE_CM.x,
@@ -94,9 +131,35 @@ func _apply_default_zoom() -> void:
 	queue_redraw()
 
 
+func get_camera_state() -> Dictionary:
+	return {
+		"position": view_center,
+		"zoom": zoom
+	}
+
+
+func set_camera_state(position: Vector2, saved_zoom: float) -> void:
+	view_center = position
+	zoom = clampf(saved_zoom, MIN_ZOOM, MAX_ZOOM)
+	camera_state_restored = true
+	queue_redraw()
+
+
 func _gui_input(event: InputEvent) -> void:
+	if event is InputEventKey:
+		if event.meta_pressed or event.ctrl_pressed:
+			command_shortcut_active = true
+		elif not event.pressed and event.keycode in [KEY_META, KEY_CTRL]:
+			command_shortcut_active = false
 	if event is InputEventMouseButton and event.pressed:
 		grab_focus()
+		if event.button_index == MOUSE_BUTTON_LEFT and active_tool == "point":
+			draw_pointer_down = true
+			pending_draw_position = _snap_to_grid(_world_to_local(_screen_to_world(event.position)))
+			pending_draw_handle_out = Vector2.ZERO
+			pending_draw_has_handle = false
+			queue_redraw()
+			return
 		if event.button_index == MOUSE_BUTTON_LEFT and active_tool == "line":
 			var snapped_point := _snap_to_grid(_world_to_local(_screen_to_world(event.position)))
 			if line_draft.size() >= 3 and _is_near_first_point(snapped_point):
@@ -110,10 +173,53 @@ func _gui_input(event: InputEvent) -> void:
 			line_draft_changed.emit(line_draft)
 			queue_redraw()
 		elif event.button_index == MOUSE_BUTTON_LEFT and interaction_state == "edit":
+			if edit_mode == "point" and not edit_handles_enabled:
+				var gizmo_axis := _selection_gizmo_at(event.position)
+				if not gizmo_axis.is_empty():
+					selection_gizmo_dragging = true
+					selection_gizmo_drag_axis = gizmo_axis
+					selection_gizmo_last_world = _screen_to_world(event.position)
+					return
 			if _is_near_pivot(event.position):
 				pivot_dragging = true
 				return
-			if edit_mode == "add":
+			if edit_mode == "edge":
+				selected_edge_id = _nearest_bezier_edge(event.position)
+				edge_selection_changed.emit(selected_edge_id)
+				queue_redraw()
+				return
+			if edit_mode == "face":
+				var face_local := _world_to_local(_screen_to_world(event.position))
+				if outer_shape_closed and outer_shape.size() >= 3 and Geometry2D.is_point_in_polygon(face_local, PackedVector2Array(outer_shape)):
+					face_dragging = true
+					face_drag_start_local = face_local
+					face_drag_start_shape = outer_shape.duplicate()
+				return
+			if edit_mode == "point" and not bezier_points.is_empty():
+				if not edit_handles_enabled:
+					var gizmo_axis := _selection_gizmo_at(event.position)
+					if not gizmo_axis.is_empty():
+						selection_gizmo_dragging = true
+						selection_gizmo_drag_axis = gizmo_axis
+						selection_gizmo_last_world = _screen_to_world(event.position)
+						return
+				var handle_side := _bezier_handle_at(event.position) if edit_handles_enabled else ""
+				if not handle_side.is_empty():
+					bezier_handle_drag_side = handle_side
+					return
+				var bezier_point_index := _nearest_bezier_point(event.position)
+				if bezier_point_index >= 0:
+					_set_selected_point_indices([bezier_point_index])
+					# Selection and movement are intentionally separate: after this
+					# click the selection gizmo is the only point-move entry point.
+					bezier_point_dragging = false
+				else:
+					point_marquee_dragging = true
+					point_marquee_moved = false
+					point_marquee_start = event.position
+					point_marquee_current = event.position
+					point_press_edge_hit = _bezier_edge_hit(event.position)
+				queue_redraw()
 				return
 			var gizmo_axis := _gizmo_axis_at(event.position)
 			if selected_point_index >= 0 and gizmo_axis != "":
@@ -141,12 +247,66 @@ func _gui_input(event: InputEvent) -> void:
 			if not component_id.is_empty():
 				reference_component_selected.emit(component_id)
 	if event is InputEventMouseButton and not event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		if draw_pointer_down and active_tool == "point":
+			if _is_near_first_chain_point(pending_draw_position):
+				bezier_chain_closed.emit()
+			else:
+				bezier_point_added.emit(pending_draw_position, draw_point_mode, pending_draw_handle_out if pending_draw_has_handle else Vector2.ZERO)
+			draw_pointer_down = false
+			pending_draw_has_handle = false
+			queue_redraw()
+			return
+		if selection_gizmo_dragging:
+			selection_gizmo_dragging = false
+			selection_gizmo_drag_axis = ""
+			queue_redraw()
+			return
+		if point_marquee_dragging:
+			if point_marquee_moved:
+				_select_points_in_marquee()
+			elif not point_press_edge_hit.is_empty() and not edit_handles_enabled:
+				bezier_edge_insert_requested.emit(str(point_press_edge_hit["id"]), float(point_press_edge_hit["t"]))
+			else:
+				clear_selection()
+			point_marquee_dragging = false
+			point_marquee_moved = false
+			point_press_edge_hit = {}
+			queue_redraw()
+			return
 		drag_axis = ""
+		bezier_handle_drag_side = ""
+		bezier_point_dragging = false
 		pivot_dragging = false
 		transform_drag_axis = ""
+		face_dragging = false
 	if event is InputEventMouseMotion:
 		cursor_over_canvas = true
 		cursor_world = _snap_to_grid(_world_to_local(_screen_to_world(event.position)))
+		if point_marquee_dragging:
+			point_marquee_current = event.position
+			if point_marquee_start.distance_to(point_marquee_current) >= 4.0:
+				point_marquee_moved = true
+			queue_redraw()
+			return
+		if selection_gizmo_dragging:
+			var current_world := _screen_to_world(event.position)
+			var move_delta := current_world - selection_gizmo_last_world
+			if selection_gizmo_drag_axis == "x":
+				move_delta.y = 0.0
+			elif selection_gizmo_drag_axis == "y":
+				move_delta.x = 0.0
+			if not is_zero_approx(move_delta.length_squared()):
+				bezier_points_moved.emit(selected_point_indices.duplicate(), move_delta)
+				selection_gizmo_last_world = current_world
+			queue_redraw()
+			return
+		if draw_pointer_down and active_tool == "point" and draw_point_mode != "linear":
+			var raw_draw_handle := _world_to_local(_screen_to_world(event.position)) - pending_draw_position
+			if raw_draw_handle.length() * zoom >= 3.0:
+				pending_draw_handle_out = raw_draw_handle
+				pending_draw_has_handle = true
+			queue_redraw()
+			return
 		if pivot_dragging:
 			var old_pivot: Vector2 = component_transform.get("pivot", Vector2.ZERO)
 			var new_pivot := _snap_to_grid(_world_to_local(_screen_to_world(event.position)))
@@ -193,9 +353,30 @@ func _gui_input(event: InputEvent) -> void:
 			transform_changed.emit(component_transform.duplicate(true))
 			queue_redraw()
 			return
-		if interaction_state == "edit" and edit_mode == "add":
-			_update_add_preview(event.position)
-		if interaction_state == "edit" and selected_point_index >= 0 and drag_axis != "":
+		if interaction_state == "edit" and edit_mode == "face" and face_dragging:
+			var current_local := _world_to_local(_screen_to_world(event.position))
+			var face_delta := _snap_to_grid(current_local - face_drag_start_local)
+			outer_shape.clear()
+			for original_point in face_drag_start_shape:
+				outer_shape.append(original_point + face_delta)
+			outer_shape_changed.emit(outer_shape.duplicate())
+			queue_redraw()
+			return
+		if interaction_state == "edit" and edit_mode == "point" and selected_point_index >= 0 and not bezier_points.is_empty():
+			if bezier_handle_drag_side != "":
+				var bezier_point: Dictionary = bezier_points[selected_point_index]
+				var point_position: Vector2 = bezier_point.get("position", Vector2.ZERO)
+				# Handles are continuous curve controls, not geometric vertices. They
+				# must follow the pointer exactly, independently from point snapping.
+				var handle_position := _world_to_local(_screen_to_world(event.position)) - point_position
+				bezier_handle_changed.emit(selected_point_index, bezier_handle_drag_side, handle_position)
+				queue_redraw()
+				return
+			if bezier_point_dragging:
+				bezier_point_moved.emit(selected_point_index, _snap_to_grid(_world_to_local(_screen_to_world(event.position))))
+				queue_redraw()
+				return
+		if interaction_state == "edit" and edit_mode == "point" and selected_point_index >= 0 and drag_axis != "":
 			var moved_point := _snap_to_grid(_world_to_local(_screen_to_world(event.position)))
 			var original_point: Vector2 = outer_shape[selected_point_index]
 			if drag_axis == "x":
@@ -206,14 +387,12 @@ func _gui_input(event: InputEvent) -> void:
 			outer_shape_changed.emit(outer_shape.duplicate())
 		queue_redraw()
 	if event is InputEventKey and event.pressed and not event.echo:
-		if (event.keycode == KEY_BACKSPACE or event.keycode == KEY_DELETE) and interaction_state == "edit" and selected_point_index >= 0 and outer_shape.size() > 3:
+		if (event.keycode == KEY_BACKSPACE or event.keycode == KEY_DELETE) and interaction_state == "edit" and edit_mode == "point" and selected_point_index >= 0 and outer_shape.size() > 3:
 			outer_shape.remove_at(selected_point_index)
 			selected_point_index = mini(selected_point_index, outer_shape.size() - 1)
 			point_selection_changed.emit(selected_point_index)
 			outer_shape_changed.emit(outer_shape.duplicate())
 			queue_redraw()
-		elif event.keycode == KEY_SPACE and interaction_state == "edit" and edit_mode == "add":
-			_confirm_add_point()
 		elif event.keycode == KEY_ESCAPE and interaction_state == "edit":
 			clear_selection()
 		elif event.keycode == KEY_ENTER and active_tool == "line" and not line_draft.is_empty():
@@ -254,6 +433,13 @@ func set_tool_mode(tool_name: String) -> void:
 	queue_redraw()
 
 
+func set_draw_point_mode(mode: String) -> void:
+	if mode not in ["linear", "aligned", "free", "mirrored", "corner"]:
+		return
+	draw_point_mode = mode
+	queue_redraw()
+
+
 func set_line_draft(points: Array) -> void:
 	line_draft.clear()
 	for point in points:
@@ -265,6 +451,7 @@ func set_interaction_state(state: String) -> void:
 	interaction_state = state
 	if state != "edit":
 		clear_selection()
+		selected_edge_id = ""
 	queue_redraw()
 
 
@@ -278,9 +465,41 @@ func set_reference_shapes(shapes: Array) -> void:
 
 func set_edit_mode(mode: String) -> void:
 	edit_mode = mode
-	if edit_mode != "add":
-		_clear_add_preview()
+	if edit_mode != "point":
+		clear_selection()
+	if edit_mode != "edge":
+		selected_edge_id = ""
 	queue_redraw()
+
+
+func set_edit_handles_enabled(enabled: bool) -> void:
+	edit_handles_enabled = enabled
+	queue_redraw()
+
+
+func set_selected_edge_id(edge_id: String) -> void:
+	selected_edge_id = edge_id
+	queue_redraw()
+
+
+func set_selected_point_index(point_index: int) -> void:
+	selected_point_indices.clear()
+	if point_index >= 0 and point_index < bezier_points.size():
+		selected_point_indices.append(point_index)
+	selected_point_index = point_index
+	queue_redraw()
+
+
+func _set_selected_point_indices(indices: Array) -> void:
+	selected_point_indices.clear()
+	for index_value in indices:
+		var point_index := int(index_value)
+		if point_index >= 0 and point_index < bezier_points.size() and point_index not in selected_point_indices:
+			selected_point_indices.append(point_index)
+	selected_point_indices.sort()
+	selected_point_index = selected_point_indices[0] if selected_point_indices.size() == 1 else -1
+	point_selection_changed.emit(selected_point_index)
+	point_selection_set_changed.emit(selected_point_indices.duplicate())
 
 
 func set_transform_mode(mode: String) -> void:
@@ -297,7 +516,6 @@ func set_snap_settings(enabled: bool, new_grid_step: float, new_rotation_step: f
 
 func set_world_scale(new_grid_size: float) -> void:
 	world_grid_size = maxf(new_grid_size, 0.0001)
-	grid_step = world_grid_size
 	queue_redraw()
 
 
@@ -335,6 +553,14 @@ func set_paper_frame(frame_size: Vector2, frame_visible: bool) -> void:
 	queue_redraw()
 
 
+func set_navigation_locked(locked: bool) -> void:
+	navigation_locked = locked
+
+
+func set_command_shortcut_active(active: bool) -> void:
+	command_shortcut_active = active
+
+
 func _local_to_world(local_point: Vector2) -> Vector2:
 	return _local_to_world_with_transform(local_point, component_transform)
 
@@ -362,8 +588,10 @@ func _world_to_local(world_point: Vector2) -> Vector2:
 
 func clear_selection() -> void:
 	selected_point_index = -1
+	selected_point_indices.clear()
 	drag_axis = ""
 	point_selection_changed.emit(selected_point_index)
+	point_selection_set_changed.emit([])
 
 
 func _clear_add_preview() -> void:
@@ -414,11 +642,30 @@ func set_outer_shape(points: Array, closed := true) -> void:
 	queue_redraw()
 
 
+func set_bezier_geometry(points: Array, edges: Array, chains: Array) -> void:
+	bezier_points.clear()
+	bezier_edges.clear()
+	bezier_chains.clear()
+	for point_data in points:
+		if point_data is Dictionary:
+			bezier_points.append(point_data.duplicate(true))
+	for edge_data in edges:
+		if edge_data is Dictionary:
+			bezier_edges.append(edge_data.duplicate(true))
+	for chain_data in chains:
+		if chain_data is Dictionary:
+			bezier_chains.append(chain_data.duplicate(true))
+	queue_redraw()
+
+
 func _process(delta: float) -> void:
-	if not has_focus():
+	if navigation_locked or command_shortcut_active or not has_focus():
 		return
 	var command_modifier: bool = Input.is_key_pressed(KEY_META) or Input.is_key_pressed(KEY_CTRL)
-	var pan_input := Vector2.ZERO if command_modifier else Vector2(
+	if command_modifier:
+		queue_redraw()
+		return
+	var pan_input := Vector2(
 		float(Input.is_key_pressed(KEY_D)) - float(Input.is_key_pressed(KEY_A)),
 		float(Input.is_key_pressed(KEY_W)) - float(Input.is_key_pressed(KEY_S))
 	)
@@ -442,9 +689,14 @@ func _draw() -> void:
 	draw_line(_world_to_screen(Vector2(0.0, min_world.y)), _world_to_screen(Vector2(0.0, max_world.y)), y_axis_color, 2.0)
 	_draw_reference_image()
 	_draw_reference_shapes()
-	_draw_outer_shape()
+	if not bezier_points.is_empty() and not bezier_chains.is_empty():
+		_draw_bezier_geometry()
+	else:
+		_draw_outer_shape()
 	_draw_pivot()
 	_draw_transform_gizmo()
+	_draw_selection_gizmo()
+	_draw_point_selection_marquee()
 	_draw_line_draft()
 	_draw_measurement_guides()
 
@@ -508,25 +760,17 @@ func _draw_paper_frame() -> void:
 func _draw_measurement_guides() -> void:
 	if not cursor_over_canvas or context_name.is_empty():
 		return
-	if interaction_state != "asset" and not interaction_state.is_empty():
-		return
 	var origin_world := Vector2.ZERO
 	var cursor_position_world := cursor_world
 	if interaction_state.is_empty():
 		origin_world = component_transform.get("position", Vector2.ZERO)
 		cursor_position_world = _local_to_world(cursor_world)
-	var origin_screen := _world_to_screen(origin_world)
 	var cursor_screen := _world_to_screen(cursor_position_world)
 	var guide_color := Color("#f2c94c")
-	var x_guide_start := Vector2(origin_screen.x, cursor_screen.y)
-	var y_guide_start := Vector2(cursor_screen.x, origin_screen.y)
-	_draw_dashed_line(origin_screen, x_guide_start, guide_color)
-	_draw_dashed_line(origin_screen, y_guide_start, guide_color)
-	_draw_dashed_line(x_guide_start, cursor_screen, guide_color)
-	_draw_dashed_line(y_guide_start, cursor_screen, guide_color)
-	draw_circle(cursor_screen, 3.0, guide_color)
-	_draw_measurement_label("x: %.2f cm" % (cursor_position_world.x - origin_world.x), (y_guide_start + cursor_screen) * 0.5 + Vector2(0.0, -8.0), guide_color)
-	_draw_measurement_label("y: %.2f cm" % (cursor_position_world.y - origin_world.y), (x_guide_start + cursor_screen) * 0.5 + Vector2(8.0, 0.0), guide_color)
+	var coordinate_lines: Array[String] = []
+	coordinate_lines.append("x: %.2f cm" % (cursor_position_world.x - origin_world.x))
+	coordinate_lines.append("y: %.2f cm" % (cursor_position_world.y - origin_world.y))
+	_draw_coordinate_readout(coordinate_lines, cursor_screen, guide_color)
 
 
 func _draw_dashed_line(line_start: Vector2, line_end: Vector2, line_color: Color) -> void:
@@ -548,6 +792,23 @@ func _draw_measurement_label(label_text: String, label_center: Vector2, label_co
 	var label_rect := Rect2(label_center - text_size * 0.5 - Vector2(4.0, 2.0), text_size + Vector2(8.0, 4.0))
 	draw_rect(label_rect, Color("#181a1fcc"))
 	draw_string(label_font, label_rect.position + Vector2(4.0, text_size.y), label_text, HORIZONTAL_ALIGNMENT_LEFT, -1, MEASUREMENT_FONT_SIZE, label_color)
+
+
+func _draw_coordinate_readout(lines: Array[String], cursor_screen: Vector2, label_color: Color) -> void:
+	var label_font := ThemeDB.fallback_font
+	var line_height := float(MEASUREMENT_FONT_SIZE + 4)
+	var max_width := 0.0
+	for line in lines:
+		max_width = maxf(max_width, label_font.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, MEASUREMENT_FONT_SIZE).x)
+	var label_size := Vector2(max_width + 12.0, line_height * lines.size() + 8.0)
+	var label_position := cursor_screen + Vector2(14.0, -label_size.y - 14.0)
+	label_position.x = clampf(label_position.x, 4.0, maxf(4.0, size.x - label_size.x - 4.0))
+	label_position.y = clampf(label_position.y, 4.0, maxf(4.0, size.y - label_size.y - 4.0))
+	var label_rect := Rect2(label_position, label_size)
+	draw_rect(label_rect, Color("#181a1f"))
+	for line_index in range(lines.size()):
+		var baseline := label_position + Vector2(6.0, 4.0 + line_height * float(line_index + 1) - 2.0)
+		draw_string(label_font, baseline, lines[line_index], HORIZONTAL_ALIGNMENT_LEFT, -1, MEASUREMENT_FONT_SIZE, label_color)
 
 
 func _draw_reference_image() -> void:
@@ -631,6 +892,12 @@ func _draw_reference_shapes() -> void:
 	for shape in ordered_shapes:
 		if not bool(shape.get("visibility", true)):
 			continue
+		var bezier_shape_points: Array = shape.get("bezier_points", [])
+		var bezier_shape_edges: Array = shape.get("edges", [])
+		var bezier_shape_chains: Array = shape.get("chains", [])
+		if not bezier_shape_points.is_empty() and not bezier_shape_edges.is_empty() and not bezier_shape_chains.is_empty():
+			_draw_reference_bezier_shape(shape, bezier_shape_points, bezier_shape_edges, bezier_shape_chains)
+			continue
 		var points: Array = shape.get("points", [])
 		if points.is_empty():
 			continue
@@ -643,6 +910,41 @@ func _draw_reference_shapes() -> void:
 			draw_line(_world_to_screen(_local_to_world_with_transform(points[index], transform)), _world_to_screen(_local_to_world_with_transform(points[next_index], transform)), reference_color, 2.0)
 		for point in points:
 			draw_circle(_world_to_screen(_local_to_world_with_transform(point, transform)), 3.0, reference_color)
+
+
+func _draw_reference_bezier_shape(shape: Dictionary, points: Array, edges: Array, chains: Array) -> void:
+	var transform: Dictionary = shape.get("transform", {})
+	var points_by_id: Dictionary = {}
+	for point_data in points:
+		if point_data is Dictionary:
+			points_by_id[str(point_data.get("id", ""))] = point_data
+	var edges_by_id: Dictionary = {}
+	for edge_data in edges:
+		if edge_data is Dictionary:
+			edges_by_id[str(edge_data.get("id", ""))] = edge_data
+	var reference_color := Color("#55c7d966")
+	for chain_data in chains:
+		if not chain_data is Dictionary:
+			continue
+		for edge_id_value in chain_data.get("edge_ids", []):
+			var edge_id := str(edge_id_value)
+			if not edges_by_id.has(edge_id):
+				continue
+			var edge_data: Dictionary = edges_by_id[edge_id]
+			if not bool(edge_data.get("render_outline", true)):
+				continue
+			var start_id := str(edge_data.get("start_point_id", ""))
+			var end_id := str(edge_data.get("end_point_id", ""))
+			if not points_by_id.has(start_id) or not points_by_id.has(end_id):
+				continue
+			var start_point: Dictionary = points_by_id[start_id]
+			var end_point: Dictionary = points_by_id[end_id]
+			var curve_points := _bezier_edge_screen_points_with_transform(start_point, end_point, transform)
+			if curve_points.size() >= 2:
+				draw_polyline(curve_points, reference_color, 2.0, true)
+	for point_data in points:
+		if point_data is Dictionary:
+			draw_circle(_world_to_screen(_local_to_world_with_transform(point_data.get("position", Vector2.ZERO), transform)), 3.0, reference_color)
 
 
 func _sort_reference_shapes(a: Dictionary, b: Dictionary) -> bool:
@@ -675,6 +977,172 @@ func _reference_component_at(world_position: Vector2) -> String:
 				nearest_distance = distance
 				nearest_id = str(shape.get("id", ""))
 	return nearest_id
+
+
+func _draw_bezier_geometry() -> void:
+	if not bool(component_transform.get("visibility", true)):
+		return
+	var points_by_id: Dictionary = {}
+	for point_data in bezier_points:
+		points_by_id[str(point_data.get("id", ""))] = point_data
+	var edges_by_id: Dictionary = {}
+	for edge_data in bezier_edges:
+		edges_by_id[str(edge_data.get("id", ""))] = edge_data
+	if outer_shape_closed and outer_shape.size() >= 3 and is_instance_valid(material_texture):
+		_draw_material_polygon()
+	var shape_color := Color("#55c7d9")
+	for chain_data in bezier_chains:
+		for edge_id_value in chain_data.get("edge_ids", []):
+			var edge_id := str(edge_id_value)
+			if not edges_by_id.has(edge_id):
+				continue
+			var edge_data: Dictionary = edges_by_id[edge_id]
+			if not bool(edge_data.get("render_outline", true)):
+				continue
+			var start_id := str(edge_data.get("start_point_id", ""))
+			var end_id := str(edge_data.get("end_point_id", ""))
+			if not points_by_id.has(start_id) or not points_by_id.has(end_id):
+				continue
+			var start_point: Dictionary = points_by_id[start_id]
+			var end_point: Dictionary = points_by_id[end_id]
+			var curve_points := _bezier_edge_screen_points(start_point, end_point)
+			if curve_points.size() >= 2:
+				var edge_color := Color("#f2c94c") if edge_id == selected_edge_id else shape_color
+				draw_polyline(curve_points, edge_color, 2.0 if edge_id == selected_edge_id else 2.0, true)
+	if interaction_state != "transform":
+		for point_data in bezier_points:
+			var point_position: Vector2 = point_data.get("position", Vector2.ZERO)
+			draw_circle(_world_to_screen(_local_to_world(point_position)), 4.0, shape_color)
+	if interaction_state == "edit" and selected_point_index >= 0 and selected_point_index < bezier_points.size():
+		var selected_point: Dictionary = bezier_points[selected_point_index]
+		var selected_position: Vector2 = selected_point.get("position", Vector2.ZERO)
+		var selected_screen := _world_to_screen(_local_to_world(selected_position))
+		draw_circle(selected_screen, 7.0, Color("#f2c94c"), false, 2.0)
+		if edit_handles_enabled:
+			_draw_bezier_handle_preview(selected_point)
+	if interaction_state == "edit" and edit_mode == "point" and not edit_handles_enabled:
+		for point_index in selected_point_indices:
+			if point_index < 0 or point_index >= bezier_points.size():
+				continue
+			var selected_position: Vector2 = bezier_points[point_index].get("position", Vector2.ZERO)
+			draw_circle(_world_to_screen(_local_to_world(selected_position)), 7.0, Color("#f2c94c"), false, 2.0)
+
+
+func _selected_points_center() -> Vector2:
+	if selected_point_indices.is_empty():
+		return Vector2.ZERO
+	var center := Vector2.ZERO
+	var valid_count := 0
+	for point_index in selected_point_indices:
+		if point_index < 0 or point_index >= bezier_points.size():
+			continue
+		center += Vector2(bezier_points[point_index].get("position", Vector2.ZERO))
+		valid_count += 1
+	return center / float(valid_count) if valid_count > 0 else Vector2.ZERO
+
+
+func _selection_gizmo_at(screen_position: Vector2) -> String:
+	if selected_point_indices.is_empty():
+		return ""
+	var center := _world_to_screen(_local_to_world(_selected_points_center()))
+	if screen_position.distance_to(center) <= 12.0:
+		return "move"
+	if screen_position.distance_to(center + Vector2(GIZMO_AXIS_LENGTH, 0.0)) <= 12.0:
+		return "x"
+	if screen_position.distance_to(center + Vector2(0.0, -GIZMO_AXIS_LENGTH)) <= 12.0:
+		return "y"
+	return ""
+
+
+func _draw_selection_gizmo() -> void:
+	if interaction_state != "edit" or edit_mode != "point" or edit_handles_enabled or selected_point_indices.is_empty():
+		return
+	var center := _world_to_screen(_local_to_world(_selected_points_center()))
+	draw_line(center, center + Vector2(GIZMO_AXIS_LENGTH, 0.0), Color("#e56b6f"), 2.0)
+	draw_line(center, center + Vector2(0.0, -GIZMO_AXIS_LENGTH), Color("#6bcb77"), 2.0)
+	draw_circle(center + Vector2(GIZMO_AXIS_LENGTH, 0.0), 7.0, Color("#e56b6f"))
+	draw_circle(center + Vector2(0.0, -GIZMO_AXIS_LENGTH), 7.0, Color("#6bcb77"))
+	draw_rect(Rect2(center - Vector2(7.0, 7.0), Vector2(14.0, 14.0)), Color("#f2c94c"), false, 2.0)
+
+
+func _select_points_in_marquee() -> void:
+	var selection_rect := Rect2(point_marquee_start, point_marquee_current - point_marquee_start).abs()
+	var selected_indices: Array = []
+	for point_index in range(bezier_points.size()):
+		var point_position: Vector2 = bezier_points[point_index].get("position", Vector2.ZERO)
+		var point_screen := _world_to_screen(_local_to_world(point_position))
+		if selection_rect.has_point(point_screen):
+			selected_indices.append(point_index)
+	_set_selected_point_indices(selected_indices)
+
+
+func _draw_point_selection_marquee() -> void:
+	if not point_marquee_dragging or not point_marquee_moved:
+		return
+	var selection_rect := Rect2(point_marquee_start, point_marquee_current - point_marquee_start).abs()
+	draw_rect(selection_rect, Color("#f2c94c22"), true)
+	draw_rect(selection_rect, Color("#f2c94c"), false, 1.0)
+
+
+func _bezier_edge_screen_points(start_point: Dictionary, end_point: Dictionary) -> PackedVector2Array:
+	# The component's visible control points already use component_transform.
+	# Render the sampled curve through the same transform so both remain locked
+	# together while translating, rotating, or scaling the component.
+	return _bezier_edge_screen_points_with_transform(start_point, end_point, component_transform)
+
+
+func _bezier_edge_screen_points_with_transform(start_point: Dictionary, end_point: Dictionary, transform: Dictionary) -> PackedVector2Array:
+	var start_position: Vector2 = start_point.get("position", Vector2.ZERO)
+	var end_position: Vector2 = end_point.get("position", Vector2.ZERO)
+	var start_handle: Vector2 = start_point.get("handle_out", Vector2.ZERO)
+	var end_handle: Vector2 = end_point.get("handle_in", Vector2.ZERO)
+	var points := PackedVector2Array()
+	var sample_count := 24
+	for sample_index in range(sample_count + 1):
+		var t := float(sample_index) / float(sample_count)
+		var inverse_t := 1.0 - t
+		var local_point := inverse_t * inverse_t * inverse_t * start_position
+		local_point += 3.0 * inverse_t * inverse_t * t * (start_position + start_handle)
+		local_point += 3.0 * inverse_t * t * t * (end_position + end_handle)
+		local_point += t * t * t * end_position
+		points.append(_world_to_screen(_local_to_world_with_transform(local_point, transform)))
+	return points
+
+
+func _bezier_curve_screen_points(start_point: Dictionary, end_point: Dictionary) -> PackedVector2Array:
+	var start_position: Vector2 = start_point.get("position", Vector2.ZERO)
+	var end_position: Vector2 = end_point.get("position", Vector2.ZERO)
+	var start_handle: Vector2 = start_point.get("handle_out", Vector2.ZERO)
+	var end_handle: Vector2 = end_point.get("handle_in", Vector2.ZERO)
+	var points := PackedVector2Array()
+	for sample_index in range(25):
+		var t := float(sample_index) / 24.0
+		var inverse_t := 1.0 - t
+		var local_point := inverse_t * inverse_t * inverse_t * start_position
+		local_point += 3.0 * inverse_t * inverse_t * t * (start_position + start_handle)
+		local_point += 3.0 * inverse_t * t * t * (end_position + end_handle)
+		local_point += t * t * t * end_position
+		points.append(_world_to_screen(_local_to_world(local_point)))
+	return points
+
+
+func _draw_bezier_handle_preview(point_data: Dictionary) -> void:
+	var point_position: Vector2 = point_data.get("position", Vector2.ZERO)
+	var handle_in: Vector2 = point_data.get("handle_in", Vector2.ZERO)
+	var handle_out: Vector2 = point_data.get("handle_out", Vector2.ZERO)
+	var point_screen := _world_to_screen(_local_to_world(point_position))
+	if not is_zero_approx(handle_in.length_squared()):
+		var handle_in_screen := _world_to_screen(_local_to_world(point_position + handle_in))
+		var handle_in_color := Color("#c084fc")
+		draw_line(point_screen, handle_in_screen, handle_in_color, 1.5)
+		draw_circle(handle_in_screen, 5.0, handle_in_color, false, 1.5)
+		draw_string(ThemeDB.fallback_font, handle_in_screen + Vector2(7.0, -6.0), "In", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, handle_in_color)
+	if not is_zero_approx(handle_out.length_squared()):
+		var handle_out_screen := _world_to_screen(_local_to_world(point_position + handle_out))
+		var handle_out_color := Color("#38bdf8")
+		draw_line(point_screen, handle_out_screen, handle_out_color, 1.5)
+		draw_circle(handle_out_screen, 5.0, handle_out_color, false, 1.5)
+		draw_string(ThemeDB.fallback_font, handle_out_screen + Vector2(7.0, -6.0), "Out", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, handle_out_color)
 
 
 func _draw_outer_shape() -> void:
@@ -760,7 +1228,48 @@ func _nearest_outer_point(screen_position: Vector2) -> int:
 	return nearest_index
 
 
+func _nearest_bezier_point(screen_position: Vector2) -> int:
+	var nearest_index := -1
+	var nearest_distance := HANDLE_HIT_RADIUS
+	for point_index in range(bezier_points.size()):
+		var point_position: Vector2 = bezier_points[point_index].get("position", Vector2.ZERO)
+		var distance := screen_position.distance_to(_world_to_screen(_local_to_world(point_position)))
+		if distance <= nearest_distance:
+			nearest_distance = distance
+			nearest_index = point_index
+	return nearest_index
+
+
+func _bezier_handle_at(screen_position: Vector2) -> String:
+	if selected_point_index < 0 or selected_point_index >= bezier_points.size():
+		return ""
+	var point_data: Dictionary = bezier_points[selected_point_index]
+	var point_position: Vector2 = point_data.get("position", Vector2.ZERO)
+	var handle_in: Vector2 = point_data.get("handle_in", Vector2.ZERO)
+	var handle_out: Vector2 = point_data.get("handle_out", Vector2.ZERO)
+	if not is_zero_approx(handle_out.length_squared()):
+		var handle_out_screen := _world_to_screen(_local_to_world(point_position + handle_out))
+		if screen_position.distance_to(handle_out_screen) <= HANDLE_HIT_RADIUS:
+			return "out"
+	if not is_zero_approx(handle_in.length_squared()):
+		var handle_in_screen := _world_to_screen(_local_to_world(point_position + handle_in))
+		if screen_position.distance_to(handle_in_screen) <= HANDLE_HIT_RADIUS:
+			return "in"
+	return ""
+
+
 func _draw_line_draft() -> void:
+	if active_tool == "point":
+		if not cursor_over_canvas:
+			return
+		_draw_draw_point_preview()
+		var preview_position := _world_to_screen(_local_to_world(cursor_world))
+		var close_to_first := _is_near_first_chain_point(cursor_world)
+		var preview_color := Color("#76e0a5") if close_to_first else Color("#f2c94c")
+		draw_circle(preview_position, 5.0, preview_color, false, 2.0)
+		if close_to_first:
+			draw_circle(preview_position, 8.0, preview_color, false, 2.0)
+		return
 	if active_tool != "line" or not cursor_over_canvas:
 		return
 	var draft_color := Color("#f2c94c")
@@ -779,6 +1288,100 @@ func _draw_line_draft() -> void:
 			draw_circle(_world_to_screen(_local_to_world(line_draft[0])), 7.0, Color("#76e0a5"), false, 2.0)
 
 
+func _draw_draw_point_preview() -> void:
+	if bezier_chains.is_empty():
+		return
+	var chain: Dictionary = bezier_chains.back()
+	if bool(chain.get("closed", false)):
+		return
+	var point_ids: Array = chain.get("point_ids", [])
+	if point_ids.is_empty():
+		return
+	var preview_points: Array = bezier_points.duplicate(true)
+	var preview_chain: Dictionary = chain.duplicate(true)
+	var preview_point_ids: Array = preview_chain.get("point_ids", []).duplicate()
+	var candidate_position := pending_draw_position if draw_pointer_down else cursor_world
+	var closing_preview := not draw_pointer_down and _is_near_first_chain_point(cursor_world)
+	var preview_end_id := ""
+	if closing_preview and point_ids.size() >= 3:
+		preview_chain["closed"] = true
+		preview_end_id = str(preview_point_ids.front())
+	else:
+		preview_end_id = "preview_point"
+		preview_points.append({
+			"id": preview_end_id,
+			"position": candidate_position,
+			"mode": draw_point_mode,
+			"preserve_point": draw_point_mode == "corner",
+			"handle_source": "auto",
+			"handle_in": Vector2.ZERO,
+			"handle_out": Vector2.ZERO
+		})
+		preview_point_ids.append(preview_end_id)
+		preview_chain["point_ids"] = preview_point_ids
+	BezierGeometry.resolve_chain_auto_handles(preview_points, preview_chain)
+	if draw_pointer_down and pending_draw_has_handle:
+		for point_data in preview_points:
+			if str(point_data.get("id", "")) != preview_end_id:
+				continue
+			point_data["handle_source"] = "manual"
+			point_data["handle_out"] = pending_draw_handle_out
+			if draw_point_mode == "mirrored":
+				point_data["handle_in"] = -pending_draw_handle_out
+			elif draw_point_mode == "aligned" and not is_zero_approx(pending_draw_handle_out.length_squared()):
+				var automatic_in: Vector2 = point_data.get("handle_in", Vector2.ZERO)
+				var incoming_length := automatic_in.length()
+				if is_zero_approx(incoming_length):
+					incoming_length = pending_draw_handle_out.length()
+				point_data["handle_in"] = -pending_draw_handle_out.normalized() * incoming_length
+			break
+	var points_by_id: Dictionary = {}
+	for point_data in preview_points:
+		points_by_id[str(point_data.get("id", ""))] = point_data
+	# For a normal preview the temporary point is appended, so the previous
+	# point is the penultimate id. During close-chain preview no temporary point
+	# is appended; the preview edge must therefore start at the actual last
+	# chain point and end at the first point.
+	var start_id := str(preview_point_ids.back() if closing_preview else preview_point_ids[preview_point_ids.size() - 2])
+	if not points_by_id.has(start_id) or not points_by_id.has(preview_end_id):
+		return
+	_draw_dashed_polyline(_bezier_curve_screen_points(points_by_id[start_id], points_by_id[preview_end_id]), Color("#f2c94caa"), 1.5)
+
+
+func _draw_dashed_polyline(points: PackedVector2Array, line_color: Color, line_width: float) -> void:
+	if points.size() < 2:
+		return
+	var dash_length := 7.0
+	var gap_length := 5.0
+	var dash_remaining := dash_length
+	var gap_remaining := 0.0
+	var drawing_dash := true
+	for index in range(points.size() - 1):
+		var segment_start := points[index]
+		var segment_end := points[index + 1]
+		var segment := segment_end - segment_start
+		var segment_length := segment.length()
+		if segment_length <= 0.001:
+			continue
+		var distance := 0.0
+		while distance < segment_length:
+			var remaining_pattern := dash_remaining if drawing_dash else gap_remaining
+			var step := minf(remaining_pattern, segment_length - distance)
+			if drawing_dash:
+				draw_line(segment_start + segment * (distance / segment_length), segment_start + segment * ((distance + step) / segment_length), line_color, line_width)
+			distance += step
+			if drawing_dash:
+				dash_remaining -= step
+				if dash_remaining <= 0.001:
+					drawing_dash = false
+					gap_remaining = gap_length
+			else:
+				gap_remaining -= step
+				if gap_remaining <= 0.001:
+					drawing_dash = true
+					dash_remaining = dash_length
+
+
 func _world_to_screen(world_position: Vector2) -> Vector2:
 	return size * 0.5 + Vector2(world_position.x - view_center.x, -(world_position.y - view_center.y)) * zoom
 
@@ -791,7 +1394,13 @@ func _screen_to_world(screen_position: Vector2) -> Vector2:
 func _snap_to_grid(world_position: Vector2) -> Vector2:
 	if not snap_enabled:
 		return world_position
-	var snap_step := maxf(world_grid_size, 0.0001) * pow(5.0, _active_grid_package_level())
+	var package_level := _active_grid_package_level()
+	# Fine mode is one raster level below the active coarse package. Without
+	# this correction a zoomed-out view could multiply the fine step back to
+	# the coarse step while the UI still reported Fine.
+	if grid_step < world_grid_size:
+		package_level = maxi(package_level - 1, 0)
+	var snap_step := maxf(grid_step, 0.0001) * pow(5.0, package_level)
 	return Vector2(
 		round(world_position.x / snap_step) * snap_step,
 		round(world_position.y / snap_step) * snap_step
@@ -802,3 +1411,50 @@ func _is_near_first_point(world_position: Vector2) -> bool:
 	if line_draft.is_empty():
 		return false
 	return _world_to_screen(_local_to_world(world_position)).distance_to(_world_to_screen(_local_to_world(line_draft[0]))) <= CLOSE_DISTANCE_PIXELS
+
+
+func _is_near_first_chain_point(local_position: Vector2) -> bool:
+	if bezier_chains.is_empty():
+		return false
+	var chain: Dictionary = bezier_chains.back()
+	if bool(chain.get("closed", false)):
+		return false
+	var point_ids: Array = chain.get("point_ids", [])
+	if point_ids.size() < 3:
+		return false
+	var first_id := str(point_ids[0])
+	for point_data in bezier_points:
+		if str(point_data.get("id", "")) == first_id:
+			var first_position: Vector2 = point_data.get("position", Vector2.ZERO)
+			return _world_to_screen(_local_to_world(local_position)).distance_to(_world_to_screen(_local_to_world(first_position))) <= CLOSE_DISTANCE_PIXELS
+	return false
+
+
+func _nearest_bezier_edge(screen_position: Vector2) -> String:
+	return str(_bezier_edge_hit(screen_position).get("id", ""))
+
+
+func _bezier_edge_hit(screen_position: Vector2) -> Dictionary:
+	var points_by_id: Dictionary = {}
+	for point_data in bezier_points:
+		points_by_id[str(point_data.get("id", ""))] = point_data
+	var result := {}
+	var nearest_distance := 14.0
+	for edge_data in bezier_edges:
+		var start_id := str(edge_data.get("start_point_id", ""))
+		var end_id := str(edge_data.get("end_point_id", ""))
+		if not points_by_id.has(start_id) or not points_by_id.has(end_id):
+			continue
+		var curve_points := _bezier_edge_screen_points(points_by_id[start_id], points_by_id[end_id])
+		for index in range(curve_points.size() - 1):
+			var closest := Geometry2D.get_closest_point_to_segment(screen_position, curve_points[index], curve_points[index + 1])
+			var distance := screen_position.distance_to(closest)
+			if distance < nearest_distance:
+				nearest_distance = distance
+				var segment := curve_points[index + 1] - curve_points[index]
+				var factor := clampf((screen_position - curve_points[index]).dot(segment) / maxf(segment.length_squared(), 0.000001), 0.0, 1.0)
+				result = {
+					"id": str(edge_data.get("id", "")),
+					"t": (float(index) + factor) / float(curve_points.size() - 1)
+				}
+	return result

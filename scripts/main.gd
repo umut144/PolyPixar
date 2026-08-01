@@ -6,7 +6,7 @@ const INACTIVE_MODULES := ["Motion", "Transform", "Effects", "Export"]
 const WORKSPACES_ROOT := "res://workspaces"
 const IMPORT_TEXTURES_ROOT := "res://imports/textures"
 const CONFIG_PATH := "res://configs/app_config.json"
-const SCHEMA_VERSION := 8
+const SCHEMA_VERSION := 9
 const MAX_HISTORY_SIZE := 100
 const PAPER_SIZES_CM := [Vector2(21.0, 29.7), Vector2(29.7, 42.0), Vector2(42.0, 59.4), Vector2(59.4, 84.1), Vector2(84.1, 118.9)]
 const PAPER_LABELS := ["A4", "A3", "A2", "A1", "A0"]
@@ -27,6 +27,9 @@ var textures: Array[Dictionary] = []
 var materials: Array[Dictionary] = []
 var selected_asset_id := ""
 var selected_component_id := ""
+var selected_edge_id := ""
+var selected_point_index := -1
+var selected_point_indices: Array[int] = []
 var selected_texture_id := ""
 var selected_element_id := ""
 var selected_material_id := ""
@@ -80,18 +83,21 @@ var program_status_label: Label
 var active_material_status_label: Label
 var status_clear_timer: Timer
 var active_draw_tool := ""
+var active_draw_point_mode := "linear"
 var active_state := ""
 var active_import_preview_mode := "original"
 var pending_import_threshold := 0.05
 var import_threshold_field: SpinBox
-var active_edit_mode := "select"
+var active_edit_mode := "point"
+var edit_bezier_handles := false
 var active_transform_mode := "transform"
 var snap_enabled := true
+var snap_mode := "coarse"
 var snap_grid_step := 16.0
 var snap_rotation_step := 15.0
 var snap_button: Button
 var snap_popup: PopupPanel
-var snap_toggle: CheckButton
+var snap_mode_buttons: Array[CheckBox] = []
 var snap_rotation_slider: HSlider
 var snap_rotation_value_label: Label
 var paper_menu: MenuButton
@@ -127,7 +133,21 @@ func _ready() -> void:
 	_render_inspector()
 	_render_canvas_context()
 	_load_last_workspace()
+	call_deferred("_disable_quit_shortcut")
 	call_deferred("_focus_active_canvas_after_startup")
+
+
+func _disable_quit_shortcut() -> void:
+	# On macOS Cmd+Q is owned by the native application menu, before Godot's
+	# regular input dispatch. Remove only its accelerator; quitting via the menu
+	# or window controls remains possible.
+	if OS.get_name() != "macOS":
+		return
+	var application_menu := NativeMenu.get_system_menu(NativeMenu.APPLICATION_MENU_ID)
+	for item_index in range(NativeMenu.get_item_count(application_menu)):
+		if NativeMenu.get_item_text(application_menu, item_index).begins_with("Quit"):
+			NativeMenu.set_item_accelerator(application_menu, item_index, KEY_NONE)
+			return
 
 
 func _load_last_workspace() -> void:
@@ -149,9 +169,16 @@ func _focus_active_canvas_after_startup() -> void:
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
-	if not event is InputEventKey or not event.pressed or event.echo:
+	if not event is InputEventKey:
+		return
+	if is_instance_valid(canvas_view) and (event.meta_pressed or event.ctrl_pressed or event.keycode in [KEY_META, KEY_CTRL]):
+		canvas_view.set_command_shortcut_active(event.meta_pressed or event.ctrl_pressed)
+	if not event.pressed or event.echo:
 		return
 	var has_command_modifier: bool = event.meta_pressed or event.ctrl_pressed
+	if has_command_modifier and event.keycode == KEY_Q:
+		get_viewport().set_input_as_handled()
+		return
 	if event.keycode == KEY_ESCAPE:
 		_reset_to_default_state()
 		get_viewport().set_input_as_handled()
@@ -167,10 +194,22 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			_undo()
 		get_viewport().set_input_as_handled()
 		return
+	if not has_command_modifier and (event.keycode == KEY_BACKSPACE or event.keycode == KEY_DELETE) and active_state == "edit" and active_edit_mode == "point" and not selected_point_indices.is_empty():
+		if selected_point_indices.size() == 1:
+			_on_bezier_point_delete_requested(selected_point_indices[0])
+		else:
+			_on_bezier_points_delete_requested(selected_point_indices.duplicate())
+		get_viewport().set_input_as_handled()
+		return
 	if not has_command_modifier and (event.keycode == KEY_BACKSPACE or event.keycode == KEY_DELETE) and active_state.is_empty():
 		_delete_current_outliner_selection()
 		get_viewport().set_input_as_handled()
 		return
+	if not has_command_modifier and active_state == "draw" and active_draw_tool == "point":
+		if event.keycode >= KEY_1 and event.keycode <= KEY_5:
+			_set_draw_point_mode(_draw_point_mode_from_key(event.keycode))
+			get_viewport().set_input_as_handled()
+			return
 	if selected_component_id.is_empty():
 		if not selected_texture_id.is_empty() and not selected_element_id.is_empty():
 			var selected_texture := _get_texture(selected_texture_id)
@@ -192,41 +231,52 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if has_command_modifier and event.keycode == KEY_1:
 		_activate_draw_state()
 	elif has_command_modifier and event.keycode == KEY_2:
-		_activate_edit_state()
+		_activate_edit_point_state()
 	elif has_command_modifier and event.keycode == KEY_3:
-		_activate_transform_state()
-	elif not has_command_modifier and active_state == "draw" and event.keycode == KEY_1:
-		_activate_draw_line()
-	elif not has_command_modifier and active_state == "edit":
-		if event.keycode == KEY_1:
-			_set_edit_mode("select")
-		elif event.keycode == KEY_2:
-			_set_edit_mode("add")
-		elif event.keycode == KEY_3:
-			_set_edit_mode("move")
-		elif event.keycode == KEY_4:
-			_set_edit_mode("delete")
-	elif not has_command_modifier and active_state == "transform":
-		if event.keycode == KEY_1:
-			_set_transform_mode("transform")
-		elif event.keycode == KEY_2:
-			_set_transform_mode("rotate")
-		elif event.keycode == KEY_3:
-			_set_transform_mode("scale")
+		_activate_edit_edge_state()
+	elif has_command_modifier and event.keycode == KEY_4:
+		_activate_edit_face_state()
+	elif not has_command_modifier and active_state == "edit" and active_edit_mode == "point" and event.keycode == KEY_1:
+		_activate_edit_point_state(false)
+		get_viewport().set_input_as_handled()
+	elif not has_command_modifier and active_state == "edit" and active_edit_mode == "point" and event.keycode == KEY_2:
+		_activate_edit_point_state(true)
+		get_viewport().set_input_as_handled()
 
 
 func _reset_to_default_state() -> void:
 	active_state = ""
 	active_draw_tool = ""
-	active_edit_mode = "select"
+	active_edit_mode = "point"
+	edit_bezier_handles = false
 	active_transform_mode = "transform"
+	selected_edge_id = ""
+	selected_point_index = -1
 	active_import_preview_mode = "original"
 	if is_instance_valid(canvas_view):
 		canvas_view.set_interaction_state("")
 		canvas_view.set_tool_mode("")
 		canvas_view.set_edit_mode(active_edit_mode)
 		canvas_view.set_transform_mode(active_transform_mode)
+		canvas_view.set_selected_edge_id("")
+	_ensure_default_edit_point_state()
 	_render_canvas_context()
+
+
+func _ensure_default_edit_point_state() -> void:
+	if selected_component_id.is_empty() or not active_state.is_empty():
+		return
+	active_state = "edit"
+	active_draw_tool = ""
+	active_edit_mode = "point"
+	edit_bezier_handles = false
+	active_transform_mode = "transform"
+	selected_edge_id = ""
+	selected_point_index = -1
+	if is_instance_valid(canvas_view):
+		canvas_view.set_edit_handles_enabled(false)
+		canvas_view.set_edit_mode("point")
+		canvas_view.set_transform_mode("transform")
 
 
 func _build_ui() -> void:
@@ -258,6 +308,13 @@ func _build_ui() -> void:
 	create_action_button.focus_mode = Control.FOCUS_NONE
 	create_action_button.pressed.connect(_on_create_action_pressed)
 	toolbar.add_child(create_action_button)
+	snap_button = Button.new()
+	snap_button.text = "Snap: %s  ▼" % ("On" if snap_enabled else "Off")
+	snap_button.custom_minimum_size = Vector2(112, 32)
+	snap_button.focus_mode = Control.FOCUS_NONE
+	snap_button.pressed.connect(_toggle_snap_popup)
+	toolbar.add_child(snap_button)
+	toolbar.add_child(_create_paper_menu())
 	var toolbar_spacer := Control.new()
 	toolbar_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	toolbar.add_child(toolbar_spacer)
@@ -266,6 +323,7 @@ func _build_ui() -> void:
 	workspace_menu.custom_minimum_size = Vector2(132, 32)
 	workspace_menu.focus_mode = Control.FOCUS_NONE
 	var workspace_popup := workspace_menu.get_popup()
+	_style_popup_menu(workspace_popup)
 	workspace_popup.add_item("New")
 	workspace_popup.add_item("Save")
 	workspace_popup.add_item("Load")
@@ -354,6 +412,17 @@ func _build_ui() -> void:
 	canvas_view = ComponentCanvas.new()
 	canvas_view.line_shape_changed.connect(_on_line_shape_changed)
 	canvas_view.outer_shape_changed.connect(_on_outer_shape_changed)
+	canvas_view.bezier_point_added.connect(_on_bezier_point_added)
+	canvas_view.bezier_chain_closed.connect(_on_bezier_chain_closed)
+	canvas_view.edge_selection_changed.connect(_on_edge_selection_changed)
+	canvas_view.point_selection_changed.connect(_on_point_selection_changed)
+	canvas_view.point_selection_set_changed.connect(_on_point_selection_set_changed)
+	canvas_view.bezier_point_moved.connect(_on_bezier_point_moved)
+	canvas_view.bezier_points_moved.connect(_on_bezier_points_moved)
+	canvas_view.bezier_handle_changed.connect(_on_bezier_handle_changed)
+	canvas_view.bezier_edge_insert_requested.connect(_on_bezier_edge_insert_requested)
+	canvas_view.bezier_point_delete_requested.connect(_on_bezier_point_delete_requested)
+	canvas_view.bezier_points_delete_requested.connect(_on_bezier_points_delete_requested)
 	canvas_view.reference_component_selected.connect(_on_reference_component_selected)
 	canvas_view.pivot_changed.connect(_on_pivot_changed)
 	canvas_view.transform_changed.connect(_on_transform_changed)
@@ -588,18 +657,39 @@ func _create_panel_label(text: String) -> Label:
 
 func _create_inspector_section(text: String) -> VBoxContainer:
 	var section := VBoxContainer.new()
+	section.set_meta("inspector_section", true)
 	section.add_theme_constant_override("separation", 0)
 	var separator := HSeparator.new()
 	separator.modulate = Color("#3a424f")
 	section.add_child(separator)
-	var label := Label.new()
-	label.text = text
-	label.custom_minimum_size = Vector2(0, 20)
-	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", 10)
-	label.add_theme_color_override("font_color", Color("#c0c8d5"))
-	section.add_child(label)
+	var header := Button.new()
+	header.text = "▾  %s" % text
+	header.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	header.custom_minimum_size = Vector2(0, 24)
+	header.focus_mode = Control.FOCUS_NONE
+	header.toggle_mode = true
+	header.flat = true
+	header.add_theme_font_size_override("font_size", 10)
+	header.add_theme_color_override("font_color", Color("#c0c8d5"))
+	header.add_theme_color_override("font_hover_color", Color("#ffffff"))
+	header.pressed.connect(_on_inspector_section_toggled.bind(section, text, header))
+	section.add_child(header)
 	return section
+
+
+func _on_inspector_section_toggled(section: VBoxContainer, text: String, header: Button) -> void:
+	var parent := section.get_parent()
+	if parent == null:
+		return
+	var section_index := section.get_index()
+	var expanded := header.button_pressed
+	header.text = ("▾  " if expanded else "▸  ") + text
+	for sibling_index in range(section_index + 1, parent.get_child_count()):
+		var sibling := parent.get_child(sibling_index)
+		if sibling is Control and sibling.has_meta("inspector_section"):
+			break
+		if sibling is Control:
+			sibling.visible = expanded
 
 
 func _create_inspector_field_label(text: String) -> Label:
@@ -624,20 +714,32 @@ func _create_status_region() -> PanelContainer:
 
 func _create_snap_popup() -> void:
 	snap_popup = PopupPanel.new()
-	snap_popup.size = Vector2i(250, 170)
+	snap_popup.size = Vector2i(250, 230)
+	snap_popup.add_theme_stylebox_override("panel", _opaque_popup_style())
 	var content := VBoxContainer.new()
 	content.add_theme_constant_override("separation", 6)
 	snap_popup.add_child(content)
 	var title := Label.new()
 	title.text = "Snap Settings"
 	content.add_child(title)
-	snap_toggle = CheckButton.new()
-	snap_toggle.text = "Snap On"
-	snap_toggle.button_pressed = snap_enabled
-	snap_toggle.toggled.connect(_on_snap_enabled_toggled)
-	content.add_child(snap_toggle)
+	var grid_mode_label := Label.new()
+	grid_mode_label.text = "Snap Mode"
+	content.add_child(grid_mode_label)
+	var grid_mode_group := ButtonGroup.new()
+	snap_mode_buttons.clear()
+	var grid_modes := [
+		["Coarse", "coarse"],
+		["Fine", "fine"]
+	]
+	for grid_mode in grid_modes:
+		var mode_button := CheckBox.new()
+		mode_button.text = str(grid_mode[0])
+		mode_button.button_group = grid_mode_group
+		mode_button.pressed.connect(_on_snap_mode_selected.bind(str(grid_mode[1])))
+		content.add_child(mode_button)
+		snap_mode_buttons.append(mode_button)
 	var snap_grid_info := Label.new()
-	snap_grid_info.text = "Grid snap follows the active 5× package."
+	snap_grid_info.text = "Fine = 1/5 of Coarse."
 	snap_grid_info.add_theme_color_override("font_color", Color("#9aa3b2"))
 	content.add_child(snap_grid_info)
 	snap_rotation_value_label = Label.new()
@@ -705,7 +807,7 @@ func _on_world_grid_size_changed(value: float) -> void:
 
 
 func _apply_world_scale() -> void:
-	snap_grid_step = world_grid_size
+	snap_grid_step = _snap_base_step()
 	if is_instance_valid(canvas_view):
 		canvas_view.set_snap_settings(snap_enabled, snap_grid_step, snap_rotation_step)
 		canvas_view.set_world_scale(world_grid_size)
@@ -759,8 +861,29 @@ func _toggle_snap_popup() -> void:
 
 func _on_snap_enabled_toggled(enabled: bool) -> void:
 	snap_enabled = enabled
-	canvas_view.set_snap_settings(snap_enabled, snap_grid_step, snap_rotation_step)
+	if is_instance_valid(canvas_view):
+		canvas_view.set_snap_settings(snap_enabled, snap_grid_step, snap_rotation_step)
 	_update_snap_popup_labels()
+
+
+func _on_snap_mode_selected(mode: String) -> void:
+	_set_snap_mode(mode)
+
+
+func _set_snap_mode(mode: String) -> void:
+	if mode not in ["coarse", "fine"]:
+		return
+	snap_mode = mode
+	snap_enabled = true
+	snap_grid_step = _snap_base_step()
+	if is_instance_valid(canvas_view):
+		canvas_view.set_snap_settings(snap_enabled, snap_grid_step, snap_rotation_step)
+	_update_snap_popup_labels()
+	_update_context_action_button()
+
+
+func _snap_base_step() -> float:
+	return world_grid_size / 5.0 if snap_mode == "fine" else world_grid_size
 
 
 func _on_snap_rotation_changed(value: float) -> void:
@@ -770,12 +893,32 @@ func _on_snap_rotation_changed(value: float) -> void:
 
 
 func _update_snap_popup_labels() -> void:
-	if is_instance_valid(snap_toggle):
-		snap_toggle.button_pressed = snap_enabled
+	if is_instance_valid(snap_button):
+		snap_button.text = "Snap: %s  ▼" % _snap_mode_label()
+	for mode_index in range(snap_mode_buttons.size()):
+		var mode_button := snap_mode_buttons[mode_index]
+		var mode: String = ["coarse", "fine"][mode_index]
+		mode_button.set_pressed_no_signal(mode == snap_mode)
 	if is_instance_valid(snap_rotation_slider):
 		snap_rotation_slider.set_value_no_signal(snap_rotation_step)
 	if is_instance_valid(snap_rotation_value_label):
 		snap_rotation_value_label.text = "Rotation Step: %d°" % int(snap_rotation_step)
+
+
+func _snap_mode_label() -> String:
+	return "Fine" if snap_mode == "fine" else "Coarse"
+
+
+func _opaque_popup_style() -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color("#20242c")
+	style.border_color = Color("#363d48")
+	style.set_border_width_all(1)
+	return style
+
+
+func _style_popup_menu(popup: PopupMenu) -> void:
+	popup.add_theme_stylebox_override("panel", _opaque_popup_style())
 
 
 func _create_asset_dialog() -> void:
@@ -799,6 +942,7 @@ func _create_component_dialog() -> void:
 	component_dialog.dialog_text = "Enter a component name"
 	component_dialog.size = Vector2i(360, 160)
 	component_dialog.confirmed.connect(_confirm_component_creation)
+	component_dialog.canceled.connect(_on_component_dialog_canceled)
 	component_name_input = LineEdit.new()
 	component_name_input.placeholder_text = "Component name"
 	component_name_input.custom_minimum_size = Vector2(320, 32)
@@ -923,6 +1067,13 @@ func _update_context_action_button() -> void:
 	if not is_instance_valid(create_action_button):
 		return
 	create_action_button.visible = active_module == "Create" or active_module == "Style"
+	var show_asset_create_controls := active_module == "Create" and active_create_submodule == "Asset"
+	if is_instance_valid(snap_button):
+		snap_button.visible = show_asset_create_controls
+	if is_instance_valid(paper_menu):
+		paper_menu.visible = show_asset_create_controls
+	if not show_asset_create_controls and is_instance_valid(snap_popup):
+		snap_popup.hide()
 	if active_module == "Create" and active_create_submodule == "Asset":
 		create_action_button.text = "Create Asset"
 	elif active_module == "Create" and active_create_submodule == "Texture":
@@ -1063,6 +1214,11 @@ func _save_workspace() -> void:
 			asset_data["components"].append({
 				"id": str(component["id"]),
 				"name": str(component["name"]),
+				"points": _serialize_bezier_points(component.get("points", [])),
+				"edges": _serialize_edges(component.get("edges", [])),
+				"chains": _serialize_chains(component.get("chains", [])),
+				# Kept through the Bezier transition so the current linear canvas and
+				# export path can continue to load the same workspace safely.
 				"outer_shape": _serialize_points(component["outer_shape"]),
 				"closed": bool(component.get("closed", component["outer_shape"].size() >= 3)),
 				"transform": _serialize_transform(component.get("transform", {})),
@@ -1246,11 +1402,18 @@ func _load_workspace(workspace_entry: String) -> bool:
 		for component_data in asset_data.get("components", []):
 			if not component_data is Dictionary:
 				continue
+			var legacy_outer_shape := _deserialize_points(component_data.get("outer_shape", []))
+			var legacy_closed := bool(component_data.get("closed", legacy_outer_shape.size() >= 3))
+			var topology := _deserialize_component_topology(component_data, legacy_outer_shape, legacy_closed)
+			var legacy_projection := _legacy_projection_from_topology(topology, legacy_outer_shape, legacy_closed)
 			components.append({
 				"id": str(component_data.get("id", "")),
 				"name": str(component_data.get("name", "Component")),
-				"outer_shape": _deserialize_points(component_data.get("outer_shape", [])),
-				"closed": bool(component_data.get("closed", component_data.get("outer_shape", []).size() >= 3)),
+				"points": topology["points"],
+				"edges": topology["edges"],
+				"chains": topology["chains"],
+				"outer_shape": legacy_projection["points"],
+				"closed": legacy_projection["closed"],
 				"transform": _deserialize_transform(component_data.get("transform", {})),
 				"visibility": bool(component_data.get("visibility", true)),
 				"z_index": int(component_data.get("z_index", 0)),
@@ -1310,6 +1473,13 @@ func _serialize_editor_state() -> Dictionary:
 	for asset in assets:
 		var asset_id := str(asset["id"])
 		expanded_state[asset_id] = bool(expanded_assets.get(asset_id, false))
+	var camera_state := {}
+	if is_instance_valid(canvas_view):
+		var current_camera := canvas_view.get_camera_state()
+		camera_state = {
+			"position": _serialize_vector(current_camera.get("position", Vector2.ZERO)),
+			"zoom": float(current_camera.get("zoom", 1.0))
+		}
 	return {
 		"selected_asset_id": selected_asset_id,
 		"selected_component_id": selected_component_id,
@@ -1322,6 +1492,7 @@ func _serialize_editor_state() -> Dictionary:
 		"lookdev_target_component_id": lookdev_target_component_id,
 		"expanded_assets": expanded_state,
 		"expanded_textures": expanded_textures.duplicate(true),
+		"camera": camera_state,
 		"paper_level": paper_level,
 		"world_scale": {
 			"unit": world_unit,
@@ -1329,6 +1500,7 @@ func _serialize_editor_state() -> Dictionary:
 		},
 		"snap": {
 			"enabled": snap_enabled,
+			"mode": snap_mode,
 			"grid_step": snap_grid_step,
 			"rotation_step": snap_rotation_step
 		}
@@ -1402,6 +1574,11 @@ func _restore_editor_state(state) -> void:
 	_apply_world_scale_settings(state.get("world_scale", {}))
 	paper_level = clampi(int(state.get("paper_level", 0)), PAPER_NONE_LEVEL, PAPER_SIZES_CM.size() - 1)
 	_apply_snap_settings(state.get("snap", {}))
+	var saved_camera = state.get("camera", {})
+	if saved_camera is Dictionary and not saved_camera.is_empty() and is_instance_valid(canvas_view):
+		var camera_position := _deserialize_vector(saved_camera.get("position", [0.0, 0.0]), Vector2.ZERO)
+		var camera_zoom := clampf(float(saved_camera.get("zoom", 1.0)), 0.25, 256.0)
+		canvas_view.set_camera_state(camera_position, camera_zoom)
 
 
 func _apply_world_scale_settings(settings) -> void:
@@ -1433,6 +1610,12 @@ func _convert_asset_units(loaded_assets: Array[Dictionary], conversion_factor: f
 				if point is Vector2:
 					converted_points.append(point * conversion_factor)
 			component["outer_shape"] = converted_points
+			for bezier_point in component.get("points", []):
+				if not bezier_point is Dictionary:
+					continue
+				bezier_point["position"] = Vector2(bezier_point.get("position", Vector2.ZERO)) * conversion_factor
+				bezier_point["handle_in"] = Vector2(bezier_point.get("handle_in", Vector2.ZERO)) * conversion_factor
+				bezier_point["handle_out"] = Vector2(bezier_point.get("handle_out", Vector2.ZERO)) * conversion_factor
 			var transform: Dictionary = component.get("transform", _default_component_transform()).duplicate(true)
 			var transform_position: Vector2 = transform.get("position", Vector2.ZERO)
 			var transform_pivot: Vector2 = transform.get("pivot", Vector2.ZERO)
@@ -1444,11 +1627,21 @@ func _convert_asset_units(loaded_assets: Array[Dictionary], conversion_factor: f
 func _apply_snap_settings(settings) -> void:
 	if settings is Dictionary:
 		snap_enabled = bool(settings.get("enabled", true))
+		snap_mode = str(settings.get("mode", "coarse"))
 		snap_rotation_step = clampf(float(settings.get("rotation_step", 15.0)), 1.0, 90.0)
 	else:
 		snap_enabled = true
+		snap_mode = "coarse"
 		snap_rotation_step = 15.0
-	snap_grid_step = world_grid_size
+	if snap_mode in ["fine_on", "fine_off"]:
+		snap_mode = "fine"
+	elif snap_mode not in ["coarse", "fine"]:
+		snap_mode = "coarse"
+	# Coarse/Fine are now the two active snap modes. Restore the mode and the
+	# runtime snap state together so the UI cannot show Fine while the canvas
+	# still has snapping disabled.
+	snap_enabled = true
+	snap_grid_step = _snap_base_step()
 	if is_instance_valid(canvas_view):
 		canvas_view.set_snap_settings(snap_enabled, snap_grid_step, snap_rotation_step)
 		canvas_view.set_world_scale(world_grid_size)
@@ -1460,6 +1653,227 @@ func _serialize_points(points: Array) -> Array:
 	for point in points:
 		serialized.append([point.x, point.y])
 	return serialized
+
+
+func _serialize_bezier_points(points: Array) -> Array:
+	var serialized: Array = []
+	for point_data in points:
+		if not point_data is Dictionary:
+			continue
+		var point: Vector2 = point_data.get("position", Vector2.ZERO)
+		var handle_in: Vector2 = point_data.get("handle_in", Vector2.ZERO)
+		var handle_out: Vector2 = point_data.get("handle_out", Vector2.ZERO)
+		serialized.append({
+			"id": str(point_data.get("id", "")),
+			"position": _serialize_vector(point),
+			"mode": str(point_data.get("mode", "linear")),
+			"preserve_point": bool(point_data.get("preserve_point", false)),
+			"handle_source": str(point_data.get("handle_source", "auto")),
+			"handle_in": _serialize_vector(handle_in),
+			"handle_out": _serialize_vector(handle_out)
+		})
+	return serialized
+
+
+func _serialize_edges(edges: Array) -> Array:
+	var serialized: Array = []
+	for edge_data in edges:
+		if not edge_data is Dictionary:
+			continue
+		serialized.append({
+			"id": str(edge_data.get("id", "")),
+			"start_point_id": str(edge_data.get("start_point_id", "")),
+			"end_point_id": str(edge_data.get("end_point_id", "")),
+			"render_outline": bool(edge_data.get("render_outline", true))
+		})
+	return serialized
+
+
+func _serialize_chains(chains: Array) -> Array:
+	var serialized: Array = []
+	for chain_data in chains:
+		if not chain_data is Dictionary:
+			continue
+		serialized.append({
+			"id": str(chain_data.get("id", "")),
+			"point_ids": chain_data.get("point_ids", []).duplicate(),
+			"edge_ids": chain_data.get("edge_ids", []).duplicate(),
+			"closed": bool(chain_data.get("closed", false)),
+			"topology_role": str(chain_data.get("topology_role", "outer"))
+		})
+	return serialized
+
+
+func _deserialize_component_topology(component_data: Dictionary, legacy_points: Array[Vector2], legacy_closed: bool) -> Dictionary:
+	var raw_points = component_data.get("points", [])
+	var raw_edges = component_data.get("edges", [])
+	var raw_chains = component_data.get("chains", [])
+	if not raw_points is Array or not raw_edges is Array or not raw_chains is Array:
+		return _linear_topology_from_legacy_shape(legacy_points, legacy_closed)
+	if raw_points.is_empty() and not legacy_points.is_empty():
+		return _linear_topology_from_legacy_shape(legacy_points, legacy_closed)
+	var points: Array[Dictionary] = []
+	var known_point_ids: Dictionary = {}
+	for raw_point in raw_points:
+		if not raw_point is Dictionary:
+			continue
+		var point_id := str(raw_point.get("id", ""))
+		if point_id.is_empty() or known_point_ids.has(point_id):
+			continue
+		var point_mode := str(raw_point.get("mode", "linear"))
+		# Backward compatibility for workspaces saved while this mode was named Tip.
+		if point_mode == "tip":
+			point_mode = "corner"
+		if not point_mode in ["linear", "free", "aligned", "mirrored", "corner"]:
+			point_mode = "linear"
+		points.append({
+			"id": point_id,
+			"position": _deserialize_vector(raw_point.get("position", [0.0, 0.0]), Vector2.ZERO),
+			"mode": point_mode,
+			"preserve_point": bool(raw_point.get("preserve_point", point_mode == "corner")),
+			"handle_source": "manual" if str(raw_point.get("handle_source", "auto")) == "manual" else "auto",
+			"handle_in": _deserialize_vector(raw_point.get("handle_in", [0.0, 0.0]), Vector2.ZERO),
+			"handle_out": _deserialize_vector(raw_point.get("handle_out", [0.0, 0.0]), Vector2.ZERO)
+		})
+		known_point_ids[point_id] = true
+	if points.is_empty() and not raw_points.is_empty():
+		return _linear_topology_from_legacy_shape(legacy_points, legacy_closed)
+	var edges: Array[Dictionary] = []
+	var known_edge_ids: Dictionary = {}
+	for raw_edge in raw_edges:
+		if not raw_edge is Dictionary:
+			continue
+		var edge_id := str(raw_edge.get("id", ""))
+		var start_point_id := str(raw_edge.get("start_point_id", ""))
+		var end_point_id := str(raw_edge.get("end_point_id", ""))
+		if edge_id.is_empty() or known_edge_ids.has(edge_id) or not known_point_ids.has(start_point_id) or not known_point_ids.has(end_point_id) or start_point_id == end_point_id:
+			continue
+		edges.append({
+			"id": edge_id,
+			"start_point_id": start_point_id,
+			"end_point_id": end_point_id,
+			"render_outline": bool(raw_edge.get("render_outline", true))
+		})
+		known_edge_ids[edge_id] = true
+	var chains: Array[Dictionary] = []
+	for raw_chain in raw_chains:
+		if not raw_chain is Dictionary:
+			continue
+		var point_ids: Array = []
+		for point_id_value in raw_chain.get("point_ids", []):
+			var point_id := str(point_id_value)
+			if known_point_ids.has(point_id):
+				point_ids.append(point_id)
+		if point_ids.is_empty():
+			continue
+		var edge_ids: Array = []
+		for edge_id_value in raw_chain.get("edge_ids", []):
+			var edge_id := str(edge_id_value)
+			if known_edge_ids.has(edge_id):
+				edge_ids.append(edge_id)
+		var topology_role := str(raw_chain.get("topology_role", "outer"))
+		if not topology_role in ["outer", "hole", "cut", "seam"]:
+			topology_role = "outer"
+		chains.append({
+			"id": str(raw_chain.get("id", "chain_%d" % (chains.size() + 1))),
+			"point_ids": point_ids,
+			"edge_ids": edge_ids,
+			"closed": bool(raw_chain.get("closed", false)) and point_ids.size() >= 3,
+			"topology_role": topology_role
+		})
+	if chains.is_empty() and not points.is_empty():
+		return _linear_topology_from_points(points, legacy_closed)
+	BezierGeometry.resolve_auto_handles(points, chains)
+	return {"points": points, "edges": edges, "chains": chains}
+
+
+func _linear_topology_from_legacy_shape(legacy_points: Array[Vector2], legacy_closed: bool) -> Dictionary:
+	var points: Array[Dictionary] = []
+	for point_index in range(legacy_points.size()):
+		points.append({
+			"id": "point_%d" % (point_index + 1),
+			"position": legacy_points[point_index],
+			"mode": "linear",
+			"preserve_point": false,
+			"handle_source": "auto",
+			"handle_in": Vector2.ZERO,
+			"handle_out": Vector2.ZERO
+		})
+	return _linear_topology_from_points(points, legacy_closed)
+
+
+func _linear_topology_from_points(points: Array[Dictionary], closed: bool) -> Dictionary:
+	var point_ids: Array = []
+	for point in points:
+		point_ids.append(str(point["id"]))
+	var edges: Array[Dictionary] = []
+	for point_index in range(maxi(point_ids.size() - 1, 0)):
+		edges.append({
+			"id": "edge_%d" % (edges.size() + 1),
+			"start_point_id": point_ids[point_index],
+			"end_point_id": point_ids[point_index + 1],
+			"render_outline": true
+		})
+	var chain_closed := closed and point_ids.size() >= 3
+	if chain_closed:
+		edges.append({
+			"id": "edge_%d" % (edges.size() + 1),
+			"start_point_id": point_ids[point_ids.size() - 1],
+			"end_point_id": point_ids[0],
+			"render_outline": true
+		})
+	var chains: Array[Dictionary] = []
+	if not point_ids.is_empty():
+		var edge_ids: Array = []
+		for edge in edges:
+			edge_ids.append(str(edge["id"]))
+		chains.append({
+			"id": "chain_1",
+			"point_ids": point_ids,
+			"edge_ids": edge_ids,
+			"closed": chain_closed,
+			"topology_role": "outer"
+		})
+	return {"points": points, "edges": edges, "chains": chains}
+
+
+func _legacy_projection_from_topology(topology: Dictionary, fallback_points: Array[Vector2], fallback_closed: bool) -> Dictionary:
+	var points_by_id: Dictionary = {}
+	for point in topology.get("points", []):
+		if point is Dictionary:
+			points_by_id[str(point.get("id", ""))] = point.get("position", Vector2.ZERO)
+	for chain in topology.get("chains", []):
+		if not chain is Dictionary or str(chain.get("topology_role", "outer")) != "outer":
+			continue
+		var projected_points: Array[Vector2] = []
+		for point_id_value in chain.get("point_ids", []):
+			var point_id := str(point_id_value)
+			if points_by_id.has(point_id):
+				projected_points.append(points_by_id[point_id])
+		if not projected_points.is_empty():
+			return {"points": projected_points, "closed": bool(chain.get("closed", false))}
+	return {"points": fallback_points.duplicate(), "closed": fallback_closed}
+
+
+func _sync_linear_topology_from_legacy_shape(component: Dictionary) -> void:
+	var legacy_points: Array[Vector2] = component.get("outer_shape", [])
+	var legacy_closed := bool(component.get("closed", legacy_points.size() >= 3))
+	var existing_points: Array = component.get("points", [])
+	var existing_chains: Array = component.get("chains", [])
+	if existing_points.size() == legacy_points.size() and not existing_points.is_empty() and not existing_chains.is_empty():
+		var outer_chain: Dictionary = existing_chains[0]
+		var outer_point_ids: Array = outer_chain.get("point_ids", [])
+		if outer_point_ids.size() == legacy_points.size():
+			for point_index in range(legacy_points.size()):
+				var point_data: Dictionary = existing_points[point_index]
+				point_data["position"] = legacy_points[point_index]
+			outer_chain["closed"] = legacy_closed
+			component["closed"] = legacy_closed
+			return
+	var topology := _linear_topology_from_legacy_shape(legacy_points, legacy_closed)
+	component["points"] = topology["points"]
+	component["edges"] = topology["edges"]
+	component["chains"] = topology["chains"]
 
 
 func _default_component_transform() -> Dictionary:
@@ -1629,6 +2043,7 @@ func _create_paper_menu() -> MenuButton:
 	paper_menu.custom_minimum_size = Vector2(118, 32)
 	paper_menu.focus_mode = Control.FOCUS_NONE
 	var paper_popup := paper_menu.get_popup()
+	_style_popup_menu(paper_popup)
 	paper_popup.add_item(PAPER_NONE_LABEL, PAPER_NONE_LEVEL)
 	for paper_index in range(PAPER_LABELS.size()):
 		paper_popup.add_item(PAPER_LABELS[paper_index], paper_index)
@@ -1662,6 +2077,7 @@ func _paper_frame_size(level: int) -> Vector2:
 func _render_context_bar() -> void:
 	if not is_instance_valid(context_bar):
 		return
+	_update_context_action_button()
 	_clear(context_bar)
 	if active_module == "Export":
 		var validate_button := Button.new()
@@ -1691,54 +2107,54 @@ func _render_context_bar() -> void:
 		_render_info_bar()
 		return
 	if selected_component_id.is_empty():
-		snap_button = Button.new()
-		snap_button.text = "Snap: %s  ▼" % ("On" if snap_enabled else "Off")
-		snap_button.custom_minimum_size = Vector2(112, 32)
-		snap_button.focus_mode = Control.FOCUS_NONE
-		snap_button.pressed.connect(_toggle_snap_popup)
-		context_bar.add_child(snap_button)
-		context_bar.add_child(_create_paper_menu())
 		active_draw_tool = ""
 		_render_info_bar()
 		return
 	var draw_menu := MenuButton.new()
-	draw_menu.text = "⌘1  Draw  ▼"
-	draw_menu.custom_minimum_size = Vector2(88, 32)
+	draw_menu.text = "⌘1  Draw Point  ▼"
+	draw_menu.custom_minimum_size = Vector2(156, 32)
 	draw_menu.focus_mode = Control.FOCUS_NONE
 	draw_menu.toggle_mode = true
 	draw_menu.button_pressed = active_state == "draw"
-	draw_menu.pressed.connect(_activate_draw_state)
-	var draw_popup := draw_menu.get_popup()
-	draw_popup.add_item("1: Line", 0)
-	draw_popup.id_pressed.connect(_on_draw_menu_id)
+	draw_menu.get_popup().add_item("1: Linear", 0)
+	draw_menu.get_popup().add_item("2: Aligned", 1)
+	draw_menu.get_popup().add_item("3: Free", 2)
+	draw_menu.get_popup().add_item("4: Mirrored", 3)
+	draw_menu.get_popup().add_item("5: Corner", 4)
+	_style_popup_menu(draw_menu.get_popup())
+	draw_menu.get_popup().id_pressed.connect(_on_draw_menu_id)
 	context_bar.add_child(draw_menu)
-	var edit_menu := MenuButton.new()
-	edit_menu.text = "⌘2  Edit  ▼"
-	edit_menu.custom_minimum_size = Vector2(88, 32)
-	edit_menu.focus_mode = Control.FOCUS_NONE
-	edit_menu.toggle_mode = true
-	edit_menu.button_pressed = active_state == "edit"
-	edit_menu.pressed.connect(_activate_edit_state)
-	var edit_popup := edit_menu.get_popup()
-	edit_popup.add_item("1: Select", 0)
-	edit_popup.add_item("2: Add", 1)
-	edit_popup.add_item("3: Move", 2)
-	edit_popup.add_item("4: Delete", 3)
-	edit_popup.id_pressed.connect(_on_edit_menu_id)
-	context_bar.add_child(edit_menu)
-	var transform_menu := MenuButton.new()
-	transform_menu.text = "⌘3  Transform  ▼"
-	transform_menu.custom_minimum_size = Vector2(118, 32)
-	transform_menu.focus_mode = Control.FOCUS_NONE
-	transform_menu.toggle_mode = true
-	transform_menu.button_pressed = active_state == "transform"
-	transform_menu.pressed.connect(_activate_transform_state)
-	var transform_popup := transform_menu.get_popup()
-	transform_popup.add_item("1: Translate", 0)
-	transform_popup.add_item("2: Rotate", 1)
-	transform_popup.add_item("3: Scale", 2)
-	transform_popup.id_pressed.connect(_on_transform_menu_id)
-	context_bar.add_child(transform_menu)
+	var edit_point_menu := MenuButton.new()
+	edit_point_menu.text = "⌘2  Edit Point  ▼"
+	edit_point_menu.custom_minimum_size = Vector2(138, 32)
+	edit_point_menu.focus_mode = Control.FOCUS_NONE
+	edit_point_menu.toggle_mode = true
+	edit_point_menu.button_pressed = active_state == "edit" and active_edit_mode == "point"
+	edit_point_menu.get_popup().add_item("1: Select", 0)
+	edit_point_menu.get_popup().add_item("2: Bezier Handle", 1)
+	_style_popup_menu(edit_point_menu.get_popup())
+	edit_point_menu.get_popup().id_pressed.connect(_on_edit_menu_id)
+	context_bar.add_child(edit_point_menu)
+	var edit_edge_menu := MenuButton.new()
+	edit_edge_menu.text = "⌘3  Edit Edge  ▼"
+	edit_edge_menu.custom_minimum_size = Vector2(136, 32)
+	edit_edge_menu.focus_mode = Control.FOCUS_NONE
+	edit_edge_menu.toggle_mode = true
+	edit_edge_menu.button_pressed = active_state == "edit" and active_edit_mode == "edge"
+	edit_edge_menu.get_popup().add_item("Select Edge", 0)
+	_style_popup_menu(edit_edge_menu.get_popup())
+	edit_edge_menu.get_popup().id_pressed.connect(_on_edit_edge_menu_id)
+	context_bar.add_child(edit_edge_menu)
+	var edit_face_menu := MenuButton.new()
+	edit_face_menu.text = "⌘4  Edit Face  ▼"
+	edit_face_menu.custom_minimum_size = Vector2(134, 32)
+	edit_face_menu.focus_mode = Control.FOCUS_NONE
+	edit_face_menu.toggle_mode = true
+	edit_face_menu.button_pressed = active_state == "edit" and active_edit_mode == "face"
+	edit_face_menu.get_popup().add_item("Move Face", 0)
+	_style_popup_menu(edit_face_menu.get_popup())
+	edit_face_menu.get_popup().id_pressed.connect(_on_edit_face_menu_id)
+	context_bar.add_child(edit_face_menu)
 
 
 func _render_material_context_bar() -> void:
@@ -1778,6 +2194,7 @@ func _render_texture_context_bar() -> void:
 		preview_menu.custom_minimum_size = Vector2(132, 32)
 		preview_menu.focus_mode = Control.FOCUS_NONE
 		var preview_popup := preview_menu.get_popup()
+		_style_popup_menu(preview_popup)
 		preview_popup.add_item("1: Original", 0)
 		preview_popup.add_item("2: White to Alpha", 1)
 		preview_popup.id_pressed.connect(_on_import_preview_menu_id)
@@ -1794,6 +2211,7 @@ func _render_texture_context_bar() -> void:
 	origin_menu.custom_minimum_size = Vector2(150, 32)
 	origin_menu.focus_mode = Control.FOCUS_NONE
 	var origin_popup := origin_menu.get_popup()
+	_style_popup_menu(origin_popup)
 	origin_popup.add_item("Bottom Left", 0)
 	origin_popup.add_item("Top Left", 1)
 	origin_popup.add_item("Center", 2)
@@ -2125,18 +2543,27 @@ func _texture_output_state(texture: Dictionary) -> String:
 
 
 func _on_draw_menu_id(id: int) -> void:
-	if id == 0:
-		_activate_draw_line()
+	if id < 0 or id > 4:
+		return
+	_activate_draw_state()
+	_set_draw_point_mode(_draw_point_mode_from_menu_id(id))
 
 
 func _on_edit_menu_id(id: int) -> void:
-	_activate_edit_state()
-	if id == 1:
-		_set_edit_mode("add")
-	elif id == 2:
-		_set_edit_mode("move")
-	elif id == 3:
-		_set_edit_mode("delete")
+	if id == 0:
+		_activate_edit_point_state(false)
+	elif id == 1:
+		_activate_edit_point_state(true)
+
+
+func _on_edit_edge_menu_id(id: int) -> void:
+	if id == 0:
+		_activate_edit_edge_state()
+
+
+func _on_edit_face_menu_id(id: int) -> void:
+	if id == 0:
+		_activate_edit_face_state()
 
 
 func _on_transform_menu_id(id: int) -> void:
@@ -2149,10 +2576,29 @@ func _on_transform_menu_id(id: int) -> void:
 
 func _activate_draw_state() -> void:
 	_set_active_state("draw")
+	canvas_view.set_draw_point_mode(active_draw_point_mode)
+
+
+func _draw_point_mode_from_key(keycode: int) -> String:
+	return ["linear", "aligned", "free", "mirrored", "corner"][keycode - KEY_1]
+
+
+func _draw_point_mode_from_menu_id(id: int) -> String:
+	return ["linear", "aligned", "free", "mirrored", "corner"][id]
+
+
+func _set_draw_point_mode(mode: String) -> void:
+	if mode not in ["linear", "aligned", "free", "mirrored", "corner"]:
+		return
+	active_draw_point_mode = mode
+	if is_instance_valid(canvas_view):
+		canvas_view.set_draw_point_mode(mode)
+	_render_context_bar()
+	_render_info_bar()
 
 
 func _activate_draw_line() -> void:
-	active_draw_tool = "line"
+	active_draw_tool = "point"
 	canvas_view.set_interaction_state("draw")
 	canvas_view.set_tool_mode(active_draw_tool)
 	_render_info_bar()
@@ -2160,12 +2606,36 @@ func _activate_draw_line() -> void:
 
 func _set_edit_mode(mode: String) -> void:
 	active_edit_mode = mode
+	if mode != "edge":
+		selected_edge_id = ""
+	if mode != "point":
+		selected_point_index = -1
+		edit_bezier_handles = false
 	canvas_view.set_edit_mode(active_edit_mode)
+	canvas_view.set_edit_handles_enabled(edit_bezier_handles)
+	canvas_view.set_selected_edge_id(selected_edge_id)
 	_render_info_bar()
 
 
 func _activate_edit_state() -> void:
+	_activate_edit_point_state()
+
+
+func _activate_edit_point_state(handle_editing := false) -> void:
+	edit_bezier_handles = handle_editing
 	_set_active_state("edit")
+	_set_edit_mode("point")
+	canvas_view.set_edit_handles_enabled(edit_bezier_handles)
+
+
+func _activate_edit_edge_state() -> void:
+	_set_active_state("edit")
+	_set_edit_mode("edge")
+
+
+func _activate_edit_face_state() -> void:
+	_set_active_state("edit")
+	_set_edit_mode("face")
 
 
 func _activate_transform_state() -> void:
@@ -2183,19 +2653,19 @@ func _set_active_state(state: String) -> void:
 		return
 	active_state = state
 	if state == "draw":
-		active_draw_tool = "line"
-		active_edit_mode = "select"
+		active_draw_tool = "point"
+		active_edit_mode = "point"
 		canvas_view.set_interaction_state("draw")
 		canvas_view.set_tool_mode(active_draw_tool)
+		canvas_view.set_draw_point_mode(active_draw_point_mode)
 	else:
 		active_draw_tool = ""
-		active_edit_mode = "select"
+		if active_edit_mode not in ["point", "edge", "face"]:
+			active_edit_mode = "point"
 		active_transform_mode = "transform"
-		canvas_view.set_interaction_state("edit" if state == "edit" else "transform")
+		canvas_view.set_interaction_state(state)
 		if state == "edit":
 			canvas_view.set_edit_mode(active_edit_mode)
-		else:
-			canvas_view.set_transform_mode(active_transform_mode)
 		canvas_view.set_tool_mode("")
 	_render_context_bar()
 	_render_info_bar()
@@ -2204,6 +2674,7 @@ func _set_active_state(state: String) -> void:
 func _render_info_bar() -> void:
 	if not is_instance_valid(info_bar):
 		return
+	_ensure_default_edit_point_state()
 	if is_instance_valid(active_material_status_label):
 		if active_module == "Style" and not selected_material_id.is_empty():
 			var active_material := _get_material(selected_material_id)
@@ -2242,22 +2713,46 @@ func _render_info_bar() -> void:
 			info_bar.add_child(asset_state_label)
 		return
 	var state_label := Label.new()
-	state_label.text = "State: %s" % ("Draw" if active_state == "draw" else "Edit" if active_state == "edit" else "Transform" if active_state == "transform" else "Default")
+	var state_name := "Default"
+	if active_state == "draw":
+		state_name = "Draw Point"
+	elif active_state == "edit" and active_edit_mode == "point":
+		state_name = "Edit Point"
+	elif active_state == "edit" and active_edit_mode == "edge":
+		state_name = "Edit Edge"
+	elif active_state == "edit" and active_edit_mode == "face":
+		state_name = "Edit Face"
+	state_label.text = "State: %s" % state_name
 	info_bar.add_child(state_label)
 	if active_state == "draw":
-		_add_info_option("1: Line")
-	elif active_state == "edit":
-		_add_info_option("1: Select")
-		_add_info_option("2: Add")
-		_add_info_option("3: Move")
-		_add_info_option("4: Delete")
-	elif active_state == "transform":
-		_add_info_option("1: Translate")
-		_add_info_option("2: Rotate")
-		_add_info_option("3: Scale")
+		_add_info_option("Click: Add %s Point" % _draw_point_mode_label(active_draw_point_mode))
+		_add_info_option("1: Linear  2: Aligned  3: Free  4: Mirrored  5: Corner")
+	elif active_state == "edit" and active_edit_mode == "point":
+		_add_info_option("Drag: Bezier Handle" if edit_bezier_handles else "Click: Select")
+		_add_info_option("1: Select  2: Bezier Handle")
+	elif active_state == "edit" and active_edit_mode == "edge":
+		_add_info_option("Click: Select Edge")
+	elif active_state == "edit" and active_edit_mode == "face":
+		_add_info_option("Drag: Move Face")
 	else:
-		_add_info_option("⌘1: Draw")
-		_add_info_option("⌘2: Edit")
+		_add_info_option("⌘1: Draw Point")
+		_add_info_option("⌘2: Edit Point")
+		_add_info_option("⌘3: Edit Edge")
+		_add_info_option("⌘4: Edit Face")
+
+
+func _draw_point_mode_label(mode: String) -> String:
+	match mode:
+		"aligned":
+			return "Aligned"
+		"free":
+			return "Free"
+		"mirrored":
+			return "Mirrored"
+		"corner":
+			return "Corner"
+		_:
+			return "Linear"
 
 
 func _validate_selected_export_asset() -> void:
@@ -2573,6 +3068,10 @@ func _save_reference_image_result(reference_image_result: Image) -> void:
 		return
 	var reference_image := _normalize_reference_image(asset.get("reference_image", {}))
 	reference_image["file"] = reference_filename
+	# Every newly loaded reference starts from a neutral transform. The
+	# selected target height and pivot remain unchanged.
+	reference_image["position"] = Vector2.ZERO
+	reference_image["scale"] = 1.0
 	_record_direct_change()
 	asset["reference_image"] = reference_image
 	_render_inspector()
@@ -3253,6 +3752,7 @@ func _open_component_dialog(asset_id: String) -> void:
 	selected_element_id = ""
 	component_name_input.text = ""
 	component_dialog.set_meta("asset_id", asset_id)
+	canvas_view.set_navigation_locked(true)
 	component_dialog.popup_centered()
 	component_name_input.grab_focus()
 
@@ -3261,11 +3761,16 @@ func _submit_component_name(_submitted_text: String) -> void:
 	_confirm_component_creation()
 
 
+func _on_component_dialog_canceled() -> void:
+	canvas_view.set_navigation_locked(false)
+
+
 func _confirm_component_creation() -> void:
 	var asset_id := str(component_dialog.get_meta("asset_id", ""))
 	var asset := _get_asset(asset_id)
 	if asset.is_empty():
 		component_dialog.hide()
+		canvas_view.set_navigation_locked(false)
 		return
 	_record_direct_change()
 	var component_name := component_name_input.text.strip_edges()
@@ -3276,6 +3781,9 @@ func _confirm_component_creation() -> void:
 	asset["components"].append({
 		"id": component_id,
 		"name": component_name,
+		"points": [],
+		"edges": [],
+		"chains": [],
 		"outer_shape": [],
 		"closed": false,
 		"transform": _default_component_transform(),
@@ -3290,6 +3798,7 @@ func _confirm_component_creation() -> void:
 	active_state = ""
 	expanded_assets[asset_id] = true
 	component_dialog.hide()
+	canvas_view.set_navigation_locked(false)
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
@@ -3314,6 +3823,8 @@ func _select_component(asset_id: String, component_id: String) -> void:
 	_set_create_submodule_context("Asset")
 	selected_asset_id = asset_id
 	selected_component_id = component_id
+	selected_edge_id = ""
+	selected_point_index = -1
 	selected_texture_id = ""
 	selected_element_id = ""
 	selected_material_id = ""
@@ -3509,6 +4020,7 @@ func _render_material_inspector() -> void:
 	opacity_field.min_value = 0.0
 	opacity_field.max_value = 1.0
 	opacity_field.step = 0.01
+	opacity_field.custom_arrow_step = 0.1
 	opacity_field.custom_minimum_size = Vector2(0, 26)
 	opacity_field.set_value_no_signal(clampf(float(material_data.get("opacity", 1.0)), 0.0, 1.0))
 	opacity_field.value_changed.connect(_on_material_opacity_changed)
@@ -3584,6 +4096,7 @@ func _add_material_mapping_field(grid: GridContainer, label_text: String, value:
 	field.min_value = -100.0 if property_name.begins_with("offset") else 0.01
 	field.max_value = 100.0
 	field.step = 0.01
+	field.custom_arrow_step = 0.1
 	field.custom_minimum_size = Vector2(96, 26)
 	field.set_value_no_signal(value)
 	field.value_changed.connect(_on_material_mapping_changed.bind(property_name))
@@ -3708,6 +4221,7 @@ func _on_material_opacity_changed(value: float) -> void:
 
 
 func _render_inspector() -> void:
+	_ensure_default_edit_point_state()
 	_clear(inspector_content)
 	transform_fields.clear()
 	if active_module == "Export":
@@ -3774,6 +4288,7 @@ func _render_inspector() -> void:
 			threshold_field.min_value = 0.0
 			threshold_field.max_value = 1.0
 			threshold_field.step = 0.01
+			threshold_field.custom_arrow_step = 0.1
 			threshold_field.custom_minimum_size = Vector2(0, 26)
 			threshold_field.add_theme_font_size_override("font_size", 11)
 			pending_import_threshold = clampf(float(pipeline.get("threshold", 0.05)), 0.0, 1.0)
@@ -3828,7 +4343,8 @@ func _render_inspector() -> void:
 		var target_height := SpinBox.new()
 		target_height.min_value = 0.01
 		target_height.max_value = 100000.0
-		target_height.step = 0.1
+		target_height.step = 0.01
+		target_height.custom_arrow_step = 0.1
 		target_height.custom_minimum_size = Vector2(0, 26)
 		target_height.value = float(reference_image.get("target_height_cm", 13.0))
 		target_height.value_changed.connect(_on_reference_image_target_height_changed)
@@ -3862,6 +4378,7 @@ func _render_inspector() -> void:
 			reference_opacity.min_value = 0.0
 			reference_opacity.max_value = 1.0
 			reference_opacity.step = 0.01
+			reference_opacity.custom_arrow_step = 0.1
 			reference_opacity.custom_minimum_size = Vector2(0, 26)
 			reference_opacity.value = float(reference_image.get("opacity", 0.5))
 			reference_opacity.value_changed.connect(_on_reference_image_property_changed.bind("opacity"))
@@ -3880,6 +4397,49 @@ func _render_inspector() -> void:
 	var component := _get_component(asset, selected_component_id)
 	if component.is_empty():
 		return
+	if not selected_edge_id.is_empty():
+		var selected_edge := _get_edge(component, selected_edge_id)
+		if not selected_edge.is_empty():
+			inspector_content.add_child(_create_inspector_field_label("Edge"))
+			inspector_content.add_child(_create_inspector_section("Edge Settings"))
+			var render_outline := CheckButton.new()
+			render_outline.text = "Render Outline"
+			render_outline.custom_minimum_size = Vector2(0, 26)
+			render_outline.button_pressed = bool(selected_edge.get("render_outline", true))
+			render_outline.toggled.connect(_on_edge_render_outline_changed)
+			inspector_content.add_child(render_outline)
+			return
+	if active_edit_mode == "point" and selected_point_index >= 0:
+		var selected_point := _get_component_point(component, selected_point_index)
+		if not selected_point.is_empty():
+			inspector_content.add_child(_create_inspector_field_label("Point"))
+			inspector_content.add_child(_create_inspector_section("Point Settings"))
+			var point_mode := OptionButton.new()
+			point_mode.custom_minimum_size = Vector2(0, 26)
+			point_mode.add_item("Linear")
+			point_mode.set_item_metadata(0, "linear")
+			point_mode.add_item("Aligned")
+			point_mode.set_item_metadata(1, "aligned")
+			point_mode.add_item("Free")
+			point_mode.set_item_metadata(2, "free")
+			point_mode.add_item("Mirrored")
+			point_mode.set_item_metadata(3, "mirrored")
+			point_mode.add_item("Corner")
+			point_mode.set_item_metadata(4, "corner")
+			for mode_index in range(point_mode.item_count):
+				if str(point_mode.get_item_metadata(mode_index)) == str(selected_point.get("mode", "linear")):
+					point_mode.select(mode_index)
+					break
+			point_mode.item_selected.connect(_on_point_mode_selected.bind(point_mode))
+			inspector_content.add_child(point_mode)
+			var preserve_point := CheckBox.new()
+			preserve_point.text = "Preserve Point for Sampling"
+			preserve_point.button_pressed = bool(selected_point.get("preserve_point", str(selected_point.get("mode", "linear")) == "corner"))
+			preserve_point.toggled.connect(_on_preserve_point_changed)
+			inspector_content.add_child(preserve_point)
+			var handle_source := _create_inspector_field_label("Handles: %s" % ("Manual" if str(selected_point.get("handle_source", "auto")) == "manual" else "Auto"))
+			inspector_content.add_child(handle_source)
+			return
 	inspector_content.add_child(_create_inspector_field_label("Name"))
 	component_name_editor = _create_name_editor(str(component["name"]), "Component name")
 	component_name_editor.text_submitted.connect(_rename_selected_component)
@@ -3923,8 +4483,10 @@ func _render_inspector() -> void:
 	z_index_field.add_theme_font_size_override("font_size", 11)
 	z_index_field.value_changed.connect(_on_component_z_index_changed)
 	inspector_content.add_child(z_index_field)
+	inspector_content.add_child(_create_inspector_section("Material"))
 	var material_option := OptionButton.new()
 	material_option.custom_minimum_size = Vector2(0, 26)
+	inspector_content.add_child(_create_inspector_field_label("Assigned Material"))
 	material_option.add_item("None")
 	material_option.set_item_metadata(0, "")
 	var sorted_materials: Array[Dictionary] = materials.duplicate(true)
@@ -3951,6 +4513,46 @@ func _on_component_material_selected(index: int, option: OptionButton) -> void:
 	_record_direct_change()
 	component["material_id"] = material_id
 	_render_outliner()
+
+
+func _on_edge_render_outline_changed(enabled: bool) -> void:
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	var edge := _get_edge(component, selected_edge_id)
+	if edge.is_empty():
+		return
+	_record_direct_change()
+	edge["render_outline"] = enabled
+	canvas_view.set_bezier_geometry(component.get("points", []), component.get("edges", []), component.get("chains", []))
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _on_point_mode_selected(index: int, option: OptionButton) -> void:
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	var point := _get_component_point(component, selected_point_index)
+	if point.is_empty() or index < 0 or index >= option.item_count:
+		return
+	_record_direct_change()
+	point["mode"] = str(option.get_item_metadata(index))
+	if point["mode"] == "corner":
+		point["preserve_point"] = true
+	point["handle_source"] = "auto"
+	BezierGeometry.resolve_auto_handles(component.get("points", []), component.get("chains", []))
+	_update_legacy_projection(component)
+	canvas_view.set_bezier_geometry(component.get("points", []), component.get("edges", []), component.get("chains", []))
+	_render_inspector()
+	_render_canvas_context()
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _on_preserve_point_changed(enabled: bool) -> void:
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	var point := _get_component_point(component, selected_point_index)
+	if point.is_empty():
+		return
+	_record_direct_change()
+	point["preserve_point"] = enabled
 	_render_inspector()
 	_render_canvas_context()
 
@@ -3974,7 +4576,10 @@ func _add_reference_image_field(grid: GridContainer, label_text: String, value: 
 	var field := SpinBox.new()
 	field.min_value = 0.01 if property_name == "scale" else -100000.0
 	field.max_value = 100000.0
-	field.step = 0.01 if property_name == "scale" else 1.0
+	# Use tenths for the arrow buttons while retaining hundredth precision in
+	# the editable text field.
+	field.step = 0.01
+	field.custom_arrow_step = 0.1
 	field.value = value
 	field.custom_minimum_size = Vector2(96, 26)
 	field.add_theme_font_size_override("font_size", 11)
@@ -3992,7 +4597,10 @@ func _add_transform_field(grid: GridContainer, label_text: String, value: float,
 	var field := SpinBox.new()
 	field.min_value = -100000.0
 	field.max_value = 100000.0
-	field.step = step
+	# Arrow buttons move in tenths; the embedded LineEdit still accepts
+	# hundredths for precise values such as 0.01.
+	field.step = 0.01
+	field.custom_arrow_step = 0.1
 	field.value = value
 	field.custom_minimum_size = Vector2(96, 26)
 	field.add_theme_font_size_override("font_size", 11)
@@ -4278,6 +4886,7 @@ func _render_lookdev_canvas() -> void:
 
 
 func _render_canvas_context() -> void:
+	_ensure_default_edit_point_state()
 	_render_context_bar()
 	_render_info_bar()
 	if not is_instance_valid(canvas_context_label):
@@ -4366,6 +4975,7 @@ func _render_canvas_context() -> void:
 		canvas_view.set_component_transform({})
 		canvas_view.set_reference_shapes([])
 		canvas_view.set_outer_shape([])
+		canvas_view.set_bezier_geometry([], [], [])
 		return
 	_set_reference_image_canvas(asset)
 	if selected_component_id.is_empty():
@@ -4378,6 +4988,7 @@ func _render_canvas_context() -> void:
 		canvas_view.set_component_material(null)
 		canvas_view.set_reference_shapes(_build_reference_shapes(asset))
 		canvas_view.set_outer_shape([])
+		canvas_view.set_bezier_geometry([], [], [])
 		canvas_view.call_deferred("grab_focus")
 		return
 	var component := _get_component(asset, selected_component_id)
@@ -4385,16 +4996,18 @@ func _render_canvas_context() -> void:
 		canvas_context_label.text = "Asset: %s" % str(asset["name"])
 		canvas_view.set_context(str(asset["name"]))
 		canvas_view.set_interaction_state("asset")
-		canvas_view.set_paper_frame(_paper_frame_size(paper_level) if paper_level >= 0 else Vector2.ZERO, paper_level >= 0)
+		canvas_view.set_paper_frame(Vector2.ZERO, false)
 		canvas_view.set_tool_mode("")
 		canvas_view.set_component_transform({})
 		canvas_view.set_reference_shapes(_build_reference_shapes(asset))
 		canvas_view.set_outer_shape([])
+		canvas_view.set_bezier_geometry([], [], [])
 		canvas_view.call_deferred("grab_focus")
 		return
 	canvas_context_label.text = "Component: %s" % str(component["name"])
 	canvas_view.set_context(str(component["name"]))
 	canvas_view.set_interaction_state(active_state)
+	canvas_view.set_paper_frame(Vector2.ZERO, false)
 	var component_transform: Dictionary = component.get("transform", _default_component_transform()).duplicate(true)
 	component_transform["visibility"] = bool(asset.get("visibility", true)) and bool(component.get("visibility", true))
 	component_transform["z_index"] = int(component.get("z_index", 0))
@@ -4405,8 +5018,11 @@ func _render_canvas_context() -> void:
 	else:
 		canvas_view.set_component_material(_load_material_canvas_texture(component_material), component_material.get("tint", Color.WHITE), float(component_material.get("opacity", 1.0)), component_material.get("mapping_scale", Vector2.ONE), component_material.get("mapping_offset", Vector2.ZERO), _material_wrap_mode(component_material))
 	canvas_view.set_reference_shapes(_build_reference_shapes(asset, selected_component_id))
+	BezierGeometry.resolve_auto_handles(component.get("points", []), component.get("chains", []))
 	var component_closed := bool(component.get("closed", component["outer_shape"].size() >= 3))
 	canvas_view.set_outer_shape(component["outer_shape"], component_closed)
+	canvas_view.set_bezier_geometry(component.get("points", []), component.get("edges", []), component.get("chains", []))
+	canvas_view.set_selected_edge_id(selected_edge_id)
 	canvas_view.call_deferred("grab_focus")
 	if active_state == "draw" and not component_closed:
 		canvas_view.set_line_draft(component["outer_shape"])
@@ -4445,6 +5061,9 @@ func _build_reference_shapes(asset: Dictionary, excluded_component_id := "") -> 
 		shapes.append({
 			"id": str(component["id"]),
 			"points": component["outer_shape"].duplicate(),
+			"bezier_points": component.get("points", []).duplicate(true),
+			"edges": component.get("edges", []).duplicate(true),
+			"chains": component.get("chains", []).duplicate(true),
 			"closed": bool(component.get("closed", component["outer_shape"].size() >= 3)),
 			"transform": component.get("transform", _default_component_transform()).duplicate(true),
 			"visibility": asset_is_visible and bool(component.get("visibility", true)),
@@ -4461,7 +5080,135 @@ func _on_line_shape_changed(points: Array[Vector2], closed: bool) -> void:
 	_record_direct_change()
 	component["outer_shape"] = points.duplicate()
 	component["closed"] = closed
+	_sync_linear_topology_from_legacy_shape(component)
 	canvas_view.set_outer_shape(points, closed)
+	canvas_view.set_bezier_geometry(component.get("points", []), component.get("edges", []), component.get("chains", []))
+
+
+func _on_bezier_point_added(position: Vector2, point_mode: String = "linear", drawn_handle_out: Vector2 = Vector2.ZERO) -> void:
+	var asset := _get_asset(selected_asset_id)
+	var component := _get_component(asset, selected_component_id)
+	if component.is_empty():
+		return
+	_record_direct_change()
+	var points: Array = component.get("points", [])
+	var edges: Array = component.get("edges", [])
+	var chains: Array = component.get("chains", [])
+	if chains.is_empty() or bool(chains.back().get("closed", false)):
+		chains.append({
+			"id": "chain_%d" % (chains.size() + 1),
+			"point_ids": [],
+			"edge_ids": [],
+			"closed": false,
+			"topology_role": "outer"
+		})
+	var active_chain: Dictionary = chains.back()
+	var point_id := "point_%d" % (points.size() + 1)
+	var resolved_point_mode := point_mode if point_mode in ["linear", "aligned", "free", "mirrored", "corner"] else active_draw_point_mode
+	var new_point := {
+		"id": point_id,
+		"position": position,
+		"mode": resolved_point_mode,
+		"preserve_point": resolved_point_mode == "corner",
+		"handle_source": "auto",
+		"handle_in": Vector2.ZERO,
+		"handle_out": Vector2.ZERO
+	}
+	points.append(new_point)
+	var point_ids: Array = active_chain.get("point_ids", [])
+	var edge_ids: Array = active_chain.get("edge_ids", [])
+	if not point_ids.is_empty():
+		var edge_id := "edge_%d" % (edges.size() + 1)
+		edges.append({
+			"id": edge_id,
+			"start_point_id": str(point_ids.back()),
+			"end_point_id": point_id,
+			"render_outline": true
+		})
+		edge_ids.append(edge_id)
+	point_ids.append(point_id)
+	active_chain["point_ids"] = point_ids
+	active_chain["edge_ids"] = edge_ids
+	component["points"] = points
+	component["edges"] = edges
+	component["chains"] = chains
+	BezierGeometry.resolve_auto_handles(points, chains)
+	if resolved_point_mode != "linear" and not is_zero_approx(drawn_handle_out.length_squared()):
+		new_point["handle_source"] = "manual"
+		new_point["handle_out"] = drawn_handle_out
+		var automatic_in: Vector2 = new_point.get("handle_in", Vector2.ZERO)
+		if resolved_point_mode == "mirrored":
+			new_point["handle_in"] = -drawn_handle_out
+		elif resolved_point_mode == "aligned":
+			var incoming_length := automatic_in.length()
+			if is_zero_approx(incoming_length):
+				incoming_length = drawn_handle_out.length()
+			new_point["handle_in"] = -drawn_handle_out.normalized() * incoming_length
+	_update_legacy_projection(component)
+	canvas_view.set_outer_shape(component["outer_shape"], bool(component["closed"]))
+	canvas_view.set_bezier_geometry(points, edges, chains)
+
+
+func _on_bezier_chain_closed() -> void:
+	var asset := _get_asset(selected_asset_id)
+	var component := _get_component(asset, selected_component_id)
+	if component.is_empty():
+		return
+	var chains: Array = component.get("chains", [])
+	if chains.is_empty():
+		return
+	var active_chain: Dictionary = chains.back()
+	var point_ids: Array = active_chain.get("point_ids", [])
+	if bool(active_chain.get("closed", false)) or point_ids.size() < 3:
+		return
+	_record_direct_change()
+	var edges: Array = component.get("edges", [])
+	var edge_ids: Array = active_chain.get("edge_ids", [])
+	var edge_id := "edge_%d" % (edges.size() + 1)
+	edges.append({
+		"id": edge_id,
+		"start_point_id": str(point_ids.back()),
+		"end_point_id": str(point_ids.front()),
+		"render_outline": true
+	})
+	edge_ids.append(edge_id)
+	active_chain["edge_ids"] = edge_ids
+	active_chain["closed"] = true
+	# A closed contour has a real closing edge from the last point back to the
+	# first point. Keep both endpoints in the later sampling result.
+	var points: Array = component.get("points", [])
+	var first_point := _get_point_by_id(points, str(point_ids.front()))
+	var last_point := _get_point_by_id(points, str(point_ids.back()))
+	if not first_point.is_empty():
+		first_point["preserve_point"] = true
+	if not last_point.is_empty():
+		last_point["preserve_point"] = true
+	component["edges"] = edges
+	component["chains"] = chains
+	BezierGeometry.resolve_auto_handles(component.get("points", []), chains)
+	_update_legacy_projection(component)
+	canvas_view.set_outer_shape(component["outer_shape"], bool(component["closed"]))
+	canvas_view.set_bezier_geometry(component.get("points", []), edges, chains)
+
+
+func _update_legacy_projection(component: Dictionary) -> void:
+	var topology_points: Array = component.get("points", [])
+	# An explicitly empty Bezier topology is a valid editable state. Reusing the
+	# previous legacy outline here would resurrect the last deleted point and
+	# make it appear as a legacy shape point with different interaction rules.
+	if topology_points.is_empty():
+		component["outer_shape"] = []
+		component["closed"] = false
+		return
+	var topology := {
+		"points": topology_points,
+		"edges": component.get("edges", []),
+		"chains": component.get("chains", [])
+	}
+	var fallback_points: Array[Vector2] = component.get("outer_shape", [])
+	var projection := _legacy_projection_from_topology(topology, fallback_points, bool(component.get("closed", false)))
+	component["outer_shape"] = projection["points"]
+	component["closed"] = projection["closed"]
 
 
 func _on_outer_shape_changed(points: Array[Vector2]) -> void:
@@ -4471,6 +5218,8 @@ func _on_outer_shape_changed(points: Array[Vector2]) -> void:
 		return
 	_record_coalesced_change()
 	component["outer_shape"] = points.duplicate()
+	_sync_linear_topology_from_legacy_shape(component)
+	canvas_view.set_bezier_geometry(component.get("points", []), component.get("edges", []), component.get("chains", []))
 
 
 func _on_pivot_changed(pivot: Vector2) -> void:
@@ -4515,8 +5264,295 @@ func _on_reference_component_selected(component_id: String) -> void:
 	_select_component(selected_asset_id, component_id)
 
 
+func _on_bezier_point_moved(point_index: int, position: Vector2) -> void:
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	var point := _get_component_point(component, point_index)
+	if point.is_empty():
+		return
+	_record_coalesced_change()
+	point["position"] = position
+	BezierGeometry.resolve_auto_handles(component.get("points", []), component.get("chains", []))
+	_update_legacy_projection(component)
+	canvas_view.set_outer_shape(component.get("outer_shape", []), bool(component.get("closed", false)))
+	canvas_view.set_bezier_geometry(component.get("points", []), component.get("edges", []), component.get("chains", []))
+
+
+func _on_bezier_points_moved(indices: Array, world_delta: Vector2) -> void:
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if component.is_empty() or indices.is_empty():
+		return
+	var transform: Dictionary = component.get("transform", _default_component_transform())
+	var rotation := deg_to_rad(float(transform.get("rotation", 0.0)))
+	var scale: Vector2 = transform.get("scale", Vector2.ONE)
+	var local_delta := world_delta.rotated(-rotation)
+	if not is_zero_approx(scale.x):
+		local_delta.x /= scale.x
+	if not is_zero_approx(scale.y):
+		local_delta.y /= scale.y
+	_record_coalesced_change()
+	var points: Array = component.get("points", [])
+	for index_value in indices:
+		var point_index := int(index_value)
+		if point_index >= 0 and point_index < points.size() and points[point_index] is Dictionary:
+			points[point_index]["position"] = Vector2(points[point_index].get("position", Vector2.ZERO)) + local_delta
+	BezierGeometry.resolve_auto_handles(points, component.get("chains", []))
+	_update_legacy_projection(component)
+	canvas_view.set_outer_shape(component.get("outer_shape", []), bool(component.get("closed", false)))
+	canvas_view.set_bezier_geometry(points, component.get("edges", []), component.get("chains", []))
+	_render_inspector()
+
+
+func _on_bezier_handle_changed(point_index: int, handle_side: String, value: Vector2) -> void:
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	var point := _get_component_point(component, point_index)
+	if point.is_empty() or handle_side not in ["in", "out"]:
+		return
+	_record_coalesced_change()
+	var mode := str(point.get("mode", "linear"))
+	if mode == "linear":
+		mode = "free"
+		point["mode"] = mode
+	point["handle_source"] = "manual"
+	point["handle_%s" % handle_side] = value
+	var opposite_side := "out" if handle_side == "in" else "in"
+	var opposite: Vector2 = point.get("handle_%s" % opposite_side, Vector2.ZERO)
+	if mode == "mirrored":
+		point["handle_%s" % opposite_side] = -value
+	elif mode == "aligned" and not is_zero_approx(value.length_squared()):
+		var opposite_length := opposite.length()
+		if is_zero_approx(opposite_length):
+			opposite_length = value.length()
+		point["handle_%s" % opposite_side] = -value.normalized() * opposite_length
+	BezierGeometry.resolve_auto_handles(component.get("points", []), component.get("chains", []))
+	_update_legacy_projection(component)
+	canvas_view.set_outer_shape(component.get("outer_shape", []), bool(component.get("closed", false)))
+	canvas_view.set_bezier_geometry(component.get("points", []), component.get("edges", []), component.get("chains", []))
+
+
+func _on_bezier_edge_insert_requested(edge_id: String, t: float) -> void:
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	var edge := _get_edge(component, edge_id)
+	if component.is_empty() or edge.is_empty():
+		return
+	var chain := _get_chain_for_edge(component, edge_id)
+	if chain.is_empty():
+		return
+	var start_id := str(edge.get("start_point_id", ""))
+	var end_id := str(edge.get("end_point_id", ""))
+	var points: Array = component.get("points", [])
+	var start_point := _get_point_by_id(points, start_id)
+	var end_point := _get_point_by_id(points, end_id)
+	if start_point.is_empty() or end_point.is_empty():
+		return
+	_record_direct_change()
+	var split := BezierGeometry.split_edge(start_point, end_point, t)
+	start_point["handle_out"] = split["start_handle_out"]
+	start_point["handle_source"] = "manual"
+	end_point["handle_in"] = split["end_handle_in"]
+	end_point["handle_source"] = "manual"
+	var new_point_id := _next_topology_id(points, "point")
+	var new_point := {
+		"id": new_point_id,
+		"position": split["position"],
+		"mode": "free",
+		"preserve_point": false,
+		"handle_source": "manual",
+		"handle_in": split["new_handle_in"],
+		"handle_out": split["new_handle_out"]
+	}
+	points.append(new_point)
+	var edges: Array = component.get("edges", [])
+	edge["end_point_id"] = new_point_id
+	var new_edge_id := _next_topology_id(edges, "edge")
+	edges.append({
+		"id": new_edge_id,
+		"start_point_id": new_point_id,
+		"end_point_id": end_id,
+		"render_outline": bool(edge.get("render_outline", true))
+	})
+	var point_ids: Array = chain.get("point_ids", [])
+	var edge_ids: Array = chain.get("edge_ids", [])
+	var start_index := point_ids.find(start_id)
+	var edge_index := edge_ids.find(edge_id)
+	if start_index < 0 or edge_index < 0:
+		return
+	point_ids.insert(start_index + 1, new_point_id)
+	edge_ids.insert(edge_index + 1, new_edge_id)
+	chain["point_ids"] = point_ids
+	chain["edge_ids"] = edge_ids
+	component["points"] = points
+	component["edges"] = edges
+	_update_legacy_projection(component)
+	selected_point_index = points.size() - 1
+	canvas_view.set_outer_shape(component.get("outer_shape", []), bool(component.get("closed", false)))
+	canvas_view.set_bezier_geometry(points, edges, component.get("chains", []))
+	canvas_view.set_selected_point_index(selected_point_index)
+	_render_inspector()
+
+
+func _on_bezier_point_delete_requested(point_index: int, record_history := true) -> void:
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	var points: Array = component.get("points", [])
+	if component.is_empty() or point_index < 0 or point_index >= points.size():
+		return
+	var point_id := str(points[point_index].get("id", ""))
+	var chain := _get_chain_for_point(component, point_id)
+	if chain.is_empty():
+		return
+	var point_ids: Array = chain.get("point_ids", [])
+	var chain_index := point_ids.find(point_id)
+	var closed := bool(chain.get("closed", false))
+	# Open chains may be reduced to zero points (for example a freshly created
+	# component with only its first point). Closed contours still require at
+	# least three points to remain valid.
+	if chain_index < 0 or (closed and point_ids.size() <= 3):
+		return
+	if record_history:
+		_record_direct_change()
+	var edge_ids: Array = chain.get("edge_ids", [])
+	var previous_edge_index := posmod(chain_index - 1, edge_ids.size()) if closed else chain_index - 1
+	var next_edge_index := chain_index
+	var edges: Array = component.get("edges", [])
+	var removed_edge_ids: Array = []
+	if previous_edge_index >= 0 and previous_edge_index < edge_ids.size():
+		removed_edge_ids.append(str(edge_ids[previous_edge_index]))
+	if next_edge_index >= 0 and next_edge_index < edge_ids.size():
+		removed_edge_ids.append(str(edge_ids[next_edge_index]))
+	var previous_id := ""
+	var next_id := ""
+	if chain_index > 0:
+		previous_id = str(point_ids[chain_index - 1])
+	elif closed:
+		previous_id = str(point_ids.back())
+	if chain_index < point_ids.size() - 1:
+		next_id = str(point_ids[chain_index + 1])
+	elif closed:
+		next_id = str(point_ids.front())
+	var bridge_edge_id := ""
+	if not previous_id.is_empty() and not next_id.is_empty():
+		bridge_edge_id = _next_topology_id(edges, "edge")
+		edges.append({
+			"id": bridge_edge_id,
+			"start_point_id": previous_id,
+			"end_point_id": next_id,
+			"render_outline": _combined_outline_visibility(edges, removed_edge_ids)
+		})
+	for edge_index in range(edges.size() - 1, -1, -1):
+		if str(edges[edge_index].get("id", "")) in removed_edge_ids:
+			edges.remove_at(edge_index)
+	points.remove_at(point_index)
+	point_ids.remove_at(chain_index)
+	chain["point_ids"] = point_ids
+	chain["edge_ids"] = _ordered_chain_edge_ids(point_ids, edges, closed)
+	component["points"] = points
+	component["edges"] = edges
+	BezierGeometry.resolve_auto_handles(points, component.get("chains", []))
+	_update_legacy_projection(component)
+	selected_point_index = mini(point_index, points.size() - 1)
+	selected_point_indices.clear()
+	if selected_point_index >= 0:
+		selected_point_indices.append(selected_point_index)
+	canvas_view.set_outer_shape(component.get("outer_shape", []), bool(component.get("closed", false)))
+	canvas_view.set_bezier_geometry(points, edges, component.get("chains", []))
+	canvas_view.set_selected_point_index(selected_point_index)
+	_render_inspector()
+
+
+func _on_bezier_points_delete_requested(point_indices: Array) -> void:
+	if point_indices.is_empty():
+		return
+	var indices: Array = []
+	for index_value in point_indices:
+		var point_index := int(index_value)
+		if point_index not in indices:
+			indices.append(point_index)
+	indices.sort()
+	indices.reverse()
+	_record_direct_change()
+	for point_index in indices:
+		_on_bezier_point_delete_requested(point_index, false)
+	selected_point_index = -1
+	selected_point_indices.clear()
+	canvas_view.clear_selection()
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _get_chain_for_edge(component: Dictionary, edge_id: String) -> Dictionary:
+	for chain_data in component.get("chains", []):
+		if edge_id in chain_data.get("edge_ids", []):
+			return chain_data
+	return {}
+
+
+func _get_chain_for_point(component: Dictionary, point_id: String) -> Dictionary:
+	for chain_data in component.get("chains", []):
+		if point_id in chain_data.get("point_ids", []):
+			return chain_data
+	return {}
+
+
+func _get_point_by_id(points: Array, point_id: String) -> Dictionary:
+	for point_data in points:
+		if str(point_data.get("id", "")) == point_id:
+			return point_data
+	return {}
+
+
+func _next_topology_id(items: Array, prefix: String) -> String:
+	var known_ids: Dictionary = {}
+	for item in items:
+		known_ids[str(item.get("id", ""))] = true
+	var index := items.size() + 1
+	var candidate := "%s_%d" % [prefix, index]
+	while known_ids.has(candidate):
+		index += 1
+		candidate = "%s_%d" % [prefix, index]
+	return candidate
+
+
+func _combined_outline_visibility(edges: Array, edge_ids: Array) -> bool:
+	var visible := true
+	for edge_data in edges:
+		if str(edge_data.get("id", "")) in edge_ids:
+			visible = visible and bool(edge_data.get("render_outline", true))
+	return visible
+
+
+func _ordered_chain_edge_ids(point_ids: Array, edges: Array, closed: bool) -> Array:
+	var ordered_ids: Array = []
+	var edge_count := point_ids.size() if closed else maxi(point_ids.size() - 1, 0)
+	for point_index in range(edge_count):
+		var start_id := str(point_ids[point_index])
+		var end_id := str(point_ids[(point_index + 1) % point_ids.size()])
+		for edge_data in edges:
+			if str(edge_data.get("start_point_id", "")) == start_id and str(edge_data.get("end_point_id", "")) == end_id:
+				ordered_ids.append(str(edge_data.get("id", "")))
+				break
+	return ordered_ids
+
+
 func _on_point_selection_changed(_index: int) -> void:
-	pass
+	selected_point_index = _index
+	if active_edit_mode == "point":
+		selected_edge_id = ""
+		_render_inspector()
+
+
+func _on_point_selection_set_changed(indices: Array) -> void:
+	selected_point_indices.clear()
+	for index_value in indices:
+		selected_point_indices.append(int(index_value))
+	selected_point_index = selected_point_indices[0] if selected_point_indices.size() == 1 else -1
+	if active_edit_mode == "point":
+		selected_edge_id = ""
+		_render_inspector()
+
+
+func _on_edge_selection_changed(edge_id: String) -> void:
+	selected_edge_id = edge_id
+	canvas_view.set_selected_edge_id(edge_id)
+	_render_inspector()
 
 
 func _get_asset(asset_id: String) -> Dictionary:
@@ -4533,6 +5569,24 @@ func _get_component(asset: Dictionary, component_id: String) -> Dictionary:
 		if str(component["id"]) == component_id:
 			return component
 	return {}
+
+
+func _get_edge(component: Dictionary, edge_id: String) -> Dictionary:
+	if component.is_empty():
+		return {}
+	for edge in component.get("edges", []):
+		if str(edge.get("id", "")) == edge_id:
+			return edge
+	return {}
+
+
+func _get_component_point(component: Dictionary, point_index: int) -> Dictionary:
+	if component.is_empty() or point_index < 0:
+		return {}
+	var points: Array = component.get("points", [])
+	if point_index >= points.size() or not points[point_index] is Dictionary:
+		return {}
+	return points[point_index]
 
 
 func _get_texture(texture_id: String) -> Dictionary:
