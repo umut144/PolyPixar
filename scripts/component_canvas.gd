@@ -398,13 +398,7 @@ func _gui_input(event: InputEvent) -> void:
 			outer_shape_changed.emit(outer_shape.duplicate())
 		queue_redraw()
 	if event is InputEventKey and event.pressed and not event.echo:
-		if (event.keycode == KEY_BACKSPACE or event.keycode == KEY_DELETE) and interaction_state == "edit" and edit_mode == "point" and selected_point_index >= 0 and outer_shape.size() > 3:
-			outer_shape.remove_at(selected_point_index)
-			selected_point_index = mini(selected_point_index, outer_shape.size() - 1)
-			point_selection_changed.emit(selected_point_index)
-			outer_shape_changed.emit(outer_shape.duplicate())
-			queue_redraw()
-		elif event.keycode == KEY_ESCAPE and interaction_state == "edit":
+		if event.keycode == KEY_ESCAPE and interaction_state == "edit":
 			clear_selection()
 		elif event.keycode == KEY_ENTER and active_tool == "line" and not line_draft.is_empty():
 			line_draft.clear()

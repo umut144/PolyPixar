@@ -5649,6 +5649,18 @@ func _on_bezier_point_delete_requested(point_index: int, record_history := true)
 		return
 	if record_history:
 		_record_direct_change()
+	# Retain point semantics explicitly while the chain is rebuilt below. The
+	# legacy projection is allowed to change positions, but must never turn the
+	# surviving Bezier points back into linear points.
+	var surviving_point_settings: Dictionary = {}
+	for point_data in points:
+		if not point_data is Dictionary or str(point_data.get("id", "")) == point_id:
+			continue
+		surviving_point_settings[str(point_data.get("id", ""))] = {
+			"mode": str(point_data.get("mode", "linear")),
+			"preserve_point": bool(point_data.get("preserve_point", false)),
+			"handle_source": str(point_data.get("handle_source", "auto"))
+		}
 	var edge_ids: Array = chain.get("edge_ids", [])
 	var previous_edge_index := posmod(chain_index - 1, edge_ids.size()) if closed else chain_index - 1
 	var next_edge_index := chain_index
@@ -5686,6 +5698,17 @@ func _on_bezier_point_delete_requested(point_index: int, record_history := true)
 	chain["edge_ids"] = _ordered_chain_edge_ids(point_ids, edges, closed)
 	component["points"] = points
 	component["edges"] = edges
+	BezierGeometry.resolve_auto_handles(points, component.get("chains", []))
+	for point_data in points:
+		if not point_data is Dictionary:
+			continue
+		var saved_settings = surviving_point_settings.get(str(point_data.get("id", "")), {})
+		if not saved_settings is Dictionary:
+			continue
+		point_data["mode"] = str(saved_settings.get("mode", "linear"))
+		point_data["preserve_point"] = bool(saved_settings.get("preserve_point", false))
+		point_data["handle_source"] = str(saved_settings.get("handle_source", "auto"))
+	# Recalculate only automatic handles after restoring the semantic settings.
 	BezierGeometry.resolve_auto_handles(points, component.get("chains", []))
 	_update_legacy_projection(component)
 	selected_point_index = mini(point_index, points.size() - 1)
