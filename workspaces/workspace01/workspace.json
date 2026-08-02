@@ -3,13 +3,14 @@
 		"asset_1"
 	],
 	"editor_state": {
-		"active_module": "Create",
+		"active_module": "Motion",
+		"active_motion_submodule": "Animation",
 		"camera": {
 			"position": [
-				0.201797008514404,
-				3.80387783050537
+				0.90886402130127,
+				3.64053153991699
 			],
-			"zoom": 109.513047094395
+			"zoom": 63.9923897041308
 		},
 		"expanded_assets": {
 			"asset_1": true
@@ -18,11 +19,17 @@
 		"lookdev_target_asset_id": "",
 		"lookdev_target_component_id": "",
 		"material_view_mode": "graph",
+		"motion_path_preview_asset_id": "asset_1",
+		"motion_sequence_preview_loop": true,
+		"motion_sequence_view": "player",
 		"paper_level": 0,
 		"selected_asset_id": "asset_1",
-		"selected_component_id": "component_3",
+		"selected_component_id": "",
 		"selected_element_id": "",
 		"selected_material_id": "",
+		"selected_motion_path_id": "path_1",
+		"selected_motion_sequence_entry_id": "entry_1",
+		"selected_motion_sequence_id": "sequence_1",
 		"selected_texture_id": "",
 		"snap": {
 			"enabled": true,
@@ -37,6 +44,12 @@
 	},
 	"materials": [],
 	"name": "workspace01",
-	"schema_version": 9,
+	"paths": [
+		"path_1"
+	],
+	"schema_version": 15,
+	"sequences": [
+		"sequence_1"
+	],
 	"textures": []
 }
