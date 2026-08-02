@@ -2,11 +2,12 @@ extends Control
 
 const CREATE_SUBMODULES := ["Asset", "Texture"]
 const STYLE_SUBMODULES := ["Material"]
-const INACTIVE_MODULES := ["Motion", "Transform", "Effects", "Export"]
+const MOTION_SUBMODULES := ["Animation", "Path", "Sequence"]
+const INACTIVE_MODULES := ["Transform", "Effects", "Export"]
 const WORKSPACES_ROOT := "res://workspaces"
 const IMPORT_TEXTURES_ROOT := "res://imports/textures"
 const CONFIG_PATH := "res://configs/app_config.json"
-const SCHEMA_VERSION := 9
+const SCHEMA_VERSION := 15
 const MAX_HISTORY_SIZE := 100
 const PAPER_SIZES_CM := [Vector2(21.0, 29.7), Vector2(29.7, 42.0), Vector2(42.0, 59.4), Vector2(59.4, 84.1), Vector2(84.1, 118.9)]
 const PAPER_LABELS := ["A4", "A3", "A2", "A1", "A0"]
@@ -17,6 +18,7 @@ const PAPER_NONE_LABEL := "Kein Rahmen"
 const SHOW_PROCESSED_OUTLINER := false
 
 var active_create_submodule := "Asset"
+var active_motion_submodule := "Animation"
 var active_module := "Create"
 var outliner_list: VBoxContainer
 var outliner_search_input: LineEdit
@@ -25,11 +27,38 @@ var module_sections: Array[ModuleSection] = []
 var assets: Array[Dictionary] = []
 var textures: Array[Dictionary] = []
 var materials: Array[Dictionary] = []
+var motion_paths: Array[Dictionary] = []
+var motion_sequences: Array[Dictionary] = []
+var next_motion_path_id := 1
+var next_motion_sequence_id := 1
+var selected_motion_path_id := ""
+var selected_motion_sequence_id := ""
+var selected_motion_sequence_entry_id := ""
+var motion_sequence_view := MotionSequenceWorkspace.VIEW_COMPOSITION
+var motion_sequence_phase := 0.0
+var motion_sequence_playing := false
+var motion_sequence_preview_loop := true
+var motion_sequence_phase_slider: HSlider
+var motion_sequence_phase_value_label: Label
+var motion_sequence_runtime_sequence_label: Label
+var motion_sequence_runtime_path_label: Label
+var motion_sequence_runtime_animation_label: Label
+var motion_path_preview_asset_id := ""
+var motion_path_phase := 0.0
+var motion_path_playing := false
+var motion_path_tool := "draw"
+var motion_path_phase_slider: HSlider
+var motion_path_phase_value_label: Label
+var motion_selection := MotionSelection.new()
+var motion_phase := 0.0
+var motion_player: MotionPlayer
+var motion_player_asset_id := ""
+var motion_last_marker := ""
 var selected_asset_id := ""
 var selected_component_id := ""
 var selected_edge_id := ""
-var selected_point_index := -1
-var selected_point_indices: Array[int] = []
+var selected_point_id := ""
+var selected_point_ids: Array[String] = []
 var bezier_point_move_start_positions: Dictionary = {}
 var bezier_point_move_component_id := ""
 var selected_texture_id := ""
@@ -74,6 +103,30 @@ var material_preview_texture: TextureRect
 var material_preview_label: Label
 var material_preview_shader: ShaderMaterial
 var export_workspace: VBoxContainer
+var motion_workspace: MotionWorkspace
+var motion_path_workspace: MotionPathWorkspace
+var motion_sequence_workspace: MotionSequenceWorkspace
+var motion_phase_value_label: Label
+var motion_phase_marks: MotionPhaseMarks
+var motion_phase_slider: HSlider
+var motion_play_button: Button
+var motion_runtime_state_label: Label
+var motion_asset_preview: MotionAssetPreview
+var motion_state_dialog: ConfirmationDialog
+var motion_state_name_input: LineEdit
+var motion_remove_state_dialog: ConfirmationDialog
+var pending_motion_remove_state_id := ""
+var motion_remove_motion_dialog: ConfirmationDialog
+var pending_motion_remove_motion_state_id := ""
+var pending_motion_remove_motion_id := ""
+var motion_remove_item_dialog: ConfirmationDialog
+var pending_motion_remove_item_kind := ""
+var pending_motion_remove_item_state_id := ""
+var pending_motion_remove_item_id := ""
+var motion_path_dialog: ConfirmationDialog
+var motion_path_name_input: LineEdit
+var motion_sequence_dialog: ConfirmationDialog
+var motion_sequence_name_input: LineEdit
 var export_summary_label: Label
 var export_validation_label: Label
 var texture_context_label: Label
@@ -128,6 +181,11 @@ func _ready() -> void:
 	# Native macOS quit requests bypass regular key input. Handle them below so
 	# Cmd+Q can be blocked without disabling a normal window close.
 	get_tree().auto_accept_quit = false
+	motion_player = MotionPlayer.new()
+	motion_player.phase_changed.connect(_on_motion_player_phase_changed)
+	motion_player.state_changed.connect(_on_motion_player_state_changed)
+	motion_player.marker_fired.connect(_on_motion_player_marker_fired)
+	motion_player.playback_changed.connect(_on_motion_player_playback_changed)
 	_build_ui()
 	history_coalesce_timer = Timer.new()
 	history_coalesce_timer.one_shot = true
@@ -141,6 +199,15 @@ func _ready() -> void:
 	_load_last_workspace()
 	call_deferred("_disable_quit_shortcut")
 	call_deferred("_focus_active_canvas_after_startup")
+
+
+func _process(delta: float) -> void:
+	if active_module == "Motion" and active_motion_submodule == "Animation" and motion_player != null:
+		motion_player.advance(delta)
+	elif active_module == "Motion" and active_motion_submodule == "Path" and motion_path_playing:
+		_advance_motion_path_preview(delta)
+	elif active_module == "Motion" and active_motion_submodule == "Sequence" and motion_sequence_view == MotionSequenceWorkspace.VIEW_PLAYER and motion_sequence_playing:
+		_advance_motion_sequence_preview(delta)
 
 
 func _disable_quit_shortcut() -> void:
@@ -200,11 +267,17 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			_undo()
 		get_viewport().set_input_as_handled()
 		return
-	if not has_command_modifier and (event.keycode == KEY_BACKSPACE or event.keycode == KEY_DELETE) and active_state == "edit" and active_edit_mode == "point" and not selected_point_indices.is_empty():
-		if selected_point_indices.size() == 1:
-			_on_bezier_point_delete_requested(selected_point_indices[0])
+	if has_command_modifier and active_module == "Motion" and active_motion_submodule == "Sequence" and event.keycode in [KEY_1, KEY_2]:
+		var focus_owner := get_viewport().gui_get_focus_owner()
+		if not (focus_owner is LineEdit or focus_owner is TextEdit):
+			_set_motion_sequence_view(MotionSequenceWorkspace.VIEW_COMPOSITION if event.keycode == KEY_1 else MotionSequenceWorkspace.VIEW_PLAYER)
+			get_viewport().set_input_as_handled()
+		return
+	if not has_command_modifier and (event.keycode == KEY_BACKSPACE or event.keycode == KEY_DELETE) and active_state == "edit" and active_edit_mode == "point" and not selected_point_ids.is_empty():
+		if selected_point_ids.size() == 1:
+			_on_bezier_point_delete_requested(selected_point_ids[0])
 		else:
-			_on_bezier_points_delete_requested(selected_point_indices.duplicate())
+			_on_bezier_points_delete_requested(selected_point_ids.duplicate())
 		get_viewport().set_input_as_handled()
 		return
 	if not has_command_modifier and (event.keycode == KEY_BACKSPACE or event.keycode == KEY_DELETE) and active_state.is_empty():
@@ -261,7 +334,8 @@ func _reset_to_default_state() -> void:
 	edit_point_set_mode = false
 	active_transform_mode = "transform"
 	selected_edge_id = ""
-	selected_point_index = -1
+	selected_point_id = ""
+	selected_point_ids.clear()
 	active_import_preview_mode = "original"
 	if is_instance_valid(canvas_view):
 		canvas_view.set_interaction_state("")
@@ -283,7 +357,8 @@ func _ensure_default_edit_point_state() -> void:
 	edit_point_set_mode = false
 	active_transform_mode = "transform"
 	selected_edge_id = ""
-	selected_point_index = -1
+	selected_point_id = ""
+	selected_point_ids.clear()
 	if is_instance_valid(canvas_view):
 		canvas_view.set_edit_handles_enabled(false)
 		canvas_view.set_edit_point_set_enabled(false)
@@ -357,6 +432,7 @@ func _build_ui() -> void:
 	module_rail_panel.add_child(module_rail)
 	_add_module_section(module_rail, "Create", CREATE_SUBMODULES, true)
 	_add_module_section(module_rail, "Style", STYLE_SUBMODULES)
+	_add_module_section(module_rail, "Motion", MOTION_SUBMODULES)
 	for module_name in INACTIVE_MODULES:
 		_add_module_section(module_rail, module_name, [])
 
@@ -422,20 +498,15 @@ func _build_ui() -> void:
 	canvas_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	canvas_column.add_child(canvas_panel)
 	canvas_view = ComponentCanvas.new()
-	canvas_view.line_shape_changed.connect(_on_line_shape_changed)
-	canvas_view.outer_shape_changed.connect(_on_outer_shape_changed)
 	canvas_view.bezier_point_added.connect(_on_bezier_point_added)
 	canvas_view.bezier_chain_closed.connect(_on_bezier_chain_closed)
 	canvas_view.edge_selection_changed.connect(_on_edge_selection_changed)
 	canvas_view.point_selection_changed.connect(_on_point_selection_changed)
 	canvas_view.point_selection_set_changed.connect(_on_point_selection_set_changed)
-	canvas_view.bezier_point_moved.connect(_on_bezier_point_moved)
 	canvas_view.bezier_points_move_started.connect(_on_bezier_points_move_started)
 	canvas_view.bezier_points_moved.connect(_on_bezier_points_moved)
 	canvas_view.bezier_handle_changed.connect(_on_bezier_handle_changed)
 	canvas_view.bezier_edge_insert_requested.connect(_on_bezier_edge_insert_requested)
-	canvas_view.bezier_point_delete_requested.connect(_on_bezier_point_delete_requested)
-	canvas_view.bezier_points_delete_requested.connect(_on_bezier_points_delete_requested)
 	canvas_view.reference_component_selected.connect(_on_reference_component_selected)
 	canvas_view.pivot_changed.connect(_on_pivot_changed)
 	canvas_view.transform_changed.connect(_on_transform_changed)
@@ -469,6 +540,9 @@ func _build_ui() -> void:
 	_create_material_graph()
 	_create_material_preview()
 	_create_export_workspace(canvas_panel)
+	_create_motion_workspace(canvas_panel)
+	_create_motion_path_workspace(canvas_panel)
+	_create_motion_sequence_workspace(canvas_panel)
 	texture_context_label = Label.new()
 	texture_context_label.position = Vector2(8, 6)
 	texture_context_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -540,6 +614,8 @@ func _build_ui() -> void:
 	add_child(reference_image_crop_dialog)
 	_create_element_dialog()
 	_create_workspace_dialogs()
+	_create_motion_state_dialogs()
+	_create_motion_resource_dialogs()
 
 
 func _create_material_graph() -> void:
@@ -643,6 +719,125 @@ func _create_export_workspace(parent: Control) -> void:
 	export_workspace.add_child(export_validation_label)
 
 
+func _create_motion_workspace(parent: Control) -> void:
+	motion_workspace = MotionWorkspace.new()
+	motion_workspace.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	motion_workspace.set_selection_model(motion_selection)
+	motion_workspace.selection_changed.connect(_on_motion_selection_changed)
+	motion_workspace.document_change_requested.connect(_record_direct_change)
+	motion_workspace.add_state_requested.connect(_open_motion_state_dialog)
+	motion_workspace.authoring_error.connect(_show_status_message)
+	motion_workspace.visible = false
+	parent.add_child(motion_workspace)
+
+
+func _create_motion_path_workspace(parent: Control) -> void:
+	motion_path_workspace = MotionPathWorkspace.new()
+	motion_path_workspace.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	motion_path_workspace.point_add_requested.connect(_on_motion_path_point_add_requested)
+	motion_path_workspace.point_move_started.connect(_record_direct_change)
+	motion_path_workspace.point_move_requested.connect(_on_motion_path_point_move_requested)
+	motion_path_workspace.handle_move_requested.connect(_on_motion_path_handle_move_requested)
+	motion_path_workspace.point_delete_requested.connect(_on_motion_path_point_delete_requested)
+	motion_path_workspace.visible = false
+	parent.add_child(motion_path_workspace)
+
+
+func _create_motion_sequence_workspace(parent: Control) -> void:
+	motion_sequence_workspace = MotionSequenceWorkspace.new()
+	motion_sequence_workspace.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	motion_sequence_workspace.entry_selected.connect(_select_motion_sequence_entry)
+	motion_sequence_workspace.add_entry_requested.connect(_add_motion_sequence_entry)
+	motion_sequence_workspace.visible = false
+	parent.add_child(motion_sequence_workspace)
+
+
+func _create_motion_state_dialogs() -> void:
+	motion_state_dialog = ConfirmationDialog.new()
+	motion_state_dialog.title = "Add State"
+	motion_state_dialog.dialog_text = "Enter a unique State name"
+	motion_state_dialog.size = Vector2i(360, 160)
+	motion_state_dialog.confirmed.connect(_confirm_motion_state_creation)
+	motion_state_name_input = LineEdit.new()
+	motion_state_name_input.placeholder_text = "State name"
+	motion_state_name_input.custom_minimum_size = Vector2(320, 32)
+	motion_state_name_input.text_submitted.connect(func(_text: String) -> void: _confirm_motion_state_creation())
+	motion_state_dialog.add_child(motion_state_name_input)
+	add_child(motion_state_dialog)
+	motion_remove_state_dialog = ConfirmationDialog.new()
+	motion_remove_state_dialog.title = "Remove State"
+	motion_remove_state_dialog.ok_button_text = "Remove"
+	motion_remove_state_dialog.confirmed.connect(_confirm_motion_state_removal)
+	add_child(motion_remove_state_dialog)
+	motion_remove_motion_dialog = ConfirmationDialog.new()
+	motion_remove_motion_dialog.title = "Remove Motion"
+	motion_remove_motion_dialog.ok_button_text = "Remove"
+	motion_remove_motion_dialog.confirmed.connect(_confirm_motion_removal)
+	add_child(motion_remove_motion_dialog)
+	motion_remove_item_dialog = ConfirmationDialog.new()
+	motion_remove_item_dialog.ok_button_text = "Remove"
+	motion_remove_item_dialog.confirmed.connect(_confirm_motion_item_removal)
+	add_child(motion_remove_item_dialog)
+
+
+func _create_motion_resource_dialogs() -> void:
+	motion_path_dialog = ConfirmationDialog.new()
+	motion_path_dialog.title = "Create Path"
+	motion_path_dialog.dialog_text = "Enter a Path name"
+	motion_path_dialog.confirmed.connect(_confirm_motion_path_creation)
+	motion_path_name_input = LineEdit.new()
+	motion_path_name_input.placeholder_text = "Path name"
+	motion_path_name_input.custom_minimum_size = Vector2(320, 32)
+	motion_path_name_input.text_submitted.connect(func(_text: String) -> void: _confirm_motion_path_creation())
+	motion_path_dialog.add_child(motion_path_name_input)
+	add_child(motion_path_dialog)
+	motion_sequence_dialog = ConfirmationDialog.new()
+	motion_sequence_dialog.title = "Create Sequence"
+	motion_sequence_dialog.dialog_text = "Enter a Sequence name"
+	motion_sequence_dialog.confirmed.connect(_confirm_motion_sequence_creation)
+	motion_sequence_name_input = LineEdit.new()
+	motion_sequence_name_input.placeholder_text = "Sequence name"
+	motion_sequence_name_input.custom_minimum_size = Vector2(320, 32)
+	motion_sequence_name_input.text_submitted.connect(func(_text: String) -> void: _confirm_motion_sequence_creation())
+	motion_sequence_dialog.add_child(motion_sequence_name_input)
+	add_child(motion_sequence_dialog)
+
+
+func _confirm_motion_path_creation() -> void:
+	var path_name := motion_path_name_input.text.strip_edges()
+	if path_name.is_empty():
+		path_name = "Path %02d" % next_motion_path_id
+	_record_direct_change()
+	var path_id := "path_%d" % next_motion_path_id
+	next_motion_path_id += 1
+	motion_paths.append(_default_motion_path(path_id, path_name))
+	selected_motion_path_id = path_id
+	motion_path_dialog.hide()
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _confirm_motion_sequence_creation() -> void:
+	var sequence_name := motion_sequence_name_input.text.strip_edges()
+	if sequence_name.is_empty():
+		sequence_name = "Sequence %02d" % next_motion_sequence_id
+	_record_direct_change()
+	var sequence_id := "sequence_%d" % next_motion_sequence_id
+	next_motion_sequence_id += 1
+	motion_sequences.append(_default_motion_sequence(sequence_id, sequence_name))
+	selected_motion_sequence_id = sequence_id
+	selected_motion_sequence_entry_id = ""
+	motion_sequence_view = MotionSequenceWorkspace.VIEW_COMPOSITION
+	motion_sequence_phase = 0.0
+	motion_sequence_playing = false
+	motion_sequence_preview_loop = true
+	motion_sequence_dialog.hide()
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
 func _create_panel(background_color := Color("#20242c")) -> PanelContainer:
 	var panel := PanelContainer.new()
 	var style := StyleBoxFlat.new()
@@ -681,6 +876,7 @@ func _create_inspector_section(text: String) -> VBoxContainer:
 	header.custom_minimum_size = Vector2(0, 24)
 	header.focus_mode = Control.FOCUS_NONE
 	header.toggle_mode = true
+	header.button_pressed = true
 	header.flat = true
 	header.add_theme_font_size_override("font_size", 10)
 	header.add_theme_color_override("font_color", Color("#c0c8d5"))
@@ -1074,12 +1270,22 @@ func _on_create_action_pressed() -> void:
 		_open_new_texture_dialog()
 	elif active_module == "Style":
 		_open_new_material_dialog()
+	elif active_module == "Motion" and active_motion_submodule == "Path":
+		motion_path_name_input.text = "Path %02d" % next_motion_path_id
+		motion_path_dialog.popup_centered()
+		motion_path_name_input.select_all()
+		motion_path_name_input.grab_focus()
+	elif active_module == "Motion" and active_motion_submodule == "Sequence":
+		motion_sequence_name_input.text = "Sequence %02d" % next_motion_sequence_id
+		motion_sequence_dialog.popup_centered()
+		motion_sequence_name_input.select_all()
+		motion_sequence_name_input.grab_focus()
 
 
 func _update_context_action_button() -> void:
 	if not is_instance_valid(create_action_button):
 		return
-	create_action_button.visible = active_module == "Create" or active_module == "Style"
+	create_action_button.visible = active_module == "Create" or active_module == "Style" or (active_module == "Motion" and active_motion_submodule != "Animation")
 	var show_asset_create_controls := active_module == "Create" and active_create_submodule == "Asset"
 	if is_instance_valid(snap_button):
 		snap_button.visible = show_asset_create_controls
@@ -1093,6 +1299,10 @@ func _update_context_action_button() -> void:
 		create_action_button.text = "Create Texture"
 	elif active_module == "Style":
 		create_action_button.text = "Create Material"
+	elif active_module == "Motion" and active_motion_submodule == "Path":
+		create_action_button.text = "Create Path"
+	elif active_module == "Motion" and active_motion_submodule == "Sequence":
+		create_action_button.text = "Create Sequence"
 
 
 func _on_workspace_menu_id(id: int) -> void:
@@ -1126,6 +1336,8 @@ func _confirm_new_workspace() -> void:
 	assets.clear()
 	textures.clear()
 	materials.clear()
+	motion_paths.clear()
+	motion_sequences.clear()
 	selected_asset_id = ""
 	selected_component_id = ""
 	expanded_assets.clear()
@@ -1133,6 +1345,19 @@ func _confirm_new_workspace() -> void:
 	next_component_id = 1
 	next_texture_id = 1
 	next_material_id = 1
+	next_motion_path_id = 1
+	next_motion_sequence_id = 1
+	selected_motion_path_id = ""
+	selected_motion_sequence_id = ""
+	selected_motion_sequence_entry_id = ""
+	motion_path_preview_asset_id = ""
+	motion_path_phase = 0.0
+	motion_path_playing = false
+	motion_path_tool = "draw"
+	motion_sequence_view = MotionSequenceWorkspace.VIEW_COMPOSITION
+	motion_sequence_phase = 0.0
+	motion_sequence_playing = false
+	motion_sequence_preview_loop = true
 	active_state = ""
 	_apply_snap_settings({})
 	pending_save_after_new = false
@@ -1207,9 +1432,13 @@ func _save_workspace() -> void:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("%s/assets" % workspace_root))
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("%s/textures" % workspace_root))
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("%s/materials" % workspace_root))
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("%s/paths" % workspace_root))
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("%s/sequences" % workspace_root))
 	var asset_ids: Array[String] = []
 	var texture_ids: Array[String] = []
 	var material_ids: Array[String] = []
+	var motion_path_ids: Array[String] = []
+	var motion_sequence_ids: Array[String] = []
 	for asset in assets:
 		var asset_id := str(asset["id"])
 		asset_ids.append(asset_id)
@@ -1221,6 +1450,7 @@ func _save_workspace() -> void:
 			"name": str(asset["name"]),
 			"visibility": bool(asset.get("visibility", true)),
 			"reference_image": _serialize_reference_image(asset.get("reference_image", {})),
+			"animation": MotionWorkspace.normalize_animation_document(asset.get("animation", {})).duplicate(true),
 			"components": []
 		}
 		for component in asset["components"]:
@@ -1230,10 +1460,6 @@ func _save_workspace() -> void:
 				"points": _serialize_bezier_points(component.get("points", [])),
 				"edges": _serialize_edges(component.get("edges", [])),
 				"chains": _serialize_chains(component.get("chains", [])),
-				# Kept through the Bezier transition so the current linear canvas and
-				# export path can continue to load the same workspace safely.
-				"outer_shape": _serialize_points(component["outer_shape"]),
-				"closed": bool(component.get("closed", component["outer_shape"].size() >= 3)),
 				"transform": _serialize_transform(component.get("transform", {})),
 				"visibility": bool(component.get("visibility", true)),
 				"z_index": int(component.get("z_index", 0)),
@@ -1274,12 +1500,36 @@ func _save_workspace() -> void:
 			"mapping_wrap_mode": str(material_record.get("mapping_wrap_mode", "clamp")),
 			"mapping_repeat": bool(material_record.get("mapping_repeat", false))
 		})
+	for path_document in motion_paths:
+		var path_id := str(path_document.get("id", ""))
+		motion_path_ids.append(path_id)
+		_write_json("%s/paths/%s/path.json" % [workspace_root, path_id], {
+			"schema_version": SCHEMA_VERSION,
+			"id": path_id,
+			"name": str(path_document.get("name", path_id)),
+			"visibility": bool(path_document.get("visibility", true)),
+			"topology": MotionPathTopology.serialize(path_document.get("topology", {})),
+			"playback": path_document.get("playback", {}).duplicate(true)
+		})
+	for sequence_document in motion_sequences:
+		var sequence_id := str(sequence_document.get("id", ""))
+		motion_sequence_ids.append(sequence_id)
+		_write_json("%s/sequences/%s/sequence.json" % [workspace_root, sequence_id], {
+			"schema_version": SCHEMA_VERSION,
+			"id": sequence_id,
+			"name": str(sequence_document.get("name", sequence_id)),
+			"visibility": bool(sequence_document.get("visibility", true)),
+			"next_entry_index": int(sequence_document.get("next_entry_index", 1)),
+			"entries": sequence_document.get("entries", []).duplicate(true)
+		})
 	_write_json("%s/workspace.json" % workspace_root, {
 		"schema_version": SCHEMA_VERSION,
 		"name": workspace_name,
 		"assets": asset_ids,
 		"textures": texture_ids,
 		"materials": material_ids,
+		"paths": motion_path_ids,
+		"sequences": motion_sequence_ids,
 		"editor_state": _serialize_editor_state()
 	})
 	_write_json(CONFIG_PATH, {"schema_version": SCHEMA_VERSION, "last_workspace": workspace_name})
@@ -1295,12 +1545,21 @@ func _capture_history_snapshot() -> Dictionary:
 		"next_texture_id": next_texture_id,
 		"materials": materials.duplicate(true),
 		"next_material_id": next_material_id,
+		"motion_paths": motion_paths.duplicate(true),
+		"next_motion_path_id": next_motion_path_id,
+		"motion_sequences": motion_sequences.duplicate(true),
+		"next_motion_sequence_id": next_motion_sequence_id,
 		"selected_asset_id": selected_asset_id,
 		"selected_component_id": selected_component_id,
 		"selected_texture_id": selected_texture_id,
 		"selected_element_id": selected_element_id,
 		"selected_material_id": selected_material_id,
+		"selected_motion_path_id": selected_motion_path_id,
+		"selected_motion_sequence_id": selected_motion_sequence_id,
+		"selected_motion_sequence_entry_id": selected_motion_sequence_entry_id,
+		"motion_path_preview_asset_id": motion_path_preview_asset_id,
 		"active_module": active_module,
+		"active_motion_submodule": active_motion_submodule,
 		"material_view_mode": material_view_mode,
 		"lookdev_target_asset_id": lookdev_target_asset_id,
 		"lookdev_target_component_id": lookdev_target_component_id,
@@ -1347,16 +1606,25 @@ func _restore_history_snapshot(snapshot: Dictionary) -> void:
 	assets = snapshot.get("assets", []).duplicate(true)
 	textures = snapshot.get("textures", []).duplicate(true)
 	materials = snapshot.get("materials", []).duplicate(true)
+	motion_paths = snapshot.get("motion_paths", []).duplicate(true)
+	motion_sequences = snapshot.get("motion_sequences", []).duplicate(true)
 	next_asset_id = int(snapshot.get("next_asset_id", 1))
 	next_component_id = int(snapshot.get("next_component_id", 1))
 	next_texture_id = int(snapshot.get("next_texture_id", 1))
 	next_material_id = int(snapshot.get("next_material_id", 1))
+	next_motion_path_id = int(snapshot.get("next_motion_path_id", 1))
+	next_motion_sequence_id = int(snapshot.get("next_motion_sequence_id", 1))
 	selected_asset_id = str(snapshot.get("selected_asset_id", ""))
 	selected_component_id = str(snapshot.get("selected_component_id", ""))
 	selected_texture_id = str(snapshot.get("selected_texture_id", ""))
 	selected_element_id = str(snapshot.get("selected_element_id", ""))
 	selected_material_id = str(snapshot.get("selected_material_id", ""))
+	selected_motion_path_id = str(snapshot.get("selected_motion_path_id", ""))
+	selected_motion_sequence_id = str(snapshot.get("selected_motion_sequence_id", ""))
+	selected_motion_sequence_entry_id = str(snapshot.get("selected_motion_sequence_entry_id", ""))
+	motion_path_preview_asset_id = str(snapshot.get("motion_path_preview_asset_id", ""))
 	active_module = str(snapshot.get("active_module", "Create"))
+	active_motion_submodule = str(snapshot.get("active_motion_submodule", "Animation"))
 	material_view_mode = "graph"
 	lookdev_target_asset_id = ""
 	lookdev_target_component_id = ""
@@ -1366,8 +1634,23 @@ func _restore_history_snapshot(snapshot: Dictionary) -> void:
 		selected_component_id = ""
 	elif not selected_component_id.is_empty() and _get_component(_get_asset(selected_asset_id), selected_component_id).is_empty():
 		selected_component_id = ""
+	if _get_motion_path(selected_motion_path_id).is_empty():
+		selected_motion_path_id = ""
+	if _get_motion_sequence(selected_motion_sequence_id).is_empty():
+		selected_motion_sequence_id = ""
+		selected_motion_sequence_entry_id = ""
+	elif _get_motion_sequence_entry(_get_motion_sequence(selected_motion_sequence_id), selected_motion_sequence_entry_id).is_empty():
+		selected_motion_sequence_entry_id = str(_first_motion_sequence_entry(_get_motion_sequence(selected_motion_sequence_id)).get("id", ""))
+	if _get_asset(motion_path_preview_asset_id).is_empty():
+		motion_path_preview_asset_id = _default_motion_path_preview_asset_id()
 	if active_module == "Create":
 		_set_create_submodule_context("Texture" if not selected_texture_id.is_empty() else "Asset")
+	elif active_module == "Motion":
+		active_motion_submodule = active_motion_submodule if active_motion_submodule in MOTION_SUBMODULES else "Animation"
+		var motion_section := _find_section("Motion")
+		if motion_section != null:
+			motion_section.set_expanded(true)
+			motion_section.set_active_submodule(active_motion_submodule)
 	var can_retain_component_tool := retained_module == "Create" \
 		and active_module == "Create" \
 		and not selected_component_id.is_empty() \
@@ -1438,18 +1721,13 @@ func _load_workspace(workspace_entry: String) -> bool:
 		for component_data in asset_data.get("components", []):
 			if not component_data is Dictionary:
 				continue
-			var legacy_outer_shape := _deserialize_points(component_data.get("outer_shape", []))
-			var legacy_closed := bool(component_data.get("closed", legacy_outer_shape.size() >= 3))
-			var topology := _deserialize_component_topology(component_data, legacy_outer_shape, legacy_closed)
-			var legacy_projection := _legacy_projection_from_topology(topology, legacy_outer_shape, legacy_closed)
+			var topology := _deserialize_component_topology(component_data)
 			components.append({
 				"id": str(component_data.get("id", "")),
 				"name": str(component_data.get("name", "Component")),
 				"points": topology["points"],
 				"edges": topology["edges"],
 				"chains": topology["chains"],
-				"outer_shape": legacy_projection["points"],
-				"closed": legacy_projection["closed"],
 				"transform": _deserialize_transform(component_data.get("transform", {})),
 				"visibility": bool(component_data.get("visibility", true)),
 				"z_index": int(component_data.get("z_index", 0)),
@@ -1460,6 +1738,7 @@ func _load_workspace(workspace_entry: String) -> bool:
 			"name": str(asset_data.get("name", asset_id)),
 			"visibility": bool(asset_data.get("visibility", true)),
 			"reference_image": _normalize_reference_image(asset_data.get("reference_image", {})),
+			"animation": MotionWorkspace.normalize_animation_document(asset_data.get("animation", {})),
 			"components": components
 		})
 	for texture_id_variant in workspace_data.get("textures", []):
@@ -1487,9 +1766,23 @@ func _load_workspace(workspace_entry: String) -> bool:
 		if not _has_supported_schema(material_data):
 			continue
 		loaded_materials.append(_normalize_material(material_data, material_id))
+	var loaded_motion_paths: Array[Dictionary] = []
+	for path_id_variant in workspace_data.get("paths", []):
+		var path_id := str(path_id_variant)
+		var path_data = _read_json("%s/paths/%s/path.json" % [workspace_root, path_id])
+		if _has_supported_schema(path_data):
+			loaded_motion_paths.append(_normalize_motion_path(path_data, path_id))
+	var loaded_motion_sequences: Array[Dictionary] = []
+	for sequence_id_variant in workspace_data.get("sequences", []):
+		var sequence_id := str(sequence_id_variant)
+		var sequence_data = _read_json("%s/sequences/%s/sequence.json" % [workspace_root, sequence_id])
+		if _has_supported_schema(sequence_data):
+			loaded_motion_sequences.append(_normalize_motion_sequence(sequence_data, sequence_id))
 	assets = loaded_assets
 	textures = loaded_textures
 	materials = loaded_materials
+	motion_paths = loaded_motion_paths
+	motion_sequences = loaded_motion_sequences
 	var saved_editor_state = workspace_data.get("editor_state", {})
 	if saved_editor_state is Dictionary and str(saved_editor_state.get("world_scale", {}).get("unit", "")) == "m":
 		_convert_asset_units(assets, 100.0)
@@ -1522,7 +1815,14 @@ func _serialize_editor_state() -> Dictionary:
 		"selected_texture_id": selected_texture_id,
 		"selected_element_id": selected_element_id,
 		"selected_material_id": selected_material_id,
+		"selected_motion_path_id": selected_motion_path_id,
+		"selected_motion_sequence_id": selected_motion_sequence_id,
+		"selected_motion_sequence_entry_id": selected_motion_sequence_entry_id,
+		"motion_path_preview_asset_id": motion_path_preview_asset_id,
+		"motion_sequence_view": motion_sequence_view,
+		"motion_sequence_preview_loop": motion_sequence_preview_loop,
 		"active_module": active_module,
+		"active_motion_submodule": active_motion_submodule,
 		"material_view_mode": material_view_mode,
 		"lookdev_target_asset_id": lookdev_target_asset_id,
 		"lookdev_target_component_id": lookdev_target_component_id,
@@ -1549,7 +1849,14 @@ func _restore_editor_state(state) -> void:
 	selected_texture_id = ""
 	selected_element_id = ""
 	selected_material_id = ""
+	selected_motion_path_id = ""
+	selected_motion_sequence_id = ""
+	selected_motion_sequence_entry_id = ""
+	motion_path_preview_asset_id = ""
+	motion_sequence_view = MotionSequenceWorkspace.VIEW_COMPOSITION
+	motion_sequence_preview_loop = true
 	active_module = "Create"
+	active_motion_submodule = "Animation"
 	material_view_mode = "graph"
 	lookdev_target_asset_id = ""
 	lookdev_target_component_id = ""
@@ -1596,6 +1903,26 @@ func _restore_editor_state(state) -> void:
 	else:
 		active_module = "Create"
 		_set_create_submodule_context("Texture" if not selected_texture_id.is_empty() else "Asset")
+	var requested_motion_submodule := str(state.get("active_motion_submodule", "Animation"))
+	if str(state.get("active_module", "")) == "Motion" and requested_motion_submodule in MOTION_SUBMODULES:
+		active_module = "Motion"
+		active_motion_submodule = requested_motion_submodule
+		var requested_path_id := str(state.get("selected_motion_path_id", ""))
+		var requested_sequence_id := str(state.get("selected_motion_sequence_id", ""))
+		selected_motion_path_id = requested_path_id if not _get_motion_path(requested_path_id).is_empty() else ""
+		selected_motion_sequence_id = requested_sequence_id if not _get_motion_sequence(requested_sequence_id).is_empty() else ""
+		var requested_sequence_entry_id := str(state.get("selected_motion_sequence_entry_id", ""))
+		selected_motion_sequence_entry_id = requested_sequence_entry_id if not _get_motion_sequence_entry(_get_motion_sequence(selected_motion_sequence_id), requested_sequence_entry_id).is_empty() else str(_first_motion_sequence_entry(_get_motion_sequence(selected_motion_sequence_id)).get("id", ""))
+		motion_sequence_view = str(state.get("motion_sequence_view", MotionSequenceWorkspace.VIEW_COMPOSITION))
+		if motion_sequence_view not in [MotionSequenceWorkspace.VIEW_COMPOSITION, MotionSequenceWorkspace.VIEW_PLAYER]:
+			motion_sequence_view = MotionSequenceWorkspace.VIEW_COMPOSITION
+		motion_sequence_preview_loop = bool(state.get("motion_sequence_preview_loop", true))
+		var requested_preview_asset_id := str(state.get("motion_path_preview_asset_id", ""))
+		motion_path_preview_asset_id = requested_preview_asset_id if not _get_asset(requested_preview_asset_id).is_empty() else _default_motion_path_preview_asset_id()
+		var motion_section := _find_section("Motion")
+		if motion_section != null:
+			motion_section.set_expanded(true)
+			motion_section.set_active_submodule(active_motion_submodule)
 	# Older editor_state files may contain View/LookDev fields. They are read
 	# only for compatibility; the current workflow always opens the Graph.
 	material_view_mode = "graph"
@@ -1641,11 +1968,6 @@ func _convert_asset_units(loaded_assets: Array[Dictionary], conversion_factor: f
 		reference_image["scale"] = float(reference_image.get("scale", 1.0)) * conversion_factor
 		asset["reference_image"] = reference_image
 		for component in asset.get("components", []):
-			var converted_points: Array[Vector2] = []
-			for point in component.get("outer_shape", []):
-				if point is Vector2:
-					converted_points.append(point * conversion_factor)
-			component["outer_shape"] = converted_points
 			for bezier_point in component.get("points", []):
 				if not bezier_point is Dictionary:
 					continue
@@ -1682,13 +2004,6 @@ func _apply_snap_settings(settings) -> void:
 		canvas_view.set_snap_settings(snap_enabled, snap_grid_step, snap_rotation_step)
 		canvas_view.set_world_scale(world_grid_size)
 	_update_snap_popup_labels()
-
-
-func _serialize_points(points: Array) -> Array:
-	var serialized: Array = []
-	for point in points:
-		serialized.append([point.x, point.y])
-	return serialized
 
 
 func _serialize_bezier_points(points: Array) -> Array:
@@ -1740,14 +2055,12 @@ func _serialize_chains(chains: Array) -> Array:
 	return serialized
 
 
-func _deserialize_component_topology(component_data: Dictionary, legacy_points: Array[Vector2], legacy_closed: bool) -> Dictionary:
+func _deserialize_component_topology(component_data: Dictionary) -> Dictionary:
 	var raw_points = component_data.get("points", [])
 	var raw_edges = component_data.get("edges", [])
 	var raw_chains = component_data.get("chains", [])
 	if not raw_points is Array or not raw_edges is Array or not raw_chains is Array:
-		return _linear_topology_from_legacy_shape(legacy_points, legacy_closed)
-	if raw_points.is_empty() and not legacy_points.is_empty():
-		return _linear_topology_from_legacy_shape(legacy_points, legacy_closed)
+		return {"points": [], "edges": [], "chains": []}
 	var points: Array[Dictionary] = []
 	var known_point_ids: Dictionary = {}
 	for raw_point in raw_points:
@@ -1757,10 +2070,7 @@ func _deserialize_component_topology(component_data: Dictionary, legacy_points: 
 		if point_id.is_empty() or known_point_ids.has(point_id):
 			continue
 		var point_mode := str(raw_point.get("mode", "linear"))
-		# Backward compatibility for workspaces saved while this mode was named Tip.
-		if point_mode == "tip":
-			point_mode = "corner"
-		if not point_mode in ["linear", "free", "aligned", "mirrored", "corner"]:
+		if point_mode not in BezierTopology.VALID_POINT_MODES:
 			point_mode = "linear"
 		points.append({
 			"id": point_id,
@@ -1772,8 +2082,6 @@ func _deserialize_component_topology(component_data: Dictionary, legacy_points: 
 			"handle_out": _deserialize_vector(raw_point.get("handle_out", [0.0, 0.0]), Vector2.ZERO)
 		})
 		known_point_ids[point_id] = true
-	if points.is_empty() and not raw_points.is_empty():
-		return _linear_topology_from_legacy_shape(legacy_points, legacy_closed)
 	var edges: Array[Dictionary] = []
 	var known_edge_ids: Dictionary = {}
 	for raw_edge in raw_edges:
@@ -1808,7 +2116,7 @@ func _deserialize_component_topology(component_data: Dictionary, legacy_points: 
 			if known_edge_ids.has(edge_id):
 				edge_ids.append(edge_id)
 		var topology_role := str(raw_chain.get("topology_role", "outer"))
-		if not topology_role in ["outer", "hole", "cut", "seam"]:
+		if topology_role not in BezierTopology.VALID_TOPOLOGY_ROLES:
 			topology_role = "outer"
 		chains.append({
 			"id": str(raw_chain.get("id", "chain_%d" % (chains.size() + 1))),
@@ -1817,99 +2125,8 @@ func _deserialize_component_topology(component_data: Dictionary, legacy_points: 
 			"closed": bool(raw_chain.get("closed", false)) and point_ids.size() >= 3,
 			"topology_role": topology_role
 		})
-	if chains.is_empty() and not points.is_empty():
-		return _linear_topology_from_points(points, legacy_closed)
 	BezierGeometry.resolve_auto_handles(points, chains)
 	return {"points": points, "edges": edges, "chains": chains}
-
-
-func _linear_topology_from_legacy_shape(legacy_points: Array[Vector2], legacy_closed: bool) -> Dictionary:
-	var points: Array[Dictionary] = []
-	for point_index in range(legacy_points.size()):
-		points.append({
-			"id": "point_%d" % (point_index + 1),
-			"position": legacy_points[point_index],
-			"mode": "linear",
-			"preserve_point": false,
-			"handle_source": "auto",
-			"handle_in": Vector2.ZERO,
-			"handle_out": Vector2.ZERO
-		})
-	return _linear_topology_from_points(points, legacy_closed)
-
-
-func _linear_topology_from_points(points: Array[Dictionary], closed: bool) -> Dictionary:
-	var point_ids: Array = []
-	for point in points:
-		point_ids.append(str(point["id"]))
-	var edges: Array[Dictionary] = []
-	for point_index in range(maxi(point_ids.size() - 1, 0)):
-		edges.append({
-			"id": "edge_%d" % (edges.size() + 1),
-			"start_point_id": point_ids[point_index],
-			"end_point_id": point_ids[point_index + 1],
-			"render_outline": true
-		})
-	var chain_closed := closed and point_ids.size() >= 3
-	if chain_closed:
-		edges.append({
-			"id": "edge_%d" % (edges.size() + 1),
-			"start_point_id": point_ids[point_ids.size() - 1],
-			"end_point_id": point_ids[0],
-			"render_outline": true
-		})
-	var chains: Array[Dictionary] = []
-	if not point_ids.is_empty():
-		var edge_ids: Array = []
-		for edge in edges:
-			edge_ids.append(str(edge["id"]))
-		chains.append({
-			"id": "chain_1",
-			"point_ids": point_ids,
-			"edge_ids": edge_ids,
-			"closed": chain_closed,
-			"topology_role": "outer"
-		})
-	return {"points": points, "edges": edges, "chains": chains}
-
-
-func _legacy_projection_from_topology(topology: Dictionary, fallback_points: Array[Vector2], fallback_closed: bool) -> Dictionary:
-	var points_by_id: Dictionary = {}
-	for point in topology.get("points", []):
-		if point is Dictionary:
-			points_by_id[str(point.get("id", ""))] = point.get("position", Vector2.ZERO)
-	for chain in topology.get("chains", []):
-		if not chain is Dictionary or str(chain.get("topology_role", "outer")) != "outer":
-			continue
-		var projected_points: Array[Vector2] = []
-		for point_id_value in chain.get("point_ids", []):
-			var point_id := str(point_id_value)
-			if points_by_id.has(point_id):
-				projected_points.append(points_by_id[point_id])
-		if not projected_points.is_empty():
-			return {"points": projected_points, "closed": bool(chain.get("closed", false))}
-	return {"points": fallback_points.duplicate(), "closed": fallback_closed}
-
-
-func _sync_linear_topology_from_legacy_shape(component: Dictionary) -> void:
-	var legacy_points := _deserialize_points(component.get("outer_shape", []))
-	var legacy_closed := bool(component.get("closed", legacy_points.size() >= 3))
-	var existing_points: Array = component.get("points", [])
-	var existing_chains: Array = component.get("chains", [])
-	if existing_points.size() == legacy_points.size() and not existing_points.is_empty() and not existing_chains.is_empty():
-		var outer_chain: Dictionary = existing_chains[0]
-		var outer_point_ids: Array = outer_chain.get("point_ids", [])
-		if outer_point_ids.size() == legacy_points.size():
-			for point_index in range(legacy_points.size()):
-				var point_data: Dictionary = existing_points[point_index]
-				point_data["position"] = legacy_points[point_index]
-			outer_chain["closed"] = legacy_closed
-			component["closed"] = legacy_closed
-			return
-	var topology := _linear_topology_from_legacy_shape(legacy_points, legacy_closed)
-	component["points"] = topology["points"]
-	component["edges"] = topology["edges"]
-	component["chains"] = topology["chains"]
 
 
 func _default_component_transform() -> Dictionary:
@@ -2023,16 +2240,6 @@ func _deserialize_vector(value, fallback: Vector2) -> Vector2:
 	return fallback
 
 
-func _deserialize_points(points: Array) -> Array[Vector2]:
-	var deserialized: Array[Vector2] = []
-	for point in points:
-		if point is Vector2:
-			deserialized.append(point)
-		elif point is Array and point.size() >= 2:
-			deserialized.append(Vector2(float(point[0]), float(point[1])))
-	return deserialized
-
-
 func _write_json(path: String, data: Dictionary) -> void:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(path.get_base_dir()))
 	var file := FileAccess.open(path, FileAccess.WRITE)
@@ -2060,6 +2267,9 @@ func _update_next_ids() -> void:
 	next_asset_id = 1
 	next_component_id = 1
 	next_texture_id = 1
+	next_material_id = 1
+	next_motion_path_id = 1
+	next_motion_sequence_id = 1
 	for asset in assets:
 		next_asset_id = maxi(next_asset_id, _id_suffix_number(str(asset["id"])) + 1)
 		for component in asset["components"]:
@@ -2068,6 +2278,10 @@ func _update_next_ids() -> void:
 		next_texture_id = maxi(next_texture_id, _id_suffix_number(str(texture["id"])) + 1)
 	for material_record in materials:
 		next_material_id = maxi(next_material_id, _id_suffix_number(str(material_record["id"])) + 1)
+	for path_document in motion_paths:
+		next_motion_path_id = maxi(next_motion_path_id, _id_suffix_number(str(path_document.get("id", ""))) + 1)
+	for sequence_document in motion_sequences:
+		next_motion_sequence_id = maxi(next_motion_sequence_id, _id_suffix_number(str(sequence_document.get("id", ""))) + 1)
 
 
 func _id_suffix_number(identifier: String) -> int:
@@ -2133,6 +2347,26 @@ func _render_context_bar() -> void:
 		context_bar.add_child(build_button)
 		_render_info_bar()
 		return
+	if active_module == "Motion":
+		if active_motion_submodule == "Animation":
+			_render_motion_context_bar()
+		elif active_motion_submodule == "Path":
+			_render_motion_path_context_bar()
+		elif active_motion_submodule == "Sequence":
+			_render_motion_sequence_context_bar()
+		else:
+			var module_label := Label.new()
+			module_label.text = "Motion → %s" % active_motion_submodule
+			module_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			module_label.add_theme_color_override("font_color", Color("#9aa3b2"))
+			context_bar.add_child(module_label)
+			var boundary_label := Label.new()
+			boundary_label.text = "Drawing tools · Phase 11" if active_motion_submodule == "Path" else "Composition controls · Phase 12"
+			boundary_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			boundary_label.add_theme_color_override("font_color", Color("#596474"))
+			context_bar.add_child(boundary_label)
+		_render_info_bar()
+		return
 	if active_module == "Style" and not selected_material_id.is_empty():
 		_render_material_context_bar()
 		_render_info_bar()
@@ -2194,6 +2428,283 @@ func _render_context_bar() -> void:
 	_style_popup_menu(edit_face_menu.get_popup())
 	edit_face_menu.get_popup().id_pressed.connect(_on_edit_face_menu_id)
 	context_bar.add_child(edit_face_menu)
+
+
+func _render_motion_context_bar() -> void:
+	motion_play_button = Button.new()
+	motion_play_button.text = "❚❚" if motion_player != null and motion_player.playing else "▶"
+	motion_play_button.custom_minimum_size = Vector2(40, 32)
+	motion_play_button.focus_mode = Control.FOCUS_NONE
+	motion_play_button.disabled = motion_player == null or motion_player.current_state_id.is_empty()
+	motion_play_button.tooltip_text = "Pause Animation Preview" if motion_player != null and motion_player.playing else "Play Animation Preview"
+	motion_play_button.pressed.connect(_toggle_motion_playback)
+	context_bar.add_child(motion_play_button)
+	motion_runtime_state_label = Label.new()
+	motion_runtime_state_label.text = motion_player.current_state_name() if motion_player != null else "None"
+	motion_runtime_state_label.custom_minimum_size = Vector2(72, 32)
+	motion_runtime_state_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	motion_runtime_state_label.add_theme_font_size_override("font_size", 11)
+	motion_runtime_state_label.add_theme_color_override("font_color", Color("#f2c94c"))
+	context_bar.add_child(motion_runtime_state_label)
+	var phase_label := Label.new()
+	phase_label.text = "Phase"
+	phase_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	phase_label.add_theme_font_size_override("font_size", 11)
+	phase_label.add_theme_color_override("font_color", Color("#9aa3b2"))
+	context_bar.add_child(phase_label)
+	var phase_stack := VBoxContainer.new()
+	phase_stack.custom_minimum_size = Vector2(220, 32)
+	phase_stack.add_theme_constant_override("separation", 0)
+	context_bar.add_child(phase_stack)
+	motion_phase_slider = HSlider.new()
+	motion_phase_slider.min_value = 0.0
+	motion_phase_slider.max_value = 1.0
+	motion_phase_slider.step = 0.01
+	motion_phase_slider.custom_minimum_size = Vector2(220, 22)
+	motion_phase_slider.set_value_no_signal(motion_phase)
+	motion_phase_slider.value_changed.connect(_on_motion_phase_changed)
+	phase_stack.add_child(motion_phase_slider)
+	motion_phase_marks = MotionPhaseMarks.new()
+	var marker_state_id := motion_player.current_state_id if motion_player != null else motion_selection.state_id
+	motion_phase_marks.set_marker_phases(motion_workspace.marker_phases_for_state(marker_state_id) if is_instance_valid(motion_workspace) else [])
+	phase_stack.add_child(motion_phase_marks)
+	motion_phase_value_label = Label.new()
+	motion_phase_value_label.text = "%.2f" % motion_phase
+	motion_phase_value_label.custom_minimum_size = Vector2(42, 32)
+	motion_phase_value_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	motion_phase_value_label.add_theme_font_size_override("font_size", 11)
+	context_bar.add_child(motion_phase_value_label)
+	var loop_toggle := CheckBox.new()
+	loop_toggle.text = "Loop"
+	loop_toggle.button_pressed = motion_player.loop if motion_player != null else true
+	loop_toggle.disabled = motion_player == null
+	loop_toggle.toggled.connect(_on_motion_loop_changed)
+	context_bar.add_child(loop_toggle)
+
+
+func _on_motion_phase_changed(value: float) -> void:
+	if motion_player != null:
+		motion_player.seek(value)
+	else:
+		_on_motion_player_phase_changed(value)
+
+
+func _toggle_motion_playback() -> void:
+	if motion_player != null:
+		motion_player.toggle_playback()
+
+
+func _on_motion_loop_changed(enabled: bool) -> void:
+	if motion_player != null:
+		motion_player.loop = enabled
+
+
+func _render_motion_path_context_bar() -> void:
+	var path_document := _get_motion_path(selected_motion_path_id)
+	var draw_button := Button.new()
+	draw_button.text = "Draw Path"
+	draw_button.toggle_mode = true
+	draw_button.button_pressed = motion_path_tool == "draw"
+	draw_button.disabled = path_document.is_empty()
+	draw_button.pressed.connect(_set_motion_path_tool.bind("draw"))
+	context_bar.add_child(draw_button)
+	var edit_button := Button.new()
+	edit_button.text = "Edit Path"
+	edit_button.toggle_mode = true
+	edit_button.button_pressed = motion_path_tool == "edit"
+	edit_button.disabled = path_document.is_empty()
+	edit_button.pressed.connect(_set_motion_path_tool.bind("edit"))
+	context_bar.add_child(edit_button)
+	var play_button := Button.new()
+	play_button.text = "❚❚" if motion_path_playing else "▶"
+	play_button.custom_minimum_size = Vector2(40, 32)
+	play_button.disabled = not _motion_path_is_previewable(path_document)
+	play_button.pressed.connect(_toggle_motion_path_playback)
+	context_bar.add_child(play_button)
+	var phase_label := Label.new()
+	phase_label.text = "Phase"
+	phase_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	context_bar.add_child(phase_label)
+	motion_path_phase_slider = HSlider.new()
+	motion_path_phase_slider.min_value = 0.0
+	motion_path_phase_slider.max_value = 1.0
+	motion_path_phase_slider.step = 0.001
+	motion_path_phase_slider.custom_minimum_size = Vector2(240, 28)
+	motion_path_phase_slider.set_value_no_signal(motion_path_phase)
+	motion_path_phase_slider.value_changed.connect(_on_motion_path_phase_changed)
+	context_bar.add_child(motion_path_phase_slider)
+	motion_path_phase_value_label = Label.new()
+	motion_path_phase_value_label.text = "%.2f" % motion_path_phase
+	motion_path_phase_value_label.custom_minimum_size = Vector2(42, 32)
+	motion_path_phase_value_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	context_bar.add_child(motion_path_phase_value_label)
+
+
+func _set_motion_path_tool(value: String) -> void:
+	motion_path_tool = value if value in ["draw", "edit"] else "draw"
+	if is_instance_valid(motion_path_workspace):
+		motion_path_workspace.set_tool_mode(motion_path_tool)
+	_render_context_bar()
+	_render_info_bar()
+
+
+func _toggle_motion_path_playback() -> void:
+	var path_document := _get_motion_path(selected_motion_path_id)
+	if not _motion_path_is_previewable(path_document):
+		return
+	if not motion_path_playing and motion_path_phase >= 1.0:
+		motion_path_phase = 0.0
+	motion_path_playing = not motion_path_playing
+	_render_context_bar()
+	_render_info_bar()
+	_refresh_motion_path_workspace()
+
+
+func _on_motion_path_phase_changed(value: float) -> void:
+	motion_path_phase = clampf(value, 0.0, 1.0)
+	_refresh_motion_path_workspace()
+	_render_info_bar()
+
+
+func _advance_motion_path_preview(delta: float) -> void:
+	var path_document := _get_motion_path(selected_motion_path_id)
+	if not _motion_path_is_previewable(path_document):
+		motion_path_playing = false
+		return
+	var playback: Dictionary = path_document.get("playback", {})
+	var duration := maxf(0.01, float(playback.get("duration", 2.0)))
+	motion_path_phase += delta / duration
+	if motion_path_phase >= 1.0:
+		if bool(playback.get("loop", true)):
+			motion_path_phase = fmod(motion_path_phase, 1.0)
+		else:
+			motion_path_phase = 1.0
+			motion_path_playing = false
+			_render_context_bar()
+	_refresh_motion_path_workspace()
+
+
+func _motion_path_is_previewable(path_document: Dictionary) -> bool:
+	if path_document.is_empty() or not MotionPathTopology.validate(path_document.get("topology", {})).is_empty() or _get_asset(motion_path_preview_asset_id).is_empty():
+		return false
+	return bool(MotionPathSampler.sample(path_document.get("topology", {}), 0.5).get("valid", false))
+
+
+func _render_motion_sequence_context_bar() -> void:
+	var composition_button := Button.new()
+	composition_button.text = "⌘1  Composition"
+	composition_button.toggle_mode = true
+	composition_button.button_pressed = motion_sequence_view == MotionSequenceWorkspace.VIEW_COMPOSITION
+	composition_button.pressed.connect(_set_motion_sequence_view.bind(MotionSequenceWorkspace.VIEW_COMPOSITION))
+	context_bar.add_child(composition_button)
+	var player_button := Button.new()
+	player_button.text = "⌘2  Player"
+	player_button.toggle_mode = true
+	player_button.button_pressed = motion_sequence_view == MotionSequenceWorkspace.VIEW_PLAYER
+	player_button.pressed.connect(_set_motion_sequence_view.bind(MotionSequenceWorkspace.VIEW_PLAYER))
+	context_bar.add_child(player_button)
+	var sequence_document := _get_motion_sequence(selected_motion_sequence_id)
+	var entry := _resolved_motion_sequence_entry(sequence_document)
+	if motion_sequence_view == MotionSequenceWorkspace.VIEW_COMPOSITION:
+		var add_button := Button.new()
+		add_button.text = "+ Add Entry"
+		add_button.disabled = sequence_document.is_empty() or not sequence_document.get("entries", []).is_empty()
+		add_button.pressed.connect(_add_motion_sequence_entry)
+		context_bar.add_child(add_button)
+		return
+	var play_button := Button.new()
+	play_button.text = "❚❚" if motion_sequence_playing else "▶"
+	play_button.custom_minimum_size = Vector2(40, 32)
+	play_button.disabled = not _motion_sequence_is_previewable(entry)
+	play_button.pressed.connect(_toggle_motion_sequence_playback)
+	context_bar.add_child(play_button)
+	var phase_label := Label.new()
+	phase_label.text = "Phase"
+	phase_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	context_bar.add_child(phase_label)
+	motion_sequence_phase_slider = HSlider.new()
+	motion_sequence_phase_slider.min_value = 0.0
+	motion_sequence_phase_slider.max_value = 1.0
+	motion_sequence_phase_slider.step = 0.001
+	motion_sequence_phase_slider.custom_minimum_size = Vector2(240, 28)
+	motion_sequence_phase_slider.set_value_no_signal(motion_sequence_phase)
+	motion_sequence_phase_slider.value_changed.connect(_on_motion_sequence_phase_changed)
+	context_bar.add_child(motion_sequence_phase_slider)
+	motion_sequence_phase_value_label = Label.new()
+	motion_sequence_phase_value_label.text = "%.2f" % motion_sequence_phase
+	motion_sequence_phase_value_label.custom_minimum_size = Vector2(42, 32)
+	motion_sequence_phase_value_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	context_bar.add_child(motion_sequence_phase_value_label)
+	var loop_toggle := CheckBox.new()
+	loop_toggle.text = "Preview Loop"
+	loop_toggle.button_pressed = motion_sequence_preview_loop
+	loop_toggle.toggled.connect(_on_motion_sequence_preview_loop_changed)
+	context_bar.add_child(loop_toggle)
+
+
+func _set_motion_sequence_view(value: String) -> void:
+	motion_sequence_view = value if value in [MotionSequenceWorkspace.VIEW_COMPOSITION, MotionSequenceWorkspace.VIEW_PLAYER] else MotionSequenceWorkspace.VIEW_COMPOSITION
+	if motion_sequence_view != MotionSequenceWorkspace.VIEW_PLAYER:
+		motion_sequence_playing = false
+	_render_context_bar()
+	_render_inspector()
+	_render_info_bar()
+	_refresh_motion_sequence_workspace()
+
+
+func _toggle_motion_sequence_playback() -> void:
+	var entry := _resolved_motion_sequence_entry(_get_motion_sequence(selected_motion_sequence_id))
+	if not _motion_sequence_is_previewable(entry):
+		return
+	if not motion_sequence_playing and motion_sequence_phase >= 1.0:
+		motion_sequence_phase = 0.0
+	motion_sequence_playing = not motion_sequence_playing
+	_render_context_bar()
+	_render_info_bar()
+	_refresh_motion_sequence_workspace()
+
+
+func _on_motion_sequence_phase_changed(value: float) -> void:
+	motion_sequence_phase = clampf(value, 0.0, 1.0)
+	_refresh_motion_sequence_workspace()
+	_render_info_bar()
+
+
+func _on_motion_sequence_preview_loop_changed(enabled: bool) -> void:
+	motion_sequence_preview_loop = enabled
+
+
+func _advance_motion_sequence_preview(delta: float) -> void:
+	var entry := _resolved_motion_sequence_entry(_get_motion_sequence(selected_motion_sequence_id))
+	var context := _motion_sequence_entry_context(entry)
+	if not MotionSequenceEvaluator.validation_issues(entry, context.get("asset", {}), context.get("path", {})).is_empty():
+		motion_sequence_playing = false
+		_render_context_bar()
+		return
+	var duration := maxf(0.01, float(context.get("path", {}).get("playback", {}).get("duration", 2.0)))
+	motion_sequence_phase += delta / duration
+	if motion_sequence_phase >= 1.0:
+		if motion_sequence_preview_loop:
+			motion_sequence_phase = fmod(motion_sequence_phase, 1.0)
+		else:
+			motion_sequence_phase = 1.0
+			motion_sequence_playing = false
+			_render_context_bar()
+	_refresh_motion_sequence_workspace()
+
+
+func _resolved_motion_sequence_entry(sequence_document: Dictionary) -> Dictionary:
+	var selected := _get_motion_sequence_entry(sequence_document, selected_motion_sequence_entry_id)
+	return selected if not selected.is_empty() else _first_motion_sequence_entry(sequence_document)
+
+
+func _motion_sequence_entry_context(entry: Dictionary) -> Dictionary:
+	return {"asset": _get_asset(str(entry.get("asset_id", ""))), "path": _get_motion_path(str(entry.get("path_id", "")))}
+
+
+func _motion_sequence_is_previewable(entry: Dictionary) -> bool:
+	var context := _motion_sequence_entry_context(entry)
+	return MotionSequenceEvaluator.validation_issues(entry, context.get("asset", {}), context.get("path", {})).is_empty()
 
 
 func _render_material_context_bar() -> void:
@@ -2638,19 +3149,13 @@ func _set_draw_point_mode(mode: String) -> void:
 	_render_info_bar()
 
 
-func _activate_draw_line() -> void:
-	active_draw_tool = "point"
-	canvas_view.set_interaction_state("draw")
-	canvas_view.set_tool_mode(active_draw_tool)
-	_render_info_bar()
-
-
 func _set_edit_mode(mode: String) -> void:
 	active_edit_mode = mode
 	if mode != "edge":
 		selected_edge_id = ""
 	if mode != "point":
-		selected_point_index = -1
+		selected_point_id = ""
+		selected_point_ids.clear()
 		edit_bezier_handles = false
 		edit_point_set_mode = false
 	canvas_view.set_edit_mode(active_edit_mode)
@@ -2727,6 +3232,32 @@ func _render_info_bar() -> void:
 		else:
 			active_material_status_label.text = ""
 	_clear(info_bar)
+	if active_module == "Motion":
+		if active_motion_submodule == "Path":
+			var path_document := _get_motion_path(selected_motion_path_id)
+			_add_info_option("Motion: Path")
+			_add_info_option(str(path_document.get("name", "No Path selected")))
+			_add_info_option("Phase %.2f" % motion_path_phase)
+			_add_info_option("%d Points" % path_document.get("topology", {}).get("points", []).size() if not path_document.is_empty() else "Independent resource")
+			return
+		if active_motion_submodule == "Sequence":
+			var sequence_document := _get_motion_sequence(selected_motion_sequence_id)
+			_add_info_option("Motion: Sequence")
+			_add_info_option(str(sequence_document.get("name", "No Sequence selected")))
+			_add_info_option("Composition" if motion_sequence_view == MotionSequenceWorkspace.VIEW_COMPOSITION else "Player · Phase %.2f" % motion_sequence_phase)
+			if motion_sequence_view == MotionSequenceWorkspace.VIEW_PLAYER:
+				_add_info_option("Playing" if motion_sequence_playing else "Paused")
+			return
+		var motion_state_label := Label.new()
+		motion_state_label.text = "Motion: %s" % (motion_player.current_state_name() if motion_player != null else "None")
+		info_bar.add_child(motion_state_label)
+		_add_info_option("Phase %.2f" % motion_phase)
+		_add_info_option("Playing" if motion_player != null and motion_player.playing else "Paused")
+		if motion_player != null and not motion_player.blend.is_empty():
+			_add_info_option("Blend %.0f%%" % (motion_player.blend_weight() * 100.0))
+		if not motion_last_marker.is_empty():
+			_add_info_option("Marker %s" % motion_last_marker)
+		return
 	if active_module == "Style":
 		var material_state_label := Label.new()
 		material_state_label.text = "State: Default"
@@ -2816,8 +3347,8 @@ func _export_validation_errors(asset: Dictionary) -> Array[String]:
 		return errors
 	for component in asset.get("components", []):
 		var component_name := str(component.get("name", "Component"))
-		var points: Array = component.get("outer_shape", [])
-		if not bool(component.get("closed", false)):
+		var points: Array = BezierTopology.outer_control_polygon(component)
+		if not BezierTopology.outer_chain_closed(component):
 			errors.append("%s: contour is not closed." % component_name)
 			continue
 		if points.size() < 3:
@@ -2873,7 +3404,7 @@ func _build_selected_asset_scene() -> void:
 	for component in asset.get("components", []):
 		var polygon := Polygon2D.new()
 		polygon.name = _tscn_name(str(component.get("name", "Component")))
-		var export_points := _godot_export_points(component.get("outer_shape", []))
+		var export_points := _godot_export_points(BezierTopology.outer_control_polygon(component))
 		polygon.polygon = PackedVector2Array(export_points)
 		var transform: Dictionary = component.get("transform", _default_component_transform())
 		var export_transform := _godot_export_transform(transform)
@@ -2940,80 +3471,8 @@ func _build_export_uvs(points: Array, texture_size: Vector2, mapping_scale: Vect
 	return uvs
 
 
-func _export_selected_asset_scene_legacy() -> void:
-	var asset := _get_asset(selected_asset_id)
-	if asset.is_empty():
-		_show_status_message("Select an Asset before exporting.")
-		return
-	var export_dir := "res://exports"
-	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(export_dir))
-	var safe_name := str(asset.get("name", "Asset")).strip_edges().to_lower().replace(" ", "_")
-	if safe_name.is_empty():
-		safe_name = str(asset.get("id", "asset"))
-	var scene_path := "%s/%s.tscn" % [export_dir, safe_name]
-	var lines: Array[String] = []
-	lines.append("[gd_scene load_steps=%d format=3]" % (1 + _export_texture_resource_count(asset)))
-	var resource_id := 1
-	var texture_resources := {}
-	for component in asset.get("components", []):
-		var material_data := _get_material(str(component.get("material_id", "")))
-		var texture := _get_texture(str(material_data.get("texture_id", ""))) if not material_data.is_empty() else {}
-		var texture_path := _get_texture_final_path(texture) if not texture.is_empty() else ""
-		if texture_path.is_empty() or texture_resources.has(texture_path):
-			continue
-		texture_resources[texture_path] = resource_id
-		lines.append("[ext_resource type=\"Texture2D\" path=\"%s\" id=\"%d_tex\"]" % [texture_path, resource_id])
-		resource_id += 1
-	for component in asset.get("components", []):
-		var material_data := _get_material(str(component.get("material_id", "")))
-		var texture := _get_texture(str(material_data.get("texture_id", ""))) if not material_data.is_empty() else {}
-		var texture_path := _get_texture_final_path(texture) if not texture.is_empty() else ""
-		var node_name := _tscn_name(str(component.get("name", "Component")))
-		var transform: Dictionary = component.get("transform", _default_component_transform())
-		lines.append("\n[node name=\"%s\" type=\"Polygon2D\" parent=\".\"]" % node_name)
-		var export_points := _godot_export_points(component.get("outer_shape", []))
-		var export_transform := _godot_export_transform(transform)
-		lines.append("polygon = %s" % _tscn_vector2_array(export_points))
-		lines.append("position = Vector2(%s, %s)" % [str(export_transform["position"].x), str(export_transform["position"].y)])
-		lines.append("rotation = %s" % str(deg_to_rad(float(export_transform["rotation"]))))
-		lines.append("scale = Vector2(%s, %s)" % [str(export_transform["scale"].x), str(export_transform["scale"].y)])
-		lines.append("visible = %s" % str(bool(asset.get("visibility", true)) and bool(component.get("visibility", true))).to_lower())
-		lines.append("z_index = %d" % int(component.get("z_index", 0)))
-		if not material_data.is_empty():
-			var tint: Color = material_data.get("tint", Color.WHITE)
-			lines.append("color = Color(%s, %s, %s, %s)" % [str(tint.r), str(tint.g), str(tint.b), str(tint.a * float(material_data.get("opacity", 1.0)))])
-		if texture_resources.has(texture_path):
-			lines.append("texture = ExtResource(\"%d_tex\")" % int(texture_resources[texture_path]))
-	var file := FileAccess.open(scene_path, FileAccess.WRITE)
-	if file == null:
-		_show_status_message("Export failed.")
-		return
-	file.store_string("\n".join(lines) + "\n")
-	file.close()
-	_show_status_message("Exported: %s" % scene_path)
-
-
-func _export_texture_resource_count(asset: Dictionary) -> int:
-	var paths := {}
-	for component in asset.get("components", []):
-		var material_data := _get_material(str(component.get("material_id", "")))
-		var texture := _get_texture(str(material_data.get("texture_id", ""))) if not material_data.is_empty() else {}
-		var texture_path := _get_texture_final_path(texture) if not texture.is_empty() else ""
-		if not texture_path.is_empty():
-			paths[texture_path] = true
-	return paths.size()
-
-
 func _tscn_name(value: String) -> String:
 	return value.replace("\"", "'") if not value.is_empty() else "Component"
-
-
-func _tscn_vector2_array(points: Array) -> String:
-	var values: Array[String] = []
-	for point in points:
-		var vector: Vector2 = point if point is Vector2 else Vector2.ZERO
-		values.append("%s, %s" % [str(vector.x), str(vector.y)])
-	return "PackedVector2Array(%s)" % ", ".join(values)
 
 
 func _godot_export_points(points: Array) -> Array[Vector2]:
@@ -3062,7 +3521,7 @@ func _confirm_asset_creation() -> void:
 		asset_name = _next_default_asset_name()
 	var asset_id := "asset_%d" % next_asset_id
 	next_asset_id += 1
-	assets.append({"id": asset_id, "name": asset_name, "visibility": true, "reference_image": _default_reference_image(), "components": []})
+	assets.append({"id": asset_id, "name": asset_name, "visibility": true, "reference_image": _default_reference_image(), "animation": MotionWorkspace.create_default_animation_document(), "components": []})
 	selected_asset_id = asset_id
 	selected_component_id = ""
 	selected_texture_id = ""
@@ -3377,6 +3836,9 @@ func _has_asset_name(asset_name: String) -> bool:
 func _render_outliner() -> void:
 	_clear(outliner_list)
 	_update_context_action_button()
+	if active_module == "Motion":
+		_render_motion_outliner()
+		return
 	if active_module == "Style":
 		_render_material_outliner()
 		return
@@ -3404,6 +3866,258 @@ func _render_outliner() -> void:
 		outliner_list.add_child(_create_outliner_group_label("Textures"))
 		for texture in visible_textures:
 			_render_texture_outliner_entry(texture, not search_text.is_empty())
+
+
+func _render_motion_outliner() -> void:
+	var search_text := outliner_search_input.text.strip_edges().to_lower() if is_instance_valid(outliner_search_input) else ""
+	if active_motion_submodule == "Path":
+		outliner_list.add_child(_create_outliner_group_label("Paths"))
+		for path_document in motion_paths:
+			if search_text.is_empty() or str(path_document.get("name", "")).to_lower().contains(search_text):
+				var path_button := Button.new()
+				path_button.text = str(path_document.get("name", "Path"))
+				path_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+				path_button.focus_mode = Control.FOCUS_NONE
+				_style_outliner_button(path_button, str(path_document.get("id", "")) == selected_motion_path_id)
+				path_button.pressed.connect(_select_motion_path.bind(str(path_document.get("id", ""))))
+				outliner_list.add_child(path_button)
+		if motion_paths.is_empty():
+			outliner_list.add_child(_create_inspector_field_label("No Paths"))
+		return
+	if active_motion_submodule == "Sequence":
+		outliner_list.add_child(_create_outliner_group_label("Sequences"))
+		for sequence_document in motion_sequences:
+			if search_text.is_empty() or str(sequence_document.get("name", "")).to_lower().contains(search_text):
+				var sequence_button := Button.new()
+				sequence_button.text = str(sequence_document.get("name", "Sequence"))
+				sequence_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+				sequence_button.focus_mode = Control.FOCUS_NONE
+				_style_outliner_button(sequence_button, str(sequence_document.get("id", "")) == selected_motion_sequence_id)
+				sequence_button.pressed.connect(_select_motion_sequence.bind(str(sequence_document.get("id", ""))))
+				outliner_list.add_child(sequence_button)
+		if motion_sequences.is_empty():
+			outliner_list.add_child(_create_inspector_field_label("No Sequences"))
+		return
+	var visible_assets: Array[Dictionary] = []
+	for asset in assets:
+		if search_text.is_empty() or str(asset.get("name", "")).to_lower().contains(search_text):
+			visible_assets.append(asset)
+	visible_assets.sort_custom(_sort_named_documents)
+	outliner_list.add_child(_create_outliner_group_label("Animation Assets"))
+	for asset in visible_assets:
+		var asset_id := str(asset.get("id", ""))
+		var asset_button := Button.new()
+		asset_button.text = str(asset.get("name", "Asset"))
+		asset_button.custom_minimum_size = Vector2(0, 30)
+		asset_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		asset_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		asset_button.focus_mode = Control.FOCUS_NONE
+		_style_outliner_button(asset_button, asset_id == selected_asset_id)
+		asset_button.pressed.connect(_select_motion_asset.bind(asset_id))
+		outliner_list.add_child(asset_button)
+	if visible_assets.is_empty():
+		outliner_list.add_child(_create_inspector_field_label("No Assets"))
+
+
+func _select_motion_path(path_id: String) -> void:
+	selected_motion_path_id = path_id
+	motion_path_phase = 0.0
+	motion_path_playing = false
+	if _get_asset(motion_path_preview_asset_id).is_empty():
+		motion_path_preview_asset_id = _default_motion_path_preview_asset_id()
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _select_motion_sequence(sequence_id: String) -> void:
+	selected_motion_sequence_id = sequence_id
+	var sequence_document := _get_motion_sequence(sequence_id)
+	var first_entry := _first_motion_sequence_entry(sequence_document)
+	selected_motion_sequence_entry_id = str(first_entry.get("id", ""))
+	motion_sequence_phase = 0.0
+	motion_sequence_playing = false
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _select_motion_sequence_entry(entry_id: String) -> void:
+	var sequence_document := _get_motion_sequence(selected_motion_sequence_id)
+	if _get_motion_sequence_entry(sequence_document, entry_id).is_empty():
+		return
+	selected_motion_sequence_entry_id = entry_id
+	_render_inspector()
+	_refresh_motion_sequence_workspace()
+
+
+func _add_motion_sequence_entry() -> void:
+	var sequence_document := _get_motion_sequence(selected_motion_sequence_id)
+	if sequence_document.is_empty():
+		return
+	if not sequence_document.get("entries", []).is_empty():
+		_show_status_message("Phase 12 MVP supports one Composition Entry.")
+		return
+	_record_direct_change()
+	var entry_index := int(sequence_document.get("next_entry_index", 1))
+	sequence_document["next_entry_index"] = entry_index + 1
+	var asset_id := _default_motion_path_preview_asset_id()
+	var asset := _get_asset(asset_id)
+	var state_id := _default_sequence_state_id(asset)
+	var path_id := selected_motion_path_id if not _get_motion_path(selected_motion_path_id).is_empty() else (str(motion_paths[0].get("id", "")) if not motion_paths.is_empty() else "")
+	var entry := {"id": "entry_%d" % entry_index, "name": "Composition Entry", "enabled": true, "asset_id": asset_id, "animation_state_id": state_id, "path_id": path_id}
+	sequence_document["entries"].append(entry)
+	selected_motion_sequence_entry_id = str(entry["id"])
+	motion_sequence_phase = 0.0
+	motion_sequence_playing = false
+	_render_inspector()
+	_render_context_bar()
+	_refresh_motion_sequence_workspace()
+
+
+func _remove_motion_sequence_entry() -> void:
+	var sequence_document := _get_motion_sequence(selected_motion_sequence_id)
+	var entries: Array = sequence_document.get("entries", [])
+	for index in range(entries.size()):
+		if str(entries[index].get("id", "")) == selected_motion_sequence_entry_id:
+			_record_direct_change()
+			entries.remove_at(index)
+			selected_motion_sequence_entry_id = ""
+			motion_sequence_phase = 0.0
+			motion_sequence_playing = false
+			_render_inspector()
+			_render_context_bar()
+			_refresh_motion_sequence_workspace()
+			return
+
+
+func _default_sequence_state_id(asset: Dictionary) -> String:
+	var states: Array = asset.get("animation", {}).get("states", [])
+	for state in states:
+		if str(state.get("name", "")).to_upper() == "WALK":
+			return str(state.get("id", ""))
+	return str(states[0].get("id", "")) if not states.is_empty() else ""
+
+
+func _rename_motion_path(new_name: String, path_document: Dictionary, editor: LineEdit) -> void:
+	var normalized_name := new_name.strip_edges()
+	if normalized_name.is_empty():
+		editor.text = str(path_document.get("name", "Path"))
+		_show_status_message("Path name cannot be empty.")
+		return
+	if normalized_name == str(path_document.get("name", "")):
+		return
+	_record_direct_change()
+	path_document["name"] = normalized_name
+	_render_outliner()
+	if is_instance_valid(motion_path_workspace):
+		motion_path_workspace.set_document(path_document)
+
+
+func _rename_motion_sequence(new_name: String, sequence_document: Dictionary, editor: LineEdit) -> void:
+	var normalized_name := new_name.strip_edges()
+	if normalized_name.is_empty():
+		editor.text = str(sequence_document.get("name", "Sequence"))
+		_show_status_message("Sequence name cannot be empty.")
+		return
+	if normalized_name == str(sequence_document.get("name", "")):
+		return
+	_record_direct_change()
+	sequence_document["name"] = normalized_name
+	_render_outliner()
+	if is_instance_valid(motion_sequence_workspace):
+		motion_sequence_workspace.set_document(sequence_document)
+
+
+func _on_motion_path_point_add_requested(position: Vector2) -> void:
+	var path_document := _get_motion_path(selected_motion_path_id)
+	if path_document.is_empty():
+		return
+	_record_direct_change()
+	MotionPathTopology.add_point(path_document["topology"], position)
+	motion_path_phase = 0.0
+	_refresh_motion_path_workspace()
+	_render_inspector()
+	_render_context_bar()
+
+
+func _on_motion_path_point_move_requested(point_id: String, position: Vector2) -> void:
+	var path_document := _get_motion_path(selected_motion_path_id)
+	if path_document.is_empty() or not MotionPathTopology.move_point(path_document["topology"], point_id, position):
+		return
+	_refresh_motion_path_workspace()
+
+
+func _on_motion_path_handle_move_requested(point_id: String, side: String, value: Vector2) -> void:
+	var path_document := _get_motion_path(selected_motion_path_id)
+	if path_document.is_empty() or not MotionPathTopology.set_handle(path_document["topology"], point_id, side, value):
+		return
+	_refresh_motion_path_workspace()
+
+
+func _on_motion_path_point_delete_requested(point_id: String) -> void:
+	var path_document := _get_motion_path(selected_motion_path_id)
+	if path_document.is_empty():
+		return
+	_record_direct_change()
+	if MotionPathTopology.delete_point(path_document["topology"], point_id):
+		motion_path_phase = 0.0
+		_refresh_motion_path_workspace()
+		_render_inspector()
+		_render_context_bar()
+
+
+func _refresh_motion_path_workspace() -> void:
+	if not is_instance_valid(motion_path_workspace):
+		return
+	motion_path_workspace.set_document(_get_motion_path(selected_motion_path_id))
+	motion_path_workspace.set_preview_asset(_get_asset(motion_path_preview_asset_id))
+	motion_path_workspace.set_tool_mode(motion_path_tool)
+	motion_path_workspace.set_runtime(motion_path_phase, motion_path_playing)
+	if is_instance_valid(motion_path_phase_slider):
+		motion_path_phase_slider.set_value_no_signal(motion_path_phase)
+	if is_instance_valid(motion_path_phase_value_label):
+		motion_path_phase_value_label.text = "%.2f" % motion_path_phase
+
+
+func _refresh_motion_sequence_workspace() -> void:
+	if not is_instance_valid(motion_sequence_workspace):
+		return
+	var sequence_document := _get_motion_sequence(selected_motion_sequence_id)
+	var entry := _resolved_motion_sequence_entry(sequence_document)
+	var context := _motion_sequence_entry_context(entry)
+	motion_sequence_workspace.set_context(sequence_document, str(entry.get("id", "")), context.get("asset", {}), context.get("path", {}))
+	motion_sequence_workspace.set_view_mode(motion_sequence_view)
+	motion_sequence_workspace.set_runtime(motion_sequence_phase, motion_sequence_playing)
+	if is_instance_valid(motion_sequence_phase_slider):
+		motion_sequence_phase_slider.set_value_no_signal(motion_sequence_phase)
+	if is_instance_valid(motion_sequence_phase_value_label):
+		motion_sequence_phase_value_label.text = "%.2f" % motion_sequence_phase
+	var snapshot := MotionSequenceEvaluator.evaluate(entry, context.get("asset", {}), context.get("path", {}), motion_sequence_phase)
+	if is_instance_valid(motion_sequence_runtime_sequence_label):
+		motion_sequence_runtime_sequence_label.text = "%.2f" % motion_sequence_phase
+	if is_instance_valid(motion_sequence_runtime_path_label):
+		motion_sequence_runtime_path_label.text = "%.2f" % float(snapshot.get("path_phase", 0.0))
+	if is_instance_valid(motion_sequence_runtime_animation_label):
+		motion_sequence_runtime_animation_label.text = "%.2f" % float(snapshot.get("animation_phase", 0.0))
+
+
+func _select_motion_asset(asset_id: String) -> void:
+	var asset := _get_asset(asset_id)
+	if asset.is_empty():
+		return
+	selected_asset_id = asset_id
+	selected_component_id = ""
+	selected_texture_id = ""
+	selected_element_id = ""
+	selected_material_id = ""
+	motion_selection.select_asset(asset_id)
+	if is_instance_valid(motion_workspace):
+		motion_workspace.set_asset(asset_id, str(asset.get("name", "Asset")), asset.get("components", []), _ensure_asset_animation(asset))
+	_sync_motion_player_document(asset)
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
 
 
 func _render_material_outliner() -> void:
@@ -3834,8 +4548,6 @@ func _confirm_component_creation() -> void:
 		"points": [],
 		"edges": [],
 		"chains": [],
-		"outer_shape": [],
-		"closed": false,
 		"transform": _default_component_transform(),
 		"visibility": true,
 		"z_index": 0,
@@ -3874,7 +4586,8 @@ func _select_component(asset_id: String, component_id: String) -> void:
 	selected_asset_id = asset_id
 	selected_component_id = component_id
 	selected_edge_id = ""
-	selected_point_index = -1
+	selected_point_id = ""
+	selected_point_ids.clear()
 	selected_texture_id = ""
 	selected_element_id = ""
 	selected_material_id = ""
@@ -4274,6 +4987,14 @@ func _render_inspector() -> void:
 	_ensure_default_edit_point_state()
 	_clear(inspector_content)
 	transform_fields.clear()
+	if active_module == "Motion":
+		if active_motion_submodule == "Path":
+			_render_motion_path_inspector()
+		elif active_motion_submodule == "Sequence":
+			_render_motion_sequence_inspector()
+		else:
+			_render_motion_inspector()
+		return
 	if active_module == "Export":
 		inspector_content.add_child(_create_inspector_section("Build"))
 		inspector_content.add_child(_create_inspector_field_label("Source Asset"))
@@ -4448,16 +5169,16 @@ func _render_inspector() -> void:
 	if component.is_empty():
 		return
 	if active_state == "edit" and active_edit_mode == "point":
-		var point_indices := _valid_selected_point_indices(component)
-		if point_indices.is_empty():
+		var point_ids := _valid_selected_point_ids(component)
+		if point_ids.is_empty():
 			inspector_content.add_child(_create_inspector_field_label("Edit Point"))
 			inspector_content.add_child(_create_inspector_section("Point Settings"))
 			var selection_hint := _create_inspector_field_label("Select one or more points to edit them.")
 			selection_hint.add_theme_color_override("font_color", Color("#9aa3b2"))
 			inspector_content.add_child(selection_hint)
 			return
-		var is_multi_point_selection := point_indices.size() > 1
-		inspector_content.add_child(_create_inspector_field_label("%d Points" % point_indices.size() if is_multi_point_selection else "Point"))
+		var is_multi_point_selection := point_ids.size() > 1
+		inspector_content.add_child(_create_inspector_field_label("%d Points" % point_ids.size() if is_multi_point_selection else "Point"))
 		inspector_content.add_child(_create_inspector_section("Transform"))
 		var point_transform_grid := GridContainer.new()
 		point_transform_grid.columns = 2
@@ -4467,13 +5188,13 @@ func _render_inspector() -> void:
 			_add_selected_points_delta_field(point_transform_grid, "Delta X (cm)", "position_x")
 			_add_selected_points_delta_field(point_transform_grid, "Delta Y (cm)", "position_y")
 		else:
-			var selected_point := _get_component_point(component, point_indices[0])
+			var selected_point := BezierTopology.point_by_id(component.get("points", []), point_ids[0])
 			var point_position: Vector2 = selected_point.get("position", Vector2.ZERO)
 			_add_point_position_field(point_transform_grid, "Position X (cm)", _editor_units_to_world(point_position.x), "position_x")
 			_add_point_position_field(point_transform_grid, "Position Y (cm)", _editor_units_to_world(point_position.y), "position_y")
 		inspector_content.add_child(point_transform_grid)
 		inspector_content.add_child(_create_inspector_section("Point Settings"))
-		_add_selected_point_settings(component, point_indices)
+		_add_selected_point_settings(component, point_ids)
 		return
 	if not selected_edge_id.is_empty():
 		var selected_edge := _get_edge(component, selected_edge_id)
@@ -4550,6 +5271,1128 @@ func _render_inspector() -> void:
 	inspector_content.add_child(material_option)
 
 
+func _render_motion_inspector() -> void:
+	inspector_content.add_child(_create_inspector_section("Animation Preview"))
+	var asset := _get_asset(selected_asset_id)
+	var preview_panel := _create_panel(Color("#171b22"))
+	motion_asset_preview = MotionAssetPreview.new()
+	motion_asset_preview.set_asset(asset)
+	motion_asset_preview.set_runtime(motion_player.current_state_name() if motion_player != null else "None", motion_phase, motion_player.playing if motion_player != null else false)
+	preview_panel.add_child(motion_asset_preview)
+	inspector_content.add_child(preview_panel)
+	if asset.is_empty():
+		inspector_content.add_child(_create_inspector_field_label("Select an Asset in the Motion Outliner."))
+		return
+	if is_instance_valid(motion_workspace) and motion_workspace.asset_id != selected_asset_id:
+		motion_selection.select_asset(selected_asset_id)
+		motion_workspace.set_asset(selected_asset_id, str(asset.get("name", "Asset")), asset.get("components", []), _ensure_asset_animation(asset))
+	_sync_motion_player_document(asset)
+	_refresh_motion_asset_preview()
+	var preview := motion_workspace.get_selected_preview() if is_instance_valid(motion_workspace) else {}
+	if motion_selection.kind == MotionSelection.ASSET:
+		_render_simulation_contract_inspector()
+		_render_legacy_path_follow_migration(asset)
+		_render_animation_validation_inspector()
+		inspector_content.add_child(_create_inspector_field_label("Persisted with the Asset · evaluated beginning in Phase 8."))
+		return
+	if preview.is_empty():
+		inspector_content.add_child(_create_inspector_field_label("Select a State or one of its Preview entries."))
+		return
+	var kind := str(preview.get("kind", MotionSelection.NONE))
+	var state: Dictionary = preview.get("state", {})
+	inspector_content.add_child(_create_inspector_section(kind.capitalize()))
+	if kind == MotionSelection.STATE:
+		var state_id := str(state.get("id", ""))
+		inspector_content.add_child(_create_inspector_field_label("Name"))
+		var state_name_editor := _create_name_editor(str(state.get("name", "State")), "State name")
+		state_name_editor.text_submitted.connect(_rename_motion_state.bind(state_id, state_name_editor))
+		state_name_editor.focus_exited.connect(func() -> void: _rename_motion_state(state_name_editor.text, state_id, state_name_editor))
+		inspector_content.add_child(state_name_editor)
+		inspector_content.add_child(_create_inspector_field_label("Cycle Duration (s)"))
+		var cycle_duration := SpinBox.new()
+		cycle_duration.min_value = 0.01
+		cycle_duration.max_value = 3600.0
+		cycle_duration.step = 0.05
+		cycle_duration.value = float(state.get("cycle_duration", 1.0))
+		cycle_duration.value_changed.connect(_on_motion_state_cycle_duration_changed.bind(state_id))
+		inspector_content.add_child(cycle_duration)
+		inspector_content.add_child(_create_motion_inspector_value("Motion", "%d Preview entries" % state.get("motions", []).size()))
+		inspector_content.add_child(_create_motion_inspector_value("Transitions", "%d Preview entries" % state.get("transitions", []).size()))
+		inspector_content.add_child(_create_motion_inspector_value("Markers", "%d Preview entries" % state.get("markers", []).size()))
+		var remove_state_button := Button.new()
+		remove_state_button.text = "Remove State"
+		remove_state_button.custom_minimum_size = Vector2(0, 28)
+		remove_state_button.focus_mode = Control.FOCUS_NONE
+		remove_state_button.pressed.connect(_request_motion_state_removal.bind(state_id))
+		inspector_content.add_child(remove_state_button)
+	elif kind == MotionSelection.MOTION:
+		var motion: Dictionary = preview.get("item", {})
+		_render_motion_authoring_inspector(state, motion)
+	elif kind == MotionSelection.TRANSITION:
+		var transition: Dictionary = preview.get("item", {})
+		_render_transition_authoring_inspector(state, transition)
+	elif kind == MotionSelection.MARKER:
+		var marker: Dictionary = preview.get("item", {})
+		_render_marker_authoring_inspector(state, marker)
+	else:
+		var item: Dictionary = preview.get("item", {})
+		inspector_content.add_child(_create_motion_inspector_value("State", str(state.get("name", "State"))))
+		inspector_content.add_child(_create_motion_inspector_value("Name", motion_workspace.item_display_name(kind, item)))
+		inspector_content.add_child(_create_motion_inspector_value("Preview", motion_workspace.item_summary(kind, item)))
+		if kind == MotionSelection.TRANSITION:
+			inspector_content.add_child(_create_motion_inspector_value("Priority", "List order · first eligible wins"))
+	inspector_content.add_child(_create_inspector_field_label("Persisted Animation data · runtime evaluation follows in Phase 8."))
+
+
+func _render_motion_path_inspector() -> void:
+	inspector_content.add_child(_create_inspector_section("Path"))
+	var path_document := _get_motion_path(selected_motion_path_id)
+	if path_document.is_empty():
+		inspector_content.add_child(_create_inspector_field_label("Create or select an independent Path resource."))
+		return
+	inspector_content.add_child(_create_inspector_field_label("Name"))
+	var name_editor := _create_name_editor(str(path_document.get("name", "Path")), "Path name")
+	name_editor.text_submitted.connect(_rename_motion_path.bind(path_document, name_editor))
+	name_editor.focus_exited.connect(func() -> void: _rename_motion_path(name_editor.text, path_document, name_editor))
+	inspector_content.add_child(name_editor)
+	inspector_content.add_child(_create_motion_inspector_value("Stable Resource ID", str(path_document.get("id", ""))))
+	inspector_content.add_child(_create_inspector_section("Path Preview"))
+	inspector_content.add_child(_create_inspector_field_label("Preview Asset · editor-only"))
+	var preview_asset_option := OptionButton.new()
+	preview_asset_option.custom_minimum_size = Vector2(0, 28)
+	preview_asset_option.add_item("No Preview Asset")
+	preview_asset_option.set_item_metadata(0, "")
+	for asset in assets:
+		preview_asset_option.add_item(str(asset.get("name", "Asset")))
+		preview_asset_option.set_item_metadata(preview_asset_option.item_count - 1, str(asset.get("id", "")))
+		if str(asset.get("id", "")) == motion_path_preview_asset_id:
+			preview_asset_option.select(preview_asset_option.item_count - 1)
+	preview_asset_option.item_selected.connect(_on_motion_path_preview_asset_selected.bind(preview_asset_option))
+	inspector_content.add_child(preview_asset_option)
+	var playback: Dictionary = path_document.get("playback", {})
+	inspector_content.add_child(_create_inspector_field_label("Duration (s)"))
+	var duration_input := SpinBox.new()
+	duration_input.min_value = 0.01
+	duration_input.max_value = 3600.0
+	duration_input.step = 0.05
+	duration_input.value = float(playback.get("duration", 2.0))
+	duration_input.value_changed.connect(_on_motion_path_duration_changed)
+	inspector_content.add_child(duration_input)
+	var loop_toggle := CheckBox.new()
+	loop_toggle.text = "Loop"
+	loop_toggle.button_pressed = bool(playback.get("loop", true))
+	loop_toggle.toggled.connect(_on_motion_path_playback_toggle.bind("loop"))
+	inspector_content.add_child(loop_toggle)
+	var orient_toggle := CheckBox.new()
+	orient_toggle.text = "Orient Along Path"
+	orient_toggle.button_pressed = bool(playback.get("orient_along_path", false))
+	orient_toggle.toggled.connect(_on_motion_path_playback_toggle.bind("orient_along_path"))
+	inspector_content.add_child(orient_toggle)
+	inspector_content.add_child(_create_inspector_section("Path Geometry"))
+	var topology: Dictionary = path_document.get("topology", {})
+	inspector_content.add_child(_create_motion_inspector_value("Points", str(topology.get("points", []).size())))
+	inspector_content.add_child(_create_motion_inspector_value("Segments", str(topology.get("segments", []).size())))
+	inspector_content.add_child(_create_motion_inspector_value("Ownership", "Independent Workspace resource · no Asset reference"))
+	var validation := MotionPathTopology.validate(topology)
+	var sample := MotionPathSampler.sample(topology, 0.5)
+	var validation_text := "Ready for Preview · %.2f cm" % float(sample.get("length", 0.0))
+	if topology.get("points", []).size() < 2:
+		validation_text = "Add at least two Points."
+	elif not validation.is_empty():
+		validation_text = "Invalid · %s" % validation[0]
+	elif not bool(sample.get("valid", false)):
+		validation_text = "Invalid · Path length must be greater than zero."
+	elif _get_asset(motion_path_preview_asset_id).is_empty():
+		validation_text = "Select a Preview Asset."
+	var validation_label := _create_inspector_field_label(validation_text)
+	validation_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	validation_label.add_theme_color_override("font_color", Color("#75b88a") if _motion_path_is_previewable(path_document) else Color("#f2c94c"))
+	inspector_content.add_child(validation_label)
+
+
+func _on_motion_path_preview_asset_selected(index: int, option: OptionButton) -> void:
+	if index < 0 or index >= option.item_count:
+		return
+	motion_path_preview_asset_id = str(option.get_item_metadata(index))
+	motion_path_playing = false
+	_refresh_motion_path_workspace()
+	_render_context_bar()
+	_render_info_bar()
+
+
+func _on_motion_path_duration_changed(value: float) -> void:
+	var path_document := _get_motion_path(selected_motion_path_id)
+	if path_document.is_empty():
+		return
+	_record_coalesced_change()
+	path_document["playback"]["duration"] = maxf(0.01, value)
+
+
+func _on_motion_path_playback_toggle(enabled: bool, property_name: String) -> void:
+	var path_document := _get_motion_path(selected_motion_path_id)
+	if path_document.is_empty() or property_name not in ["loop", "orient_along_path"]:
+		return
+	_record_direct_change()
+	path_document["playback"][property_name] = enabled
+	_refresh_motion_path_workspace()
+
+
+func _render_motion_sequence_inspector() -> void:
+	inspector_content.add_child(_create_inspector_section("Sequence"))
+	var sequence_document := _get_motion_sequence(selected_motion_sequence_id)
+	if sequence_document.is_empty():
+		inspector_content.add_child(_create_inspector_field_label("Create or select a Sequence resource."))
+		return
+	var entry := _resolved_motion_sequence_entry(sequence_document)
+	if motion_sequence_view == MotionSequenceWorkspace.VIEW_PLAYER:
+		inspector_content.add_child(_create_motion_inspector_value("Stable Resource ID", str(sequence_document.get("id", ""))))
+		_render_motion_sequence_player_inspector(entry)
+		return
+	inspector_content.add_child(_create_inspector_field_label("Name"))
+	var name_editor := _create_name_editor(str(sequence_document.get("name", "Sequence")), "Sequence name")
+	name_editor.text_submitted.connect(_rename_motion_sequence.bind(sequence_document, name_editor))
+	name_editor.focus_exited.connect(func() -> void: _rename_motion_sequence(name_editor.text, sequence_document, name_editor))
+	inspector_content.add_child(name_editor)
+	inspector_content.add_child(_create_motion_inspector_value("Stable Resource ID", str(sequence_document.get("id", ""))))
+	inspector_content.add_child(_create_motion_inspector_value("Entries", "%d composition entries" % sequence_document.get("entries", []).size()))
+	if entry.is_empty():
+		inspector_content.add_child(_create_inspector_field_label("Add one Composition Entry to reference an Asset, Animation State, and Path."))
+		return
+	inspector_content.add_child(_create_inspector_section("Composition Entry"))
+	var entry_name := _create_name_editor(str(entry.get("name", "Composition Entry")), "Entry name")
+	entry_name.text_submitted.connect(_rename_motion_sequence_entry.bind(entry, entry_name))
+	entry_name.focus_exited.connect(func() -> void: _rename_motion_sequence_entry(entry_name.text, entry, entry_name))
+	inspector_content.add_child(entry_name)
+	var enabled_toggle := CheckBox.new()
+	enabled_toggle.text = "Enabled"
+	enabled_toggle.button_pressed = bool(entry.get("enabled", true))
+	enabled_toggle.toggled.connect(_on_motion_sequence_entry_enabled_changed)
+	inspector_content.add_child(enabled_toggle)
+	inspector_content.add_child(_create_inspector_field_label("Asset"))
+	var asset_option := OptionButton.new()
+	asset_option.add_item("Select Asset")
+	asset_option.set_item_metadata(0, "")
+	for asset in assets:
+		asset_option.add_item(str(asset.get("name", "Asset")))
+		asset_option.set_item_metadata(asset_option.item_count - 1, str(asset.get("id", "")))
+		if str(asset.get("id", "")) == str(entry.get("asset_id", "")):
+			asset_option.select(asset_option.item_count - 1)
+	asset_option.item_selected.connect(_on_motion_sequence_asset_selected.bind(asset_option))
+	inspector_content.add_child(asset_option)
+	inspector_content.add_child(_create_inspector_field_label("Animation State"))
+	var state_option := OptionButton.new()
+	state_option.add_item("Select State")
+	state_option.set_item_metadata(0, "")
+	var resolved_asset := _get_asset(str(entry.get("asset_id", "")))
+	for state in resolved_asset.get("animation", {}).get("states", []):
+		state_option.add_item(str(state.get("name", "State")))
+		state_option.set_item_metadata(state_option.item_count - 1, str(state.get("id", "")))
+		if str(state.get("id", "")) == str(entry.get("animation_state_id", "")):
+			state_option.select(state_option.item_count - 1)
+	state_option.item_selected.connect(_on_motion_sequence_state_selected.bind(state_option))
+	inspector_content.add_child(state_option)
+	inspector_content.add_child(_create_inspector_field_label("Path"))
+	var path_option := OptionButton.new()
+	path_option.add_item("Select Path")
+	path_option.set_item_metadata(0, "")
+	for path_document in motion_paths:
+		path_option.add_item(str(path_document.get("name", "Path")))
+		path_option.set_item_metadata(path_option.item_count - 1, str(path_document.get("id", "")))
+		if str(path_document.get("id", "")) == str(entry.get("path_id", "")):
+			path_option.select(path_option.item_count - 1)
+	path_option.item_selected.connect(_on_motion_sequence_path_selected.bind(path_option))
+	inspector_content.add_child(path_option)
+	var context := _motion_sequence_entry_context(entry)
+	var issues := MotionSequenceEvaluator.validation_issues(entry, context.get("asset", {}), context.get("path", {}))
+	var validation_label := _create_inspector_field_label("Ready for Playback" if issues.is_empty() else "Incomplete · %s" % issues[0])
+	validation_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	validation_label.add_theme_color_override("font_color", Color("#75b88a") if issues.is_empty() else Color("#f2c94c"))
+	inspector_content.add_child(validation_label)
+	var remove_button := Button.new()
+	remove_button.text = "Remove Entry"
+	remove_button.pressed.connect(_remove_motion_sequence_entry)
+	inspector_content.add_child(remove_button)
+
+
+func _render_motion_sequence_player_inspector(entry: Dictionary) -> void:
+	inspector_content.add_child(_create_inspector_section("Resolved Entry"))
+	var context := _motion_sequence_entry_context(entry)
+	var asset: Dictionary = context.get("asset", {})
+	var path_document: Dictionary = context.get("path", {})
+	var snapshot := MotionSequenceEvaluator.evaluate(entry, asset, path_document, motion_sequence_phase)
+	inspector_content.add_child(_create_motion_inspector_value("Asset", str(asset.get("name", "Missing Asset"))))
+	inspector_content.add_child(_create_motion_inspector_value("State", str(snapshot.get("state_name", "Missing State"))))
+	inspector_content.add_child(_create_motion_inspector_value("Path", str(path_document.get("name", "Missing Path"))))
+	inspector_content.add_child(_create_inspector_section("Runtime"))
+	var sequence_phase_field := _create_motion_inspector_value("Sequence Phase", "%.2f" % motion_sequence_phase)
+	motion_sequence_runtime_sequence_label = sequence_phase_field.get_child(1) as Label
+	inspector_content.add_child(sequence_phase_field)
+	var path_phase_field := _create_motion_inspector_value("Path Phase", "%.2f" % float(snapshot.get("path_phase", 0.0)))
+	motion_sequence_runtime_path_label = path_phase_field.get_child(1) as Label
+	inspector_content.add_child(path_phase_field)
+	var animation_phase_field := _create_motion_inspector_value("Animation Phase", "%.2f" % float(snapshot.get("animation_phase", 0.0)))
+	motion_sequence_runtime_animation_label = animation_phase_field.get_child(1) as Label
+	inspector_content.add_child(animation_phase_field)
+	inspector_content.add_child(_create_motion_inspector_value("Duration", "%.2f s · inherited from Path" % float(snapshot.get("duration", 0.0))))
+	var issues: Array = snapshot.get("issues", [])
+	var status := _create_inspector_field_label("Ready for Playback" if issues.is_empty() else "Blocked · %s" % issues[0])
+	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	status.add_theme_color_override("font_color", Color("#75b88a") if issues.is_empty() else Color("#f2c94c"))
+	inspector_content.add_child(status)
+
+
+func _rename_motion_sequence_entry(new_name: String, entry: Dictionary, editor: LineEdit) -> void:
+	var normalized := new_name.strip_edges()
+	if normalized.is_empty():
+		editor.text = str(entry.get("name", "Composition Entry"))
+		return
+	if normalized == str(entry.get("name", "")):
+		return
+	_record_direct_change()
+	entry["name"] = normalized
+	_refresh_motion_sequence_workspace()
+
+
+func _on_motion_sequence_entry_enabled_changed(enabled: bool) -> void:
+	var entry := _resolved_motion_sequence_entry(_get_motion_sequence(selected_motion_sequence_id))
+	if entry.is_empty() or bool(entry.get("enabled", true)) == enabled:
+		return
+	_record_direct_change()
+	entry["enabled"] = enabled
+	motion_sequence_playing = false
+	_render_inspector()
+	_render_context_bar()
+	_refresh_motion_sequence_workspace()
+
+
+func _on_motion_sequence_asset_selected(index: int, option: OptionButton) -> void:
+	var entry := _resolved_motion_sequence_entry(_get_motion_sequence(selected_motion_sequence_id))
+	if entry.is_empty() or index < 0 or index >= option.item_count:
+		return
+	_record_direct_change()
+	entry["asset_id"] = str(option.get_item_metadata(index))
+	entry["animation_state_id"] = _default_sequence_state_id(_get_asset(str(entry["asset_id"])))
+	motion_sequence_playing = false
+	_render_inspector()
+	_render_context_bar()
+	_refresh_motion_sequence_workspace()
+
+
+func _on_motion_sequence_state_selected(index: int, option: OptionButton) -> void:
+	var entry := _resolved_motion_sequence_entry(_get_motion_sequence(selected_motion_sequence_id))
+	if entry.is_empty() or index < 0 or index >= option.item_count:
+		return
+	_record_direct_change()
+	entry["animation_state_id"] = str(option.get_item_metadata(index))
+	motion_sequence_playing = false
+	_render_inspector()
+	_render_context_bar()
+	_refresh_motion_sequence_workspace()
+
+
+func _on_motion_sequence_path_selected(index: int, option: OptionButton) -> void:
+	var entry := _resolved_motion_sequence_entry(_get_motion_sequence(selected_motion_sequence_id))
+	if entry.is_empty() or index < 0 or index >= option.item_count:
+		return
+	_record_direct_change()
+	entry["path_id"] = str(option.get_item_metadata(index))
+	motion_sequence_phase = 0.0
+	motion_sequence_playing = false
+	_render_inspector()
+	_render_context_bar()
+	_refresh_motion_sequence_workspace()
+
+
+func _render_motion_authoring_inspector(state: Dictionary, motion: Dictionary) -> void:
+	var state_id := str(state.get("id", ""))
+	var motion_id := str(motion.get("id", ""))
+	var domain := str(motion.get("domain", MotionWorkspace.OUTER))
+	inspector_content.add_child(_create_motion_inspector_value("State", str(state.get("name", "State"))))
+	inspector_content.add_child(_create_inspector_field_label("Name"))
+	var name_editor := _create_name_editor(str(motion.get("name", "Motion")), "Motion name")
+	name_editor.text_submitted.connect(_rename_motion.bind(state_id, motion_id, name_editor))
+	name_editor.focus_exited.connect(func() -> void: _rename_motion(name_editor.text, state_id, motion_id, name_editor))
+	inspector_content.add_child(name_editor)
+	var enabled_toggle := CheckBox.new()
+	enabled_toggle.text = "Enabled"
+	enabled_toggle.button_pressed = bool(motion.get("enabled", true))
+	enabled_toggle.toggled.connect(_on_motion_enabled_changed.bind(state_id, motion_id))
+	inspector_content.add_child(enabled_toggle)
+	inspector_content.add_child(_create_inspector_field_label("Domain"))
+	var domain_option := OptionButton.new()
+	domain_option.custom_minimum_size = Vector2(0, 28)
+	for domain_data in [["Outer", MotionWorkspace.OUTER], ["Inner", MotionWorkspace.INNER]]:
+		domain_option.add_item(str(domain_data[0]))
+		domain_option.set_item_metadata(domain_option.item_count - 1, str(domain_data[1]))
+		if str(domain_data[1]) == str(motion.get("domain", MotionWorkspace.OUTER)):
+			domain_option.select(domain_option.item_count - 1)
+	domain_option.item_selected.connect(_on_motion_domain_selected.bind(domain_option, state_id, motion_id))
+	inspector_content.add_child(domain_option)
+	inspector_content.add_child(_create_inspector_field_label("Target"))
+	var target_option := OptionButton.new()
+	target_option.custom_minimum_size = Vector2(0, 28)
+	if domain == MotionWorkspace.OUTER:
+		target_option.add_item("Entire Asset")
+		target_option.set_item_metadata(0, {"scope": MotionWorkspace.TARGET_ASSET, "component_id": ""})
+	target_option.add_item("Select Component")
+	target_option.set_item_metadata(target_option.item_count - 1, {"scope": MotionWorkspace.TARGET_COMPONENT, "component_id": ""})
+	var asset := _get_asset(selected_asset_id)
+	for component in asset.get("components", []):
+		target_option.add_item(str(component.get("name", "Component")))
+		target_option.set_item_metadata(target_option.item_count - 1, {"scope": MotionWorkspace.TARGET_COMPONENT, "component_id": str(component.get("id", ""))})
+	var target_scope := str(motion.get("target_scope", MotionWorkspace.TARGET_COMPONENT))
+	var target_component_id := str(motion.get("target_component_id", ""))
+	for target_index in range(target_option.item_count):
+		var target_data: Dictionary = target_option.get_item_metadata(target_index)
+		if str(target_data.get("scope", "")) == target_scope and str(target_data.get("component_id", "")) == target_component_id:
+			target_option.select(target_index)
+			break
+	target_option.item_selected.connect(_on_motion_target_selected.bind(target_option, state_id, motion_id))
+	inspector_content.add_child(target_option)
+	inspector_content.add_child(_create_inspector_field_label("Primitive"))
+	var primitive_option := OptionButton.new()
+	primitive_option.custom_minimum_size = Vector2(0, 28)
+	for primitive in motion_workspace.primitive_options(domain):
+		primitive_option.add_item(motion_workspace.primitive_label(primitive))
+		primitive_option.set_item_metadata(primitive_option.item_count - 1, primitive)
+		if primitive == str(motion.get("primitive", MotionWorkspace.BOB)):
+			primitive_option.select(primitive_option.item_count - 1)
+	primitive_option.item_selected.connect(_on_motion_primitive_selected.bind(primitive_option, state_id, motion_id))
+	inspector_content.add_child(primitive_option)
+	var primitive := str(motion.get("primitive", MotionWorkspace.BOB))
+	if domain == MotionWorkspace.INNER:
+		_add_unavailable_motion_guide_field("Animation Guides", "Animation Spine authoring is not available yet.")
+	inspector_content.add_child(_create_inspector_section("Parameters"))
+	if primitive == MotionWorkspace.BOB:
+		_add_motion_number_parameter("Distance", state_id, motion_id, "distance", float(motion.get("parameters", {}).get("distance", 0.25)), 0.0, 1000.0, 0.05)
+	elif primitive == MotionWorkspace.SPINE_SWAY:
+		_add_motion_number_parameter("Strength", state_id, motion_id, "strength", float(motion.get("parameters", {}).get("strength", 0.5)), 0.0, 1.0, 0.05)
+	_add_motion_number_parameter("Cycles", state_id, motion_id, "cycles", float(motion.get("parameters", {}).get("cycles", 1.0)), 0.01, 100.0, 0.1)
+	inspector_content.add_child(_create_inspector_field_label("Phase Offset"))
+	var phase_offset := SpinBox.new()
+	phase_offset.min_value = -1.0
+	phase_offset.max_value = 1.0
+	phase_offset.step = 0.01
+	phase_offset.value = float(motion.get("phase_offset", 0.0))
+	phase_offset.custom_minimum_size = Vector2(0, 28)
+	phase_offset.value_changed.connect(_on_motion_phase_offset_changed.bind(state_id, motion_id))
+	inspector_content.add_child(phase_offset)
+	var validation := _motion_preview_validation(motion)
+	var validation_label := Label.new()
+	validation_label.text = validation
+	validation_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	validation_label.add_theme_font_size_override("font_size", 10)
+	validation_label.add_theme_color_override("font_color", Color("#75b88a") if validation == "Ready for Preview" else Color("#f2c94c"))
+	inspector_content.add_child(validation_label)
+	var remove_button := Button.new()
+	remove_button.text = "Remove Motion"
+	remove_button.custom_minimum_size = Vector2(0, 28)
+	remove_button.focus_mode = Control.FOCUS_NONE
+	remove_button.pressed.connect(_request_motion_removal.bind(state_id, motion_id))
+	inspector_content.add_child(remove_button)
+
+
+func _render_transition_authoring_inspector(state: Dictionary, transition: Dictionary) -> void:
+	var state_id := str(state.get("id", ""))
+	var transition_id := str(transition.get("id", ""))
+	inspector_content.add_child(_create_motion_inspector_value("Source State", str(state.get("name", "State"))))
+	var priority_index := motion_workspace.transition_index(state_id, transition_id)
+	var transition_count: int = state.get("transitions", []).size()
+	var priority_row := HBoxContainer.new()
+	var priority_label := Label.new()
+	priority_label.text = "Priority #%d" % (priority_index + 1)
+	priority_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	priority_row.add_child(priority_label)
+	var move_up := Button.new()
+	move_up.text = "↑"
+	move_up.tooltip_text = "Higher priority"
+	move_up.disabled = priority_index <= 0
+	move_up.pressed.connect(_move_transition.bind(state_id, transition_id, -1))
+	priority_row.add_child(move_up)
+	var move_down := Button.new()
+	move_down.text = "↓"
+	move_down.tooltip_text = "Lower priority"
+	move_down.disabled = priority_index < 0 or priority_index >= transition_count - 1
+	move_down.pressed.connect(_move_transition.bind(state_id, transition_id, 1))
+	priority_row.add_child(move_down)
+	inspector_content.add_child(priority_row)
+	inspector_content.add_child(_create_inspector_field_label("Target State"))
+	var target_option := OptionButton.new()
+	target_option.custom_minimum_size = Vector2(0, 28)
+	var target_state_id := str(transition.get("target_state_id", ""))
+	var target_exists := false
+	for candidate in motion_workspace.get_states_for_asset(selected_asset_id):
+		if str(candidate.get("id", "")) == target_state_id:
+			target_exists = true
+			break
+	if not target_exists and not target_state_id.is_empty():
+		target_option.add_item("Missing State")
+		target_option.set_item_metadata(0, target_state_id)
+		target_option.set_item_disabled(0, true)
+	for candidate in motion_workspace.get_states_for_asset(selected_asset_id):
+		var candidate_id := str(candidate.get("id", ""))
+		if candidate_id == state_id:
+			continue
+		target_option.add_item(str(candidate.get("name", "State")))
+		target_option.set_item_metadata(target_option.item_count - 1, candidate_id)
+		if candidate_id == target_state_id:
+			target_option.select(target_option.item_count - 1)
+	target_option.item_selected.connect(_on_transition_target_selected.bind(target_option, state_id, transition_id))
+	inspector_content.add_child(target_option)
+	inspector_content.add_child(_create_inspector_field_label("Exit Policy"))
+	var exit_option := OptionButton.new()
+	for exit_data in [["Any Phase", MotionWorkspace.EXIT_ANY_PHASE], ["After Phase", MotionWorkspace.EXIT_AFTER_PHASE], ["At Loop End", MotionWorkspace.EXIT_LOOP_END]]:
+		exit_option.add_item(str(exit_data[0]))
+		exit_option.set_item_metadata(exit_option.item_count - 1, str(exit_data[1]))
+		if str(exit_data[1]) == str(transition.get("exit_policy", MotionWorkspace.EXIT_ANY_PHASE)):
+			exit_option.select(exit_option.item_count - 1)
+	exit_option.item_selected.connect(_on_transition_exit_policy_selected.bind(exit_option, state_id, transition_id))
+	inspector_content.add_child(exit_option)
+	if str(transition.get("exit_policy", MotionWorkspace.EXIT_ANY_PHASE)) == MotionWorkspace.EXIT_AFTER_PHASE:
+		inspector_content.add_child(_create_inspector_field_label("Exit After Phase"))
+		var exit_phase := SpinBox.new()
+		exit_phase.min_value = 0.0
+		exit_phase.max_value = 1.0
+		exit_phase.step = 0.01
+		exit_phase.value = float(transition.get("exit_phase", 0.8))
+		exit_phase.value_changed.connect(_on_transition_number_changed.bind(state_id, transition_id, "exit_phase"))
+		inspector_content.add_child(exit_phase)
+	inspector_content.add_child(_create_inspector_field_label("Entry Mode"))
+	var entry_option := OptionButton.new()
+	for entry_data in [["Restart", MotionWorkspace.ENTRY_RESTART], ["Preserve Phase", MotionWorkspace.ENTRY_PRESERVE_PHASE]]:
+		entry_option.add_item(str(entry_data[0]))
+		entry_option.set_item_metadata(entry_option.item_count - 1, str(entry_data[1]))
+		if str(entry_data[1]) == str(transition.get("entry_mode", MotionWorkspace.ENTRY_RESTART)):
+			entry_option.select(entry_option.item_count - 1)
+	entry_option.item_selected.connect(_on_transition_entry_mode_selected.bind(entry_option, state_id, transition_id))
+	inspector_content.add_child(entry_option)
+	inspector_content.add_child(_create_inspector_field_label("Blend Duration (s)"))
+	var blend_duration := SpinBox.new()
+	blend_duration.min_value = 0.0
+	blend_duration.max_value = 10.0
+	blend_duration.step = 0.05
+	blend_duration.value = float(transition.get("blend_duration", 0.15))
+	blend_duration.value_changed.connect(_on_transition_number_changed.bind(state_id, transition_id, "blend_duration"))
+	inspector_content.add_child(blend_duration)
+	inspector_content.add_child(_create_inspector_section("Rules · ALL"))
+	var rules: Array = transition.get("rules", [])
+	if rules.is_empty():
+		var no_rules := _create_inspector_field_label("No Rules · phase policy alone controls eligibility")
+		no_rules.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		inspector_content.add_child(no_rules)
+	for rule in rules:
+		_render_transition_rule(state_id, transition_id, rule)
+	var add_rule_button := Button.new()
+	add_rule_button.text = "+ Add Rule"
+	add_rule_button.disabled = motion_workspace.get_contract_parameters().is_empty()
+	add_rule_button.tooltip_text = "Declare a Simulation Contract parameter first." if add_rule_button.disabled else "All Rules must match."
+	add_rule_button.pressed.connect(_add_transition_rule.bind(state_id, transition_id))
+	inspector_content.add_child(add_rule_button)
+	var rules_valid := motion_workspace.transition_rules_valid(transition)
+	var transition_validation := "Ready for future evaluation" if target_exists and rules_valid else ("Incomplete · Target State no longer exists" if not target_exists else "Incomplete · Rule references are invalid")
+	var transition_validation_label := _create_inspector_field_label(transition_validation)
+	transition_validation_label.add_theme_color_override("font_color", Color("#75b88a") if target_exists and rules_valid else Color("#f2c94c"))
+	inspector_content.add_child(transition_validation_label)
+	var remove_button := Button.new()
+	remove_button.text = "Remove Transition"
+	remove_button.pressed.connect(_request_motion_item_removal.bind(MotionSelection.TRANSITION, state_id, transition_id))
+	inspector_content.add_child(remove_button)
+
+
+func _render_simulation_contract_inspector() -> void:
+	inspector_content.add_child(_create_inspector_section("Simulation Contract"))
+	var explanation := _create_inspector_field_label("Typed inputs exposed by the host Simulation. Transition Rules reference stable parameter IDs.")
+	explanation.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	inspector_content.add_child(explanation)
+	inspector_content.add_child(_create_motion_inspector_value("Source", "Persisted Asset Contract · future external import boundary"))
+	var parameters := motion_workspace.get_contract_parameters()
+	if parameters.is_empty():
+		inspector_content.add_child(_create_inspector_field_label("No parameters declared."))
+	for parameter in parameters:
+		_render_contract_parameter(parameter)
+	var add_parameter := Button.new()
+	add_parameter.text = "+ Add Parameter"
+	add_parameter.pressed.connect(_add_contract_parameter)
+	inspector_content.add_child(add_parameter)
+	_render_simulation_preview_values()
+
+
+func _render_simulation_preview_values() -> void:
+	inspector_content.add_child(_create_inspector_section("Simulation Preview Values"))
+	var note := _create_inspector_field_label("Runtime-only values · used by the Phase 8 Transition evaluator")
+	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	inspector_content.add_child(note)
+	for parameter in motion_workspace.get_contract_parameters():
+		var parameter_id := str(parameter.get("id", ""))
+		var parameter_name := str(parameter.get("name", "parameter"))
+		if str(parameter.get("type", MotionWorkspace.PARAM_NUMBER)) == MotionWorkspace.PARAM_BOOL:
+			var bool_input := CheckBox.new()
+			bool_input.text = parameter_name
+			bool_input.button_pressed = bool(motion_player.parameter_value(parameter_id)) if motion_player != null else false
+			bool_input.toggled.connect(_on_motion_runtime_bool_changed.bind(parameter_id))
+			inspector_content.add_child(bool_input)
+		else:
+			inspector_content.add_child(_create_inspector_field_label(parameter_name))
+			var number_input := SpinBox.new()
+			number_input.min_value = -1000000.0
+			number_input.max_value = 1000000.0
+			number_input.step = 0.01
+			number_input.value = float(motion_player.parameter_value(parameter_id)) if motion_player != null else 0.0
+			number_input.value_changed.connect(_on_motion_runtime_number_changed.bind(parameter_id))
+			inspector_content.add_child(number_input)
+
+
+func _render_animation_validation_inspector() -> void:
+	inspector_content.add_child(_create_inspector_section("Validation"))
+	var issues := motion_workspace.validation_issues()
+	if issues.is_empty():
+		var ready := _create_inspector_field_label("Animation document is valid.")
+		ready.add_theme_color_override("font_color", Color("#75b88a"))
+		inspector_content.add_child(ready)
+		return
+	var summary := _create_inspector_field_label("%d issue%s" % [issues.size(), "" if issues.size() == 1 else "s"])
+	summary.add_theme_color_override("font_color", Color("#f2c94c"))
+	inspector_content.add_child(summary)
+	for issue in issues:
+		var issue_label := _create_inspector_field_label("• %s" % issue)
+		issue_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		inspector_content.add_child(issue_label)
+
+
+func _render_legacy_path_follow_migration(asset: Dictionary) -> void:
+	var animation: Dictionary = asset.get("animation", {})
+	var archived = animation.get("legacy_path_follow_motions", [])
+	if not archived is Array or archived.is_empty():
+		return
+	inspector_content.add_child(_create_inspector_section("Phase 10 Migration"))
+	var summary := _create_inspector_field_label("%d legacy Path Follow Motion%s retained in the Animation archive." % [archived.size(), "" if archived.size() == 1 else "s"])
+	summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	summary.add_theme_color_override("font_color", Color("#f2c94c"))
+	inspector_content.add_child(summary)
+	var note := _create_inspector_field_label("They no longer evaluate as Animation primitives. Their original data remains persisted so it can be recreated as an independent Motion → Path resource in Phase 11.")
+	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	inspector_content.add_child(note)
+
+
+func _render_contract_parameter(parameter: Dictionary) -> void:
+	var parameter_id := str(parameter.get("id", ""))
+	var panel := _create_panel(Color("#252b35"))
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 4)
+	panel.add_child(content)
+	var name_editor := _create_name_editor(str(parameter.get("name", "parameter")), "Parameter name")
+	name_editor.text_submitted.connect(_rename_contract_parameter.bind(parameter_id, name_editor))
+	name_editor.focus_exited.connect(func() -> void: _rename_contract_parameter(name_editor.text, parameter_id, name_editor))
+	content.add_child(name_editor)
+	var type_option := OptionButton.new()
+	for type_data in [["Number", MotionWorkspace.PARAM_NUMBER], ["Bool", MotionWorkspace.PARAM_BOOL]]:
+		type_option.add_item(str(type_data[0]))
+		type_option.set_item_metadata(type_option.item_count - 1, str(type_data[1]))
+		if str(type_data[1]) == str(parameter.get("type", MotionWorkspace.PARAM_NUMBER)):
+			type_option.select(type_option.item_count - 1)
+	type_option.item_selected.connect(_on_contract_parameter_type_selected.bind(type_option, parameter_id))
+	content.add_child(type_option)
+	var id_label := _create_inspector_field_label("Stable ID · %s" % parameter_id)
+	id_label.add_theme_color_override("font_color", Color("#737f91"))
+	content.add_child(id_label)
+	var remove_parameter := Button.new()
+	remove_parameter.text = "Remove Parameter"
+	remove_parameter.pressed.connect(_remove_contract_parameter.bind(parameter_id))
+	content.add_child(remove_parameter)
+	inspector_content.add_child(panel)
+
+
+func _render_transition_rule(state_id: String, transition_id: String, rule: Dictionary) -> void:
+	var rule_id := str(rule.get("id", ""))
+	var panel := _create_panel(Color("#252b35"))
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 6)
+	grid.add_theme_constant_override("v_separation", 4)
+	panel.add_child(grid)
+	grid.add_child(_create_inspector_field_label("Parameter"))
+	var parameter_option := OptionButton.new()
+	parameter_option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var parameter_id := str(rule.get("parameter_id", ""))
+	var parameter := motion_workspace.find_contract_parameter(parameter_id)
+	if parameter.is_empty():
+		parameter_option.add_item("Missing Parameter")
+		parameter_option.set_item_metadata(0, parameter_id)
+		parameter_option.set_item_disabled(0, true)
+	for candidate in motion_workspace.get_contract_parameters():
+		parameter_option.add_item(str(candidate.get("name", "parameter")))
+		parameter_option.set_item_metadata(parameter_option.item_count - 1, str(candidate.get("id", "")))
+		if str(candidate.get("id", "")) == parameter_id:
+			parameter_option.select(parameter_option.item_count - 1)
+	parameter_option.item_selected.connect(_on_transition_rule_parameter_selected.bind(parameter_option, state_id, transition_id, rule_id))
+	grid.add_child(parameter_option)
+	grid.add_child(_create_inspector_field_label("Operator"))
+	var operator_option := OptionButton.new()
+	var parameter_type := str(parameter.get("type", MotionWorkspace.PARAM_NUMBER))
+	for operator in motion_workspace.rule_operators(parameter_type):
+		operator_option.add_item(motion_workspace.rule_operator_label(operator))
+		operator_option.set_item_metadata(operator_option.item_count - 1, operator)
+		if operator == str(rule.get("operator", "")):
+			operator_option.select(operator_option.item_count - 1)
+	operator_option.disabled = parameter.is_empty()
+	operator_option.item_selected.connect(_on_transition_rule_operator_selected.bind(operator_option, state_id, transition_id, rule_id))
+	grid.add_child(operator_option)
+	if parameter_type == MotionWorkspace.PARAM_NUMBER and not parameter.is_empty():
+		grid.add_child(_create_inspector_field_label("Value"))
+		var rule_value := SpinBox.new()
+		rule_value.min_value = -1000000.0
+		rule_value.max_value = 1000000.0
+		rule_value.step = 0.01
+		rule_value.value = float(rule.get("value", 0.0))
+		rule_value.value_changed.connect(_on_transition_rule_value_changed.bind(state_id, transition_id, rule_id))
+		grid.add_child(rule_value)
+	grid.add_child(_create_inspector_field_label("Rule ID"))
+	grid.add_child(_create_inspector_field_label(rule_id))
+	var remove_rule := Button.new()
+	remove_rule.text = "Remove Rule"
+	remove_rule.pressed.connect(_remove_transition_rule.bind(state_id, transition_id, rule_id))
+	grid.add_child(remove_rule)
+	grid.add_child(Control.new())
+	inspector_content.add_child(panel)
+
+
+func _render_marker_authoring_inspector(state: Dictionary, marker: Dictionary) -> void:
+	var state_id := str(state.get("id", ""))
+	var marker_id := str(marker.get("id", ""))
+	inspector_content.add_child(_create_motion_inspector_value("State", str(state.get("name", "State"))))
+	inspector_content.add_child(_create_inspector_field_label("Event ID"))
+	var event_editor := _create_name_editor(str(marker.get("event_id", "event")), "Event ID")
+	event_editor.text_submitted.connect(_rename_marker_event.bind(state_id, marker_id, event_editor))
+	event_editor.focus_exited.connect(func() -> void: _rename_marker_event(event_editor.text, state_id, marker_id, event_editor))
+	inspector_content.add_child(event_editor)
+	inspector_content.add_child(_create_inspector_field_label("Kind"))
+	var kind_option := OptionButton.new()
+	for kind_data in [["Event", MotionWorkspace.MARKER_EVENT], ["SFX", MotionWorkspace.MARKER_SFX], ["VFX", MotionWorkspace.MARKER_VFX]]:
+		kind_option.add_item(str(kind_data[0]))
+		kind_option.set_item_metadata(kind_option.item_count - 1, str(kind_data[1]))
+		if str(kind_data[1]) == str(marker.get("kind", MotionWorkspace.MARKER_EVENT)):
+			kind_option.select(kind_option.item_count - 1)
+	kind_option.item_selected.connect(_on_marker_kind_selected.bind(kind_option, state_id, marker_id))
+	inspector_content.add_child(kind_option)
+	inspector_content.add_child(_create_inspector_field_label("Normalized Phase"))
+	var marker_phase := SpinBox.new()
+	marker_phase.min_value = 0.0
+	marker_phase.max_value = 1.0
+	marker_phase.step = 0.01
+	marker_phase.value = float(marker.get("phase", 0.5))
+	marker_phase.value_changed.connect(_on_marker_phase_changed.bind(state_id, marker_id))
+	inspector_content.add_child(marker_phase)
+	var marker_note := _create_inspector_field_label("Marker ticks are shown below the normalized Phase scrubber.")
+	marker_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	inspector_content.add_child(marker_note)
+	var remove_button := Button.new()
+	remove_button.text = "Remove Marker"
+	remove_button.pressed.connect(_request_motion_item_removal.bind(MotionSelection.MARKER, state_id, marker_id))
+	inspector_content.add_child(remove_button)
+
+
+func _add_unavailable_motion_guide_field(label_text: String, tooltip: String) -> void:
+	inspector_content.add_child(_create_inspector_field_label(label_text))
+	var guide_option := OptionButton.new()
+	guide_option.add_item("Not available")
+	guide_option.disabled = true
+	guide_option.tooltip_text = tooltip
+	guide_option.custom_minimum_size = Vector2(0, 28)
+	inspector_content.add_child(guide_option)
+
+
+func _add_motion_number_parameter(label_text: String, state_id: String, motion_id: String, parameter_name: String, value: float, minimum: float, maximum: float, step: float) -> void:
+	inspector_content.add_child(_create_inspector_field_label(label_text))
+	var field := SpinBox.new()
+	field.min_value = minimum
+	field.max_value = maximum
+	field.step = step
+	field.value = value
+	field.custom_minimum_size = Vector2(0, 28)
+	field.value_changed.connect(_on_motion_parameter_changed.bind(state_id, motion_id, parameter_name))
+	inspector_content.add_child(field)
+
+
+func _motion_preview_validation(motion: Dictionary) -> String:
+	if not bool(motion.get("enabled", true)):
+		return "Disabled · excluded from Preview"
+	var domain := str(motion.get("domain", MotionWorkspace.OUTER))
+	var target_scope := str(motion.get("target_scope", MotionWorkspace.TARGET_COMPONENT))
+	if not (domain == MotionWorkspace.OUTER and target_scope == MotionWorkspace.TARGET_ASSET) and str(motion.get("target_component_id", "")).is_empty():
+		return "Incomplete · Select a target Component"
+	if target_scope == MotionWorkspace.TARGET_COMPONENT and _get_component(_get_asset(selected_asset_id), str(motion.get("target_component_id", ""))).is_empty():
+		return "Incomplete · Target Component no longer exists"
+	if domain == MotionWorkspace.INNER:
+		return "Not Previewable · Animation Guides and mesh are not available"
+	return "Ready for Preview"
+
+
+func _create_motion_inspector_value(label_text: String, value_text: String) -> VBoxContainer:
+	var field := VBoxContainer.new()
+	field.add_theme_constant_override("separation", 1)
+	field.add_child(_create_inspector_field_label(label_text))
+	var value := Label.new()
+	value.text = value_text
+	value.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	value.add_theme_font_size_override("font_size", 11)
+	value.add_theme_color_override("font_color", Color("#d6dbe4"))
+	field.add_child(value)
+	return field
+
+
+func _on_motion_selection_changed() -> void:
+	_sync_motion_player_document(_get_asset(selected_asset_id))
+	if motion_player != null and not motion_player.playing and not motion_selection.state_id.is_empty() and motion_player.current_state_id != motion_selection.state_id:
+		motion_player.set_state(motion_selection.state_id)
+	_render_inspector()
+	_render_context_bar()
+	_render_info_bar()
+
+
+func _sync_motion_player_document(asset: Dictionary) -> void:
+	if motion_player == null:
+		return
+	if asset.is_empty():
+		motion_player.pause()
+		motion_player.set_document({})
+		motion_player_asset_id = ""
+		return
+	var next_asset_id := str(asset.get("id", ""))
+	var changed_asset := motion_player_asset_id != next_asset_id
+	if changed_asset:
+		motion_player.pause()
+		motion_player.parameter_values.clear()
+	motion_player.set_document(_ensure_asset_animation(asset))
+	motion_player_asset_id = next_asset_id
+	if changed_asset:
+		var states: Array = motion_player.document.get("states", [])
+		if not states.is_empty():
+			motion_player.set_state(str(states[0].get("id", "")), 0.0)
+
+
+func _on_motion_player_phase_changed(value: float) -> void:
+	motion_phase = clampf(value, 0.0, 1.0)
+	if is_instance_valid(motion_phase_slider):
+		motion_phase_slider.set_value_no_signal(motion_phase)
+	if is_instance_valid(motion_phase_value_label):
+		motion_phase_value_label.text = "%.2f" % motion_phase
+	if is_instance_valid(motion_workspace):
+		motion_workspace.set_phase(motion_phase)
+	if is_instance_valid(motion_asset_preview):
+		motion_asset_preview.set_runtime(motion_player.current_state_name(), motion_phase, motion_player.playing)
+	_refresh_motion_asset_preview()
+
+
+func _on_motion_player_state_changed(_previous_state_id: String, _state_id: String) -> void:
+	if is_instance_valid(motion_runtime_state_label):
+		motion_runtime_state_label.text = motion_player.current_state_name()
+	if is_instance_valid(motion_phase_marks) and is_instance_valid(motion_workspace):
+		motion_phase_marks.set_marker_phases(motion_workspace.marker_phases_for_state(motion_player.current_state_id))
+	if is_instance_valid(motion_asset_preview):
+		motion_asset_preview.set_runtime(motion_player.current_state_name(), motion_phase, motion_player.playing)
+	_refresh_motion_asset_preview()
+	_render_info_bar()
+
+
+func _on_motion_player_marker_fired(_state_id: String, event_id: String, kind: String) -> void:
+	motion_last_marker = "%s · %s" % [kind.to_upper(), event_id]
+	_show_status_message("Marker: %s" % motion_last_marker)
+	_render_info_bar()
+
+
+func _on_motion_player_playback_changed(_playing: bool) -> void:
+	if is_instance_valid(motion_play_button):
+		motion_play_button.text = "❚❚" if motion_player.playing else "▶"
+		motion_play_button.tooltip_text = "Pause Animation Preview" if motion_player.playing else "Play Animation Preview"
+	if is_instance_valid(motion_asset_preview):
+		motion_asset_preview.set_runtime(motion_player.current_state_name(), motion_phase, motion_player.playing)
+	_refresh_motion_asset_preview()
+	_render_info_bar()
+
+
+func _refresh_motion_asset_preview() -> void:
+	if not is_instance_valid(motion_asset_preview) or motion_player == null:
+		return
+	var asset := _get_asset(selected_asset_id)
+	var component_ids: Array[String] = []
+	for component in asset.get("components", []):
+		if bool(component.get("visibility", true)):
+			component_ids.append(str(component.get("id", "")))
+	motion_asset_preview.set_component_samples(MotionSampler.sample_player(motion_player, component_ids))
+
+
+func _on_motion_state_cycle_duration_changed(value: float, state_id: String) -> void:
+	if is_instance_valid(motion_workspace):
+		motion_workspace.set_state_cycle_duration(state_id, value)
+
+
+func _on_motion_runtime_number_changed(value: float, parameter_id: String) -> void:
+	if motion_player != null:
+		motion_player.set_parameter_value(parameter_id, value)
+
+
+func _on_motion_runtime_bool_changed(value: bool, parameter_id: String) -> void:
+	if motion_player != null:
+		motion_player.set_parameter_value(parameter_id, value)
+
+
+func _open_motion_state_dialog() -> void:
+	if not is_instance_valid(motion_workspace) or _get_asset(selected_asset_id).is_empty():
+		return
+	motion_state_name_input.text = motion_workspace.next_default_state_name()
+	motion_state_dialog.popup_centered()
+	motion_state_name_input.select_all()
+	motion_state_name_input.grab_focus()
+
+
+func _confirm_motion_state_creation() -> void:
+	if not is_instance_valid(motion_workspace):
+		return
+	var error := motion_workspace.add_state(motion_state_name_input.text)
+	motion_state_dialog.hide()
+	if not error.is_empty():
+		_show_status_message(error)
+		return
+	_show_status_message("State added to the Asset Animation.")
+
+
+func _rename_motion_state(new_name: String, state_id: String, editor: LineEdit) -> void:
+	if not is_instance_valid(motion_workspace):
+		return
+	if new_name.strip_edges() == motion_workspace.state_name(state_id):
+		return
+	var error := motion_workspace.rename_state(state_id, new_name)
+	if not error.is_empty():
+		editor.text = motion_workspace.state_name(state_id)
+		_show_status_message(error)
+		return
+	_show_status_message("State renamed in the Asset Animation.")
+
+
+func _request_motion_state_removal(state_id: String) -> void:
+	if not is_instance_valid(motion_workspace):
+		return
+	pending_motion_remove_state_id = state_id
+	motion_remove_state_dialog.dialog_text = "Remove State '%s' from the Asset Animation?" % motion_workspace.state_name(state_id)
+	motion_remove_state_dialog.popup_centered()
+
+
+func _confirm_motion_state_removal() -> void:
+	var state_id := pending_motion_remove_state_id
+	pending_motion_remove_state_id = ""
+	if state_id.is_empty() or not is_instance_valid(motion_workspace):
+		return
+	if motion_workspace.remove_state(state_id):
+		_show_status_message("State removed from the Asset Animation.")
+
+
+func _rename_motion(new_name: String, state_id: String, motion_id: String, editor: LineEdit) -> void:
+	var motion := motion_workspace.find_motion(state_id, motion_id) if is_instance_valid(motion_workspace) else {}
+	if motion.is_empty() or new_name.strip_edges() == str(motion.get("name", "")):
+		return
+	var error := motion_workspace.rename_motion(state_id, motion_id, new_name)
+	if not error.is_empty():
+		editor.text = str(motion.get("name", "Motion"))
+		_show_status_message(error)
+		return
+	_show_status_message("Motion renamed in the Asset Animation.")
+
+
+func _on_motion_enabled_changed(enabled: bool, state_id: String, motion_id: String) -> void:
+	motion_workspace.set_motion_property(state_id, motion_id, "enabled", enabled)
+
+
+func _on_motion_domain_selected(index: int, option: OptionButton, state_id: String, motion_id: String) -> void:
+	if index < 0 or index >= option.item_count:
+		return
+	motion_workspace.set_motion_property(state_id, motion_id, "domain", str(option.get_item_metadata(index)))
+
+
+func _on_motion_target_selected(index: int, option: OptionButton, state_id: String, motion_id: String) -> void:
+	if index < 0 or index >= option.item_count:
+		return
+	var target_data: Dictionary = option.get_item_metadata(index)
+	motion_workspace.set_motion_target(state_id, motion_id, str(target_data.get("scope", MotionWorkspace.TARGET_COMPONENT)), str(target_data.get("component_id", "")))
+
+
+func _on_motion_primitive_selected(index: int, option: OptionButton, state_id: String, motion_id: String) -> void:
+	if index < 0 or index >= option.item_count:
+		return
+	motion_workspace.set_motion_property(state_id, motion_id, "primitive", str(option.get_item_metadata(index)))
+
+
+func _on_motion_parameter_changed(value: float, state_id: String, motion_id: String, parameter_name: String) -> void:
+	motion_workspace.set_motion_parameter(state_id, motion_id, parameter_name, value)
+	_refresh_motion_asset_preview()
+
+
+func _on_motion_phase_offset_changed(value: float, state_id: String, motion_id: String) -> void:
+	motion_workspace.set_motion_property(state_id, motion_id, "phase_offset", value, false)
+	_refresh_motion_asset_preview()
+
+
+func _request_motion_removal(state_id: String, motion_id: String) -> void:
+	var motion := motion_workspace.find_motion(state_id, motion_id) if is_instance_valid(motion_workspace) else {}
+	if motion.is_empty():
+		return
+	pending_motion_remove_motion_state_id = state_id
+	pending_motion_remove_motion_id = motion_id
+	motion_remove_motion_dialog.dialog_text = "Remove Motion '%s' from the Asset Animation?" % str(motion.get("name", "Motion"))
+	motion_remove_motion_dialog.popup_centered()
+
+
+func _confirm_motion_removal() -> void:
+	var state_id := pending_motion_remove_motion_state_id
+	var motion_id := pending_motion_remove_motion_id
+	pending_motion_remove_motion_state_id = ""
+	pending_motion_remove_motion_id = ""
+	if state_id.is_empty() or motion_id.is_empty() or not is_instance_valid(motion_workspace):
+		return
+	if motion_workspace.remove_motion(state_id, motion_id):
+		_show_status_message("Motion removed from the Asset Animation.")
+
+
+func _move_transition(state_id: String, transition_id: String, direction: int) -> void:
+	if is_instance_valid(motion_workspace) and motion_workspace.move_transition(state_id, transition_id, direction):
+		_show_status_message("Transition priority updated in the Asset Animation.")
+
+
+func _on_transition_target_selected(index: int, option: OptionButton, state_id: String, transition_id: String) -> void:
+	if index < 0 or index >= option.item_count:
+		return
+	motion_workspace.set_transition_property(state_id, transition_id, "target_state_id", str(option.get_item_metadata(index)))
+
+
+func _on_transition_exit_policy_selected(index: int, option: OptionButton, state_id: String, transition_id: String) -> void:
+	if index < 0 or index >= option.item_count:
+		return
+	motion_workspace.set_transition_property(state_id, transition_id, "exit_policy", str(option.get_item_metadata(index)))
+
+
+func _on_transition_entry_mode_selected(index: int, option: OptionButton, state_id: String, transition_id: String) -> void:
+	if index < 0 or index >= option.item_count:
+		return
+	motion_workspace.set_transition_property(state_id, transition_id, "entry_mode", str(option.get_item_metadata(index)))
+
+
+func _on_transition_number_changed(value: float, state_id: String, transition_id: String, property_name: String) -> void:
+	if is_instance_valid(motion_workspace):
+		motion_workspace.set_transition_property(state_id, transition_id, property_name, value, false)
+
+
+func _add_contract_parameter() -> void:
+	var error := motion_workspace.add_contract_parameter() if is_instance_valid(motion_workspace) else "Motion workspace is not available."
+	if not error.is_empty():
+		_show_status_message(error)
+
+
+func _rename_contract_parameter(new_name: String, parameter_id: String, editor: LineEdit) -> void:
+	var parameter := motion_workspace.find_contract_parameter(parameter_id) if is_instance_valid(motion_workspace) else {}
+	if parameter.is_empty() or new_name.strip_edges() == str(parameter.get("name", "")):
+		return
+	var error := motion_workspace.set_contract_parameter_property(parameter_id, "name", new_name)
+	if not error.is_empty():
+		editor.text = str(parameter.get("name", "parameter"))
+		_show_status_message(error)
+
+
+func _on_contract_parameter_type_selected(index: int, option: OptionButton, parameter_id: String) -> void:
+	if index < 0 or index >= option.item_count:
+		return
+	var error := motion_workspace.set_contract_parameter_property(parameter_id, "type", str(option.get_item_metadata(index)))
+	if not error.is_empty():
+		_show_status_message(error)
+
+
+func _remove_contract_parameter(parameter_id: String) -> void:
+	var error := motion_workspace.remove_contract_parameter(parameter_id) if is_instance_valid(motion_workspace) else "Motion workspace is not available."
+	if not error.is_empty():
+		_show_status_message(error)
+
+
+func _add_transition_rule(state_id: String, transition_id: String) -> void:
+	var error := motion_workspace.add_transition_rule(state_id, transition_id) if is_instance_valid(motion_workspace) else "Motion workspace is not available."
+	if not error.is_empty():
+		_show_status_message(error)
+
+
+func _on_transition_rule_parameter_selected(index: int, option: OptionButton, state_id: String, transition_id: String, rule_id: String) -> void:
+	if index < 0 or index >= option.item_count:
+		return
+	motion_workspace.set_transition_rule_property(state_id, transition_id, rule_id, "parameter_id", str(option.get_item_metadata(index)))
+
+
+func _on_transition_rule_operator_selected(index: int, option: OptionButton, state_id: String, transition_id: String, rule_id: String) -> void:
+	if index < 0 or index >= option.item_count:
+		return
+	motion_workspace.set_transition_rule_property(state_id, transition_id, rule_id, "operator", str(option.get_item_metadata(index)))
+
+
+func _on_transition_rule_value_changed(value: float, state_id: String, transition_id: String, rule_id: String) -> void:
+	if is_instance_valid(motion_workspace):
+		motion_workspace.set_transition_rule_property(state_id, transition_id, rule_id, "value", value, false)
+
+
+func _remove_transition_rule(state_id: String, transition_id: String, rule_id: String) -> void:
+	if is_instance_valid(motion_workspace):
+		motion_workspace.remove_transition_rule(state_id, transition_id, rule_id)
+
+
+func _rename_marker_event(new_event_id: String, state_id: String, marker_id: String, editor: LineEdit) -> void:
+	var marker := motion_workspace.find_marker(state_id, marker_id) if is_instance_valid(motion_workspace) else {}
+	if marker.is_empty() or new_event_id.strip_edges() == str(marker.get("event_id", "")):
+		return
+	var error := motion_workspace.set_marker_property(state_id, marker_id, "event_id", new_event_id)
+	if not error.is_empty():
+		editor.text = str(marker.get("event_id", "event"))
+		_show_status_message(error)
+		return
+	_show_status_message("Marker Event ID updated in the Asset Animation.")
+
+
+func _on_marker_kind_selected(index: int, option: OptionButton, state_id: String, marker_id: String) -> void:
+	if index < 0 or index >= option.item_count:
+		return
+	motion_workspace.set_marker_property(state_id, marker_id, "kind", str(option.get_item_metadata(index)))
+
+
+func _on_marker_phase_changed(value: float, state_id: String, marker_id: String) -> void:
+	if not is_instance_valid(motion_workspace):
+		return
+	motion_workspace.set_marker_property(state_id, marker_id, "phase", value, false)
+	motion_workspace.refresh_board()
+	_render_context_bar()
+
+
+func _request_motion_item_removal(kind: String, state_id: String, item_id: String) -> void:
+	if not is_instance_valid(motion_workspace):
+		return
+	var item := motion_workspace.find_transition(state_id, item_id) if kind == MotionSelection.TRANSITION else motion_workspace.find_marker(state_id, item_id)
+	if item.is_empty():
+		return
+	pending_motion_remove_item_kind = kind
+	pending_motion_remove_item_state_id = state_id
+	pending_motion_remove_item_id = item_id
+	var type_label := "Transition" if kind == MotionSelection.TRANSITION else "Marker"
+	motion_remove_item_dialog.title = "Remove %s" % type_label
+	motion_remove_item_dialog.dialog_text = "Remove %s '%s' from the Asset Animation?" % [type_label, motion_workspace.item_display_name(kind, item)]
+	motion_remove_item_dialog.popup_centered()
+
+
+func _confirm_motion_item_removal() -> void:
+	var kind := pending_motion_remove_item_kind
+	var state_id := pending_motion_remove_item_state_id
+	var item_id := pending_motion_remove_item_id
+	pending_motion_remove_item_kind = ""
+	pending_motion_remove_item_state_id = ""
+	pending_motion_remove_item_id = ""
+	if state_id.is_empty() or item_id.is_empty() or not is_instance_valid(motion_workspace):
+		return
+	var removed := motion_workspace.remove_transition(state_id, item_id) if kind == MotionSelection.TRANSITION else motion_workspace.remove_marker(state_id, item_id)
+	if removed:
+		_show_status_message("%s removed from the Asset Animation." % ("Transition" if kind == MotionSelection.TRANSITION else "Marker"))
+
+
 func _on_component_material_selected(index: int, option: OptionButton) -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	if component.is_empty() or index < 0 or index >= option.item_count:
@@ -4574,18 +6417,18 @@ func _on_edge_render_outline_changed(enabled: bool) -> void:
 	_render_canvas_context()
 
 
-func _valid_selected_point_indices(component: Dictionary) -> Array[int]:
-	var valid_indices: Array[int] = []
-	for index_value in selected_point_indices:
-		var point_index := int(index_value)
-		if point_index not in valid_indices and not _get_component_point(component, point_index).is_empty():
-			valid_indices.append(point_index)
-	if valid_indices.is_empty() and not _get_component_point(component, selected_point_index).is_empty():
-		valid_indices.append(selected_point_index)
-	return valid_indices
+func _valid_selected_point_ids(component: Dictionary) -> Array[String]:
+	var valid_ids: Array[String] = []
+	for point_id_value in selected_point_ids:
+		var point_id := str(point_id_value)
+		if point_id not in valid_ids and not BezierTopology.point_by_id(component.get("points", []), point_id).is_empty():
+			valid_ids.append(point_id)
+	if valid_ids.is_empty() and not selected_point_id.is_empty() and not BezierTopology.point_by_id(component.get("points", []), selected_point_id).is_empty():
+		valid_ids.append(selected_point_id)
+	return valid_ids
 
 
-func _add_selected_point_settings(component: Dictionary, point_indices: Array[int]) -> void:
+func _add_selected_point_settings(component: Dictionary, point_ids: Array[String]) -> void:
 	var shared_mode := ""
 	var mode_mixed := false
 	var shared_preserve := false
@@ -4594,8 +6437,8 @@ func _add_selected_point_settings(component: Dictionary, point_indices: Array[in
 	var shared_handle_in := Vector2.ZERO
 	var shared_handle_out := Vector2.ZERO
 	var handles_mixed := false
-	for selection_index in range(point_indices.size()):
-		var point := _get_component_point(component, point_indices[selection_index])
+	for selection_index in range(point_ids.size()):
+		var point := BezierTopology.point_by_id(component.get("points", []), point_ids[selection_index])
 		if point.is_empty():
 			continue
 		var point_mode := str(point.get("mode", "linear"))
@@ -4633,49 +6476,47 @@ func _add_selected_point_settings(component: Dictionary, point_indices: Array[in
 			if str(point_mode_option.get_item_metadata(mode_index)) == shared_mode:
 				point_mode_option.select(mode_index)
 				break
-	point_mode_option.item_selected.connect(_on_selected_points_mode_selected.bind(point_mode_option, point_indices.duplicate()))
+	point_mode_option.item_selected.connect(_on_selected_points_mode_selected.bind(point_mode_option, point_ids.duplicate()))
 	inspector_content.add_child(point_mode_option)
 	var preserve_point := CheckBox.new()
 	preserve_point.text = "Preserve Point" if not preserve_mixed else "Preserve Point: - Mixed -"
 	preserve_point.button_pressed = shared_preserve if not preserve_mixed else false
-	preserve_point.toggled.connect(_on_selected_points_preserve_changed.bind(point_indices.duplicate()))
+	preserve_point.toggled.connect(_on_selected_points_preserve_changed.bind(point_ids.duplicate()))
 	inspector_content.add_child(preserve_point)
 	var handles_label := "Handles: - Mixed -" if handles_mixed else "Handles: %s" % ("Manual" if shared_handle_source == "manual" else "Auto")
 	inspector_content.add_child(_create_inspector_field_label(handles_label))
 
 
-func _on_selected_points_mode_selected(index: int, option: OptionButton, _point_indices: Array) -> void:
+func _on_selected_points_mode_selected(index: int, option: OptionButton, _point_ids: Array) -> void:
 	if index < 0 or index >= option.item_count:
 		return
 	var mode := str(option.get_item_metadata(index))
 	if mode.is_empty():
 		return
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	var valid_indices := _valid_selected_point_indices(component)
-	if component.is_empty() or valid_indices.is_empty():
+	var valid_ids := _valid_selected_point_ids(component)
+	if component.is_empty() or valid_ids.is_empty():
 		return
 	_record_direct_change()
-	for point_index in valid_indices:
-		var point := _get_component_point(component, point_index)
+	for point_id in valid_ids:
+		var point := BezierTopology.point_by_id(component.get("points", []), point_id)
 		point["mode"] = mode
 		if mode == "corner":
 			point["preserve_point"] = true
 		point["handle_source"] = "auto"
 	BezierGeometry.resolve_auto_handles(component.get("points", []), component.get("chains", []))
-	_update_legacy_projection(component)
-	canvas_view.set_outer_shape(component.get("outer_shape", []), bool(component.get("closed", false)))
-	canvas_view.set_bezier_geometry(component.get("points", []), component.get("edges", []), component.get("chains", []))
+	_refresh_component_geometry(component)
 	_render_inspector()
 
 
-func _on_selected_points_preserve_changed(enabled: bool, _point_indices: Array) -> void:
+func _on_selected_points_preserve_changed(enabled: bool, _point_ids: Array) -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	var valid_indices := _valid_selected_point_indices(component)
-	if component.is_empty() or valid_indices.is_empty():
+	var valid_ids := _valid_selected_point_ids(component)
+	if component.is_empty() or valid_ids.is_empty():
 		return
 	_record_direct_change()
-	for point_index in valid_indices:
-		_get_component_point(component, point_index)["preserve_point"] = enabled
+	for point_id in valid_ids:
+		BezierTopology.point_by_id(component.get("points", []), point_id)["preserve_point"] = enabled
 	_render_inspector()
 
 
@@ -4774,13 +6615,13 @@ func _on_selected_points_delta_changed(value: float, property_name: String, fiel
 	if is_zero_approx(value) or property_name not in ["position_x", "position_y"]:
 		return
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	var point_indices := _valid_selected_point_indices(component)
-	if component.is_empty() or point_indices.size() < 2:
+	var point_ids := _valid_selected_point_ids(component)
+	if component.is_empty() or point_ids.size() < 2:
 		return
 	var local_delta := _world_to_editor_units(value)
 	_record_direct_change()
-	for point_index in point_indices:
-		var point := _get_component_point(component, point_index)
+	for point_id in point_ids:
+		var point := BezierTopology.point_by_id(component.get("points", []), point_id)
 		var point_position: Vector2 = point.get("position", Vector2.ZERO)
 		if property_name == "position_x":
 			point_position.x += local_delta
@@ -4788,15 +6629,13 @@ func _on_selected_points_delta_changed(value: float, property_name: String, fiel
 			point_position.y += local_delta
 		point["position"] = point_position
 	BezierGeometry.resolve_auto_handles(component.get("points", []), component.get("chains", []))
-	_update_legacy_projection(component)
-	canvas_view.set_outer_shape(component.get("outer_shape", []), bool(component.get("closed", false)))
-	canvas_view.set_bezier_geometry(component.get("points", []), component.get("edges", []), component.get("chains", []))
+	_refresh_component_geometry(component)
 	field.set_value_no_signal(0.0)
 
 
 func _on_point_position_changed(value: float, property_name: String) -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	var point := _get_component_point(component, selected_point_index)
+	var point := BezierTopology.point_by_id(component.get("points", []), selected_point_id)
 	if component.is_empty() or point.is_empty():
 		return
 	if property_name != "position_x" and property_name != "position_y":
@@ -4810,9 +6649,7 @@ func _on_point_position_changed(value: float, property_name: String) -> void:
 		point_position.y = value
 	point["position"] = point_position
 	BezierGeometry.resolve_auto_handles(component.get("points", []), component.get("chains", []))
-	_update_legacy_projection(component)
-	canvas_view.set_outer_shape(component.get("outer_shape", []), bool(component.get("closed", false)))
-	canvas_view.set_bezier_geometry(component.get("points", []), component.get("edges", []), component.get("chains", []))
+	_refresh_component_geometry(component)
 	_render_inspector()
 
 
@@ -5061,7 +6898,7 @@ func _render_lookdev_canvas() -> void:
 		canvas_view.set_component_transform({})
 		canvas_view.set_component_material(null)
 		canvas_view.set_reference_shapes([])
-		canvas_view.set_outer_shape([])
+		canvas_view.set_display_polygon([])
 		return
 	var component := _get_component(asset, lookdev_target_component_id)
 	if component.is_empty():
@@ -5073,7 +6910,7 @@ func _render_lookdev_canvas() -> void:
 		canvas_view.set_component_transform({})
 		canvas_view.set_component_material(null)
 		canvas_view.set_reference_shapes(_build_reference_shapes(asset))
-		canvas_view.set_outer_shape([])
+		canvas_view.set_display_polygon([])
 		return
 	canvas_context_label.text = "LookDev: %s / %s" % [str(asset.get("name", "Asset")), str(component.get("name", "Component"))]
 	canvas_view.set_context(str(component.get("name", "Component")))
@@ -5089,18 +6926,45 @@ func _render_lookdev_canvas() -> void:
 	else:
 		canvas_view.set_component_material(_load_material_canvas_texture(material_data), material_data.get("tint", Color.WHITE), float(material_data.get("opacity", 1.0)), material_data.get("mapping_scale", Vector2.ONE), material_data.get("mapping_offset", Vector2.ZERO), _material_wrap_mode(material_data))
 	canvas_view.set_reference_shapes(_build_reference_shapes(asset, lookdev_target_component_id))
-	canvas_view.set_outer_shape(component.get("outer_shape", []), bool(component.get("closed", false)))
+	_refresh_component_geometry(component)
 
 
 func _render_canvas_context() -> void:
 	_ensure_default_edit_point_state()
+	if active_module == "Motion" and active_motion_submodule == "Animation":
+		_sync_motion_player_document(_get_asset(selected_asset_id))
 	_render_context_bar()
 	_render_info_bar()
 	if not is_instance_valid(canvas_context_label):
 		return
 	canvas_view.set_reference_image(null)
 	canvas_view.set_paper_frame(Vector2.ZERO, false)
+	if active_module == "Motion":
+		canvas_view.visible = false
+		texture_canvas.visible = false
+		import_preview.visible = false
+		material_graph.visible = false
+		material_preview_container.visible = false
+		export_workspace.visible = false
+		motion_workspace.visible = active_motion_submodule == "Animation"
+		motion_path_workspace.visible = active_motion_submodule == "Path"
+		motion_sequence_workspace.visible = active_motion_submodule == "Sequence"
+		if active_motion_submodule == "Animation":
+			var motion_asset := _get_asset(selected_asset_id)
+			motion_workspace.set_asset(selected_asset_id, str(motion_asset.get("name", "")) if not motion_asset.is_empty() else "", motion_asset.get("components", []) if not motion_asset.is_empty() else [], _ensure_asset_animation(motion_asset))
+			motion_workspace.set_phase(motion_phase)
+		elif active_motion_submodule == "Path":
+			_refresh_motion_path_workspace()
+		else:
+			_refresh_motion_sequence_workspace()
+		canvas_context_label.text = ""
+		texture_context_label.text = ""
+		import_preview_context_label.text = ""
+		return
+	motion_path_workspace.visible = false
+	motion_sequence_workspace.visible = false
 	if active_module == "Export":
+		motion_workspace.visible = false
 		canvas_view.visible = false
 		texture_canvas.visible = false
 		import_preview.visible = false
@@ -5114,6 +6978,7 @@ func _render_canvas_context() -> void:
 		return
 	export_workspace.visible = false
 	if active_module == "Style":
+		motion_workspace.visible = false
 		canvas_view.visible = false
 		texture_canvas.visible = false
 		import_preview.visible = false
@@ -5129,6 +6994,7 @@ func _render_canvas_context() -> void:
 		return
 	material_graph.visible = false
 	material_preview_container.visible = false
+	motion_workspace.visible = false
 	if not selected_texture_id.is_empty():
 		var texture := _get_texture(selected_texture_id)
 		if texture.is_empty():
@@ -5181,7 +7047,7 @@ func _render_canvas_context() -> void:
 		canvas_view.set_tool_mode("")
 		canvas_view.set_component_transform({})
 		canvas_view.set_reference_shapes([])
-		canvas_view.set_outer_shape([])
+		canvas_view.set_display_polygon([])
 		canvas_view.set_bezier_geometry([], [], [])
 		return
 	_set_reference_image_canvas(asset)
@@ -5194,7 +7060,7 @@ func _render_canvas_context() -> void:
 		canvas_view.set_component_transform({})
 		canvas_view.set_component_material(null)
 		canvas_view.set_reference_shapes(_build_reference_shapes(asset))
-		canvas_view.set_outer_shape([])
+		canvas_view.set_display_polygon([])
 		canvas_view.set_bezier_geometry([], [], [])
 		canvas_view.call_deferred("grab_focus")
 		return
@@ -5207,7 +7073,7 @@ func _render_canvas_context() -> void:
 		canvas_view.set_tool_mode("")
 		canvas_view.set_component_transform({})
 		canvas_view.set_reference_shapes(_build_reference_shapes(asset))
-		canvas_view.set_outer_shape([])
+		canvas_view.set_display_polygon([])
 		canvas_view.set_bezier_geometry([], [], [])
 		canvas_view.call_deferred("grab_focus")
 		return
@@ -5238,13 +7104,9 @@ func _render_canvas_context() -> void:
 		canvas_view.set_component_material(_load_material_canvas_texture(component_material), component_material.get("tint", Color.WHITE), float(component_material.get("opacity", 1.0)), component_material.get("mapping_scale", Vector2.ONE), component_material.get("mapping_offset", Vector2.ZERO), _material_wrap_mode(component_material))
 	canvas_view.set_reference_shapes(_build_reference_shapes(asset, selected_component_id))
 	BezierGeometry.resolve_auto_handles(component.get("points", []), component.get("chains", []))
-	var component_closed := bool(component.get("closed", component["outer_shape"].size() >= 3))
-	canvas_view.set_outer_shape(component["outer_shape"], component_closed)
-	canvas_view.set_bezier_geometry(component.get("points", []), component.get("edges", []), component.get("chains", []))
+	_refresh_component_geometry(component)
 	canvas_view.set_selected_edge_id(selected_edge_id)
 	canvas_view.call_deferred("grab_focus")
-	if active_state == "draw" and not component_closed:
-		canvas_view.set_line_draft(component["outer_shape"])
 
 
 func _set_reference_image_canvas(asset: Dictionary) -> void:
@@ -5279,11 +7141,11 @@ func _build_reference_shapes(asset: Dictionary, excluded_component_id := "") -> 
 			continue
 		shapes.append({
 			"id": str(component["id"]),
-			"points": component["outer_shape"].duplicate(),
+			"points": BezierTopology.outer_control_polygon(component),
 			"bezier_points": component.get("points", []).duplicate(true),
 			"edges": component.get("edges", []).duplicate(true),
 			"chains": component.get("chains", []).duplicate(true),
-			"closed": bool(component.get("closed", component["outer_shape"].size() >= 3)),
+			"closed": BezierTopology.outer_chain_closed(component),
 			"transform": component.get("transform", _default_component_transform()).duplicate(true),
 			"visibility": asset_is_visible and bool(component.get("visibility", true)),
 			"z_index": int(component.get("z_index", 0))
@@ -5291,154 +7153,32 @@ func _build_reference_shapes(asset: Dictionary, excluded_component_id := "") -> 
 	return shapes
 
 
-func _on_line_shape_changed(points: Array[Vector2], closed: bool) -> void:
-	var asset := _get_asset(selected_asset_id)
-	var component := _get_component(asset, selected_component_id)
-	if component.is_empty():
+func _refresh_component_geometry(component: Dictionary) -> void:
+	if component.is_empty() or not is_instance_valid(canvas_view):
 		return
-	_record_direct_change()
-	component["outer_shape"] = points.duplicate()
-	component["closed"] = closed
-	_sync_linear_topology_from_legacy_shape(component)
-	canvas_view.set_outer_shape(points, closed)
+	canvas_view.set_display_polygon(BezierTopology.outer_control_polygon(component), BezierTopology.outer_chain_closed(component))
 	canvas_view.set_bezier_geometry(component.get("points", []), component.get("edges", []), component.get("chains", []))
 
 
 func _on_bezier_point_added(position: Vector2, point_mode: String = "linear", drawn_handle_out: Vector2 = Vector2.ZERO) -> void:
-	var asset := _get_asset(selected_asset_id)
-	var component := _get_component(asset, selected_component_id)
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	if component.is_empty():
 		return
 	_record_direct_change()
-	var points: Array = component.get("points", [])
-	var edges: Array = component.get("edges", [])
-	var chains: Array = component.get("chains", [])
-	if chains.is_empty() or bool(chains.back().get("closed", false)):
-		chains.append({
-			"id": "chain_%d" % (chains.size() + 1),
-			"point_ids": [],
-			"edge_ids": [],
-			"closed": false,
-			"topology_role": "outer"
-		})
-	var active_chain: Dictionary = chains.back()
-	var point_id := "point_%d" % (points.size() + 1)
-	var resolved_point_mode := point_mode if point_mode in ["linear", "aligned", "free", "mirrored", "corner"] else active_draw_point_mode
-	var new_point := {
-		"id": point_id,
-		"position": position,
-		"mode": resolved_point_mode,
-		"preserve_point": resolved_point_mode == "corner",
-		"handle_source": "auto",
-		"handle_in": Vector2.ZERO,
-		"handle_out": Vector2.ZERO
-	}
-	points.append(new_point)
-	var point_ids: Array = active_chain.get("point_ids", [])
-	var edge_ids: Array = active_chain.get("edge_ids", [])
-	if not point_ids.is_empty():
-		var edge_id := "edge_%d" % (edges.size() + 1)
-		edges.append({
-			"id": edge_id,
-			"start_point_id": str(point_ids.back()),
-			"end_point_id": point_id,
-			"render_outline": true
-		})
-		edge_ids.append(edge_id)
-	point_ids.append(point_id)
-	active_chain["point_ids"] = point_ids
-	active_chain["edge_ids"] = edge_ids
-	component["points"] = points
-	component["edges"] = edges
-	component["chains"] = chains
-	BezierGeometry.resolve_auto_handles(points, chains)
-	if resolved_point_mode != "linear" and not is_zero_approx(drawn_handle_out.length_squared()):
-		new_point["handle_source"] = "manual"
-		new_point["handle_out"] = drawn_handle_out
-		var automatic_in: Vector2 = new_point.get("handle_in", Vector2.ZERO)
-		if resolved_point_mode == "mirrored":
-			new_point["handle_in"] = -drawn_handle_out
-		elif resolved_point_mode == "aligned":
-			var incoming_length := automatic_in.length()
-			if is_zero_approx(incoming_length):
-				incoming_length = drawn_handle_out.length()
-			new_point["handle_in"] = -drawn_handle_out.normalized() * incoming_length
-	_update_legacy_projection(component)
-	canvas_view.set_outer_shape(component["outer_shape"], bool(component["closed"]))
-	canvas_view.set_bezier_geometry(points, edges, chains)
+	BezierTopology.add_point(component, position, point_mode if point_mode in BezierTopology.VALID_POINT_MODES else active_draw_point_mode, drawn_handle_out)
+	_refresh_component_geometry(component)
 
 
 func _on_bezier_chain_closed() -> void:
-	var asset := _get_asset(selected_asset_id)
-	var component := _get_component(asset, selected_component_id)
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	if component.is_empty():
 		return
 	var chains: Array = component.get("chains", [])
-	if chains.is_empty():
-		return
-	var active_chain: Dictionary = chains.back()
-	var point_ids: Array = active_chain.get("point_ids", [])
-	if bool(active_chain.get("closed", false)) or point_ids.size() < 3:
+	if chains.is_empty() or bool(chains.back().get("closed", false)) or chains.back().get("point_ids", []).size() < 3:
 		return
 	_record_direct_change()
-	var edges: Array = component.get("edges", [])
-	var edge_ids: Array = active_chain.get("edge_ids", [])
-	var edge_id := "edge_%d" % (edges.size() + 1)
-	edges.append({
-		"id": edge_id,
-		"start_point_id": str(point_ids.back()),
-		"end_point_id": str(point_ids.front()),
-		"render_outline": true
-	})
-	edge_ids.append(edge_id)
-	active_chain["edge_ids"] = edge_ids
-	active_chain["closed"] = true
-	# A closed contour has a real closing edge from the last point back to the
-	# first point. Keep both endpoints in the later sampling result.
-	var points: Array = component.get("points", [])
-	var first_point := _get_point_by_id(points, str(point_ids.front()))
-	var last_point := _get_point_by_id(points, str(point_ids.back()))
-	if not first_point.is_empty():
-		first_point["preserve_point"] = true
-	if not last_point.is_empty():
-		last_point["preserve_point"] = true
-	component["edges"] = edges
-	component["chains"] = chains
-	BezierGeometry.resolve_auto_handles(component.get("points", []), chains)
-	_update_legacy_projection(component)
-	canvas_view.set_outer_shape(component["outer_shape"], bool(component["closed"]))
-	canvas_view.set_bezier_geometry(component.get("points", []), edges, chains)
-
-
-func _update_legacy_projection(component: Dictionary) -> void:
-	var topology_points: Array = component.get("points", [])
-	# An explicitly empty Bezier topology is a valid editable state. Reusing the
-	# previous legacy outline here would resurrect the last deleted point and
-	# make it appear as a legacy shape point with different interaction rules.
-	if topology_points.is_empty():
-		component["outer_shape"] = []
-		component["closed"] = false
-		return
-	var topology := {
-		"points": topology_points,
-		"edges": component.get("edges", []),
-		"chains": component.get("chains", [])
-	}
-	var fallback_points := _deserialize_points(component.get("outer_shape", []))
-	var projection := _legacy_projection_from_topology(topology, fallback_points, bool(component.get("closed", false)))
-	component["outer_shape"] = projection["points"]
-	component["closed"] = projection["closed"]
-
-
-func _on_outer_shape_changed(points: Array[Vector2]) -> void:
-	var asset := _get_asset(selected_asset_id)
-	var component := _get_component(asset, selected_component_id)
-	if component.is_empty():
-		return
-	_record_coalesced_change()
-	component["outer_shape"] = points.duplicate()
-	_sync_linear_topology_from_legacy_shape(component)
-	canvas_view.set_bezier_geometry(component.get("points", []), component.get("edges", []), component.get("chains", []))
+	BezierTopology.close_active_chain(component)
+	_refresh_component_geometry(component)
 
 
 func _on_pivot_changed(pivot: Vector2) -> void:
@@ -5483,38 +7223,25 @@ func _on_reference_component_selected(component_id: String) -> void:
 	_select_component(selected_asset_id, component_id)
 
 
-func _on_bezier_point_moved(point_index: int, position: Vector2) -> void:
-	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	var point := _get_component_point(component, point_index)
-	if point.is_empty():
-		return
-	_record_coalesced_change()
-	point["position"] = position
-	BezierGeometry.resolve_auto_handles(component.get("points", []), component.get("chains", []))
-	_update_legacy_projection(component)
-	canvas_view.set_outer_shape(component.get("outer_shape", []), bool(component.get("closed", false)))
-	canvas_view.set_bezier_geometry(component.get("points", []), component.get("edges", []), component.get("chains", []))
-
-
-func _on_bezier_points_move_started(indices: Array) -> void:
+func _on_bezier_points_move_started(point_ids: Array) -> void:
 	bezier_point_move_start_positions.clear()
 	bezier_point_move_component_id = selected_component_id
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	if component.is_empty():
 		return
-	for index_value in indices:
-		var point_index := int(index_value)
-		var point := _get_component_point(component, point_index)
+	for point_id_value in point_ids:
+		var point_id := str(point_id_value)
+		var point := BezierTopology.point_by_id(component.get("points", []), point_id)
 		if not point.is_empty():
-			bezier_point_move_start_positions[point_index] = Vector2(point.get("position", Vector2.ZERO))
+			bezier_point_move_start_positions[point_id] = Vector2(point.get("position", Vector2.ZERO))
 
 
-func _on_bezier_points_moved(indices: Array, world_delta: Vector2) -> void:
+func _on_bezier_points_moved(point_ids: Array, world_delta: Vector2) -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	if component.is_empty() or indices.is_empty():
+	if component.is_empty() or point_ids.is_empty():
 		return
 	if bezier_point_move_component_id != selected_component_id or bezier_point_move_start_positions.is_empty():
-		_on_bezier_points_move_started(indices)
+		_on_bezier_points_move_started(point_ids)
 	var transform: Dictionary = component.get("transform", _default_component_transform())
 	var rotation := deg_to_rad(float(transform.get("rotation", 0.0)))
 	var scale: Vector2 = transform.get("scale", Vector2.ONE)
@@ -5525,26 +7252,25 @@ func _on_bezier_points_moved(indices: Array, world_delta: Vector2) -> void:
 		local_delta.y /= scale.y
 	# Snap the group's anchor position once, then apply the resulting delta to
 	# every selected point so their relative spacing remains unchanged.
-	var anchor_index := int(indices[0])
-	if bezier_point_move_start_positions.has(anchor_index):
-		var anchor_position: Vector2 = bezier_point_move_start_positions[anchor_index]
+	var anchor_id := str(point_ids[0])
+	if bezier_point_move_start_positions.has(anchor_id):
+		var anchor_position: Vector2 = bezier_point_move_start_positions[anchor_id]
 		local_delta = canvas_view.snap_position(anchor_position + local_delta) - anchor_position
 	_record_coalesced_change()
 	var points: Array = component.get("points", [])
-	for index_value in indices:
-		var point_index := int(index_value)
-		if point_index >= 0 and point_index < points.size() and points[point_index] is Dictionary and bezier_point_move_start_positions.has(point_index):
-			points[point_index]["position"] = Vector2(bezier_point_move_start_positions[point_index]) + local_delta
+	for point_id_value in point_ids:
+		var point_id := str(point_id_value)
+		var point := BezierTopology.point_by_id(points, point_id)
+		if not point.is_empty() and bezier_point_move_start_positions.has(point_id):
+			point["position"] = Vector2(bezier_point_move_start_positions[point_id]) + local_delta
 	BezierGeometry.resolve_auto_handles(points, component.get("chains", []))
-	_update_legacy_projection(component)
-	canvas_view.set_outer_shape(component.get("outer_shape", []), bool(component.get("closed", false)))
-	canvas_view.set_bezier_geometry(points, component.get("edges", []), component.get("chains", []))
+	_refresh_component_geometry(component)
 	_render_inspector()
 
 
-func _on_bezier_handle_changed(point_index: int, handle_side: String, value: Vector2) -> void:
+func _on_bezier_handle_changed(point_id: String, handle_side: String, value: Vector2) -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	var point := _get_component_point(component, point_index)
+	var point := BezierTopology.point_by_id(component.get("points", []), point_id)
 	if point.is_empty() or handle_side not in ["in", "out"]:
 		return
 	_record_coalesced_change()
@@ -5564,249 +7290,84 @@ func _on_bezier_handle_changed(point_index: int, handle_side: String, value: Vec
 			opposite_length = value.length()
 		point["handle_%s" % opposite_side] = -value.normalized() * opposite_length
 	BezierGeometry.resolve_auto_handles(component.get("points", []), component.get("chains", []))
-	_update_legacy_projection(component)
-	canvas_view.set_outer_shape(component.get("outer_shape", []), bool(component.get("closed", false)))
-	canvas_view.set_bezier_geometry(component.get("points", []), component.get("edges", []), component.get("chains", []))
+	_refresh_component_geometry(component)
 
 
 func _on_bezier_edge_insert_requested(edge_id: String, t: float) -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	var edge := _get_edge(component, edge_id)
-	if component.is_empty() or edge.is_empty():
-		return
-	var chain := _get_chain_for_edge(component, edge_id)
-	if chain.is_empty():
-		return
-	var start_id := str(edge.get("start_point_id", ""))
-	var end_id := str(edge.get("end_point_id", ""))
-	var points: Array = component.get("points", [])
-	var start_point := _get_point_by_id(points, start_id)
-	var end_point := _get_point_by_id(points, end_id)
-	if start_point.is_empty() or end_point.is_empty():
+	if component.is_empty() or BezierTopology.edge_by_id(component.get("edges", []), edge_id).is_empty():
 		return
 	_record_direct_change()
-	var split := BezierGeometry.split_edge(start_point, end_point, t)
-	start_point["handle_out"] = split["start_handle_out"]
-	start_point["handle_source"] = "manual"
-	end_point["handle_in"] = split["end_handle_in"]
-	end_point["handle_source"] = "manual"
-	var new_point_id := _next_topology_id(points, "point")
-	var new_point := {
-		"id": new_point_id,
-		"position": split["position"],
-		"mode": "free",
-		"preserve_point": false,
-		"handle_source": "manual",
-		"handle_in": split["new_handle_in"],
-		"handle_out": split["new_handle_out"]
-	}
-	points.append(new_point)
-	var edges: Array = component.get("edges", [])
-	edge["end_point_id"] = new_point_id
-	var new_edge_id := _next_topology_id(edges, "edge")
-	edges.append({
-		"id": new_edge_id,
-		"start_point_id": new_point_id,
-		"end_point_id": end_id,
-		"render_outline": bool(edge.get("render_outline", true))
-	})
-	var point_ids: Array = chain.get("point_ids", [])
-	var edge_ids: Array = chain.get("edge_ids", [])
-	var start_index := point_ids.find(start_id)
-	var edge_index := edge_ids.find(edge_id)
-	if start_index < 0 or edge_index < 0:
+	var new_point_id := BezierTopology.insert_point_on_edge(component, edge_id, t)
+	if new_point_id.is_empty():
 		return
-	point_ids.insert(start_index + 1, new_point_id)
-	edge_ids.insert(edge_index + 1, new_edge_id)
-	chain["point_ids"] = point_ids
-	chain["edge_ids"] = edge_ids
-	component["points"] = points
-	component["edges"] = edges
-	_update_legacy_projection(component)
-	selected_point_index = points.size() - 1
-	canvas_view.set_outer_shape(component.get("outer_shape", []), bool(component.get("closed", false)))
-	canvas_view.set_bezier_geometry(points, edges, component.get("chains", []))
-	canvas_view.set_selected_point_index(selected_point_index)
+	selected_point_id = new_point_id
+	selected_point_ids = [new_point_id]
+	_refresh_component_geometry(component)
+	canvas_view.set_selected_point_id(selected_point_id)
 	_render_inspector()
 
 
-func _on_bezier_point_delete_requested(point_index: int, record_history := true) -> void:
+func _on_bezier_point_delete_requested(point_id: String, record_history := true) -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	var points: Array = component.get("points", [])
-	if component.is_empty() or point_index < 0 or point_index >= points.size():
+	if component.is_empty() or BezierTopology.point_by_id(points, point_id).is_empty():
 		return
-	var point_id := str(points[point_index].get("id", ""))
-	var chain := _get_chain_for_point(component, point_id)
+	var chain := BezierTopology.chain_for_point(component.get("chains", []), point_id)
 	if chain.is_empty():
 		return
 	var point_ids: Array = chain.get("point_ids", [])
-	var chain_index := point_ids.find(point_id)
 	var closed := bool(chain.get("closed", false))
-	# Open chains may be reduced to zero points (for example a freshly created
-	# component with only its first point). Closed contours still require at
-	# least three points to remain valid.
-	if chain_index < 0 or (closed and point_ids.size() <= 3):
+	var deleted_point_index := point_ids.find(point_id)
+	if deleted_point_index < 0 or (closed and point_ids.size() <= 3):
 		return
 	if record_history:
 		_record_direct_change()
-	# Retain point semantics explicitly while the chain is rebuilt below. The
-	# legacy projection is allowed to change positions, but must never turn the
-	# surviving Bezier points back into linear points.
-	var surviving_point_settings: Dictionary = {}
-	for point_data in points:
-		if not point_data is Dictionary or str(point_data.get("id", "")) == point_id:
-			continue
-		surviving_point_settings[str(point_data.get("id", ""))] = {
-			"mode": str(point_data.get("mode", "linear")),
-			"preserve_point": bool(point_data.get("preserve_point", false)),
-			"handle_source": str(point_data.get("handle_source", "auto"))
-		}
-	var edge_ids: Array = chain.get("edge_ids", [])
-	var previous_edge_index := posmod(chain_index - 1, edge_ids.size()) if closed else chain_index - 1
-	var next_edge_index := chain_index
-	var edges: Array = component.get("edges", [])
-	var removed_edge_ids: Array = []
-	if previous_edge_index >= 0 and previous_edge_index < edge_ids.size():
-		removed_edge_ids.append(str(edge_ids[previous_edge_index]))
-	if next_edge_index >= 0 and next_edge_index < edge_ids.size():
-		removed_edge_ids.append(str(edge_ids[next_edge_index]))
-	var previous_id := ""
-	var next_id := ""
-	if chain_index > 0:
-		previous_id = str(point_ids[chain_index - 1])
-	elif closed:
-		previous_id = str(point_ids.back())
-	if chain_index < point_ids.size() - 1:
-		next_id = str(point_ids[chain_index + 1])
-	elif closed:
-		next_id = str(point_ids.front())
-	var bridge_edge_id := ""
-	if not previous_id.is_empty() and not next_id.is_empty():
-		bridge_edge_id = _next_topology_id(edges, "edge")
-		edges.append({
-			"id": bridge_edge_id,
-			"start_point_id": previous_id,
-			"end_point_id": next_id,
-			"render_outline": _combined_outline_visibility(edges, removed_edge_ids)
-		})
-	for edge_index in range(edges.size() - 1, -1, -1):
-		if str(edges[edge_index].get("id", "")) in removed_edge_ids:
-			edges.remove_at(edge_index)
-	points.remove_at(point_index)
-	point_ids.remove_at(chain_index)
-	chain["point_ids"] = point_ids
-	chain["edge_ids"] = _ordered_chain_edge_ids(point_ids, edges, closed)
-	component["points"] = points
-	component["edges"] = edges
-	BezierGeometry.resolve_auto_handles(points, component.get("chains", []))
-	for point_data in points:
-		if not point_data is Dictionary:
-			continue
-		var saved_settings = surviving_point_settings.get(str(point_data.get("id", "")), {})
-		if not saved_settings is Dictionary:
-			continue
-		point_data["mode"] = str(saved_settings.get("mode", "linear"))
-		point_data["preserve_point"] = bool(saved_settings.get("preserve_point", false))
-		point_data["handle_source"] = str(saved_settings.get("handle_source", "auto"))
-	# Recalculate only automatic handles after restoring the semantic settings.
-	BezierGeometry.resolve_auto_handles(points, component.get("chains", []))
-	_update_legacy_projection(component)
-	selected_point_index = mini(point_index, points.size() - 1)
-	selected_point_indices.clear()
-	if selected_point_index >= 0:
-		selected_point_indices.append(selected_point_index)
-	canvas_view.set_outer_shape(component.get("outer_shape", []), bool(component.get("closed", false)))
-	canvas_view.set_bezier_geometry(points, edges, component.get("chains", []))
-	canvas_view.set_selected_point_index(selected_point_index)
-	_render_inspector()
-
-
-func _on_bezier_points_delete_requested(point_indices: Array) -> void:
-	if point_indices.is_empty():
+	if not BezierTopology.delete_point(component, point_id):
 		return
-	var indices: Array = []
-	for index_value in point_indices:
-		var point_index := int(index_value)
-		if point_index not in indices:
-			indices.append(point_index)
-	indices.sort()
-	indices.reverse()
-	_record_direct_change()
-	for point_index in indices:
-		_on_bezier_point_delete_requested(point_index, false)
-	selected_point_index = -1
-	selected_point_indices.clear()
-	canvas_view.clear_selection()
+	points = component.get("points", [])
+	var next_selection_index := mini(deleted_point_index, points.size() - 1)
+	selected_point_id = str(points[next_selection_index].get("id", "")) if next_selection_index >= 0 else ""
+	selected_point_ids.clear()
+	if not selected_point_id.is_empty():
+		selected_point_ids.append(selected_point_id)
+	_refresh_component_geometry(component)
+	canvas_view.set_selected_point_id(selected_point_id)
 	_render_inspector()
-	_render_canvas_context()
 
 
-func _get_chain_for_edge(component: Dictionary, edge_id: String) -> Dictionary:
-	for chain_data in component.get("chains", []):
-		if edge_id in chain_data.get("edge_ids", []):
-			return chain_data
-	return {}
+func _on_bezier_points_delete_requested(point_ids: Array) -> void:
+	if point_ids.is_empty():
+		return
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if component.is_empty():
+		return
+	var valid_point_ids := _valid_selected_point_ids(component)
+	if valid_point_ids.is_empty():
+		return
+	_record_direct_change()
+	BezierTopology.delete_points(component, valid_point_ids)
+	selected_point_id = ""
+	selected_point_ids.clear()
+	canvas_view.clear_selection()
+	_refresh_component_geometry(component)
+	_render_inspector()
 
 
-func _get_chain_for_point(component: Dictionary, point_id: String) -> Dictionary:
-	for chain_data in component.get("chains", []):
-		if point_id in chain_data.get("point_ids", []):
-			return chain_data
-	return {}
-
-
-func _get_point_by_id(points: Array, point_id: String) -> Dictionary:
-	for point_data in points:
-		if str(point_data.get("id", "")) == point_id:
-			return point_data
-	return {}
-
-
-func _next_topology_id(items: Array, prefix: String) -> String:
-	var known_ids: Dictionary = {}
-	for item in items:
-		known_ids[str(item.get("id", ""))] = true
-	var index := items.size() + 1
-	var candidate := "%s_%d" % [prefix, index]
-	while known_ids.has(candidate):
-		index += 1
-		candidate = "%s_%d" % [prefix, index]
-	return candidate
-
-
-func _combined_outline_visibility(edges: Array, edge_ids: Array) -> bool:
-	var visible := true
-	for edge_data in edges:
-		if str(edge_data.get("id", "")) in edge_ids:
-			visible = visible and bool(edge_data.get("render_outline", true))
-	return visible
-
-
-func _ordered_chain_edge_ids(point_ids: Array, edges: Array, closed: bool) -> Array:
-	var ordered_ids: Array = []
-	var edge_count := point_ids.size() if closed else maxi(point_ids.size() - 1, 0)
-	for point_index in range(edge_count):
-		var start_id := str(point_ids[point_index])
-		var end_id := str(point_ids[(point_index + 1) % point_ids.size()])
-		for edge_data in edges:
-			if str(edge_data.get("start_point_id", "")) == start_id and str(edge_data.get("end_point_id", "")) == end_id:
-				ordered_ids.append(str(edge_data.get("id", "")))
-				break
-	return ordered_ids
-
-
-func _on_point_selection_changed(_index: int) -> void:
-	selected_point_index = _index
+func _on_point_selection_changed(point_id: String) -> void:
+	selected_point_id = point_id
 	if active_edit_mode == "point":
 		selected_edge_id = ""
 		_render_inspector()
 
 
-func _on_point_selection_set_changed(indices: Array) -> void:
-	selected_point_indices.clear()
-	for index_value in indices:
-		selected_point_indices.append(int(index_value))
-	selected_point_index = selected_point_indices[0] if selected_point_indices.size() == 1 else -1
+func _on_point_selection_set_changed(point_ids: Array) -> void:
+	selected_point_ids.clear()
+	for point_id_value in point_ids:
+		var point_id := str(point_id_value)
+		if not point_id.is_empty() and point_id not in selected_point_ids:
+			selected_point_ids.append(point_id)
+	selected_point_id = selected_point_ids[0] if selected_point_ids.size() == 1 else ""
 	if active_edit_mode == "point":
 		selected_edge_id = ""
 		_render_inspector()
@@ -5825,6 +7386,102 @@ func _get_asset(asset_id: String) -> Dictionary:
 	return {}
 
 
+func _ensure_asset_animation(asset: Dictionary) -> Dictionary:
+	if asset.is_empty():
+		return {}
+	var animation := MotionWorkspace.normalize_animation_document(asset.get("animation", {}))
+	asset["animation"] = animation
+	return animation
+
+
+func _default_motion_path(path_id: String, path_name: String) -> Dictionary:
+	return {
+		"id": path_id,
+		"name": path_name,
+		"visibility": true,
+		"topology": MotionPathTopology.default_topology(),
+		"playback": {"duration": 2.0, "loop": true, "orient_along_path": false}
+	}
+
+
+func _normalize_motion_path(raw_path, fallback_id: String) -> Dictionary:
+	var source: Dictionary = raw_path if raw_path is Dictionary else {}
+	var result := _default_motion_path(str(source.get("id", fallback_id)), str(source.get("name", fallback_id)))
+	result["visibility"] = bool(source.get("visibility", true))
+	result["topology"] = MotionPathTopology.normalize(source.get("topology", {}))
+	if source.get("playback", {}) is Dictionary:
+		result["playback"].merge(source.get("playback", {}), true)
+	return result
+
+
+func _default_motion_sequence(sequence_id: String, sequence_name: String) -> Dictionary:
+	return {"id": sequence_id, "name": sequence_name, "visibility": true, "next_entry_index": 1, "entries": []}
+
+
+func _normalize_motion_sequence(raw_sequence, fallback_id: String) -> Dictionary:
+	var source: Dictionary = raw_sequence if raw_sequence is Dictionary else {}
+	var result := _default_motion_sequence(str(source.get("id", fallback_id)), str(source.get("name", fallback_id)))
+	result["visibility"] = bool(source.get("visibility", true))
+	var normalized_entries: Array = []
+	var raw_entries = source.get("entries", [])
+	if raw_entries is Array:
+		for raw_entry in raw_entries:
+			if not raw_entry is Dictionary:
+				continue
+			var entry_id := str(raw_entry.get("id", ""))
+			if entry_id.is_empty():
+				continue
+			normalized_entries.append({
+				"id": entry_id,
+				"name": str(raw_entry.get("name", "Composition Entry")),
+				"enabled": bool(raw_entry.get("enabled", true)),
+				"asset_id": str(raw_entry.get("asset_id", "")),
+				"animation_state_id": str(raw_entry.get("animation_state_id", "")),
+				"path_id": str(raw_entry.get("path_id", ""))
+			})
+	result["entries"] = normalized_entries
+	var inferred_next_entry_index := 1
+	for entry in normalized_entries:
+		var entry_id := str(entry.get("id", ""))
+		if entry_id.begins_with("entry_"):
+			inferred_next_entry_index = maxi(inferred_next_entry_index, entry_id.trim_prefix("entry_").to_int() + 1)
+	result["next_entry_index"] = maxi(inferred_next_entry_index, int(source.get("next_entry_index", inferred_next_entry_index)))
+	return result
+
+
+func _get_motion_path(path_id: String) -> Dictionary:
+	for path_document in motion_paths:
+		if str(path_document.get("id", "")) == path_id:
+			return path_document
+	return {}
+
+
+func _get_motion_sequence(sequence_id: String) -> Dictionary:
+	for sequence_document in motion_sequences:
+		if str(sequence_document.get("id", "")) == sequence_id:
+			return sequence_document
+	return {}
+
+
+func _get_motion_sequence_entry(sequence_document: Dictionary, entry_id: String) -> Dictionary:
+	for entry in sequence_document.get("entries", []):
+		if str(entry.get("id", "")) == entry_id:
+			return entry
+	return {}
+
+
+func _first_motion_sequence_entry(sequence_document: Dictionary) -> Dictionary:
+	var entries: Array = sequence_document.get("entries", [])
+	return entries[0] if not entries.is_empty() else {}
+
+
+func _default_motion_path_preview_asset_id() -> String:
+	for asset in assets:
+		if str(asset.get("name", "")).to_lower().contains("wizard"):
+			return str(asset.get("id", ""))
+	return str(assets[0].get("id", "")) if not assets.is_empty() else ""
+
+
 func _get_component(asset: Dictionary, component_id: String) -> Dictionary:
 	if asset.is_empty():
 		return {}
@@ -5841,15 +7498,6 @@ func _get_edge(component: Dictionary, edge_id: String) -> Dictionary:
 		if str(edge.get("id", "")) == edge_id:
 			return edge
 	return {}
-
-
-func _get_component_point(component: Dictionary, point_index: int) -> Dictionary:
-	if component.is_empty() or point_index < 0:
-		return {}
-	var points: Array = component.get("points", [])
-	if point_index >= points.size() or not points[point_index] is Dictionary:
-		return {}
-	return points[point_index]
 
 
 func _get_texture(texture_id: String) -> Dictionary:
@@ -5891,8 +7539,18 @@ func _add_module_section(parent: Container, module_name: String, submodules: Arr
 
 func _on_category_pressed(_module_name: String) -> void:
 	active_module = _module_name
+	if active_module != "Motion":
+		motion_path_playing = false
+		motion_sequence_playing = false
 	if active_module != "Style":
 		selected_material_id = ""
+	if active_module == "Motion":
+		selected_component_id = ""
+		selected_texture_id = ""
+		selected_element_id = ""
+		active_state = ""
+		if active_motion_submodule == "Animation" and not _get_asset(selected_asset_id).is_empty():
+			motion_selection.select_asset(selected_asset_id)
 	if active_module == "Export":
 		selected_component_id = ""
 		selected_texture_id = ""
@@ -5904,6 +7562,9 @@ func _on_category_pressed(_module_name: String) -> void:
 	if pressed_section != null and not pressed_section.active_submodule.is_empty():
 		if active_module == "Create":
 			_set_create_submodule_context(pressed_section.active_submodule)
+		elif active_module == "Motion":
+			active_motion_submodule = pressed_section.active_submodule if pressed_section.active_submodule in MOTION_SUBMODULES else "Animation"
+			pressed_section.set_active_submodule(active_motion_submodule)
 	elif active_module == "Style":
 		selected_asset_id = ""
 		selected_component_id = ""
@@ -5932,6 +7593,8 @@ func _select_submodule(module_name: String, submodule: String, section: ModuleSe
 		_render_canvas_context()
 	elif module_name == "Style" and submodule == "Material":
 		_enter_material_context(selected_material_id)
+	elif module_name == "Motion" and submodule in MOTION_SUBMODULES:
+		_enter_motion_context(submodule)
 	return
 
 
@@ -5962,6 +7625,39 @@ func _enter_material_context(material_id: String = "") -> void:
 	if style_section != null:
 		style_section.set_expanded(true)
 		style_section.set_active_submodule("Material")
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _enter_motion_context(submodule := "Animation") -> void:
+	active_module = "Motion"
+	active_motion_submodule = submodule if submodule in MOTION_SUBMODULES else "Animation"
+	selected_component_id = ""
+	selected_texture_id = ""
+	selected_element_id = ""
+	selected_material_id = ""
+	active_state = ""
+	if active_motion_submodule != "Path":
+		motion_path_playing = false
+	if active_motion_submodule != "Sequence":
+		motion_sequence_playing = false
+	var motion_section := _find_section("Motion")
+	if motion_section != null:
+		motion_section.set_expanded(true)
+		motion_section.set_active_submodule(active_motion_submodule)
+	if active_motion_submodule == "Animation":
+		if _get_asset(selected_asset_id).is_empty():
+			selected_asset_id = ""
+			motion_selection.clear()
+		else:
+			motion_selection.select_asset(selected_asset_id)
+	elif active_motion_submodule == "Path" and _get_asset(motion_path_preview_asset_id).is_empty():
+		motion_path_preview_asset_id = _default_motion_path_preview_asset_id()
+	elif active_motion_submodule == "Sequence":
+		var sequence_document := _get_motion_sequence(selected_motion_sequence_id)
+		if _get_motion_sequence_entry(sequence_document, selected_motion_sequence_entry_id).is_empty():
+			selected_motion_sequence_entry_id = str(_first_motion_sequence_entry(sequence_document).get("id", ""))
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()

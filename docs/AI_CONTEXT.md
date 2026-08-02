@@ -11,11 +11,10 @@ testable vertical slices rather than a complete feature set up front.
 
 ## Current phase
 
-The repository contains the reviewed editor shell, Asset/Component drawing and
-transforms, Workspace persistence, and the initial UV Texture Canvas. The next
-implementation target is Slice 4: **Stone Floor Bloom**. It validates imported
-Texture processing, a first Style Material binding, and a deliberately narrow
-Motion Sequence. Empty panes remain preferable to invented functionality.
+The repository contains the editor shell, Asset/Component Bézier authoring,
+transforms, Workspace persistence, Texture import, Style Materials, and Godot
+scene export. Component geometry uses one canonical Point/Edge/Chain topology;
+see [`BEZIER_MODEL.md`](BEZIER_MODEL.md).
 
 Slice 4 Phase 1 is implemented and awaiting manual verification: a selected
 Texture can import a PNG, JPEG, or WebP through the native image picker, which
@@ -29,6 +28,42 @@ and must pass through processing before contributing to the parent output.
 The current implementation target is not a functional morphing engine or a
 general animation/VFX framework.
 
+The Motion category now exposes three distinct modules: asset-local
+`Animation`, independent Workspace-level `Path`, and compositional `Sequence`.
+`Motion → Animation` contains persisted Asset Animation authoring
+documented in [`MOTION_UI.md`](MOTION_UI.md). Each Asset starts with `IDLE`,
+`WALK`, and `RUN`; States can be added, renamed, and removed while the
+the Asset remains available. Motions can be added and configured as Outer Bob
+or Inner Spine Sway; unavailable Guide dependencies are shown explicitly.
+Ordered Transitions expose target, Exit/Entry policies, and
+blend duration. Markers expose Event ID, kind, and normalized phase and appear
+as ticks below the phase scrubber. The Simulation Contract supports Number/Bool
+parameters and typed `ALL` Rules referencing stable parameter IDs. Phase 7
+persists this entire document in the Asset, includes its mutations in Undo/Redo,
+and validates broken references; see
+[`SIMULATION_CONTRACT.md`](SIMULATION_CONTRACT.md). Phase 8 adds the
+geometry-independent `MotionPlayer`: Play/Pause,
+State phase, Marker crossings, typed Rule evaluation, Transition priority,
+Exit/Entry policies, and blend progress. See
+[`MOTION_PLAYER.md`](MOTION_PLAYER.md). Phase 9 adds non-destructive visible
+Outer Bob sampling for
+Entire Asset or Component targets in the Inspector Preview, including additive
+Motions and Transition blending; see
+[`MOTION_SAMPLER.md`](MOTION_SAMPLER.md). Phase 10 establishes independent Path
+and Sequence resource shells with stable IDs, Save/Load, Undo/Redo, Outliners,
+Inspectors, and centre workspaces. Legacy Animation Path Follow entries are
+archived rather than silently discarded. Phase 11 adds open Path authoring,
+Draw/Edit tools, free Bézier handles, approximate arc-length sampling, and a
+Wizard contour preview with Phase, Loop, Duration, and optional tangent
+orientation. The preview Asset is editor-only and never becomes Path data. See
+[`MOTION_PATH.md`](MOTION_PATH.md) and
+[`MOTION_COMPOSITION.md`](MOTION_COMPOSITION.md). Phase 12 adds one
+bounded Sequence Composition Entry that references Asset, Animation State, and
+Path IDs. `⌘1 Composition` authors those references; `⌘2 Player` shows a
+large, read-only Path + Animation preview with independent Path and State phase
+evaluation. Multi-Entry composition, meshes, Inner deformation, and animation
+export remain deferred. See [`MOTION_SEQUENCE.md`](MOTION_SEQUENCE.md).
+
 ## Technology baseline
 
 - Engine: **Godot 4.7.1**
@@ -36,7 +71,7 @@ general animation/VFX framework.
 - Editor workspace and default window: 1920×1200 (16:10); preview uses preserved
   aspect ratio (`keep`) so the UI proportions remain stable
 - Project icon: `assets/assetflow_icon.png`
-- Current JSON schema version: **8**
+- Current JSON schema version: **15**
 
 ## Confirmed vocabulary
 
@@ -64,10 +99,9 @@ it into a general scene or animation-graph abstraction prematurely.
 - Prefer the smallest usable implementation over a general framework.
 - Keep data types generic enough to avoid example-specific code. A closed
   `PolylineContour` is appropriate; a `WizardHatShape` is not.
-- Assets contain independently editable Components. The `Line` tool in
-	`Create → Asset` stores Polyline points on the selected Component and can
-  optionally mark the result closed; it does not draw directly on the Asset
-  container.
+- Assets contain independently editable Components. `Draw Point` stores
+  ordered Bézier Points on the selected Component and automatically maintains
+  Edges and Chains; drawing never targets the Asset container directly.
 - Textures are a separate Workspace document type. They will contain
   `elements`, not Components, and have their own canvas dimensions and
   PolyTexture-style editing context.
@@ -135,9 +169,8 @@ it into a general scene or animation-graph abstraction prematurely.
 - An Import Element's Context Bar uses `⌘1 Previews` with `1: Original` and
   `2: White to Alpha`; unmodified `1`/`2` switch the preview directly. Preview
   selection does not by itself change `not_ready` to `ready`.
-- Do not add Bézier editing, maps, material features beyond Slice 4's narrow
-  binding/shading needs, a node graph, generic rigging, or export pipelines
-  until a confirmed checklist item requires them.
+- Do not expand the current topology into meshing, generic rigging, or new
+  export pipelines until a confirmed checklist item requires them.
 - Treat dummy UI data as dummy UI data. Do not let it quietly become a rigid
   domain model.
 - When a product or UX decision is unclear, ask before deciding it in code.
@@ -196,23 +229,17 @@ the Outliner/Inspector. The central workspace identifies whether an Asset,
 Component, Texture, or Element is the active context. The Shapes canvas uses a
 PolyPixAAA-style grid with click-to-focus `A/S/D/W` pan and `Q/E` zoom controls
 (`E` zooms in).
-When a Component is selected, the Context Bar shows `⌘1 Draw ▼` and `⌘2 Edit ▼`
-(Ctrl is accepted as the equivalent modifier on non-macOS systems). The lower
-Info Bar lists the available subcommands dynamically. Draw exposes `1: Line`;
-Edit exposes `1: Select`, `2: Move`, and `3: Delete`. Draw uses the Line
-Polyline tool. Edit defaults to point selection; clicking a point reveals a
-move gizmo with X/Y handles plus a central free-move handle that can be dragged
-on the canvas. Add mode (`2`)
-highlights the nearest position on a contour segment and inserts a point there
-when `Space` is pressed. `Backspace` deletes the selected point when at least
-three points remain; `Delete` is also available in Select mode. The modifier shortcut selects a state, and the unmodified
-number selects its subcommand.
-Clicks place snapped Polyline points immediately, and each point is an
-independent Undo snapshot. A yellow preview point appears on hover. `Enter`
-confirms the current open line without closing it; `Escape` clears the active
-draft. Clicking near the first point after at least three points marks the
-stored line as closed, enabling outer-shape polygon semantics. Both open and
-closed lines are persisted in the Component data.
+When a Component is selected, `⌘1` activates Draw Point, `⌘2` Edit Point,
+`⌘3` Edit Edge, and `⌘4` Edit Face (Ctrl is accepted as the equivalent modifier
+on non-macOS systems). Draw Point selects Linear, Aligned, Free, Mirrored, or
+Corner Points before placement. Edit Point exposes Select, Bézier Handle, and
+Set; Select supports marquee selection and a shared move gizmo. Set splits the
+clicked Bézier Edge without changing its curve. Backspace/Delete removes the
+selected Point set while preserving valid closed-Chain topology.
+
+Points are persisted immediately with stable IDs. Edges and Chains are
+maintained by `BezierTopology`; the Canvas never writes document geometry.
+Clicking the first Point after at least three Points closes the active Chain.
 
 When an Asset (rather than a Component) is selected, the Shapes canvas shows
 all of its completed component contours together. Clicking inside a contour or
@@ -228,11 +255,11 @@ Workspace persistence uses the project-local `workspaces/` directory. The
 Workspace menu provides `New`, `Save`, and `Load`; New uses an in-app naming
 dialog with `workspace01` fallback, Save overwrites the active workspace, and
 Load uses an in-app list of existing workspace folders. Each workspace has a
-`workspace.json`, one `assets/<asset_id>/asset.json` per Asset, and one
-`textures/<texture_id>/texture.json` per Texture. The latest loaded or saved
+`workspace.json` plus independent Asset, Texture, Material, Path, and Sequence
+documents in their corresponding resource directories. The latest loaded or saved
 workspace name is stored in `configs/app_config.json` and is loaded
 automatically on startup. Every workspace, asset, texture, and config JSON
-uses the numeric `schema_version` field; the current schema is version `8`.
+uses the numeric `schema_version` field; the current schema is version `15`.
 Materials are independent Workspace resources stored below
 `materials/<material_id>/material.json` and listed by ID in `workspace.json`.
 The bottom status bar is divided into 17% program status, 64% contextual tool

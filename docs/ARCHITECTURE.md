@@ -46,8 +46,9 @@ the Godot application icon.
 For every step, define the visible outcome first and then implement only the
 smallest capability needed to reach it.
 
-Example: the first editable shapes use closed polylines. Bézier curves are not
-part of that step because no accepted MVP outcome requires them yet.
+Example: authored Component contours now use ordered Bézier topology. Mesh
+sampling remains separate because the current authoring outcome does not yet
+require a production meshing pipeline.
 
 This does not justify hard-coding an example. General names and relationships
 are still used where they cost little, for example `Asset` and
@@ -75,12 +76,10 @@ more **modules** that provide the concrete working context. For example,
 the canvas workflow used by the Asset module.
 
 An Asset is a container for independently editable Components. Drawing is
-performed on a selected Component, never directly on the Asset container. The
-first `Create → Asset` drawing tool is named `Line`; despite the name, it is a
-Polyline tool that stores each ordered point immediately. `Enter` confirms an
-open line, while clicking the first point after at least three points marks it
-as a closed contour for outer-shape semantics. Bézier editing and other contour
-types are deferred.
+performed on a selected Component, never directly on the Asset container.
+`Draw Point` creates Linear, Aligned, Free, Mirrored, or Corner Bézier Points.
+Edges and Chains are maintained automatically, and clicking the first Point
+after at least three Points closes the active Chain.
 
 The next validated use of the currently empty categories is the **Stone Floor
 Bloom** slice. It introduces one deliberately narrow module in each of two
@@ -93,6 +92,60 @@ areas:
 
 These names are confirmed for the slice, not a commitment to a universal
 material system or general animation graph.
+
+`Motion` is split vertically into three ownership contexts: `Animation` owns
+asset-local motion, `Path` owns reusable Workspace-level travel geometry, and
+`Sequence` composes stable references to both without copying their data.
+
+`Motion → Animation` provides a bounded asset-local workflow. Its horizontal
+State board, contextual
+Inspector, and normalized phase scrubber validate timeline-free asset-local
+authoring. `IDLE`, `WALK`, and `RUN` States can contain editable Motions,
+priority-ordered Transitions, and normalized-phase Markers. The first
+Outer/Inner configuration fields, Transition Exit/Entry policies, and Marker
+scrubber ticks are present. Path Follow is deliberately not an Animation
+primitive.
+Phase 6 adds a typed Simulation Contract and `ALL` Rule authoring. Contract parameters use stable
+IDs so a future host import can validate and supply values independently of
+display names. Phase 7 persists the normalized Animation document on its Asset,
+adds Undo/Redo participation, and validates stable references. See
+`MOTION_UI.md` and `SIMULATION_CONTRACT.md`.
+
+Phase 8's `MotionPlayer` is a runtime-only evaluator over that document. It
+owns current State/phase, Simulation values, Transition/Rule decisions, Marker
+crossings, and blend progress but never mutates Asset data. This keeps Phase 9
+geometry sampling and later mesh deformation downstream of one deterministic
+state machine. See `MOTION_PLAYER.md`.
+
+Phase 9's `MotionSampler` converts that runtime state into temporary
+per-Component Outer transform deltas. Bob is the first implementation and may
+target the Entire Asset or one Component. The Inspector Preview fits immutable
+rest geometry, then applies samples, so animation never feeds back into
+Point/Edge/Chain topology or stored Component transforms. See
+`MOTION_SAMPLER.md`.
+
+Phase 10 gives Path and Sequence their own centre workspaces, Outliners,
+Inspectors, stable IDs, persistence, and Undo/Redo document shells. A Path has
+no permanent Asset reference. A Sequence entry will own the stable Asset,
+Animation State, and Path references needed for composition. Legacy
+`path_follow` Animation Motions are retained in a migration archive and do not
+evaluate. The formal boundary and transform order are defined in
+`MOTION_COMPOSITION.md`.
+
+Phase 11 makes Path the first spatial Motion authoring context. One Path owns
+one open ordered Point/Segment curve with optional free Bézier handles.
+`MotionPathSampler` maps normalized Phase to approximate arc length and returns
+temporary position and tangent rotation. The Path workspace uses a selected
+Asset—initially the Wizard—only as an immutable editor preview; that Asset ID
+is editor state and is never persisted inside the Path. See `MOTION_PATH.md`.
+
+Phase 12 implements the first bounded Sequence composition. One MVP Entry
+references an Asset, one State from that Asset's Animation, and one independent
+Path by stable ID. `Composition` is the authoring board; `Player` is a separate
+large, read-only preview. Path duration drives Sequence preview duration while
+the State's own cycle duration drives Animation phase. The Player applies
+`Sequence × Path × Animation × Component × Geometry` without mutating any
+referenced document. See `MOTION_SEQUENCE.md`.
 
 ## Confirmed domain relationship
 
@@ -350,15 +403,21 @@ loaded or saved independently through the top-level menu.
 workspaces/<workspace_name>/
 ├── workspace.json
 ├── assets/<asset_id>/asset.json
-└── textures/<texture_id>/texture.json
+├── textures/<texture_id>/texture.json
+├── materials/<material_id>/material.json
+├── paths/<path_id>/path.json
+└── sequences/<sequence_id>/sequence.json
 ```
 
 Every JSON document contains a numeric `schema_version`. The current MVP
-schema is version `8`. Workspace metadata references Asset, Texture, and
-Material IDs. Each Asset document stores its Components, their contour
-points, and optional Material IDs; each Texture document stores its dimensions, origin convention,
+schema is version `15`. Workspace metadata references Asset, Texture, Material,
+Path, and Sequence IDs. Each Asset document stores its Components, canonical Bézier
+Points/Edges/Chains, optional Material IDs, and one normalized Animation
+document; each Texture document stores its dimensions, origin convention,
 Elements, and an optional `final_output_element_id`. Each Material is an
 independent Workspace resource with a Texture reference, tint, and opacity.
+Path and Sequence are also independent Workspace resources; Sequence owns
+references but never embeds an Asset Animation or Path document.
 Display names remain editable and are not used as persistent references.
 
 The Material editing context opens directly as one Graph workspace containing

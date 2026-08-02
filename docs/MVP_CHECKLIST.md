@@ -1,5 +1,10 @@
 # AssetFlow2D – MVP Checklist
 
+Earlier checked Line/Polyline items below record completed historical slices.
+The current editor has superseded that implementation with the canonical
+Point/Edge/Chain Bézier model documented in `BEZIER_MODEL.md`; those entries
+must not be used as current implementation instructions.
+
 **Status:** Asset, Component, Transform, Workspace, and UV-Texture foundations
 are functional. The next implementation target is Slice 4: Stone Floor Bloom.
 **Rule:** A box is checked only after the result can be demonstrated in the
@@ -266,10 +271,27 @@ system, particle system, or universal animation graph.
 - [ ] Provide a glow colour and intensity parameter that can be targeted by the
       first Sequence.
 
-### E. Motion → Sequence
+### E. Motion → Path
 
-- [ ] Add the first `Sequence` module under Motion and show its contextual time
-      area only while that module is active.
+- [x] Add `Animation`, `Path`, and `Sequence` as separate Motion modules with
+      independent ownership and stable Workspace resources.
+- [x] Author one open ordered Point/Segment Path with Draw and Edit tools.
+- [x] Move Path Points, edit free Bézier handles, and delete Points without
+      mutating Asset Component topology.
+- [x] Map normalized Phase to approximate arc length for visibly even travel.
+- [x] Preview the Wizard contours on the Path with Play/Pause, Duration, Loop,
+      Phase scrubbing, and optional tangent orientation.
+- [x] Keep the selected Preview Asset in editor state instead of storing an
+      Asset reference in the Path resource.
+
+### F. Motion → Sequence
+
+- [x] Add the first `Sequence` module under Motion with separate `Composition`
+      and large read-only `Player` views selected by `CMD/Ctrl + 1/2`.
+- [x] Add one bounded Composition Entry referencing Asset, Animation State,
+      and Path by stable ID, with missing-reference validation.
+- [x] Combine Wizard Path travel and asset-local Bob in the Sequence Player
+      while retaining a stable fitted camera.
 - [ ] Create a Sequence that deliberately references the Stone Floor, its
       Guide Shape, and the independent Flower Asset by stable IDs.
 - [ ] Animate the Guide-area glow from inactive to visible and back down.
@@ -285,7 +307,7 @@ system, particle system, or universal animation graph.
 These may become valuable later, but they are not implementation targets until
 a verified slice requires them.
 
-- Bézier curve editing
+- Production Bézier-to-mesh sampling and adaptive topology sampling
 - Full material, map, and texture authoring beyond Slice 4's import, material,
   and tile-preview requirements
 - General-purpose rigging
