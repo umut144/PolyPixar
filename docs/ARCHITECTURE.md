@@ -93,9 +93,10 @@ areas:
 These names are confirmed for the slice, not a commitment to a universal
 material system or general animation graph.
 
-`Motion` is split vertically into three ownership contexts: `Animation` owns
-asset-local motion, `Path` owns reusable Workspace-level travel geometry, and
-`Sequence` composes stable references to both without copying their data.
+`Motion` is split vertically into four ownership contexts: `Animation` owns
+asset-local cyclic motion, `Path` owns reusable Workspace-level travel
+geometry, `Act` owns independent action primitives, and `Sequence` composes
+stable references without copying their data.
 
 `Motion → Animation` provides a bounded asset-local workflow. Its horizontal
 State board, contextual
@@ -146,6 +147,19 @@ large, read-only preview. Path duration drives Sequence preview duration while
 the State's own cycle duration drives Animation phase. The Player applies
 `Sequence × Path × Animation × Component × Geometry` without mutating any
 referenced document. See `MOTION_SEQUENCE.md`.
+
+Phase 13 establishes `Act` as an independent Workspace resource and implements
+`Slide`. Phase 14 adds a deliberately bounded primitive catalog and `Jump`.
+Both evaluate geometry-independent temporary transform offsets; the selected
+Asset remains an immutable editor preview. Jump adds a mathematical vertical
+arc without owning or generating Path geometry. See `MOTION_ACT.md`.
+
+Phase 15 adds `Blink` as the first Act combining translation and uniform scale.
+It owns a short backward anticipation, then travels from the authored Start to
+End while scale contracts to a positive minimum at the spatial midpoint and
+returns to one. It does not toggle visibility, create Path geometry, or mutate
+the preview Asset. The accepted default timing assigns 50% to anticipation,
+40% to reaching the midpoint, and the final 10% to a fast Ease-Out exit.
 
 ## Confirmed domain relationship
 
@@ -406,17 +420,18 @@ workspaces/<workspace_name>/
 ├── textures/<texture_id>/texture.json
 ├── materials/<material_id>/material.json
 ├── paths/<path_id>/path.json
+├── acts/<act_id>/act.json
 └── sequences/<sequence_id>/sequence.json
 ```
 
 Every JSON document contains a numeric `schema_version`. The current MVP
-schema is version `15`. Workspace metadata references Asset, Texture, Material,
-Path, and Sequence IDs. Each Asset document stores its Components, canonical Bézier
+schema is version `19`. Workspace metadata references Asset, Texture, Material,
+Path, Act, and Sequence IDs. Each Asset document stores its Components, canonical Bézier
 Points/Edges/Chains, optional Material IDs, and one normalized Animation
 document; each Texture document stores its dimensions, origin convention,
 Elements, and an optional `final_output_element_id`. Each Material is an
 independent Workspace resource with a Texture reference, tint, and opacity.
-Path and Sequence are also independent Workspace resources; Sequence owns
+Path, Act, and Sequence are also independent Workspace resources; Sequence owns
 references but never embeds an Asset Animation or Path document.
 Display names remain editable and are not used as persistent references.
 

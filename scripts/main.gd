@@ -2,12 +2,12 @@ extends Control
 
 const CREATE_SUBMODULES := ["Asset", "Texture"]
 const STYLE_SUBMODULES := ["Material"]
-const MOTION_SUBMODULES := ["Animation", "Path", "Sequence"]
+const MOTION_SUBMODULES := ["Animation", "Path", "Act", "Sequence"]
 const INACTIVE_MODULES := ["Transform", "Effects", "Export"]
 const WORKSPACES_ROOT := "res://workspaces"
 const IMPORT_TEXTURES_ROOT := "res://imports/textures"
 const CONFIG_PATH := "res://configs/app_config.json"
-const SCHEMA_VERSION := 15
+const SCHEMA_VERSION := 19
 const MAX_HISTORY_SIZE := 100
 const PAPER_SIZES_CM := [Vector2(21.0, 29.7), Vector2(29.7, 42.0), Vector2(42.0, 59.4), Vector2(59.4, 84.1), Vector2(84.1, 118.9)]
 const PAPER_LABELS := ["A4", "A3", "A2", "A1", "A0"]
@@ -28,10 +28,13 @@ var assets: Array[Dictionary] = []
 var textures: Array[Dictionary] = []
 var materials: Array[Dictionary] = []
 var motion_paths: Array[Dictionary] = []
+var motion_acts: Array[Dictionary] = []
 var motion_sequences: Array[Dictionary] = []
 var next_motion_path_id := 1
+var next_motion_act_id := 1
 var next_motion_sequence_id := 1
 var selected_motion_path_id := ""
+var selected_motion_act_id := ""
 var selected_motion_sequence_id := ""
 var selected_motion_sequence_entry_id := ""
 var motion_sequence_view := MotionSequenceWorkspace.VIEW_COMPOSITION
@@ -49,6 +52,12 @@ var motion_path_playing := false
 var motion_path_tool := "draw"
 var motion_path_phase_slider: HSlider
 var motion_path_phase_value_label: Label
+var motion_act_preview_asset_id := ""
+var motion_act_phase := 0.0
+var motion_act_playing := false
+var motion_act_preview_loop := true
+var motion_act_phase_slider: HSlider
+var motion_act_phase_value_label: Label
 var motion_selection := MotionSelection.new()
 var motion_phase := 0.0
 var motion_player: MotionPlayer
@@ -105,6 +114,7 @@ var material_preview_shader: ShaderMaterial
 var export_workspace: VBoxContainer
 var motion_workspace: MotionWorkspace
 var motion_path_workspace: MotionPathWorkspace
+var motion_act_workspace: MotionActWorkspace
 var motion_sequence_workspace: MotionSequenceWorkspace
 var motion_phase_value_label: Label
 var motion_phase_marks: MotionPhaseMarks
@@ -206,6 +216,8 @@ func _process(delta: float) -> void:
 		motion_player.advance(delta)
 	elif active_module == "Motion" and active_motion_submodule == "Path" and motion_path_playing:
 		_advance_motion_path_preview(delta)
+	elif active_module == "Motion" and active_motion_submodule == "Act" and motion_act_playing:
+		_advance_motion_act_preview(delta)
 	elif active_module == "Motion" and active_motion_submodule == "Sequence" and motion_sequence_view == MotionSequenceWorkspace.VIEW_PLAYER and motion_sequence_playing:
 		_advance_motion_sequence_preview(delta)
 
@@ -432,7 +444,7 @@ func _build_ui() -> void:
 	module_rail_panel.add_child(module_rail)
 	_add_module_section(module_rail, "Create", CREATE_SUBMODULES, true)
 	_add_module_section(module_rail, "Style", STYLE_SUBMODULES)
-	_add_module_section(module_rail, "Motion", MOTION_SUBMODULES)
+	_add_module_section(module_rail, "Motion", MOTION_SUBMODULES, false, false, 3)
 	for module_name in INACTIVE_MODULES:
 		_add_module_section(module_rail, module_name, [])
 
@@ -542,6 +554,7 @@ func _build_ui() -> void:
 	_create_export_workspace(canvas_panel)
 	_create_motion_workspace(canvas_panel)
 	_create_motion_path_workspace(canvas_panel)
+	_create_motion_act_workspace(canvas_panel)
 	_create_motion_sequence_workspace(canvas_panel)
 	texture_context_label = Label.new()
 	texture_context_label.position = Vector2(8, 6)
@@ -750,6 +763,15 @@ func _create_motion_sequence_workspace(parent: Control) -> void:
 	motion_sequence_workspace.add_entry_requested.connect(_add_motion_sequence_entry)
 	motion_sequence_workspace.visible = false
 	parent.add_child(motion_sequence_workspace)
+
+
+func _create_motion_act_workspace(parent: Control) -> void:
+	motion_act_workspace = MotionActWorkspace.new()
+	motion_act_workspace.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	motion_act_workspace.act_selected.connect(_select_motion_act)
+	motion_act_workspace.add_primitive_requested.connect(_add_motion_act)
+	motion_act_workspace.visible = false
+	parent.add_child(motion_act_workspace)
 
 
 func _create_motion_state_dialogs() -> void:
@@ -1285,7 +1307,7 @@ func _on_create_action_pressed() -> void:
 func _update_context_action_button() -> void:
 	if not is_instance_valid(create_action_button):
 		return
-	create_action_button.visible = active_module == "Create" or active_module == "Style" or (active_module == "Motion" and active_motion_submodule != "Animation")
+	create_action_button.visible = active_module == "Create" or active_module == "Style" or (active_module == "Motion" and active_motion_submodule in ["Path", "Sequence"])
 	var show_asset_create_controls := active_module == "Create" and active_create_submodule == "Asset"
 	if is_instance_valid(snap_button):
 		snap_button.visible = show_asset_create_controls
@@ -1337,6 +1359,7 @@ func _confirm_new_workspace() -> void:
 	textures.clear()
 	materials.clear()
 	motion_paths.clear()
+	motion_acts.clear()
 	motion_sequences.clear()
 	selected_asset_id = ""
 	selected_component_id = ""
@@ -1346,14 +1369,20 @@ func _confirm_new_workspace() -> void:
 	next_texture_id = 1
 	next_material_id = 1
 	next_motion_path_id = 1
+	next_motion_act_id = 1
 	next_motion_sequence_id = 1
 	selected_motion_path_id = ""
+	selected_motion_act_id = ""
 	selected_motion_sequence_id = ""
 	selected_motion_sequence_entry_id = ""
 	motion_path_preview_asset_id = ""
 	motion_path_phase = 0.0
 	motion_path_playing = false
 	motion_path_tool = "draw"
+	motion_act_preview_asset_id = ""
+	motion_act_phase = 0.0
+	motion_act_playing = false
+	motion_act_preview_loop = true
 	motion_sequence_view = MotionSequenceWorkspace.VIEW_COMPOSITION
 	motion_sequence_phase = 0.0
 	motion_sequence_playing = false
@@ -1433,11 +1462,13 @@ func _save_workspace() -> void:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("%s/textures" % workspace_root))
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("%s/materials" % workspace_root))
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("%s/paths" % workspace_root))
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("%s/acts" % workspace_root))
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("%s/sequences" % workspace_root))
 	var asset_ids: Array[String] = []
 	var texture_ids: Array[String] = []
 	var material_ids: Array[String] = []
 	var motion_path_ids: Array[String] = []
+	var motion_act_ids: Array[String] = []
 	var motion_sequence_ids: Array[String] = []
 	for asset in assets:
 		var asset_id := str(asset["id"])
@@ -1522,6 +1553,10 @@ func _save_workspace() -> void:
 			"next_entry_index": int(sequence_document.get("next_entry_index", 1)),
 			"entries": sequence_document.get("entries", []).duplicate(true)
 		})
+	for act_document in motion_acts:
+		var act_id := str(act_document.get("id", ""))
+		motion_act_ids.append(act_id)
+		_write_json("%s/acts/%s/act.json" % [workspace_root, act_id], _serialize_motion_act(act_document))
 	_write_json("%s/workspace.json" % workspace_root, {
 		"schema_version": SCHEMA_VERSION,
 		"name": workspace_name,
@@ -1529,6 +1564,7 @@ func _save_workspace() -> void:
 		"textures": texture_ids,
 		"materials": material_ids,
 		"paths": motion_path_ids,
+		"acts": motion_act_ids,
 		"sequences": motion_sequence_ids,
 		"editor_state": _serialize_editor_state()
 	})
@@ -1547,6 +1583,8 @@ func _capture_history_snapshot() -> Dictionary:
 		"next_material_id": next_material_id,
 		"motion_paths": motion_paths.duplicate(true),
 		"next_motion_path_id": next_motion_path_id,
+		"motion_acts": motion_acts.duplicate(true),
+		"next_motion_act_id": next_motion_act_id,
 		"motion_sequences": motion_sequences.duplicate(true),
 		"next_motion_sequence_id": next_motion_sequence_id,
 		"selected_asset_id": selected_asset_id,
@@ -1555,9 +1593,11 @@ func _capture_history_snapshot() -> Dictionary:
 		"selected_element_id": selected_element_id,
 		"selected_material_id": selected_material_id,
 		"selected_motion_path_id": selected_motion_path_id,
+		"selected_motion_act_id": selected_motion_act_id,
 		"selected_motion_sequence_id": selected_motion_sequence_id,
 		"selected_motion_sequence_entry_id": selected_motion_sequence_entry_id,
 		"motion_path_preview_asset_id": motion_path_preview_asset_id,
+		"motion_act_preview_asset_id": motion_act_preview_asset_id,
 		"active_module": active_module,
 		"active_motion_submodule": active_motion_submodule,
 		"material_view_mode": material_view_mode,
@@ -1607,12 +1647,14 @@ func _restore_history_snapshot(snapshot: Dictionary) -> void:
 	textures = snapshot.get("textures", []).duplicate(true)
 	materials = snapshot.get("materials", []).duplicate(true)
 	motion_paths = snapshot.get("motion_paths", []).duplicate(true)
+	motion_acts = snapshot.get("motion_acts", []).duplicate(true)
 	motion_sequences = snapshot.get("motion_sequences", []).duplicate(true)
 	next_asset_id = int(snapshot.get("next_asset_id", 1))
 	next_component_id = int(snapshot.get("next_component_id", 1))
 	next_texture_id = int(snapshot.get("next_texture_id", 1))
 	next_material_id = int(snapshot.get("next_material_id", 1))
 	next_motion_path_id = int(snapshot.get("next_motion_path_id", 1))
+	next_motion_act_id = int(snapshot.get("next_motion_act_id", 1))
 	next_motion_sequence_id = int(snapshot.get("next_motion_sequence_id", 1))
 	selected_asset_id = str(snapshot.get("selected_asset_id", ""))
 	selected_component_id = str(snapshot.get("selected_component_id", ""))
@@ -1620,9 +1662,11 @@ func _restore_history_snapshot(snapshot: Dictionary) -> void:
 	selected_element_id = str(snapshot.get("selected_element_id", ""))
 	selected_material_id = str(snapshot.get("selected_material_id", ""))
 	selected_motion_path_id = str(snapshot.get("selected_motion_path_id", ""))
+	selected_motion_act_id = str(snapshot.get("selected_motion_act_id", ""))
 	selected_motion_sequence_id = str(snapshot.get("selected_motion_sequence_id", ""))
 	selected_motion_sequence_entry_id = str(snapshot.get("selected_motion_sequence_entry_id", ""))
 	motion_path_preview_asset_id = str(snapshot.get("motion_path_preview_asset_id", ""))
+	motion_act_preview_asset_id = str(snapshot.get("motion_act_preview_asset_id", ""))
 	active_module = str(snapshot.get("active_module", "Create"))
 	active_motion_submodule = str(snapshot.get("active_motion_submodule", "Animation"))
 	material_view_mode = "graph"
@@ -1636,6 +1680,8 @@ func _restore_history_snapshot(snapshot: Dictionary) -> void:
 		selected_component_id = ""
 	if _get_motion_path(selected_motion_path_id).is_empty():
 		selected_motion_path_id = ""
+	if _get_motion_act(selected_motion_act_id).is_empty():
+		selected_motion_act_id = ""
 	if _get_motion_sequence(selected_motion_sequence_id).is_empty():
 		selected_motion_sequence_id = ""
 		selected_motion_sequence_entry_id = ""
@@ -1643,6 +1689,8 @@ func _restore_history_snapshot(snapshot: Dictionary) -> void:
 		selected_motion_sequence_entry_id = str(_first_motion_sequence_entry(_get_motion_sequence(selected_motion_sequence_id)).get("id", ""))
 	if _get_asset(motion_path_preview_asset_id).is_empty():
 		motion_path_preview_asset_id = _default_motion_path_preview_asset_id()
+	if _get_asset(motion_act_preview_asset_id).is_empty():
+		motion_act_preview_asset_id = _default_motion_path_preview_asset_id()
 	if active_module == "Create":
 		_set_create_submodule_context("Texture" if not selected_texture_id.is_empty() else "Asset")
 	elif active_module == "Motion":
@@ -1778,10 +1826,17 @@ func _load_workspace(workspace_entry: String) -> bool:
 		var sequence_data = _read_json("%s/sequences/%s/sequence.json" % [workspace_root, sequence_id])
 		if _has_supported_schema(sequence_data):
 			loaded_motion_sequences.append(_normalize_motion_sequence(sequence_data, sequence_id))
+	var loaded_motion_acts: Array[Dictionary] = []
+	for act_id_variant in workspace_data.get("acts", []):
+		var act_id := str(act_id_variant)
+		var act_data = _read_json("%s/acts/%s/act.json" % [workspace_root, act_id])
+		if _has_supported_schema(act_data):
+			loaded_motion_acts.append(_normalize_motion_act(act_data, act_id))
 	assets = loaded_assets
 	textures = loaded_textures
 	materials = loaded_materials
 	motion_paths = loaded_motion_paths
+	motion_acts = loaded_motion_acts
 	motion_sequences = loaded_motion_sequences
 	var saved_editor_state = workspace_data.get("editor_state", {})
 	if saved_editor_state is Dictionary and str(saved_editor_state.get("world_scale", {}).get("unit", "")) == "m":
@@ -1816,9 +1871,12 @@ func _serialize_editor_state() -> Dictionary:
 		"selected_element_id": selected_element_id,
 		"selected_material_id": selected_material_id,
 		"selected_motion_path_id": selected_motion_path_id,
+		"selected_motion_act_id": selected_motion_act_id,
 		"selected_motion_sequence_id": selected_motion_sequence_id,
 		"selected_motion_sequence_entry_id": selected_motion_sequence_entry_id,
 		"motion_path_preview_asset_id": motion_path_preview_asset_id,
+		"motion_act_preview_asset_id": motion_act_preview_asset_id,
+		"motion_act_preview_loop": motion_act_preview_loop,
 		"motion_sequence_view": motion_sequence_view,
 		"motion_sequence_preview_loop": motion_sequence_preview_loop,
 		"active_module": active_module,
@@ -1850,9 +1908,12 @@ func _restore_editor_state(state) -> void:
 	selected_element_id = ""
 	selected_material_id = ""
 	selected_motion_path_id = ""
+	selected_motion_act_id = ""
 	selected_motion_sequence_id = ""
 	selected_motion_sequence_entry_id = ""
 	motion_path_preview_asset_id = ""
+	motion_act_preview_asset_id = ""
+	motion_act_preview_loop = true
 	motion_sequence_view = MotionSequenceWorkspace.VIEW_COMPOSITION
 	motion_sequence_preview_loop = true
 	active_module = "Create"
@@ -1908,8 +1969,10 @@ func _restore_editor_state(state) -> void:
 		active_module = "Motion"
 		active_motion_submodule = requested_motion_submodule
 		var requested_path_id := str(state.get("selected_motion_path_id", ""))
+		var requested_act_id := str(state.get("selected_motion_act_id", ""))
 		var requested_sequence_id := str(state.get("selected_motion_sequence_id", ""))
 		selected_motion_path_id = requested_path_id if not _get_motion_path(requested_path_id).is_empty() else ""
+		selected_motion_act_id = requested_act_id if not _get_motion_act(requested_act_id).is_empty() else ""
 		selected_motion_sequence_id = requested_sequence_id if not _get_motion_sequence(requested_sequence_id).is_empty() else ""
 		var requested_sequence_entry_id := str(state.get("selected_motion_sequence_entry_id", ""))
 		selected_motion_sequence_entry_id = requested_sequence_entry_id if not _get_motion_sequence_entry(_get_motion_sequence(selected_motion_sequence_id), requested_sequence_entry_id).is_empty() else str(_first_motion_sequence_entry(_get_motion_sequence(selected_motion_sequence_id)).get("id", ""))
@@ -1917,8 +1980,11 @@ func _restore_editor_state(state) -> void:
 		if motion_sequence_view not in [MotionSequenceWorkspace.VIEW_COMPOSITION, MotionSequenceWorkspace.VIEW_PLAYER]:
 			motion_sequence_view = MotionSequenceWorkspace.VIEW_COMPOSITION
 		motion_sequence_preview_loop = bool(state.get("motion_sequence_preview_loop", true))
+		motion_act_preview_loop = bool(state.get("motion_act_preview_loop", true))
 		var requested_preview_asset_id := str(state.get("motion_path_preview_asset_id", ""))
 		motion_path_preview_asset_id = requested_preview_asset_id if not _get_asset(requested_preview_asset_id).is_empty() else _default_motion_path_preview_asset_id()
+		var requested_act_preview_asset_id := str(state.get("motion_act_preview_asset_id", ""))
+		motion_act_preview_asset_id = requested_act_preview_asset_id if not _get_asset(requested_act_preview_asset_id).is_empty() else _default_motion_path_preview_asset_id()
 		var motion_section := _find_section("Motion")
 		if motion_section != null:
 			motion_section.set_expanded(true)
@@ -2269,6 +2335,7 @@ func _update_next_ids() -> void:
 	next_texture_id = 1
 	next_material_id = 1
 	next_motion_path_id = 1
+	next_motion_act_id = 1
 	next_motion_sequence_id = 1
 	for asset in assets:
 		next_asset_id = maxi(next_asset_id, _id_suffix_number(str(asset["id"])) + 1)
@@ -2280,6 +2347,8 @@ func _update_next_ids() -> void:
 		next_material_id = maxi(next_material_id, _id_suffix_number(str(material_record["id"])) + 1)
 	for path_document in motion_paths:
 		next_motion_path_id = maxi(next_motion_path_id, _id_suffix_number(str(path_document.get("id", ""))) + 1)
+	for act_document in motion_acts:
+		next_motion_act_id = maxi(next_motion_act_id, _id_suffix_number(str(act_document.get("id", ""))) + 1)
 	for sequence_document in motion_sequences:
 		next_motion_sequence_id = maxi(next_motion_sequence_id, _id_suffix_number(str(sequence_document.get("id", ""))) + 1)
 
@@ -2352,6 +2421,8 @@ func _render_context_bar() -> void:
 			_render_motion_context_bar()
 		elif active_motion_submodule == "Path":
 			_render_motion_path_context_bar()
+		elif active_motion_submodule == "Act":
+			_render_motion_act_context_bar()
 		elif active_motion_submodule == "Sequence":
 			_render_motion_sequence_context_bar()
 		else:
@@ -2588,6 +2659,76 @@ func _motion_path_is_previewable(path_document: Dictionary) -> bool:
 	if path_document.is_empty() or not MotionPathTopology.validate(path_document.get("topology", {})).is_empty() or _get_asset(motion_path_preview_asset_id).is_empty():
 		return false
 	return bool(MotionPathSampler.sample(path_document.get("topology", {}), 0.5).get("valid", false))
+
+
+func _render_motion_act_context_bar() -> void:
+	var act := _get_motion_act(selected_motion_act_id)
+	var play_button := Button.new()
+	play_button.text = "❚❚" if motion_act_playing else "▶"
+	play_button.custom_minimum_size = Vector2(40, 32)
+	play_button.disabled = not _motion_act_is_previewable(act)
+	play_button.pressed.connect(_toggle_motion_act_playback)
+	context_bar.add_child(play_button)
+	var phase_label := Label.new()
+	phase_label.text = "Phase"
+	phase_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	context_bar.add_child(phase_label)
+	motion_act_phase_slider = HSlider.new()
+	motion_act_phase_slider.min_value = 0.0
+	motion_act_phase_slider.max_value = 1.0
+	motion_act_phase_slider.step = 0.001
+	motion_act_phase_slider.custom_minimum_size = Vector2(240, 28)
+	motion_act_phase_slider.set_value_no_signal(motion_act_phase)
+	motion_act_phase_slider.value_changed.connect(_on_motion_act_phase_changed)
+	context_bar.add_child(motion_act_phase_slider)
+	motion_act_phase_value_label = Label.new()
+	motion_act_phase_value_label.text = "%.2f" % motion_act_phase
+	motion_act_phase_value_label.custom_minimum_size = Vector2(42, 32)
+	motion_act_phase_value_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	context_bar.add_child(motion_act_phase_value_label)
+	var loop_toggle := CheckBox.new()
+	loop_toggle.text = "Preview Loop"
+	loop_toggle.button_pressed = motion_act_preview_loop
+	loop_toggle.toggled.connect(func(enabled: bool) -> void: motion_act_preview_loop = enabled)
+	context_bar.add_child(loop_toggle)
+
+
+func _toggle_motion_act_playback() -> void:
+	var act := _get_motion_act(selected_motion_act_id)
+	if not _motion_act_is_previewable(act):
+		return
+	if not motion_act_playing and motion_act_phase >= 1.0:
+		motion_act_phase = 0.0
+	motion_act_playing = not motion_act_playing
+	_render_context_bar()
+	_refresh_motion_act_workspace()
+
+
+func _on_motion_act_phase_changed(value: float) -> void:
+	motion_act_phase = clampf(value, 0.0, 1.0)
+	_refresh_motion_act_workspace()
+	_render_info_bar()
+
+
+func _advance_motion_act_preview(delta: float) -> void:
+	var act := _get_motion_act(selected_motion_act_id)
+	if not _motion_act_is_previewable(act):
+		motion_act_playing = false
+		return
+	var duration := maxf(0.01, float(act.get("timing", {}).get("duration", 0.6)))
+	motion_act_phase += delta / duration
+	if motion_act_phase >= 1.0:
+		if motion_act_preview_loop:
+			motion_act_phase = fmod(motion_act_phase, 1.0)
+		else:
+			motion_act_phase = 1.0
+			motion_act_playing = false
+			_render_context_bar()
+	_refresh_motion_act_workspace()
+
+
+func _motion_act_is_previewable(act: Dictionary) -> bool:
+	return not _get_asset(motion_act_preview_asset_id).is_empty() and MotionActEvaluator.validation_issues(act).is_empty()
 
 
 func _render_motion_sequence_context_bar() -> void:
@@ -3239,6 +3380,13 @@ func _render_info_bar() -> void:
 			_add_info_option(str(path_document.get("name", "No Path selected")))
 			_add_info_option("Phase %.2f" % motion_path_phase)
 			_add_info_option("%d Points" % path_document.get("topology", {}).get("points", []).size() if not path_document.is_empty() else "Independent resource")
+			return
+		if active_motion_submodule == "Act":
+			var act := _get_motion_act(selected_motion_act_id)
+			_add_info_option("Motion: Act")
+			_add_info_option(str(act.get("name", "No Act selected")))
+			_add_info_option("Slide · Phase %.2f" % motion_act_phase)
+			_add_info_option("Playing" if motion_act_playing else "Paused")
 			return
 		if active_motion_submodule == "Sequence":
 			var sequence_document := _get_motion_sequence(selected_motion_sequence_id)
@@ -3898,6 +4046,22 @@ func _render_motion_outliner() -> void:
 		if motion_sequences.is_empty():
 			outliner_list.add_child(_create_inspector_field_label("No Sequences"))
 		return
+	if active_motion_submodule == "Act":
+		outliner_list.add_child(_create_outliner_group_label("Preview Assets"))
+		for asset in assets:
+			if not search_text.is_empty() and not str(asset.get("name", "")).to_lower().contains(search_text):
+				continue
+			var asset_id := str(asset.get("id", ""))
+			var preview_button := Button.new()
+			preview_button.text = str(asset.get("name", "Asset"))
+			preview_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+			preview_button.focus_mode = Control.FOCUS_NONE
+			_style_outliner_button(preview_button, asset_id == motion_act_preview_asset_id)
+			preview_button.pressed.connect(_select_motion_act_preview_asset.bind(asset_id))
+			outliner_list.add_child(preview_button)
+		if assets.is_empty():
+			outliner_list.add_child(_create_inspector_field_label("No Assets"))
+		return
 	var visible_assets: Array[Dictionary] = []
 	for asset in assets:
 		if search_text.is_empty() or str(asset.get("name", "")).to_lower().contains(search_text):
@@ -3939,6 +4103,16 @@ func _select_motion_sequence(sequence_id: String) -> void:
 	motion_sequence_playing = false
 	_render_outliner()
 	_render_inspector()
+	_render_canvas_context()
+
+
+func _select_motion_act_preview_asset(asset_id: String) -> void:
+	if _get_asset(asset_id).is_empty():
+		return
+	motion_act_preview_asset_id = asset_id
+	motion_act_phase = 0.0
+	motion_act_playing = false
+	_render_outliner()
 	_render_canvas_context()
 
 
@@ -4078,6 +4252,17 @@ func _refresh_motion_path_workspace() -> void:
 		motion_path_phase_slider.set_value_no_signal(motion_path_phase)
 	if is_instance_valid(motion_path_phase_value_label):
 		motion_path_phase_value_label.text = "%.2f" % motion_path_phase
+
+
+func _refresh_motion_act_workspace() -> void:
+	if not is_instance_valid(motion_act_workspace):
+		return
+	motion_act_workspace.set_context(motion_acts, selected_motion_act_id, _get_asset(motion_act_preview_asset_id))
+	motion_act_workspace.set_runtime(motion_act_phase, motion_act_playing)
+	if is_instance_valid(motion_act_phase_slider):
+		motion_act_phase_slider.set_value_no_signal(motion_act_phase)
+	if is_instance_valid(motion_act_phase_value_label):
+		motion_act_phase_value_label.text = "%.2f" % motion_act_phase
 
 
 func _refresh_motion_sequence_workspace() -> void:
@@ -4990,6 +5175,8 @@ func _render_inspector() -> void:
 	if active_module == "Motion":
 		if active_motion_submodule == "Path":
 			_render_motion_path_inspector()
+		elif active_motion_submodule == "Act":
+			_render_motion_act_inspector()
 		elif active_motion_submodule == "Sequence":
 			_render_motion_sequence_inspector()
 		else:
@@ -5342,6 +5529,219 @@ func _render_motion_inspector() -> void:
 		if kind == MotionSelection.TRANSITION:
 			inspector_content.add_child(_create_motion_inspector_value("Priority", "List order · first eligible wins"))
 	inspector_content.add_child(_create_inspector_field_label("Persisted Animation data · runtime evaluation follows in Phase 8."))
+
+
+func _render_motion_act_inspector() -> void:
+	inspector_content.add_child(_create_inspector_section("Act"))
+	var act := _get_motion_act(selected_motion_act_id)
+	if act.is_empty():
+		inspector_content.add_child(_create_inspector_field_label("Add a Slide, Jump, or Blink with the + button in the Act list."))
+		return
+	var primitive := str(act.get("primitive", MotionActEvaluator.SLIDE))
+	var primitive_label := MotionActEvaluator.primitive_label(primitive)
+	inspector_content.add_child(_create_inspector_field_label("Name"))
+	var name_editor := _create_name_editor(str(act.get("name", primitive_label)), "Act name")
+	name_editor.text_submitted.connect(_rename_motion_act.bind(act, name_editor))
+	name_editor.focus_exited.connect(func() -> void: _rename_motion_act(name_editor.text, act, name_editor))
+	inspector_content.add_child(name_editor)
+	inspector_content.add_child(_create_motion_inspector_value("Stable Act ID", str(act.get("id", ""))))
+	var enabled_toggle := CheckBox.new()
+	enabled_toggle.text = "Enabled"
+	enabled_toggle.button_pressed = bool(act.get("enabled", true))
+	enabled_toggle.toggled.connect(_on_motion_act_enabled_changed)
+	inspector_content.add_child(enabled_toggle)
+	inspector_content.add_child(_create_inspector_section("Primitive"))
+	inspector_content.add_child(_create_motion_inspector_value("Type", primitive_label))
+	var parameters: Dictionary = act.get("parameters", {})
+	var direction: Vector2 = parameters.get("direction", Vector2.RIGHT)
+	inspector_content.add_child(_create_inspector_field_label("Direction"))
+	var direction_grid := GridContainer.new()
+	direction_grid.columns = 2
+	for axis_data in [["X", direction.x, "x"], ["Y", direction.y, "y"]]:
+		direction_grid.add_child(_create_inspector_field_label(str(axis_data[0])))
+		var field := SpinBox.new()
+		field.min_value = -1000.0
+		field.max_value = 1000.0
+		field.step = 0.05
+		field.value = float(axis_data[1])
+		field.value_changed.connect(_on_motion_act_direction_changed.bind(str(axis_data[2])))
+		direction_grid.add_child(field)
+	inspector_content.add_child(direction_grid)
+	inspector_content.add_child(_create_inspector_field_label("Distance (cm)"))
+	var distance := SpinBox.new()
+	distance.min_value = 0.0
+	distance.max_value = 100000.0
+	distance.step = 0.1
+	distance.value = float(parameters.get("distance", 4.0))
+	distance.value_changed.connect(_on_motion_act_number_changed.bind("distance"))
+	inspector_content.add_child(distance)
+	if primitive == MotionActEvaluator.JUMP:
+		inspector_content.add_child(_create_inspector_field_label("Height (cm)"))
+		var height := SpinBox.new()
+		height.min_value = 0.01
+		height.max_value = 100000.0
+		height.step = 0.1
+		height.value = float(parameters.get("height", 3.0))
+		height.value_changed.connect(_on_motion_act_number_changed.bind("height"))
+		inspector_content.add_child(height)
+		inspector_content.add_child(_create_inspector_field_label("Arc Shape"))
+		var arc_option := OptionButton.new()
+		var current_arc := str(parameters.get("arc", MotionActEvaluator.JUMP_ARC_SMOOTH))
+		for arc in MotionActEvaluator.JUMP_ARC_OPTIONS:
+			arc_option.add_item(MotionActEvaluator.jump_arc_label(arc))
+			arc_option.set_item_metadata(arc_option.item_count - 1, arc)
+			if arc == current_arc:
+				arc_option.select(arc_option.item_count - 1)
+		arc_option.item_selected.connect(_on_motion_act_jump_arc_selected.bind(arc_option))
+		inspector_content.add_child(arc_option)
+	elif primitive == MotionActEvaluator.BLINK:
+		_add_motion_act_parameter_field("Anticipation Distance (cm)", float(parameters.get("anticipation_distance", 1.0)), "anticipation_distance", 0.0, 100000.0, 0.1)
+		var anticipation_share := float(parameters.get("anticipation_share", 0.5))
+		var anticipation_field := _add_motion_act_parameter_field("Anticipation Share", anticipation_share, "anticipation_share", 0.01, 0.89, 0.01)
+		_add_motion_act_parameter_field("Minimum Scale", float(parameters.get("minimum_scale", 0.05)), "minimum_scale", 0.01, 1.0, 0.01)
+		var timing_split := _create_motion_inspector_value("Timing Split", _motion_act_blink_timing_text(anticipation_share))
+		inspector_content.add_child(timing_split)
+		anticipation_field.value_changed.connect(func(value: float) -> void:
+			var timing_value := timing_split.get_child(1) as Label
+			if is_instance_valid(timing_value):
+				timing_value.text = _motion_act_blink_timing_text(value)
+		)
+	inspector_content.add_child(_create_inspector_section("Timing"))
+	inspector_content.add_child(_create_inspector_field_label("Duration (s)"))
+	var duration := SpinBox.new()
+	duration.min_value = 0.01
+	duration.max_value = 3600.0
+	duration.step = 0.05
+	duration.value = float(act.get("timing", {}).get("duration", 0.6))
+	duration.value_changed.connect(_on_motion_act_number_changed.bind("duration"))
+	inspector_content.add_child(duration)
+	inspector_content.add_child(_create_inspector_field_label("Easing"))
+	var easing_option := OptionButton.new()
+	var current_easing := str(act.get("timing", {}).get("easing", MotionActEvaluator.EASE_IN_OUT))
+	for easing in MotionActEvaluator.EASING_OPTIONS:
+		easing_option.add_item(MotionActEvaluator.easing_label(easing))
+		easing_option.set_item_metadata(easing_option.item_count - 1, easing)
+		if easing == current_easing:
+			easing_option.select(easing_option.item_count - 1)
+	easing_option.item_selected.connect(_on_motion_act_easing_selected.bind(easing_option))
+	inspector_content.add_child(easing_option)
+	var issues := MotionActEvaluator.validation_issues(act)
+	var validation := _create_inspector_field_label("Ready for Preview" if issues.is_empty() else str(issues[0]))
+	validation.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	validation.add_theme_color_override("font_color", Color("#75b88a") if issues.is_empty() else Color("#f2c94c"))
+	inspector_content.add_child(validation)
+	var remove_button := Button.new()
+	remove_button.text = "Remove Act"
+	remove_button.pressed.connect(_remove_selected_motion_act)
+	inspector_content.add_child(remove_button)
+
+
+func _rename_motion_act(new_name: String, act: Dictionary, editor: LineEdit) -> void:
+	var clean_name := new_name.strip_edges()
+	if clean_name.is_empty():
+		editor.text = str(act.get("name", MotionActEvaluator.primitive_label(str(act.get("primitive", MotionActEvaluator.SLIDE)))))
+		return
+	if clean_name == str(act.get("name", "")):
+		return
+	_record_direct_change()
+	act["name"] = clean_name
+	_refresh_motion_act_workspace()
+
+
+func _on_motion_act_enabled_changed(enabled: bool) -> void:
+	var act := _get_motion_act(selected_motion_act_id)
+	if act.is_empty(): return
+	_record_direct_change()
+	act["enabled"] = enabled
+	motion_act_playing = false
+	_render_context_bar()
+	_refresh_motion_act_workspace()
+
+
+func _on_motion_act_direction_changed(value: float, axis: String) -> void:
+	var act := _get_motion_act(selected_motion_act_id)
+	if act.is_empty(): return
+	_record_coalesced_change()
+	var direction: Vector2 = act["parameters"].get("direction", Vector2.RIGHT)
+	if axis == "x": direction.x = value
+	else: direction.y = value
+	act["parameters"]["direction"] = direction
+	_refresh_motion_act_workspace()
+	_render_context_bar()
+
+
+func _on_motion_act_number_changed(value: float, property_name: String) -> void:
+	var act := _get_motion_act(selected_motion_act_id)
+	if act.is_empty(): return
+	_record_coalesced_change()
+	if property_name == "distance":
+		act["parameters"]["distance"] = maxf(0.0, value)
+	elif property_name == "height" and str(act.get("primitive", "")) == MotionActEvaluator.JUMP:
+		act["parameters"]["height"] = maxf(0.01, value)
+	elif property_name == "anticipation_distance" and str(act.get("primitive", "")) == MotionActEvaluator.BLINK:
+		act["parameters"]["anticipation_distance"] = maxf(0.0, value)
+	elif property_name == "anticipation_share" and str(act.get("primitive", "")) == MotionActEvaluator.BLINK:
+		act["parameters"]["anticipation_share"] = clampf(value, 0.01, 0.89)
+	elif property_name == "minimum_scale" and str(act.get("primitive", "")) == MotionActEvaluator.BLINK:
+		act["parameters"]["minimum_scale"] = clampf(value, 0.01, 1.0)
+	elif property_name == "duration":
+		act["timing"]["duration"] = maxf(0.01, value)
+	_refresh_motion_act_workspace()
+
+
+func _add_motion_act_parameter_field(label_text: String, value: float, property_name: String, minimum: float, maximum: float, step: float) -> SpinBox:
+	inspector_content.add_child(_create_inspector_field_label(label_text))
+	var field := SpinBox.new()
+	field.min_value = minimum
+	field.max_value = maximum
+	field.step = step
+	field.value = value
+	field.value_changed.connect(_on_motion_act_number_changed.bind(property_name))
+	inspector_content.add_child(field)
+	return field
+
+
+func _motion_act_blink_timing_text(anticipation_share: float) -> String:
+	var clamped_share := clampf(anticipation_share, 0.01, 0.89)
+	var ingress_share := (1.0 - clamped_share) * 0.8
+	var exit_share := (1.0 - clamped_share) * 0.2
+	return "%.0f%% · %.0f%% · %.0f%%" % [clamped_share * 100.0, ingress_share * 100.0, exit_share * 100.0]
+
+
+func _on_motion_act_jump_arc_selected(index: int, option: OptionButton) -> void:
+	var act := _get_motion_act(selected_motion_act_id)
+	if act.is_empty() or str(act.get("primitive", "")) != MotionActEvaluator.JUMP or index < 0 or index >= option.item_count:
+		return
+	var arc := str(option.get_item_metadata(index))
+	if arc not in MotionActEvaluator.JUMP_ARC_OPTIONS:
+		return
+	_record_direct_change()
+	act["parameters"]["arc"] = arc
+	_refresh_motion_act_workspace()
+
+
+func _on_motion_act_easing_selected(index: int, option: OptionButton) -> void:
+	var act := _get_motion_act(selected_motion_act_id)
+	if act.is_empty() or index < 0 or index >= option.item_count: return
+	_record_direct_change()
+	act["timing"]["easing"] = str(option.get_item_metadata(index))
+	_refresh_motion_act_workspace()
+
+
+func _remove_selected_motion_act() -> void:
+	var index := -1
+	for candidate_index in range(motion_acts.size()):
+		if str(motion_acts[candidate_index].get("id", "")) == selected_motion_act_id:
+			index = candidate_index
+			break
+	if index < 0: return
+	_record_direct_change()
+	motion_acts.remove_at(index)
+	selected_motion_act_id = str(motion_acts[mini(index, motion_acts.size() - 1)].get("id", "")) if not motion_acts.is_empty() else ""
+	motion_act_phase = 0.0
+	motion_act_playing = false
+	_render_inspector()
+	_render_canvas_context()
 
 
 func _render_motion_path_inspector() -> void:
@@ -6948,6 +7348,7 @@ func _render_canvas_context() -> void:
 		export_workspace.visible = false
 		motion_workspace.visible = active_motion_submodule == "Animation"
 		motion_path_workspace.visible = active_motion_submodule == "Path"
+		motion_act_workspace.visible = active_motion_submodule == "Act"
 		motion_sequence_workspace.visible = active_motion_submodule == "Sequence"
 		if active_motion_submodule == "Animation":
 			var motion_asset := _get_asset(selected_asset_id)
@@ -6955,6 +7356,8 @@ func _render_canvas_context() -> void:
 			motion_workspace.set_phase(motion_phase)
 		elif active_motion_submodule == "Path":
 			_refresh_motion_path_workspace()
+		elif active_motion_submodule == "Act":
+			_refresh_motion_act_workspace()
 		else:
 			_refresh_motion_sequence_workspace()
 		canvas_context_label.text = ""
@@ -6962,6 +7365,7 @@ func _render_canvas_context() -> void:
 		import_preview_context_label.text = ""
 		return
 	motion_path_workspace.visible = false
+	motion_act_workspace.visible = false
 	motion_sequence_workspace.visible = false
 	if active_module == "Export":
 		motion_workspace.visible = false
@@ -7414,6 +7818,127 @@ func _normalize_motion_path(raw_path, fallback_id: String) -> Dictionary:
 	return result
 
 
+func _default_motion_act(act_id: String, act_name: String, primitive := MotionActEvaluator.SLIDE) -> Dictionary:
+	var resolved_primitive: String = primitive if primitive in MotionActEvaluator.PRIMITIVES else MotionActEvaluator.SLIDE
+	return {
+		"id": act_id,
+		"name": act_name,
+		"kind": MotionActEvaluator.KIND_PRIMITIVE,
+		"primitive": resolved_primitive,
+		"enabled": true,
+		"timing": {"duration": MotionActEvaluator.default_duration(resolved_primitive), "easing": MotionActEvaluator.EASE_IN_OUT},
+		"parameters": MotionActEvaluator.default_parameters(resolved_primitive)
+	}
+
+
+func _normalize_motion_act(raw_act, fallback_id: String) -> Dictionary:
+	var source: Dictionary = raw_act if raw_act is Dictionary else {}
+	var primitive := str(source.get("primitive", MotionActEvaluator.SLIDE))
+	if primitive not in MotionActEvaluator.PRIMITIVES:
+		primitive = MotionActEvaluator.SLIDE
+	var result := _default_motion_act(str(source.get("id", fallback_id)), str(source.get("name", MotionActEvaluator.primitive_label(primitive))), primitive)
+	result["enabled"] = bool(source.get("enabled", true))
+	var timing = source.get("timing", {})
+	if timing is Dictionary:
+		result["timing"]["duration"] = maxf(0.01, float(timing.get("duration", MotionActEvaluator.default_duration(primitive))))
+		var easing := str(timing.get("easing", MotionActEvaluator.EASE_IN_OUT))
+		result["timing"]["easing"] = easing if easing in MotionActEvaluator.EASING_OPTIONS else MotionActEvaluator.EASE_IN_OUT
+	var parameters = source.get("parameters", {})
+	if parameters is Dictionary:
+		if parameters.has("direction"):
+			result["parameters"]["direction"] = MotionActEvaluator._vector(parameters.get("direction"))
+		result["parameters"]["distance"] = maxf(0.0, float(parameters.get("distance", 4.0)))
+		if primitive == MotionActEvaluator.JUMP:
+			result["parameters"]["height"] = maxf(0.0, float(parameters.get("height", 3.0)))
+			var arc := str(parameters.get("arc", MotionActEvaluator.JUMP_ARC_SMOOTH))
+			result["parameters"]["arc"] = arc if arc in MotionActEvaluator.JUMP_ARC_OPTIONS else MotionActEvaluator.JUMP_ARC_SMOOTH
+		elif primitive == MotionActEvaluator.BLINK:
+			result["parameters"]["anticipation_distance"] = maxf(0.0, float(parameters.get("anticipation_distance", 1.0)))
+			var anticipation_share := float(parameters.get("anticipation_share", 0.5))
+			if int(source.get("schema_version", 0)) in range(1, 19) and is_equal_approx(anticipation_share, 0.18):
+				anticipation_share = 0.5
+			result["parameters"]["anticipation_share"] = clampf(anticipation_share, 0.01, 0.89)
+			result["parameters"]["minimum_scale"] = clampf(float(parameters.get("minimum_scale", 0.05)), 0.01, 1.0)
+	return result
+
+
+func _serialize_motion_act(act: Dictionary) -> Dictionary:
+	var normalized := _normalize_motion_act(act, str(act.get("id", "act")))
+	return {
+		"schema_version": SCHEMA_VERSION,
+		"id": str(normalized.get("id", "")),
+		"name": str(normalized.get("name", MotionActEvaluator.primitive_label(str(normalized.get("primitive", MotionActEvaluator.SLIDE))))),
+		"kind": MotionActEvaluator.KIND_PRIMITIVE,
+		"primitive": str(normalized.get("primitive", MotionActEvaluator.SLIDE)),
+		"enabled": bool(normalized.get("enabled", true)),
+		"timing": normalized.get("timing", {}).duplicate(true),
+		"parameters": _serialize_motion_act_parameters(normalized)
+	}
+
+
+func _serialize_motion_act_parameters(act: Dictionary) -> Dictionary:
+	var parameters: Dictionary = act.get("parameters", {})
+	var serialized := {
+		"direction": _serialize_vector(parameters.get("direction", Vector2.RIGHT)),
+		"distance": float(parameters.get("distance", 4.0))
+	}
+	if str(act.get("primitive", MotionActEvaluator.SLIDE)) == MotionActEvaluator.JUMP:
+		serialized["height"] = float(parameters.get("height", 3.0))
+		serialized["arc"] = str(parameters.get("arc", MotionActEvaluator.JUMP_ARC_SMOOTH))
+	elif str(act.get("primitive", MotionActEvaluator.SLIDE)) == MotionActEvaluator.BLINK:
+		serialized["anticipation_distance"] = float(parameters.get("anticipation_distance", 1.0))
+		serialized["anticipation_share"] = float(parameters.get("anticipation_share", 0.5))
+		serialized["minimum_scale"] = float(parameters.get("minimum_scale", 0.05))
+	return serialized
+
+
+func _get_motion_act(act_id: String) -> Dictionary:
+	for act in motion_acts:
+		if str(act.get("id", "")) == act_id:
+			return act
+	return {}
+
+
+func _add_motion_act(primitive: String) -> void:
+	if primitive not in MotionActEvaluator.PRIMITIVES:
+		return
+	_record_direct_change()
+	var act_id := "act_%d" % next_motion_act_id
+	var act_name := "%s %02d" % [MotionActEvaluator.primitive_label(primitive), next_motion_act_id]
+	next_motion_act_id += 1
+	motion_acts.append(_default_motion_act(act_id, act_name, primitive))
+	selected_motion_act_id = act_id
+	motion_act_phase = 0.0
+	motion_act_playing = false
+	if _get_asset(motion_act_preview_asset_id).is_empty():
+		motion_act_preview_asset_id = _default_motion_path_preview_asset_id()
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _add_motion_slide() -> void:
+	_add_motion_act(MotionActEvaluator.SLIDE)
+
+
+func _add_motion_jump() -> void:
+	_add_motion_act(MotionActEvaluator.JUMP)
+
+
+func _add_motion_blink() -> void:
+	_add_motion_act(MotionActEvaluator.BLINK)
+
+
+func _select_motion_act(act_id: String) -> void:
+	if _get_motion_act(act_id).is_empty():
+		return
+	selected_motion_act_id = act_id
+	motion_act_phase = 0.0
+	motion_act_playing = false
+	_render_inspector()
+	_refresh_motion_act_workspace()
+	_render_context_bar()
+
+
 func _default_motion_sequence(sequence_id: String, sequence_name: String) -> Dictionary:
 	return {"id": sequence_id, "name": sequence_name, "visibility": true, "next_entry_index": 1, "entries": []}
 
@@ -7528,9 +8053,9 @@ func _clear(container: Node) -> void:
 		child.queue_free()
 
 
-func _add_module_section(parent: Container, module_name: String, submodules: Array, open_by_default := false) -> void:
+func _add_module_section(parent: Container, module_name: String, submodules: Array, open_by_default := false, show_submodule_separators := false, separator_before_submodule_index := -1) -> void:
 	var section := ModuleSection.new()
-	section.setup(module_name, submodules, open_by_default)
+	section.setup(module_name, submodules, open_by_default, show_submodule_separators, separator_before_submodule_index)
 	section.module_pressed.connect(_on_category_pressed)
 	section.submodule_pressed.connect(_select_submodule.bind(section))
 	module_sections.append(section)
@@ -7541,6 +8066,7 @@ func _on_category_pressed(_module_name: String) -> void:
 	active_module = _module_name
 	if active_module != "Motion":
 		motion_path_playing = false
+		motion_act_playing = false
 		motion_sequence_playing = false
 	if active_module != "Style":
 		selected_material_id = ""
@@ -7640,6 +8166,8 @@ func _enter_motion_context(submodule := "Animation") -> void:
 	active_state = ""
 	if active_motion_submodule != "Path":
 		motion_path_playing = false
+	if active_motion_submodule != "Act":
+		motion_act_playing = false
 	if active_motion_submodule != "Sequence":
 		motion_sequence_playing = false
 	var motion_section := _find_section("Motion")
@@ -7654,6 +8182,11 @@ func _enter_motion_context(submodule := "Animation") -> void:
 			motion_selection.select_asset(selected_asset_id)
 	elif active_motion_submodule == "Path" and _get_asset(motion_path_preview_asset_id).is_empty():
 		motion_path_preview_asset_id = _default_motion_path_preview_asset_id()
+	elif active_motion_submodule == "Act":
+		if _get_asset(motion_act_preview_asset_id).is_empty():
+			motion_act_preview_asset_id = _default_motion_path_preview_asset_id()
+		if _get_motion_act(selected_motion_act_id).is_empty() and not motion_acts.is_empty():
+			selected_motion_act_id = str(motion_acts[0].get("id", ""))
 	elif active_motion_submodule == "Sequence":
 		var sequence_document := _get_motion_sequence(selected_motion_sequence_id)
 		if _get_motion_sequence_entry(sequence_document, selected_motion_sequence_entry_id).is_empty():

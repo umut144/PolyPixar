@@ -1,7 +1,14 @@
 # AssetFlow2D – Motion UI Contract
 
-**Status:** Phase 10 separates Motion into Animation, Path, and Sequence while
-retaining Phase 9 State/Transition playback and visible Outer Bob sampling.
+**Status:** Motion is separated into Animation, Path, Act, and Sequence while
+retaining State/Transition playback and visible Outer Bob sampling.
+
+The Motion category presents its four workspaces as a clearly separated second
+navigation level: Animation, Path, Act, and Sequence remain sibling buttons, with
+one strong visual separator before Sequence. Animation, Path, and Act therefore
+read as the Core group, while Sequence reads as the Extended group. The
+separator communicates workspace ownership only; it does not change module
+selection or persistence.
 
 ## Purpose
 

@@ -273,7 +273,7 @@ system, particle system, or universal animation graph.
 
 ### E. Motion → Path
 
-- [x] Add `Animation`, `Path`, and `Sequence` as separate Motion modules with
+- [x] Add `Animation`, `Path`, `Act`, and `Sequence` as separate Motion modules with
       independent ownership and stable Workspace resources.
 - [x] Author one open ordered Point/Segment Path with Draw and Edit tools.
 - [x] Move Path Points, edit free Bézier handles, and delete Points without
@@ -284,7 +284,27 @@ system, particle system, or universal animation graph.
 - [x] Keep the selected Preview Asset in editor state instead of storing an
       Asset reference in the Path resource.
 
-### F. Motion → Sequence
+### F. Motion → Act
+
+- [x] Add an independent Act workspace with a 1/4 primitive list and 3/4
+      centered Preview.
+- [x] Add `Slide` through the list-local plus menu and edit its name, enabled
+      state, direction, distance, duration, and easing in the Inspector.
+- [x] Preview the selected Slide with normalized Phase, Play/Pause, and an
+      editor-only Preview Asset.
+- [x] Add a bounded Slide/Jump primitive catalog and expose Jump Direction,
+      Distance, Height, Arc Shape, Duration, and Easing.
+- [x] Preview the complete Jump trajectory with a stable fitted camera while
+      preserving immutable Asset contour data.
+- [x] Add Blink with backward Anticipation, forward Distance, configurable
+      Anticipation Share, and a positive Minimum Scale.
+- [x] Drive Blink contraction by spatial progress so its smallest uniform
+      scale remains at the Start/End midpoint independently of Easing.
+- [x] Use the accepted default Blink timing split: 50% anticipation, 40% to
+      the midpoint, and a rapid Ease-Out over the final 10%.
+- [ ] Add Act Groups only when their sequencing semantics are specified.
+
+### G. Motion → Sequence
 
 - [x] Add the first `Sequence` module under Motion with separate `Composition`
       and large read-only `Player` views selected by `CMD/Ctrl + 1/2`.

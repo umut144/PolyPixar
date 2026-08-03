@@ -28,8 +28,9 @@ and must pass through processing before contributing to the parent output.
 The current implementation target is not a functional morphing engine or a
 general animation/VFX framework.
 
-The Motion category now exposes three distinct modules: asset-local
-`Animation`, independent Workspace-level `Path`, and compositional `Sequence`.
+The Motion category now exposes four distinct modules: asset-local
+`Animation`, independent Workspace-level `Path`, independent action primitives
+in `Act`, and compositional `Sequence`.
 `Motion → Animation` contains persisted Asset Animation authoring
 documented in [`MOTION_UI.md`](MOTION_UI.md). Each Asset starts with `IDLE`,
 `WALK`, and `RUN`; States can be added, renamed, and removed while the
@@ -62,7 +63,16 @@ bounded Sequence Composition Entry that references Asset, Animation State, and
 Path IDs. `⌘1 Composition` authors those references; `⌘2 Player` shows a
 large, read-only Path + Animation preview with independent Path and State phase
 evaluation. Multi-Entry composition, meshes, Inner deformation, and animation
-export remain deferred. See [`MOTION_SEQUENCE.md`](MOTION_SEQUENCE.md).
+export remain deferred. See [`MOTION_SEQUENCE.md`](MOTION_SEQUENCE.md). Phase
+13 adds the independent `Act` module and its first `Slide` primitive. Acts are
+created in a vertical list, edited through the Inspector, and previewed against
+an editor-only Asset. Phase 14 adds a bounded primitive catalog and `Jump` with
+Direction, Distance, Height, Arc Shape, Duration, and Easing; see
+[`MOTION_ACT.md`](MOTION_ACT.md). Phase 15 adds `Blink`: a short backward
+anticipation followed by forward travel and uniform wormhole contraction to a
+minimum scale at the spatial midpoint before returning to full scale. Its
+default timing is 50% anticipation, 40% ingress to the midpoint, and a fast
+10% exit.
 
 ## Technology baseline
 
@@ -71,7 +81,7 @@ export remain deferred. See [`MOTION_SEQUENCE.md`](MOTION_SEQUENCE.md).
 - Editor workspace and default window: 1920×1200 (16:10); preview uses preserved
   aspect ratio (`keep`) so the UI proportions remain stable
 - Project icon: `assets/assetflow_icon.png`
-- Current JSON schema version: **15**
+- Current JSON schema version: **19**
 
 ## Confirmed vocabulary
 
@@ -259,7 +269,7 @@ Load uses an in-app list of existing workspace folders. Each workspace has a
 documents in their corresponding resource directories. The latest loaded or saved
 workspace name is stored in `configs/app_config.json` and is loaded
 automatically on startup. Every workspace, asset, texture, and config JSON
-uses the numeric `schema_version` field; the current schema is version `15`.
+uses the numeric `schema_version` field; the current schema is version `19`.
 Materials are independent Workspace resources stored below
 `materials/<material_id>/material.json` and listed by ID in `workspace.json`.
 The bottom status bar is divided into 17% program status, 64% contextual tool

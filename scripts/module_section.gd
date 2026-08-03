@@ -12,7 +12,7 @@ var expanded := false
 var active_submodule := ""
 
 
-func setup(section_name: String, submodules: Array, open_by_default := false) -> void:
+func setup(section_name: String, submodules: Array, open_by_default := false, show_submodule_separators := false, separator_before_submodule_index := -1) -> void:
 	module_name = section_name
 	header_button = Button.new()
 	header_button.text = module_name
@@ -30,8 +30,12 @@ func setup(section_name: String, submodules: Array, open_by_default := false) ->
 	content_list.add_theme_constant_override("separation", 2)
 	content_panel.add_child(content_list)
 
-	for submodule in submodules:
-		_add_submodule_button(str(submodule))
+	for submodule_index in range(submodules.size()):
+		if show_submodule_separators and submodule_index > 0:
+			_add_submodule_separator()
+		elif submodule_index == separator_before_submodule_index:
+			_add_submodule_separator(6)
+		_add_submodule_button(str(submodules[submodule_index]))
 	if not submodules.is_empty():
 		set_active_submodule(str(submodules[0]))
 	set_expanded(open_by_default)
@@ -60,6 +64,14 @@ func _add_submodule_button(submodule_name: String) -> void:
 		submodule_pressed.emit(module_name, submodule_name)
 	)
 	content_list.add_child(button)
+
+
+func _add_submodule_separator(thickness := 1) -> void:
+	var separator := ColorRect.new()
+	separator.color = Color("#697386") if thickness > 1 else Color("#4a5260")
+	separator.custom_minimum_size = Vector2(0, thickness)
+	separator.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content_list.add_child(separator)
 
 
 func set_active_submodule(submodule_name: String) -> void:
