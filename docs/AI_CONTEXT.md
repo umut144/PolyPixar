@@ -119,8 +119,9 @@ it into a general scene or animation-graph abstraction prematurely.
   Geometry is a separate derived-pipeline category with Sampling, Seeding,
   Meshing, and UV Mapping. Sampling is implemented per Component with Adaptive
   and Even Spacing recipes, Generate/Bake, immutable preview, derived
-  persistence, and stale-source detection; the remaining modules are
-  placeholders. Each implemented module's Outliner
+  persistence, and stale-source detection. Seeding consumes a current Sampling
+  Bake and provides deterministic Poisson Fill, Generate/Bake, and optional
+  baked-Seed editing. Meshing and UV Mapping remain placeholders. Each implemented module's Outliner
   shows only its own document type, with a shared search field.
 - Expanded Asset entries group children under `Components` and optional
   `Guides`; expanded Texture entries group typed children under `Import
@@ -232,7 +233,7 @@ The active module uses a yellow background with black text, including its
 hover state. No tree icons or glyphs are used.
 
 Create exposes `Asset` and `Texture`. Geometry exposes the implemented
-`Sampling` module plus placeholders for `Seeding`, `Meshing`, and `UV Mapping`. Style
+`Sampling` and `Seeding` modules plus placeholders for `Meshing` and `UV Mapping`. Style
 exposes `Material`; the remaining categories are present as empty sections.
 
 The Main Toolbar has one context-specific action button: `Create Asset` in the

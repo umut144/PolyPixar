@@ -74,8 +74,8 @@ In the UI, these areas are called **categories**. A category contains one or
 more **modules** that provide the concrete working context. For example,
 `Create` is a category with `Asset` and `Texture` authoring modules.
 `Geometry` is a separate derived-pipeline category with modules for
-`Sampling`, `Seeding`, `Meshing`, and `UV Mapping`. Sampling is the first
-implemented module; the other three remain placeholders. Shapes editing
+`Sampling`, `Seeding`, `Meshing`, and `UV Mapping`. Sampling and Seeding are
+implemented; Meshing and UV Mapping remain placeholders. Shapes editing
 is the canvas workflow used by the Asset module.
 
 An Asset is a container for independently editable Components. Drawing is
@@ -507,9 +507,12 @@ replacing authored data.
 
 Sampling recipes and accepted bakes are stored as Component-scoped Geometry
 records keyed by stable Asset and Component IDs. A source fingerprint marks a
-bake stale after canonical topology changes. A future optional advanced mode
-may expose manual sample or mesh overrides; these remain derived overrides and
-never replace the standard contour workflow.
+bake stale after canonical topology changes. Seeding recipes and accepted
+bakes live in the same Component-scoped record. A Seeding Bake depends on one
+stable current Sampling Bake ID and sampled-boundary fingerprint; it becomes
+stale without reverse synchronization when that upstream dependency changes.
+Manual Seed edits remain derived overrides and never replace the standard
+contour or Sampling workflow.
 
 - UI prototypes may use only the smallest dummy data needed to exercise a
   specific interaction. Prefer empty panes over invented asset content.
