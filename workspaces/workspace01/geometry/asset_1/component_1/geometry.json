@@ -1,0 +1,773 @@
+{
+	"asset_id": "asset_1",
+	"component_id": "component_1",
+	"sampling": {
+		"bake": {
+			"bake_id": "bake_1601911261758009845",
+			"chains": [
+				{
+					"chain_id": "chain_1",
+					"closed": true,
+					"samples": [
+						{
+							"curve_t": 0.0,
+							"edge_id": "edge_1",
+							"id": "sample:edge_1:point_1",
+							"position": [
+								0.0,
+								8.0
+							],
+							"preserved": true,
+							"source_point_id": "point_1"
+						},
+						{
+							"curve_t": 0.25,
+							"edge_id": "edge_1",
+							"id": "sample:edge_1:0.250000000",
+							"position": [
+								-0.360937476158142,
+								8.0
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 0.375,
+							"edge_id": "edge_1",
+							"id": "sample:edge_1:0.375000000",
+							"position": [
+								-0.754101514816284,
+								8.0
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 0.5,
+							"edge_id": "edge_1",
+							"id": "sample:edge_1:0.500000000",
+							"position": [
+								-1.23749995231628,
+								8.0
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 0.625,
+							"edge_id": "edge_1",
+							"id": "sample:edge_1:0.625000000",
+							"position": [
+								-1.7724609375,
+								8.0
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 0.75,
+							"edge_id": "edge_1",
+							"id": "sample:edge_1:0.750000000",
+							"position": [
+								-2.3203125,
+								8.0
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 0.875,
+							"edge_id": "edge_1",
+							"id": "sample:edge_1:0.875000000",
+							"position": [
+								-2.84238290786743,
+								8.0
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 1.0,
+							"edge_id": "edge_1",
+							"id": "sample:edge_1:point_2",
+							"position": [
+								-3.29999995231628,
+								8.0
+							],
+							"preserved": true,
+							"source_point_id": "point_2"
+						},
+						{
+							"curve_t": 0.25,
+							"edge_id": "edge_2",
+							"id": "sample:edge_2:0.250000000",
+							"position": [
+								-2.88935708999634,
+								8.26220512390137
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 0.5,
+							"edge_id": "edge_2",
+							"id": "sample:edge_2:0.500000000",
+							"position": [
+								-2.47161912918091,
+								8.5158805847168
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 0.75,
+							"edge_id": "edge_2",
+							"id": "sample:edge_2:0.750000000",
+							"position": [
+								-2.06807160377502,
+								8.78661727905273
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 1.0,
+							"edge_id": "edge_2",
+							"id": "sample:edge_2:point_3",
+							"position": [
+								-1.70000004768372,
+								9.10000038146973
+							],
+							"preserved": false,
+							"source_point_id": "point_3"
+						},
+						{
+							"curve_t": 0.25,
+							"edge_id": "edge_3",
+							"id": "sample:edge_3:0.250000000",
+							"position": [
+								-1.46660959720612,
+								9.3620719909668
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 0.5,
+							"edge_id": "edge_3",
+							"id": "sample:edge_3:0.500000000",
+							"position": [
+								-1.26487827301025,
+								9.65327262878418
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 0.75,
+							"edge_id": "edge_3",
+							"id": "sample:edge_3:0.750000000",
+							"position": [
+								-1.10570764541626,
+								9.96783638000488
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 1.0,
+							"edge_id": "edge_3",
+							"id": "sample:edge_3:point_4",
+							"position": [
+								-1.0,
+								10.3000001907349
+							],
+							"preserved": false,
+							"source_point_id": "point_4"
+						},
+						{
+							"curve_t": 0.25,
+							"edge_id": "edge_4",
+							"id": "sample:edge_4:0.250000000",
+							"position": [
+								-0.945403277873993,
+								10.6746225357056
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 0.5,
+							"edge_id": "edge_4",
+							"id": "sample:edge_4:0.500000000",
+							"position": [
+								-0.944271564483643,
+								11.0571117401123
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 0.75,
+							"edge_id": "edge_4",
+							"id": "sample:edge_4:0.750000000",
+							"position": [
+								-0.996004104614258,
+								11.4360446929932
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 1.0,
+							"edge_id": "edge_4",
+							"id": "sample:edge_4:point_5",
+							"position": [
+								-1.10000002384186,
+								11.8000001907349
+							],
+							"preserved": false,
+							"source_point_id": "point_5"
+						},
+						{
+							"curve_t": 0.25,
+							"edge_id": "edge_5",
+							"id": "sample:edge_5:0.250000000",
+							"position": [
+								-1.1828019618988,
+								11.9515800476074
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 0.5,
+							"edge_id": "edge_5",
+							"id": "sample:edge_5:0.500000000",
+							"position": [
+								-1.30848228931427,
+								12.0683851242065
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 1.0,
+							"edge_id": "edge_5",
+							"id": "sample:edge_5:point_6",
+							"position": [
+								-1.70000004768372,
+								12.1999998092651
+							],
+							"preserved": false,
+							"source_point_id": "point_6"
+						},
+						{
+							"curve_t": 0.5,
+							"edge_id": "edge_6",
+							"id": "sample:edge_6:0.500000000",
+							"position": [
+								-2.13168954849243,
+								12.1653900146484
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 1.0,
+							"edge_id": "edge_6",
+							"id": "sample:edge_6:point_7",
+							"position": [
+								-2.5,
+								12.0
+							],
+							"preserved": false,
+							"source_point_id": "point_7"
+						},
+						{
+							"curve_t": 0.5,
+							"edge_id": "edge_20",
+							"id": "sample:edge_20:0.500000000",
+							"position": [
+								-2.94027709960938,
+								11.7011737823486
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 1.0,
+							"edge_id": "edge_20",
+							"id": "sample:edge_20:point_9",
+							"position": [
+								-3.31361985206604,
+								11.3223171234131
+							],
+							"preserved": false,
+							"source_point_id": "point_9"
+						},
+						{
+							"curve_t": 0.25,
+							"edge_id": "edge_9",
+							"id": "sample:edge_9:0.250000000",
+							"position": [
+								-3.50139045715332,
+								11.0513210296631
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 0.5,
+							"edge_id": "edge_9",
+							"id": "sample:edge_9:0.500000000",
+							"position": [
+								-3.66181778907776,
+								10.7617826461792
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 0.75,
+							"edge_id": "edge_9",
+							"id": "sample:edge_9:0.750000000",
+							"position": [
+								-3.81130814552307,
+								10.4648265838623
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 1.0,
+							"edge_id": "edge_9",
+							"id": "sample:edge_9:point_10",
+							"position": [
+								-3.96626710891724,
+								10.1715803146362
+							],
+							"preserved": true,
+							"source_point_id": "point_10"
+						},
+						{
+							"curve_t": 0.5,
+							"edge_id": "edge_10",
+							"id": "sample:edge_10:0.500000000",
+							"position": [
+								-3.88394117355347,
+								10.6987628936768
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 1.0,
+							"edge_id": "edge_10",
+							"id": "sample:edge_10:point_11",
+							"position": [
+								-3.76251173019409,
+								11.2151575088501
+							],
+							"preserved": false,
+							"source_point_id": "point_11"
+						},
+						{
+							"curve_t": 0.5,
+							"edge_id": "edge_11",
+							"id": "sample:edge_11:0.500000000",
+							"position": [
+								-3.53093862533569,
+								11.7870807647705
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 1.0,
+							"edge_id": "edge_11",
+							"id": "sample:edge_11:point_12",
+							"position": [
+								-3.20000004768372,
+								12.3000001907349
+							],
+							"preserved": false,
+							"source_point_id": "point_12"
+						},
+						{
+							"curve_t": 0.25,
+							"edge_id": "edge_12",
+							"id": "sample:edge_12:0.250000000",
+							"position": [
+								-2.9386568069458,
+								12.5747032165527
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 0.5,
+							"edge_id": "edge_12",
+							"id": "sample:edge_12:0.500000000",
+							"position": [
+								-2.6520791053772,
+								12.8271389007568
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 0.75,
+							"edge_id": "edge_12",
+							"id": "sample:edge_12:0.750000000",
+							"position": [
+								-2.33946228027344,
+								13.0410041809082
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 1.0,
+							"edge_id": "edge_12",
+							"id": "sample:edge_12:point_13",
+							"position": [
+								-2.0,
+								13.1999998092651
+							],
+							"preserved": false,
+							"source_point_id": "point_13"
+						},
+						{
+							"curve_t": 0.25,
+							"edge_id": "edge_13",
+							"id": "sample:edge_13:0.250000000",
+							"position": [
+								-1.61174833774567,
+								13.3042163848877
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 0.5,
+							"edge_id": "edge_13",
+							"id": "sample:edge_13:0.500000000",
+							"position": [
+								-1.2087607383728,
+								13.3514461517334
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 0.75,
+							"edge_id": "edge_13",
+							"id": "sample:edge_13:0.750000000",
+							"position": [
+								-0.801392674446106,
+								13.3479537963867
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 1.0,
+							"edge_id": "edge_13",
+							"id": "sample:edge_13:point_14",
+							"position": [
+								-0.400000005960464,
+								13.3000001907349
+							],
+							"preserved": false,
+							"source_point_id": "point_14"
+						},
+						{
+							"curve_t": 0.25,
+							"edge_id": "edge_14",
+							"id": "sample:edge_14:0.250000000",
+							"position": [
+								-0.05355304479599,
+								13.2103672027588
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 0.5,
+							"edge_id": "edge_14",
+							"id": "sample:edge_14:0.500000000",
+							"position": [
+								0.279450833797455,
+								13.0717964172363
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 0.75,
+							"edge_id": "edge_14",
+							"id": "sample:edge_14:0.750000000",
+							"position": [
+								0.597729325294495,
+								12.8973274230957
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 1.0,
+							"edge_id": "edge_14",
+							"id": "sample:edge_14:point_15",
+							"position": [
+								0.899999976158142,
+								12.6999998092651
+							],
+							"preserved": false,
+							"source_point_id": "point_15"
+						},
+						{
+							"curve_t": 0.25,
+							"edge_id": "edge_15",
+							"id": "sample:edge_15:0.250000000",
+							"position": [
+								1.17897295951843,
+								12.4826354980469
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 0.5,
+							"edge_id": "edge_15",
+							"id": "sample:edge_15:0.500000000",
+							"position": [
+								1.43702721595764,
+								12.2389297485352
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 0.75,
+							"edge_id": "edge_15",
+							"id": "sample:edge_15:0.750000000",
+							"position": [
+								1.67656791210175,
+								11.9757585525513
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 1.0,
+							"edge_id": "edge_15",
+							"id": "sample:edge_15:point_16",
+							"position": [
+								1.89999997615814,
+								11.6999998092651
+							],
+							"preserved": false,
+							"source_point_id": "point_16"
+						},
+						{
+							"curve_t": 0.25,
+							"edge_id": "edge_16",
+							"id": "sample:edge_16:0.250000000",
+							"position": [
+								2.10260224342346,
+								11.4175186157227
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 0.5,
+							"edge_id": "edge_16",
+							"id": "sample:edge_16:0.500000000",
+							"position": [
+								2.2862434387207,
+								11.1215381622314
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 0.75,
+							"edge_id": "edge_16",
+							"id": "sample:edge_16:0.750000000",
+							"position": [
+								2.45176291465759,
+								10.8147888183594
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 1.0,
+							"edge_id": "edge_16",
+							"id": "sample:edge_16:point_17",
+							"position": [
+								2.59999990463257,
+								10.5
+							],
+							"preserved": false,
+							"source_point_id": "point_17"
+						},
+						{
+							"curve_t": 0.25,
+							"edge_id": "edge_17",
+							"id": "sample:edge_17:0.250000000",
+							"position": [
+								2.72234106063843,
+								10.1831979751587
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 0.5,
+							"edge_id": "edge_17",
+							"id": "sample:edge_17:0.500000000",
+							"position": [
+								2.82263088226318,
+								9.85810089111328
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 0.75,
+							"edge_id": "edge_17",
+							"id": "sample:edge_17:0.750000000",
+							"position": [
+								2.91160488128662,
+								9.52895355224609
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 1.0,
+							"edge_id": "edge_17",
+							"id": "sample:edge_17:point_18",
+							"position": [
+								3.0,
+								9.19999980926514
+							],
+							"preserved": false,
+							"source_point_id": "point_18"
+						},
+						{
+							"curve_t": 0.5,
+							"edge_id": "edge_18",
+							"id": "sample:edge_18:0.500000000",
+							"position": [
+								3.15418910980225,
+								8.60110950469971
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 1.0,
+							"edge_id": "edge_18",
+							"id": "sample:edge_18:point_19",
+							"position": [
+								3.29999995231628,
+								8.0
+							],
+							"preserved": true,
+							"source_point_id": "point_19"
+						},
+						{
+							"curve_t": 0.125,
+							"edge_id": "edge_19",
+							"id": "sample:edge_19:0.125000000",
+							"position": [
+								2.84238290786743,
+								8.0
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 0.25,
+							"edge_id": "edge_19",
+							"id": "sample:edge_19:0.250000000",
+							"position": [
+								2.3203125,
+								8.0
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 0.375,
+							"edge_id": "edge_19",
+							"id": "sample:edge_19:0.375000000",
+							"position": [
+								1.7724609375,
+								8.0
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 0.5,
+							"edge_id": "edge_19",
+							"id": "sample:edge_19:0.500000000",
+							"position": [
+								1.23749995231628,
+								8.0
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 0.625,
+							"edge_id": "edge_19",
+							"id": "sample:edge_19:0.625000000",
+							"position": [
+								0.754101514816284,
+								8.0
+							],
+							"preserved": false,
+							"source_point_id": ""
+						},
+						{
+							"curve_t": 0.75,
+							"edge_id": "edge_19",
+							"id": "sample:edge_19:0.750000000",
+							"position": [
+								0.360937476158142,
+								8.0
+							],
+							"preserved": false,
+							"source_point_id": ""
+						}
+					],
+					"topology_role": "outer"
+				}
+			],
+			"errors": [],
+			"method": "adaptive",
+			"parameters": {
+				"feature_detail": 0.5,
+				"spacing": 0.65
+			},
+			"preserve_count": 4,
+			"sample_count": 67,
+			"source_fingerprint": "67139d3f564d24728f1341e05372a8427d33e894cdd05bcbcb9f1fb0ab9b3ef0",
+			"valid": true
+		},
+		"recipe": {
+			"method": "adaptive",
+			"parameters": {
+				"feature_detail": 0.5,
+				"spacing": 0.65
+			}
+		}
+	},
+	"schema_version": 20
+}

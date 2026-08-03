@@ -81,7 +81,7 @@ default timing is 50% anticipation, 40% ingress to the midpoint, and a fast
 - Editor workspace and default window: 1920×1200 (16:10); preview uses preserved
   aspect ratio (`keep`) so the UI proportions remain stable
 - Project icon: `assets/assetflow_icon.png`
-- Current JSON schema version: **19**
+- Current JSON schema version: **20**
 
 ## Confirmed vocabulary
 
@@ -117,7 +117,10 @@ it into a general scene or animation-graph abstraction prematurely.
   PolyTexture-style editing context.
 - The Create category exposes Core Asset and Texture authoring modules.
   Geometry is a separate derived-pipeline category with Sampling, Seeding,
-  Meshing, and UV Mapping placeholders. Each implemented module's Outliner
+  Meshing, and UV Mapping. Sampling is implemented per Component with Adaptive
+  and Even Spacing recipes, Generate/Bake, immutable preview, derived
+  persistence, and stale-source detection; the remaining modules are
+  placeholders. Each implemented module's Outliner
   shows only its own document type, with a shared search field.
 - Expanded Asset entries group children under `Components` and optional
   `Guides`; expanded Texture entries group typed children under `Import
@@ -228,8 +231,8 @@ The rail behaves as an accordion: at most one category is expanded at a time.
 The active module uses a yellow background with black text, including its
 hover state. No tree icons or glyphs are used.
 
-Create exposes `Asset` and `Texture`. Geometry exposes placeholder modules for
-`Sampling`, `Seeding`, `Meshing`, and `UV Mapping`. Style
+Create exposes `Asset` and `Texture`. Geometry exposes the implemented
+`Sampling` module plus placeholders for `Seeding`, `Meshing`, and `UV Mapping`. Style
 exposes `Material`; the remaining categories are present as empty sections.
 
 The Main Toolbar has one context-specific action button: `Create Asset` in the
@@ -272,7 +275,7 @@ Load uses an in-app list of existing workspace folders. Each workspace has a
 documents in their corresponding resource directories. The latest loaded or saved
 workspace name is stored in `configs/app_config.json` and is loaded
 automatically on startup. Every workspace, asset, texture, and config JSON
-uses the numeric `schema_version` field; the current schema is version `19`.
+uses the numeric `schema_version` field; the current schema is version `20`.
 Materials are independent Workspace resources stored below
 `materials/<material_id>/material.json` and listed by ID in `workspace.json`.
 The bottom status bar is divided into 17% program status, 64% contextual tool
@@ -304,11 +307,11 @@ Component is still rendered as the active editing overlay.
 
 ## Documentation maintenance
 
-Meshing is intentionally internal infrastructure. Components store authored
-contours; triangulation, UV generation, and render-mesh rebuilding are derived
-services shared by rendering, deformation, and morphing. A future optional
-Advanced area may expose mesh diagnostics, manual mesh overrides, and
-triangulation/UV guides, but this is not an MVP creative category.
+Geometry modules author compact recipes and inspect or accept derived pipeline
+results. Components still store only authored contours; sampling,
+triangulation, UV generation, and render-mesh rebuilding remain derived
+services shared by rendering, deformation, and morphing. Manual topology
+overrides and mesh-debug tooling remain outside the MVP.
 
 - Update `ARCHITECTURE.md` when a stable product boundary is decided.
 - Update `MVP_CHECKLIST.md` when a result is accepted, changed, or split.

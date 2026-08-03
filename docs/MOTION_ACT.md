@@ -22,7 +22,7 @@ common and primitive-specific parameters in the Inspector.
 
 ## Primitive documents
 
-Each Act is stored at `acts/<act_id>/act.json` using schema 19. Common fields
+Each Act is stored at `acts/<act_id>/act.json` using schema 20. Common fields
 are:
 
 - stable `id`, editable `name`, `kind: primitive`, and a primitive ID;

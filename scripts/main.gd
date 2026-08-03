@@ -8,7 +8,7 @@ const INACTIVE_MODULES := ["Transform", "Effects", "Export"]
 const WORKSPACES_ROOT := "res://workspaces"
 const IMPORT_TEXTURES_ROOT := "res://imports/textures"
 const CONFIG_PATH := "res://configs/app_config.json"
-const SCHEMA_VERSION := 19
+const SCHEMA_VERSION := 20
 const MAX_HISTORY_SIZE := 100
 const PAPER_SIZES_CM := [Vector2(21.0, 29.7), Vector2(29.7, 42.0), Vector2(42.0, 59.4), Vector2(59.4, 84.1), Vector2(84.1, 118.9)]
 const PAPER_LABELS := ["A4", "A3", "A2", "A1", "A0"]
@@ -32,6 +32,9 @@ var materials: Array[Dictionary] = []
 var motion_paths: Array[Dictionary] = []
 var motion_acts: Array[Dictionary] = []
 var motion_sequences: Array[Dictionary] = []
+var geometry_documents: Dictionary = {}
+var geometry_sampling_preview: Dictionary = {}
+var geometry_sampling_preview_key := ""
 var next_motion_path_id := 1
 var next_motion_act_id := 1
 var next_motion_sequence_id := 1
@@ -118,6 +121,8 @@ var motion_workspace: MotionWorkspace
 var motion_path_workspace: MotionPathWorkspace
 var motion_act_workspace: MotionActWorkspace
 var motion_sequence_workspace: MotionSequenceWorkspace
+var geometry_sampling_workspace: GeometrySamplingWorkspace
+var geometry_method_menu: MenuButton
 var motion_phase_value_label: Label
 var motion_phase_marks: MotionPhaseMarks
 var motion_phase_slider: HSlider
@@ -287,6 +292,19 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			_set_motion_sequence_view(MotionSequenceWorkspace.VIEW_COMPOSITION if event.keycode == KEY_1 else MotionSequenceWorkspace.VIEW_PLAYER)
 			get_viewport().set_input_as_handled()
 		return
+	if active_module == "Geometry" and active_geometry_submodule == "Sampling" and event.keycode in [KEY_1, KEY_2]:
+		var geometry_focus_owner := get_viewport().gui_get_focus_owner()
+		if geometry_focus_owner is LineEdit or geometry_focus_owner is TextEdit or geometry_focus_owner is SpinBox:
+			return
+		if has_command_modifier and event.keycode == KEY_1:
+			if is_instance_valid(geometry_method_menu):
+				geometry_method_menu.show_popup()
+			get_viewport().set_input_as_handled()
+			return
+		if not has_command_modifier:
+			_set_geometry_sampling_method(GeometrySamplingService.ADAPTIVE if event.keycode == KEY_1 else GeometrySamplingService.EVEN_SPACING)
+			get_viewport().set_input_as_handled()
+			return
 	if not has_command_modifier and (event.keycode == KEY_BACKSPACE or event.keycode == KEY_DELETE) and active_state == "edit" and active_edit_mode == "point" and not selected_point_ids.is_empty():
 		if selected_point_ids.size() == 1:
 			_on_bezier_point_delete_requested(selected_point_ids[0])
@@ -362,7 +380,7 @@ func _reset_to_default_state() -> void:
 
 
 func _ensure_default_edit_point_state() -> void:
-	if selected_component_id.is_empty() or not active_state.is_empty():
+	if active_module != "Create" or active_create_submodule != "Asset" or selected_component_id.is_empty() or not active_state.is_empty():
 		return
 	active_state = "edit"
 	active_draw_tool = ""
@@ -559,6 +577,7 @@ func _build_ui() -> void:
 	_create_motion_path_workspace(canvas_panel)
 	_create_motion_act_workspace(canvas_panel)
 	_create_motion_sequence_workspace(canvas_panel)
+	_create_geometry_sampling_workspace(canvas_panel)
 	texture_context_label = Label.new()
 	texture_context_label.position = Vector2(8, 6)
 	texture_context_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -775,6 +794,13 @@ func _create_motion_act_workspace(parent: Control) -> void:
 	motion_act_workspace.add_primitive_requested.connect(_add_motion_act)
 	motion_act_workspace.visible = false
 	parent.add_child(motion_act_workspace)
+
+
+func _create_geometry_sampling_workspace(parent: Control) -> void:
+	geometry_sampling_workspace = GeometrySamplingWorkspace.new()
+	geometry_sampling_workspace.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	geometry_sampling_workspace.visible = false
+	parent.add_child(geometry_sampling_workspace)
 
 
 func _create_motion_state_dialogs() -> void:
@@ -1364,6 +1390,9 @@ func _confirm_new_workspace() -> void:
 	motion_paths.clear()
 	motion_acts.clear()
 	motion_sequences.clear()
+	geometry_documents.clear()
+	geometry_sampling_preview = {}
+	geometry_sampling_preview_key = ""
 	selected_asset_id = ""
 	selected_component_id = ""
 	expanded_assets.clear()
@@ -1467,6 +1496,7 @@ func _save_workspace() -> void:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("%s/paths" % workspace_root))
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("%s/acts" % workspace_root))
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("%s/sequences" % workspace_root))
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("%s/geometry" % workspace_root))
 	var asset_ids: Array[String] = []
 	var texture_ids: Array[String] = []
 	var material_ids: Array[String] = []
@@ -1500,6 +1530,12 @@ func _save_workspace() -> void:
 				"material_id": str(component.get("material_id", ""))
 			})
 		_write_json("%s/asset.json" % asset_root, asset_data)
+		for component in asset.get("components", []):
+			var geometry_key := _geometry_document_key(asset_id, str(component.get("id", "")))
+			if not geometry_documents.has(geometry_key):
+				continue
+			var geometry_path := "%s/geometry/%s/%s/geometry.json" % [workspace_root, asset_id, str(component.get("id", ""))]
+			_write_json(geometry_path, _serialize_geometry_document(geometry_documents[geometry_key]))
 	for texture in textures:
 		var texture_id := str(texture["id"])
 		texture_ids.append(texture_id)
@@ -1589,6 +1625,7 @@ func _capture_history_snapshot() -> Dictionary:
 		"motion_acts": motion_acts.duplicate(true),
 		"next_motion_act_id": next_motion_act_id,
 		"motion_sequences": motion_sequences.duplicate(true),
+		"geometry_documents": geometry_documents.duplicate(true),
 		"next_motion_sequence_id": next_motion_sequence_id,
 		"selected_asset_id": selected_asset_id,
 		"selected_component_id": selected_component_id,
@@ -1628,7 +1665,8 @@ func _record_coalesced_change() -> void:
 	if not history_coalescing:
 		_push_undo_snapshot()
 		history_coalescing = true
-	history_coalesce_timer.start()
+	if is_instance_valid(history_coalesce_timer):
+		history_coalesce_timer.start()
 
 
 func _finish_history_coalescing() -> void:
@@ -1653,6 +1691,9 @@ func _restore_history_snapshot(snapshot: Dictionary) -> void:
 	motion_paths = snapshot.get("motion_paths", []).duplicate(true)
 	motion_acts = snapshot.get("motion_acts", []).duplicate(true)
 	motion_sequences = snapshot.get("motion_sequences", []).duplicate(true)
+	geometry_documents = snapshot.get("geometry_documents", {}).duplicate(true)
+	geometry_sampling_preview = {}
+	geometry_sampling_preview_key = ""
 	next_asset_id = int(snapshot.get("next_asset_id", 1))
 	next_component_id = int(snapshot.get("next_component_id", 1))
 	next_texture_id = int(snapshot.get("next_texture_id", 1))
@@ -1819,6 +1860,14 @@ func _load_workspace(workspace_entry: String) -> bool:
 			"final_output_element_id": _normalize_final_output_element_id(normalized_elements, str(texture_data.get("final_output_element_id", "")))
 		})
 	var loaded_materials: Array[Dictionary] = []
+	var loaded_geometry_documents: Dictionary = {}
+	for loaded_asset in loaded_assets:
+		var loaded_asset_id := str(loaded_asset.get("id", ""))
+		for loaded_component in loaded_asset.get("components", []):
+			var loaded_component_id := str(loaded_component.get("id", ""))
+			var geometry_data = _read_json("%s/geometry/%s/%s/geometry.json" % [workspace_root, loaded_asset_id, loaded_component_id])
+			if _has_supported_schema(geometry_data):
+				loaded_geometry_documents[_geometry_document_key(loaded_asset_id, loaded_component_id)] = _normalize_geometry_document(geometry_data, loaded_asset_id, loaded_component_id)
 	for material_id_variant in workspace_data.get("materials", []):
 		var material_id := str(material_id_variant)
 		var material_data = _read_json("%s/materials/%s/material.json" % [workspace_root, material_id])
@@ -1849,6 +1898,9 @@ func _load_workspace(workspace_entry: String) -> bool:
 	motion_paths = loaded_motion_paths
 	motion_acts = loaded_motion_acts
 	motion_sequences = loaded_motion_sequences
+	geometry_documents = loaded_geometry_documents
+	geometry_sampling_preview = {}
+	geometry_sampling_preview_key = ""
 	var saved_editor_state = workspace_data.get("editor_state", {})
 	if saved_editor_state is Dictionary and str(saved_editor_state.get("world_scale", {}).get("unit", "")) == "m":
 		_convert_asset_units(assets, 100.0)
@@ -2327,6 +2379,149 @@ func _deserialize_vector(value, fallback: Vector2) -> Vector2:
 	return fallback
 
 
+func _geometry_document_key(asset_id: String, component_id: String) -> String:
+	return "%s/%s" % [asset_id, component_id]
+
+
+func _default_geometry_document(asset_id: String, component_id: String) -> Dictionary:
+	return {
+		"asset_id": asset_id,
+		"component_id": component_id,
+		"sampling": {
+			"recipe": GeometrySamplingService.default_recipe(),
+			"bake": {}
+		}
+	}
+
+
+func _get_geometry_document(asset_id: String, component_id: String, create_if_missing := false) -> Dictionary:
+	var key := _geometry_document_key(asset_id, component_id)
+	if geometry_documents.has(key):
+		return geometry_documents[key]
+	if not create_if_missing:
+		return {}
+	var document := _default_geometry_document(asset_id, component_id)
+	geometry_documents[key] = document
+	return document
+
+
+func _geometry_sampling_recipe(asset_id: String, component_id: String) -> Dictionary:
+	var document := _get_geometry_document(asset_id, component_id)
+	if document.is_empty():
+		return GeometrySamplingService.default_recipe()
+	return GeometrySamplingService.normalize_recipe(document.get("sampling", {}).get("recipe", {}))
+
+
+func _normalize_geometry_document(raw_document, asset_id: String, component_id: String) -> Dictionary:
+	var source: Dictionary = raw_document if raw_document is Dictionary else {}
+	var sampling_source = source.get("sampling", {})
+	if not sampling_source is Dictionary:
+		sampling_source = {}
+	var document := _default_geometry_document(asset_id, component_id)
+	document["sampling"]["recipe"] = GeometrySamplingService.normalize_recipe(sampling_source.get("recipe", {}))
+	var raw_bake = sampling_source.get("bake", {})
+	if not raw_bake is Dictionary or not bool(raw_bake.get("valid", false)):
+		return document
+	var bake: Dictionary = raw_bake.duplicate(true)
+	var normalized_chains: Array = []
+	for raw_chain in raw_bake.get("chains", []):
+		if not raw_chain is Dictionary:
+			continue
+		var samples: Array = []
+		for raw_sample in raw_chain.get("samples", []):
+			if not raw_sample is Dictionary:
+				continue
+			samples.append({
+				"id": str(raw_sample.get("id", "")),
+				"position": _deserialize_vector(raw_sample.get("position", [0.0, 0.0]), Vector2.ZERO),
+				"edge_id": str(raw_sample.get("edge_id", "")),
+				"curve_t": clampf(float(raw_sample.get("curve_t", 0.0)), 0.0, 1.0),
+				"source_point_id": str(raw_sample.get("source_point_id", "")),
+				"preserved": bool(raw_sample.get("preserved", false))
+			})
+		normalized_chains.append({
+			"chain_id": str(raw_chain.get("chain_id", "")),
+			"topology_role": str(raw_chain.get("topology_role", "outer")),
+			"closed": bool(raw_chain.get("closed", false)),
+			"samples": samples
+		})
+	bake["method"] = str(raw_bake.get("method", GeometrySamplingService.ADAPTIVE))
+	bake["parameters"] = GeometrySamplingService.normalize_recipe({"method": bake["method"], "parameters": raw_bake.get("parameters", {})})["parameters"]
+	bake["chains"] = normalized_chains
+	bake["sample_count"] = int(raw_bake.get("sample_count", 0))
+	bake["preserve_count"] = int(raw_bake.get("preserve_count", 0))
+	document["sampling"]["bake"] = bake
+	return document
+
+
+func _serialize_geometry_document(document: Dictionary) -> Dictionary:
+	var normalized := _normalize_geometry_document(document, str(document.get("asset_id", "")), str(document.get("component_id", "")))
+	var serialized_bake: Dictionary = normalized.get("sampling", {}).get("bake", {}).duplicate(true)
+	if not serialized_bake.is_empty():
+		var serialized_chains: Array = []
+		for chain_data in serialized_bake.get("chains", []):
+			var serialized_samples: Array = []
+			for sample in chain_data.get("samples", []):
+				serialized_samples.append({
+					"id": str(sample.get("id", "")),
+					"position": _serialize_vector(Vector2(sample.get("position", Vector2.ZERO))),
+					"edge_id": str(sample.get("edge_id", "")),
+					"curve_t": float(sample.get("curve_t", 0.0)),
+					"source_point_id": str(sample.get("source_point_id", "")),
+					"preserved": bool(sample.get("preserved", false))
+				})
+			serialized_chains.append({
+				"chain_id": str(chain_data.get("chain_id", "")),
+				"topology_role": str(chain_data.get("topology_role", "outer")),
+				"closed": bool(chain_data.get("closed", false)),
+				"samples": serialized_samples
+			})
+		serialized_bake["chains"] = serialized_chains
+	return {
+		"schema_version": SCHEMA_VERSION,
+		"asset_id": str(normalized.get("asset_id", "")),
+		"component_id": str(normalized.get("component_id", "")),
+		"sampling": {
+			"recipe": normalized.get("sampling", {}).get("recipe", {}).duplicate(true),
+			"bake": serialized_bake
+		}
+	}
+
+
+func _geometry_sampling_bake(asset_id: String, component_id: String) -> Dictionary:
+	var document := _get_geometry_document(asset_id, component_id)
+	return document.get("sampling", {}).get("bake", {}) if not document.is_empty() else {}
+
+
+func _geometry_sampling_status(asset_id: String, component_id: String, component: Dictionary) -> String:
+	if component.is_empty():
+		return "Not Generated"
+	if geometry_sampling_preview_key == _geometry_document_key(asset_id, component_id) \
+		and str(geometry_sampling_preview.get("source_fingerprint", "")) == GeometrySamplingService.source_fingerprint(component) \
+		and not bool(geometry_sampling_preview.get("valid", false)):
+		return "Invalid"
+	if _geometry_sampling_preview_matches(asset_id, component_id, component):
+		return "Preview"
+	var bake := _geometry_sampling_bake(asset_id, component_id)
+	if bake.is_empty():
+		return "Not Generated"
+	var recipe := _geometry_sampling_recipe(asset_id, component_id)
+	if str(bake.get("source_fingerprint", "")) != GeometrySamplingService.source_fingerprint(component) \
+		or str(bake.get("method", "")) != str(recipe.get("method", "")) \
+		or bake.get("parameters", {}) != recipe.get("parameters", {}):
+		return "Stale"
+	return "Baked"
+
+
+func _geometry_sampling_preview_matches(asset_id: String, component_id: String, component: Dictionary) -> bool:
+	if geometry_sampling_preview_key != _geometry_document_key(asset_id, component_id) or not bool(geometry_sampling_preview.get("valid", false)):
+		return false
+	var recipe := _geometry_sampling_recipe(asset_id, component_id)
+	return str(geometry_sampling_preview.get("source_fingerprint", "")) == GeometrySamplingService.source_fingerprint(component) \
+		and str(geometry_sampling_preview.get("method", "")) == str(recipe.get("method", "")) \
+		and geometry_sampling_preview.get("parameters", {}) == recipe.get("parameters", {})
+
+
 func _write_json(path: String, data: Dictionary) -> void:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(path.get_base_dir()))
 	var file := FileAccess.open(path, FileAccess.WRITE)
@@ -2460,16 +2655,19 @@ func _render_context_bar() -> void:
 		_render_info_bar()
 		return
 	if active_module == "Geometry":
-		var geometry_label := Label.new()
-		geometry_label.text = "Geometry → %s" % active_geometry_submodule
-		geometry_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		geometry_label.add_theme_color_override("font_color", Color("#9aa3b2"))
-		context_bar.add_child(geometry_label)
-		var geometry_phase_label := Label.new()
-		geometry_phase_label.text = "Placeholder · Geometry pipeline"
-		geometry_phase_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		geometry_phase_label.add_theme_color_override("font_color", Color("#596474"))
-		context_bar.add_child(geometry_phase_label)
+		if active_geometry_submodule == "Sampling":
+			_render_geometry_sampling_context_bar()
+		else:
+			var geometry_label := Label.new()
+			geometry_label.text = "Geometry → %s" % active_geometry_submodule
+			geometry_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			geometry_label.add_theme_color_override("font_color", Color("#9aa3b2"))
+			context_bar.add_child(geometry_label)
+			var geometry_phase_label := Label.new()
+			geometry_phase_label.text = "Placeholder · Geometry pipeline"
+			geometry_phase_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			geometry_phase_label.add_theme_color_override("font_color", Color("#596474"))
+			context_bar.add_child(geometry_phase_label)
 		_render_info_bar()
 		return
 	if active_module == "Style" and not selected_material_id.is_empty():
@@ -2763,6 +2961,45 @@ func _advance_motion_act_preview(delta: float) -> void:
 
 func _motion_act_is_previewable(act: Dictionary) -> bool:
 	return not _get_asset(motion_act_preview_asset_id).is_empty() and MotionActEvaluator.validation_issues(act).is_empty()
+
+
+func _render_geometry_sampling_context_bar() -> void:
+	geometry_method_menu = MenuButton.new()
+	geometry_method_menu.text = "⌘1  Method"
+	geometry_method_menu.custom_minimum_size = Vector2(118, 32)
+	geometry_method_menu.focus_mode = Control.FOCUS_NONE
+	var popup := geometry_method_menu.get_popup()
+	_style_popup_menu(popup)
+	popup.add_item("1  Adaptive", 0)
+	popup.set_item_metadata(0, GeometrySamplingService.ADAPTIVE)
+	popup.add_item("2  Even Spacing", 1)
+	popup.set_item_metadata(1, GeometrySamplingService.EVEN_SPACING)
+	popup.id_pressed.connect(_on_geometry_sampling_method_menu_selected.bind(popup))
+	context_bar.add_child(geometry_method_menu)
+	var recipe := _geometry_sampling_recipe(selected_asset_id, selected_component_id)
+	var method_label := Label.new()
+	method_label.text = "Adaptive" if str(recipe.get("method", "")) == GeometrySamplingService.ADAPTIVE else "Even Spacing"
+	method_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	method_label.add_theme_color_override("font_color", Color("#9aa3b2"))
+	context_bar.add_child(method_label)
+
+
+func _on_geometry_sampling_method_menu_selected(id: int, popup: PopupMenu) -> void:
+	_set_geometry_sampling_method(str(popup.get_item_metadata(popup.get_item_index(id))))
+
+
+func _set_geometry_sampling_method(method: String) -> void:
+	if selected_asset_id.is_empty() or selected_component_id.is_empty() or method not in GeometrySamplingService.VALID_METHODS:
+		return
+	var current := _geometry_sampling_recipe(selected_asset_id, selected_component_id)
+	if str(current.get("method", "")) == method:
+		return
+	_record_direct_change()
+	var document := _get_geometry_document(selected_asset_id, selected_component_id, true)
+	var recipe := GeometrySamplingService.normalize_recipe(document.get("sampling", {}).get("recipe", {}))
+	recipe["method"] = method
+	document["sampling"]["recipe"] = recipe
+	call_deferred("_generate_geometry_sampling_preview")
 
 
 func _render_motion_sequence_context_bar() -> void:
@@ -4032,8 +4269,11 @@ func _render_outliner() -> void:
 		_render_export_outliner()
 		return
 	if active_module == "Geometry":
-		outliner_list.add_child(_create_outliner_group_label("Geometry · Placeholder"))
-		outliner_list.add_child(_create_inspector_field_label("%s authoring will be introduced in a later phase." % active_geometry_submodule))
+		if active_geometry_submodule == "Sampling":
+			_render_geometry_sampling_outliner()
+		else:
+			outliner_list.add_child(_create_outliner_group_label("Geometry · Placeholder"))
+			outliner_list.add_child(_create_inspector_field_label("%s authoring will be introduced in a later phase." % active_geometry_submodule))
 		return
 	var search_text := outliner_search_input.text.strip_edges().to_lower() if is_instance_valid(outliner_search_input) else ""
 	var show_assets := active_create_submodule == "Asset"
@@ -4485,6 +4725,92 @@ func _create_outliner_child_group_label(text: String, indent := 16) -> HBoxConta
 	label.add_theme_color_override("font_color", Color("#737f91"))
 	row.add_child(label)
 	return row
+
+
+func _render_geometry_sampling_outliner() -> void:
+	var search_text := outliner_search_input.text.strip_edges().to_lower() if is_instance_valid(outliner_search_input) else ""
+	var visible_assets: Array = []
+	for asset in assets:
+		if _asset_matches_search(asset, search_text):
+			visible_assets.append(asset)
+	visible_assets.sort_custom(_sort_named_documents)
+	outliner_list.add_child(_create_outliner_group_label("Sampling · Components"))
+	for asset in visible_assets:
+		_render_geometry_sampling_asset_entry(asset, not search_text.is_empty())
+
+
+func _render_geometry_sampling_asset_entry(asset: Dictionary, force_expand := false) -> void:
+	var asset_id := str(asset.get("id", ""))
+	var container := VBoxContainer.new()
+	container.add_theme_constant_override("separation", 0)
+	outliner_list.add_child(container)
+	var asset_button := Button.new()
+	asset_button.text = str(asset.get("name", "Asset"))
+	asset_button.custom_minimum_size = Vector2(0, 30)
+	asset_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	asset_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	asset_button.focus_mode = Control.FOCUS_NONE
+	_style_outliner_button(asset_button, selected_asset_id == asset_id and selected_component_id.is_empty())
+	asset_button.pressed.connect(_select_geometry_sampling_asset.bind(asset_id))
+	container.add_child(asset_button)
+	if not force_expand and not bool(expanded_assets.get(asset_id, false)):
+		return
+	container.add_child(_create_outliner_child_group_label("Components"))
+	var components: Array = asset.get("components", []).duplicate()
+	components.sort_custom(_sort_named_documents)
+	for component in components:
+		if str(component.get("type", "component")) == "guide":
+			continue
+		var component_id := str(component.get("id", ""))
+		var row := HBoxContainer.new()
+		var indent := Control.new()
+		indent.custom_minimum_size = Vector2(16, 0)
+		row.add_child(indent)
+		var button := Button.new()
+		var sample_status := _geometry_sampling_status(asset_id, component_id, component)
+		button.text = "%s  ·  %s" % [str(component.get("name", "Component")), sample_status]
+		button.tooltip_text = sample_status
+		button.custom_minimum_size = Vector2(0, 30)
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		button.focus_mode = Control.FOCUS_NONE
+		_style_outliner_button(button, selected_asset_id == asset_id and selected_component_id == component_id)
+		button.pressed.connect(_select_geometry_sampling_component.bind(asset_id, component_id))
+		row.add_child(button)
+		container.add_child(row)
+
+
+func _select_geometry_sampling_asset(asset_id: String) -> void:
+	var was_selected := selected_asset_id == asset_id and selected_component_id.is_empty()
+	selected_asset_id = asset_id
+	selected_component_id = ""
+	selected_texture_id = ""
+	selected_element_id = ""
+	selected_material_id = ""
+	active_module = "Geometry"
+	active_geometry_submodule = "Sampling"
+	active_state = ""
+	if was_selected:
+		expanded_assets[asset_id] = not bool(expanded_assets.get(asset_id, false))
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _select_geometry_sampling_component(asset_id: String, component_id: String) -> void:
+	selected_asset_id = asset_id
+	selected_component_id = component_id
+	selected_texture_id = ""
+	selected_element_id = ""
+	selected_material_id = ""
+	active_module = "Geometry"
+	active_geometry_submodule = "Sampling"
+	active_state = ""
+	expanded_assets[asset_id] = true
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+	geometry_sampling_workspace.grab_focus()
 
 
 func _render_asset_outliner_entry(asset: Dictionary, force_expand := false, lookdev := false) -> void:
@@ -5210,6 +5536,169 @@ func _on_material_opacity_changed(value: float) -> void:
 	_render_canvas_context()
 
 
+func _render_geometry_sampling_inspector() -> void:
+	inspector_content.add_child(_create_inspector_section("Sampling"))
+	var asset := _get_asset(selected_asset_id)
+	var component := _get_component(asset, selected_component_id)
+	if component.is_empty():
+		inspector_content.add_child(_create_inspector_field_label("Select one Component to configure its boundary sampling."))
+		return
+	inspector_content.add_child(_create_inspector_field_label(str(component.get("name", "Component"))))
+	var recipe := _geometry_sampling_recipe(selected_asset_id, selected_component_id)
+	inspector_content.add_child(_create_inspector_field_label("Method"))
+	var method_option := OptionButton.new()
+	method_option.add_item("Adaptive")
+	method_option.set_item_metadata(0, GeometrySamplingService.ADAPTIVE)
+	method_option.add_item("Even Spacing")
+	method_option.set_item_metadata(1, GeometrySamplingService.EVEN_SPACING)
+	method_option.select(0 if str(recipe.get("method", "")) == GeometrySamplingService.ADAPTIVE else 1)
+	method_option.item_selected.connect(func(index: int) -> void: _set_geometry_sampling_method(str(method_option.get_item_metadata(index))))
+	inspector_content.add_child(method_option)
+	inspector_content.add_child(_create_inspector_section("Parameters"))
+	inspector_content.add_child(_create_inspector_field_label("Spacing (local units)"))
+	var spacing := SpinBox.new()
+	spacing.min_value = GeometrySamplingService.MIN_SPACING
+	spacing.max_value = 10000.0
+	spacing.step = 0.01
+	spacing.custom_arrow_step = 0.01
+	spacing.set_value_no_signal(float(recipe.get("parameters", {}).get("spacing", GeometrySamplingService.DEFAULT_SPACING)))
+	spacing.value_changed.connect(_on_geometry_sampling_parameter_changed.bind("spacing"))
+	var spacing_line_edit := spacing.get_line_edit()
+	spacing_line_edit.text_submitted.connect(_on_geometry_spacing_text_submitted.bind(spacing))
+	spacing_line_edit.focus_exited.connect(_on_geometry_spacing_focus_exited.bind(spacing))
+	inspector_content.add_child(spacing)
+	if str(recipe.get("method", "")) == GeometrySamplingService.ADAPTIVE:
+		inspector_content.add_child(_create_inspector_field_label("Feature Detail"))
+		var feature_detail := SpinBox.new()
+		feature_detail.min_value = 0.0
+		feature_detail.max_value = 100.0
+		feature_detail.step = 5.0
+		feature_detail.suffix = "%"
+		feature_detail.set_value_no_signal(float(recipe.get("parameters", {}).get("feature_detail", GeometrySamplingService.DEFAULT_FEATURE_DETAIL)) * 100.0)
+		feature_detail.value_changed.connect(_on_geometry_sampling_feature_detail_changed)
+		inspector_content.add_child(feature_detail)
+	var status := _geometry_sampling_status(selected_asset_id, selected_component_id, component)
+	inspector_content.add_child(_create_inspector_section("Result"))
+	inspector_content.add_child(_create_inspector_field_label("Status: %s" % status))
+	var result := geometry_sampling_preview if _geometry_sampling_preview_matches(selected_asset_id, selected_component_id, component) else _geometry_sampling_bake(selected_asset_id, selected_component_id)
+	if not result.is_empty():
+		inspector_content.add_child(_create_inspector_field_label("Sample Points: %d" % int(result.get("sample_count", 0))))
+		inspector_content.add_child(_create_inspector_field_label("Preserved Points: %d" % int(result.get("preserve_count", 0))))
+	if geometry_sampling_preview_key == _geometry_document_key(selected_asset_id, selected_component_id) \
+		and str(geometry_sampling_preview.get("source_fingerprint", "")) == GeometrySamplingService.source_fingerprint(component) \
+		and not bool(geometry_sampling_preview.get("valid", true)):
+		for error_message in geometry_sampling_preview.get("errors", []):
+			var error_label := _create_inspector_field_label(str(error_message))
+			error_label.add_theme_color_override("font_color", Color("#ef8354"))
+			inspector_content.add_child(error_label)
+	var actions := HBoxContainer.new()
+	var generate_button := Button.new()
+	generate_button.text = "Generate"
+	generate_button.custom_minimum_size = Vector2(96, 28)
+	generate_button.focus_mode = Control.FOCUS_NONE
+	generate_button.pressed.connect(_generate_geometry_sampling_preview)
+	actions.add_child(generate_button)
+	var bake_button := Button.new()
+	bake_button.text = "Bake"
+	bake_button.custom_minimum_size = Vector2(76, 28)
+	bake_button.focus_mode = Control.FOCUS_NONE
+	bake_button.disabled = not _geometry_sampling_preview_matches(selected_asset_id, selected_component_id, component)
+	bake_button.pressed.connect(_bake_geometry_sampling_preview)
+	actions.add_child(bake_button)
+	inspector_content.add_child(actions)
+
+
+func _on_geometry_sampling_parameter_changed(value: float, parameter_name: String) -> void:
+	if selected_asset_id.is_empty() or selected_component_id.is_empty():
+		return
+	var current_recipe := _geometry_sampling_recipe(selected_asset_id, selected_component_id)
+	var normalized_value := maxf(value, GeometrySamplingService.MIN_SPACING) if parameter_name == "spacing" else clampf(value, 0.0, 1.0)
+	if is_equal_approx(float(current_recipe.get("parameters", {}).get(parameter_name, normalized_value)), normalized_value):
+		return
+	_record_coalesced_change()
+	var document := _get_geometry_document(selected_asset_id, selected_component_id, true)
+	var recipe := GeometrySamplingService.normalize_recipe(document.get("sampling", {}).get("recipe", {}))
+	recipe["parameters"][parameter_name] = normalized_value
+	document["sampling"]["recipe"] = recipe
+	call_deferred("_generate_geometry_sampling_preview")
+
+
+func _on_geometry_sampling_feature_detail_changed(percent: float) -> void:
+	_on_geometry_sampling_parameter_changed(clampf(percent / 100.0, 0.0, 1.0), "feature_detail")
+
+
+func _on_geometry_spacing_text_submitted(text: String, spacing: SpinBox) -> void:
+	_commit_geometry_spacing_text(text, spacing)
+
+
+func _on_geometry_spacing_focus_exited(spacing: SpinBox) -> void:
+	_commit_geometry_spacing_text(spacing.get_line_edit().text, spacing)
+
+
+func _commit_geometry_spacing_text(raw_text: String, spacing: SpinBox) -> void:
+	var normalized_text := raw_text.strip_edges().replace(",", ".")
+	if not normalized_text.is_valid_float():
+		spacing.get_line_edit().text = String.num(spacing.value, 2)
+		return
+	var value := maxf(float(normalized_text), GeometrySamplingService.MIN_SPACING)
+	value = minf(value, spacing.max_value)
+	spacing.set_value_no_signal(value)
+	spacing.get_line_edit().text = String.num(value, 2)
+	_on_geometry_sampling_parameter_changed(value, "spacing")
+
+
+func _generate_geometry_sampling_preview() -> void:
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if component.is_empty():
+		return
+	geometry_sampling_preview_key = _geometry_document_key(selected_asset_id, selected_component_id)
+	geometry_sampling_preview = GeometrySamplingService.generate(component, _geometry_sampling_recipe(selected_asset_id, selected_component_id))
+	if not bool(geometry_sampling_preview.get("valid", false)):
+		var errors: Array = geometry_sampling_preview.get("errors", [])
+		_show_status_message(str(errors[0]) if not errors.is_empty() else "Sampling could not be generated.")
+	else:
+		_show_status_message("Generated %d Sample Points." % int(geometry_sampling_preview.get("sample_count", 0)))
+	_render_outliner()
+	_render_inspector()
+	_refresh_geometry_sampling_workspace()
+
+
+func _bake_geometry_sampling_preview() -> void:
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if not _geometry_sampling_preview_matches(selected_asset_id, selected_component_id, component):
+		return
+	_record_direct_change()
+	var document := _get_geometry_document(selected_asset_id, selected_component_id, true)
+	var bake := geometry_sampling_preview.duplicate(true)
+	bake["bake_id"] = "bake_%d" % ResourceUID.create_id()
+	document["sampling"]["bake"] = bake
+	geometry_sampling_preview = {}
+	geometry_sampling_preview_key = ""
+	_show_status_message("Sampling baked for %s." % str(component.get("name", "Component")))
+	_render_outliner()
+	_render_inspector()
+	_refresh_geometry_sampling_workspace()
+
+
+func _clear_geometry_sampling_preview_for_selection() -> void:
+	if geometry_sampling_preview_key == _geometry_document_key(selected_asset_id, selected_component_id):
+		geometry_sampling_preview = {}
+		geometry_sampling_preview_key = ""
+
+
+func _refresh_geometry_sampling_workspace() -> void:
+	if not is_instance_valid(geometry_sampling_workspace):
+		return
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if component.is_empty():
+		geometry_sampling_workspace.clear_context()
+		return
+	var preview := geometry_sampling_preview if geometry_sampling_preview_key == _geometry_document_key(selected_asset_id, selected_component_id) \
+		and str(geometry_sampling_preview.get("source_fingerprint", "")) == GeometrySamplingService.source_fingerprint(component) else {}
+	var bake := _geometry_sampling_bake(selected_asset_id, selected_component_id)
+	geometry_sampling_workspace.set_context(component, preview, bake, _geometry_sampling_status(selected_asset_id, selected_component_id, component))
+
+
 func _render_inspector() -> void:
 	_ensure_default_edit_point_state()
 	_clear(inspector_content)
@@ -5237,9 +5726,12 @@ func _render_inspector() -> void:
 		_render_material_inspector()
 		return
 	if active_module == "Geometry":
-		inspector_content.add_child(_create_inspector_section(active_geometry_submodule))
-		inspector_content.add_child(_create_inspector_field_label("Placeholder module"))
-		inspector_content.add_child(_create_inspector_field_label("Geometry pipeline tooling is planned for a later phase."))
+		if active_geometry_submodule == "Sampling":
+			_render_geometry_sampling_inspector()
+		else:
+			inspector_content.add_child(_create_inspector_section(active_geometry_submodule))
+			inspector_content.add_child(_create_inspector_field_label("Placeholder module"))
+			inspector_content.add_child(_create_inspector_field_label("Geometry pipeline tooling is planned for a later phase."))
 		return
 	if not selected_texture_id.is_empty():
 		var texture := _get_texture(selected_texture_id)
@@ -7386,6 +7878,7 @@ func _render_canvas_context() -> void:
 		return
 	canvas_view.set_reference_image(null)
 	canvas_view.set_paper_frame(Vector2.ZERO, false)
+	geometry_sampling_workspace.visible = false
 	if active_module == "Motion":
 		canvas_view.visible = false
 		texture_canvas.visible = false
@@ -7435,7 +7928,10 @@ func _render_canvas_context() -> void:
 		import_preview.visible = false
 		material_graph.visible = false
 		material_preview_container.visible = false
-		canvas_context_label.text = "Geometry → %s · Placeholder" % active_geometry_submodule
+		geometry_sampling_workspace.visible = active_geometry_submodule == "Sampling"
+		if active_geometry_submodule == "Sampling":
+			_refresh_geometry_sampling_workspace()
+		canvas_context_label.text = "" if active_geometry_submodule == "Sampling" else "Geometry → %s · Placeholder" % active_geometry_submodule
 		texture_context_label.text = ""
 		import_preview_context_label.text = ""
 		return
@@ -8136,10 +8632,10 @@ func _on_category_pressed(_module_name: String) -> void:
 		if active_motion_submodule == "Animation" and not _get_asset(selected_asset_id).is_empty():
 			motion_selection.select_asset(selected_asset_id)
 	if active_module == "Geometry":
-		selected_asset_id = ""
-		selected_component_id = ""
 		selected_texture_id = ""
 		selected_element_id = ""
+		selected_material_id = ""
+		active_state = ""
 		active_geometry_submodule = active_geometry_submodule if active_geometry_submodule in GEOMETRY_SUBMODULES else "Sampling"
 	if active_module == "Export":
 		selected_component_id = ""
@@ -8184,10 +8680,10 @@ func _select_submodule(module_name: String, submodule: String, section: ModuleSe
 	elif module_name == "Geometry" and submodule in GEOMETRY_SUBMODULES:
 		active_geometry_submodule = submodule
 		active_module = "Geometry"
-		selected_asset_id = ""
-		selected_component_id = ""
 		selected_texture_id = ""
 		selected_element_id = ""
+		selected_material_id = ""
+		active_state = ""
 		_render_outliner()
 		_render_inspector()
 		_render_canvas_context()

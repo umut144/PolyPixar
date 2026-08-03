@@ -73,8 +73,9 @@ The labels may gain or lose submodules as the MVP proves what is necessary.
 In the UI, these areas are called **categories**. A category contains one or
 more **modules** that provide the concrete working context. For example,
 `Create` is a category with `Asset` and `Texture` authoring modules.
-`Geometry` is a separate derived-pipeline category with placeholder modules for
-`Sampling`, `Seeding`, `Meshing`, and `UV Mapping`. Shapes editing
+`Geometry` is a separate derived-pipeline category with modules for
+`Sampling`, `Seeding`, `Meshing`, and `UV Mapping`. Sampling is the first
+implemented module; the other three remain placeholders. Shapes editing
 is the canvas workflow used by the Asset module.
 
 An Asset is a container for independently editable Components. Drawing is
@@ -423,11 +424,12 @@ workspaces/<workspace_name>/
 ├── materials/<material_id>/material.json
 ├── paths/<path_id>/path.json
 ├── acts/<act_id>/act.json
+├── geometry/<asset_id>/<component_id>/geometry.json
 └── sequences/<sequence_id>/sequence.json
 ```
 
 Every JSON document contains a numeric `schema_version`. The current MVP
-schema is version `19`. Workspace metadata references Asset, Texture, Material,
+schema is version `20`. Workspace metadata references Asset, Texture, Material,
 Path, Act, and Sequence IDs. Each Asset document stores its Components, canonical Bézier
 Points/Edges/Chains, optional Material IDs, and one normalized Animation
 document; each Texture document stores its dimensions, origin convention,
@@ -494,18 +496,20 @@ the operating system's file picker. Save overwrites the active Workspace.
 
 ## Architecture constraints for the MVP
 
-### Internal meshing and future Advanced tooling
+### Derived Geometry pipeline
 
-Meshing is shared implementation infrastructure, not a creative category. The
-authored Component contour remains authoritative; an internal triangulator and
-UV mapper derive a render mesh whenever the contour, transform, morph, or
-mapping changes. Invalid contours must fail visibly and safely rather than
-crashing or silently replacing the authored data.
+Geometry is a user-facing configuration and preview category over shared
+derived services. It does not grant ownership of authored form to a mesh. The
+authored Component contour remains authoritative; samplers, triangulators, and
+UV mappers derive their results without reverse synchronization. Invalid
+contours must fail visibly and safely rather than crashing or silently
+replacing authored data.
 
-A future optional `Advanced` area may expose mesh diagnostics, triangle and
-vertex inspection, manual mesh overrides, and manually authored triangulation
-or UV guides. These are overrides and debugging aids; they do not replace the
-standard contour workflow and are outside the MVP.
+Sampling recipes and accepted bakes are stored as Component-scoped Geometry
+records keyed by stable Asset and Component IDs. A source fingerprint marks a
+bake stale after canonical topology changes. A future optional advanced mode
+may expose manual sample or mesh overrides; these remain derived overrides and
+never replace the standard contour workflow.
 
 - UI prototypes may use only the smallest dummy data needed to exercise a
   specific interaction. Prefer empty panes over invented asset content.

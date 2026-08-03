@@ -48,7 +48,11 @@ before implementing real creation tools.
       Main Toolbar;
       Texture initially remained inert until its own phase began.
 - [x] Add the separate `Geometry` category with Sampling, Seeding, Meshing,
-      and UV Mapping placeholders.
+      and UV Mapping module entries.
+- [x] Implement Component-local Geometry Sampling with Adaptive and Even
+      Spacing methods, compact artist-facing parameters, immutable Generate
+      preview, explicit Bake, Preserve Point guarantees, derived persistence,
+      and stale-source detection.
 - [x] Implement `Create Asset` with a name dialog, OK/Cancel controls, Enter
       confirmation, and Escape cancellation.
 - [x] Use `asset01`, `asset02`, and so on when an Asset name is confirmed
@@ -329,7 +333,7 @@ system, particle system, or universal animation graph.
 These may become valuable later, but they are not implementation targets until
 a verified slice requires them.
 
-- Production Bézier-to-mesh sampling and adaptive topology sampling
+- Seeding, triangulation, production mesh construction, and UV mapping
 - Full material, map, and texture authoring beyond Slice 4's import, material,
   and tile-preview requirements
 - General-purpose rigging

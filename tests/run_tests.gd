@@ -9,6 +9,8 @@ func _init() -> void:
 	_test_delete_multiple_points_and_protect_closed_minimum()
 	_test_ids_are_not_reused()
 	_test_insert_preserves_curve()
+	_test_geometry_sampling_service()
+	_test_geometry_sampling_ui_shell()
 	_test_motion_selection_context()
 	_test_motion_player()
 	_test_motion_sampler()
@@ -90,6 +92,106 @@ func _test_insert_preserves_curve() -> void:
 	_expect(not inserted_id.is_empty(), "Splitting an edge should create a point.")
 	_expect(component["points"].size() == 3 and component["edges"].size() == 2, "Splitting should replace one edge with two connected edges.")
 	_expect(BezierTopology.validate(component).is_empty(), "A split open chain should remain valid.")
+
+
+func _test_geometry_sampling_service() -> void:
+	var component := _component()
+	var first_id := BezierTopology.add_point(component, Vector2(0.0, 0.0), "corner")
+	var curve_id := BezierTopology.add_point(component, Vector2(10.0, 0.0), "free")
+	var last_id := BezierTopology.add_point(component, Vector2(10.0, 10.0), "linear")
+	BezierTopology.add_point(component, Vector2(0.0, 10.0), "linear")
+	_expect(BezierTopology.close_active_chain(component), "Sampling fixture should form a closed outer Chain.")
+	var curve_point := BezierTopology.point_by_id(component["points"], curve_id)
+	curve_point["handle_source"] = "manual"
+	curve_point["handle_in"] = Vector2(-5.0, 7.0)
+	curve_point["handle_out"] = Vector2(0.0, 5.0)
+	var even := GeometrySamplingService.generate(component, {"method": GeometrySamplingService.EVEN_SPACING, "parameters": {"spacing": 2.5}})
+	_expect(bool(even.get("valid", false)), "Even Spacing should sample a valid closed Component.")
+	_expect(int(even.get("sample_count", 0)) > component["points"].size(), "Even Spacing should add derived Points without replacing authored Points.")
+	var even_samples: Array = even.get("chains", [])[0].get("samples", [])
+	_expect(str(even_samples.front().get("source_point_id", "")) == first_id, "The first authored Point should remain the first ordered sample.")
+	var source_ids: Array[String] = []
+	for sample in even_samples:
+		var source_id := str(sample.get("source_point_id", ""))
+		if not source_id.is_empty():
+			source_ids.append(source_id)
+	_expect(first_id in source_ids and curve_id in source_ids and last_id in source_ids, "Every authored edge endpoint should survive boundary sampling.")
+	_expect(bool(even_samples.front().get("preserved", false)), "A preserve_point source must carry the preserved guarantee into the sample result.")
+	_expect(source_ids.count(first_id) == 1, "A closed sampled Chain must not duplicate its first Point at the end.")
+	var adaptive_low := GeometrySamplingService.generate(component, {"method": GeometrySamplingService.ADAPTIVE, "parameters": {"spacing": 20.0, "feature_detail": 0.0}})
+	var adaptive_high := GeometrySamplingService.generate(component, {"method": GeometrySamplingService.ADAPTIVE, "parameters": {"spacing": 20.0, "feature_detail": 1.0}})
+	_expect(bool(adaptive_high.get("valid", false)) and int(adaptive_high.get("sample_count", 0)) > int(adaptive_low.get("sample_count", 0)), "Higher Adaptive Feature Detail should refine curved regions.")
+	var repeated := GeometrySamplingService.generate(component, {"method": GeometrySamplingService.ADAPTIVE, "parameters": {"spacing": 20.0, "feature_detail": 1.0}})
+	_expect(repeated == adaptive_high, "Sampling must be deterministic for the same topology and recipe.")
+	var original_position: Vector2 = BezierTopology.point_by_id(component["points"], first_id)["position"]
+	adaptive_high["chains"][0]["samples"][0]["position"] = Vector2(999.0, 999.0)
+	_expect(Vector2(BezierTopology.point_by_id(component["points"], first_id)["position"]) == original_position, "Sampling results must not mutate canonical Component topology.")
+	var open_component := _component()
+	BezierTopology.add_point(open_component, Vector2.ZERO, "linear")
+	BezierTopology.add_point(open_component, Vector2.ONE, "linear")
+	_expect(not bool(GeometrySamplingService.generate(open_component).get("valid", true)), "An open contour should fail visibly at the mesh-pipeline Sampling boundary.")
+	var application_script = load("res://scripts/main.gd")
+	var application: Control = application_script.new()
+	_expect(application._has_supported_schema({"schema_version": 19}) and not application._has_supported_schema({"schema_version": 21}), "Schema 20 should keep older Workspace documents readable and reject unknown future schemas.")
+	var geometry_document: Dictionary = application._default_geometry_document("asset_1", "component_1")
+	geometry_document["sampling"]["recipe"] = {"method": GeometrySamplingService.EVEN_SPACING, "parameters": {"spacing": 2.5, "feature_detail": GeometrySamplingService.DEFAULT_FEATURE_DETAIL}}
+	var baked_result := even.duplicate(true)
+	baked_result["bake_id"] = "bake_test"
+	geometry_document["sampling"]["bake"] = baked_result
+	var serialized_geometry: Dictionary = application._serialize_geometry_document(geometry_document)
+	_expect(int(serialized_geometry.get("schema_version", 0)) == 20 and serialized_geometry.get("sampling", {}).get("bake", {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Geometry bakes should serialize derived positions as schema-20 JSON arrays.")
+	var normalized_geometry: Dictionary = application._normalize_geometry_document(serialized_geometry, "asset_1", "component_1")
+	_expect(normalized_geometry.get("sampling", {}).get("bake", {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Vector2, "Geometry bake loading should restore local sample positions as Vector2 values.")
+	var test_assets: Array[Dictionary] = [{"id": "asset_1", "components": [component]}]
+	application.assets = test_assets
+	application.geometry_documents["asset_1/component_1"] = normalized_geometry
+	_expect(application._geometry_sampling_status("asset_1", "component_1", component) == "Baked", "A bake matching its recipe and source fingerprint should report Baked.")
+	BezierTopology.point_by_id(component["points"], curve_id)["position"] += Vector2.ONE
+	_expect(application._geometry_sampling_status("asset_1", "component_1", component) == "Stale", "Changing canonical topology should make a persisted bake stale without rewriting it.")
+	application.free()
+
+
+func _test_geometry_sampling_ui_shell() -> void:
+	var component := _component()
+	BezierTopology.add_point(component, Vector2.ZERO, "corner")
+	BezierTopology.add_point(component, Vector2(10.0, 0.0), "linear")
+	BezierTopology.add_point(component, Vector2(10.0, 10.0), "linear")
+	BezierTopology.add_point(component, Vector2(0.0, 10.0), "linear")
+	BezierTopology.close_active_chain(component)
+	component.merge({"id": "component_1", "name": "Body", "visibility": true})
+	var application_script = load("res://scripts/main.gd")
+	var application: Control = application_script.new()
+	application._build_ui()
+	var test_assets: Array[Dictionary] = [{"id": "asset_1", "name": "Wizard", "visibility": true, "components": [component]}]
+	application.assets = test_assets
+	application.active_module = "Geometry"
+	application.active_geometry_submodule = "Sampling"
+	application.selected_asset_id = "asset_1"
+	application.selected_component_id = "component_1"
+	application.expanded_assets["asset_1"] = true
+	application._render_outliner()
+	application._render_inspector()
+	application._render_canvas_context()
+	_expect(application.geometry_sampling_workspace.visible, "Geometry Sampling should own a dedicated visible centre workspace.")
+	_expect(application.outliner_list.get_child_count() > 1, "Sampling Outliner should expose the Asset/Component hierarchy.")
+	_expect(application.inspector_content.get_child_count() >= 8, "A selected Component should expose Sampling method, parameters, result, Generate, and Bake controls.")
+	_expect(application.geometry_sampling_workspace.component.get("points", []).size() == 4, "Sampling Workspace should receive an immutable Component view copy.")
+	application.geometry_sampling_workspace.component["points"][0]["position"] = Vector2(999.0, 999.0)
+	_expect(Vector2(component["points"][0]["position"]) == Vector2.ZERO, "Sampling Workspace presentation copies must not mutate canonical topology.")
+	var spacing_input := SpinBox.new()
+	spacing_input.min_value = GeometrySamplingService.MIN_SPACING
+	spacing_input.max_value = 10000.0
+	application._commit_geometry_spacing_text("1,25", spacing_input)
+	_expect(is_equal_approx(float(application._geometry_sampling_recipe("asset_1", "component_1").get("parameters", {}).get("spacing", 0.0)), 1.25), "Sampling Spacing should accept comma-decimal direct input.")
+	application._commit_geometry_spacing_text("2.50", spacing_input)
+	_expect(is_equal_approx(float(application._geometry_sampling_recipe("asset_1", "component_1").get("parameters", {}).get("spacing", 0.0)), 2.5), "Sampling Spacing should accept dot-decimal direct input.")
+	spacing_input.free()
+	application.geometry_documents["asset_1/component_1"] = application._default_geometry_document("asset_1", "component_1")
+	var history_snapshot: Dictionary = application._capture_history_snapshot()
+	application.geometry_documents["asset_1/component_1"]["sampling"]["recipe"]["parameters"]["spacing"] = 42.0
+	application._restore_history_snapshot(history_snapshot)
+	_expect(is_equal_approx(float(application.geometry_documents["asset_1/component_1"]["sampling"]["recipe"]["parameters"]["spacing"]), GeometrySamplingService.DEFAULT_SPACING), "Geometry recipes and bakes should participate in Workspace Undo/Redo snapshots.")
+	application.free()
 
 
 func _test_motion_selection_context() -> void:
@@ -389,7 +491,7 @@ func _test_motion_act_evaluator() -> void:
 	var normalized: Dictionary = application._normalize_motion_act({"id": "act_7", "parameters": {"direction": [0.0, 2.0], "distance": 12.0}}, "fallback")
 	_expect(Vector2(normalized.get("parameters", {}).get("direction", Vector2.ZERO)) == Vector2(0.0, 2.0), "Persisted Slide direction arrays should normalize back to Vector2 values.")
 	var serialized: Dictionary = application._serialize_motion_act(normalized)
-	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 19, "Act persistence should serialize vectors as JSON arrays using schema 19.")
+	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 20, "Act persistence should serialize vectors as JSON arrays using schema 20.")
 	var normalized_jump: Dictionary = application._normalize_motion_act({"id": "act_8", "primitive": "jump", "parameters": {"direction": [1.0, 0.0], "distance": 7.0, "height": 2.5, "arc": "snappy"}}, "fallback")
 	var serialized_jump: Dictionary = application._serialize_motion_act(normalized_jump)
 	_expect(str(serialized_jump.get("primitive", "")) == MotionActEvaluator.JUMP and is_equal_approx(float(serialized_jump.get("parameters", {}).get("height", 0.0)), 2.5) and str(serialized_jump.get("parameters", {}).get("arc", "")) == MotionActEvaluator.JUMP_ARC_SNAPPY, "Jump-specific parameters should survive normalization and serialization.")
@@ -427,7 +529,7 @@ func _test_motion_module_separators() -> void:
 	create_section.free()
 	var geometry_section := ModuleSection.new()
 	geometry_section.setup("Geometry", ["Sampling", "Seeding", "Meshing", "UV Mapping"], false)
-	_expect(geometry_section.content_list.get_child_count() == 4, "Geometry should expose Sampling, Seeding, Meshing, and UV Mapping placeholders.")
+	_expect(geometry_section.content_list.get_child_count() == 4, "Geometry should expose Sampling, Seeding, Meshing, and UV Mapping module entries.")
 	geometry_section.free()
 
 
