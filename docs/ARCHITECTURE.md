@@ -74,8 +74,8 @@ In the UI, these areas are called **categories**. A category contains one or
 more **modules** that provide the concrete working context. For example,
 `Create` is a category with `Asset` and `Texture` authoring modules.
 `Geometry` is a separate derived-pipeline category with modules for
-`Sampling`, `Seeding`, `Meshing`, and `UV Mapping`. Sampling and Seeding are
-implemented; Meshing and UV Mapping remain placeholders. Shapes editing
+`Sampling`, `Seeding`, `Meshing`, and `UV Mapping`. Sampling, Seeding, and
+Meshing are implemented; UV Mapping remains a placeholder. Shapes editing
 is the canvas workflow used by the Asset module.
 
 An Asset is a container for independently editable Components. Drawing is
@@ -435,7 +435,7 @@ workspaces/<workspace_name>/
 ```
 
 Every JSON document contains a numeric `schema_version`. The current MVP
-schema is version `20`. Workspace metadata references Asset, Texture, Material,
+schema is version `24`. Workspace metadata references Asset, Texture, Material,
 Path, Act, and Sequence IDs. Each Asset document stores its Components, canonical Bézier
 Points/Edges/Chains, optional Material IDs, and one normalized Animation
 document; each Texture document stores its dimensions, origin convention,
@@ -520,6 +520,14 @@ stable current Sampling Bake ID and sampled-boundary fingerprint; it becomes
 stale without reverse synchronization when that upstream dependency changes.
 Manual Seed edits remain derived overrides and never replace the standard
 contour or Sampling workflow.
+
+Meshing recipes and accepted Bakes are stored in the same Component-scoped
+Geometry record, one Bake per Meshing method. A Meshing recipe selects one
+persisted Seeding Bake; that Bake pins its exact Sampling Bake. Mesh Bakes store
+both upstream IDs and fingerprints, stable derived Vertex IDs, boundary
+constraints, and Triangles referencing those Vertex IDs. Constrained Delaunay
+and Organic Relaxed never mutate their Sampling or Seeding inputs and never
+synchronize Mesh positions back into Component topology.
 
 - UI prototypes may use only the smallest dummy data needed to exercise a
   specific interaction. Prefer empty panes over invented asset content.

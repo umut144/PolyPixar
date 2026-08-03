@@ -81,7 +81,7 @@ default timing is 50% anticipation, 40% ingress to the midpoint, and a fast
 - Editor workspace and default window: 1920×1200 (16:10); preview uses preserved
   aspect ratio (`keep`) so the UI proportions remain stable
 - Project icon: `assets/assetflow_icon.png`
-- Current JSON schema version: **23**
+- Current JSON schema version: **24**
 
 ## Confirmed vocabulary
 
@@ -129,8 +129,10 @@ it into a general scene or animation-graph abstraction prematurely.
   Seeding consumes a current Sampling
   Bake and provides deterministic Poisson Fill plus Sampler-Spine-driven Spine
   Flow, Generate/Bake, dual Sampling/Guide stale detection, one persistent
-  Bake per method, and optional baked-Seed editing. Meshing and UV Mapping
-  remain placeholders. Each implemented module's Outliner
+  Bake per method, and optional baked-Seed editing. Meshing consumes an exact
+  Seeding/Sampling Bake chain and provides Constrained Delaunay plus Organic
+  Relaxed previews, one persistent Bake per method, stable derived Vertex IDs,
+  and stale-input detection. UV Mapping remains a placeholder. Each implemented module's Outliner
   shows only its own document type, with a shared search field.
 - Expanded Asset entries group Components and display Guides directly beneath
   their scoped Component; expanded Texture entries group typed children under `Import
@@ -242,7 +244,7 @@ The active module uses a yellow background with black text, including its
 hover state. No tree icons or glyphs are used.
 
 Create exposes `Asset` and `Texture`. Geometry exposes the implemented
-`Sampling` and `Seeding` modules plus placeholders for `Meshing` and `UV Mapping`. Style
+`Sampling`, `Seeding`, and `Meshing` modules plus a placeholder for `UV Mapping`. Style
 exposes `Material`; the remaining categories are present as empty sections.
 
 The Main Toolbar has one context-specific action button: `Create Asset` in the
@@ -285,7 +287,7 @@ Load uses an in-app list of existing workspace folders. Each workspace has a
 documents in their corresponding resource directories. The latest loaded or saved
 workspace name is stored in `configs/app_config.json` and is loaded
 automatically on startup. Every workspace, asset, texture, and config JSON
-uses the numeric `schema_version` field; the current schema is version `23`.
+uses the numeric `schema_version` field; the current schema is version `24`.
 Materials are independent Workspace resources stored below
 `materials/<material_id>/material.json` and listed by ID in `workspace.json`.
 The bottom status bar is divided into 17% program status, 64% contextual tool

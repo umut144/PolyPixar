@@ -8,7 +8,7 @@ const INACTIVE_MODULES := ["Transform", "Effects", "Export"]
 const WORKSPACES_ROOT := "res://workspaces"
 const IMPORT_TEXTURES_ROOT := "res://imports/textures"
 const CONFIG_PATH := "res://configs/app_config.json"
-const SCHEMA_VERSION := 23
+const SCHEMA_VERSION := 24
 const MAX_HISTORY_SIZE := 100
 const PAPER_SIZES_CM := [Vector2(21.0, 29.7), Vector2(29.7, 42.0), Vector2(42.0, 59.4), Vector2(59.4, 84.1), Vector2(84.1, 118.9)]
 const PAPER_LABELS := ["A4", "A3", "A2", "A1", "A0"]
@@ -38,6 +38,8 @@ var geometry_sampling_preview: Dictionary = {}
 var geometry_sampling_preview_key := ""
 var geometry_seeding_preview: Dictionary = {}
 var geometry_seeding_preview_key := ""
+var geometry_meshing_preview: Dictionary = {}
+var geometry_meshing_preview_key := ""
 var geometry_seeding_edit_active := false
 var geometry_seeding_edit_tool := "select"
 var geometry_seeding_enter_edit_after_bake := false
@@ -138,6 +140,9 @@ var geometry_sampling_method_choice_active := false
 var geometry_seeding_workspace: GeometrySeedingWorkspace
 var geometry_seeding_method_menu: MenuButton
 var geometry_seeding_method_choice_active := false
+var geometry_meshing_workspace: GeometryMeshingWorkspace
+var geometry_meshing_method_menu: MenuButton
+var geometry_meshing_method_choice_active := false
 var selected_geometry_bake_method := ""
 var geometry_seeding_replace_dialog: ConfirmationDialog
 var guide_remove_dialog: ConfirmationDialog
@@ -348,6 +353,18 @@ func _unhandled_key_input(event: InputEvent) -> void:
 					geometry_seeding_workspace.delete_selected_seed()
 				get_viewport().set_input_as_handled()
 				return
+	if active_module == "Geometry" and active_geometry_submodule == "Meshing" and event.keycode in [KEY_1, KEY_2]:
+		var meshing_focus_owner := get_viewport().gui_get_focus_owner()
+		if meshing_focus_owner is LineEdit or meshing_focus_owner is TextEdit or meshing_focus_owner is SpinBox:
+			return
+		if has_command_modifier and event.keycode == KEY_1:
+			_activate_geometry_meshing_method_choice()
+			get_viewport().set_input_as_handled()
+			return
+		if not has_command_modifier and geometry_meshing_method_choice_active:
+			_set_geometry_meshing_method(GeometryMeshingService.CONSTRAINED_DELAUNAY if event.keycode == KEY_1 else GeometryMeshingService.ORGANIC_RELAXED)
+			get_viewport().set_input_as_handled()
+			return
 	if not has_command_modifier and (event.keycode == KEY_BACKSPACE or event.keycode == KEY_DELETE) and active_state == "edit" and active_edit_mode == "point" and not selected_point_ids.is_empty():
 		if selected_point_ids.size() == 1:
 			_on_bezier_point_delete_requested(selected_point_ids[0])
@@ -448,12 +465,15 @@ func _set_geometry_command_state(state: String) -> void:
 	geometry_sampling_method_choice_active = state == "sampling_method"
 	geometry_seeding_method_choice_active = state == "seeding_method"
 	geometry_seeding_edit_active = state == "seeding_edit"
+	geometry_meshing_method_choice_active = state == "meshing_method"
 	if state == "sampling_method":
 		_set_active_context_command("geometry.sampling.method")
 	elif state == "seeding_method":
 		_set_active_context_command("geometry.seeding.method")
 	elif state == "seeding_edit":
 		_set_active_context_command("geometry.seeding.edit_seeds")
+	elif state == "meshing_method":
+		_set_active_context_command("geometry.meshing.method")
 	elif active_context_command.begins_with("geometry."):
 		_set_active_context_command("")
 	if not geometry_seeding_edit_active:
@@ -674,6 +694,7 @@ func _build_ui() -> void:
 	_create_motion_sequence_workspace(canvas_panel)
 	_create_geometry_sampling_workspace(canvas_panel)
 	_create_geometry_seeding_workspace(canvas_panel)
+	_create_geometry_meshing_workspace(canvas_panel)
 	texture_context_label = Label.new()
 	texture_context_label.position = Vector2(8, 6)
 	texture_context_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -912,6 +933,13 @@ func _create_geometry_seeding_workspace(parent: Control) -> void:
 	geometry_seeding_workspace.seed_remove_requested.connect(_on_geometry_seed_remove_requested)
 	geometry_seeding_workspace.visible = false
 	parent.add_child(geometry_seeding_workspace)
+
+
+func _create_geometry_meshing_workspace(parent: Control) -> void:
+	geometry_meshing_workspace = GeometryMeshingWorkspace.new()
+	geometry_meshing_workspace.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	geometry_meshing_workspace.visible = false
+	parent.add_child(geometry_meshing_workspace)
 
 
 func _create_geometry_seeding_dialogs() -> void:
@@ -2644,6 +2672,10 @@ func _default_geometry_document(asset_id: String, component_id: String) -> Dicti
 		"seeding": {
 			"recipe": GeometrySeedingService.default_recipe(),
 			"bakes": {}
+		},
+		"meshing": {
+			"recipe": GeometryMeshingService.default_recipe(),
+			"bakes": {}
 		}
 	}
 
@@ -2671,6 +2703,13 @@ func _geometry_seeding_recipe(asset_id: String, component_id: String) -> Diction
 	if document.is_empty():
 		return GeometrySeedingService.default_recipe()
 	return GeometrySeedingService.normalize_recipe(document.get("seeding", {}).get("recipe", {}))
+
+
+func _geometry_meshing_recipe(asset_id: String, component_id: String) -> Dictionary:
+	var document := _get_geometry_document(asset_id, component_id)
+	if document.is_empty():
+		return GeometryMeshingService.default_recipe()
+	return GeometryMeshingService.normalize_recipe(document.get("meshing", {}).get("recipe", {}))
 
 
 func _normalize_geometry_document(raw_document, asset_id: String, component_id: String) -> Dictionary:
@@ -2702,6 +2741,15 @@ func _normalize_geometry_document(raw_document, asset_id: String, component_id: 
 		var seeding_bake := _normalize_seeding_bake(raw_seeding_bakes[raw_method])
 		if not seeding_bake.is_empty():
 			document["seeding"]["bakes"][str(seeding_bake.get("method", raw_method))] = seeding_bake
+	var meshing_source = source.get("meshing", {})
+	if not meshing_source is Dictionary:
+		meshing_source = {}
+	document["meshing"]["recipe"] = GeometryMeshingService.normalize_recipe(meshing_source.get("recipe", {}))
+	var raw_meshing_bakes: Dictionary = meshing_source.get("bakes", {}) if meshing_source.get("bakes", {}) is Dictionary else {}
+	for raw_method in raw_meshing_bakes:
+		var meshing_bake := _normalize_meshing_bake(raw_meshing_bakes[raw_method])
+		if not meshing_bake.is_empty():
+			document["meshing"]["bakes"][str(meshing_bake.get("method", raw_method))] = meshing_bake
 	return document
 
 
@@ -2742,6 +2790,35 @@ func _normalize_seeding_bake(raw_bake) -> Dictionary:
 	return bake
 
 
+func _normalize_meshing_bake(raw_bake) -> Dictionary:
+	if not raw_bake is Dictionary or not bool(raw_bake.get("valid", false)):
+		return {}
+	var bake: Dictionary = raw_bake.duplicate(true)
+	var normalized_vertices: Array = []
+	for raw_vertex in raw_bake.get("vertices", []):
+		if raw_vertex is Dictionary:
+			normalized_vertices.append({
+				"id": str(raw_vertex.get("id", "")),
+				"position": _deserialize_vector(raw_vertex.get("position", [0.0, 0.0]), Vector2.ZERO),
+				"origin": str(raw_vertex.get("origin", "seed")),
+				"source_id": str(raw_vertex.get("source_id", "")),
+				"preserved": bool(raw_vertex.get("preserved", false))
+			})
+	var normalized_triangles: Array = []
+	for raw_triangle in raw_bake.get("triangles", []):
+		if raw_triangle is Dictionary and raw_triangle.get("vertex_ids", []) is Array:
+			normalized_triangles.append({"vertex_ids": raw_triangle.get("vertex_ids", []).duplicate()})
+	bake["method"] = str(raw_bake.get("method", GeometryMeshingService.CONSTRAINED_DELAUNAY))
+	bake["parameters"] = GeometryMeshingService.normalize_recipe({"method": bake["method"], "parameters": raw_bake.get("parameters", {})})["parameters"]
+	bake["vertices"] = normalized_vertices
+	bake["triangles"] = normalized_triangles
+	bake["boundary_constraints"] = raw_bake.get("boundary_constraints", []).duplicate(true)
+	bake["vertex_count"] = normalized_vertices.size()
+	bake["triangle_count"] = normalized_triangles.size()
+	bake["minimum_angle"] = maxf(float(raw_bake.get("minimum_angle", 0.0)), 0.0)
+	return bake
+
+
 func _serialize_sampling_bake(bake: Dictionary) -> Dictionary:
 	var serialized_bake := bake.duplicate(true)
 	var serialized_chains: Array = []
@@ -2763,6 +2840,21 @@ func _serialize_seeding_bake(bake: Dictionary) -> Dictionary:
 	return serialized_bake
 
 
+func _serialize_meshing_bake(bake: Dictionary) -> Dictionary:
+	var serialized_bake := bake.duplicate(true)
+	var serialized_vertices: Array = []
+	for vertex in bake.get("vertices", []):
+		serialized_vertices.append({
+			"id": str(vertex.get("id", "")),
+			"position": _serialize_vector(Vector2(vertex.get("position", Vector2.ZERO))),
+			"origin": str(vertex.get("origin", "seed")),
+			"source_id": str(vertex.get("source_id", "")),
+			"preserved": bool(vertex.get("preserved", false))
+		})
+	serialized_bake["vertices"] = serialized_vertices
+	return serialized_bake
+
+
 func _serialize_geometry_document(document: Dictionary) -> Dictionary:
 	var normalized := _normalize_geometry_document(document, str(document.get("asset_id", "")), str(document.get("component_id", "")))
 	var serialized_sampling_bakes: Dictionary = {}
@@ -2771,6 +2863,9 @@ func _serialize_geometry_document(document: Dictionary) -> Dictionary:
 	var serialized_seeding_bakes: Dictionary = {}
 	for method in normalized.get("seeding", {}).get("bakes", {}):
 		serialized_seeding_bakes[str(method)] = _serialize_seeding_bake(normalized["seeding"]["bakes"][method])
+	var serialized_meshing_bakes: Dictionary = {}
+	for method in normalized.get("meshing", {}).get("bakes", {}):
+		serialized_meshing_bakes[str(method)] = _serialize_meshing_bake(normalized["meshing"]["bakes"][method])
 	return {
 		"schema_version": SCHEMA_VERSION,
 		"asset_id": str(normalized.get("asset_id", "")),
@@ -2782,6 +2877,10 @@ func _serialize_geometry_document(document: Dictionary) -> Dictionary:
 		"seeding": {
 			"recipe": normalized.get("seeding", {}).get("recipe", {}).duplicate(true),
 			"bakes": serialized_seeding_bakes
+		},
+		"meshing": {
+			"recipe": normalized.get("meshing", {}).get("recipe", {}).duplicate(true),
+			"bakes": serialized_meshing_bakes
 		}
 	}
 
@@ -2794,6 +2893,13 @@ func _geometry_sampling_bakes(asset_id: String, component_id: String) -> Diction
 func _geometry_sampling_bake(asset_id: String, component_id: String, method := "") -> Dictionary:
 	var resolved_method := method if not method.is_empty() else str(_geometry_sampling_recipe(asset_id, component_id).get("method", ""))
 	return _geometry_sampling_bakes(asset_id, component_id).get(resolved_method, {})
+
+
+func _geometry_sampling_bake_by_id(asset_id: String, component_id: String, bake_id: String) -> Dictionary:
+	for bake in _geometry_sampling_bakes(asset_id, component_id).values():
+		if bake is Dictionary and str(bake.get("bake_id", "")) == bake_id:
+			return bake
+	return {}
 
 
 func _geometry_sampling_bake_is_current(asset_id: String, component_id: String, component: Dictionary) -> bool:
@@ -2904,6 +3010,86 @@ func _geometry_seeding_status(asset_id: String, component_id: String, component:
 	if not _geometry_seeding_result_matches(bake, asset_id, component_id, component):
 		return "Stale"
 	return "Edited" if bool(bake.get("edited", false)) else "Baked"
+
+
+func _geometry_meshing_bakes(asset_id: String, component_id: String) -> Dictionary:
+	var document := _get_geometry_document(asset_id, component_id)
+	return document.get("meshing", {}).get("bakes", {}) if not document.is_empty() else {}
+
+
+func _geometry_meshing_bake(asset_id: String, component_id: String, method := "") -> Dictionary:
+	var resolved_method := method if not method.is_empty() else str(_geometry_meshing_recipe(asset_id, component_id).get("method", ""))
+	return _geometry_meshing_bakes(asset_id, component_id).get(resolved_method, {})
+
+
+func _geometry_meshing_input(asset_id: String, component_id: String, recipe: Dictionary = {}) -> Dictionary:
+	var resolved_recipe := recipe if not recipe.is_empty() else _geometry_meshing_recipe(asset_id, component_id)
+	var seeding_method := str(resolved_recipe.get("parameters", {}).get("seeding_method", ""))
+	var seeding_bake := _geometry_seeding_bake(asset_id, component_id, seeding_method)
+	var sampling_bake := _geometry_sampling_bake_by_id(asset_id, component_id, str(seeding_bake.get("sampling_bake_id", "")))
+	return {"sampling": sampling_bake, "seeding": seeding_bake}
+
+
+func _geometry_meshing_input_is_current(asset_id: String, component_id: String, component: Dictionary, recipe: Dictionary = {}) -> bool:
+	var resolved_recipe := recipe if not recipe.is_empty() else _geometry_meshing_recipe(asset_id, component_id)
+	var input := _geometry_meshing_input(asset_id, component_id, resolved_recipe)
+	var sampling_bake: Dictionary = input.get("sampling", {})
+	var seeding_bake: Dictionary = input.get("seeding", {})
+	if component.is_empty() or sampling_bake.is_empty() or seeding_bake.is_empty():
+		return false
+	if str(sampling_bake.get("source_fingerprint", "")) != GeometrySamplingService.source_fingerprint(component):
+		return false
+	if str(seeding_bake.get("sampling_bake_id", "")) != str(sampling_bake.get("bake_id", "")) \
+		or str(seeding_bake.get("sampling_fingerprint", "")) != GeometrySeedingService.sampling_fingerprint(sampling_bake):
+		return false
+	if str(seeding_bake.get("method", "")) != str(resolved_recipe.get("parameters", {}).get("seeding_method", "")):
+		return false
+	if str(seeding_bake.get("method", "")) == GeometrySeedingService.SPINE_FLOW:
+		var seed_recipe := GeometrySeedingService.normalize_recipe({"method": GeometrySeedingService.SPINE_FLOW, "parameters": seeding_bake.get("parameters", {})})
+		var guide := _geometry_seeding_sampler_spine(asset_id, component_id, seed_recipe)
+		if guide.is_empty() or str(seeding_bake.get("guide_id", "")) != str(guide.get("id", "")) \
+			or str(seeding_bake.get("guide_fingerprint", "")) != GeometrySeedingService.guide_fingerprint(guide):
+			return false
+	return true
+
+
+func _geometry_meshing_result_matches(result: Dictionary, asset_id: String, component_id: String, component: Dictionary) -> bool:
+	if result.is_empty() or not bool(result.get("valid", false)):
+		return false
+	var recipe := _geometry_meshing_recipe(asset_id, component_id)
+	if not _geometry_meshing_input_is_current(asset_id, component_id, component, recipe):
+		return false
+	var input := _geometry_meshing_input(asset_id, component_id, recipe)
+	var sampling_bake: Dictionary = input.get("sampling", {})
+	var seeding_bake: Dictionary = input.get("seeding", {})
+	return str(result.get("method", "")) == str(recipe.get("method", "")) \
+		and result.get("parameters", {}) == recipe.get("parameters", {}) \
+		and str(result.get("sampling_bake_id", "")) == str(sampling_bake.get("bake_id", "")) \
+		and str(result.get("sampling_fingerprint", "")) == GeometrySeedingService.sampling_fingerprint(sampling_bake) \
+		and str(result.get("seeding_bake_id", "")) == str(seeding_bake.get("bake_id", "")) \
+		and str(result.get("seeding_fingerprint", "")) == GeometryMeshingService.seeding_fingerprint(seeding_bake)
+
+
+func _geometry_meshing_preview_matches(asset_id: String, component_id: String, component: Dictionary) -> bool:
+	return geometry_meshing_preview_key == _geometry_document_key(asset_id, component_id) \
+		and _geometry_meshing_result_matches(geometry_meshing_preview, asset_id, component_id, component)
+
+
+func _geometry_meshing_status(asset_id: String, component_id: String, component: Dictionary) -> String:
+	if component.is_empty():
+		return "Seeding Required"
+	if not _geometry_meshing_input_is_current(asset_id, component_id, component):
+		return "Seeding Required / Stale"
+	if geometry_meshing_preview_key == _geometry_document_key(asset_id, component_id) and not bool(geometry_meshing_preview.get("valid", true)):
+		return "Invalid"
+	if _geometry_meshing_preview_matches(asset_id, component_id, component):
+		return "Preview"
+	var bake := _geometry_meshing_bake(asset_id, component_id)
+	if bake.is_empty():
+		return "Not Generated"
+	if not _geometry_meshing_result_matches(bake, asset_id, component_id, component):
+		return "Stale"
+	return "Baked"
 
 
 func _write_json(path: String, data: Dictionary) -> void:
@@ -3046,6 +3232,8 @@ func _render_context_bar() -> void:
 			_render_geometry_sampling_context_bar()
 		elif active_geometry_submodule == "Seeding":
 			_render_geometry_seeding_context_bar()
+		elif active_geometry_submodule == "Meshing":
+			_render_geometry_meshing_context_bar()
 		else:
 			var geometry_label := Label.new()
 			geometry_label.text = "Geometry → %s" % active_geometry_submodule
@@ -3530,6 +3718,66 @@ func _set_geometry_seeding_edit_tool(tool: String) -> void:
 	geometry_seeding_edit_tool = tool
 	_render_context_bar()
 	_refresh_geometry_seeding_workspace()
+
+
+func _render_geometry_meshing_context_bar() -> void:
+	geometry_meshing_method_menu = MenuButton.new()
+	geometry_meshing_method_menu.text = "⌘1  Method"
+	geometry_meshing_method_menu.custom_minimum_size = Vector2(118, 32)
+	geometry_meshing_method_menu.focus_mode = Control.FOCUS_NONE
+	_style_context_command_button(geometry_meshing_method_menu, _context_command_is("geometry.meshing.method"))
+	var popup := geometry_meshing_method_menu.get_popup()
+	_style_popup_menu(popup)
+	popup.add_item("1  Constrained Delaunay", 0)
+	popup.set_item_metadata(0, GeometryMeshingService.CONSTRAINED_DELAUNAY)
+	popup.add_item("2  Organic Relaxed", 1)
+	popup.set_item_metadata(1, GeometryMeshingService.ORGANIC_RELAXED)
+	popup.id_pressed.connect(func(id: int) -> void: _set_geometry_meshing_method(str(popup.get_item_metadata(popup.get_item_index(id)))))
+	context_bar.add_child(geometry_meshing_method_menu)
+	var recipe := _geometry_meshing_recipe(selected_asset_id, selected_component_id)
+	var method_label := Label.new()
+	method_label.text = "Constrained Delaunay" if str(recipe.get("method", "")) == GeometryMeshingService.CONSTRAINED_DELAUNAY else "Organic Relaxed"
+	method_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	method_label.add_theme_color_override("font_color", Color("#9aa3b2"))
+	context_bar.add_child(method_label)
+
+
+func _set_geometry_meshing_method(method: String) -> void:
+	if selected_asset_id.is_empty() or selected_component_id.is_empty() or method not in GeometryMeshingService.VALID_METHODS:
+		return
+	_set_geometry_command_state("meshing_method")
+	selected_geometry_bake_method = method
+	var current := _geometry_meshing_recipe(selected_asset_id, selected_component_id)
+	if str(current.get("method", "")) == method:
+		_render_outliner()
+		_render_inspector()
+		_render_context_bar()
+		_refresh_geometry_meshing_workspace()
+		return
+	_record_direct_change()
+	var document := _get_geometry_document(selected_asset_id, selected_component_id, true)
+	var next_recipe := GeometryMeshingService.normalize_recipe({"method": method, "parameters": current.get("parameters", {})})
+	var matching_bake := _geometry_meshing_bake(selected_asset_id, selected_component_id, method)
+	if not matching_bake.is_empty():
+		next_recipe["parameters"] = matching_bake.get("parameters", {}).duplicate(true)
+	document["meshing"]["recipe"] = next_recipe
+	geometry_meshing_preview = {}
+	geometry_meshing_preview_key = ""
+	_render_outliner()
+	_render_inspector()
+	_render_context_bar()
+	_refresh_geometry_meshing_workspace()
+	if matching_bake.is_empty():
+		call_deferred("_generate_geometry_meshing_preview")
+
+
+func _activate_geometry_meshing_method_choice() -> void:
+	if selected_asset_id.is_empty() or selected_component_id.is_empty():
+		return
+	_set_geometry_command_state("meshing_method")
+	_render_context_bar()
+	_render_info_bar()
+	_show_status_message("Meshing Method: 1 Constrained Delaunay · 2 Organic Relaxed")
 
 
 func _render_motion_sequence_context_bar() -> void:
@@ -4275,6 +4523,11 @@ func _render_info_bar() -> void:
 			_add_info_option("2: Add")
 			_add_info_option("3: Remove")
 			_add_info_option("Delete: Remove selected")
+		elif active_geometry_submodule == "Meshing" and geometry_meshing_method_choice_active:
+			geometry_state_label.text = "State: Meshing Method"
+			info_bar.add_child(geometry_state_label)
+			_add_info_option("1: Constrained Delaunay")
+			_add_info_option("2: Organic Relaxed")
 		else:
 			geometry_state_label.text = "State: Default"
 			info_bar.add_child(geometry_state_label)
@@ -4886,7 +5139,7 @@ func _render_outliner() -> void:
 		_render_export_outliner()
 		return
 	if active_module == "Geometry":
-		if active_geometry_submodule in ["Sampling", "Seeding"]:
+		if active_geometry_submodule in ["Sampling", "Seeding", "Meshing"]:
 			_render_geometry_component_outliner()
 		else:
 			outliner_list.add_child(_create_outliner_group_label("Geometry · Placeholder"))
@@ -5384,7 +5637,9 @@ func _render_geometry_component_asset_entry(asset: Dictionary, force_expand := f
 		indent.custom_minimum_size = Vector2(16, 0)
 		row.add_child(indent)
 		var button := Button.new()
-		var geometry_status := _geometry_sampling_status(asset_id, component_id, component) if active_geometry_submodule == "Sampling" else _geometry_seeding_status(asset_id, component_id, component)
+		var geometry_status := _geometry_sampling_status(asset_id, component_id, component) if active_geometry_submodule == "Sampling" \
+			else _geometry_seeding_status(asset_id, component_id, component) if active_geometry_submodule == "Seeding" \
+			else _geometry_meshing_status(asset_id, component_id, component)
 		button.text = "%s  ·  %s" % [str(component.get("name", "Component")), geometry_status]
 		button.tooltip_text = geometry_status
 		button.custom_minimum_size = Vector2(0, 30)
@@ -5395,7 +5650,9 @@ func _render_geometry_component_asset_entry(asset: Dictionary, force_expand := f
 		button.pressed.connect(_select_geometry_component.bind(asset_id, component_id))
 		row.add_child(button)
 		container.add_child(row)
-		var bakes := _geometry_sampling_bakes(asset_id, component_id) if active_geometry_submodule == "Sampling" else _geometry_seeding_bakes(asset_id, component_id)
+		var bakes := _geometry_sampling_bakes(asset_id, component_id) if active_geometry_submodule == "Sampling" \
+			else _geometry_seeding_bakes(asset_id, component_id) if active_geometry_submodule == "Seeding" \
+			else _geometry_meshing_bakes(asset_id, component_id)
 		for method in _geometry_bake_methods_for_active_module(bakes):
 			var bake: Dictionary = bakes[method]
 			var bake_row := HBoxContainer.new()
@@ -5420,9 +5677,12 @@ func _geometry_bake_methods_for_active_module(bakes: Dictionary) -> Array[String
 	if active_geometry_submodule == "Sampling":
 		order.append(GeometrySamplingService.ADAPTIVE)
 		order.append(GeometrySamplingService.EVEN_SPACING)
-	else:
+	elif active_geometry_submodule == "Seeding":
 		order.append(GeometrySeedingService.POISSON_FILL)
 		order.append(GeometrySeedingService.SPINE_FLOW)
+	else:
+		order.append(GeometryMeshingService.CONSTRAINED_DELAUNAY)
+		order.append(GeometryMeshingService.ORGANIC_RELAXED)
 	var methods: Array[String] = []
 	for method in order:
 		if bakes.has(method):
@@ -5437,12 +5697,28 @@ func _geometry_bake_method_label(method: String) -> String:
 		return "Even Spacing"
 	if method == GeometrySeedingService.SPINE_FLOW:
 		return "Spine Flow"
+	if method == GeometryMeshingService.CONSTRAINED_DELAUNAY:
+		return "Constrained Delaunay"
+	if method == GeometryMeshingService.ORGANIC_RELAXED:
+		return "Organic Relaxed"
 	return "Poisson Fill"
 
 
 func _geometry_bake_status(method: String, bake: Dictionary, asset_id: String, component_id: String, component: Dictionary) -> String:
 	if active_geometry_submodule == "Sampling":
 		return "Baked" if str(bake.get("source_fingerprint", "")) == GeometrySamplingService.source_fingerprint(component) else "Stale"
+	if active_geometry_submodule == "Meshing":
+		var mesh_recipe := GeometryMeshingService.normalize_recipe({"method": method, "parameters": bake.get("parameters", {})})
+		if not _geometry_meshing_input_is_current(asset_id, component_id, component, mesh_recipe):
+			return "Input Stale"
+		var mesh_input := _geometry_meshing_input(asset_id, component_id, mesh_recipe)
+		var mesh_sampling: Dictionary = mesh_input.get("sampling", {})
+		var mesh_seeding: Dictionary = mesh_input.get("seeding", {})
+		var mesh_matches := str(bake.get("sampling_bake_id", "")) == str(mesh_sampling.get("bake_id", "")) \
+			and str(bake.get("sampling_fingerprint", "")) == GeometrySeedingService.sampling_fingerprint(mesh_sampling) \
+			and str(bake.get("seeding_bake_id", "")) == str(mesh_seeding.get("bake_id", "")) \
+			and str(bake.get("seeding_fingerprint", "")) == GeometryMeshingService.seeding_fingerprint(mesh_seeding)
+		return "Baked" if mesh_matches else "Stale"
 	var sampling_bake := _geometry_sampling_bake(asset_id, component_id)
 	if sampling_bake.is_empty() or not _geometry_sampling_bake_is_current(asset_id, component_id, component):
 		return "Sampling Stale"
@@ -5493,14 +5769,18 @@ func _select_geometry_component(asset_id: String, component_id: String) -> void:
 		geometry_sampling_workspace.grab_focus()
 	elif active_geometry_submodule == "Seeding" and is_instance_valid(geometry_seeding_workspace):
 		geometry_seeding_workspace.grab_focus()
+	elif active_geometry_submodule == "Meshing" and is_instance_valid(geometry_meshing_workspace):
+		geometry_meshing_workspace.grab_focus()
 
 
 func _select_geometry_bake(asset_id: String, component_id: String, method: String) -> void:
 	_select_geometry_component(asset_id, component_id)
 	if active_geometry_submodule == "Sampling":
 		_set_geometry_sampling_method(method)
-	else:
+	elif active_geometry_submodule == "Seeding":
 		_set_geometry_seeding_method(method)
+	else:
+		_set_geometry_meshing_method(method)
 
 
 func _render_asset_outliner_entry(asset: Dictionary, force_expand := false, lookdev := false) -> void:
@@ -7011,6 +7291,194 @@ func _mark_geometry_seeding_bake_edited(bake: Dictionary) -> void:
 	_refresh_geometry_seeding_workspace()
 
 
+func _render_geometry_meshing_inspector() -> void:
+	inspector_content.add_child(_create_inspector_section("Meshing"))
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if component.is_empty():
+		inspector_content.add_child(_create_inspector_field_label("Select one Component to generate its derived Mesh."))
+		return
+	inspector_content.add_child(_create_inspector_field_label(str(component.get("name", "Component"))))
+	var recipe := _geometry_meshing_recipe(selected_asset_id, selected_component_id)
+	inspector_content.add_child(_create_inspector_field_label("Method"))
+	var method_option := OptionButton.new()
+	method_option.add_item("Constrained Delaunay")
+	method_option.set_item_metadata(0, GeometryMeshingService.CONSTRAINED_DELAUNAY)
+	method_option.add_item("Organic Relaxed")
+	method_option.set_item_metadata(1, GeometryMeshingService.ORGANIC_RELAXED)
+	method_option.select(0 if str(recipe.get("method", "")) == GeometryMeshingService.CONSTRAINED_DELAUNAY else 1)
+	method_option.item_selected.connect(func(index: int) -> void: _set_geometry_meshing_method(str(method_option.get_item_metadata(index))))
+	inspector_content.add_child(method_option)
+	inspector_content.add_child(_create_inspector_section("Input"))
+	inspector_content.add_child(_create_inspector_field_label("Seed Source"))
+	var seed_option := OptionButton.new()
+	var seeding_bakes := _geometry_seeding_bakes(selected_asset_id, selected_component_id)
+	for method in GeometrySeedingService.VALID_METHODS:
+		var available := seeding_bakes.has(method)
+		seed_option.add_item(_geometry_bake_method_label(method) if available else "%s · Required" % _geometry_bake_method_label(method))
+		seed_option.set_item_metadata(seed_option.item_count - 1, method)
+		seed_option.set_item_disabled(seed_option.item_count - 1, not available)
+		if method == str(recipe.get("parameters", {}).get("seeding_method", "")):
+			seed_option.select(seed_option.item_count - 1)
+	seed_option.disabled = seeding_bakes.is_empty()
+	seed_option.item_selected.connect(_on_geometry_meshing_seed_source_selected.bind(seed_option))
+	inspector_content.add_child(seed_option)
+	if seed_option.item_count == 0:
+		var missing_seed := _create_inspector_field_label("Bake at least one Seeding method first.")
+		missing_seed.add_theme_color_override("font_color", Color("#ef8354"))
+		inspector_content.add_child(missing_seed)
+	var input_current := _geometry_meshing_input_is_current(selected_asset_id, selected_component_id, component, recipe)
+	var input_label := _create_inspector_field_label("Input Status: %s" % ("Ready" if input_current else "Required / Stale"))
+	input_label.add_theme_color_override("font_color", Color("#75b88a") if input_current else Color("#ef8354"))
+	inspector_content.add_child(input_label)
+	if str(recipe.get("method", "")) == GeometryMeshingService.ORGANIC_RELAXED:
+		inspector_content.add_child(_create_inspector_section("Parameters"))
+		inspector_content.add_child(_create_inspector_field_label("Relaxation"))
+		var relaxation := SpinBox.new()
+		relaxation.min_value = 0.0
+		relaxation.max_value = 1.0
+		relaxation.step = 0.01
+		relaxation.custom_arrow_step = 0.01
+		relaxation.set_value_no_signal(float(recipe.get("parameters", {}).get("relaxation", GeometryMeshingService.DEFAULT_RELAXATION)))
+		relaxation.value_changed.connect(_on_geometry_meshing_parameter_changed.bind("relaxation"))
+		relaxation.get_line_edit().text_submitted.connect(_on_geometry_meshing_float_text_submitted.bind(relaxation, "relaxation"))
+		relaxation.get_line_edit().focus_exited.connect(_on_geometry_meshing_float_focus_exited.bind(relaxation, "relaxation"))
+		inspector_content.add_child(relaxation)
+		inspector_content.add_child(_create_inspector_field_label("Passes"))
+		var passes := SpinBox.new()
+		passes.min_value = 1.0
+		passes.max_value = GeometryMeshingService.MAX_PASSES
+		passes.step = 1.0
+		passes.set_value_no_signal(float(recipe.get("parameters", {}).get("passes", GeometryMeshingService.DEFAULT_PASSES)))
+		passes.value_changed.connect(_on_geometry_meshing_parameter_changed.bind("passes"))
+		inspector_content.add_child(passes)
+	var status := _geometry_meshing_status(selected_asset_id, selected_component_id, component)
+	inspector_content.add_child(_create_inspector_section("Result"))
+	inspector_content.add_child(_create_inspector_field_label("Status: %s" % status))
+	var result := geometry_meshing_preview if _geometry_meshing_preview_matches(selected_asset_id, selected_component_id, component) else _geometry_meshing_bake(selected_asset_id, selected_component_id)
+	if not result.is_empty():
+		inspector_content.add_child(_create_inspector_field_label("Vertices: %d" % int(result.get("vertex_count", 0))))
+		inspector_content.add_child(_create_inspector_field_label("Triangles: %d" % int(result.get("triangle_count", 0))))
+		inspector_content.add_child(_create_inspector_field_label("Minimum Angle: %.1f°" % float(result.get("minimum_angle", 0.0))))
+	if geometry_meshing_preview_key == _geometry_document_key(selected_asset_id, selected_component_id) and not bool(geometry_meshing_preview.get("valid", true)):
+		for error_message in geometry_meshing_preview.get("errors", []):
+			var error_label := _create_inspector_field_label(str(error_message))
+			error_label.add_theme_color_override("font_color", Color("#ef8354"))
+			inspector_content.add_child(error_label)
+	var actions := HBoxContainer.new()
+	var generate_button := Button.new()
+	generate_button.text = "Generate"
+	generate_button.custom_minimum_size = Vector2(96, 28)
+	generate_button.focus_mode = Control.FOCUS_NONE
+	generate_button.disabled = not input_current
+	generate_button.pressed.connect(_generate_geometry_meshing_preview)
+	actions.add_child(generate_button)
+	var bake_button := Button.new()
+	bake_button.text = "Bake"
+	bake_button.custom_minimum_size = Vector2(76, 28)
+	bake_button.focus_mode = Control.FOCUS_NONE
+	bake_button.disabled = not _geometry_meshing_preview_matches(selected_asset_id, selected_component_id, component)
+	bake_button.pressed.connect(_bake_geometry_meshing_preview)
+	actions.add_child(bake_button)
+	inspector_content.add_child(actions)
+
+
+func _on_geometry_meshing_seed_source_selected(index: int, option: OptionButton) -> void:
+	if index < 0 or index >= option.item_count:
+		return
+	var seeding_method := str(option.get_item_metadata(index))
+	var current := _geometry_meshing_recipe(selected_asset_id, selected_component_id)
+	if str(current.get("parameters", {}).get("seeding_method", "")) == seeding_method:
+		return
+	_record_direct_change()
+	var document := _get_geometry_document(selected_asset_id, selected_component_id, true)
+	current["parameters"]["seeding_method"] = seeding_method
+	document["meshing"]["recipe"] = GeometryMeshingService.normalize_recipe(current)
+	call_deferred("_generate_geometry_meshing_preview")
+
+
+func _on_geometry_meshing_parameter_changed(value: float, parameter_name: String) -> void:
+	var current := _geometry_meshing_recipe(selected_asset_id, selected_component_id)
+	var normalized: Variant = clampf(value, 0.0, 1.0) if parameter_name == "relaxation" else clampi(int(round(value)), 1, GeometryMeshingService.MAX_PASSES)
+	if current.get("parameters", {}).get(parameter_name) == normalized:
+		return
+	_record_coalesced_change()
+	var document := _get_geometry_document(selected_asset_id, selected_component_id, true)
+	current["parameters"][parameter_name] = normalized
+	document["meshing"]["recipe"] = GeometryMeshingService.normalize_recipe(current)
+	call_deferred("_generate_geometry_meshing_preview")
+
+
+func _on_geometry_meshing_float_text_submitted(text: String, field: SpinBox, parameter_name: String) -> void:
+	_commit_geometry_meshing_float_text(text, field, parameter_name)
+
+
+func _on_geometry_meshing_float_focus_exited(field: SpinBox, parameter_name: String) -> void:
+	_commit_geometry_meshing_float_text(field.get_line_edit().text, field, parameter_name)
+
+
+func _commit_geometry_meshing_float_text(raw_text: String, field: SpinBox, parameter_name: String) -> void:
+	var normalized_text := raw_text.strip_edges().replace(",", ".")
+	if not normalized_text.is_valid_float():
+		field.get_line_edit().text = String.num(field.value, 2)
+		return
+	var value := clampf(float(normalized_text), field.min_value, field.max_value)
+	field.set_value_no_signal(value)
+	field.get_line_edit().text = String.num(value, 2)
+	_on_geometry_meshing_parameter_changed(value, parameter_name)
+
+
+func _generate_geometry_meshing_preview() -> void:
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	var recipe := _geometry_meshing_recipe(selected_asset_id, selected_component_id)
+	if not _geometry_meshing_input_is_current(selected_asset_id, selected_component_id, component, recipe):
+		geometry_meshing_preview_key = _geometry_document_key(selected_asset_id, selected_component_id)
+		geometry_meshing_preview = GeometryMeshingService.generate({}, {}, recipe)
+		_show_status_message("Bake a current Seeding input before generating a Mesh.")
+	else:
+		var input := _geometry_meshing_input(selected_asset_id, selected_component_id, recipe)
+		geometry_meshing_preview_key = _geometry_document_key(selected_asset_id, selected_component_id)
+		geometry_meshing_preview = GeometryMeshingService.generate(input.get("sampling", {}), input.get("seeding", {}), recipe)
+		if bool(geometry_meshing_preview.get("valid", false)):
+			_show_status_message("Generated %d Triangles." % int(geometry_meshing_preview.get("triangle_count", 0)))
+		else:
+			var errors: Array = geometry_meshing_preview.get("errors", [])
+			_show_status_message(str(errors[0]) if not errors.is_empty() else "Meshing could not be generated.")
+	_render_outliner()
+	_render_inspector()
+	_refresh_geometry_meshing_workspace()
+
+
+func _bake_geometry_meshing_preview() -> void:
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if not _geometry_meshing_preview_matches(selected_asset_id, selected_component_id, component):
+		return
+	_record_direct_change()
+	var document := _get_geometry_document(selected_asset_id, selected_component_id, true)
+	var bake := geometry_meshing_preview.duplicate(true)
+	bake["bake_id"] = "meshing_bake_%d" % ResourceUID.create_id()
+	document["meshing"]["bakes"][str(bake.get("method", ""))] = bake
+	selected_geometry_bake_method = str(bake.get("method", ""))
+	geometry_meshing_preview = {}
+	geometry_meshing_preview_key = ""
+	_show_status_message("Mesh baked for %s." % str(component.get("name", "Component")))
+	_render_outliner()
+	_render_inspector()
+	_refresh_geometry_meshing_workspace()
+
+
+func _refresh_geometry_meshing_workspace() -> void:
+	if not is_instance_valid(geometry_meshing_workspace):
+		return
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if component.is_empty():
+		geometry_meshing_workspace.clear_context()
+		return
+	var recipe := _geometry_meshing_recipe(selected_asset_id, selected_component_id)
+	var input := _geometry_meshing_input(selected_asset_id, selected_component_id, recipe)
+	var result := geometry_meshing_preview if _geometry_meshing_preview_matches(selected_asset_id, selected_component_id, component) else _geometry_meshing_bake(selected_asset_id, selected_component_id)
+	geometry_meshing_workspace.set_context(input.get("sampling", {}), input.get("seeding", {}), result, _geometry_meshing_status(selected_asset_id, selected_component_id, component))
+
+
 func _render_inspector() -> void:
 	_ensure_default_edit_point_state()
 	_clear(inspector_content)
@@ -7042,6 +7510,8 @@ func _render_inspector() -> void:
 			_render_geometry_sampling_inspector()
 		elif active_geometry_submodule == "Seeding":
 			_render_geometry_seeding_inspector()
+		elif active_geometry_submodule == "Meshing":
+			_render_geometry_meshing_inspector()
 		else:
 			inspector_content.add_child(_create_inspector_section(active_geometry_submodule))
 			inspector_content.add_child(_create_inspector_field_label("Placeholder module"))
@@ -9200,6 +9670,7 @@ func _render_canvas_context() -> void:
 	canvas_view.clear_draw_constraint()
 	geometry_sampling_workspace.visible = false
 	geometry_seeding_workspace.visible = false
+	geometry_meshing_workspace.visible = false
 	if active_module == "Motion":
 		canvas_view.visible = false
 		texture_canvas.visible = false
@@ -9251,11 +9722,14 @@ func _render_canvas_context() -> void:
 		material_preview_container.visible = false
 		geometry_sampling_workspace.visible = active_geometry_submodule == "Sampling"
 		geometry_seeding_workspace.visible = active_geometry_submodule == "Seeding"
+		geometry_meshing_workspace.visible = active_geometry_submodule == "Meshing"
 		if active_geometry_submodule == "Sampling":
 			_refresh_geometry_sampling_workspace()
 		elif active_geometry_submodule == "Seeding":
 			_refresh_geometry_seeding_workspace()
-		canvas_context_label.text = "" if active_geometry_submodule in ["Sampling", "Seeding"] else "Geometry → %s · Placeholder" % active_geometry_submodule
+		elif active_geometry_submodule == "Meshing":
+			_refresh_geometry_meshing_workspace()
+		canvas_context_label.text = "" if active_geometry_submodule in ["Sampling", "Seeding", "Meshing"] else "Geometry → %s · Placeholder" % active_geometry_submodule
 		texture_context_label.text = ""
 		import_preview_context_label.text = ""
 		return
