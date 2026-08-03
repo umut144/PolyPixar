@@ -47,6 +47,8 @@ before implementing real creation tools.
 - [x] Add context-specific `Create Asset` and `Create Texture` actions to the
       Main Toolbar;
       Texture initially remained inert until its own phase began.
+- [x] Add the separated `Create → Mesh` placeholder below the Core Create
+      modules without exposing a creation action yet.
 - [x] Implement `Create Asset` with a name dialog, OK/Cancel controls, Enter
       confirmation, and Escape cancellation.
 - [x] Use `asset01`, `asset02`, and so on when an Asset name is confirmed

@@ -72,8 +72,10 @@ The labels may gain or lose submodules as the MVP proves what is necessary.
 
 In the UI, these areas are called **categories**. A category contains one or
 more **modules** that provide the concrete working context. For example,
-`Create` is a category with `Asset` and `Texture` modules. Shapes editing is
-the canvas workflow used by the Asset module.
+`Create` is a category with `Asset`, `Texture`, and a placeholder `Mesh` module.
+Asset and Texture are the current Core workspaces; Mesh is visually separated
+as an Extended placeholder until mesh authoring is introduced. Shapes editing
+is the canvas workflow used by the Asset module.
 
 An Asset is a container for independently editable Components. Drawing is
 performed on a selected Component, never directly on the Asset container.

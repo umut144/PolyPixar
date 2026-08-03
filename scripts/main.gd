@@ -1,6 +1,6 @@
 extends Control
 
-const CREATE_SUBMODULES := ["Asset", "Texture"]
+const CREATE_SUBMODULES := ["Asset", "Texture", "Mesh"]
 const STYLE_SUBMODULES := ["Material"]
 const MOTION_SUBMODULES := ["Animation", "Path", "Act", "Sequence"]
 const INACTIVE_MODULES := ["Transform", "Effects", "Export"]
@@ -442,7 +442,7 @@ func _build_ui() -> void:
 	var module_rail := VBoxContainer.new()
 	module_rail.add_theme_constant_override("separation", 4)
 	module_rail_panel.add_child(module_rail)
-	_add_module_section(module_rail, "Create", CREATE_SUBMODULES, true)
+	_add_module_section(module_rail, "Create", CREATE_SUBMODULES, true, false, 2)
 	_add_module_section(module_rail, "Style", STYLE_SUBMODULES)
 	_add_module_section(module_rail, "Motion", MOTION_SUBMODULES, false, false, 3)
 	for module_name in INACTIVE_MODULES:
@@ -1307,7 +1307,7 @@ func _on_create_action_pressed() -> void:
 func _update_context_action_button() -> void:
 	if not is_instance_valid(create_action_button):
 		return
-	create_action_button.visible = active_module == "Create" or active_module == "Style" or (active_module == "Motion" and active_motion_submodule in ["Path", "Sequence"])
+	create_action_button.visible = (active_module == "Create" and active_create_submodule in ["Asset", "Texture"]) or active_module == "Style" or (active_module == "Motion" and active_motion_submodule in ["Path", "Sequence"])
 	var show_asset_create_controls := active_module == "Create" and active_create_submodule == "Asset"
 	if is_instance_valid(snap_button):
 		snap_button.visible = show_asset_create_controls
@@ -3993,6 +3993,10 @@ func _render_outliner() -> void:
 	if active_module == "Export":
 		_render_export_outliner()
 		return
+	if active_module == "Create" and active_create_submodule == "Mesh":
+		outliner_list.add_child(_create_outliner_group_label("Mesh · Placeholder"))
+		outliner_list.add_child(_create_inspector_field_label("Mesh authoring will be introduced in a later phase."))
+		return
 	var search_text := outliner_search_input.text.strip_edges().to_lower() if is_instance_valid(outliner_search_input) else ""
 	var show_assets := active_create_submodule == "Asset"
 	var show_textures := active_create_submodule == "Texture"
@@ -5193,6 +5197,11 @@ func _render_inspector() -> void:
 		return
 	if active_module == "Style":
 		_render_material_inspector()
+		return
+	if active_module == "Create" and active_create_submodule == "Mesh":
+		inspector_content.add_child(_create_inspector_section("Mesh"))
+		inspector_content.add_child(_create_inspector_field_label("Placeholder module"))
+		inspector_content.add_child(_create_inspector_field_label("Mesh generation and editing are planned for a later phase."))
 		return
 	if not selected_texture_id.is_empty():
 		var texture := _get_texture(selected_texture_id)
@@ -7381,6 +7390,17 @@ func _render_canvas_context() -> void:
 		import_preview_context_label.text = ""
 		return
 	export_workspace.visible = false
+	if active_module == "Create" and active_create_submodule == "Mesh":
+		motion_workspace.visible = false
+		canvas_view.visible = false
+		texture_canvas.visible = false
+		import_preview.visible = false
+		material_graph.visible = false
+		material_preview_container.visible = false
+		canvas_context_label.text = "Create → Mesh · Placeholder"
+		texture_context_label.text = ""
+		import_preview_context_label.text = ""
+		return
 	if active_module == "Style":
 		motion_workspace.visible = false
 		canvas_view.visible = false
@@ -8134,6 +8154,11 @@ func _set_create_submodule_context(submodule: String) -> void:
 	elif submodule == "Texture":
 		selected_asset_id = ""
 		selected_component_id = ""
+	else:
+		selected_asset_id = ""
+		selected_component_id = ""
+		selected_texture_id = ""
+		selected_element_id = ""
 	var create_section := _find_section("Create")
 	if create_section != null:
 		create_section.set_active_submodule(submodule)

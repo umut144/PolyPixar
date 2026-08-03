@@ -417,6 +417,14 @@ func _test_motion_module_separators() -> void:
 			separator_height = int(child.custom_minimum_size.y)
 	_expect(separator_count == 1 and separator_height == 6 and section.content_list.get_child_count() == 5, "Motion should use one thick non-interactive separator between its Core and Extended workspace groups.")
 	section.free()
+	var create_section := ModuleSection.new()
+	create_section.setup("Create", ["Asset", "Texture", "Mesh"], false, false, 2)
+	var create_separator_count := 0
+	for child in create_section.content_list.get_children():
+		if child is ColorRect:
+			create_separator_count += 1
+	_expect(create_separator_count == 1 and create_section.content_list.get_child_count() == 4, "Create should expose a Mesh placeholder below one thick Core separator.")
+	create_section.free()
 
 
 func _test_motion_sequence_evaluator() -> void:
