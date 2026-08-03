@@ -44,6 +44,12 @@ explicit and participates in Undo/Redo and Workspace persistence. The UV
 Outliner nests accepted results beneath their source Mesh method so the exact
 dependency remains visible and directly selectable.
 
+The UV Space always uses a neutral 8×8 checker background. The Source Mesh
+shows the same checker through its derived UV coordinates by default, making
+stretching, rotation, density changes, and out-of-range UVs visible. `UV
+Checker Overlay` is an editor-only Preview toggle; it does not affect recipes
+or Bakes.
+
 ## Deferred
 
 `CMD/Ctrl + 2 · Edit UV`, manual UV overrides, Seams, texture assignment,

@@ -9,22 +9,31 @@ const MESH_COLOR := Color("#63b3ed")
 const UV_COLOR := Color("#f2c94c")
 const VERTEX_COLOR := Color("#68d391")
 const SEPARATOR_COLOR := Color("#11151a")
+const CHECKER_LIGHT := Color("#c8d0d8")
+const CHECKER_DARK := Color("#697586")
+const CHECKER_SIZE := 128
+const CHECKER_CELLS := 8
 
 var mesh_bake: Dictionary = {}
 var uv_result: Dictionary = {}
 var status := "Mesh Required"
+var checker_overlay_enabled := true
+var checker_texture: ImageTexture
 
 
 func _ready() -> void:
 	focus_mode = Control.FOCUS_ALL
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
+	checker_texture = _create_checker_texture()
 	queue_redraw()
 
 
-func set_context(mesh_data: Dictionary, uv_data: Dictionary, status_value: String) -> void:
+func set_context(mesh_data: Dictionary, uv_data: Dictionary, status_value: String, show_checker_overlay := true) -> void:
 	mesh_bake = mesh_data.duplicate(true)
 	uv_result = uv_data.duplicate(true)
 	status = status_value
+	checker_overlay_enabled = show_checker_overlay
 	queue_redraw()
 
 
@@ -78,6 +87,12 @@ func _draw_source_mesh(rect: Rect2) -> void:
 	for vertex in mesh_bake.get("vertices", []):
 		var position := Vector2(vertex.get("position", Vector2.ZERO))
 		positions[str(vertex.get("id", ""))] = rect.get_center() + Vector2((position.x - bounds.get_center().x) * zoom, -(position.y - bounds.get_center().y) * zoom)
+	if checker_overlay_enabled and bool(uv_result.get("valid", false)) and checker_texture != null:
+		var uvs: Dictionary = {}
+		for entry in uv_result.get("uvs", []):
+			if entry is Dictionary:
+				uvs[str(entry.get("vertex_id", ""))] = Vector2(entry.get("uv", Vector2.ZERO))
+		_draw_uv_checker_overlay(mesh_bake.get("triangles", []), positions, uvs)
 	_draw_triangles(mesh_bake.get("triangles", []), positions, MESH_COLOR)
 	for screen_position in positions.values():
 		draw_circle(screen_position, 2.2, VERTEX_COLOR)
@@ -117,6 +132,33 @@ func _draw_triangles(triangles: Array, positions: Dictionary, color: Color) -> v
 			var second := str(ids[(edge_index + 1) % 3])
 			if positions.has(first) and positions.has(second):
 				draw_line(positions[first], positions[second], color, 1.0, true)
+
+
+func _draw_uv_checker_overlay(triangles: Array, positions: Dictionary, uvs: Dictionary) -> void:
+	for triangle in triangles:
+		var ids: Array = triangle.get("vertex_ids", [])
+		if ids.size() != 3:
+			continue
+		var first := str(ids[0])
+		var second := str(ids[1])
+		var third := str(ids[2])
+		if not positions.has(first) or not positions.has(second) or not positions.has(third) \
+			or not uvs.has(first) or not uvs.has(second) or not uvs.has(third):
+			continue
+		var triangle_points := PackedVector2Array([positions[first], positions[second], positions[third]])
+		var triangle_colors := PackedColorArray([Color(1.0, 1.0, 1.0, 0.72), Color(1.0, 1.0, 1.0, 0.72), Color(1.0, 1.0, 1.0, 0.72)])
+		var triangle_uvs := PackedVector2Array([uvs[first], uvs[second], uvs[third]])
+		draw_primitive(triangle_points, triangle_colors, triangle_uvs, checker_texture)
+
+
+func _create_checker_texture() -> ImageTexture:
+	var image := Image.create(CHECKER_SIZE, CHECKER_SIZE, false, Image.FORMAT_RGBA8)
+	var cell_size := CHECKER_SIZE / CHECKER_CELLS
+	for y in range(CHECKER_SIZE):
+		for x in range(CHECKER_SIZE):
+			var even := ((x / cell_size) + (y / cell_size)) % 2 == 0
+			image.set_pixel(x, y, CHECKER_LIGHT if even else CHECKER_DARK)
+	return ImageTexture.create_from_image(image)
 
 
 func _draw_message(rect: Rect2, message: String) -> void:

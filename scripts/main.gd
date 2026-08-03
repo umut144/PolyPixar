@@ -42,6 +42,7 @@ var geometry_meshing_preview: Dictionary = {}
 var geometry_meshing_preview_key := ""
 var geometry_uv_mapping_preview: Dictionary = {}
 var geometry_uv_mapping_preview_key := ""
+var geometry_uv_mapping_checker_overlay := true
 var geometry_seeding_edit_active := false
 var geometry_seeding_edit_tool := "select"
 var geometry_seeding_enter_edit_after_bake := false
@@ -7797,6 +7798,12 @@ func _render_geometry_uv_mapping_inspector() -> void:
 	preserve_aspect.button_pressed = bool(recipe.get("parameters", {}).get("preserve_aspect", GeometryUVMappingService.DEFAULT_PRESERVE_ASPECT))
 	preserve_aspect.toggled.connect(_on_geometry_uv_mapping_preserve_aspect_changed)
 	inspector_content.add_child(preserve_aspect)
+	inspector_content.add_child(_create_inspector_section("Preview"))
+	var checker_overlay := CheckBox.new()
+	checker_overlay.text = "UV Checker Overlay"
+	checker_overlay.button_pressed = geometry_uv_mapping_checker_overlay
+	checker_overlay.toggled.connect(_on_geometry_uv_mapping_checker_overlay_changed)
+	inspector_content.add_child(checker_overlay)
 	var status := _geometry_uv_mapping_status(selected_asset_id, selected_component_id, component)
 	inspector_content.add_child(_create_inspector_section("Result"))
 	inspector_content.add_child(_create_inspector_field_label("Status: %s" % status))
@@ -7895,6 +7902,11 @@ func _on_geometry_uv_mapping_preserve_aspect_changed(enabled: bool) -> void:
 	call_deferred("_generate_geometry_uv_mapping_preview")
 
 
+func _on_geometry_uv_mapping_checker_overlay_changed(enabled: bool) -> void:
+	geometry_uv_mapping_checker_overlay = enabled
+	_refresh_geometry_uv_mapping_workspace()
+
+
 func _on_geometry_uv_mapping_float_text_submitted(text: String, field: SpinBox, parameter_name: String) -> void:
 	_commit_geometry_uv_mapping_float_text(text, field, parameter_name)
 
@@ -7961,7 +7973,7 @@ func _refresh_geometry_uv_mapping_workspace() -> void:
 		return
 	var mesh_bake := _geometry_uv_mapping_input(selected_asset_id, selected_component_id)
 	var result := geometry_uv_mapping_preview if _geometry_uv_mapping_preview_matches(selected_asset_id, selected_component_id, component) else _geometry_uv_mapping_bake(selected_asset_id, selected_component_id)
-	geometry_uv_mapping_workspace.set_context(mesh_bake, result, _geometry_uv_mapping_status(selected_asset_id, selected_component_id, component))
+	geometry_uv_mapping_workspace.set_context(mesh_bake, result, _geometry_uv_mapping_status(selected_asset_id, selected_component_id, component), geometry_uv_mapping_checker_overlay)
 
 
 func _render_inspector() -> void:
