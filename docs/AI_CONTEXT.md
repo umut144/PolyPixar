@@ -115,9 +115,10 @@ it into a general scene or animation-graph abstraction prematurely.
 - Textures are a separate Workspace document type. They will contain
   `elements`, not Components, and have their own canvas dimensions and
   PolyTexture-style editing context.
-- The Create category exposes Core Asset and Texture modules plus an Extended
-  Mesh placeholder separated in the module rail. Each implemented module's
-  Outliner shows only its own document type, with a shared search field.
+- The Create category exposes Core Asset and Texture authoring modules.
+  Geometry is a separate derived-pipeline category with Sampling, Seeding,
+  Meshing, and UV Mapping placeholders. Each implemented module's Outliner
+  shows only its own document type, with a shared search field.
 - Expanded Asset entries group children under `Components` and optional
   `Guides`; expanded Texture entries group typed children under `Import
   Elements` and `Generator Elements`. These are visual groups over unified
@@ -227,8 +228,8 @@ The rail behaves as an accordion: at most one category is expanded at a time.
 The active module uses a yellow background with black text, including its
 hover state. No tree icons or glyphs are used.
 
-Create exposes `Asset`, `Texture`, and a placeholder `Mesh` module separated
-below the Core Create modules. Style
+Create exposes `Asset` and `Texture`. Geometry exposes placeholder modules for
+`Sampling`, `Seeding`, `Meshing`, and `UV Mapping`. Style
 exposes `Material`; the remaining categories are present as empty sections.
 
 The Main Toolbar has one context-specific action button: `Create Asset` in the

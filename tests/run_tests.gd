@@ -418,13 +418,17 @@ func _test_motion_module_separators() -> void:
 	_expect(separator_count == 1 and separator_height == 6 and section.content_list.get_child_count() == 5, "Motion should use one thick non-interactive separator between its Core and Extended workspace groups.")
 	section.free()
 	var create_section := ModuleSection.new()
-	create_section.setup("Create", ["Asset", "Texture", "Mesh"], false, false, 2)
+	create_section.setup("Create", ["Asset", "Texture"], false)
 	var create_separator_count := 0
 	for child in create_section.content_list.get_children():
 		if child is ColorRect:
 			create_separator_count += 1
-	_expect(create_separator_count == 1 and create_section.content_list.get_child_count() == 4, "Create should expose a Mesh placeholder below one thick Core separator.")
+	_expect(create_separator_count == 0 and create_section.content_list.get_child_count() == 2, "Create should contain only its two Core authoring modules.")
 	create_section.free()
+	var geometry_section := ModuleSection.new()
+	geometry_section.setup("Geometry", ["Sampling", "Seeding", "Meshing", "UV Mapping"], false)
+	_expect(geometry_section.content_list.get_child_count() == 4, "Geometry should expose Sampling, Seeding, Meshing, and UV Mapping placeholders.")
+	geometry_section.free()
 
 
 func _test_motion_sequence_evaluator() -> void:

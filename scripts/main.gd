@@ -1,6 +1,7 @@
 extends Control
 
-const CREATE_SUBMODULES := ["Asset", "Texture", "Mesh"]
+const CREATE_SUBMODULES := ["Asset", "Texture"]
+const GEOMETRY_SUBMODULES := ["Sampling", "Seeding", "Meshing", "UV Mapping"]
 const STYLE_SUBMODULES := ["Material"]
 const MOTION_SUBMODULES := ["Animation", "Path", "Act", "Sequence"]
 const INACTIVE_MODULES := ["Transform", "Effects", "Export"]
@@ -18,6 +19,7 @@ const PAPER_NONE_LABEL := "Kein Rahmen"
 const SHOW_PROCESSED_OUTLINER := false
 
 var active_create_submodule := "Asset"
+var active_geometry_submodule := "Sampling"
 var active_motion_submodule := "Animation"
 var active_module := "Create"
 var outliner_list: VBoxContainer
@@ -442,7 +444,8 @@ func _build_ui() -> void:
 	var module_rail := VBoxContainer.new()
 	module_rail.add_theme_constant_override("separation", 4)
 	module_rail_panel.add_child(module_rail)
-	_add_module_section(module_rail, "Create", CREATE_SUBMODULES, true, false, 2)
+	_add_module_section(module_rail, "Create", CREATE_SUBMODULES, true)
+	_add_module_section(module_rail, "Geometry", GEOMETRY_SUBMODULES, false, false, -1)
 	_add_module_section(module_rail, "Style", STYLE_SUBMODULES)
 	_add_module_section(module_rail, "Motion", MOTION_SUBMODULES, false, false, 3)
 	for module_name in INACTIVE_MODULES:
@@ -1599,6 +1602,7 @@ func _capture_history_snapshot() -> Dictionary:
 		"motion_path_preview_asset_id": motion_path_preview_asset_id,
 		"motion_act_preview_asset_id": motion_act_preview_asset_id,
 		"active_module": active_module,
+		"active_geometry_submodule": active_geometry_submodule,
 		"active_motion_submodule": active_motion_submodule,
 		"material_view_mode": material_view_mode,
 		"lookdev_target_asset_id": lookdev_target_asset_id,
@@ -1668,6 +1672,7 @@ func _restore_history_snapshot(snapshot: Dictionary) -> void:
 	motion_path_preview_asset_id = str(snapshot.get("motion_path_preview_asset_id", ""))
 	motion_act_preview_asset_id = str(snapshot.get("motion_act_preview_asset_id", ""))
 	active_module = str(snapshot.get("active_module", "Create"))
+	active_geometry_submodule = str(snapshot.get("active_geometry_submodule", "Sampling"))
 	active_motion_submodule = str(snapshot.get("active_motion_submodule", "Animation"))
 	material_view_mode = "graph"
 	lookdev_target_asset_id = ""
@@ -1693,6 +1698,12 @@ func _restore_history_snapshot(snapshot: Dictionary) -> void:
 		motion_act_preview_asset_id = _default_motion_path_preview_asset_id()
 	if active_module == "Create":
 		_set_create_submodule_context("Texture" if not selected_texture_id.is_empty() else "Asset")
+	elif active_module == "Geometry":
+		active_geometry_submodule = active_geometry_submodule if active_geometry_submodule in GEOMETRY_SUBMODULES else "Sampling"
+		var geometry_section := _find_section("Geometry")
+		if geometry_section != null:
+			geometry_section.set_expanded(true)
+			geometry_section.set_active_submodule(active_geometry_submodule)
 	elif active_module == "Motion":
 		active_motion_submodule = active_motion_submodule if active_motion_submodule in MOTION_SUBMODULES else "Animation"
 		var motion_section := _find_section("Motion")
@@ -1880,6 +1891,7 @@ func _serialize_editor_state() -> Dictionary:
 		"motion_sequence_view": motion_sequence_view,
 		"motion_sequence_preview_loop": motion_sequence_preview_loop,
 		"active_module": active_module,
+		"active_geometry_submodule": active_geometry_submodule,
 		"active_motion_submodule": active_motion_submodule,
 		"material_view_mode": material_view_mode,
 		"lookdev_target_asset_id": lookdev_target_asset_id,
@@ -1917,6 +1929,7 @@ func _restore_editor_state(state) -> void:
 	motion_sequence_view = MotionSequenceWorkspace.VIEW_COMPOSITION
 	motion_sequence_preview_loop = true
 	active_module = "Create"
+	active_geometry_submodule = "Sampling"
 	active_motion_submodule = "Animation"
 	material_view_mode = "graph"
 	lookdev_target_asset_id = ""
@@ -1965,6 +1978,14 @@ func _restore_editor_state(state) -> void:
 		active_module = "Create"
 		_set_create_submodule_context("Texture" if not selected_texture_id.is_empty() else "Asset")
 	var requested_motion_submodule := str(state.get("active_motion_submodule", "Animation"))
+	var requested_geometry_submodule := str(state.get("active_geometry_submodule", "Sampling"))
+	if str(state.get("active_module", "")) == "Geometry" and requested_geometry_submodule in GEOMETRY_SUBMODULES:
+		active_module = "Geometry"
+		active_geometry_submodule = requested_geometry_submodule
+		var geometry_section := _find_section("Geometry")
+		if geometry_section != null:
+			geometry_section.set_expanded(true)
+			geometry_section.set_active_submodule(active_geometry_submodule)
 	if str(state.get("active_module", "")) == "Motion" and requested_motion_submodule in MOTION_SUBMODULES:
 		active_module = "Motion"
 		active_motion_submodule = requested_motion_submodule
@@ -2436,6 +2457,19 @@ func _render_context_bar() -> void:
 			boundary_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 			boundary_label.add_theme_color_override("font_color", Color("#596474"))
 			context_bar.add_child(boundary_label)
+		_render_info_bar()
+		return
+	if active_module == "Geometry":
+		var geometry_label := Label.new()
+		geometry_label.text = "Geometry → %s" % active_geometry_submodule
+		geometry_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		geometry_label.add_theme_color_override("font_color", Color("#9aa3b2"))
+		context_bar.add_child(geometry_label)
+		var geometry_phase_label := Label.new()
+		geometry_phase_label.text = "Placeholder · Geometry pipeline"
+		geometry_phase_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		geometry_phase_label.add_theme_color_override("font_color", Color("#596474"))
+		context_bar.add_child(geometry_phase_label)
 		_render_info_bar()
 		return
 	if active_module == "Style" and not selected_material_id.is_empty():
@@ -3406,6 +3440,10 @@ func _render_info_bar() -> void:
 		if not motion_last_marker.is_empty():
 			_add_info_option("Marker %s" % motion_last_marker)
 		return
+	if active_module == "Geometry":
+		_add_info_option("Geometry: %s" % active_geometry_submodule)
+		_add_info_option("Placeholder")
+		return
 	if active_module == "Style":
 		var material_state_label := Label.new()
 		material_state_label.text = "State: Default"
@@ -3993,9 +4031,9 @@ func _render_outliner() -> void:
 	if active_module == "Export":
 		_render_export_outliner()
 		return
-	if active_module == "Create" and active_create_submodule == "Mesh":
-		outliner_list.add_child(_create_outliner_group_label("Mesh · Placeholder"))
-		outliner_list.add_child(_create_inspector_field_label("Mesh authoring will be introduced in a later phase."))
+	if active_module == "Geometry":
+		outliner_list.add_child(_create_outliner_group_label("Geometry · Placeholder"))
+		outliner_list.add_child(_create_inspector_field_label("%s authoring will be introduced in a later phase." % active_geometry_submodule))
 		return
 	var search_text := outliner_search_input.text.strip_edges().to_lower() if is_instance_valid(outliner_search_input) else ""
 	var show_assets := active_create_submodule == "Asset"
@@ -5198,10 +5236,10 @@ func _render_inspector() -> void:
 	if active_module == "Style":
 		_render_material_inspector()
 		return
-	if active_module == "Create" and active_create_submodule == "Mesh":
-		inspector_content.add_child(_create_inspector_section("Mesh"))
+	if active_module == "Geometry":
+		inspector_content.add_child(_create_inspector_section(active_geometry_submodule))
 		inspector_content.add_child(_create_inspector_field_label("Placeholder module"))
-		inspector_content.add_child(_create_inspector_field_label("Mesh generation and editing are planned for a later phase."))
+		inspector_content.add_child(_create_inspector_field_label("Geometry pipeline tooling is planned for a later phase."))
 		return
 	if not selected_texture_id.is_empty():
 		var texture := _get_texture(selected_texture_id)
@@ -7390,14 +7428,14 @@ func _render_canvas_context() -> void:
 		import_preview_context_label.text = ""
 		return
 	export_workspace.visible = false
-	if active_module == "Create" and active_create_submodule == "Mesh":
+	if active_module == "Geometry":
 		motion_workspace.visible = false
 		canvas_view.visible = false
 		texture_canvas.visible = false
 		import_preview.visible = false
 		material_graph.visible = false
 		material_preview_container.visible = false
-		canvas_context_label.text = "Create → Mesh · Placeholder"
+		canvas_context_label.text = "Geometry → %s · Placeholder" % active_geometry_submodule
 		texture_context_label.text = ""
 		import_preview_context_label.text = ""
 		return
@@ -8097,6 +8135,12 @@ func _on_category_pressed(_module_name: String) -> void:
 		active_state = ""
 		if active_motion_submodule == "Animation" and not _get_asset(selected_asset_id).is_empty():
 			motion_selection.select_asset(selected_asset_id)
+	if active_module == "Geometry":
+		selected_asset_id = ""
+		selected_component_id = ""
+		selected_texture_id = ""
+		selected_element_id = ""
+		active_geometry_submodule = active_geometry_submodule if active_geometry_submodule in GEOMETRY_SUBMODULES else "Sampling"
 	if active_module == "Export":
 		selected_component_id = ""
 		selected_texture_id = ""
@@ -8108,6 +8152,9 @@ func _on_category_pressed(_module_name: String) -> void:
 	if pressed_section != null and not pressed_section.active_submodule.is_empty():
 		if active_module == "Create":
 			_set_create_submodule_context(pressed_section.active_submodule)
+		elif active_module == "Geometry":
+			active_geometry_submodule = pressed_section.active_submodule if pressed_section.active_submodule in GEOMETRY_SUBMODULES else "Sampling"
+			pressed_section.set_active_submodule(active_geometry_submodule)
 		elif active_module == "Motion":
 			active_motion_submodule = pressed_section.active_submodule if pressed_section.active_submodule in MOTION_SUBMODULES else "Animation"
 			pressed_section.set_active_submodule(active_motion_submodule)
@@ -8134,6 +8181,13 @@ func _select_submodule(module_name: String, submodule: String, section: ModuleSe
 	active_module = module_name
 	if module_name == "Create":
 		_set_create_submodule_context(submodule)
+	elif module_name == "Geometry" and submodule in GEOMETRY_SUBMODULES:
+		active_geometry_submodule = submodule
+		active_module = "Geometry"
+		selected_asset_id = ""
+		selected_component_id = ""
+		selected_texture_id = ""
+		selected_element_id = ""
 		_render_outliner()
 		_render_inspector()
 		_render_canvas_context()
