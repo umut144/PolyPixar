@@ -47,8 +47,11 @@ var display_polygon_closed := false
 var bezier_points: Array[Dictionary] = []
 var bezier_edges: Array[Dictionary] = []
 var bezier_chains: Array[Dictionary] = []
+var guide_style := false
 var draw_point_mode := "linear"
 var reference_shapes: Array[Dictionary] = []
+var draw_constraint_outer := PackedVector2Array()
+var draw_constraint_holes: Array = []
 var cursor_world := Vector2.ZERO
 var cursor_over_canvas := false
 var selected_point_id := ""
@@ -144,9 +147,9 @@ func _gui_input(event: InputEvent) -> void:
 			command_shortcut_active = false
 	if event is InputEventMouseButton and event.pressed:
 		grab_focus()
-		if event.button_index == MOUSE_BUTTON_LEFT and interaction_state == "draw" and active_tool == "point":
+		if event.button_index == MOUSE_BUTTON_LEFT and interaction_state == "draw" and active_tool in ["point", "spine"]:
 			draw_pointer_down = true
-			pending_draw_position = _snap_to_grid(_world_to_local(_screen_to_world(event.position)))
+			pending_draw_position = constrain_draw_position(_snap_to_grid(_world_to_local(_screen_to_world(event.position))))
 			pending_draw_handle_out = Vector2.ZERO
 			pending_draw_has_handle = false
 			queue_redraw()
@@ -222,8 +225,8 @@ func _gui_input(event: InputEvent) -> void:
 			if not component_id.is_empty():
 				reference_component_selected.emit(component_id)
 	if event is InputEventMouseButton and not event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		if draw_pointer_down and interaction_state == "draw" and active_tool == "point":
-			if _is_near_first_chain_point(pending_draw_position):
+		if draw_pointer_down and interaction_state == "draw" and active_tool in ["point", "spine"]:
+			if active_tool == "point" and _is_near_first_chain_point(pending_draw_position):
 				bezier_chain_closed.emit()
 			else:
 				bezier_point_added.emit(pending_draw_position, draw_point_mode, pending_draw_handle_out if pending_draw_has_handle else Vector2.ZERO)
@@ -252,7 +255,7 @@ func _gui_input(event: InputEvent) -> void:
 		face_dragging = false
 	if event is InputEventMouseMotion:
 		cursor_over_canvas = true
-		cursor_world = _snap_to_grid(_world_to_local(_screen_to_world(event.position)))
+		cursor_world = constrain_draw_position(_snap_to_grid(_world_to_local(_screen_to_world(event.position))))
 		if point_marquee_dragging:
 			point_marquee_current = event.position
 			if point_marquee_start.distance_to(point_marquee_current) >= 4.0:
@@ -363,7 +366,7 @@ func _on_mouse_exited() -> void:
 
 func set_tool_mode(tool_name: String) -> void:
 	active_tool = tool_name
-	if tool_name != "point":
+	if tool_name not in ["point", "spine"]:
 		draw_pointer_down = false
 		pending_draw_has_handle = false
 		pending_draw_handle_out = Vector2.ZERO
@@ -396,6 +399,48 @@ func set_reference_shapes(shapes: Array) -> void:
 		if shape is Dictionary:
 			reference_shapes.append(shape.duplicate(true))
 	queue_redraw()
+
+
+func set_draw_constraint(outer: PackedVector2Array, holes: Array = []) -> void:
+	draw_constraint_outer = outer.duplicate()
+	draw_constraint_holes.clear()
+	for hole in holes:
+		if hole is PackedVector2Array:
+			draw_constraint_holes.append(hole.duplicate())
+	queue_redraw()
+
+
+func clear_draw_constraint() -> void:
+	draw_constraint_outer = PackedVector2Array()
+	draw_constraint_holes.clear()
+	queue_redraw()
+
+
+func constrain_draw_position(position: Vector2) -> Vector2:
+	if draw_constraint_outer.size() < 3:
+		return position
+	if not _point_on_polygon_boundary(position, draw_constraint_outer) and not Geometry2D.is_point_in_polygon(position, draw_constraint_outer):
+		return _closest_point_on_polygon(position, draw_constraint_outer)
+	for hole in draw_constraint_holes:
+		if hole is PackedVector2Array and hole.size() >= 3 and Geometry2D.is_point_in_polygon(position, hole) and not _point_on_polygon_boundary(position, hole):
+			return _closest_point_on_polygon(position, hole)
+	return position
+
+
+func _closest_point_on_polygon(position: Vector2, polygon: PackedVector2Array) -> Vector2:
+	var closest := polygon[0]
+	var closest_distance_squared := INF
+	for index in range(polygon.size()):
+		var candidate := Geometry2D.get_closest_point_to_segment(position, polygon[index], polygon[(index + 1) % polygon.size()])
+		var distance_squared := position.distance_squared_to(candidate)
+		if distance_squared < closest_distance_squared:
+			closest = candidate
+			closest_distance_squared = distance_squared
+	return closest
+
+
+func _point_on_polygon_boundary(position: Vector2, polygon: PackedVector2Array) -> bool:
+	return position.distance_squared_to(_closest_point_on_polygon(position, polygon)) <= 0.000001
 
 
 func set_edit_mode(mode: String) -> void:
@@ -560,6 +605,11 @@ func set_bezier_geometry(points: Array, edges: Array, chains: Array) -> void:
 			valid_selection.append(point_id)
 	selected_point_ids = valid_selection
 	selected_point_id = selected_point_ids[0] if selected_point_ids.size() == 1 else ""
+	queue_redraw()
+
+
+func set_guide_style(enabled: bool) -> void:
+	guide_style = enabled
 	queue_redraw()
 
 
@@ -806,11 +856,13 @@ func _draw_reference_shapes() -> void:
 			continue
 		var transform: Dictionary = shape.get("transform", {})
 		var closed := bool(shape.get("closed", points.size() >= 3))
-		var reference_color := Color("#55c7d966")
+		var emphasized := bool(shape.get("emphasized", false))
+		var reference_color := Color("#55c7d9") if emphasized else Color("#55c7d966")
+		var reference_width := 2.5 if emphasized else 2.0
 		var edge_count := points.size() if closed and points.size() >= 3 else maxi(points.size() - 1, 0)
 		for index in range(edge_count):
 			var next_index := (index + 1) % points.size()
-			draw_line(_world_to_screen(_local_to_world_with_transform(points[index], transform)), _world_to_screen(_local_to_world_with_transform(points[next_index], transform)), reference_color, 2.0)
+			draw_line(_world_to_screen(_local_to_world_with_transform(points[index], transform)), _world_to_screen(_local_to_world_with_transform(points[next_index], transform)), reference_color, reference_width)
 		for point in points:
 			draw_circle(_world_to_screen(_local_to_world_with_transform(point, transform)), 3.0, reference_color)
 
@@ -825,7 +877,9 @@ func _draw_reference_bezier_shape(shape: Dictionary, points: Array, edges: Array
 	for edge_data in edges:
 		if edge_data is Dictionary:
 			edges_by_id[str(edge_data.get("id", ""))] = edge_data
-	var reference_color := Color("#55c7d966")
+	var emphasized := bool(shape.get("emphasized", false))
+	var reference_color := Color("#55c7d9") if emphasized else Color("#55c7d966")
+	var reference_width := 2.5 if emphasized else 2.0
 	for chain_data in chains:
 		if not chain_data is Dictionary:
 			continue
@@ -844,13 +898,15 @@ func _draw_reference_bezier_shape(shape: Dictionary, points: Array, edges: Array
 			var end_point: Dictionary = points_by_id[end_id]
 			var curve_points := _bezier_edge_screen_points_with_transform(start_point, end_point, transform)
 			if curve_points.size() >= 2:
-				draw_polyline(curve_points, reference_color, 2.0, true)
+				draw_polyline(curve_points, reference_color, reference_width, true)
 	for point_data in points:
 		if point_data is Dictionary:
 			draw_circle(_world_to_screen(_local_to_world_with_transform(point_data.get("position", Vector2.ZERO), transform)), 3.0, reference_color)
 
 
 func _sort_reference_shapes(a: Dictionary, b: Dictionary) -> bool:
+	if bool(a.get("emphasized", false)) != bool(b.get("emphasized", false)):
+		return not bool(a.get("emphasized", false))
 	return int(a.get("z_index", 0)) < int(b.get("z_index", 0))
 
 
@@ -893,7 +949,7 @@ func _draw_bezier_geometry() -> void:
 		edges_by_id[str(edge_data.get("id", ""))] = edge_data
 	if display_polygon_closed and display_polygon.size() >= 3 and is_instance_valid(material_texture):
 		_draw_material_polygon()
-	var shape_color := Color("#55c7d9")
+	var shape_color := Color("#f2c94c") if guide_style else Color("#55c7d9")
 	for chain_data in bezier_chains:
 		for edge_id_value in chain_data.get("edge_ids", []):
 			var edge_id := str(edge_id_value)
@@ -911,7 +967,10 @@ func _draw_bezier_geometry() -> void:
 			var curve_points := _bezier_edge_screen_points(start_point, end_point)
 			if curve_points.size() >= 2:
 				var edge_color := Color("#f2c94c") if edge_id == selected_edge_id else shape_color
-				draw_polyline(curve_points, edge_color, 2.0 if edge_id == selected_edge_id else 2.0, true)
+				if guide_style:
+					_draw_dashed_polyline(curve_points, edge_color, 2.0)
+				else:
+					draw_polyline(curve_points, edge_color, 2.0, true)
 	if interaction_state != "transform":
 		for point_data in bezier_points:
 			var point_position: Vector2 = point_data.get("position", Vector2.ZERO)
@@ -1105,11 +1164,11 @@ func _bezier_handle_at(screen_position: Vector2) -> String:
 
 
 func _draw_draw_preview() -> void:
-	if interaction_state != "draw" or active_tool != "point" or not cursor_over_canvas:
+	if interaction_state != "draw" or active_tool not in ["point", "spine"] or not cursor_over_canvas:
 		return
 	_draw_draw_point_preview()
 	var preview_position := _world_to_screen(_local_to_world(cursor_world))
-	var close_to_first := _is_near_first_chain_point(cursor_world)
+	var close_to_first := active_tool == "point" and _is_near_first_chain_point(cursor_world)
 	var preview_color := Color("#76e0a5") if close_to_first else Color("#f2c94c")
 	draw_circle(preview_position, 5.0, preview_color, false, 2.0)
 	if close_to_first:
@@ -1129,7 +1188,7 @@ func _draw_draw_point_preview() -> void:
 	var preview_chain: Dictionary = chain.duplicate(true)
 	var preview_point_ids: Array = preview_chain.get("point_ids", []).duplicate()
 	var candidate_position := pending_draw_position if draw_pointer_down else cursor_world
-	var closing_preview := not draw_pointer_down and _is_near_first_chain_point(cursor_world)
+	var closing_preview := active_tool == "point" and not draw_pointer_down and _is_near_first_chain_point(cursor_world)
 	var preview_end_id := ""
 	if closing_preview and point_ids.size() >= 3:
 		preview_chain["closed"] = true
@@ -1148,7 +1207,7 @@ func _draw_draw_point_preview() -> void:
 		preview_point_ids.append(preview_end_id)
 		preview_chain["point_ids"] = preview_point_ids
 	BezierGeometry.resolve_chain_auto_handles(preview_points, preview_chain)
-	if draw_pointer_down and pending_draw_has_handle:
+	if active_tool == "point" and draw_pointer_down and pending_draw_has_handle:
 		for point_data in preview_points:
 			if str(point_data.get("id", "")) != preview_end_id:
 				continue

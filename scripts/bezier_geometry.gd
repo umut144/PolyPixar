@@ -137,6 +137,29 @@ static func cubic_position(controls: Array[Vector2], t: float) -> Vector2:
 		+ controls[3] * clamped_t * clamped_t * clamped_t
 
 
+static func flatten_chain(component: Dictionary, chain_data: Dictionary, subdivisions_per_edge := 32) -> PackedVector2Array:
+	var polygon := PackedVector2Array()
+	var edges: Array = component.get("edges", [])
+	var points: Array = component.get("points", [])
+	var steps := maxi(subdivisions_per_edge, 1)
+	for edge_id_value in chain_data.get("edge_ids", []):
+		var edge := BezierTopology.edge_by_id(edges, str(edge_id_value))
+		if edge.is_empty():
+			continue
+		var start_point := BezierTopology.point_by_id(points, str(edge.get("start_point_id", "")))
+		var end_point := BezierTopology.point_by_id(points, str(edge.get("end_point_id", "")))
+		if start_point.is_empty() or end_point.is_empty():
+			continue
+		var controls := cubic_controls(start_point, end_point)
+		if polygon.is_empty():
+			polygon.append(controls[0])
+		for sample_index in range(1, steps + 1):
+			polygon.append(cubic_position(controls, float(sample_index) / float(steps)))
+	if bool(chain_data.get("closed", false)) and polygon.size() > 1 and polygon[0].is_equal_approx(polygon[polygon.size() - 1]):
+		polygon.remove_at(polygon.size() - 1)
+	return polygon
+
+
 static func cubic_tangent(controls: Array[Vector2], t: float) -> Vector2:
 	if controls.size() != 4:
 		return Vector2.ZERO

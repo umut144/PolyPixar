@@ -1310,6 +1310,235 @@
 			"z_index": 0
 		}
 	],
+	"guides": [
+		{
+			"chains": [
+				{
+					"closed": false,
+					"edge_ids": [
+						"edge_1304063114323833868",
+						"edge_7057749644656058477",
+						"edge_5345463551568330104",
+						"edge_634947701497542480",
+						"edge_731648191421589318",
+						"edge_4343786766805686187",
+						"edge_8321769758513644349"
+					],
+					"id": "chain_374823302126946121",
+					"point_ids": [
+						"point_4730881230274648077",
+						"point_2758517882983433013",
+						"point_8772606022847928102",
+						"point_6058630782240579425",
+						"point_6558817568221718418",
+						"point_3382325568134191931",
+						"point_7637062686147617494",
+						"point_3978897764096526539"
+					],
+					"topology_role": "outer"
+				}
+			],
+			"edges": [
+				{
+					"end_point_id": "point_2758517882983433013",
+					"id": "edge_1304063114323833868",
+					"render_outline": true,
+					"start_point_id": "point_4730881230274648077"
+				},
+				{
+					"end_point_id": "point_8772606022847928102",
+					"id": "edge_7057749644656058477",
+					"render_outline": true,
+					"start_point_id": "point_2758517882983433013"
+				},
+				{
+					"end_point_id": "point_6058630782240579425",
+					"id": "edge_5345463551568330104",
+					"render_outline": true,
+					"start_point_id": "point_8772606022847928102"
+				},
+				{
+					"end_point_id": "point_6558817568221718418",
+					"id": "edge_634947701497542480",
+					"render_outline": true,
+					"start_point_id": "point_6058630782240579425"
+				},
+				{
+					"end_point_id": "point_3382325568134191931",
+					"id": "edge_731648191421589318",
+					"render_outline": true,
+					"start_point_id": "point_6558817568221718418"
+				},
+				{
+					"end_point_id": "point_7637062686147617494",
+					"id": "edge_4343786766805686187",
+					"render_outline": true,
+					"start_point_id": "point_3382325568134191931"
+				},
+				{
+					"end_point_id": "point_3978897764096526539",
+					"id": "edge_8321769758513644349",
+					"render_outline": true,
+					"start_point_id": "point_7637062686147617494"
+				}
+			],
+			"guide_type": "sampler_spine",
+			"id": "guide_1",
+			"name": "Hat_Sample_Spine",
+			"points": [
+				{
+					"handle_in": [
+						0.0,
+						0.0
+					],
+					"handle_out": [
+						0.233333334326744,
+						0.366666793823242
+					],
+					"handle_source": "auto",
+					"id": "point_4730881230274648077",
+					"mode": "aligned",
+					"position": [
+						0.0,
+						8.0
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.127813696861267,
+						-0.415394574403763
+					],
+					"handle_out": [
+						0.147369310259819,
+						0.478950321674347
+					],
+					"handle_source": "auto",
+					"id": "point_2758517882983433013",
+					"mode": "aligned",
+					"position": [
+						0.699999988079071,
+						9.10000038146973
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.0734369829297066,
+						-0.495699644088745
+					],
+					"handle_out": [
+						-0.0635044127702713,
+						0.428654760122299
+					],
+					"handle_source": "auto",
+					"id": "point_8772606022847928102",
+					"mode": "aligned",
+					"position": [
+						0.800000011920929,
+						10.6000003814697
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.262618750333786,
+						-0.344687014818192
+					],
+					"handle_out": [
+						-0.287116438150406,
+						0.376840204000473
+					],
+					"handle_source": "auto",
+					"id": "point_6058630782240579425",
+					"mode": "aligned",
+					"position": [
+						0.300000011920929,
+						11.8000001907349
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.452805668115616,
+						-0.139324843883514
+					],
+					"handle_out": [
+						-0.478950321674347,
+						0.147369369864464
+					],
+					"handle_source": "auto",
+					"id": "point_6558817568221718418",
+					"mode": "aligned",
+					"position": [
+						-0.800000011920929,
+						12.6999998092651
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.471488028764725,
+						0.169735610485077
+					],
+					"handle_out": [
+						-0.401641339063644,
+						-0.144590809941292
+					],
+					"handle_source": "auto",
+					"id": "point_3382325568134191931",
+					"mode": "aligned",
+					"position": [
+						-2.29999995231628,
+						12.6000003814697
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.241514891386032,
+						0.351984143257141
+					],
+					"handle_out": [
+						-0.331817090511322,
+						-0.483590692281723
+					],
+					"handle_source": "auto",
+					"id": "point_7637062686147617494",
+					"mode": "aligned",
+					"position": [
+						-3.29999995231628,
+						11.8000001907349
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.222089052200317,
+						0.542806625366211
+					],
+					"handle_out": [
+						0.0,
+						0.0
+					],
+					"handle_source": "auto",
+					"id": "point_3978897764096526539",
+					"mode": "aligned",
+					"position": [
+						-3.96626710891724,
+						10.1715803146362
+					],
+					"preserve_point": false
+				}
+			],
+			"scope": {
+				"component_id": "component_1",
+				"kind": "component"
+			},
+			"type": "guide",
+			"visibility": true
+		}
+	],
 	"id": "asset_1",
 	"name": "Wizard",
 	"reference_image": {
@@ -1324,6 +1553,6 @@
 		"target_height_cm": 13.0,
 		"visible": false
 	},
-	"schema_version": 21,
+	"schema_version": 23,
 	"visibility": true
 }

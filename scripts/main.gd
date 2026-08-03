@@ -8,7 +8,7 @@ const INACTIVE_MODULES := ["Transform", "Effects", "Export"]
 const WORKSPACES_ROOT := "res://workspaces"
 const IMPORT_TEXTURES_ROOT := "res://imports/textures"
 const CONFIG_PATH := "res://configs/app_config.json"
-const SCHEMA_VERSION := 21
+const SCHEMA_VERSION := 23
 const MAX_HISTORY_SIZE := 100
 const PAPER_SIZES_CM := [Vector2(21.0, 29.7), Vector2(29.7, 42.0), Vector2(42.0, 59.4), Vector2(59.4, 84.1), Vector2(84.1, 118.9)]
 const PAPER_LABELS := ["A4", "A3", "A2", "A1", "A0"]
@@ -75,11 +75,13 @@ var motion_player_asset_id := ""
 var motion_last_marker := ""
 var selected_asset_id := ""
 var selected_component_id := ""
+var selected_guide_id := ""
 var selected_edge_id := ""
 var selected_point_id := ""
 var selected_point_ids: Array[String] = []
 var bezier_point_move_start_positions: Dictionary = {}
 var bezier_point_move_component_id := ""
+var bezier_point_move_guide_id := ""
 var selected_texture_id := ""
 var selected_element_id := ""
 var selected_material_id := ""
@@ -92,12 +94,15 @@ var expanded_assets: Dictionary = {}
 var expanded_textures: Dictionary = {}
 var next_asset_id := 1
 var next_component_id := 1
+var next_guide_id := 1
 var next_texture_id := 1
 var next_material_id := 1
 var asset_dialog: ConfirmationDialog
 var asset_name_input: LineEdit
 var component_dialog: ConfirmationDialog
 var component_name_input: LineEdit
+var guide_dialog: ConfirmationDialog
+var guide_name_input: LineEdit
 var texture_dialog: ConfirmationDialog
 var texture_name_input: LineEdit
 var material_dialog: ConfirmationDialog
@@ -128,9 +133,15 @@ var motion_act_workspace: MotionActWorkspace
 var motion_sequence_workspace: MotionSequenceWorkspace
 var geometry_sampling_workspace: GeometrySamplingWorkspace
 var geometry_method_menu: MenuButton
+var geometry_sampling_method_choice_active := false
 var geometry_seeding_workspace: GeometrySeedingWorkspace
 var geometry_seeding_method_menu: MenuButton
+var geometry_seeding_method_choice_active := false
+var selected_geometry_bake_method := ""
 var geometry_seeding_replace_dialog: ConfirmationDialog
+var guide_remove_dialog: ConfirmationDialog
+var pending_guide_remove_asset_id := ""
+var pending_guide_remove_id := ""
 var motion_phase_value_label: Label
 var motion_phase_marks: MotionPhaseMarks
 var motion_phase_slider: HSlider
@@ -305,11 +316,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		if geometry_focus_owner is LineEdit or geometry_focus_owner is TextEdit or geometry_focus_owner is SpinBox:
 			return
 		if has_command_modifier and event.keycode == KEY_1:
-			if is_instance_valid(geometry_method_menu):
-				geometry_method_menu.show_popup()
+			_activate_geometry_sampling_method_choice()
 			get_viewport().set_input_as_handled()
 			return
-		if not has_command_modifier:
+		if not has_command_modifier and geometry_sampling_method_choice_active:
 			_set_geometry_sampling_method(GeometrySamplingService.ADAPTIVE if event.keycode == KEY_1 else GeometrySamplingService.EVEN_SPACING)
 			get_viewport().set_input_as_handled()
 			return
@@ -317,8 +327,11 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		var seeding_focus_owner := get_viewport().gui_get_focus_owner()
 		if not (seeding_focus_owner is LineEdit or seeding_focus_owner is TextEdit or seeding_focus_owner is SpinBox):
 			if has_command_modifier and event.keycode == KEY_1:
-				if is_instance_valid(geometry_seeding_method_menu):
-					geometry_seeding_method_menu.show_popup()
+				_activate_geometry_seeding_method_choice()
+				get_viewport().set_input_as_handled()
+				return
+			if not has_command_modifier and geometry_seeding_method_choice_active and event.keycode in [KEY_1, KEY_2]:
+				_set_geometry_seeding_method(GeometrySeedingService.POISSON_FILL if event.keycode == KEY_1 else GeometrySeedingService.SPINE_FLOW)
 				get_viewport().set_input_as_handled()
 				return
 			if has_command_modifier and event.keycode == KEY_2:
@@ -350,6 +363,16 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			_set_draw_point_mode(_draw_point_mode_from_key(event.keycode))
 			get_viewport().set_input_as_handled()
 			return
+	if not selected_guide_id.is_empty():
+		if has_command_modifier and event.keycode == KEY_1:
+			_activate_guide_draw_state()
+			get_viewport().set_input_as_handled()
+			return
+		if has_command_modifier and event.keycode == KEY_2:
+			_activate_guide_edit_state()
+			get_viewport().set_input_as_handled()
+			return
+		return
 	if selected_component_id.is_empty():
 		if not selected_texture_id.is_empty() and not selected_element_id.is_empty():
 			var selected_texture := _get_texture(selected_texture_id)
@@ -370,12 +393,20 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		return
 	if has_command_modifier and event.keycode == KEY_1:
 		_activate_draw_state()
+		get_viewport().set_input_as_handled()
+		return
 	elif has_command_modifier and event.keycode == KEY_2:
 		_activate_edit_point_state()
+		get_viewport().set_input_as_handled()
+		return
 	elif has_command_modifier and event.keycode == KEY_3:
 		_activate_edit_edge_state()
+		get_viewport().set_input_as_handled()
+		return
 	elif has_command_modifier and event.keycode == KEY_4:
 		_activate_edit_face_state()
+		get_viewport().set_input_as_handled()
+		return
 	elif not has_command_modifier and active_state == "edit" and active_edit_mode == "point" and event.keycode == KEY_1:
 		_activate_edit_point_state(false, false)
 		get_viewport().set_input_as_handled()
@@ -388,8 +419,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 
 func _reset_to_default_state() -> void:
-	geometry_seeding_edit_active = false
-	geometry_seeding_edit_tool = "select"
+	_stop_guide_draw_state()
+	_set_geometry_command_state("")
+	selected_geometry_bake_method = ""
 	active_state = ""
 	active_draw_tool = ""
 	active_edit_mode = "point"
@@ -408,6 +440,19 @@ func _reset_to_default_state() -> void:
 		canvas_view.set_selected_edge_id("")
 	_ensure_default_edit_point_state()
 	_render_canvas_context()
+
+
+func _set_geometry_command_state(state: String) -> void:
+	geometry_sampling_method_choice_active = state == "sampling_method"
+	geometry_seeding_method_choice_active = state == "seeding_method"
+	geometry_seeding_edit_active = state == "seeding_edit"
+	if not geometry_seeding_edit_active:
+		geometry_seeding_edit_tool = "select"
+
+
+func _stop_guide_draw_state() -> void:
+	if active_draw_tool == "spine":
+		active_draw_tool = ""
 
 
 func _ensure_default_edit_point_state() -> void:
@@ -671,6 +716,7 @@ func _build_ui() -> void:
 
 	_create_asset_dialog()
 	_create_component_dialog()
+	_create_guide_dialog()
 	_create_texture_dialog()
 	_create_material_dialog()
 	_create_texture_import_dialog()
@@ -684,6 +730,7 @@ func _build_ui() -> void:
 	_create_motion_state_dialogs()
 	_create_motion_resource_dialogs()
 	_create_geometry_seeding_dialogs()
+	_create_guide_dialogs()
 
 
 func _create_material_graph() -> void:
@@ -856,6 +903,18 @@ func _create_geometry_seeding_dialogs() -> void:
 	geometry_seeding_replace_dialog.confirmed.connect(_confirm_bake_geometry_seeding_preview)
 	geometry_seeding_replace_dialog.canceled.connect(_cancel_geometry_seeding_preview_replacement)
 	add_child(geometry_seeding_replace_dialog)
+
+
+func _create_guide_dialogs() -> void:
+	guide_remove_dialog = ConfirmationDialog.new()
+	guide_remove_dialog.title = "Delete Guide"
+	guide_remove_dialog.ok_button_text = "Delete"
+	guide_remove_dialog.confirmed.connect(_confirm_guide_deletion)
+	guide_remove_dialog.canceled.connect(func() -> void:
+		pending_guide_remove_asset_id = ""
+		pending_guide_remove_id = ""
+	)
+	add_child(guide_remove_dialog)
 
 
 func _create_motion_state_dialogs() -> void:
@@ -1236,6 +1295,34 @@ func _style_popup_menu(popup: PopupMenu) -> void:
 	popup.add_theme_stylebox_override("panel", _opaque_popup_style())
 
 
+func _style_context_command_button(button: BaseButton, active: bool) -> void:
+	button.toggle_mode = true
+	button.set_pressed_no_signal(active)
+	if button is MenuButton:
+		(button as MenuButton).flat = not active
+	elif button is Button:
+		(button as Button).flat = not active
+	var active_style := StyleBoxFlat.new()
+	active_style.bg_color = Color("#8fd8f5")
+	active_style.border_color = Color("#c5efff")
+	active_style.set_border_width_all(1)
+	active_style.corner_radius_top_left = 3
+	active_style.corner_radius_top_right = 3
+	active_style.corner_radius_bottom_left = 3
+	active_style.corner_radius_bottom_right = 3
+	var active_text := Color("#10202a")
+	if active:
+		for style_name in ["normal", "hover", "pressed", "hover_pressed", "focus"]:
+			button.add_theme_stylebox_override(style_name, active_style)
+		for color_name in ["font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color", "font_focus_color"]:
+			button.add_theme_color_override(color_name, active_text)
+	else:
+		button.add_theme_stylebox_override("pressed", active_style)
+		button.add_theme_stylebox_override("hover_pressed", active_style)
+		button.add_theme_color_override("font_pressed_color", active_text)
+		button.add_theme_color_override("font_hover_pressed_color", active_text)
+
+
 func _create_asset_dialog() -> void:
 	asset_dialog = ConfirmationDialog.new()
 	asset_dialog.title = "New Asset"
@@ -1265,6 +1352,22 @@ func _create_component_dialog() -> void:
 	component_name_input.text_submitted.connect(_submit_component_name)
 	component_dialog.add_child(component_name_input)
 	add_child(component_dialog)
+
+
+func _create_guide_dialog() -> void:
+	guide_dialog = ConfirmationDialog.new()
+	guide_dialog.title = "Add Guide"
+	guide_dialog.dialog_text = "Enter a guide name"
+	guide_dialog.size = Vector2i(360, 160)
+	guide_dialog.confirmed.connect(_confirm_guide_creation)
+	guide_dialog.canceled.connect(_on_guide_dialog_canceled)
+	guide_name_input = LineEdit.new()
+	guide_name_input.placeholder_text = "Guide name"
+	guide_name_input.custom_minimum_size = Vector2(320, 32)
+	guide_name_input.focus_mode = Control.FOCUS_ALL
+	guide_name_input.text_submitted.connect(_submit_guide_name)
+	guide_dialog.add_child(guide_name_input)
+	add_child(guide_dialog)
 
 
 func _create_texture_dialog() -> void:
@@ -1450,13 +1553,16 @@ func _confirm_new_workspace() -> void:
 	geometry_sampling_preview_key = ""
 	geometry_seeding_preview = {}
 	geometry_seeding_preview_key = ""
-	geometry_seeding_edit_active = false
+	_set_geometry_command_state("")
 	geometry_seeding_enter_edit_after_bake = false
+	_stop_guide_draw_state()
 	selected_asset_id = ""
 	selected_component_id = ""
+	selected_guide_id = ""
 	expanded_assets.clear()
 	next_asset_id = 1
 	next_component_id = 1
+	next_guide_id = 1
 	next_texture_id = 1
 	next_material_id = 1
 	next_motion_path_id = 1
@@ -1574,7 +1680,8 @@ func _save_workspace() -> void:
 			"visibility": bool(asset.get("visibility", true)),
 			"reference_image": _serialize_reference_image(asset.get("reference_image", {})),
 			"animation": MotionWorkspace.normalize_animation_document(asset.get("animation", {})).duplicate(true),
-			"components": []
+			"components": [],
+			"guides": []
 		}
 		for component in asset["components"]:
 			asset_data["components"].append({
@@ -1588,6 +1695,8 @@ func _save_workspace() -> void:
 				"z_index": int(component.get("z_index", 0)),
 				"material_id": str(component.get("material_id", ""))
 			})
+		for guide in asset.get("guides", []):
+			asset_data["guides"].append(_serialize_asset_guide(guide))
 		_write_json("%s/asset.json" % asset_root, asset_data)
 		for component in asset.get("components", []):
 			var geometry_key := _geometry_document_key(asset_id, str(component.get("id", "")))
@@ -1675,6 +1784,7 @@ func _capture_history_snapshot() -> Dictionary:
 		"assets": assets.duplicate(true),
 		"next_asset_id": next_asset_id,
 		"next_component_id": next_component_id,
+		"next_guide_id": next_guide_id,
 		"textures": textures.duplicate(true),
 		"next_texture_id": next_texture_id,
 		"materials": materials.duplicate(true),
@@ -1688,6 +1798,7 @@ func _capture_history_snapshot() -> Dictionary:
 		"next_motion_sequence_id": next_motion_sequence_id,
 		"selected_asset_id": selected_asset_id,
 		"selected_component_id": selected_component_id,
+		"selected_guide_id": selected_guide_id,
 		"selected_texture_id": selected_texture_id,
 		"selected_element_id": selected_element_id,
 		"selected_material_id": selected_material_id,
@@ -1756,10 +1867,12 @@ func _restore_history_snapshot(snapshot: Dictionary) -> void:
 	geometry_sampling_preview_key = ""
 	geometry_seeding_preview = {}
 	geometry_seeding_preview_key = ""
-	geometry_seeding_edit_active = false
+	_set_geometry_command_state("")
 	geometry_seeding_enter_edit_after_bake = false
+	_stop_guide_draw_state()
 	next_asset_id = int(snapshot.get("next_asset_id", 1))
 	next_component_id = int(snapshot.get("next_component_id", 1))
+	next_guide_id = int(snapshot.get("next_guide_id", 1))
 	next_texture_id = int(snapshot.get("next_texture_id", 1))
 	next_material_id = int(snapshot.get("next_material_id", 1))
 	next_motion_path_id = int(snapshot.get("next_motion_path_id", 1))
@@ -1767,6 +1880,7 @@ func _restore_history_snapshot(snapshot: Dictionary) -> void:
 	next_motion_sequence_id = int(snapshot.get("next_motion_sequence_id", 1))
 	selected_asset_id = str(snapshot.get("selected_asset_id", ""))
 	selected_component_id = str(snapshot.get("selected_component_id", ""))
+	selected_guide_id = str(snapshot.get("selected_guide_id", ""))
 	selected_texture_id = str(snapshot.get("selected_texture_id", ""))
 	selected_element_id = str(snapshot.get("selected_element_id", ""))
 	selected_material_id = str(snapshot.get("selected_material_id", ""))
@@ -1786,8 +1900,11 @@ func _restore_history_snapshot(snapshot: Dictionary) -> void:
 	if _get_asset(selected_asset_id).is_empty():
 		selected_asset_id = ""
 		selected_component_id = ""
+		selected_guide_id = ""
 	elif not selected_component_id.is_empty() and _get_component(_get_asset(selected_asset_id), selected_component_id).is_empty():
 		selected_component_id = ""
+	if not selected_guide_id.is_empty() and _get_guide(_get_asset(selected_asset_id), selected_guide_id).is_empty():
+		selected_guide_id = ""
 	if _get_motion_path(selected_motion_path_id).is_empty():
 		selected_motion_path_id = ""
 	if _get_motion_act(selected_motion_act_id).is_empty():
@@ -1884,10 +2001,18 @@ func _load_workspace(workspace_entry: String) -> bool:
 		if not _has_supported_schema(asset_data):
 			continue
 		var components: Array[Dictionary] = []
+		var guides: Array[Dictionary] = []
 		for component_data in asset_data.get("components", []):
 			if not component_data is Dictionary:
 				continue
 			var topology := _deserialize_component_topology(component_data)
+			if str(component_data.get("type", "component")) == "guide":
+				var legacy_guide: Dictionary = component_data.duplicate(true)
+				legacy_guide["points"] = topology["points"]
+				legacy_guide["edges"] = topology["edges"]
+				legacy_guide["chains"] = topology["chains"]
+				guides.append(AssetGuide.normalize(legacy_guide))
+				continue
 			components.append({
 				"id": str(component_data.get("id", "")),
 				"name": str(component_data.get("name", "Component")),
@@ -1899,13 +2024,18 @@ func _load_workspace(workspace_entry: String) -> bool:
 				"z_index": int(component_data.get("z_index", 0)),
 				"material_id": str(component_data.get("material_id", ""))
 			})
+		for guide_data in asset_data.get("guides", []):
+			if not guide_data is Dictionary:
+				continue
+			guides.append(_deserialize_asset_guide(guide_data))
 		loaded_assets.append({
 			"id": str(asset_data.get("id", asset_id)),
 			"name": str(asset_data.get("name", asset_id)),
 			"visibility": bool(asset_data.get("visibility", true)),
 			"reference_image": _normalize_reference_image(asset_data.get("reference_image", {})),
 			"animation": MotionWorkspace.normalize_animation_document(asset_data.get("animation", {})),
-			"components": components
+			"components": components,
+			"guides": guides
 		})
 	for texture_id_variant in workspace_data.get("textures", []):
 		var texture_id := str(texture_id_variant)
@@ -1969,8 +2099,9 @@ func _load_workspace(workspace_entry: String) -> bool:
 	geometry_sampling_preview_key = ""
 	geometry_seeding_preview = {}
 	geometry_seeding_preview_key = ""
-	geometry_seeding_edit_active = false
+	_set_geometry_command_state("")
 	geometry_seeding_enter_edit_after_bake = false
+	_stop_guide_draw_state()
 	var saved_editor_state = workspace_data.get("editor_state", {})
 	if saved_editor_state is Dictionary and str(saved_editor_state.get("world_scale", {}).get("unit", "")) == "m":
 		_convert_asset_units(assets, 100.0)
@@ -2000,6 +2131,7 @@ func _serialize_editor_state() -> Dictionary:
 	return {
 		"selected_asset_id": selected_asset_id,
 		"selected_component_id": selected_component_id,
+		"selected_guide_id": selected_guide_id,
 		"selected_texture_id": selected_texture_id,
 		"selected_element_id": selected_element_id,
 		"selected_material_id": selected_material_id,
@@ -2038,6 +2170,7 @@ func _serialize_editor_state() -> Dictionary:
 func _restore_editor_state(state) -> void:
 	selected_asset_id = ""
 	selected_component_id = ""
+	selected_guide_id = ""
 	selected_texture_id = ""
 	selected_element_id = ""
 	selected_material_id = ""
@@ -2070,13 +2203,17 @@ func _restore_editor_state(state) -> void:
 		var requested_component_id := str(state.get("selected_component_id", ""))
 		if not _get_component(selected_asset, requested_component_id).is_empty():
 			selected_component_id = requested_component_id
+		var requested_guide_id := str(state.get("selected_guide_id", ""))
+		if not _get_guide(selected_asset, requested_guide_id).is_empty():
+			selected_guide_id = requested_guide_id
+			selected_component_id = ""
 	var saved_expanded = state.get("expanded_assets", {})
 	if saved_expanded is Dictionary:
 		for asset in assets:
 			var asset_id := str(asset["id"])
 			if saved_expanded.has(asset_id):
 				expanded_assets[asset_id] = bool(saved_expanded[asset_id])
-	if not selected_component_id.is_empty():
+	if not selected_component_id.is_empty() or not selected_guide_id.is_empty():
 		expanded_assets[selected_asset_id] = true
 	var requested_texture_id := str(state.get("selected_texture_id", ""))
 	var selected_texture := _get_texture(requested_texture_id)
@@ -2449,6 +2586,30 @@ func _deserialize_vector(value, fallback: Vector2) -> Vector2:
 	return fallback
 
 
+func _serialize_asset_guide(raw_guide: Dictionary) -> Dictionary:
+	var guide := AssetGuide.normalize(raw_guide)
+	return {
+		"id": str(guide.get("id", "")),
+		"type": "guide",
+		"guide_type": str(guide.get("guide_type", AssetGuide.SAMPLER_SPINE)),
+		"name": str(guide.get("name", "Guide")),
+		"visibility": bool(guide.get("visibility", true)),
+		"scope": guide.get("scope", {}).duplicate(true),
+		"points": _serialize_bezier_points(guide.get("points", [])),
+		"edges": _serialize_edges(guide.get("edges", [])),
+		"chains": _serialize_chains(guide.get("chains", []))
+	}
+
+
+func _deserialize_asset_guide(raw_guide: Dictionary) -> Dictionary:
+	var topology := _deserialize_component_topology(raw_guide)
+	var guide: Dictionary = raw_guide.duplicate(true)
+	guide["points"] = topology["points"]
+	guide["edges"] = topology["edges"]
+	guide["chains"] = topology["chains"]
+	return AssetGuide.normalize(guide)
+
+
 func _geometry_document_key(asset_id: String, component_id: String) -> String:
 	return "%s/%s" % [asset_id, component_id]
 
@@ -2459,11 +2620,11 @@ func _default_geometry_document(asset_id: String, component_id: String) -> Dicti
 		"component_id": component_id,
 		"sampling": {
 			"recipe": GeometrySamplingService.default_recipe(),
-			"bake": {}
+			"bakes": {}
 		},
 		"seeding": {
 			"recipe": GeometrySeedingService.default_recipe(),
-			"bake": {}
+			"bakes": {}
 		}
 	}
 
@@ -2500,117 +2661,120 @@ func _normalize_geometry_document(raw_document, asset_id: String, component_id: 
 		sampling_source = {}
 	var document := _default_geometry_document(asset_id, component_id)
 	document["sampling"]["recipe"] = GeometrySamplingService.normalize_recipe(sampling_source.get("recipe", {}))
-	var raw_bake = sampling_source.get("bake", {})
-	if raw_bake is Dictionary and bool(raw_bake.get("valid", false)):
-		var bake: Dictionary = raw_bake.duplicate(true)
-		var normalized_chains: Array = []
-		for raw_chain in raw_bake.get("chains", []):
-			if not raw_chain is Dictionary:
-				continue
-			var samples: Array = []
-			for raw_sample in raw_chain.get("samples", []):
-				if not raw_sample is Dictionary:
-					continue
-				samples.append({
-					"id": str(raw_sample.get("id", "")),
-					"position": _deserialize_vector(raw_sample.get("position", [0.0, 0.0]), Vector2.ZERO),
-					"edge_id": str(raw_sample.get("edge_id", "")),
-					"curve_t": clampf(float(raw_sample.get("curve_t", 0.0)), 0.0, 1.0),
-					"source_point_id": str(raw_sample.get("source_point_id", "")),
-					"preserved": bool(raw_sample.get("preserved", false))
-				})
-			normalized_chains.append({
-				"chain_id": str(raw_chain.get("chain_id", "")),
-				"topology_role": str(raw_chain.get("topology_role", "outer")),
-				"closed": bool(raw_chain.get("closed", false)),
-				"samples": samples
-			})
-		bake["method"] = str(raw_bake.get("method", GeometrySamplingService.ADAPTIVE))
-		bake["parameters"] = GeometrySamplingService.normalize_recipe({"method": bake["method"], "parameters": raw_bake.get("parameters", {})})["parameters"]
-		bake["chains"] = normalized_chains
-		bake["sample_count"] = int(raw_bake.get("sample_count", 0))
-		bake["preserve_count"] = int(raw_bake.get("preserve_count", 0))
-		document["sampling"]["bake"] = bake
+	var raw_sampling_bakes: Dictionary = sampling_source.get("bakes", {}) if sampling_source.get("bakes", {}) is Dictionary else {}
+	if raw_sampling_bakes.is_empty() and sampling_source.get("bake", {}) is Dictionary:
+		var legacy_sampling_bake: Dictionary = sampling_source.get("bake", {})
+		if bool(legacy_sampling_bake.get("valid", false)):
+			raw_sampling_bakes[str(legacy_sampling_bake.get("method", GeometrySamplingService.ADAPTIVE))] = legacy_sampling_bake
+	for raw_method in raw_sampling_bakes:
+		var sampling_bake := _normalize_sampling_bake(raw_sampling_bakes[raw_method])
+		if not sampling_bake.is_empty():
+			document["sampling"]["bakes"][str(sampling_bake.get("method", raw_method))] = sampling_bake
 	var seeding_source = source.get("seeding", {})
 	if not seeding_source is Dictionary:
 		seeding_source = {}
 	document["seeding"]["recipe"] = GeometrySeedingService.normalize_recipe(seeding_source.get("recipe", {}))
-	var raw_seeding_bake = seeding_source.get("bake", {})
-	if raw_seeding_bake is Dictionary and bool(raw_seeding_bake.get("valid", false)):
-		var seeding_bake: Dictionary = raw_seeding_bake.duplicate(true)
-		var normalized_seeds: Array = []
-		for raw_seed in raw_seeding_bake.get("seeds", []):
-			if not raw_seed is Dictionary:
-				continue
-			normalized_seeds.append({
-				"id": str(raw_seed.get("id", "")),
-				"position": _deserialize_vector(raw_seed.get("position", [0.0, 0.0]), Vector2.ZERO),
-				"origin": str(raw_seed.get("origin", "generated")),
-				"method": str(raw_seed.get("method", GeometrySeedingService.POISSON_FILL)),
-				"provenance": raw_seed.get("provenance", {}).duplicate(true) if raw_seed.get("provenance", {}) is Dictionary else {}
-			})
-		seeding_bake["method"] = str(raw_seeding_bake.get("method", GeometrySeedingService.POISSON_FILL))
-		seeding_bake["parameters"] = GeometrySeedingService.normalize_recipe({"method": seeding_bake["method"], "parameters": raw_seeding_bake.get("parameters", {})})["parameters"]
-		seeding_bake["seeds"] = normalized_seeds
-		seeding_bake["seed_count"] = normalized_seeds.size()
-		seeding_bake["edited"] = bool(raw_seeding_bake.get("edited", false))
-		document["seeding"]["bake"] = seeding_bake
+	var raw_seeding_bakes: Dictionary = seeding_source.get("bakes", {}) if seeding_source.get("bakes", {}) is Dictionary else {}
+	if raw_seeding_bakes.is_empty() and seeding_source.get("bake", {}) is Dictionary:
+		var legacy_seeding_bake: Dictionary = seeding_source.get("bake", {})
+		if bool(legacy_seeding_bake.get("valid", false)):
+			raw_seeding_bakes[str(legacy_seeding_bake.get("method", GeometrySeedingService.POISSON_FILL))] = legacy_seeding_bake
+	for raw_method in raw_seeding_bakes:
+		var seeding_bake := _normalize_seeding_bake(raw_seeding_bakes[raw_method])
+		if not seeding_bake.is_empty():
+			document["seeding"]["bakes"][str(seeding_bake.get("method", raw_method))] = seeding_bake
 	return document
+
+
+func _normalize_sampling_bake(raw_bake) -> Dictionary:
+	if not raw_bake is Dictionary or not bool(raw_bake.get("valid", false)):
+		return {}
+	var bake: Dictionary = raw_bake.duplicate(true)
+	var normalized_chains: Array = []
+	for raw_chain in raw_bake.get("chains", []):
+		if not raw_chain is Dictionary:
+			continue
+		var samples: Array = []
+		for raw_sample in raw_chain.get("samples", []):
+			if raw_sample is Dictionary:
+				samples.append({"id": str(raw_sample.get("id", "")), "position": _deserialize_vector(raw_sample.get("position", [0.0, 0.0]), Vector2.ZERO), "edge_id": str(raw_sample.get("edge_id", "")), "curve_t": clampf(float(raw_sample.get("curve_t", 0.0)), 0.0, 1.0), "source_point_id": str(raw_sample.get("source_point_id", "")), "preserved": bool(raw_sample.get("preserved", false))})
+		normalized_chains.append({"chain_id": str(raw_chain.get("chain_id", "")), "topology_role": str(raw_chain.get("topology_role", "outer")), "closed": bool(raw_chain.get("closed", false)), "samples": samples})
+	bake["method"] = str(raw_bake.get("method", GeometrySamplingService.ADAPTIVE))
+	bake["parameters"] = GeometrySamplingService.normalize_recipe({"method": bake["method"], "parameters": raw_bake.get("parameters", {})})["parameters"]
+	bake["chains"] = normalized_chains
+	bake["sample_count"] = int(raw_bake.get("sample_count", 0))
+	bake["preserve_count"] = int(raw_bake.get("preserve_count", 0))
+	return bake
+
+
+func _normalize_seeding_bake(raw_bake) -> Dictionary:
+	if not raw_bake is Dictionary or not bool(raw_bake.get("valid", false)):
+		return {}
+	var bake: Dictionary = raw_bake.duplicate(true)
+	var normalized_seeds: Array = []
+	for raw_seed in raw_bake.get("seeds", []):
+		if raw_seed is Dictionary:
+			normalized_seeds.append({"id": str(raw_seed.get("id", "")), "position": _deserialize_vector(raw_seed.get("position", [0.0, 0.0]), Vector2.ZERO), "origin": str(raw_seed.get("origin", "generated")), "method": str(raw_seed.get("method", GeometrySeedingService.POISSON_FILL)), "provenance": raw_seed.get("provenance", {}).duplicate(true) if raw_seed.get("provenance", {}) is Dictionary else {}})
+	bake["method"] = str(raw_bake.get("method", GeometrySeedingService.POISSON_FILL))
+	bake["parameters"] = GeometrySeedingService.normalize_recipe({"method": bake["method"], "parameters": raw_bake.get("parameters", {})})["parameters"]
+	bake["seeds"] = normalized_seeds
+	bake["seed_count"] = normalized_seeds.size()
+	bake["edited"] = bool(raw_bake.get("edited", false))
+	return bake
+
+
+func _serialize_sampling_bake(bake: Dictionary) -> Dictionary:
+	var serialized_bake := bake.duplicate(true)
+	var serialized_chains: Array = []
+	for chain_data in bake.get("chains", []):
+		var serialized_samples: Array = []
+		for sample in chain_data.get("samples", []):
+			serialized_samples.append({"id": str(sample.get("id", "")), "position": _serialize_vector(Vector2(sample.get("position", Vector2.ZERO))), "edge_id": str(sample.get("edge_id", "")), "curve_t": float(sample.get("curve_t", 0.0)), "source_point_id": str(sample.get("source_point_id", "")), "preserved": bool(sample.get("preserved", false))})
+		serialized_chains.append({"chain_id": str(chain_data.get("chain_id", "")), "topology_role": str(chain_data.get("topology_role", "outer")), "closed": bool(chain_data.get("closed", false)), "samples": serialized_samples})
+	serialized_bake["chains"] = serialized_chains
+	return serialized_bake
+
+
+func _serialize_seeding_bake(bake: Dictionary) -> Dictionary:
+	var serialized_bake := bake.duplicate(true)
+	var serialized_seeds: Array = []
+	for seed_data in bake.get("seeds", []):
+		serialized_seeds.append({"id": str(seed_data.get("id", "")), "position": _serialize_vector(Vector2(seed_data.get("position", Vector2.ZERO))), "origin": str(seed_data.get("origin", "generated")), "method": str(seed_data.get("method", GeometrySeedingService.POISSON_FILL)), "provenance": seed_data.get("provenance", {}).duplicate(true) if seed_data.get("provenance", {}) is Dictionary else {}})
+	serialized_bake["seeds"] = serialized_seeds
+	return serialized_bake
 
 
 func _serialize_geometry_document(document: Dictionary) -> Dictionary:
 	var normalized := _normalize_geometry_document(document, str(document.get("asset_id", "")), str(document.get("component_id", "")))
-	var serialized_bake: Dictionary = normalized.get("sampling", {}).get("bake", {}).duplicate(true)
-	if not serialized_bake.is_empty():
-		var serialized_chains: Array = []
-		for chain_data in serialized_bake.get("chains", []):
-			var serialized_samples: Array = []
-			for sample in chain_data.get("samples", []):
-				serialized_samples.append({
-					"id": str(sample.get("id", "")),
-					"position": _serialize_vector(Vector2(sample.get("position", Vector2.ZERO))),
-					"edge_id": str(sample.get("edge_id", "")),
-					"curve_t": float(sample.get("curve_t", 0.0)),
-					"source_point_id": str(sample.get("source_point_id", "")),
-					"preserved": bool(sample.get("preserved", false))
-				})
-			serialized_chains.append({
-				"chain_id": str(chain_data.get("chain_id", "")),
-				"topology_role": str(chain_data.get("topology_role", "outer")),
-				"closed": bool(chain_data.get("closed", false)),
-				"samples": serialized_samples
-			})
-		serialized_bake["chains"] = serialized_chains
-	var serialized_seeding_bake: Dictionary = normalized.get("seeding", {}).get("bake", {}).duplicate(true)
-	if not serialized_seeding_bake.is_empty():
-		var serialized_seeds: Array = []
-		for seed_data in serialized_seeding_bake.get("seeds", []):
-			serialized_seeds.append({
-				"id": str(seed_data.get("id", "")),
-				"position": _serialize_vector(Vector2(seed_data.get("position", Vector2.ZERO))),
-				"origin": str(seed_data.get("origin", "generated")),
-				"method": str(seed_data.get("method", GeometrySeedingService.POISSON_FILL)),
-				"provenance": seed_data.get("provenance", {}).duplicate(true) if seed_data.get("provenance", {}) is Dictionary else {}
-			})
-		serialized_seeding_bake["seeds"] = serialized_seeds
+	var serialized_sampling_bakes: Dictionary = {}
+	for method in normalized.get("sampling", {}).get("bakes", {}):
+		serialized_sampling_bakes[str(method)] = _serialize_sampling_bake(normalized["sampling"]["bakes"][method])
+	var serialized_seeding_bakes: Dictionary = {}
+	for method in normalized.get("seeding", {}).get("bakes", {}):
+		serialized_seeding_bakes[str(method)] = _serialize_seeding_bake(normalized["seeding"]["bakes"][method])
 	return {
 		"schema_version": SCHEMA_VERSION,
 		"asset_id": str(normalized.get("asset_id", "")),
 		"component_id": str(normalized.get("component_id", "")),
 		"sampling": {
 			"recipe": normalized.get("sampling", {}).get("recipe", {}).duplicate(true),
-			"bake": serialized_bake
+			"bakes": serialized_sampling_bakes
 		},
 		"seeding": {
 			"recipe": normalized.get("seeding", {}).get("recipe", {}).duplicate(true),
-			"bake": serialized_seeding_bake
+			"bakes": serialized_seeding_bakes
 		}
 	}
 
 
-func _geometry_sampling_bake(asset_id: String, component_id: String) -> Dictionary:
+func _geometry_sampling_bakes(asset_id: String, component_id: String) -> Dictionary:
 	var document := _get_geometry_document(asset_id, component_id)
-	return document.get("sampling", {}).get("bake", {}) if not document.is_empty() else {}
+	return document.get("sampling", {}).get("bakes", {}) if not document.is_empty() else {}
+
+
+func _geometry_sampling_bake(asset_id: String, component_id: String, method := "") -> Dictionary:
+	var resolved_method := method if not method.is_empty() else str(_geometry_sampling_recipe(asset_id, component_id).get("method", ""))
+	return _geometry_sampling_bakes(asset_id, component_id).get(resolved_method, {})
 
 
 func _geometry_sampling_bake_is_current(asset_id: String, component_id: String, component: Dictionary) -> bool:
@@ -2649,9 +2813,36 @@ func _geometry_sampling_preview_matches(asset_id: String, component_id: String, 
 		and geometry_sampling_preview.get("parameters", {}) == recipe.get("parameters", {})
 
 
-func _geometry_seeding_bake(asset_id: String, component_id: String) -> Dictionary:
+func _geometry_seeding_bakes(asset_id: String, component_id: String) -> Dictionary:
 	var document := _get_geometry_document(asset_id, component_id)
-	return document.get("seeding", {}).get("bake", {}) if not document.is_empty() else {}
+	return document.get("seeding", {}).get("bakes", {}) if not document.is_empty() else {}
+
+
+func _geometry_seeding_bake(asset_id: String, component_id: String, method := "") -> Dictionary:
+	var resolved_method := method if not method.is_empty() else str(_geometry_seeding_recipe(asset_id, component_id).get("method", ""))
+	return _geometry_seeding_bakes(asset_id, component_id).get(resolved_method, {})
+
+
+func _sampler_spines_for_component(asset: Dictionary, component_id: String) -> Array:
+	var guides: Array = []
+	for guide in asset.get("guides", []):
+		if str(guide.get("guide_type", "")) == AssetGuide.SAMPLER_SPINE \
+			and str(guide.get("scope", {}).get("component_id", "")) == component_id:
+			guides.append(guide)
+	guides.sort_custom(_sort_named_documents)
+	return guides
+
+
+func _geometry_seeding_sampler_spine(asset_id: String, component_id: String, recipe: Dictionary = {}) -> Dictionary:
+	var resolved_recipe := recipe if not recipe.is_empty() else _geometry_seeding_recipe(asset_id, component_id)
+	if str(resolved_recipe.get("method", "")) != GeometrySeedingService.SPINE_FLOW:
+		return {}
+	var guide_id := str(resolved_recipe.get("parameters", {}).get("guide_id", ""))
+	var guide := _get_guide(_get_asset(asset_id), guide_id)
+	if guide.is_empty() or str(guide.get("guide_type", "")) != AssetGuide.SAMPLER_SPINE \
+		or str(guide.get("scope", {}).get("component_id", "")) != component_id:
+		return {}
+	return guide
 
 
 func _geometry_seeding_result_matches(result: Dictionary, asset_id: String, component_id: String, component: Dictionary) -> bool:
@@ -2659,10 +2850,18 @@ func _geometry_seeding_result_matches(result: Dictionary, asset_id: String, comp
 		return false
 	var sampling_bake := _geometry_sampling_bake(asset_id, component_id)
 	var recipe := _geometry_seeding_recipe(asset_id, component_id)
-	return str(result.get("sampling_bake_id", "")) == str(sampling_bake.get("bake_id", "")) \
+	var matches: bool = str(result.get("sampling_bake_id", "")) == str(sampling_bake.get("bake_id", "")) \
 		and str(result.get("sampling_fingerprint", "")) == GeometrySeedingService.sampling_fingerprint(sampling_bake) \
 		and str(result.get("method", "")) == str(recipe.get("method", "")) \
 		and result.get("parameters", {}) == recipe.get("parameters", {})
+	if not matches:
+		return false
+	if str(recipe.get("method", "")) == GeometrySeedingService.SPINE_FLOW:
+		var guide := _geometry_seeding_sampler_spine(asset_id, component_id, recipe)
+		return not guide.is_empty() \
+			and str(result.get("guide_id", "")) == str(guide.get("id", "")) \
+			and str(result.get("guide_fingerprint", "")) == GeometrySeedingService.guide_fingerprint(guide)
+	return true
 
 
 func _geometry_seeding_preview_matches(asset_id: String, component_id: String, component: Dictionary) -> bool:
@@ -2714,6 +2913,7 @@ func _has_supported_schema(data) -> bool:
 func _update_next_ids() -> void:
 	next_asset_id = 1
 	next_component_id = 1
+	next_guide_id = 1
 	next_texture_id = 1
 	next_material_id = 1
 	next_motion_path_id = 1
@@ -2723,6 +2923,8 @@ func _update_next_ids() -> void:
 		next_asset_id = maxi(next_asset_id, _id_suffix_number(str(asset["id"])) + 1)
 		for component in asset["components"]:
 			next_component_id = maxi(next_component_id, _id_suffix_number(str(component["id"])) + 1)
+		for guide in asset.get("guides", []):
+			next_guide_id = maxi(next_guide_id, _id_suffix_number(str(guide.get("id", ""))) + 1)
 	for texture in textures:
 		next_texture_id = maxi(next_texture_id, _id_suffix_number(str(texture["id"])) + 1)
 	for material_record in materials:
@@ -2781,7 +2983,7 @@ func _render_context_bar() -> void:
 	if not is_instance_valid(context_bar):
 		return
 	_update_context_action_button()
-	_clear(context_bar)
+	_clear_context_bar()
 	if active_module == "Export":
 		var validate_button := Button.new()
 		validate_button.text = "Validate"
@@ -2849,6 +3051,23 @@ func _render_context_bar() -> void:
 	if active_module == "Create" and active_create_submodule == "Texture":
 		_render_info_bar()
 		return
+	if not selected_guide_id.is_empty():
+		var draw_guide_button := Button.new()
+		draw_guide_button.text = "⌘1  Draw Guide Point"
+		draw_guide_button.custom_minimum_size = Vector2(174, 32)
+		draw_guide_button.focus_mode = Control.FOCUS_NONE
+		_style_context_command_button(draw_guide_button, active_state == "draw" and active_draw_tool == "spine")
+		draw_guide_button.pressed.connect(_activate_guide_draw_state)
+		context_bar.add_child(draw_guide_button)
+		var edit_guide_button := Button.new()
+		edit_guide_button.text = "⌘2  Edit Guide Point"
+		edit_guide_button.custom_minimum_size = Vector2(164, 32)
+		edit_guide_button.focus_mode = Control.FOCUS_NONE
+		_style_context_command_button(edit_guide_button, active_state == "edit" and active_edit_mode == "point")
+		edit_guide_button.pressed.connect(_activate_guide_edit_state)
+		context_bar.add_child(edit_guide_button)
+		_render_info_bar()
+		return
 	if selected_component_id.is_empty():
 		active_draw_tool = ""
 		_render_info_bar()
@@ -2857,8 +3076,7 @@ func _render_context_bar() -> void:
 	draw_menu.text = "⌘1  Draw Point  ▼"
 	draw_menu.custom_minimum_size = Vector2(156, 32)
 	draw_menu.focus_mode = Control.FOCUS_NONE
-	draw_menu.toggle_mode = true
-	draw_menu.button_pressed = active_state == "draw"
+	_style_context_command_button(draw_menu, active_state == "draw" and active_draw_tool == "point")
 	draw_menu.get_popup().add_item("1: Linear", 0)
 	draw_menu.get_popup().add_item("2: Aligned", 1)
 	draw_menu.get_popup().add_item("3: Free", 2)
@@ -2871,8 +3089,7 @@ func _render_context_bar() -> void:
 	edit_point_menu.text = "⌘2  Edit Point  ▼"
 	edit_point_menu.custom_minimum_size = Vector2(138, 32)
 	edit_point_menu.focus_mode = Control.FOCUS_NONE
-	edit_point_menu.toggle_mode = true
-	edit_point_menu.button_pressed = active_state == "edit" and active_edit_mode == "point"
+	_style_context_command_button(edit_point_menu, active_state == "edit" and active_edit_mode == "point")
 	edit_point_menu.get_popup().add_item("1: Select", 0)
 	edit_point_menu.get_popup().add_item("2: Bezier Handle", 1)
 	edit_point_menu.get_popup().add_item("3: Set", 2)
@@ -2883,8 +3100,7 @@ func _render_context_bar() -> void:
 	edit_edge_menu.text = "⌘3  Edit Edge  ▼"
 	edit_edge_menu.custom_minimum_size = Vector2(136, 32)
 	edit_edge_menu.focus_mode = Control.FOCUS_NONE
-	edit_edge_menu.toggle_mode = true
-	edit_edge_menu.button_pressed = active_state == "edit" and active_edit_mode == "edge"
+	_style_context_command_button(edit_edge_menu, active_state == "edit" and active_edit_mode == "edge")
 	edit_edge_menu.get_popup().add_item("Select Edge", 0)
 	_style_popup_menu(edit_edge_menu.get_popup())
 	edit_edge_menu.get_popup().id_pressed.connect(_on_edit_edge_menu_id)
@@ -2893,12 +3109,22 @@ func _render_context_bar() -> void:
 	edit_face_menu.text = "⌘4  Edit Face  ▼"
 	edit_face_menu.custom_minimum_size = Vector2(134, 32)
 	edit_face_menu.focus_mode = Control.FOCUS_NONE
-	edit_face_menu.toggle_mode = true
-	edit_face_menu.button_pressed = active_state == "edit" and active_edit_mode == "face"
+	_style_context_command_button(edit_face_menu, active_state == "edit" and active_edit_mode == "face")
 	edit_face_menu.get_popup().add_item("Move Face", 0)
 	_style_popup_menu(edit_face_menu.get_popup())
 	edit_face_menu.get_popup().id_pressed.connect(_on_edit_face_menu_id)
 	context_bar.add_child(edit_face_menu)
+func _next_default_guide_name(asset: Dictionary, guide_type: String) -> String:
+	var base := AssetGuide.display_name(guide_type)
+	var index := 1
+	var candidate := "%s %02d" % [base, index]
+	var names: Array[String] = []
+	for guide in asset.get("guides", []):
+		names.append(str(guide.get("name", "")).to_lower())
+	while candidate.to_lower() in names:
+		index += 1
+		candidate = "%s %02d" % [base, index]
+	return candidate
 
 
 func _render_motion_context_bar() -> void:
@@ -2974,15 +3200,13 @@ func _render_motion_path_context_bar() -> void:
 	var path_document := _get_motion_path(selected_motion_path_id)
 	var draw_button := Button.new()
 	draw_button.text = "Draw Path"
-	draw_button.toggle_mode = true
-	draw_button.button_pressed = motion_path_tool == "draw"
+	_style_context_command_button(draw_button, motion_path_tool == "draw")
 	draw_button.disabled = path_document.is_empty()
 	draw_button.pressed.connect(_set_motion_path_tool.bind("draw"))
 	context_bar.add_child(draw_button)
 	var edit_button := Button.new()
 	edit_button.text = "Edit Path"
-	edit_button.toggle_mode = true
-	edit_button.button_pressed = motion_path_tool == "edit"
+	_style_context_command_button(edit_button, motion_path_tool == "edit")
 	edit_button.disabled = path_document.is_empty()
 	edit_button.pressed.connect(_set_motion_path_tool.bind("edit"))
 	context_bar.add_child(edit_button)
@@ -3136,6 +3360,7 @@ func _render_geometry_sampling_context_bar() -> void:
 	geometry_method_menu.text = "⌘1  Method"
 	geometry_method_menu.custom_minimum_size = Vector2(118, 32)
 	geometry_method_menu.focus_mode = Control.FOCUS_NONE
+	_style_context_command_button(geometry_method_menu, geometry_sampling_method_choice_active)
 	var popup := geometry_method_menu.get_popup()
 	_style_popup_menu(popup)
 	popup.add_item("1  Adaptive", 0)
@@ -3159,15 +3384,39 @@ func _on_geometry_sampling_method_menu_selected(id: int, popup: PopupMenu) -> vo
 func _set_geometry_sampling_method(method: String) -> void:
 	if selected_asset_id.is_empty() or selected_component_id.is_empty() or method not in GeometrySamplingService.VALID_METHODS:
 		return
+	_set_geometry_command_state("sampling_method")
+	selected_geometry_bake_method = method
 	var current := _geometry_sampling_recipe(selected_asset_id, selected_component_id)
 	if str(current.get("method", "")) == method:
+		_render_outliner()
+		_render_inspector()
+		_render_context_bar()
+		_refresh_geometry_sampling_workspace()
 		return
 	_record_direct_change()
 	var document := _get_geometry_document(selected_asset_id, selected_component_id, true)
 	var recipe := GeometrySamplingService.normalize_recipe(document.get("sampling", {}).get("recipe", {}))
 	recipe["method"] = method
+	var matching_bake := _geometry_sampling_bake(selected_asset_id, selected_component_id, method)
+	if not matching_bake.is_empty():
+		recipe["parameters"] = matching_bake.get("parameters", {}).duplicate(true)
 	document["sampling"]["recipe"] = recipe
-	call_deferred("_generate_geometry_sampling_preview")
+	_clear_geometry_sampling_preview_for_selection()
+	_render_outliner()
+	_render_inspector()
+	_render_context_bar()
+	_refresh_geometry_sampling_workspace()
+	if matching_bake.is_empty():
+		call_deferred("_generate_geometry_sampling_preview")
+
+
+func _activate_geometry_sampling_method_choice() -> void:
+	if selected_asset_id.is_empty() or selected_component_id.is_empty():
+		return
+	_set_geometry_command_state("sampling_method")
+	_render_context_bar()
+	_render_info_bar()
+	_show_status_message("Sampling Method: 1 Adaptive · 2 Even Spacing")
 
 
 func _render_geometry_seeding_context_bar() -> void:
@@ -3175,59 +3424,80 @@ func _render_geometry_seeding_context_bar() -> void:
 	geometry_seeding_method_menu.text = "⌘1  Method"
 	geometry_seeding_method_menu.custom_minimum_size = Vector2(118, 32)
 	geometry_seeding_method_menu.focus_mode = Control.FOCUS_NONE
+	_style_context_command_button(geometry_seeding_method_menu, geometry_seeding_method_choice_active)
 	var popup := geometry_seeding_method_menu.get_popup()
 	_style_popup_menu(popup)
 	popup.add_item("1  Poisson Fill", 0)
 	popup.set_item_metadata(0, GeometrySeedingService.POISSON_FILL)
+	popup.add_item("2  Spine Flow", 1)
+	popup.set_item_metadata(1, GeometrySeedingService.SPINE_FLOW)
 	popup.id_pressed.connect(func(id: int) -> void: _set_geometry_seeding_method(str(popup.get_item_metadata(popup.get_item_index(id)))))
 	context_bar.add_child(geometry_seeding_method_menu)
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	var status := _geometry_seeding_status(selected_asset_id, selected_component_id, component)
 	var edit_button := Button.new()
 	edit_button.text = "⌘2  Edit Seeds"
-	edit_button.toggle_mode = true
-	edit_button.button_pressed = geometry_seeding_edit_active
+	_style_context_command_button(edit_button, geometry_seeding_edit_active)
 	edit_button.disabled = status not in ["Preview", "Baked", "Edited"]
 	edit_button.tooltip_text = "Accept the current Preview and edit it" if status == "Preview" else "Edit the current Seeding Bake"
 	edit_button.focus_mode = Control.FOCUS_NONE
 	edit_button.pressed.connect(_toggle_geometry_seeding_edit)
 	context_bar.add_child(edit_button)
-	if geometry_seeding_edit_active:
-		for tool_data in [["1  Select / Move", "select"], ["2  Add", "add"], ["3  Remove", "remove"]]:
-			var tool_button := Button.new()
-			tool_button.text = tool_data[0]
-			tool_button.toggle_mode = true
-			tool_button.button_pressed = geometry_seeding_edit_tool == tool_data[1]
-			tool_button.focus_mode = Control.FOCUS_NONE
-			tool_button.pressed.connect(_set_geometry_seeding_edit_tool.bind(tool_data[1]))
-			context_bar.add_child(tool_button)
-
-
 func _set_geometry_seeding_method(method: String) -> void:
 	if selected_asset_id.is_empty() or selected_component_id.is_empty() or method not in GeometrySeedingService.VALID_METHODS:
 		return
+	_set_geometry_command_state("seeding_method")
+	selected_geometry_bake_method = method
 	var current := _geometry_seeding_recipe(selected_asset_id, selected_component_id)
 	if str(current.get("method", "")) == method:
+		_render_outliner()
+		_render_inspector()
+		_render_context_bar()
+		_refresh_geometry_seeding_workspace()
 		return
 	_record_direct_change()
 	var document := _get_geometry_document(selected_asset_id, selected_component_id, true)
-	document["seeding"]["recipe"] = GeometrySeedingService.normalize_recipe({"method": method, "parameters": current.get("parameters", {})})
-	call_deferred("_generate_geometry_seeding_preview")
+	var next_recipe := GeometrySeedingService.normalize_recipe({"method": method, "parameters": current.get("parameters", {})})
+	var matching_bake := _geometry_seeding_bake(selected_asset_id, selected_component_id, method)
+	if not matching_bake.is_empty():
+		next_recipe["parameters"] = matching_bake.get("parameters", {}).duplicate(true)
+	if method == GeometrySeedingService.SPINE_FLOW and str(next_recipe.get("parameters", {}).get("guide_id", "")).is_empty():
+		var guides := _sampler_spines_for_component(_get_asset(selected_asset_id), selected_component_id)
+		if not guides.is_empty():
+			next_recipe["parameters"]["guide_id"] = str(guides[0].get("id", ""))
+	document["seeding"]["recipe"] = next_recipe
+	geometry_seeding_preview = {}
+	geometry_seeding_preview_key = ""
+	_render_outliner()
+	_render_inspector()
+	_render_context_bar()
+	_refresh_geometry_seeding_workspace()
+	if matching_bake.is_empty():
+		call_deferred("_generate_geometry_seeding_preview")
+
+
+func _activate_geometry_seeding_method_choice() -> void:
+	if selected_asset_id.is_empty() or selected_component_id.is_empty():
+		return
+	_set_geometry_command_state("seeding_method")
+	_render_context_bar()
+	_render_info_bar()
+	_show_status_message("Seeding Method: 1 Poisson Fill · 2 Spine Flow")
 
 
 func _toggle_geometry_seeding_edit() -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	var status := _geometry_seeding_status(selected_asset_id, selected_component_id, component)
 	if geometry_seeding_edit_active:
-		geometry_seeding_edit_active = false
-		geometry_seeding_edit_tool = "select"
+		_set_geometry_command_state("")
 	elif status == "Preview":
+		_set_geometry_command_state("")
 		_bake_geometry_seeding_preview(true)
 		return
 	elif status in ["Baked", "Edited"]:
-		geometry_seeding_edit_active = true
+		_set_geometry_command_state("seeding_edit")
 	else:
-		geometry_seeding_edit_active = false
+		_set_geometry_command_state("")
 		_show_status_message("Generate a valid Seeding Preview before editing Seeds.")
 	_render_context_bar()
 	_refresh_geometry_seeding_workspace()
@@ -3246,14 +3516,12 @@ func _set_geometry_seeding_edit_tool(tool: String) -> void:
 func _render_motion_sequence_context_bar() -> void:
 	var composition_button := Button.new()
 	composition_button.text = "⌘1  Composition"
-	composition_button.toggle_mode = true
-	composition_button.button_pressed = motion_sequence_view == MotionSequenceWorkspace.VIEW_COMPOSITION
+	_style_context_command_button(composition_button, motion_sequence_view == MotionSequenceWorkspace.VIEW_COMPOSITION)
 	composition_button.pressed.connect(_set_motion_sequence_view.bind(MotionSequenceWorkspace.VIEW_COMPOSITION))
 	context_bar.add_child(composition_button)
 	var player_button := Button.new()
 	player_button.text = "⌘2  Player"
-	player_button.toggle_mode = true
-	player_button.button_pressed = motion_sequence_view == MotionSequenceWorkspace.VIEW_PLAYER
+	_style_context_command_button(player_button, motion_sequence_view == MotionSequenceWorkspace.VIEW_PLAYER)
 	player_button.pressed.connect(_set_motion_sequence_view.bind(MotionSequenceWorkspace.VIEW_PLAYER))
 	context_bar.add_child(player_button)
 	var sequence_document := _get_motion_sequence(selected_motion_sequence_id)
@@ -3396,6 +3664,7 @@ func _render_texture_context_bar() -> void:
 		preview_menu.text = "⌘1  Previews  ▼"
 		preview_menu.custom_minimum_size = Vector2(132, 32)
 		preview_menu.focus_mode = Control.FOCUS_NONE
+		_style_context_command_button(preview_menu, true)
 		var preview_popup := preview_menu.get_popup()
 		_style_popup_menu(preview_popup)
 		preview_popup.add_item("1: Original", 0)
@@ -3815,11 +4084,55 @@ func _set_edit_mode(mode: String) -> void:
 	canvas_view.set_edit_handles_enabled(edit_bezier_handles)
 	canvas_view.set_edit_point_set_enabled(edit_point_set_mode)
 	canvas_view.set_selected_edge_id(selected_edge_id)
+	_render_context_bar()
 	_render_info_bar()
 
 
 func _activate_edit_state() -> void:
 	_activate_edit_point_state()
+
+
+func _activate_guide_draw_state() -> void:
+	var asset := _get_asset(selected_asset_id)
+	var guide := _get_guide(asset, selected_guide_id)
+	var component := _get_component(asset, str(guide.get("scope", {}).get("component_id", "")))
+	if guide.is_empty() or component.is_empty():
+		_show_status_message("Select a Guide with a valid parent Component.")
+		return
+	if _component_guide_boundaries(component).get("outer", PackedVector2Array()).size() < 3:
+		_show_status_message("Draw Guide Point requires a closed parent Component contour.")
+		return
+	active_state = "draw"
+	active_draw_tool = "spine"
+	active_draw_point_mode = "aligned"
+	edit_bezier_handles = false
+	edit_point_set_mode = false
+	canvas_view.set_interaction_state("draw")
+	canvas_view.set_tool_mode("spine")
+	canvas_view.set_draw_point_mode(active_draw_point_mode)
+	_render_context_bar()
+	_render_info_bar()
+	_render_canvas_context()
+	_show_status_message("Draw Guide Point · Escape to stop")
+
+
+func _activate_guide_edit_state() -> void:
+	var guide := _get_guide(_get_asset(selected_asset_id), selected_guide_id)
+	if guide.is_empty():
+		return
+	active_state = "edit"
+	active_draw_tool = ""
+	active_edit_mode = "point"
+	edit_bezier_handles = false
+	edit_point_set_mode = false
+	canvas_view.set_interaction_state("edit")
+	canvas_view.set_tool_mode("")
+	canvas_view.set_edit_mode("point")
+	canvas_view.set_edit_handles_enabled(false)
+	canvas_view.set_edit_point_set_enabled(false)
+	_render_context_bar()
+	_render_info_bar()
+	_render_canvas_context()
 
 
 func _activate_edit_point_state(handle_editing := false, set_mode := false) -> void:
@@ -3919,8 +4232,31 @@ func _render_info_bar() -> void:
 			_add_info_option("Marker %s" % motion_last_marker)
 		return
 	if active_module == "Geometry":
-		_add_info_option("Geometry: %s" % active_geometry_submodule)
-		_add_info_option("Placeholder")
+		var geometry_state_label := Label.new()
+		if active_geometry_submodule == "Sampling" and geometry_sampling_method_choice_active:
+			geometry_state_label.text = "State: Sampling Method"
+			info_bar.add_child(geometry_state_label)
+			_add_info_option("1: Adaptive")
+			_add_info_option("2: Even Spacing")
+		elif active_geometry_submodule == "Seeding" and geometry_seeding_method_choice_active:
+			geometry_state_label.text = "State: Seeding Method"
+			info_bar.add_child(geometry_state_label)
+			_add_info_option("1: Poisson Fill")
+			_add_info_option("2: Spine Flow")
+		elif active_geometry_submodule == "Seeding" and geometry_seeding_edit_active:
+			geometry_state_label.text = "State: Edit Seeds"
+			info_bar.add_child(geometry_state_label)
+			_add_info_option("1: Select / Move")
+			_add_info_option("2: Add")
+			_add_info_option("3: Remove")
+			_add_info_option("Delete: Remove selected")
+		else:
+			geometry_state_label.text = "State: Default"
+			info_bar.add_child(geometry_state_label)
+			_add_info_option("Geometry: %s" % active_geometry_submodule)
+			_add_info_option("⌘1: Method")
+			if active_geometry_submodule == "Seeding":
+				_add_info_option("⌘2: Edit Seeds")
 		return
 	if active_module == "Style":
 		var material_state_label := Label.new()
@@ -3945,6 +4281,20 @@ func _render_info_bar() -> void:
 		if not selected_element.is_empty() and str(selected_element.get("type", "generator")) == "import":
 			_add_info_option("1: Original")
 			_add_info_option("2: White to Alpha")
+		return
+	if not selected_guide_id.is_empty():
+		var selected_guide := _get_guide(_get_asset(selected_asset_id), selected_guide_id)
+		var guide_state_label := Label.new()
+		guide_state_label.text = "State: Draw Guide Point" if active_state == "draw" else "State: Edit Guide Point" if active_state == "edit" else "State: Default"
+		info_bar.add_child(guide_state_label)
+		_add_info_option("Guide: %s" % AssetGuide.display_name(str(selected_guide.get("guide_type", AssetGuide.SAMPLER_SPINE))))
+		if active_state == "draw":
+			_add_info_option("Click: Add Smooth Point · Esc: Stop")
+		elif active_state == "edit":
+			_add_info_option("Click: Select · Drag: Move · Delete: Remove")
+		else:
+			_add_info_option("⌘1: Draw Guide Point")
+			_add_info_option("⌘2: Edit Guide Point")
 		return
 	if selected_component_id.is_empty():
 		if active_module == "Create":
@@ -4185,9 +4535,10 @@ func _confirm_asset_creation() -> void:
 		asset_name = _next_default_asset_name()
 	var asset_id := "asset_%d" % next_asset_id
 	next_asset_id += 1
-	assets.append({"id": asset_id, "name": asset_name, "visibility": true, "reference_image": _default_reference_image(), "animation": MotionWorkspace.create_default_animation_document(), "components": []})
+	assets.append({"id": asset_id, "name": asset_name, "visibility": true, "reference_image": _default_reference_image(), "animation": MotionWorkspace.create_default_animation_document(), "components": [], "guides": []})
 	selected_asset_id = asset_id
 	selected_component_id = ""
+	selected_guide_id = ""
 	selected_texture_id = ""
 	selected_element_id = ""
 	active_state = ""
@@ -5015,22 +5366,82 @@ func _render_geometry_component_asset_entry(asset: Dictionary, force_expand := f
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		button.focus_mode = Control.FOCUS_NONE
-		_style_outliner_button(button, selected_asset_id == asset_id and selected_component_id == component_id)
+		_style_outliner_button(button, selected_asset_id == asset_id and selected_component_id == component_id and selected_geometry_bake_method.is_empty())
 		button.pressed.connect(_select_geometry_component.bind(asset_id, component_id))
 		row.add_child(button)
 		container.add_child(row)
+		var bakes := _geometry_sampling_bakes(asset_id, component_id) if active_geometry_submodule == "Sampling" else _geometry_seeding_bakes(asset_id, component_id)
+		for method in _geometry_bake_methods_for_active_module(bakes):
+			var bake: Dictionary = bakes[method]
+			var bake_row := HBoxContainer.new()
+			var bake_indent := Control.new()
+			bake_indent.custom_minimum_size = Vector2(34, 0)
+			bake_row.add_child(bake_indent)
+			var bake_button := Button.new()
+			bake_button.text = "%s  ·  %s" % [_geometry_bake_method_label(method), _geometry_bake_status(method, bake, asset_id, component_id, component)]
+			bake_button.tooltip_text = "Baked %s result" % _geometry_bake_method_label(method)
+			bake_button.custom_minimum_size = Vector2(0, 26)
+			bake_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			bake_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+			bake_button.focus_mode = Control.FOCUS_NONE
+			_style_outliner_button(bake_button, selected_asset_id == asset_id and selected_component_id == component_id and selected_geometry_bake_method == method)
+			bake_button.pressed.connect(_select_geometry_bake.bind(asset_id, component_id, method))
+			bake_row.add_child(bake_button)
+			container.add_child(bake_row)
+
+
+func _geometry_bake_methods_for_active_module(bakes: Dictionary) -> Array[String]:
+	var order: Array[String] = []
+	if active_geometry_submodule == "Sampling":
+		order.append(GeometrySamplingService.ADAPTIVE)
+		order.append(GeometrySamplingService.EVEN_SPACING)
+	else:
+		order.append(GeometrySeedingService.POISSON_FILL)
+		order.append(GeometrySeedingService.SPINE_FLOW)
+	var methods: Array[String] = []
+	for method in order:
+		if bakes.has(method):
+			methods.append(method)
+	return methods
+
+
+func _geometry_bake_method_label(method: String) -> String:
+	if method == GeometrySamplingService.ADAPTIVE:
+		return "Adaptive"
+	if method == GeometrySamplingService.EVEN_SPACING:
+		return "Even Spacing"
+	if method == GeometrySeedingService.SPINE_FLOW:
+		return "Spine Flow"
+	return "Poisson Fill"
+
+
+func _geometry_bake_status(method: String, bake: Dictionary, asset_id: String, component_id: String, component: Dictionary) -> String:
+	if active_geometry_submodule == "Sampling":
+		return "Baked" if str(bake.get("source_fingerprint", "")) == GeometrySamplingService.source_fingerprint(component) else "Stale"
+	var sampling_bake := _geometry_sampling_bake(asset_id, component_id)
+	if sampling_bake.is_empty() or not _geometry_sampling_bake_is_current(asset_id, component_id, component):
+		return "Sampling Stale"
+	var recipe := GeometrySeedingService.normalize_recipe({"method": method, "parameters": bake.get("parameters", {})})
+	var matches := str(bake.get("sampling_bake_id", "")) == str(sampling_bake.get("bake_id", "")) and str(bake.get("sampling_fingerprint", "")) == GeometrySeedingService.sampling_fingerprint(sampling_bake)
+	if method == GeometrySeedingService.SPINE_FLOW:
+		var guide := _geometry_seeding_sampler_spine(asset_id, component_id, recipe)
+		matches = matches and not guide.is_empty() and str(bake.get("guide_id", "")) == str(guide.get("id", "")) and str(bake.get("guide_fingerprint", "")) == GeometrySeedingService.guide_fingerprint(guide)
+	if not matches:
+		return "Stale"
+	return "Edited" if bool(bake.get("edited", false)) else "Baked"
 
 
 func _select_geometry_asset(asset_id: String) -> void:
 	var was_selected := selected_asset_id == asset_id and selected_component_id.is_empty()
 	selected_asset_id = asset_id
 	selected_component_id = ""
+	selected_geometry_bake_method = ""
 	selected_texture_id = ""
 	selected_element_id = ""
 	selected_material_id = ""
 	active_module = "Geometry"
 	active_state = ""
-	geometry_seeding_edit_active = false
+	_set_geometry_command_state("")
 	if was_selected:
 		expanded_assets[asset_id] = not bool(expanded_assets.get(asset_id, false))
 	_render_outliner()
@@ -5041,12 +5452,14 @@ func _select_geometry_asset(asset_id: String) -> void:
 func _select_geometry_component(asset_id: String, component_id: String) -> void:
 	selected_asset_id = asset_id
 	selected_component_id = component_id
+	selected_guide_id = ""
 	selected_texture_id = ""
 	selected_element_id = ""
 	selected_material_id = ""
 	active_module = "Geometry"
 	active_state = ""
-	geometry_seeding_edit_active = false
+	selected_geometry_bake_method = ""
+	_set_geometry_command_state("")
 	expanded_assets[asset_id] = true
 	_render_outliner()
 	_render_inspector()
@@ -5055,6 +5468,14 @@ func _select_geometry_component(asset_id: String, component_id: String) -> void:
 		geometry_sampling_workspace.grab_focus()
 	elif active_geometry_submodule == "Seeding" and is_instance_valid(geometry_seeding_workspace):
 		geometry_seeding_workspace.grab_focus()
+
+
+func _select_geometry_bake(asset_id: String, component_id: String, method: String) -> void:
+	_select_geometry_component(asset_id, component_id)
+	if active_geometry_submodule == "Sampling":
+		_set_geometry_sampling_method(method)
+	else:
+		_set_geometry_seeding_method(method)
 
 
 func _render_asset_outliner_entry(asset: Dictionary, force_expand := false, lookdev := false) -> void:
@@ -5074,7 +5495,7 @@ func _render_asset_outliner_entry(asset: Dictionary, force_expand := false, look
 	asset_button.focus_mode = Control.FOCUS_NONE
 	var active_asset_id := lookdev_target_asset_id if lookdev else selected_asset_id
 	var active_component_id := lookdev_target_component_id if lookdev else selected_component_id
-	_style_outliner_button(asset_button, asset_id == active_asset_id and active_component_id.is_empty())
+	_style_outliner_button(asset_button, asset_id == active_asset_id and active_component_id.is_empty() and (lookdev or selected_guide_id.is_empty()))
 	if lookdev:
 		asset_button.pressed.connect(_select_lookdev_asset.bind(asset_id))
 	else:
@@ -5089,6 +5510,8 @@ func _render_asset_outliner_entry(asset: Dictionary, force_expand := false, look
 	if not force_expand and not bool(expanded_assets.get(asset_id, false)):
 		return
 	var components: Array = []
+	var guides_by_component: Dictionary = {}
+	var unscoped_guides: Array = []
 	var guides: Array = asset.get("guides", []).duplicate(true)
 	for component in asset.get("components", []):
 		if str(component.get("type", "component")) == "guide":
@@ -5096,7 +5519,17 @@ func _render_asset_outliner_entry(asset: Dictionary, force_expand := false, look
 		else:
 			components.append(component)
 	components.sort_custom(_sort_named_documents)
-	guides.sort_custom(_sort_named_documents)
+	for guide in guides:
+		var guide_component_id := str(guide.get("scope", {}).get("component_id", ""))
+		if guide_component_id.is_empty():
+			unscoped_guides.append(guide)
+		else:
+			if not guides_by_component.has(guide_component_id):
+				guides_by_component[guide_component_id] = []
+			guides_by_component[guide_component_id].append(guide)
+	for component_guides in guides_by_component.values():
+		component_guides.sort_custom(_sort_named_documents)
+	unscoped_guides.sort_custom(_sort_named_documents)
 	asset_container.add_child(_create_outliner_child_group_label("Components"))
 	for component in components:
 		var component_id := str(component["id"])
@@ -5120,24 +5553,42 @@ func _render_asset_outliner_entry(asset: Dictionary, force_expand := false, look
 		else:
 			component_button.pressed.connect(_select_component.bind(asset_id, component_id))
 		component_row.add_child(component_button)
-	if not guides.is_empty():
-		asset_container.add_child(_create_outliner_child_group_label("Guides"))
-		for guide in guides:
-			var guide_row := HBoxContainer.new()
-			guide_row.add_theme_constant_override("separation", 0)
-			var guide_placeholder := Control.new()
-			guide_placeholder.custom_minimum_size = Vector2(16, 0)
-			guide_row.add_child(guide_placeholder)
-			guide_row.add_child(_create_visibility_checkbox(bool(guide.get("visibility", true)), _on_component_visibility_entry_changed.bind(asset_id, str(guide.get("id", "")))))
-			var guide_button := Button.new()
-			guide_button.text = str(guide.get("name", "Guide"))
-			guide_button.custom_minimum_size = Vector2(0, 30)
-			guide_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			guide_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-			guide_button.focus_mode = Control.FOCUS_NONE
-			_style_outliner_button(guide_button, str(guide.get("id", "")) == selected_component_id)
-			guide_row.add_child(guide_button)
-			asset_container.add_child(guide_row)
+		if not lookdev:
+			var add_guide_button := Button.new()
+			add_guide_button.text = "+"
+			add_guide_button.custom_minimum_size = Vector2(28, 30)
+			add_guide_button.focus_mode = Control.FOCUS_NONE
+			add_guide_button.tooltip_text = "Add Guide"
+			add_guide_button.pressed.connect(_open_guide_dialog.bind(asset_id, component_id))
+			component_row.add_child(add_guide_button)
+		for guide in guides_by_component.get(component_id, []):
+			_render_component_guide_row(asset_container, asset_id, guide)
+	for guide in unscoped_guides:
+		_render_component_guide_row(asset_container, asset_id, guide)
+
+
+func _render_component_guide_row(container: VBoxContainer, asset_id: String, guide: Dictionary) -> void:
+	var guide_row := HBoxContainer.new()
+	guide_row.add_theme_constant_override("separation", 0)
+	container.add_child(guide_row)
+	var component_indent := Control.new()
+	component_indent.custom_minimum_size = Vector2(16, 0)
+	guide_row.add_child(component_indent)
+	var guide_indent := Control.new()
+	guide_indent.custom_minimum_size = Vector2(16, 0)
+	guide_row.add_child(guide_indent)
+	guide_row.add_child(_create_visibility_checkbox(bool(guide.get("visibility", true)), _on_guide_visibility_entry_changed.bind(asset_id, str(guide.get("id", "")))))
+	var guide_button := Button.new()
+	var guide_name := str(guide.get("name", "Guide"))
+	guide_button.text = guide_name if bool(guide.get("visibility", true)) else _strikethrough_text(guide_name)
+	guide_button.tooltip_text = AssetGuide.display_name(str(guide.get("guide_type", AssetGuide.SAMPLER_SPINE)))
+	guide_button.custom_minimum_size = Vector2(0, 30)
+	guide_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	guide_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	guide_button.focus_mode = Control.FOCUS_NONE
+	_style_guide_outliner_button(guide_button, str(guide.get("id", "")) == selected_guide_id)
+	guide_button.pressed.connect(_select_guide.bind(asset_id, str(guide.get("id", ""))))
+	guide_row.add_child(guide_button)
 
 
 func _render_texture_outliner_entry(texture: Dictionary, force_expand := false) -> void:
@@ -5255,11 +5706,13 @@ func _strikethrough_text(text: String) -> String:
 
 
 func _select_asset(asset_id: String) -> void:
-	var was_selected := selected_asset_id == asset_id and selected_component_id.is_empty()
+	_stop_guide_draw_state()
+	var was_selected := selected_asset_id == asset_id and selected_component_id.is_empty() and selected_guide_id.is_empty()
 	active_module = "Create"
 	_set_create_submodule_context("Asset")
 	selected_asset_id = asset_id
 	selected_component_id = ""
+	selected_guide_id = ""
 	selected_texture_id = ""
 	selected_element_id = ""
 	selected_material_id = ""
@@ -5273,6 +5726,7 @@ func _select_asset(asset_id: String) -> void:
 
 
 func _select_texture(texture_id: String) -> void:
+	_stop_guide_draw_state()
 	var was_selected := selected_texture_id == texture_id and selected_element_id.is_empty()
 	active_module = "Create"
 	_set_create_submodule_context("Texture")
@@ -5281,6 +5735,7 @@ func _select_texture(texture_id: String) -> void:
 	selected_element_id = ""
 	selected_asset_id = ""
 	selected_component_id = ""
+	selected_guide_id = ""
 	selected_material_id = ""
 	active_state = ""
 	if was_selected:
@@ -5291,6 +5746,7 @@ func _select_texture(texture_id: String) -> void:
 
 
 func _select_element(texture_id: String, element_id: String) -> void:
+	_stop_guide_draw_state()
 	active_import_preview_mode = "original"
 	active_module = "Create"
 	_set_create_submodule_context("Texture")
@@ -5298,6 +5754,7 @@ func _select_element(texture_id: String, element_id: String) -> void:
 	selected_element_id = element_id
 	selected_asset_id = ""
 	selected_component_id = ""
+	selected_guide_id = ""
 	selected_material_id = ""
 	active_state = ""
 	expanded_textures[texture_id] = true
@@ -5309,6 +5766,7 @@ func _select_element(texture_id: String, element_id: String) -> void:
 func _open_component_dialog(asset_id: String) -> void:
 	selected_asset_id = asset_id
 	selected_component_id = ""
+	selected_guide_id = ""
 	selected_texture_id = ""
 	selected_element_id = ""
 	component_name_input.text = ""
@@ -5324,6 +5782,61 @@ func _submit_component_name(_submitted_text: String) -> void:
 
 func _on_component_dialog_canceled() -> void:
 	canvas_view.set_navigation_locked(false)
+
+
+func _open_guide_dialog(asset_id: String, component_id: String) -> void:
+	var component := _get_component(_get_asset(asset_id), component_id)
+	if component.is_empty():
+		return
+	selected_asset_id = asset_id
+	selected_component_id = component_id
+	selected_guide_id = ""
+	guide_name_input.text = ""
+	guide_dialog.set_meta("asset_id", asset_id)
+	guide_dialog.set_meta("component_id", component_id)
+	canvas_view.set_navigation_locked(true)
+	guide_dialog.popup_centered()
+	guide_name_input.grab_focus()
+
+
+func _submit_guide_name(_submitted_text: String) -> void:
+	_confirm_guide_creation()
+
+
+func _on_guide_dialog_canceled() -> void:
+	canvas_view.set_navigation_locked(false)
+
+
+func _confirm_guide_creation() -> void:
+	var asset_id := str(guide_dialog.get_meta("asset_id", ""))
+	var component_id := str(guide_dialog.get_meta("component_id", ""))
+	var asset := _get_asset(asset_id)
+	if asset.is_empty() or _get_component(asset, component_id).is_empty():
+		guide_dialog.hide()
+		canvas_view.set_navigation_locked(false)
+		return
+	_record_direct_change()
+	var guide_name := guide_name_input.text.strip_edges()
+	if guide_name.is_empty():
+		guide_name = _next_default_guide_name(asset, AssetGuide.BODY_FLOW)
+	var guide_id := "guide_%d" % next_guide_id
+	next_guide_id += 1
+	var guide := AssetGuide.create(guide_id, guide_name, AssetGuide.BODY_FLOW, component_id)
+	if not asset.get("guides", []) is Array:
+		asset["guides"] = []
+	asset["guides"].append(guide)
+	selected_asset_id = asset_id
+	selected_component_id = ""
+	selected_guide_id = guide_id
+	active_state = ""
+	active_draw_tool = ""
+	expanded_assets[asset_id] = true
+	guide_dialog.hide()
+	canvas_view.set_navigation_locked(false)
+	_show_status_message("Created %s." % guide_name)
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
 
 
 func _confirm_component_creation() -> void:
@@ -5352,6 +5865,7 @@ func _confirm_component_creation() -> void:
 	})
 	selected_asset_id = asset_id
 	selected_component_id = component_id
+	selected_guide_id = ""
 	selected_texture_id = ""
 	selected_element_id = ""
 	active_state = ""
@@ -5378,10 +5892,12 @@ func _has_component_name(asset: Dictionary, component_name: String) -> bool:
 
 
 func _select_component(asset_id: String, component_id: String) -> void:
+	_stop_guide_draw_state()
 	active_module = "Create"
 	_set_create_submodule_context("Asset")
 	selected_asset_id = asset_id
 	selected_component_id = component_id
+	selected_guide_id = ""
 	selected_edge_id = ""
 	selected_point_id = ""
 	selected_point_ids.clear()
@@ -5390,6 +5906,29 @@ func _select_component(asset_id: String, component_id: String) -> void:
 	selected_material_id = ""
 	active_state = ""
 	canvas_view.set_interaction_state("")
+	expanded_assets[asset_id] = true
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _select_guide(asset_id: String, guide_id: String) -> void:
+	_stop_guide_draw_state()
+	var guide := _get_guide(_get_asset(asset_id), guide_id)
+	if guide.is_empty():
+		return
+	active_module = "Create"
+	_set_create_submodule_context("Asset")
+	selected_asset_id = asset_id
+	selected_component_id = ""
+	selected_guide_id = guide_id
+	selected_edge_id = ""
+	selected_point_id = ""
+	selected_point_ids.clear()
+	selected_texture_id = ""
+	selected_element_id = ""
+	selected_material_id = ""
+	active_state = ""
 	expanded_assets[asset_id] = true
 	_render_outliner()
 	_render_inspector()
@@ -5409,6 +5948,11 @@ func _delete_selected_component() -> void:
 		return
 	_record_direct_change()
 	asset["components"].remove_at(component_index)
+	var surviving_guides: Array = []
+	for guide in asset.get("guides", []):
+		if str(guide.get("scope", {}).get("component_id", "")) != selected_component_id:
+			surviving_guides.append(guide)
+	asset["guides"] = surviving_guides
 	selected_component_id = ""
 	active_state = ""
 	_render_outliner()
@@ -5417,7 +5961,9 @@ func _delete_selected_component() -> void:
 
 
 func _delete_current_outliner_selection() -> void:
-	if not selected_component_id.is_empty():
+	if not selected_guide_id.is_empty():
+		_delete_selected_guide()
+	elif not selected_component_id.is_empty():
 		_delete_selected_component()
 	elif not selected_element_id.is_empty():
 		_delete_selected_element()
@@ -5534,6 +6080,26 @@ func _style_outliner_button(button: Button, selected: bool) -> void:
 	button.add_theme_color_override("font_hover_color", Color("#16181d") if selected else Color("#ffffff"))
 	button.add_theme_color_override("font_pressed_color", Color("#16181d"))
 	button.add_theme_color_override("font_focus_color", text_color)
+
+
+func _style_guide_outliner_button(button: Button, selected: bool) -> void:
+	_style_outliner_button(button, selected)
+	if selected:
+		return
+	var normal := StyleBoxFlat.new()
+	normal.bg_color = Color("#4a4022")
+	normal.border_color = Color("#75622c")
+	normal.set_border_width_all(1)
+	var hover := normal.duplicate()
+	hover.bg_color = Color("#5b4e27")
+	var pressed := normal.duplicate()
+	pressed.bg_color = Color("#6a5929")
+	button.add_theme_stylebox_override("normal", normal)
+	button.add_theme_stylebox_override("hover", hover)
+	button.add_theme_stylebox_override("pressed", pressed)
+	button.add_theme_stylebox_override("focus", normal)
+	button.add_theme_color_override("font_color", Color("#f4d976"))
+	button.add_theme_color_override("font_hover_color", Color("#fff0a8"))
 
 
 func _render_material_inspector() -> void:
@@ -5780,6 +6346,148 @@ func _on_material_opacity_changed(value: float) -> void:
 	_render_canvas_context()
 
 
+func _render_guide_inspector(asset: Dictionary, guide: Dictionary) -> void:
+	inspector_content.add_child(_create_inspector_section("Guide"))
+	if guide.is_empty():
+		inspector_content.add_child(_create_inspector_field_label("Guide not found."))
+		return
+	inspector_content.add_child(_create_inspector_field_label("Name"))
+	var name_editor := _create_name_editor(str(guide.get("name", "Guide")), "Guide name")
+	name_editor.text_submitted.connect(_rename_selected_guide)
+	name_editor.focus_exited.connect(func() -> void: _rename_selected_guide(name_editor.text))
+	inspector_content.add_child(name_editor)
+	inspector_content.add_child(_create_inspector_field_label("Type"))
+	var type_option := OptionButton.new()
+	type_option.add_item("Body Flow")
+	type_option.set_item_metadata(0, AssetGuide.BODY_FLOW)
+	type_option.add_item("Sampler Spine")
+	type_option.set_item_metadata(1, AssetGuide.SAMPLER_SPINE)
+	var guide_type := str(guide.get("guide_type", AssetGuide.BODY_FLOW))
+	type_option.select(0 if guide_type == AssetGuide.BODY_FLOW else 1)
+	type_option.disabled = not guide.get("points", []).is_empty()
+	type_option.tooltip_text = "Guide Type is fixed once Points have been authored." if type_option.disabled else ""
+	type_option.item_selected.connect(_on_guide_type_selected.bind(type_option))
+	inspector_content.add_child(type_option)
+	inspector_content.add_child(_create_inspector_field_label("Parent Component"))
+	var target_id := str(guide.get("scope", {}).get("component_id", ""))
+	var target_name := "Missing Component"
+	for component in asset.get("components", []):
+		if str(component.get("type", "component")) == "guide":
+			continue
+		if str(component.get("id", "")) == target_id:
+			target_name = str(component.get("name", "Component"))
+	inspector_content.add_child(_create_inspector_field_label(target_name))
+	var visible_toggle := CheckBox.new()
+	visible_toggle.text = "Visible"
+	visible_toggle.button_pressed = bool(guide.get("visibility", true))
+	visible_toggle.toggled.connect(_on_selected_guide_visibility_changed)
+	inspector_content.add_child(visible_toggle)
+	inspector_content.add_child(_create_inspector_section("Topology"))
+	inspector_content.add_child(_create_inspector_field_label("Open Spine · %d Points" % guide.get("points", []).size()))
+	var status := "Ready" if AssetGuide.validation_issues(guide).is_empty() else "Ready to draw" if guide.get("points", []).is_empty() else "Invalid"
+	if _get_component(asset, target_id).is_empty():
+		status = "Unassigned"
+	inspector_content.add_child(_create_inspector_field_label("Status: %s" % status))
+	var delete_button := Button.new()
+	delete_button.text = "Delete Guide"
+	delete_button.focus_mode = Control.FOCUS_NONE
+	delete_button.pressed.connect(_delete_selected_guide)
+	inspector_content.add_child(delete_button)
+
+
+func _rename_selected_guide(new_name: String) -> void:
+	var guide := _get_guide(_get_asset(selected_asset_id), selected_guide_id)
+	var normalized_name := new_name.strip_edges()
+	if guide.is_empty() or normalized_name.is_empty() or normalized_name == str(guide.get("name", "")):
+		return
+	_record_direct_change()
+	guide["name"] = normalized_name
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _on_guide_type_selected(index: int, option: OptionButton) -> void:
+	var guide := _get_guide(_get_asset(selected_asset_id), selected_guide_id)
+	if guide.is_empty() or not guide.get("points", []).is_empty() or index < 0 or index >= option.item_count:
+		return
+	var guide_type := str(option.get_item_metadata(index))
+	if guide_type not in AssetGuide.VALID_TYPES or guide_type == str(guide.get("guide_type", "")):
+		return
+	_record_direct_change()
+	guide["guide_type"] = guide_type
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _on_guide_target_selected(index: int, option: OptionButton) -> void:
+	var guide := _get_guide(_get_asset(selected_asset_id), selected_guide_id)
+	if guide.is_empty() or not guide.get("points", []).is_empty() or index < 0 or index >= option.item_count:
+		return
+	var component_id := str(option.get_item_metadata(index))
+	if str(guide.get("scope", {}).get("component_id", "")) == component_id:
+		return
+	_record_direct_change()
+	guide["scope"] = {"kind": "component", "component_id": component_id}
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _on_selected_guide_visibility_changed(enabled: bool) -> void:
+	var guide := _get_guide(_get_asset(selected_asset_id), selected_guide_id)
+	if guide.is_empty() or bool(guide.get("visibility", true)) == enabled:
+		return
+	_record_direct_change()
+	guide["visibility"] = enabled
+	_render_outliner()
+	_render_canvas_context()
+
+
+func _on_guide_visibility_entry_changed(enabled: bool, asset_id: String, guide_id: String) -> void:
+	var guide := _get_guide(_get_asset(asset_id), guide_id)
+	if guide.is_empty() or bool(guide.get("visibility", true)) == enabled:
+		return
+	_record_direct_change()
+	guide["visibility"] = enabled
+	_render_outliner()
+	_render_canvas_context()
+
+
+func _delete_selected_guide() -> void:
+	var asset := _get_asset(selected_asset_id)
+	if asset.is_empty() or selected_guide_id.is_empty():
+		return
+	pending_guide_remove_asset_id = selected_asset_id
+	pending_guide_remove_id = selected_guide_id
+	var guide := _get_guide(asset, selected_guide_id)
+	if is_instance_valid(guide_remove_dialog):
+		guide_remove_dialog.dialog_text = "Delete Guide ‘%s’?" % str(guide.get("name", "Guide"))
+		guide_remove_dialog.popup_centered()
+	else:
+		_confirm_guide_deletion()
+
+
+func _confirm_guide_deletion() -> void:
+	var asset := _get_asset(pending_guide_remove_asset_id)
+	var guide_id := pending_guide_remove_id
+	pending_guide_remove_asset_id = ""
+	pending_guide_remove_id = ""
+	if asset.is_empty() or guide_id.is_empty():
+		return
+	var guides: Array = asset.get("guides", [])
+	for guide_index in range(guides.size()):
+		if str(guides[guide_index].get("id", "")) == guide_id:
+			_record_direct_change()
+			guides.remove_at(guide_index)
+			if selected_guide_id == guide_id:
+				selected_guide_id = ""
+			_render_outliner()
+			_render_inspector()
+			_render_canvas_context()
+			return
+
+
 func _render_geometry_sampling_inspector() -> void:
 	inspector_content.add_child(_create_inspector_section("Sampling"))
 	var asset := _get_asset(selected_asset_id)
@@ -5915,7 +6623,8 @@ func _bake_geometry_sampling_preview() -> void:
 	var document := _get_geometry_document(selected_asset_id, selected_component_id, true)
 	var bake := geometry_sampling_preview.duplicate(true)
 	bake["bake_id"] = "bake_%d" % ResourceUID.create_id()
-	document["sampling"]["bake"] = bake
+	document["sampling"]["bakes"][str(bake.get("method", ""))] = bake
+	selected_geometry_bake_method = str(bake.get("method", ""))
 	geometry_sampling_preview = {}
 	geometry_sampling_preview_key = ""
 	_show_status_message("Sampling baked for %s." % str(component.get("name", "Component")))
@@ -5960,28 +6669,50 @@ func _render_geometry_seeding_inspector() -> void:
 	var method_option := OptionButton.new()
 	method_option.add_item("Poisson Fill")
 	method_option.set_item_metadata(0, GeometrySeedingService.POISSON_FILL)
+	method_option.add_item("Spine Flow")
+	method_option.set_item_metadata(1, GeometrySeedingService.SPINE_FLOW)
+	method_option.select(0 if str(recipe.get("method", "")) == GeometrySeedingService.POISSON_FILL else 1)
 	method_option.item_selected.connect(func(index: int) -> void: _set_geometry_seeding_method(str(method_option.get_item_metadata(index))))
 	inspector_content.add_child(method_option)
 	inspector_content.add_child(_create_inspector_section("Parameters"))
-	inspector_content.add_child(_create_inspector_field_label("Spacing (local units)"))
-	var spacing := SpinBox.new()
-	spacing.min_value = GeometrySeedingService.MIN_SPACING
-	spacing.max_value = 10000.0
-	spacing.step = 0.01
-	spacing.custom_arrow_step = 0.01
-	spacing.set_value_no_signal(float(recipe.get("parameters", {}).get("spacing", GeometrySeedingService.DEFAULT_SPACING)))
-	spacing.value_changed.connect(_on_geometry_seeding_parameter_changed.bind("spacing"))
-	spacing.get_line_edit().text_submitted.connect(_on_geometry_seeding_spacing_text_submitted.bind(spacing))
-	spacing.get_line_edit().focus_exited.connect(_on_geometry_seeding_spacing_focus_exited.bind(spacing))
-	inspector_content.add_child(spacing)
-	inspector_content.add_child(_create_inspector_field_label("Random Seed"))
-	var random_seed := SpinBox.new()
-	random_seed.min_value = 0.0
-	random_seed.max_value = 2147483647.0
-	random_seed.step = 1.0
-	random_seed.set_value_no_signal(float(recipe.get("parameters", {}).get("seed", GeometrySeedingService.DEFAULT_SEED)))
-	random_seed.value_changed.connect(_on_geometry_seeding_parameter_changed.bind("seed"))
-	inspector_content.add_child(random_seed)
+	var guide_ready := true
+	if str(recipe.get("method", "")) == GeometrySeedingService.SPINE_FLOW:
+		var sampler_guides := _sampler_spines_for_component(_get_asset(selected_asset_id), selected_component_id)
+		inspector_content.add_child(_create_inspector_field_label("Sampler Spine"))
+		var guide_option := OptionButton.new()
+		for guide in sampler_guides:
+			guide_option.add_item(str(guide.get("name", "Sampler Spine")))
+			guide_option.set_item_metadata(guide_option.item_count - 1, str(guide.get("id", "")))
+			if str(guide.get("id", "")) == str(recipe.get("parameters", {}).get("guide_id", "")):
+				guide_option.select(guide_option.item_count - 1)
+		guide_ready = not _geometry_seeding_sampler_spine(selected_asset_id, selected_component_id, recipe).is_empty()
+		guide_option.disabled = sampler_guides.is_empty()
+		guide_option.item_selected.connect(_on_geometry_seeding_guide_selected.bind(guide_option))
+		inspector_content.add_child(guide_option)
+		if sampler_guides.is_empty():
+			var missing_guide := _create_inspector_field_label("Create and author a Sampler Spine on this Component.")
+			missing_guide.add_theme_color_override("font_color", Color("#ef8354"))
+			inspector_content.add_child(missing_guide)
+		_add_geometry_seeding_float_parameter("Along Spacing", recipe, "along_spacing", GeometrySeedingService.MIN_SPACING, 10000.0)
+		_add_geometry_seeding_float_parameter("Across Spacing", recipe, "across_spacing", GeometrySeedingService.MIN_SPACING, 10000.0)
+		_add_geometry_seeding_float_parameter("Boundary Clearance", recipe, "boundary_clearance", 0.0, 10000.0)
+		_add_geometry_seeding_float_parameter("Stagger", recipe, "stagger", 0.0, 1.0)
+		var fill_gaps := CheckBox.new()
+		fill_gaps.text = "Fill Gaps"
+		fill_gaps.button_pressed = bool(recipe.get("parameters", {}).get("fill_gaps", GeometrySeedingService.DEFAULT_FILL_GAPS))
+		fill_gaps.toggled.connect(_on_geometry_seeding_fill_gaps_changed)
+		inspector_content.add_child(fill_gaps)
+	else:
+		_add_geometry_seeding_float_parameter("Spacing (local units)", recipe, "spacing", GeometrySeedingService.MIN_SPACING, 10000.0)
+	if str(recipe.get("method", "")) == GeometrySeedingService.POISSON_FILL or bool(recipe.get("parameters", {}).get("fill_gaps", false)):
+		inspector_content.add_child(_create_inspector_field_label("Random Seed"))
+		var random_seed := SpinBox.new()
+		random_seed.min_value = 0.0
+		random_seed.max_value = 2147483647.0
+		random_seed.step = 1.0
+		random_seed.set_value_no_signal(float(recipe.get("parameters", {}).get("seed", GeometrySeedingService.DEFAULT_SEED)))
+		random_seed.value_changed.connect(_on_geometry_seeding_parameter_changed.bind("seed"))
+		inspector_content.add_child(random_seed)
 	var status := _geometry_seeding_status(selected_asset_id, selected_component_id, component)
 	inspector_content.add_child(_create_inspector_section("Result"))
 	inspector_content.add_child(_create_inspector_field_label("Status: %s" % status))
@@ -5998,7 +6729,7 @@ func _render_geometry_seeding_inspector() -> void:
 	generate_button.text = "Generate"
 	generate_button.custom_minimum_size = Vector2(96, 28)
 	generate_button.focus_mode = Control.FOCUS_NONE
-	generate_button.disabled = not upstream_current
+	generate_button.disabled = not upstream_current or not guide_ready
 	generate_button.pressed.connect(_generate_geometry_seeding_preview)
 	actions.add_child(generate_button)
 	var bake_button := Button.new()
@@ -6011,11 +6742,58 @@ func _render_geometry_seeding_inspector() -> void:
 	inspector_content.add_child(actions)
 
 
+func _add_geometry_seeding_float_parameter(label_text: String, recipe: Dictionary, parameter_name: String, minimum: float, maximum: float) -> void:
+	inspector_content.add_child(_create_inspector_field_label(label_text))
+	var field := SpinBox.new()
+	field.min_value = minimum
+	field.max_value = maximum
+	field.step = 0.01
+	field.custom_arrow_step = 0.01
+	field.set_value_no_signal(float(recipe.get("parameters", {}).get(parameter_name, minimum)))
+	field.value_changed.connect(_on_geometry_seeding_parameter_changed.bind(parameter_name))
+	field.get_line_edit().text_submitted.connect(_on_geometry_seeding_float_text_submitted.bind(field, parameter_name))
+	field.get_line_edit().focus_exited.connect(_on_geometry_seeding_float_focus_exited.bind(field, parameter_name))
+	inspector_content.add_child(field)
+
+
+func _on_geometry_seeding_guide_selected(index: int, option: OptionButton) -> void:
+	if index < 0 or index >= option.item_count:
+		return
+	var document := _get_geometry_document(selected_asset_id, selected_component_id, true)
+	var recipe := _geometry_seeding_recipe(selected_asset_id, selected_component_id)
+	var guide_id := str(option.get_item_metadata(index))
+	if str(recipe.get("parameters", {}).get("guide_id", "")) == guide_id:
+		return
+	_record_direct_change()
+	recipe["parameters"]["guide_id"] = guide_id
+	document["seeding"]["recipe"] = GeometrySeedingService.normalize_recipe(recipe)
+	call_deferred("_generate_geometry_seeding_preview")
+
+
+func _on_geometry_seeding_fill_gaps_changed(enabled: bool) -> void:
+	var document := _get_geometry_document(selected_asset_id, selected_component_id, true)
+	var recipe := _geometry_seeding_recipe(selected_asset_id, selected_component_id)
+	if bool(recipe.get("parameters", {}).get("fill_gaps", true)) == enabled:
+		return
+	_record_direct_change()
+	recipe["parameters"]["fill_gaps"] = enabled
+	document["seeding"]["recipe"] = GeometrySeedingService.normalize_recipe(recipe)
+	call_deferred("_generate_geometry_seeding_preview")
+
+
 func _on_geometry_seeding_parameter_changed(value: float, parameter_name: String) -> void:
 	if selected_asset_id.is_empty() or selected_component_id.is_empty():
 		return
 	var current := _geometry_seeding_recipe(selected_asset_id, selected_component_id)
-	var normalized_value = maxf(value, GeometrySeedingService.MIN_SPACING) if parameter_name == "spacing" else maxi(0, int(round(value)))
+	var normalized_value: Variant = value
+	if parameter_name in ["spacing", "along_spacing", "across_spacing"]:
+		normalized_value = maxf(value, GeometrySeedingService.MIN_SPACING)
+	elif parameter_name == "boundary_clearance":
+		normalized_value = maxf(value, 0.0)
+	elif parameter_name == "stagger":
+		normalized_value = clampf(value, 0.0, 1.0)
+	elif parameter_name == "seed":
+		normalized_value = maxi(0, int(round(value)))
 	if current.get("parameters", {}).get(parameter_name) == normalized_value:
 		return
 	_record_coalesced_change()
@@ -6034,15 +6812,23 @@ func _on_geometry_seeding_spacing_focus_exited(spacing: SpinBox) -> void:
 	_commit_geometry_seeding_spacing_text(spacing.get_line_edit().text, spacing)
 
 
-func _commit_geometry_seeding_spacing_text(raw_text: String, spacing: SpinBox) -> void:
+func _on_geometry_seeding_float_text_submitted(text: String, field: SpinBox, parameter_name: String) -> void:
+	_commit_geometry_seeding_spacing_text(text, field, parameter_name)
+
+
+func _on_geometry_seeding_float_focus_exited(field: SpinBox, parameter_name: String) -> void:
+	_commit_geometry_seeding_spacing_text(field.get_line_edit().text, field, parameter_name)
+
+
+func _commit_geometry_seeding_spacing_text(raw_text: String, spacing: SpinBox, parameter_name := "spacing") -> void:
 	var normalized_text := raw_text.strip_edges().replace(",", ".")
 	if not normalized_text.is_valid_float():
 		spacing.get_line_edit().text = String.num(spacing.value, 2)
 		return
-	var value := clampf(float(normalized_text), GeometrySeedingService.MIN_SPACING, spacing.max_value)
+	var value := clampf(float(normalized_text), spacing.min_value, spacing.max_value)
 	spacing.set_value_no_signal(value)
 	spacing.get_line_edit().text = String.num(value, 2)
-	_on_geometry_seeding_parameter_changed(value, "spacing")
+	_on_geometry_seeding_parameter_changed(value, parameter_name)
 
 
 func _generate_geometry_seeding_preview() -> void:
@@ -6050,8 +6836,10 @@ func _generate_geometry_seeding_preview() -> void:
 	if component.is_empty() or not _geometry_sampling_bake_is_current(selected_asset_id, selected_component_id, component):
 		_show_status_message("Bake current Sampling before generating Seeds.")
 		return
+	var recipe := _geometry_seeding_recipe(selected_asset_id, selected_component_id)
+	var guide := _geometry_seeding_sampler_spine(selected_asset_id, selected_component_id, recipe)
 	geometry_seeding_preview_key = _geometry_document_key(selected_asset_id, selected_component_id)
-	geometry_seeding_preview = GeometrySeedingService.generate(_geometry_sampling_bake(selected_asset_id, selected_component_id), _geometry_seeding_recipe(selected_asset_id, selected_component_id))
+	geometry_seeding_preview = GeometrySeedingService.generate(_geometry_sampling_bake(selected_asset_id, selected_component_id), recipe, guide)
 	if bool(geometry_seeding_preview.get("valid", false)):
 		_show_status_message("Generated %d Seeds." % int(geometry_seeding_preview.get("seed_count", 0)))
 	else:
@@ -6084,10 +6872,11 @@ func _confirm_bake_geometry_seeding_preview() -> void:
 	var bake := geometry_seeding_preview.duplicate(true)
 	bake["bake_id"] = "seeding_bake_%d" % ResourceUID.create_id()
 	bake["edited"] = false
-	document["seeding"]["bake"] = bake
+	document["seeding"]["bakes"][str(bake.get("method", ""))] = bake
+	selected_geometry_bake_method = str(bake.get("method", ""))
 	geometry_seeding_preview = {}
 	geometry_seeding_preview_key = ""
-	geometry_seeding_edit_active = geometry_seeding_enter_edit_after_bake
+	_set_geometry_command_state("seeding_edit" if geometry_seeding_enter_edit_after_bake else "")
 	geometry_seeding_enter_edit_after_bake = false
 	_show_status_message("Seeding baked for %s." % str(component.get("name", "Component")))
 	_render_outliner()
@@ -6111,7 +6900,8 @@ func _refresh_geometry_seeding_workspace() -> void:
 		return
 	var status := _geometry_seeding_status(selected_asset_id, selected_component_id, component)
 	var result := geometry_seeding_preview if _geometry_seeding_preview_matches(selected_asset_id, selected_component_id, component) else _geometry_seeding_bake(selected_asset_id, selected_component_id)
-	geometry_seeding_workspace.set_context(_geometry_sampling_bake(selected_asset_id, selected_component_id), result, status, geometry_seeding_edit_active and status in ["Baked", "Edited"], geometry_seeding_edit_tool)
+	var guide := _geometry_seeding_sampler_spine(selected_asset_id, selected_component_id)
+	geometry_seeding_workspace.set_context(_geometry_sampling_bake(selected_asset_id, selected_component_id), result, guide, status, geometry_seeding_edit_active and status in ["Baked", "Edited"], geometry_seeding_edit_tool)
 
 
 func _editable_geometry_seeding_bake() -> Dictionary:
@@ -6300,6 +7090,9 @@ func _render_inspector() -> void:
 		return
 	var asset := _get_asset(selected_asset_id)
 	if asset.is_empty():
+		return
+	if not selected_guide_id.is_empty():
+		_render_guide_inspector(asset, _get_guide(asset, selected_guide_id))
 		return
 	if selected_component_id.is_empty():
 		inspector_content.add_child(_create_inspector_field_label("Name"))
@@ -8319,6 +9112,7 @@ func _load_material_canvas_texture(material_data: Dictionary) -> Texture2D:
 
 func _render_lookdev_canvas() -> void:
 	canvas_view.visible = true
+	canvas_view.clear_draw_constraint()
 	texture_canvas.visible = false
 	import_preview.visible = false
 	var asset := _get_asset(lookdev_target_asset_id)
@@ -8372,6 +9166,8 @@ func _render_canvas_context() -> void:
 		return
 	canvas_view.set_reference_image(null)
 	canvas_view.set_paper_frame(Vector2.ZERO, false)
+	canvas_view.set_guide_style(false)
+	canvas_view.clear_draw_constraint()
 	geometry_sampling_workspace.visible = false
 	geometry_seeding_workspace.visible = false
 	if active_module == "Motion":
@@ -8507,6 +9303,11 @@ func _render_canvas_context() -> void:
 		canvas_view.set_bezier_geometry([], [], [])
 		return
 	_set_reference_image_canvas(asset)
+	if not selected_guide_id.is_empty():
+		var selected_guide := _get_guide(asset, selected_guide_id)
+		if not selected_guide.is_empty():
+			_render_spine_canvas(asset, selected_guide, active_state == "draw" and active_draw_tool == "spine")
+			return
 	if selected_component_id.is_empty():
 		canvas_context_label.text = "Asset: %s" % str(asset["name"])
 		canvas_view.set_context(str(asset["name"]))
@@ -8565,6 +9366,43 @@ func _render_canvas_context() -> void:
 	canvas_view.call_deferred("grab_focus")
 
 
+func _render_spine_canvas(asset: Dictionary, guide: Dictionary, drawing: bool) -> void:
+	var target_component_id := str(guide.get("scope", {}).get("component_id", ""))
+	var target_component := _get_component(asset, target_component_id)
+	var type_name := AssetGuide.display_name(str(guide.get("guide_type", AssetGuide.SAMPLER_SPINE)))
+	canvas_context_label.text = "%s: %s%s" % [type_name, str(guide.get("name", type_name)), " · Draft" if drawing else ""]
+	canvas_view.set_context(str(guide.get("name", type_name)))
+	canvas_view.set_paper_frame(Vector2.ZERO, false)
+	canvas_view.set_component_material(null)
+	canvas_view.set_guide_style(true)
+	canvas_view.set_reference_shapes(_build_reference_shapes(asset, "", target_component_id))
+	canvas_view.set_display_polygon([])
+	BezierGeometry.resolve_auto_handles(guide.get("points", []), guide.get("chains", []))
+	canvas_view.set_bezier_geometry(guide.get("points", []), guide.get("edges", []), guide.get("chains", []))
+	if target_component.is_empty():
+		canvas_view.set_component_transform(_default_component_transform())
+	else:
+		var target_transform: Dictionary = target_component.get("transform", _default_component_transform()).duplicate(true)
+		target_transform["visibility"] = bool(asset.get("visibility", true)) and bool(guide.get("visibility", true))
+		canvas_view.set_component_transform(target_transform)
+	if drawing:
+		var boundaries := _component_guide_boundaries(target_component)
+		canvas_view.set_draw_constraint(boundaries.get("outer", PackedVector2Array()), boundaries.get("holes", []))
+		canvas_view.set_interaction_state("draw")
+		canvas_view.set_tool_mode("spine")
+		canvas_view.set_draw_point_mode(active_draw_point_mode)
+	elif active_state == "edit" and not selected_guide_id.is_empty():
+		canvas_view.set_interaction_state("edit")
+		canvas_view.set_tool_mode("")
+		canvas_view.set_edit_mode("point")
+		canvas_view.set_edit_handles_enabled(edit_bezier_handles)
+		canvas_view.set_edit_point_set_enabled(false)
+	else:
+		canvas_view.set_interaction_state("")
+		canvas_view.set_tool_mode("")
+	canvas_view.call_deferred("grab_focus")
+
+
 func _set_reference_image_canvas(asset: Dictionary) -> void:
 	var reference_image := _normalize_reference_image(asset.get("reference_image", {}))
 	var reference_path := _reference_image_path(asset)
@@ -8589,10 +9427,12 @@ func _set_reference_image_canvas(asset: Dictionary) -> void:
 	)
 
 
-func _build_reference_shapes(asset: Dictionary, excluded_component_id := "") -> Array:
+func _build_reference_shapes(asset: Dictionary, excluded_component_id := "", emphasized_component_id := "") -> Array:
 	var shapes: Array = []
 	var asset_is_visible := bool(asset.get("visibility", true))
 	for component in asset["components"]:
+		if str(component.get("type", "component")) == "guide":
+			continue
 		if str(component["id"]) == excluded_component_id:
 			continue
 		shapes.append({
@@ -8604,9 +9444,31 @@ func _build_reference_shapes(asset: Dictionary, excluded_component_id := "") -> 
 			"closed": BezierTopology.outer_chain_closed(component),
 			"transform": component.get("transform", _default_component_transform()).duplicate(true),
 			"visibility": asset_is_visible and bool(component.get("visibility", true)),
-			"z_index": int(component.get("z_index", 0))
+			"z_index": int(component.get("z_index", 0)),
+			"emphasized": str(component["id"]) == emphasized_component_id
 		})
 	return shapes
+
+
+func _component_guide_boundaries(component: Dictionary) -> Dictionary:
+	var outer := PackedVector2Array()
+	var holes: Array = []
+	if component.is_empty():
+		return {"outer": outer, "holes": holes}
+	var resolved_component := component.duplicate(true)
+	BezierGeometry.resolve_auto_handles(resolved_component.get("points", []), resolved_component.get("chains", []))
+	for chain_data in resolved_component.get("chains", []):
+		if not chain_data is Dictionary or not bool(chain_data.get("closed", false)):
+			continue
+		var polygon := BezierGeometry.flatten_chain(resolved_component, chain_data)
+		if polygon.size() < 3:
+			continue
+		var role := str(chain_data.get("topology_role", "outer"))
+		if role == "outer" and outer.is_empty():
+			outer = polygon
+		elif role == "hole":
+			holes.append(polygon)
+	return {"outer": outer, "holes": holes}
 
 
 func _refresh_component_geometry(component: Dictionary) -> void:
@@ -8617,6 +9479,16 @@ func _refresh_component_geometry(component: Dictionary) -> void:
 
 
 func _on_bezier_point_added(position: Vector2, point_mode: String = "linear", drawn_handle_out: Vector2 = Vector2.ZERO) -> void:
+	if active_draw_tool == "spine" and not selected_guide_id.is_empty():
+		var guide := _get_guide(_get_asset(selected_asset_id), selected_guide_id)
+		if guide.is_empty():
+			return
+		_record_direct_change()
+		BezierTopology.add_point(guide, canvas_view.constrain_draw_position(position), "aligned", Vector2.ZERO)
+		BezierGeometry.resolve_auto_handles(guide.get("points", []), guide.get("chains", []))
+		canvas_view.set_bezier_geometry(guide.get("points", []), guide.get("edges", []), guide.get("chains", []))
+		_render_inspector()
+		return
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	if component.is_empty():
 		return
@@ -8682,23 +9554,27 @@ func _on_reference_component_selected(component_id: String) -> void:
 func _on_bezier_points_move_started(point_ids: Array) -> void:
 	bezier_point_move_start_positions.clear()
 	bezier_point_move_component_id = selected_component_id
-	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	if component.is_empty():
+	bezier_point_move_guide_id = selected_guide_id
+	var subject := _get_guide(_get_asset(selected_asset_id), selected_guide_id) if not selected_guide_id.is_empty() else _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if subject.is_empty():
 		return
 	for point_id_value in point_ids:
 		var point_id := str(point_id_value)
-		var point := BezierTopology.point_by_id(component.get("points", []), point_id)
+		var point := BezierTopology.point_by_id(subject.get("points", []), point_id)
 		if not point.is_empty():
 			bezier_point_move_start_positions[point_id] = Vector2(point.get("position", Vector2.ZERO))
 
 
 func _on_bezier_points_moved(point_ids: Array, world_delta: Vector2) -> void:
-	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	if component.is_empty() or point_ids.is_empty():
+	var asset := _get_asset(selected_asset_id)
+	var guide := _get_guide(asset, selected_guide_id) if not selected_guide_id.is_empty() else {}
+	var subject := guide if not guide.is_empty() else _get_component(asset, selected_component_id)
+	if subject.is_empty() or point_ids.is_empty():
 		return
-	if bezier_point_move_component_id != selected_component_id or bezier_point_move_start_positions.is_empty():
+	if bezier_point_move_component_id != selected_component_id or bezier_point_move_guide_id != selected_guide_id or bezier_point_move_start_positions.is_empty():
 		_on_bezier_points_move_started(point_ids)
-	var transform: Dictionary = component.get("transform", _default_component_transform())
+	var transform_subject := _get_component(asset, str(guide.get("scope", {}).get("component_id", ""))) if not guide.is_empty() else subject
+	var transform: Dictionary = transform_subject.get("transform", _default_component_transform())
 	var rotation := deg_to_rad(float(transform.get("rotation", 0.0)))
 	var scale: Vector2 = transform.get("scale", Vector2.ONE)
 	var local_delta := world_delta.rotated(-rotation)
@@ -8713,20 +9589,24 @@ func _on_bezier_points_moved(point_ids: Array, world_delta: Vector2) -> void:
 		var anchor_position: Vector2 = bezier_point_move_start_positions[anchor_id]
 		local_delta = canvas_view.snap_position(anchor_position + local_delta) - anchor_position
 	_record_coalesced_change()
-	var points: Array = component.get("points", [])
+	var points: Array = subject.get("points", [])
 	for point_id_value in point_ids:
 		var point_id := str(point_id_value)
 		var point := BezierTopology.point_by_id(points, point_id)
 		if not point.is_empty() and bezier_point_move_start_positions.has(point_id):
 			point["position"] = Vector2(bezier_point_move_start_positions[point_id]) + local_delta
-	BezierGeometry.resolve_auto_handles(points, component.get("chains", []))
-	_refresh_component_geometry(component)
+	BezierGeometry.resolve_auto_handles(points, subject.get("chains", []))
+	if guide.is_empty():
+		_refresh_component_geometry(subject)
+	else:
+		canvas_view.set_bezier_geometry(subject.get("points", []), subject.get("edges", []), subject.get("chains", []))
 	_render_inspector()
 
 
 func _on_bezier_handle_changed(point_id: String, handle_side: String, value: Vector2) -> void:
-	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	var point := BezierTopology.point_by_id(component.get("points", []), point_id)
+	var guide := _get_guide(_get_asset(selected_asset_id), selected_guide_id) if not selected_guide_id.is_empty() else {}
+	var subject := guide if not guide.is_empty() else _get_component(_get_asset(selected_asset_id), selected_component_id)
+	var point := BezierTopology.point_by_id(subject.get("points", []), point_id)
 	if point.is_empty() or handle_side not in ["in", "out"]:
 		return
 	_record_coalesced_change()
@@ -8745,8 +9625,11 @@ func _on_bezier_handle_changed(point_id: String, handle_side: String, value: Vec
 		if is_zero_approx(opposite_length):
 			opposite_length = value.length()
 		point["handle_%s" % opposite_side] = -value.normalized() * opposite_length
-	BezierGeometry.resolve_auto_handles(component.get("points", []), component.get("chains", []))
-	_refresh_component_geometry(component)
+	BezierGeometry.resolve_auto_handles(subject.get("points", []), subject.get("chains", []))
+	if guide.is_empty():
+		_refresh_component_geometry(subject)
+	else:
+		canvas_view.set_bezier_geometry(subject.get("points", []), subject.get("edges", []), subject.get("chains", []))
 
 
 func _on_bezier_edge_insert_requested(edge_id: String, t: float) -> void:
@@ -8765,11 +9648,12 @@ func _on_bezier_edge_insert_requested(edge_id: String, t: float) -> void:
 
 
 func _on_bezier_point_delete_requested(point_id: String, record_history := true) -> void:
-	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	var points: Array = component.get("points", [])
-	if component.is_empty() or BezierTopology.point_by_id(points, point_id).is_empty():
+	var guide := _get_guide(_get_asset(selected_asset_id), selected_guide_id) if not selected_guide_id.is_empty() else {}
+	var subject := guide if not guide.is_empty() else _get_component(_get_asset(selected_asset_id), selected_component_id)
+	var points: Array = subject.get("points", [])
+	if subject.is_empty() or BezierTopology.point_by_id(points, point_id).is_empty():
 		return
-	var chain := BezierTopology.chain_for_point(component.get("chains", []), point_id)
+	var chain := BezierTopology.chain_for_point(subject.get("chains", []), point_id)
 	if chain.is_empty():
 		return
 	var point_ids: Array = chain.get("point_ids", [])
@@ -8779,15 +9663,18 @@ func _on_bezier_point_delete_requested(point_id: String, record_history := true)
 		return
 	if record_history:
 		_record_direct_change()
-	if not BezierTopology.delete_point(component, point_id):
+	if not BezierTopology.delete_point(subject, point_id):
 		return
-	points = component.get("points", [])
+	points = subject.get("points", [])
 	var next_selection_index := mini(deleted_point_index, points.size() - 1)
 	selected_point_id = str(points[next_selection_index].get("id", "")) if next_selection_index >= 0 else ""
 	selected_point_ids.clear()
 	if not selected_point_id.is_empty():
 		selected_point_ids.append(selected_point_id)
-	_refresh_component_geometry(component)
+		if guide.is_empty():
+			_refresh_component_geometry(subject)
+		else:
+			canvas_view.set_bezier_geometry(subject.get("points", []), subject.get("edges", []), subject.get("chains", []))
 	canvas_view.set_selected_point_id(selected_point_id)
 	_render_inspector()
 
@@ -8795,18 +9682,22 @@ func _on_bezier_point_delete_requested(point_id: String, record_history := true)
 func _on_bezier_points_delete_requested(point_ids: Array) -> void:
 	if point_ids.is_empty():
 		return
-	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	if component.is_empty():
+	var guide := _get_guide(_get_asset(selected_asset_id), selected_guide_id) if not selected_guide_id.is_empty() else {}
+	var subject := guide if not guide.is_empty() else _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if subject.is_empty():
 		return
-	var valid_point_ids := _valid_selected_point_ids(component)
+	var valid_point_ids := _valid_selected_point_ids(subject)
 	if valid_point_ids.is_empty():
 		return
 	_record_direct_change()
-	BezierTopology.delete_points(component, valid_point_ids)
+	BezierTopology.delete_points(subject, valid_point_ids)
 	selected_point_id = ""
 	selected_point_ids.clear()
 	canvas_view.clear_selection()
-	_refresh_component_geometry(component)
+	if guide.is_empty():
+		_refresh_component_geometry(subject)
+	else:
+		canvas_view.set_bezier_geometry(subject.get("points", []), subject.get("edges", []), subject.get("chains", []))
 	_render_inspector()
 
 
@@ -9063,8 +9954,17 @@ func _get_component(asset: Dictionary, component_id: String) -> Dictionary:
 	if asset.is_empty():
 		return {}
 	for component in asset["components"]:
-		if str(component["id"]) == component_id:
+		if str(component.get("type", "component")) != "guide" and str(component["id"]) == component_id:
 			return component
+	return {}
+
+
+func _get_guide(asset: Dictionary, guide_id: String) -> Dictionary:
+	if asset.is_empty():
+		return {}
+	for guide in asset.get("guides", []):
+		if str(guide.get("id", "")) == guide_id:
+			return guide
 	return {}
 
 
@@ -9105,6 +10005,12 @@ func _clear(container: Node) -> void:
 		child.queue_free()
 
 
+func _clear_context_bar() -> void:
+	for child in context_bar.get_children():
+		context_bar.remove_child(child)
+		child.free()
+
+
 func _add_module_section(parent: Container, module_name: String, submodules: Array, open_by_default := false, show_submodule_separators := false, separator_before_submodule_index := -1) -> void:
 	var section := ModuleSection.new()
 	section.setup(module_name, submodules, open_by_default, show_submodule_separators, separator_before_submodule_index)
@@ -9127,6 +10033,7 @@ func _on_category_pressed(_module_name: String) -> void:
 		selected_texture_id = ""
 		selected_element_id = ""
 		active_state = ""
+		selected_geometry_bake_method = ""
 		if active_motion_submodule == "Animation" and not _get_asset(selected_asset_id).is_empty():
 			motion_selection.select_asset(selected_asset_id)
 	if active_module == "Geometry":
@@ -9171,14 +10078,21 @@ func _find_section(module_name: String) -> ModuleSection:
 
 
 func _select_submodule(module_name: String, submodule: String, section: ModuleSection) -> void:
+	if active_draw_tool == "spine":
+		_stop_guide_draw_state()
 	section.set_active_submodule(submodule)
 	active_module = module_name
 	if module_name == "Create":
 		_set_create_submodule_context(submodule)
+		_render_outliner()
+		_render_inspector()
+		_render_context_bar()
+		_render_canvas_context()
 	elif module_name == "Geometry" and submodule in GEOMETRY_SUBMODULES:
 		active_geometry_submodule = submodule
 		active_module = "Geometry"
-		geometry_seeding_edit_active = false
+		_set_geometry_command_state("")
+		selected_geometry_bake_method = ""
 		selected_texture_id = ""
 		selected_element_id = ""
 		selected_material_id = ""

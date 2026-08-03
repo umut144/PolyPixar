@@ -11,12 +11,14 @@ const BACKGROUND := Color("#1b1e24")
 const GRID_MINOR := Color("#252a33")
 const GRID_MAJOR := Color("#303744")
 const BOUNDARY_COLOR := Color("#7b8492")
+const GUIDE_COLOR := Color("#f2c94c")
 const GENERATED_COLOR := Color("#68d391")
 const MANUAL_COLOR := Color("#ef8354")
 const ADJUSTED_COLOR := Color("#63b3ed")
 
 var sampling_bake: Dictionary = {}
 var seeding_result: Dictionary = {}
+var sampler_spine: Dictionary = {}
 var status := "Sampling Required"
 var editing_enabled := false
 var edit_tool := "select"
@@ -34,10 +36,11 @@ func _ready() -> void:
 	queue_redraw()
 
 
-func set_context(sampling_data: Dictionary, seeding_data: Dictionary, status_value: String, can_edit: bool, tool: String) -> void:
+func set_context(sampling_data: Dictionary, seeding_data: Dictionary, guide_data: Dictionary, status_value: String, can_edit: bool, tool: String) -> void:
 	var boundary_changed := sampling_bake != sampling_data
 	sampling_bake = sampling_data.duplicate(true)
 	seeding_result = seeding_data.duplicate(true)
+	sampler_spine = guide_data.duplicate(true)
 	status = status_value
 	editing_enabled = can_edit
 	edit_tool = tool if tool in ["select", "add", "remove"] else "select"
@@ -52,6 +55,7 @@ func set_context(sampling_data: Dictionary, seeding_data: Dictionary, status_val
 func clear_context() -> void:
 	sampling_bake = {}
 	seeding_result = {}
+	sampler_spine = {}
 	status = "Sampling Required"
 	editing_enabled = false
 	selected_seed_id = ""
@@ -140,6 +144,7 @@ func _draw() -> void:
 	if not fitted:
 		_fit_boundary()
 	_draw_boundaries()
+	_draw_sampler_spine()
 	_draw_seeds()
 	draw_string(ThemeDB.fallback_font, Vector2(10.0, 20.0), "Geometry → Seeding · %s" % status, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 12, Color("#9aa3b2"))
 
@@ -196,6 +201,18 @@ func _draw_boundaries() -> void:
 				next_index = 0
 			var next := _to_screen(Vector2(samples[next_index].get("position", Vector2.ZERO)))
 			draw_line(current, next, BOUNDARY_COLOR, 1.5, true)
+
+
+func _draw_sampler_spine() -> void:
+	if sampler_spine.is_empty() or sampler_spine.get("chains", []).is_empty():
+		return
+	var resolved := sampler_spine.duplicate(true)
+	BezierGeometry.resolve_auto_handles(resolved.get("points", []), resolved.get("chains", []))
+	var polyline := BezierGeometry.flatten_chain(resolved, resolved.get("chains", [])[0], 32)
+	if polyline.size() < 2:
+		return
+	for index in range(polyline.size() - 1):
+		draw_line(_to_screen(polyline[index]), _to_screen(polyline[index + 1]), GUIDE_COLOR, 2.0, true)
 
 
 func _draw_seeds() -> void:

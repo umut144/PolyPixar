@@ -84,6 +84,13 @@ performed on a selected Component, never directly on the Asset container.
 Edges and Chains are maintained automatically, and clicking the first Point
 after at least three Points closes the active Chain.
 
+Assets also own persistent typed Guides separately from Components. The first
+two Guide types are `body_flow` and `sampler_spine`. They share open Bézier
+authoring through a selected Guide's `CMD/Ctrl + 1 · Draw Guide Point` context,
+while retaining distinct stable semantic types. Guide coordinates are local to
+their scoped Component; Guide topology never participates in Component lookup,
+fill, export, Sampling, or reverse synchronization.
+
 The next validated use of the currently empty categories is the **Stone Floor
 Bloom** slice. It introduces one deliberately narrow module in each of two
 areas:
@@ -188,8 +195,7 @@ load, preserving their existing result without treating a raw source as ready.
 The Outliner presents Assets and Textures in separate groups. The Asset module
 shows only Assets, while the Texture module shows only Textures. Both groups are
 alphabetically ordered and share a compact search field. Expanded Assets display
-`Components` and, when Guide
-data exists, a separate `Guides` group. Expanded Textures display separate
+Components with their scoped Guides directly underneath. Expanded Textures display separate
 `Import Elements` and `Generator Elements` groups. These are navigation groups
 over one typed child collection, not separate persistence models.
 
@@ -505,10 +511,11 @@ UV mappers derive their results without reverse synchronization. Invalid
 contours must fail visibly and safely rather than crashing or silently
 replacing authored data.
 
-Sampling recipes and accepted bakes are stored as Component-scoped Geometry
-records keyed by stable Asset and Component IDs. A source fingerprint marks a
-bake stale after canonical topology changes. Seeding recipes and accepted
-bakes live in the same Component-scoped record. A Seeding Bake depends on one
+Sampling recipes and accepted Bakes are stored as Component-scoped Geometry
+records keyed by stable Asset and Component IDs, with one Bake retained for
+each Sampling method. A source fingerprint marks a Bake stale after canonical
+topology changes. Seeding recipes and accepted Bakes live in the same
+Component-scoped record, again one per Seeding method. A Seeding Bake depends on one
 stable current Sampling Bake ID and sampled-boundary fingerprint; it becomes
 stale without reverse synchronization when that upstream dependency changes.
 Manual Seed edits remain derived overrides and never replace the standard

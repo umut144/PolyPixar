@@ -81,7 +81,7 @@ default timing is 50% anticipation, 40% ingress to the midpoint, and a fast
 - Editor workspace and default window: 1920×1200 (16:10); preview uses preserved
   aspect ratio (`keep`) so the UI proportions remain stable
 - Project icon: `assets/assetflow_icon.png`
-- Current JSON schema version: **20**
+- Current JSON schema version: **23**
 
 ## Confirmed vocabulary
 
@@ -112,6 +112,12 @@ it into a general scene or animation-graph abstraction prematurely.
 - Assets contain independently editable Components. `Draw Point` stores
   ordered Bézier Points on the selected Component and automatically maintains
   Edges and Chains; drawing never targets the Asset container directly.
+- Assets may also contain persistent typed Guides. Each Component's Outliner
+  `+` action creates a scoped Guide child; `CMD/Ctrl + 1 · Draw Guide Point`
+  and `CMD/Ctrl + 2 · Edit Guide Point` author its open Spine in that
+  Component's local space. Guide topology belongs only to the Guide and never
+  replaces or mutates Component topology. Body Flow and Sampler Spine remain
+  distinct semantic contracts for future Motion and Geometry consumers.
 - Textures are a separate Workspace document type. They will contain
   `elements`, not Components, and have their own canvas dimensions and
   PolyTexture-style editing context.
@@ -119,12 +125,15 @@ it into a general scene or animation-graph abstraction prematurely.
   Geometry is a separate derived-pipeline category with Sampling, Seeding,
   Meshing, and UV Mapping. Sampling is implemented per Component with Adaptive
   and Even Spacing recipes, Generate/Bake, immutable preview, derived
-  persistence, and stale-source detection. Seeding consumes a current Sampling
-  Bake and provides deterministic Poisson Fill, Generate/Bake, and optional
-  baked-Seed editing. Meshing and UV Mapping remain placeholders. Each implemented module's Outliner
+  persistence, stale-source detection, and one persistent Bake per method.
+  Seeding consumes a current Sampling
+  Bake and provides deterministic Poisson Fill plus Sampler-Spine-driven Spine
+  Flow, Generate/Bake, dual Sampling/Guide stale detection, one persistent
+  Bake per method, and optional baked-Seed editing. Meshing and UV Mapping
+  remain placeholders. Each implemented module's Outliner
   shows only its own document type, with a shared search field.
-- Expanded Asset entries group children under `Components` and optional
-  `Guides`; expanded Texture entries group typed children under `Import
+- Expanded Asset entries group Components and display Guides directly beneath
+  their scoped Component; expanded Texture entries group typed children under `Import
   Elements` and `Generator Elements`. These are visual groups over unified
   typed child lists.
 - `Create Texture` now creates a 512×512 Texture; its Outliner `Add` action
@@ -276,7 +285,7 @@ Load uses an in-app list of existing workspace folders. Each workspace has a
 documents in their corresponding resource directories. The latest loaded or saved
 workspace name is stored in `configs/app_config.json` and is loaded
 automatically on startup. Every workspace, asset, texture, and config JSON
-uses the numeric `schema_version` field; the current schema is version `20`.
+uses the numeric `schema_version` field; the current schema is version `23`.
 Materials are independent Workspace resources stored below
 `materials/<material_id>/material.json` and listed by ID in `workspace.json`.
 The bottom status bar is divided into 17% program status, 64% contextual tool
