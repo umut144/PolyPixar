@@ -22,6 +22,7 @@ var active_create_submodule := "Asset"
 var active_geometry_submodule := "Sampling"
 var active_motion_submodule := "Animation"
 var active_module := "Create"
+var active_context_command := ""
 var outliner_list: VBoxContainer
 var outliner_search_input: LineEdit
 var inspector_content: VBoxContainer
@@ -420,6 +421,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 func _reset_to_default_state() -> void:
 	_stop_guide_draw_state()
+	_set_active_context_command("")
 	_set_geometry_command_state("")
 	selected_geometry_bake_method = ""
 	active_state = ""
@@ -446,8 +448,24 @@ func _set_geometry_command_state(state: String) -> void:
 	geometry_sampling_method_choice_active = state == "sampling_method"
 	geometry_seeding_method_choice_active = state == "seeding_method"
 	geometry_seeding_edit_active = state == "seeding_edit"
+	if state == "sampling_method":
+		_set_active_context_command("geometry.sampling.method")
+	elif state == "seeding_method":
+		_set_active_context_command("geometry.seeding.method")
+	elif state == "seeding_edit":
+		_set_active_context_command("geometry.seeding.edit_seeds")
+	elif active_context_command.begins_with("geometry."):
+		_set_active_context_command("")
 	if not geometry_seeding_edit_active:
 		geometry_seeding_edit_tool = "select"
+
+
+func _set_active_context_command(command: String) -> void:
+	active_context_command = command
+
+
+func _context_command_is(command: String) -> bool:
+	return active_context_command == command
 
 
 func _stop_guide_draw_state() -> void:
@@ -459,6 +477,7 @@ func _ensure_default_edit_point_state() -> void:
 	if active_module != "Create" or active_create_submodule != "Asset" or selected_component_id.is_empty() or not active_state.is_empty():
 		return
 	active_state = "edit"
+	_set_active_context_command("asset.edit_point")
 	active_draw_tool = ""
 	active_edit_mode = "point"
 	edit_bezier_handles = false
@@ -3056,14 +3075,14 @@ func _render_context_bar() -> void:
 		draw_guide_button.text = "⌘1  Draw Guide Point"
 		draw_guide_button.custom_minimum_size = Vector2(174, 32)
 		draw_guide_button.focus_mode = Control.FOCUS_NONE
-		_style_context_command_button(draw_guide_button, active_state == "draw" and active_draw_tool == "spine")
+		_style_context_command_button(draw_guide_button, _context_command_is("guide.draw_point"))
 		draw_guide_button.pressed.connect(_activate_guide_draw_state)
 		context_bar.add_child(draw_guide_button)
 		var edit_guide_button := Button.new()
 		edit_guide_button.text = "⌘2  Edit Guide Point"
 		edit_guide_button.custom_minimum_size = Vector2(164, 32)
 		edit_guide_button.focus_mode = Control.FOCUS_NONE
-		_style_context_command_button(edit_guide_button, active_state == "edit" and active_edit_mode == "point")
+		_style_context_command_button(edit_guide_button, _context_command_is("guide.edit_point"))
 		edit_guide_button.pressed.connect(_activate_guide_edit_state)
 		context_bar.add_child(edit_guide_button)
 		_render_info_bar()
@@ -3076,7 +3095,7 @@ func _render_context_bar() -> void:
 	draw_menu.text = "⌘1  Draw Point  ▼"
 	draw_menu.custom_minimum_size = Vector2(156, 32)
 	draw_menu.focus_mode = Control.FOCUS_NONE
-	_style_context_command_button(draw_menu, active_state == "draw" and active_draw_tool == "point")
+	_style_context_command_button(draw_menu, _context_command_is("asset.draw_point"))
 	draw_menu.get_popup().add_item("1: Linear", 0)
 	draw_menu.get_popup().add_item("2: Aligned", 1)
 	draw_menu.get_popup().add_item("3: Free", 2)
@@ -3089,7 +3108,7 @@ func _render_context_bar() -> void:
 	edit_point_menu.text = "⌘2  Edit Point  ▼"
 	edit_point_menu.custom_minimum_size = Vector2(138, 32)
 	edit_point_menu.focus_mode = Control.FOCUS_NONE
-	_style_context_command_button(edit_point_menu, active_state == "edit" and active_edit_mode == "point")
+	_style_context_command_button(edit_point_menu, _context_command_is("asset.edit_point"))
 	edit_point_menu.get_popup().add_item("1: Select", 0)
 	edit_point_menu.get_popup().add_item("2: Bezier Handle", 1)
 	edit_point_menu.get_popup().add_item("3: Set", 2)
@@ -3100,7 +3119,7 @@ func _render_context_bar() -> void:
 	edit_edge_menu.text = "⌘3  Edit Edge  ▼"
 	edit_edge_menu.custom_minimum_size = Vector2(136, 32)
 	edit_edge_menu.focus_mode = Control.FOCUS_NONE
-	_style_context_command_button(edit_edge_menu, active_state == "edit" and active_edit_mode == "edge")
+	_style_context_command_button(edit_edge_menu, _context_command_is("asset.edit_edge"))
 	edit_edge_menu.get_popup().add_item("Select Edge", 0)
 	_style_popup_menu(edit_edge_menu.get_popup())
 	edit_edge_menu.get_popup().id_pressed.connect(_on_edit_edge_menu_id)
@@ -3109,7 +3128,7 @@ func _render_context_bar() -> void:
 	edit_face_menu.text = "⌘4  Edit Face  ▼"
 	edit_face_menu.custom_minimum_size = Vector2(134, 32)
 	edit_face_menu.focus_mode = Control.FOCUS_NONE
-	_style_context_command_button(edit_face_menu, active_state == "edit" and active_edit_mode == "face")
+	_style_context_command_button(edit_face_menu, _context_command_is("asset.edit_face"))
 	edit_face_menu.get_popup().add_item("Move Face", 0)
 	_style_popup_menu(edit_face_menu.get_popup())
 	edit_face_menu.get_popup().id_pressed.connect(_on_edit_face_menu_id)
@@ -3360,7 +3379,7 @@ func _render_geometry_sampling_context_bar() -> void:
 	geometry_method_menu.text = "⌘1  Method"
 	geometry_method_menu.custom_minimum_size = Vector2(118, 32)
 	geometry_method_menu.focus_mode = Control.FOCUS_NONE
-	_style_context_command_button(geometry_method_menu, geometry_sampling_method_choice_active)
+	_style_context_command_button(geometry_method_menu, _context_command_is("geometry.sampling.method"))
 	var popup := geometry_method_menu.get_popup()
 	_style_popup_menu(popup)
 	popup.add_item("1  Adaptive", 0)
@@ -3424,7 +3443,7 @@ func _render_geometry_seeding_context_bar() -> void:
 	geometry_seeding_method_menu.text = "⌘1  Method"
 	geometry_seeding_method_menu.custom_minimum_size = Vector2(118, 32)
 	geometry_seeding_method_menu.focus_mode = Control.FOCUS_NONE
-	_style_context_command_button(geometry_seeding_method_menu, geometry_seeding_method_choice_active)
+	_style_context_command_button(geometry_seeding_method_menu, _context_command_is("geometry.seeding.method"))
 	var popup := geometry_seeding_method_menu.get_popup()
 	_style_popup_menu(popup)
 	popup.add_item("1  Poisson Fill", 0)
@@ -3437,7 +3456,7 @@ func _render_geometry_seeding_context_bar() -> void:
 	var status := _geometry_seeding_status(selected_asset_id, selected_component_id, component)
 	var edit_button := Button.new()
 	edit_button.text = "⌘2  Edit Seeds"
-	_style_context_command_button(edit_button, geometry_seeding_edit_active)
+	_style_context_command_button(edit_button, _context_command_is("geometry.seeding.edit_seeds"))
 	edit_button.disabled = status not in ["Preview", "Baked", "Edited"]
 	edit_button.tooltip_text = "Accept the current Preview and edit it" if status == "Preview" else "Edit the current Seeding Bake"
 	edit_button.focus_mode = Control.FOCUS_NONE
@@ -4049,6 +4068,7 @@ func _on_transform_menu_id(id: int) -> void:
 
 
 func _activate_draw_state() -> void:
+	_set_active_context_command("asset.draw_point")
 	_set_active_state("draw")
 	canvas_view.set_draw_point_mode(active_draw_point_mode)
 
@@ -4103,6 +4123,7 @@ func _activate_guide_draw_state() -> void:
 		_show_status_message("Draw Guide Point requires a closed parent Component contour.")
 		return
 	active_state = "draw"
+	_set_active_context_command("guide.draw_point")
 	active_draw_tool = "spine"
 	active_draw_point_mode = "aligned"
 	edit_bezier_handles = false
@@ -4121,6 +4142,7 @@ func _activate_guide_edit_state() -> void:
 	if guide.is_empty():
 		return
 	active_state = "edit"
+	_set_active_context_command("guide.edit_point")
 	active_draw_tool = ""
 	active_edit_mode = "point"
 	edit_bezier_handles = false
@@ -4136,6 +4158,7 @@ func _activate_guide_edit_state() -> void:
 
 
 func _activate_edit_point_state(handle_editing := false, set_mode := false) -> void:
+	_set_active_context_command("asset.edit_point")
 	edit_bezier_handles = handle_editing
 	edit_point_set_mode = set_mode
 	_set_active_state("edit")
@@ -4145,11 +4168,13 @@ func _activate_edit_point_state(handle_editing := false, set_mode := false) -> v
 
 
 func _activate_edit_edge_state() -> void:
+	_set_active_context_command("asset.edit_edge")
 	_set_active_state("edit")
 	_set_edit_mode("edge")
 
 
 func _activate_edit_face_state() -> void:
+	_set_active_context_command("asset.edit_face")
 	_set_active_state("edit")
 	_set_edit_mode("face")
 
@@ -5707,6 +5732,7 @@ func _strikethrough_text(text: String) -> String:
 
 func _select_asset(asset_id: String) -> void:
 	_stop_guide_draw_state()
+	_set_active_context_command("")
 	var was_selected := selected_asset_id == asset_id and selected_component_id.is_empty() and selected_guide_id.is_empty()
 	active_module = "Create"
 	_set_create_submodule_context("Asset")
@@ -5727,6 +5753,7 @@ func _select_asset(asset_id: String) -> void:
 
 func _select_texture(texture_id: String) -> void:
 	_stop_guide_draw_state()
+	_set_active_context_command("")
 	var was_selected := selected_texture_id == texture_id and selected_element_id.is_empty()
 	active_module = "Create"
 	_set_create_submodule_context("Texture")
@@ -5747,6 +5774,7 @@ func _select_texture(texture_id: String) -> void:
 
 func _select_element(texture_id: String, element_id: String) -> void:
 	_stop_guide_draw_state()
+	_set_active_context_command("")
 	active_import_preview_mode = "original"
 	active_module = "Create"
 	_set_create_submodule_context("Texture")
@@ -5893,6 +5921,7 @@ func _has_component_name(asset: Dictionary, component_name: String) -> bool:
 
 func _select_component(asset_id: String, component_id: String) -> void:
 	_stop_guide_draw_state()
+	_set_active_context_command("")
 	active_module = "Create"
 	_set_create_submodule_context("Asset")
 	selected_asset_id = asset_id
@@ -5914,6 +5943,7 @@ func _select_component(asset_id: String, component_id: String) -> void:
 
 func _select_guide(asset_id: String, guide_id: String) -> void:
 	_stop_guide_draw_state()
+	_set_active_context_command("")
 	var guide := _get_guide(_get_asset(asset_id), guide_id)
 	if guide.is_empty():
 		return
