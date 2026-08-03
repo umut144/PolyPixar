@@ -10038,7 +10038,7 @@ func _clear(container: Node) -> void:
 func _clear_context_bar() -> void:
 	for child in context_bar.get_children():
 		context_bar.remove_child(child)
-		child.free()
+		child.queue_free()
 
 
 func _add_module_section(parent: Container, module_name: String, submodules: Array, open_by_default := false, show_submodule_separators := false, separator_before_submodule_index := -1) -> void:

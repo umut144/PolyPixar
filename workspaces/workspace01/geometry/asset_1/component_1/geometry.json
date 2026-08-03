@@ -631,6 +631,1857 @@
 	"schema_version": 23,
 	"seeding": {
 		"bakes": {
+			"poisson_fill": {
+				"bake_id": "seeding_bake_2864530499685289386",
+				"edited": false,
+				"errors": [],
+				"guide_fingerprint": "",
+				"guide_id": "",
+				"method": "poisson_fill",
+				"parameters": {
+					"seed": 4,
+					"spacing": 0.3
+				},
+				"sampling_bake_id": "bake_6267069298897181191",
+				"sampling_fingerprint": "9aba8f6955b822f8a6d38feef90a5a98e48a12cb7c183932da54c76d72049ea4",
+				"seed_count": 141,
+				"seeds": [
+					{
+						"id": "seed:auto:000001",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-0.333133697509766,
+							10.6771812438965
+						],
+						"provenance": {
+							"generation_index": 0,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000002",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-0.0214085876941681,
+							10.451229095459
+						],
+						"provenance": {
+							"generation_index": 1,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000003",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-0.423730611801147,
+							10.2485284805298
+						],
+						"provenance": {
+							"generation_index": 2,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000004",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-0.653517782688141,
+							10.4787044525146
+						],
+						"provenance": {
+							"generation_index": 3,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000005",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-0.570748388767242,
+							9.96721267700195
+						],
+						"provenance": {
+							"generation_index": 4,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000006",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-0.113303124904633,
+							9.86811828613281
+						],
+						"provenance": {
+							"generation_index": 5,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000007",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-0.593282461166382,
+							9.48045539855957
+						],
+						"provenance": {
+							"generation_index": 6,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000008",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-0.132581144571304,
+							11.0558204650879
+						],
+						"provenance": {
+							"generation_index": 7,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000009",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							0.070810079574585,
+							10.1192331314087
+						],
+						"provenance": {
+							"generation_index": 8,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000010",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							0.397511631250381,
+							10.8239154815674
+						],
+						"provenance": {
+							"generation_index": 9,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000011",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-0.591652154922485,
+							10.9124307632446
+						],
+						"provenance": {
+							"generation_index": 10,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000012",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							0.334860056638718,
+							10.5191612243652
+						],
+						"provenance": {
+							"generation_index": 11,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000013",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-0.871489644050598,
+							10.0297994613647
+						],
+						"provenance": {
+							"generation_index": 12,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000014",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							0.549483776092529,
+							10.2570924758911
+						],
+						"provenance": {
+							"generation_index": 13,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000015",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-0.36725777387619,
+							9.68510437011719
+						],
+						"provenance": {
+							"generation_index": 14,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000016",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							0.0321413837373257,
+							10.7576866149902
+						],
+						"provenance": {
+							"generation_index": 15,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000017",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							0.746004462242126,
+							10.8779897689819
+						],
+						"provenance": {
+							"generation_index": 16,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000018",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							0.0653914958238602,
+							9.4355354309082
+						],
+						"provenance": {
+							"generation_index": 17,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000019",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-0.79343181848526,
+							9.18565368652344
+						],
+						"provenance": {
+							"generation_index": 18,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000020",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							0.236932367086411,
+							9.73837184906006
+						],
+						"provenance": {
+							"generation_index": 19,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000021",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-0.211902469396591,
+							9.19793319702148
+						],
+						"provenance": {
+							"generation_index": 20,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000022",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-1.03250861167908,
+							9.6719970703125
+						],
+						"provenance": {
+							"generation_index": 21,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000023",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-0.379366338253021,
+							11.2533073425293
+						],
+						"provenance": {
+							"generation_index": 22,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000024",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-1.22860705852509,
+							9.23543739318848
+						],
+						"provenance": {
+							"generation_index": 23,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000025",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							0.934776186943054,
+							9.85689926147461
+						],
+						"provenance": {
+							"generation_index": 24,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000026",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-0.63672411441803,
+							11.598669052124
+						],
+						"provenance": {
+							"generation_index": 25,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000027",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-0.60230678319931,
+							8.92827892303467
+						],
+						"provenance": {
+							"generation_index": 26,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000028",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							1.01673448085785,
+							10.6985931396484
+						],
+						"provenance": {
+							"generation_index": 27,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000029",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-0.315047025680542,
+							8.56581401824951
+						],
+						"provenance": {
+							"generation_index": 28,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000030",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							0.356856405735016,
+							11.4007472991943
+						],
+						"provenance": {
+							"generation_index": 29,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000031",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							0.0228610634803772,
+							11.3237791061401
+						],
+						"provenance": {
+							"generation_index": 30,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000032",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-1.33546435832977,
+							8.81603813171387
+						],
+						"provenance": {
+							"generation_index": 31,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000033",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							0.732143521308899,
+							11.1995010375977
+						],
+						"provenance": {
+							"generation_index": 32,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000034",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							0.39991956949234,
+							9.41501331329346
+						],
+						"provenance": {
+							"generation_index": 33,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000035",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-0.00856927037239075,
+							8.95441627502441
+						],
+						"provenance": {
+							"generation_index": 34,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000036",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							1.45323407649994,
+							10.8350296020508
+						],
+						"provenance": {
+							"generation_index": 35,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000037",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							1.28369295597076,
+							11.2149267196655
+						],
+						"provenance": {
+							"generation_index": 36,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000038",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							1.03273785114288,
+							10.3096199035645
+						],
+						"provenance": {
+							"generation_index": 37,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000039",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							1.72638583183289,
+							11.0922431945801
+						],
+						"provenance": {
+							"generation_index": 38,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000040",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							0.583711445331573,
+							9.68924236297607
+						],
+						"provenance": {
+							"generation_index": 39,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000041",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							0.69015097618103,
+							10.5814027786255
+						],
+						"provenance": {
+							"generation_index": 40,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000042",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-0.168334573507309,
+							8.27787780761719
+						],
+						"provenance": {
+							"generation_index": 41,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000043",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							0.240983515977859,
+							8.60259532928467
+						],
+						"provenance": {
+							"generation_index": 42,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000044",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-0.581244349479675,
+							8.42497158050537
+						],
+						"provenance": {
+							"generation_index": 43,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000045",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-1.02668678760529,
+							8.77075290679932
+						],
+						"provenance": {
+							"generation_index": 44,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000046",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							0.332519352436066,
+							8.90630054473877
+						],
+						"provenance": {
+							"generation_index": 45,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000047",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							0.187252223491669,
+							11.0638809204102
+						],
+						"provenance": {
+							"generation_index": 46,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000048",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							1.05293345451355,
+							9.53300762176514
+						],
+						"provenance": {
+							"generation_index": 47,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000049",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-0.106984794139862,
+							11.6074829101562
+						],
+						"provenance": {
+							"generation_index": 48,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000050",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							1.8565993309021,
+							10.5571527481079
+						],
+						"provenance": {
+							"generation_index": 49,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000051",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							0.427205175161362,
+							11.7186985015869
+						],
+						"provenance": {
+							"generation_index": 50,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000052",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-1.67225694656372,
+							8.9057445526123
+						],
+						"provenance": {
+							"generation_index": 51,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000053",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							1.99347579479218,
+							10.9496421813965
+						],
+						"provenance": {
+							"generation_index": 52,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000054",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							0.636908113956451,
+							8.7121410369873
+						],
+						"provenance": {
+							"generation_index": 53,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000055",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							0.17396080493927,
+							12.125599861145
+						],
+						"provenance": {
+							"generation_index": 54,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000056",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							0.740572214126587,
+							11.662335395813
+						],
+						"provenance": {
+							"generation_index": 55,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000057",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							1.03357005119324,
+							8.95578193664551
+						],
+						"provenance": {
+							"generation_index": 56,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000058",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							0.671352505683899,
+							11.9561805725098
+						],
+						"provenance": {
+							"generation_index": 57,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000059",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							0.710420966148376,
+							9.26019763946533
+						],
+						"provenance": {
+							"generation_index": 58,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000060",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							1.27633273601532,
+							10.5426139831543
+						],
+						"provenance": {
+							"generation_index": 59,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000061",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							1.75818252563477,
+							11.3939743041992
+						],
+						"provenance": {
+							"generation_index": 60,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000062",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-1.80453968048096,
+							8.43902587890625
+						],
+						"provenance": {
+							"generation_index": 61,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000063",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-1.49621653556824,
+							8.54663181304932
+						],
+						"provenance": {
+							"generation_index": 62,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000064",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							0.514599204063416,
+							8.42440509796143
+						],
+						"provenance": {
+							"generation_index": 63,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000065",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							1.28390288352966,
+							9.21399211883545
+						],
+						"provenance": {
+							"generation_index": 64,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000066",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							0.55518764257431,
+							12.2338848114014
+						],
+						"provenance": {
+							"generation_index": 65,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000067",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-0.927056789398193,
+							8.27714824676514
+						],
+						"provenance": {
+							"generation_index": 66,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000068",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							0.512093544006348,
+							12.6076698303223
+						],
+						"provenance": {
+							"generation_index": 67,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000069",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-1.23550570011139,
+							8.33699989318848
+						],
+						"provenance": {
+							"generation_index": 68,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000070",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-0.6824551820755,
+							12.1089019775391
+						],
+						"provenance": {
+							"generation_index": 69,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000071",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-0.120534740388393,
+							11.9832782745361
+						],
+						"provenance": {
+							"generation_index": 70,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000072",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-0.42854106426239,
+							11.8738918304443
+						],
+						"provenance": {
+							"generation_index": 71,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000073",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							1.39631390571594,
+							10.2604522705078
+						],
+						"provenance": {
+							"generation_index": 72,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000074",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							1.43773305416107,
+							9.87331295013428
+						],
+						"provenance": {
+							"generation_index": 73,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000075",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							1.57219195365906,
+							11.8160371780396
+						],
+						"provenance": {
+							"generation_index": 74,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000076",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							0.813584625720978,
+							8.37565898895264
+						],
+						"provenance": {
+							"generation_index": 75,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000077",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							1.23474705219269,
+							11.6875743865967
+						],
+						"provenance": {
+							"generation_index": 76,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000078",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							1.44475889205933,
+							8.60372924804688
+						],
+						"provenance": {
+							"generation_index": 77,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000079",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							0.306720197200775,
+							8.16084957122803
+						],
+						"provenance": {
+							"generation_index": 78,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000080",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-2.04181385040283,
+							8.24459552764893
+						],
+						"provenance": {
+							"generation_index": 79,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000081",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							2.24383282661438,
+							10.6803417205811
+						],
+						"provenance": {
+							"generation_index": 80,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000082",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							1.72800827026367,
+							9.39664649963379
+						],
+						"provenance": {
+							"generation_index": 81,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000083",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							1.79909884929657,
+							10.0323371887207
+						],
+						"provenance": {
+							"generation_index": 82,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000084",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							2.29320669174194,
+							9.44181728363037
+						],
+						"provenance": {
+							"generation_index": 83,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000085",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							0.987582802772522,
+							11.4281721115112
+						],
+						"provenance": {
+							"generation_index": 84,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000086",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							1.07918751239777,
+							12.0414009094238
+						],
+						"provenance": {
+							"generation_index": 85,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000087",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-0.0707526504993439,
+							12.306357383728
+						],
+						"provenance": {
+							"generation_index": 86,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000088",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							2.56021571159363,
+							9.76784801483154
+						],
+						"provenance": {
+							"generation_index": 87,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000089",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-2.17362403869629,
+							8.52245616912842
+						],
+						"provenance": {
+							"generation_index": 88,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000090",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							1.40234065055847,
+							9.50769519805908
+						],
+						"provenance": {
+							"generation_index": 89,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000091",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							1.8072874546051,
+							9.68764781951904
+						],
+						"provenance": {
+							"generation_index": 90,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000092",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							2.69468355178833,
+							9.38122272491455
+						],
+						"provenance": {
+							"generation_index": 91,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000093",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							2.43122720718384,
+							10.0531072616577
+						],
+						"provenance": {
+							"generation_index": 92,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000094",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-1.54612302780151,
+							8.24789619445801
+						],
+						"provenance": {
+							"generation_index": 93,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000095",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							1.00808942317963,
+							8.62373828887939
+						],
+						"provenance": {
+							"generation_index": 94,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000096",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							2.2766478061676,
+							10.3134431838989
+						],
+						"provenance": {
+							"generation_index": 95,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000097",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-0.999709606170654,
+							12.0168228149414
+						],
+						"provenance": {
+							"generation_index": 96,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000098",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							2.11189293861389,
+							9.89330959320068
+						],
+						"provenance": {
+							"generation_index": 97,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000099",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							1.49797439575195,
+							8.94655799865723
+						],
+						"provenance": {
+							"generation_index": 98,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000100",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							1.01936829090118,
+							11.0694313049316
+						],
+						"provenance": {
+							"generation_index": 99,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000101",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							1.06865108013153,
+							12.3429956436157
+						],
+						"provenance": {
+							"generation_index": 100,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000102",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							0.209612727165222,
+							12.4942941665649
+						],
+						"provenance": {
+							"generation_index": 101,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000103",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							2.0571231842041,
+							8.87366580963135
+						],
+						"provenance": {
+							"generation_index": 102,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000104",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							1.23519575595856,
+							8.21646213531494
+						],
+						"provenance": {
+							"generation_index": 103,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000105",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							2.04292726516724,
+							9.27333068847656
+						],
+						"provenance": {
+							"generation_index": 104,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000106",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							1.18629240989685,
+							10.04079246521
+						],
+						"provenance": {
+							"generation_index": 105,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000107",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-0.486597746610641,
+							12.3731880187988
+						],
+						"provenance": {
+							"generation_index": 106,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000108",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-2.36191439628601,
+							8.22853374481201
+						],
+						"provenance": {
+							"generation_index": 107,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000109",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							2.0635073184967,
+							8.56889629364014
+						],
+						"provenance": {
+							"generation_index": 108,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000110",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							2.75364255905151,
+							9.06697845458984
+						],
+						"provenance": {
+							"generation_index": 109,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000111",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							2.59407544136047,
+							8.61341094970703
+						],
+						"provenance": {
+							"generation_index": 110,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000112",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							1.80171597003937,
+							9.04315757751465
+						],
+						"provenance": {
+							"generation_index": 111,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000113",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-0.0460094213485718,
+							12.7293281555176
+						],
+						"provenance": {
+							"generation_index": 112,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000114",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-0.961381077766418,
+							12.3285350799561
+						],
+						"provenance": {
+							"generation_index": 113,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000115",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							1.79247510433197,
+							8.28232574462891
+						],
+						"provenance": {
+							"generation_index": 114,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000116",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							2.32942843437195,
+							9.08726215362549
+						],
+						"provenance": {
+							"generation_index": 115,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000117",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-0.74902081489563,
+							12.5469636917114
+						],
+						"provenance": {
+							"generation_index": 116,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000118",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							2.18827223777771,
+							8.28907585144043
+						],
+						"provenance": {
+							"generation_index": 117,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000119",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-1.0570080280304,
+							12.8385543823242
+						],
+						"provenance": {
+							"generation_index": 118,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000120",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-1.3055272102356,
+							12.3624744415283
+						],
+						"provenance": {
+							"generation_index": 119,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000121",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-1.36904466152191,
+							12.9499158859253
+						],
+						"provenance": {
+							"generation_index": 120,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000122",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							1.73589277267456,
+							8.73755264282227
+						],
+						"provenance": {
+							"generation_index": 121,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000123",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-0.814623951911926,
+							13.0422163009644
+						],
+						"provenance": {
+							"generation_index": 122,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000124",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-0.529897034168243,
+							12.8227100372314
+						],
+						"provenance": {
+							"generation_index": 123,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000125",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							2.61665368080139,
+							8.20051002502441
+						],
+						"provenance": {
+							"generation_index": 124,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000126",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-1.69830417633057,
+							12.9306354522705
+						],
+						"provenance": {
+							"generation_index": 125,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000127",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							0.774773001670837,
+							12.4555139541626
+						],
+						"provenance": {
+							"generation_index": 126,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000128",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-0.138156563043594,
+							13.0601444244385
+						],
+						"provenance": {
+							"generation_index": 127,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000129",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-1.67431151866913,
+							12.3505792617798
+						],
+						"provenance": {
+							"generation_index": 128,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000130",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							2.94375014305115,
+							8.71899032592773
+						],
+						"provenance": {
+							"generation_index": 129,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000131",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							3.05215454101562,
+							8.17329692840576
+						],
+						"provenance": {
+							"generation_index": 130,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000132",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-1.82769632339478,
+							12.6311483383179
+						],
+						"provenance": {
+							"generation_index": 131,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000133",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-1.52747142314911,
+							12.6667604446411
+						],
+						"provenance": {
+							"generation_index": 132,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000134",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-2.15463209152222,
+							12.4806299209595
+						],
+						"provenance": {
+							"generation_index": 133,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000135",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-2.51897192001343,
+							12.2504768371582
+						],
+						"provenance": {
+							"generation_index": 134,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000136",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-2.02652621269226,
+							12.9191608428955
+						],
+						"provenance": {
+							"generation_index": 135,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000137",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-2.32464051246643,
+							12.8090410232544
+						],
+						"provenance": {
+							"generation_index": 136,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000138",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-2.69960331916809,
+							12.5443267822266
+						],
+						"provenance": {
+							"generation_index": 137,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000139",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-2.81977558135986,
+							12.2394332885742
+						],
+						"provenance": {
+							"generation_index": 138,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000140",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-3.18988752365112,
+							11.9394330978394
+						],
+						"provenance": {
+							"generation_index": 139,
+							"placement": "poisson"
+						}
+					},
+					{
+						"id": "seed:auto:000141",
+						"method": "poisson_fill",
+						"origin": "generated",
+						"position": [
+							-3.45298528671265,
+							11.4319515228271
+						],
+						"provenance": {
+							"generation_index": 140,
+							"placement": "poisson"
+						}
+					}
+				],
+				"valid": true
+			},
 			"spine_flow": {
 				"bake_id": "seeding_bake_7741132013348351465",
 				"edited": false,
@@ -2632,15 +4483,10 @@
 			}
 		},
 		"recipe": {
-			"method": "spine_flow",
+			"method": "poisson_fill",
 			"parameters": {
-				"across_spacing": 0.3,
-				"along_spacing": 0.3,
-				"boundary_clearance": 0.11,
-				"fill_gaps": true,
-				"guide_id": "guide_1",
 				"seed": 4,
-				"stagger": 0.5
+				"spacing": 0.3
 			}
 		}
 	}
