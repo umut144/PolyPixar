@@ -74,8 +74,8 @@ In the UI, these areas are called **categories**. A category contains one or
 more **modules** that provide the concrete working context. For example,
 `Create` is a category with `Asset` and `Texture` authoring modules.
 `Geometry` is a separate derived-pipeline category with modules for
-`Sampling`, `Seeding`, `Meshing`, and `UV Mapping`. Sampling, Seeding, and
-Meshing are implemented; UV Mapping remains a placeholder. Shapes editing
+`Sampling`, `Seeding`, `Meshing`, and `UV Mapping`. All four derived stages are
+implemented with bounded MVP contracts. Shapes editing
 is the canvas workflow used by the Asset module.
 
 An Asset is a container for independently editable Components. Drawing is
@@ -435,7 +435,7 @@ workspaces/<workspace_name>/
 ```
 
 Every JSON document contains a numeric `schema_version`. The current MVP
-schema is version `24`. Workspace metadata references Asset, Texture, Material,
+schema is version `25`. Workspace metadata references Asset, Texture, Material,
 Path, Act, and Sequence IDs. Each Asset document stores its Components, canonical Bézier
 Points/Edges/Chains, optional Material IDs, and one normalized Animation
 document; each Texture document stores its dimensions, origin convention,
@@ -528,6 +528,13 @@ both upstream IDs and fingerprints, stable derived Vertex IDs, boundary
 constraints, and Triangles referencing those Vertex IDs. Constrained Delaunay
 and Organic Relaxed never mutate their Sampling or Seeding inputs and never
 synchronize Mesh positions back into Component topology.
+
+UV Mapping recipes and Bakes remain Component-scoped derived data. Each UV
+Bake references one exact current Mesh Bake and stores UV coordinates keyed by
+stable Mesh Vertex IDs. Bakes are retained per Mesh-method/UV-method
+combination, so different Mesh results never overwrite one another's mapping.
+Bounds / Planar is the initial deterministic method; Mesh changes mark UVs
+stale without reverse synchronization. UV Mapping does not yet feed export.
 
 - UI prototypes may use only the smallest dummy data needed to exercise a
   specific interaction. Prefer empty panes over invented asset content.

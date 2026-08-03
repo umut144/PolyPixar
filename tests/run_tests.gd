@@ -13,6 +13,7 @@ func _init() -> void:
 	_test_geometry_sampling_ui_shell()
 	_test_geometry_seeding_service()
 	_test_geometry_meshing_service_and_ui()
+	_test_geometry_uv_mapping_service_and_ui()
 	_test_asset_guides()
 	_test_motion_selection_context()
 	_test_motion_player()
@@ -142,14 +143,14 @@ func _test_geometry_sampling_service() -> void:
 	_expect(not bool(GeometrySamplingService.generate(open_component).get("valid", true)), "An open contour should fail visibly at the mesh-pipeline Sampling boundary.")
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
-	_expect(application._has_supported_schema({"schema_version": 23}) and not application._has_supported_schema({"schema_version": 25}), "Schema 24 should keep older Workspace documents readable and reject unknown future schemas.")
+	_expect(application._has_supported_schema({"schema_version": 24}) and not application._has_supported_schema({"schema_version": 26}), "Schema 25 should keep older Workspace documents readable and reject unknown future schemas.")
 	var geometry_document: Dictionary = application._default_geometry_document("asset_1", "component_1")
 	geometry_document["sampling"]["recipe"] = {"method": GeometrySamplingService.EVEN_SPACING, "parameters": {"spacing": 2.5, "feature_detail": GeometrySamplingService.DEFAULT_FEATURE_DETAIL}}
 	var baked_result := even.duplicate(true)
 	baked_result["bake_id"] = "bake_test"
 	geometry_document["sampling"]["bakes"][GeometrySamplingService.EVEN_SPACING] = baked_result
 	var serialized_geometry: Dictionary = application._serialize_geometry_document(geometry_document)
-	_expect(int(serialized_geometry.get("schema_version", 0)) == 24 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.EVEN_SPACING, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Geometry method bakes should serialize derived positions as schema-24 JSON arrays.")
+	_expect(int(serialized_geometry.get("schema_version", 0)) == 25 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.EVEN_SPACING, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Geometry method bakes should serialize derived positions as schema-25 JSON arrays.")
 	var normalized_geometry: Dictionary = application._normalize_geometry_document(serialized_geometry, "asset_1", "component_1")
 	_expect(normalized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.EVEN_SPACING, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Vector2, "Geometry method bake loading should restore local sample positions as Vector2 values.")
 	var adaptive_bake := adaptive_low.duplicate(true)
@@ -449,6 +450,88 @@ func _test_geometry_meshing_service_and_ui() -> void:
 	_expect(application.selected_geometry_bake_method == GeometryMeshingService.CONSTRAINED_DELAUNAY and application._geometry_meshing_bakes("asset_1", "component_1").size() == 2, "Meshing methods should retain and select two independent Bakes without replacement.")
 	normalized["seeding"]["bakes"][GeometrySeedingService.POISSON_FILL]["seeds"][0]["position"] += Vector2(0.1, 0.0)
 	_expect(application._geometry_meshing_status("asset_1", "component_1", component) == "Stale", "Editing an upstream Seeding Bake should make its Mesh dependency stale without reverse synchronization.")
+	application.free()
+
+
+func _test_geometry_uv_mapping_service_and_ui() -> void:
+	var component := _component()
+	component.merge({"id": "component_1", "name": "Body", "visibility": true})
+	for position in [Vector2.ZERO, Vector2(12.0, 0.0), Vector2(12.0, 8.0), Vector2(0.0, 8.0)]:
+		BezierTopology.add_point(component, position, "linear")
+	BezierTopology.close_active_chain(component)
+	var sampling := GeometrySamplingService.generate(component, {"method": GeometrySamplingService.EVEN_SPACING, "parameters": {"spacing": 2.0}})
+	sampling["bake_id"] = "sampling_uv_test"
+	var seeding := GeometrySeedingService.generate(sampling, {"method": GeometrySeedingService.POISSON_FILL, "parameters": {"spacing": 2.5, "seed": 4}})
+	seeding["bake_id"] = "seeding_uv_test"
+	var mesh := GeometryMeshingService.generate(sampling, seeding, {"method": GeometryMeshingService.CONSTRAINED_DELAUNAY, "parameters": {"seeding_method": GeometrySeedingService.POISSON_FILL}})
+	mesh["bake_id"] = "mesh_uv_test"
+	var organic_mesh := GeometryMeshingService.generate(sampling, seeding, {"method": GeometryMeshingService.ORGANIC_RELAXED, "parameters": {"seeding_method": GeometrySeedingService.POISSON_FILL, "relaxation": 0.35, "passes": 2}})
+	organic_mesh["bake_id"] = "mesh_uv_organic_test"
+	var recipe := GeometryUVMappingService.default_recipe()
+	var uv_result := GeometryUVMappingService.generate(mesh, recipe)
+	var repeated := GeometryUVMappingService.generate(mesh, recipe)
+	_expect(bool(uv_result.get("valid", false)) and int(uv_result.get("uv_count", 0)) == int(mesh.get("vertex_count", 0)), "Bounds / Planar should map every stable Mesh Vertex ID to one UV coordinate.")
+	_expect(uv_result == repeated, "UV Mapping must be deterministic for an identical Mesh Bake and recipe.")
+	for entry in uv_result.get("uvs", []):
+		var uv := Vector2(entry.get("uv", Vector2.ZERO))
+		_expect(uv.x >= -0.0001 and uv.x <= 1.0001 and uv.y >= -0.0001 and uv.y <= 1.0001, "Default Bounds / Planar UVs should fit into normalized UV space.")
+	var transformed_recipe := {"method": GeometryUVMappingService.BOUNDS_PLANAR, "parameters": {"mesh_method": GeometryMeshingService.CONSTRAINED_DELAUNAY, "scale": 0.75, "rotation": 15.0, "offset_u": 0.1, "offset_v": -0.05, "preserve_aspect": false}}
+	var transformed := GeometryUVMappingService.generate(mesh, transformed_recipe)
+	_expect(bool(transformed.get("valid", false)) and transformed.get("uvs", []) != uv_result.get("uvs", []), "UV Scale, Rotation, Offset, and Preserve Aspect should affect only the derived UV result.")
+	_expect(not bool(GeometryUVMappingService.generate({}, recipe).get("valid", true)), "UV Mapping should fail visibly without a valid Mesh Bake.")
+	var application_script = load("res://scripts/main.gd")
+	var application: Control = application_script.new()
+	var document: Dictionary = application._default_geometry_document("asset_1", "component_1")
+	document["sampling"]["recipe"] = {"method": GeometrySamplingService.EVEN_SPACING, "parameters": {"spacing": 2.0}}
+	document["sampling"]["bakes"][GeometrySamplingService.EVEN_SPACING] = sampling
+	document["seeding"]["recipe"] = {"method": GeometrySeedingService.POISSON_FILL, "parameters": {"spacing": 2.5, "seed": 4}}
+	document["seeding"]["bakes"][GeometrySeedingService.POISSON_FILL] = seeding
+	document["meshing"]["recipe"] = {"method": GeometryMeshingService.CONSTRAINED_DELAUNAY, "parameters": {"seeding_method": GeometrySeedingService.POISSON_FILL}}
+	document["meshing"]["bakes"][GeometryMeshingService.CONSTRAINED_DELAUNAY] = mesh
+	document["meshing"]["bakes"][GeometryMeshingService.ORGANIC_RELAXED] = organic_mesh
+	uv_result["bake_id"] = "uv_bounds_test"
+	var uv_key := GeometryUVMappingService.bake_key(GeometryMeshingService.CONSTRAINED_DELAUNAY, GeometryUVMappingService.BOUNDS_PLANAR)
+	var organic_uv_recipe := GeometryUVMappingService.normalize_recipe({"method": GeometryUVMappingService.BOUNDS_PLANAR, "parameters": {"mesh_method": GeometryMeshingService.ORGANIC_RELAXED}})
+	var organic_uv := GeometryUVMappingService.generate(organic_mesh, organic_uv_recipe)
+	organic_uv["bake_id"] = "uv_bounds_organic_test"
+	var organic_uv_key := GeometryUVMappingService.bake_key(GeometryMeshingService.ORGANIC_RELAXED, GeometryUVMappingService.BOUNDS_PLANAR)
+	document["uv_mapping"]["recipe"] = recipe
+	document["uv_mapping"]["bakes"][uv_key] = uv_result
+	document["uv_mapping"]["bakes"][organic_uv_key] = organic_uv
+	var serialized: Dictionary = application._serialize_geometry_document(document)
+	_expect(serialized.get("uv_mapping", {}).get("bakes", {}).get(uv_key, {}).get("uvs", [])[0].get("uv", null) is Array, "UV Bake coordinates should serialize as JSON arrays.")
+	var normalized: Dictionary = application._normalize_geometry_document(serialized, "asset_1", "component_1")
+	_expect(normalized.get("uv_mapping", {}).get("bakes", {}).get(uv_key, {}).get("uvs", [])[0].get("uv", null) is Vector2, "UV Bake loading should restore normalized coordinates as Vector2 values.")
+	var test_assets: Array[Dictionary] = [{"id": "asset_1", "name": "Asset", "visibility": true, "components": [component], "guides": []}]
+	application.assets = test_assets
+	application.geometry_documents["asset_1/component_1"] = normalized
+	application._build_ui()
+	application.active_module = "Geometry"
+	application.active_geometry_submodule = "UV Mapping"
+	application.selected_asset_id = "asset_1"
+	application.selected_component_id = "component_1"
+	application.expanded_assets["asset_1"] = true
+	application._render_outliner()
+	application._render_inspector()
+	application._render_canvas_context()
+	_expect(application.geometry_uv_mapping_workspace.visible and application.inspector_content.get_child_count() >= 14, "UV Mapping should expose its dedicated split Workspace and compact Bounds / Planar Inspector.")
+	application._activate_geometry_uv_mapping_method_choice()
+	var active_style := application.geometry_uv_mapping_method_menu.get_theme_stylebox("normal") as StyleBoxFlat
+	_expect(application.active_context_command == "geometry.uv_mapping.method" and application.geometry_uv_mapping_method_choice_active and active_style != null and active_style.bg_color == Color("#8fd8f5"), "UV Mapping CMD+1 should use the shared exclusive Method state and highlight.")
+	application._set_geometry_uv_mapping_method(GeometryUVMappingService.BOUNDS_PLANAR)
+	_expect(application.selected_geometry_bake_method == uv_key and application._geometry_uv_mapping_status("asset_1", "component_1", component) == "Baked", "Selecting Bounds / Planar should select the matching Mesh-specific UV Bake.")
+	application._set_geometry_uv_mapping_mesh_source(GeometryMeshingService.ORGANIC_RELAXED)
+	_expect(application.selected_geometry_bake_method == organic_uv_key and application._geometry_uv_mapping_bakes("asset_1", "component_1").size() == 2, "CDT and Organic Relaxed should retain independently selectable Bounds / Planar UV Bakes.")
+	application._set_geometry_uv_mapping_mesh_source(GeometryMeshingService.CONSTRAINED_DELAUNAY)
+	var scale_input := SpinBox.new()
+	scale_input.min_value = GeometryUVMappingService.MIN_SCALE
+	scale_input.max_value = 100.0
+	application._commit_geometry_uv_mapping_float_text("1,25", scale_input, "scale")
+	_expect(is_equal_approx(float(application._geometry_uv_mapping_recipe("asset_1", "component_1").get("parameters", {}).get("scale", 0.0)), 1.25), "UV numeric fields should accept comma-decimal direct input and update the Recipe.")
+	normalized["uv_mapping"]["recipe"] = GeometryUVMappingService.normalize_recipe(recipe)
+	normalized["meshing"]["bakes"][GeometryMeshingService.CONSTRAINED_DELAUNAY]["vertices"][0]["position"] += Vector2(0.1, 0.0)
+	_expect(application._geometry_uv_mapping_status("asset_1", "component_1", component) == "Stale", "Changing the referenced Mesh Bake should make its UV Bake stale without changing Mesh or Component topology.")
+	scale_input.free()
 	application.free()
 
 
@@ -810,7 +893,7 @@ func _test_motion_act_evaluator() -> void:
 	var normalized: Dictionary = application._normalize_motion_act({"id": "act_7", "parameters": {"direction": [0.0, 2.0], "distance": 12.0}}, "fallback")
 	_expect(Vector2(normalized.get("parameters", {}).get("direction", Vector2.ZERO)) == Vector2(0.0, 2.0), "Persisted Slide direction arrays should normalize back to Vector2 values.")
 	var serialized: Dictionary = application._serialize_motion_act(normalized)
-	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 24, "Act persistence should serialize vectors as JSON arrays using schema 24.")
+	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 25, "Act persistence should serialize vectors as JSON arrays using schema 25.")
 	var normalized_jump: Dictionary = application._normalize_motion_act({"id": "act_8", "primitive": "jump", "parameters": {"direction": [1.0, 0.0], "distance": 7.0, "height": 2.5, "arc": "snappy"}}, "fallback")
 	var serialized_jump: Dictionary = application._serialize_motion_act(normalized_jump)
 	_expect(str(serialized_jump.get("primitive", "")) == MotionActEvaluator.JUMP and is_equal_approx(float(serialized_jump.get("parameters", {}).get("height", 0.0)), 2.5) and str(serialized_jump.get("parameters", {}).get("arc", "")) == MotionActEvaluator.JUMP_ARC_SNAPPY, "Jump-specific parameters should survive normalization and serialization.")

@@ -59,6 +59,9 @@ before implementing real creation tools.
 - [x] Implement Component-local Geometry Meshing with Constrained Delaunay and
       Organic Relaxed, exact Seeding/Sampling dependencies, stable derived
       Vertex IDs, immutable preview, and one persistent Bake per method.
+- [x] Implement Component-local UV Mapping with Bounds / Planar, exact Mesh
+      dependencies, stable Vertex-ID-to-UV assignments, split preview, and one
+      persistent Bake per Mesh-method/UV-method combination.
 - [x] Implement `Create Asset` with a name dialog, OK/Cancel controls, Enter
       confirmation, and Escape cancellation.
 - [x] Use `asset01`, `asset02`, and so on when an Asset name is confirmed
@@ -339,7 +342,8 @@ system, particle system, or universal animation graph.
 These may become valuable later, but they are not implementation targets until
 a verified slice requires them.
 
-- UV mapping, Mesh export consumption, and production refinement controls
+- Advanced UV methods/editing, Mesh/UV export consumption, and production
+  refinement controls
 - Full material, map, and texture authoring beyond Slice 4's import, material,
   and tile-preview requirements
 - General-purpose rigging
