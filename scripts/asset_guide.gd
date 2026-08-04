@@ -3,7 +3,8 @@ extends RefCounted
 
 const BODY_FLOW := "body_flow"
 const SAMPLER_SPINE := "sampler_spine"
-const VALID_TYPES := [BODY_FLOW, SAMPLER_SPINE]
+const ANIMATION_SPINE := "animation_spine"
+const VALID_TYPES := [BODY_FLOW, SAMPLER_SPINE, ANIMATION_SPINE]
 
 
 static func create(guide_id: String, guide_name: String, guide_type: String, component_id: String) -> Dictionary:
@@ -51,7 +52,11 @@ static func normalize(raw_guide) -> Dictionary:
 
 
 static func display_name(guide_type: String) -> String:
-	return "Body Flow" if guide_type == BODY_FLOW else "Sampler Spine"
+	if guide_type == BODY_FLOW:
+		return "Body Flow"
+	if guide_type == ANIMATION_SPINE:
+		return "Animation Spine"
+	return "Sampler Spine"
 
 
 static func validation_issues(guide: Dictionary) -> Array[String]:

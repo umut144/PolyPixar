@@ -81,7 +81,7 @@ default timing is 50% anticipation, 40% ingress to the midpoint, and a fast
 - Editor workspace and default window: 1920×1200 (16:10); preview uses preserved
   aspect ratio (`keep`) so the UI proportions remain stable
 - Project icon: `assets/assetflow_icon.png`
-- Current JSON schema version: **25**
+- Current JSON schema version: **27**
 
 ## Confirmed vocabulary
 
@@ -115,9 +115,12 @@ it into a general scene or animation-graph abstraction prematurely.
 - Assets may also contain persistent typed Guides. Each Component's Outliner
   `+` action creates a scoped Guide child; `CMD/Ctrl + 1 · Draw Guide Point`
   and `CMD/Ctrl + 2 · Edit Guide Point` author its open Spine in that
-  Component's local space. Guide topology belongs only to the Guide and never
-  replaces or mutates Component topology. Body Flow and Sampler Spine remain
-  distinct semantic contracts for future Motion and Geometry consumers.
+  Component's local space. `CMD/Ctrl + D` duplicates the selected Guide with
+  remapped topology IDs. Guide topology belongs only to the Guide and never
+  replaces or mutates Component topology. Body Flow, Sampler Spine, and
+  Animation Spine remain distinct semantic contracts: Sampler Spine is a
+  Geometry/Seeding input, while Animation Spine is reserved for runtime-only
+  Inner Animation.
 - Textures are a separate Workspace document type. They will contain
   `elements`, not Components, and have their own canvas dimensions and
   PolyTexture-style editing context.
@@ -132,7 +135,9 @@ it into a general scene or animation-graph abstraction prematurely.
   Bake per method, and optional baked-Seed editing. Meshing consumes an exact
   Seeding/Sampling Bake chain and provides Constrained Delaunay plus Organic
   Relaxed previews, one persistent Bake per method, stable derived Vertex IDs,
-  and stale-input detection. UV Mapping consumes one exact Mesh Bake and
+  stale-input detection, and an explicit persistent Component Mesh output
+  selection for future Weighting and export. The output is never inferred from
+  the last viewed method. UV Mapping consumes one exact Mesh Bake and
   provides Bounds / Planar mapping, artist-facing transform parameters, a
   split Mesh/UV preview, one Bake per Mesh-method/UV-method combination, and
   stale-input detection. Each implemented module's Outliner
@@ -192,6 +197,11 @@ it into a general scene or animation-graph abstraction prematurely.
 - `Style → Material` is Slice 4's first Style module. It binds a Workspace
   Texture to a Component by stable reference and exposes only repeat, scale,
   offset, base tint, ink strength, and glow values.
+- `Style → Weighting` stores multiple Component-local Weighting Styles over the
+  explicitly selected Component Mesh. Uniform and Axis Gradient generate a
+  per-Vertex heatmap and explicit persistent Bake keyed by stable Mesh Vertex
+  IDs. Styles remain reusable Motion-facing profiles; changing a Style never
+  mutates its Mesh. See [`STYLE_WEIGHTING.md`](STYLE_WEIGHTING.md).
 - `Motion → Sequence` is Slice 4's first Motion module. It owns the deliberate
   staged relation between the floor Asset, its non-rendered local Guide Shape,
   and the independent Flower Asset. Do not make the Flower store a permanent
@@ -291,7 +301,7 @@ Load uses an in-app list of existing workspace folders. Each workspace has a
 documents in their corresponding resource directories. The latest loaded or saved
 workspace name is stored in `configs/app_config.json` and is loaded
 automatically on startup. Every workspace, asset, texture, and config JSON
-uses the numeric `schema_version` field; the current schema is version `25`.
+uses the numeric `schema_version` field; the current schema is version `27`.
 Materials are independent Workspace resources stored below
 `materials/<material_id>/material.json` and listed by ID in `workspace.json`.
 The bottom status bar is divided into 17% program status, 64% contextual tool
@@ -322,6 +332,11 @@ transformed contours remain clickable for Component selection. The selected
 Component is still rendered as the active editing overlay.
 
 ## Documentation maintenance
+
+Context-Bar Method-Menüs folgen dem Lifecycle-Vertrag in
+`docs/UI_CONTEXT_COMMANDS.md`: fachliche Metadata, zentraler Setter und
+explizites Schließen/Bereinigen des transienten Commands nach Auswahl oder
+Abbruch.
 
 Geometry modules author compact recipes and inspect or accept derived pipeline
 results. Components still store only authored contours; sampling,

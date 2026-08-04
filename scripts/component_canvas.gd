@@ -48,6 +48,7 @@ var bezier_points: Array[Dictionary] = []
 var bezier_edges: Array[Dictionary] = []
 var bezier_chains: Array[Dictionary] = []
 var guide_style := false
+var guide_color := Color("#f2c94c")
 var draw_point_mode := "linear"
 var reference_shapes: Array[Dictionary] = []
 var draw_constraint_outer := PackedVector2Array()
@@ -613,6 +614,11 @@ func set_guide_style(enabled: bool) -> void:
 	queue_redraw()
 
 
+func set_guide_color(color: Color) -> void:
+	guide_color = color
+	queue_redraw()
+
+
 func _process(delta: float) -> void:
 	if navigation_locked or command_shortcut_active or not has_focus():
 		return
@@ -949,7 +955,7 @@ func _draw_bezier_geometry() -> void:
 		edges_by_id[str(edge_data.get("id", ""))] = edge_data
 	if display_polygon_closed and display_polygon.size() >= 3 and is_instance_valid(material_texture):
 		_draw_material_polygon()
-	var shape_color := Color("#f2c94c") if guide_style else Color("#55c7d9")
+	var shape_color := guide_color if guide_style else Color("#55c7d9")
 	for chain_data in bezier_chains:
 		for edge_id_value in chain_data.get("edge_ids", []):
 			var edge_id := str(edge_id_value)
@@ -966,7 +972,7 @@ func _draw_bezier_geometry() -> void:
 			var end_point: Dictionary = points_by_id[end_id]
 			var curve_points := _bezier_edge_screen_points(start_point, end_point)
 			if curve_points.size() >= 2:
-				var edge_color := Color("#f2c94c") if edge_id == selected_edge_id else shape_color
+				var edge_color := guide_color if edge_id == selected_edge_id and guide_style else Color("#f2c94c") if edge_id == selected_edge_id else shape_color
 				if guide_style:
 					_draw_dashed_polyline(curve_points, edge_color, 2.0)
 				else:
@@ -979,7 +985,7 @@ func _draw_bezier_geometry() -> void:
 	if interaction_state == "edit" and not selected_point.is_empty():
 		var selected_position: Vector2 = selected_point.get("position", Vector2.ZERO)
 		var selected_screen := _world_to_screen(_local_to_world(selected_position))
-		draw_circle(selected_screen, 7.0, Color("#f2c94c"), false, 2.0)
+		draw_circle(selected_screen, 7.0, guide_color if guide_style else Color("#f2c94c"), false, 2.0)
 		if edit_handles_enabled:
 			_draw_bezier_handle_preview(selected_point)
 	if interaction_state == "edit" and edit_mode == "point" and not edit_handles_enabled and not edit_point_set_enabled:
@@ -988,7 +994,7 @@ func _draw_bezier_geometry() -> void:
 			if selected_point_data.is_empty():
 				continue
 			var selected_position: Vector2 = selected_point_data.get("position", Vector2.ZERO)
-			draw_circle(_world_to_screen(_local_to_world(selected_position)), 7.0, Color("#f2c94c"), false, 2.0)
+			draw_circle(_world_to_screen(_local_to_world(selected_position)), 7.0, guide_color if guide_style else Color("#f2c94c"), false, 2.0)
 
 
 func _selected_points_center() -> Vector2:
@@ -1169,7 +1175,7 @@ func _draw_draw_preview() -> void:
 	_draw_draw_point_preview()
 	var preview_position := _world_to_screen(_local_to_world(cursor_world))
 	var close_to_first := active_tool == "point" and _is_near_first_chain_point(cursor_world)
-	var preview_color := Color("#76e0a5") if close_to_first else Color("#f2c94c")
+	var preview_color := Color("#76e0a5") if close_to_first else guide_color if guide_style else Color("#f2c94c")
 	draw_circle(preview_position, 5.0, preview_color, false, 2.0)
 	if close_to_first:
 		draw_circle(preview_position, 8.0, preview_color, false, 2.0)

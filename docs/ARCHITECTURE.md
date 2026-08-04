@@ -62,7 +62,7 @@ works*, not necessarily objects stored in a project.
 | Area | Current responsibility |
 | --- | --- |
 | Create | Create and arrange the visual form of an asset. |
-| Style | Define its visual appearance. |
+| Style | Define reusable appearance and deformation profiles. |
 | Motion | Create motion local to an asset. |
 | Transform | Design a transition between two independent assets. |
 | Effects | Add visual and procedural effects. |
@@ -84,12 +84,14 @@ performed on a selected Component, never directly on the Asset container.
 Edges and Chains are maintained automatically, and clicking the first Point
 after at least three Points closes the active Chain.
 
-Assets also own persistent typed Guides separately from Components. The first
-two Guide types are `body_flow` and `sampler_spine`. They share open Bézier
+Assets also own persistent typed Guides separately from Components. Guide types
+are `body_flow`, `sampler_spine`, and `animation_spine`. They share open Bézier
 authoring through a selected Guide's `CMD/Ctrl + 1 · Draw Guide Point` context,
-while retaining distinct stable semantic types. Guide coordinates are local to
-their scoped Component; Guide topology never participates in Component lookup,
-fill, export, Sampling, or reverse synchronization.
+while retaining distinct stable semantic types. `Sampler Spine` is a Geometry /
+Seeding input; `Animation Spine` is reserved for runtime-only Inner Animation.
+Guide coordinates are local to their scoped Component; Guide topology never
+participates in Component lookup, fill, export, Sampling, or reverse
+synchronization.
 
 The next validated use of the currently empty categories is the **Stone Floor
 Bloom** slice. It introduces one deliberately narrow module in each of two
@@ -545,6 +547,10 @@ stale without reverse synchronization. UV Mapping does not yet feed export.
   display names must be safe to change.
 - Procedural results should be repeatable for the same input and seed once the
   procedural root slice begins.
+
+Context-Bar Method-Menüs use the shared transient-command lifecycle documented
+in `docs/UI_CONTEXT_COMMANDS.md`; new menus must not implement bespoke popup
+selection or cleanup paths.
 
 ## Explicitly open decisions
 

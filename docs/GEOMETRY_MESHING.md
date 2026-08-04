@@ -54,6 +54,18 @@ Mesh vertices carry stable IDs. Triangles refer to those IDs instead of owning
 copies of positions, establishing the downstream identity required by UV
 Mapping and later Inner Animation without making the Mesh canonical geometry.
 
+## Component Mesh output
+
+A Component explicitly selects one current Mesh Bake through `Use as Component
+Mesh`. This persistent reference stores the Bake ID, method, and fingerprint;
+it is never inferred from the currently viewed or most recently generated
+method. Downstream Weighting and later export consume only this selected output.
+
+The output status is `Missing` until selected, `Ready` while its exact Bake and
+upstream chain are current, and `Stale` when that Bake is replaced or any input
+fingerprint changes. Existing Mesh Bakes and the selected reference are retained
+for inspection instead of being silently rewritten.
+
 ## Deferred
 
 Manual Mesh editing, quality heatmaps, multiple variants per method, automatic

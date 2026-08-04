@@ -2,13 +2,13 @@ extends Control
 
 const CREATE_SUBMODULES := ["Asset", "Texture"]
 const GEOMETRY_SUBMODULES := ["Sampling", "Seeding", "Meshing", "UV Mapping"]
-const STYLE_SUBMODULES := ["Material"]
+const STYLE_SUBMODULES := ["Material", "Weighting"]
 const MOTION_SUBMODULES := ["Animation", "Path", "Act", "Sequence"]
 const INACTIVE_MODULES := ["Transform", "Effects", "Export"]
 const WORKSPACES_ROOT := "res://workspaces"
 const IMPORT_TEXTURES_ROOT := "res://imports/textures"
 const CONFIG_PATH := "res://configs/app_config.json"
-const SCHEMA_VERSION := 25
+const SCHEMA_VERSION := 27
 const MAX_HISTORY_SIZE := 100
 const PAPER_SIZES_CM := [Vector2(21.0, 29.7), Vector2(29.7, 42.0), Vector2(42.0, 59.4), Vector2(59.4, 84.1), Vector2(84.1, 118.9)]
 const PAPER_LABELS := ["A4", "A3", "A2", "A1", "A0"]
@@ -20,6 +20,7 @@ const SHOW_PROCESSED_OUTLINER := false
 
 var active_create_submodule := "Asset"
 var active_geometry_submodule := "Sampling"
+var active_style_submodule := "Material"
 var active_motion_submodule := "Animation"
 var active_module := "Create"
 var active_context_command := ""
@@ -43,6 +44,8 @@ var geometry_meshing_preview_key := ""
 var geometry_uv_mapping_preview: Dictionary = {}
 var geometry_uv_mapping_preview_key := ""
 var geometry_uv_mapping_checker_overlay := true
+var weighting_preview: Dictionary = {}
+var weighting_preview_key := ""
 var geometry_seeding_edit_active := false
 var geometry_seeding_edit_tool := "select"
 var geometry_seeding_enter_edit_after_bake := false
@@ -91,6 +94,7 @@ var bezier_point_move_guide_id := ""
 var selected_texture_id := ""
 var selected_element_id := ""
 var selected_material_id := ""
+var selected_weighting_style_id := ""
 # Legacy workspace fields are retained for backwards-compatible JSON loading.
 # The active Material workflow is now always the Graph workspace.
 var material_view_mode := "graph"
@@ -147,6 +151,8 @@ var geometry_meshing_workspace: GeometryMeshingWorkspace
 var geometry_meshing_method_menu: MenuButton
 var geometry_meshing_method_choice_active := false
 var geometry_uv_mapping_workspace: GeometryUVMappingWorkspace
+var weighting_workspace: WeightingWorkspace
+var weighting_method_menu: MenuButton
 var geometry_uv_mapping_method_menu: MenuButton
 var geometry_uv_mapping_method_choice_active := false
 var selected_geometry_bake_method := ""
@@ -317,6 +323,17 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			_undo()
 		get_viewport().set_input_as_handled()
 		return
+	if has_command_modifier and active_module == "Style" and active_style_submodule == "Weighting" and event.keycode == KEY_1:
+		_set_active_context_command("style.weighting.method")
+		_render_context_bar()
+		if is_instance_valid(weighting_method_menu):
+			weighting_method_menu.show_popup()
+		get_viewport().set_input_as_handled()
+		return
+	if active_module == "Style" and active_style_submodule == "Weighting" and not has_command_modifier and active_context_command == "style.weighting.method" and event.keycode in [KEY_1, KEY_2]:
+		_set_weighting_method(WeightingService.UNIFORM if event.keycode == KEY_1 else WeightingService.AXIS_GRADIENT)
+		get_viewport().set_input_as_handled()
+		return
 	if has_command_modifier and active_module == "Motion" and active_motion_submodule == "Sequence" and event.keycode in [KEY_1, KEY_2]:
 		var focus_owner := get_viewport().gui_get_focus_owner()
 		if not (focus_owner is LineEdit or focus_owner is TextEdit):
@@ -400,6 +417,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return
 	if not selected_guide_id.is_empty():
+		if has_command_modifier and event.keycode == KEY_D:
+			_duplicate_selected_guide()
+			get_viewport().set_input_as_handled()
+			return
 		if has_command_modifier and event.keycode == KEY_1:
 			_activate_guide_draw_state()
 			get_viewport().set_input_as_handled()
@@ -507,6 +528,33 @@ func _set_active_context_command(command: String) -> void:
 
 func _context_command_is(command: String) -> bool:
 	return active_context_command == command
+
+
+## Context-menu contract: every transient MenuButton choice must resolve its
+## metadata, apply the value, and leave the command state when the popup
+## closes (including Escape/cancel). Plain-number shortcuts may keep their
+## command active until another command replaces them.
+func _connect_context_method_menu(popup: PopupMenu, command: String, selection_handler: Callable) -> void:
+	popup.id_pressed.connect(func(id: int) -> void:
+		var index := popup.get_item_index(id)
+		if index < 0:
+			return
+		selection_handler.call(popup.get_item_metadata(index))
+		_complete_context_method_menu(command, popup)
+	)
+	popup.popup_hide.connect(func() -> void:
+		if active_context_command == command:
+			_set_active_context_command("")
+			_render_context_bar()
+	)
+
+
+func _complete_context_method_menu(command: String, popup: PopupMenu) -> void:
+	if is_instance_valid(popup):
+		popup.hide()
+	if active_context_command == command:
+		_set_active_context_command("")
+		_render_context_bar()
 
 
 func _stop_guide_draw_state() -> void:
@@ -717,6 +765,7 @@ func _build_ui() -> void:
 	_create_geometry_seeding_workspace(canvas_panel)
 	_create_geometry_meshing_workspace(canvas_panel)
 	_create_geometry_uv_mapping_workspace(canvas_panel)
+	_create_weighting_workspace(canvas_panel)
 	texture_context_label = Label.new()
 	texture_context_label.position = Vector2(8, 6)
 	texture_context_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -969,6 +1018,13 @@ func _create_geometry_uv_mapping_workspace(parent: Control) -> void:
 	geometry_uv_mapping_workspace.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	geometry_uv_mapping_workspace.visible = false
 	parent.add_child(geometry_uv_mapping_workspace)
+
+
+func _create_weighting_workspace(parent: Control) -> void:
+	weighting_workspace = WeightingWorkspace.new()
+	weighting_workspace.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	weighting_workspace.visible = false
+	parent.add_child(weighting_workspace)
 
 
 func _create_geometry_seeding_dialogs() -> void:
@@ -1553,8 +1609,10 @@ func _on_create_action_pressed() -> void:
 		_open_new_asset_dialog()
 	elif active_module == "Create" and active_create_submodule == "Texture":
 		_open_new_texture_dialog()
-	elif active_module == "Style":
+	elif active_module == "Style" and active_style_submodule == "Material":
 		_open_new_material_dialog()
+	elif active_module == "Style" and active_style_submodule == "Weighting":
+		_create_weighting_style(selected_asset_id, selected_component_id)
 	elif active_module == "Motion" and active_motion_submodule == "Path":
 		motion_path_name_input.text = "Path %02d" % next_motion_path_id
 		motion_path_dialog.popup_centered()
@@ -1571,6 +1629,7 @@ func _update_context_action_button() -> void:
 	if not is_instance_valid(create_action_button):
 		return
 	create_action_button.visible = (active_module == "Create" and active_create_submodule in ["Asset", "Texture"]) or active_module == "Style" or (active_module == "Motion" and active_motion_submodule in ["Path", "Sequence"])
+	create_action_button.disabled = active_module == "Style" and active_style_submodule == "Weighting" and selected_component_id.is_empty()
 	var show_asset_create_controls := active_module == "Create" and active_create_submodule == "Asset"
 	if is_instance_valid(snap_button):
 		snap_button.visible = show_asset_create_controls
@@ -1582,8 +1641,10 @@ func _update_context_action_button() -> void:
 		create_action_button.text = "Create Asset"
 	elif active_module == "Create" and active_create_submodule == "Texture":
 		create_action_button.text = "Create Texture"
-	elif active_module == "Style":
+	elif active_module == "Style" and active_style_submodule == "Material":
 		create_action_button.text = "Create Material"
+	elif active_module == "Style" and active_style_submodule == "Weighting":
+		create_action_button.text = "Create Weighting Style"
 	elif active_module == "Motion" and active_motion_submodule == "Path":
 		create_action_button.text = "Create Path"
 	elif active_module == "Motion" and active_motion_submodule == "Sequence":
@@ -1878,6 +1939,7 @@ func _capture_history_snapshot() -> Dictionary:
 		"selected_texture_id": selected_texture_id,
 		"selected_element_id": selected_element_id,
 		"selected_material_id": selected_material_id,
+		"selected_weighting_style_id": selected_weighting_style_id,
 		"selected_motion_path_id": selected_motion_path_id,
 		"selected_motion_act_id": selected_motion_act_id,
 		"selected_motion_sequence_id": selected_motion_sequence_id,
@@ -1886,6 +1948,7 @@ func _capture_history_snapshot() -> Dictionary:
 		"motion_act_preview_asset_id": motion_act_preview_asset_id,
 		"active_module": active_module,
 		"active_geometry_submodule": active_geometry_submodule,
+		"active_style_submodule": active_style_submodule,
 		"active_motion_submodule": active_motion_submodule,
 		"material_view_mode": material_view_mode,
 		"lookdev_target_asset_id": lookdev_target_asset_id,
@@ -1943,6 +2006,8 @@ func _restore_history_snapshot(snapshot: Dictionary) -> void:
 	geometry_sampling_preview_key = ""
 	geometry_seeding_preview = {}
 	geometry_seeding_preview_key = ""
+	weighting_preview = {}
+	weighting_preview_key = ""
 	_set_geometry_command_state("")
 	geometry_seeding_enter_edit_after_bake = false
 	_stop_guide_draw_state()
@@ -1960,6 +2025,7 @@ func _restore_history_snapshot(snapshot: Dictionary) -> void:
 	selected_texture_id = str(snapshot.get("selected_texture_id", ""))
 	selected_element_id = str(snapshot.get("selected_element_id", ""))
 	selected_material_id = str(snapshot.get("selected_material_id", ""))
+	selected_weighting_style_id = str(snapshot.get("selected_weighting_style_id", ""))
 	selected_motion_path_id = str(snapshot.get("selected_motion_path_id", ""))
 	selected_motion_act_id = str(snapshot.get("selected_motion_act_id", ""))
 	selected_motion_sequence_id = str(snapshot.get("selected_motion_sequence_id", ""))
@@ -1968,6 +2034,7 @@ func _restore_history_snapshot(snapshot: Dictionary) -> void:
 	motion_act_preview_asset_id = str(snapshot.get("motion_act_preview_asset_id", ""))
 	active_module = str(snapshot.get("active_module", "Create"))
 	active_geometry_submodule = str(snapshot.get("active_geometry_submodule", "Sampling"))
+	active_style_submodule = str(snapshot.get("active_style_submodule", "Material"))
 	active_motion_submodule = str(snapshot.get("active_motion_submodule", "Animation"))
 	material_view_mode = "graph"
 	lookdev_target_asset_id = ""
@@ -2002,6 +2069,14 @@ func _restore_history_snapshot(snapshot: Dictionary) -> void:
 		if geometry_section != null:
 			geometry_section.set_expanded(true)
 			geometry_section.set_active_submodule(active_geometry_submodule)
+	elif active_module == "Style":
+		active_style_submodule = active_style_submodule if active_style_submodule in STYLE_SUBMODULES else "Material"
+		if active_style_submodule == "Weighting" and _weighting_style(selected_asset_id, selected_component_id, selected_weighting_style_id).is_empty():
+			selected_weighting_style_id = ""
+		var style_section := _find_section("Style")
+		if style_section != null:
+			style_section.set_expanded(true)
+			style_section.set_active_submodule(active_style_submodule)
 	elif active_module == "Motion":
 		active_motion_submodule = active_motion_submodule if active_motion_submodule in MOTION_SUBMODULES else "Animation"
 		var motion_section := _find_section("Motion")
@@ -2211,6 +2286,7 @@ func _serialize_editor_state() -> Dictionary:
 		"selected_texture_id": selected_texture_id,
 		"selected_element_id": selected_element_id,
 		"selected_material_id": selected_material_id,
+		"selected_weighting_style_id": selected_weighting_style_id,
 		"selected_motion_path_id": selected_motion_path_id,
 		"selected_motion_act_id": selected_motion_act_id,
 		"selected_motion_sequence_id": selected_motion_sequence_id,
@@ -2222,6 +2298,7 @@ func _serialize_editor_state() -> Dictionary:
 		"motion_sequence_preview_loop": motion_sequence_preview_loop,
 		"active_module": active_module,
 		"active_geometry_submodule": active_geometry_submodule,
+		"active_style_submodule": active_style_submodule,
 		"active_motion_submodule": active_motion_submodule,
 		"material_view_mode": material_view_mode,
 		"lookdev_target_asset_id": lookdev_target_asset_id,
@@ -2250,6 +2327,7 @@ func _restore_editor_state(state) -> void:
 	selected_texture_id = ""
 	selected_element_id = ""
 	selected_material_id = ""
+	selected_weighting_style_id = ""
 	selected_motion_path_id = ""
 	selected_motion_act_id = ""
 	selected_motion_sequence_id = ""
@@ -2261,6 +2339,7 @@ func _restore_editor_state(state) -> void:
 	motion_sequence_preview_loop = true
 	active_module = "Create"
 	active_geometry_submodule = "Sampling"
+	active_style_submodule = "Material"
 	active_motion_submodule = "Animation"
 	material_view_mode = "graph"
 	lookdev_target_asset_id = ""
@@ -2314,6 +2393,16 @@ func _restore_editor_state(state) -> void:
 		_set_create_submodule_context("Texture" if not selected_texture_id.is_empty() else "Asset")
 	var requested_motion_submodule := str(state.get("active_motion_submodule", "Animation"))
 	var requested_geometry_submodule := str(state.get("active_geometry_submodule", "Sampling"))
+	var requested_style_submodule := str(state.get("active_style_submodule", "Material"))
+	if str(state.get("active_module", "")) == "Style" and requested_style_submodule == "Weighting" and not selected_component_id.is_empty():
+		active_module = "Style"
+		active_style_submodule = "Weighting"
+		var requested_weighting_style_id := str(state.get("selected_weighting_style_id", ""))
+		selected_weighting_style_id = requested_weighting_style_id if not _weighting_style(selected_asset_id, selected_component_id, requested_weighting_style_id).is_empty() else ""
+		var weighting_style_section := _find_section("Style")
+		if weighting_style_section != null:
+			weighting_style_section.set_expanded(true)
+			weighting_style_section.set_active_submodule("Weighting")
 	if str(state.get("active_module", "")) == "Geometry" and requested_geometry_submodule in GEOMETRY_SUBMODULES:
 		active_module = "Geometry"
 		active_geometry_submodule = requested_geometry_submodule
@@ -2694,6 +2783,11 @@ func _default_geometry_document(asset_id: String, component_id: String) -> Dicti
 	return {
 		"asset_id": asset_id,
 		"component_id": component_id,
+		"component_mesh": {
+			"bake_id": "",
+			"method": "",
+			"mesh_fingerprint": ""
+		},
 		"sampling": {
 			"recipe": GeometrySamplingService.default_recipe(),
 			"bakes": {}
@@ -2709,6 +2803,10 @@ func _default_geometry_document(asset_id: String, component_id: String) -> Dicti
 		"uv_mapping": {
 			"recipe": GeometryUVMappingService.default_recipe(),
 			"bakes": {}
+		},
+		"weighting": {
+			"next_style_index": 1,
+			"styles": []
 		}
 	}
 
@@ -2758,6 +2856,13 @@ func _normalize_geometry_document(raw_document, asset_id: String, component_id: 
 	if not sampling_source is Dictionary:
 		sampling_source = {}
 	var document := _default_geometry_document(asset_id, component_id)
+	var component_mesh_source = source.get("component_mesh", {})
+	if component_mesh_source is Dictionary:
+		document["component_mesh"] = {
+			"bake_id": str(component_mesh_source.get("bake_id", "")),
+			"method": str(component_mesh_source.get("method", "")),
+			"mesh_fingerprint": str(component_mesh_source.get("mesh_fingerprint", ""))
+		}
 	document["sampling"]["recipe"] = GeometrySamplingService.normalize_recipe(sampling_source.get("recipe", {}))
 	var raw_sampling_bakes: Dictionary = sampling_source.get("bakes", {}) if sampling_source.get("bakes", {}) is Dictionary else {}
 	if raw_sampling_bakes.is_empty() and sampling_source.get("bake", {}) is Dictionary:
@@ -2800,6 +2905,13 @@ func _normalize_geometry_document(raw_document, asset_id: String, component_id: 
 		if not uv_bake.is_empty():
 			var bake_key := GeometryUVMappingService.bake_key(str(uv_bake.get("mesh_method", "")), str(uv_bake.get("method", "")))
 			document["uv_mapping"]["bakes"][bake_key] = uv_bake
+	var weighting_source = source.get("weighting", {})
+	if weighting_source is Dictionary:
+		document["weighting"]["next_style_index"] = maxi(1, int(weighting_source.get("next_style_index", 1)))
+		for raw_style in weighting_source.get("styles", []):
+			var style := WeightingService.normalize_style(raw_style)
+			if not str(style.get("id", "")).is_empty():
+				document["weighting"]["styles"].append(style)
 	return document
 
 
@@ -2954,6 +3066,7 @@ func _serialize_geometry_document(document: Dictionary) -> Dictionary:
 		"schema_version": SCHEMA_VERSION,
 		"asset_id": str(normalized.get("asset_id", "")),
 		"component_id": str(normalized.get("component_id", "")),
+		"component_mesh": normalized.get("component_mesh", {}).duplicate(true),
 		"sampling": {
 			"recipe": normalized.get("sampling", {}).get("recipe", {}).duplicate(true),
 			"bakes": serialized_sampling_bakes
@@ -2969,6 +3082,10 @@ func _serialize_geometry_document(document: Dictionary) -> Dictionary:
 		"uv_mapping": {
 			"recipe": normalized.get("uv_mapping", {}).get("recipe", {}).duplicate(true),
 			"bakes": serialized_uv_mapping_bakes
+		},
+		"weighting": {
+			"next_style_index": int(normalized.get("weighting", {}).get("next_style_index", 1)),
+			"styles": normalized.get("weighting", {}).get("styles", []).duplicate(true)
 		}
 	}
 
@@ -3046,6 +3163,16 @@ func _sampler_spines_for_component(asset: Dictionary, component_id: String) -> A
 	return guides
 
 
+func _animation_spines_for_component(asset: Dictionary, component_id: String) -> Array:
+	var guides: Array = []
+	for guide in asset.get("guides", []):
+		if str(guide.get("guide_type", "")) == AssetGuide.ANIMATION_SPINE \
+			and str(guide.get("scope", {}).get("component_id", "")) == component_id:
+			guides.append(guide)
+	guides.sort_custom(_sort_named_documents)
+	return guides
+
+
 func _geometry_seeding_sampler_spine(asset_id: String, component_id: String, recipe: Dictionary = {}) -> Dictionary:
 	var resolved_recipe := recipe if not recipe.is_empty() else _geometry_seeding_recipe(asset_id, component_id)
 	if str(resolved_recipe.get("method", "")) != GeometrySeedingService.SPINE_FLOW:
@@ -3108,6 +3235,132 @@ func _geometry_meshing_bakes(asset_id: String, component_id: String) -> Dictiona
 func _geometry_meshing_bake(asset_id: String, component_id: String, method := "") -> Dictionary:
 	var resolved_method := method if not method.is_empty() else str(_geometry_meshing_recipe(asset_id, component_id).get("method", ""))
 	return _geometry_meshing_bakes(asset_id, component_id).get(resolved_method, {})
+
+
+func _component_mesh_reference(asset_id: String, component_id: String) -> Dictionary:
+	var document := _get_geometry_document(asset_id, component_id)
+	return document.get("component_mesh", {}) if not document.is_empty() else {}
+
+
+func _component_mesh_bake(asset_id: String, component_id: String) -> Dictionary:
+	var reference := _component_mesh_reference(asset_id, component_id)
+	var method := str(reference.get("method", ""))
+	var bake_id := str(reference.get("bake_id", ""))
+	if method.is_empty() or bake_id.is_empty():
+		return {}
+	var bake := _geometry_meshing_bake(asset_id, component_id, method)
+	return bake if str(bake.get("bake_id", "")) == bake_id else {}
+
+
+func _component_mesh_status(asset_id: String, component_id: String, component: Dictionary) -> String:
+	var reference := _component_mesh_reference(asset_id, component_id)
+	if str(reference.get("bake_id", "")).is_empty():
+		return "Missing"
+	var method := str(reference.get("method", ""))
+	var bake := _component_mesh_bake(asset_id, component_id)
+	if bake.is_empty() or method not in GeometryMeshingService.VALID_METHODS:
+		return "Stale"
+	if str(reference.get("mesh_fingerprint", "")) != GeometryUVMappingService.mesh_fingerprint(bake):
+		return "Stale"
+	return "Ready" if _geometry_meshing_bake_is_current(asset_id, component_id, component, method) else "Stale"
+
+
+func _weighting_styles(asset_id: String, component_id: String) -> Array:
+	var document := _get_geometry_document(asset_id, component_id)
+	return document.get("weighting", {}).get("styles", []) if not document.is_empty() else []
+
+
+func _weighting_style(asset_id: String, component_id: String, style_id: String) -> Dictionary:
+	for style in _weighting_styles(asset_id, component_id):
+		if str(style.get("id", "")) == style_id:
+			return style
+	return {}
+
+
+func _weighting_preview_id(asset_id: String, component_id: String, style_id: String) -> String:
+	return "%s/%s" % [_geometry_document_key(asset_id, component_id), style_id]
+
+
+func _weighting_status(asset_id: String, component_id: String, component: Dictionary, style: Dictionary) -> String:
+	var component_mesh_status := _component_mesh_status(asset_id, component_id, component)
+	if component_mesh_status == "Missing":
+		return "Missing Component Mesh"
+	if component_mesh_status != "Ready":
+		return "Component Mesh Stale"
+	if style.is_empty():
+		return "Create or select a Weighting Style"
+	var mesh_bake := _component_mesh_bake(asset_id, component_id)
+	if weighting_preview_key == _weighting_preview_id(asset_id, component_id, str(style.get("id", ""))) and WeightingService.result_matches(weighting_preview, mesh_bake, style):
+		return "Preview"
+	var bake: Dictionary = style.get("bake", {})
+	return "Baked" if WeightingService.result_matches(bake, mesh_bake, style) else "Not Generated" if bake.is_empty() else "Stale"
+
+
+func _create_weighting_style(asset_id: String, component_id: String) -> void:
+	var component := _get_component(_get_asset(asset_id), component_id)
+	if component.is_empty():
+		_show_status_message("Select a Component before creating a Weighting Style.")
+		return
+	_record_direct_change()
+	var document := _get_geometry_document(asset_id, component_id, true)
+	var index := int(document["weighting"].get("next_style_index", 1))
+	document["weighting"]["next_style_index"] = index + 1
+	var style_id := "weighting_%d" % ResourceUID.create_id()
+	var style := WeightingService.default_style(style_id, "Weighting Style %02d" % index, component_id)
+	document["weighting"]["styles"].append(style)
+	selected_asset_id = asset_id
+	selected_component_id = component_id
+	selected_weighting_style_id = style_id
+	active_module = "Style"
+	active_style_submodule = "Weighting"
+	expanded_assets[asset_id] = true
+	_generate_weighting_preview()
+
+
+func _generate_weighting_preview() -> void:
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	var style := _weighting_style(selected_asset_id, selected_component_id, selected_weighting_style_id)
+	var mesh_bake := _component_mesh_bake(selected_asset_id, selected_component_id) if _component_mesh_status(selected_asset_id, selected_component_id, component) == "Ready" else {}
+	weighting_preview_key = _weighting_preview_id(selected_asset_id, selected_component_id, selected_weighting_style_id)
+	weighting_preview = WeightingService.generate(mesh_bake, style)
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _bake_weighting_preview() -> void:
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	var style := _weighting_style(selected_asset_id, selected_component_id, selected_weighting_style_id)
+	var mesh_bake := _component_mesh_bake(selected_asset_id, selected_component_id)
+	if component.is_empty() or style.is_empty() or not WeightingService.result_matches(weighting_preview, mesh_bake, style):
+		return
+	_record_direct_change()
+	var bake := weighting_preview.duplicate(true)
+	bake["bake_id"] = "weighting_bake_%d" % ResourceUID.create_id()
+	style["bake"] = bake
+	weighting_preview = {}
+	weighting_preview_key = ""
+	_show_status_message("Weighting baked for %s." % str(style.get("name", "Weighting Style")))
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _refresh_weighting_workspace() -> void:
+	if not is_instance_valid(weighting_workspace):
+		return
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if component.is_empty():
+		weighting_workspace.clear_context()
+		return
+	var style := _weighting_style(selected_asset_id, selected_component_id, selected_weighting_style_id)
+	var mesh_bake := _component_mesh_bake(selected_asset_id, selected_component_id)
+	var result: Dictionary = {}
+	if weighting_preview_key == _weighting_preview_id(selected_asset_id, selected_component_id, selected_weighting_style_id):
+		result = weighting_preview
+	elif not style.is_empty():
+		result = style.get("bake", {})
+	weighting_workspace.set_context(mesh_bake, result, _weighting_status(selected_asset_id, selected_component_id, component, style))
 
 
 func _geometry_meshing_input(asset_id: String, component_id: String, recipe: Dictionary = {}) -> Dictionary:
@@ -3419,8 +3672,11 @@ func _render_context_bar() -> void:
 			context_bar.add_child(geometry_phase_label)
 		_render_info_bar()
 		return
-	if active_module == "Style" and not selected_material_id.is_empty():
-		_render_material_context_bar()
+	if active_module == "Style":
+		if active_style_submodule == "Weighting":
+			_render_weighting_context_bar()
+		elif not selected_material_id.is_empty():
+			_render_material_context_bar()
 		_render_info_bar()
 		return
 	if not selected_texture_id.is_empty():
@@ -3746,7 +4002,7 @@ func _render_geometry_sampling_context_bar() -> void:
 	popup.set_item_metadata(0, GeometrySamplingService.ADAPTIVE)
 	popup.add_item("2  Even Spacing", 1)
 	popup.set_item_metadata(1, GeometrySamplingService.EVEN_SPACING)
-	popup.id_pressed.connect(_on_geometry_sampling_method_menu_selected.bind(popup))
+	_connect_context_method_menu(popup, "geometry.sampling.method", _set_geometry_sampling_method)
 	context_bar.add_child(geometry_method_menu)
 	var recipe := _geometry_sampling_recipe(selected_asset_id, selected_component_id)
 	var method_label := Label.new()
@@ -3810,7 +4066,7 @@ func _render_geometry_seeding_context_bar() -> void:
 	popup.set_item_metadata(0, GeometrySeedingService.POISSON_FILL)
 	popup.add_item("2  Spine Flow", 1)
 	popup.set_item_metadata(1, GeometrySeedingService.SPINE_FLOW)
-	popup.id_pressed.connect(func(id: int) -> void: _set_geometry_seeding_method(str(popup.get_item_metadata(popup.get_item_index(id)))))
+	_connect_context_method_menu(popup, "geometry.seeding.method", _set_geometry_seeding_method)
 	context_bar.add_child(geometry_seeding_method_menu)
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	var status := _geometry_seeding_status(selected_asset_id, selected_component_id, component)
@@ -3904,7 +4160,7 @@ func _render_geometry_meshing_context_bar() -> void:
 	popup.set_item_metadata(0, GeometryMeshingService.CONSTRAINED_DELAUNAY)
 	popup.add_item("2  Organic Relaxed", 1)
 	popup.set_item_metadata(1, GeometryMeshingService.ORGANIC_RELAXED)
-	popup.id_pressed.connect(func(id: int) -> void: _set_geometry_meshing_method(str(popup.get_item_metadata(popup.get_item_index(id)))))
+	_connect_context_method_menu(popup, "geometry.meshing.method", _set_geometry_meshing_method)
 	context_bar.add_child(geometry_meshing_method_menu)
 	var recipe := _geometry_meshing_recipe(selected_asset_id, selected_component_id)
 	var method_label := Label.new()
@@ -3962,7 +4218,7 @@ func _render_geometry_uv_mapping_context_bar() -> void:
 	_style_popup_menu(popup)
 	popup.add_item("1  Bounds / Planar", 0)
 	popup.set_item_metadata(0, GeometryUVMappingService.BOUNDS_PLANAR)
-	popup.id_pressed.connect(func(_id: int) -> void: _set_geometry_uv_mapping_method(GeometryUVMappingService.BOUNDS_PLANAR))
+	_connect_context_method_menu(popup, "geometry.uv_mapping.method", _set_geometry_uv_mapping_method)
 	context_bar.add_child(geometry_uv_mapping_method_menu)
 	var method_label := Label.new()
 	method_label.text = "Bounds / Planar"
@@ -4118,6 +4374,38 @@ func _render_material_context_bar() -> void:
 	# Reserved for future Material Graph node actions. The material workspace
 	# opens directly into the graph and has no view-switching menu.
 	return
+
+
+func _render_weighting_context_bar() -> void:
+	weighting_method_menu = MenuButton.new()
+	weighting_method_menu.text = "⌘1  Method  ▼"
+	weighting_method_menu.custom_minimum_size = Vector2(132, 32)
+	weighting_method_menu.focus_mode = Control.FOCUS_NONE
+	_style_context_command_button(weighting_method_menu, _context_command_is("style.weighting.method"))
+	var popup := weighting_method_menu.get_popup()
+	popup.add_item("1  Uniform", 0)
+	popup.set_item_metadata(0, WeightingService.UNIFORM)
+	popup.add_item("2  Axis Gradient", 1)
+	popup.set_item_metadata(1, WeightingService.AXIS_GRADIENT)
+	_style_popup_menu(popup)
+	_connect_context_method_menu(popup, "style.weighting.method", _set_weighting_method)
+	context_bar.add_child(weighting_method_menu)
+
+
+func _set_weighting_method(method_value: Variant) -> void:
+	var method := str(method_value)
+	if method not in WeightingService.VALID_METHODS:
+		return
+	var style := _weighting_style(selected_asset_id, selected_component_id, selected_weighting_style_id)
+	if style.is_empty():
+		return
+	_set_active_context_command("style.weighting.method")
+	if method == str(style.get("method", "")):
+		return
+	_record_direct_change()
+	style["method"] = method
+	style["parameters"] = WeightingService.default_parameters(method)
+	_generate_weighting_preview()
 
 
 func _on_material_view_menu_id(id: int) -> void:
@@ -4760,10 +5048,16 @@ func _render_info_bar() -> void:
 				_add_info_option("⌘2: Edit Seeds")
 		return
 	if active_module == "Style":
-		var material_state_label := Label.new()
-		material_state_label.text = "State: Default"
-		info_bar.add_child(material_state_label)
-		if not selected_material_id.is_empty():
+		var style_state_label := Label.new()
+		style_state_label.text = "State: Default"
+		info_bar.add_child(style_state_label)
+		if active_style_submodule == "Weighting":
+			_add_info_option("Weighting")
+			_add_info_option("⌘1: Method")
+			var style := _weighting_style(selected_asset_id, selected_component_id, selected_weighting_style_id)
+			if not style.is_empty():
+				_add_info_option(str(style.get("name", "Weighting Style")))
+		elif not selected_material_id.is_empty():
 			_add_info_option("Material Graph")
 		return
 	if active_module == "Export":
@@ -5356,7 +5650,10 @@ func _render_outliner() -> void:
 		_render_motion_outliner()
 		return
 	if active_module == "Style":
-		_render_material_outliner()
+		if active_style_submodule == "Weighting":
+			_render_weighting_outliner()
+		else:
+			_render_material_outliner()
 		return
 	if active_module == "Export":
 		_render_export_outliner()
@@ -5705,6 +6002,74 @@ func _render_material_outliner() -> void:
 		material_row.add_child(material_button)
 
 
+func _render_weighting_outliner() -> void:
+	var search_text := outliner_search_input.text.strip_edges().to_lower() if is_instance_valid(outliner_search_input) else ""
+	outliner_list.add_child(_create_outliner_group_label("Weighting"))
+	for asset in assets:
+		var asset_id := str(asset.get("id", ""))
+		var asset_matches := search_text.is_empty() or str(asset.get("name", "")).to_lower().contains(search_text)
+		var component_matches := false
+		for component in asset.get("components", []):
+			if str(component.get("name", "")).to_lower().contains(search_text):
+				component_matches = true
+				break
+			for style in _weighting_styles(asset_id, str(component.get("id", ""))):
+				if str(style.get("name", "")).to_lower().contains(search_text):
+					component_matches = true
+		if not asset_matches and not component_matches:
+			continue
+		var asset_button := Button.new()
+		asset_button.text = str(asset.get("name", "Asset"))
+		asset_button.custom_minimum_size = Vector2(0, 30)
+		asset_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		asset_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		asset_button.focus_mode = Control.FOCUS_NONE
+		_style_outliner_button(asset_button, selected_asset_id == asset_id and selected_component_id.is_empty())
+		asset_button.pressed.connect(_select_weighting_asset.bind(asset_id))
+		outliner_list.add_child(asset_button)
+		if not bool(expanded_assets.get(asset_id, false)) and search_text.is_empty():
+			continue
+		for component in asset.get("components", []):
+			var component_id := str(component.get("id", ""))
+			var component_row := HBoxContainer.new()
+			var indent := Control.new()
+			indent.custom_minimum_size = Vector2(16, 0)
+			component_row.add_child(indent)
+			var component_button := Button.new()
+			var mesh_status := _component_mesh_status(asset_id, component_id, component)
+			component_button.text = "%s · %s" % [str(component.get("name", "Component")), "Mesh Ready" if mesh_status == "Ready" else "Missing Mesh" if mesh_status == "Missing" else "Mesh Stale"]
+			component_button.custom_minimum_size = Vector2(0, 30)
+			component_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			component_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+			component_button.focus_mode = Control.FOCUS_NONE
+			_style_outliner_button(component_button, selected_asset_id == asset_id and selected_component_id == component_id and selected_weighting_style_id.is_empty())
+			component_button.pressed.connect(_select_weighting_component.bind(asset_id, component_id))
+			component_row.add_child(component_button)
+			var add_button := Button.new()
+			add_button.text = "+"
+			add_button.custom_minimum_size = Vector2(28, 30)
+			add_button.focus_mode = Control.FOCUS_NONE
+			add_button.tooltip_text = "Add Weighting Style"
+			add_button.pressed.connect(_create_weighting_style.bind(asset_id, component_id))
+			component_row.add_child(add_button)
+			outliner_list.add_child(component_row)
+			for style in _weighting_styles(asset_id, component_id):
+				var style_row := HBoxContainer.new()
+				var style_indent := Control.new()
+				style_indent.custom_minimum_size = Vector2(34, 0)
+				style_row.add_child(style_indent)
+				var style_button := Button.new()
+				style_button.text = "%s · %s" % [str(style.get("name", "Weighting Style")), _weighting_status(asset_id, component_id, component, style)]
+				style_button.custom_minimum_size = Vector2(0, 26)
+				style_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				style_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+				style_button.focus_mode = Control.FOCUS_NONE
+				_style_outliner_button(style_button, selected_weighting_style_id == str(style.get("id", "")))
+				style_button.pressed.connect(_select_weighting_style.bind(asset_id, component_id, str(style.get("id", ""))))
+				style_row.add_child(style_button)
+				outliner_list.add_child(style_row)
+
+
 func _render_export_outliner() -> void:
 	var search_text := outliner_search_input.text.strip_edges().to_lower() if is_instance_valid(outliner_search_input) else ""
 	var source_assets: Array[Dictionary] = []
@@ -5887,7 +6252,10 @@ func _render_geometry_component_asset_entry(asset: Dictionary, force_expand := f
 			bake_indent.custom_minimum_size = Vector2(34, 0)
 			bake_row.add_child(bake_indent)
 			var bake_button := Button.new()
-			bake_button.text = "%s  ·  %s" % [_geometry_bake_method_label(method), _geometry_bake_status(method, bake, asset_id, component_id, component)]
+			var component_mesh_marker := ""
+			if active_geometry_submodule == "Meshing" and str(_component_mesh_reference(asset_id, component_id).get("bake_id", "")) == str(bake.get("bake_id", "")):
+				component_mesh_marker = "  ·  Component Mesh"
+			bake_button.text = "%s  ·  %s%s" % [_geometry_bake_method_label(method), _geometry_bake_status(method, bake, asset_id, component_id, component), component_mesh_marker]
 			bake_button.tooltip_text = "Baked %s result" % _geometry_bake_method_label(method)
 			bake_button.custom_minimum_size = Vector2(0, 26)
 			bake_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -6423,6 +6791,79 @@ func _confirm_guide_creation() -> void:
 	_render_canvas_context()
 
 
+func _duplicate_selected_guide() -> void:
+	var asset := _get_asset(selected_asset_id)
+	var source := _get_guide(asset, selected_guide_id)
+	if asset.is_empty() or source.is_empty():
+		return
+	_record_direct_change()
+	var duplicate := _duplicate_guide_record(source, asset)
+	asset["guides"].append(duplicate)
+	selected_guide_id = str(duplicate.get("id", ""))
+	selected_component_id = ""
+	active_state = ""
+	expanded_assets[selected_asset_id] = true
+	_show_status_message("Duplicated %s." % str(duplicate.get("name", "Guide")))
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _duplicate_guide_record(source: Dictionary, asset: Dictionary) -> Dictionary:
+	var duplicate := source.duplicate(true)
+	var source_id := str(source.get("id", ""))
+	var guide_id := "guide_%d" % next_guide_id
+	next_guide_id += 1
+	duplicate["id"] = guide_id
+	var base_name := str(source.get("name", AssetGuide.display_name(str(source.get("guide_type", AssetGuide.SAMPLER_SPINE))))) + " Copy"
+	var candidate := base_name
+	var suffix := 2
+	var existing_names: Dictionary = {}
+	for guide in asset.get("guides", []):
+		existing_names[str(guide.get("name", "")).to_lower()] = true
+	while existing_names.has(candidate.to_lower()):
+		candidate = "%s %d" % [base_name, suffix]
+		suffix += 1
+	duplicate["name"] = candidate
+	var point_id_map: Dictionary = {}
+	var new_points: Array = []
+	for point in source.get("points", []):
+		var point_copy: Dictionary = point.duplicate(true)
+		var old_point_id := str(point.get("id", ""))
+		var new_point_id := BezierTopology.next_id(new_points, "point")
+		point_id_map[old_point_id] = new_point_id
+		point_copy["id"] = new_point_id
+		new_points.append(point_copy)
+	var edge_id_map: Dictionary = {}
+	var new_edges: Array = []
+	for edge in source.get("edges", []):
+		var edge_copy: Dictionary = edge.duplicate(true)
+		var old_edge_id := str(edge.get("id", ""))
+		var new_edge_id := BezierTopology.next_id(new_edges, "edge")
+		edge_id_map[old_edge_id] = new_edge_id
+		edge_copy["id"] = new_edge_id
+		edge_copy["start_point_id"] = str(point_id_map.get(str(edge.get("start_point_id", "")), ""))
+		edge_copy["end_point_id"] = str(point_id_map.get(str(edge.get("end_point_id", "")), ""))
+		new_edges.append(edge_copy)
+	var new_chains: Array = []
+	for chain in source.get("chains", []):
+		var chain_copy: Dictionary = chain.duplicate(true)
+		chain_copy["id"] = BezierTopology.next_id(new_chains, "chain")
+		var remapped_points: Array = []
+		for point_id in chain.get("point_ids", []):
+			remapped_points.append(str(point_id_map.get(str(point_id), "")))
+		var remapped_edges: Array = []
+		for edge_id in chain.get("edge_ids", []):
+			remapped_edges.append(str(edge_id_map.get(str(edge_id), "")))
+		chain_copy["point_ids"] = remapped_points
+		chain_copy["edge_ids"] = remapped_edges
+		new_chains.append(chain_copy)
+	duplicate["points"] = new_points
+	duplicate["edges"] = new_edges
+	duplicate["chains"] = new_chains
+	return AssetGuide.normalize(duplicate)
+
+
 func _confirm_component_creation() -> void:
 	var asset_id := str(component_dialog.get_meta("asset_id", ""))
 	var asset := _get_asset(asset_id)
@@ -6547,6 +6988,10 @@ func _delete_selected_component() -> void:
 
 
 func _delete_current_outliner_selection() -> void:
+	if active_module == "Style" and active_style_submodule == "Weighting":
+		if not selected_weighting_style_id.is_empty():
+			_delete_selected_weighting_style()
+		return
 	if not selected_guide_id.is_empty():
 		_delete_selected_guide()
 	elif not selected_component_id.is_empty():
@@ -6948,10 +7393,13 @@ func _render_guide_inspector(asset: Dictionary, guide: Dictionary) -> void:
 	type_option.set_item_metadata(0, AssetGuide.BODY_FLOW)
 	type_option.add_item("Sampler Spine")
 	type_option.set_item_metadata(1, AssetGuide.SAMPLER_SPINE)
+	type_option.add_item("Animation Spine")
+	type_option.set_item_metadata(2, AssetGuide.ANIMATION_SPINE)
 	var guide_type := str(guide.get("guide_type", AssetGuide.BODY_FLOW))
-	type_option.select(0 if guide_type == AssetGuide.BODY_FLOW else 1)
-	type_option.disabled = not guide.get("points", []).is_empty()
-	type_option.tooltip_text = "Guide Type is fixed once Points have been authored." if type_option.disabled else ""
+	for type_index in range(type_option.item_count):
+		if str(type_option.get_item_metadata(type_index)) == guide_type:
+			type_option.select(type_index)
+			break
 	type_option.item_selected.connect(_on_guide_type_selected.bind(type_option))
 	inspector_content.add_child(type_option)
 	inspector_content.add_child(_create_inspector_field_label("Parent Component"))
@@ -6981,6 +7429,162 @@ func _render_guide_inspector(asset: Dictionary, guide: Dictionary) -> void:
 	inspector_content.add_child(delete_button)
 
 
+func _render_weighting_inspector() -> void:
+	inspector_content.add_child(_create_inspector_section("Weighting"))
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if component.is_empty():
+		inspector_content.add_child(_create_inspector_field_label("Select a Component to create or inspect Weighting Styles."))
+		return
+	inspector_content.add_child(_create_inspector_field_label(str(component.get("name", "Component"))))
+	var mesh_status := _component_mesh_status(selected_asset_id, selected_component_id, component)
+	var mesh_label := _create_inspector_field_label("Component Mesh: %s" % mesh_status)
+	mesh_label.add_theme_color_override("font_color", Color("#75b88a") if mesh_status == "Ready" else Color("#ef8354"))
+	inspector_content.add_child(mesh_label)
+	var style := _weighting_style(selected_asset_id, selected_component_id, selected_weighting_style_id)
+	if style.is_empty():
+		inspector_content.add_child(_create_inspector_field_label("Create or select a Weighting Style."))
+		return
+	inspector_content.add_child(_create_inspector_field_label("Name"))
+	var name_editor := _create_name_editor(str(style.get("name", "Weighting Style")), "Weighting Style name")
+	name_editor.text_submitted.connect(_rename_weighting_style)
+	name_editor.focus_exited.connect(func() -> void: _rename_weighting_style(name_editor.text))
+	inspector_content.add_child(name_editor)
+	inspector_content.add_child(_create_inspector_section("Method"))
+	var method_option := OptionButton.new()
+	for method_data in [["Uniform", WeightingService.UNIFORM], ["Axis Gradient", WeightingService.AXIS_GRADIENT]]:
+		method_option.add_item(str(method_data[0]))
+		method_option.set_item_metadata(method_option.item_count - 1, str(method_data[1]))
+		if str(style.get("method", "")) == str(method_data[1]):
+			method_option.select(method_option.item_count - 1)
+	method_option.item_selected.connect(_on_weighting_method_selected.bind(method_option))
+	inspector_content.add_child(method_option)
+	inspector_content.add_child(_create_inspector_section("Parameters"))
+	if str(style.get("method", "")) == WeightingService.AXIS_GRADIENT:
+		inspector_content.add_child(_create_inspector_field_label("Direction"))
+		var direction_option := OptionButton.new()
+		for direction_data in [["Bottom → Top", WeightingService.BOTTOM_TO_TOP], ["Top → Bottom", WeightingService.TOP_TO_BOTTOM], ["Left → Right", WeightingService.LEFT_TO_RIGHT], ["Right → Left", WeightingService.RIGHT_TO_LEFT]]:
+			direction_option.add_item(str(direction_data[0]))
+			direction_option.set_item_metadata(direction_option.item_count - 1, str(direction_data[1]))
+			if str(style.get("parameters", {}).get("direction", "")) == str(direction_data[1]):
+				direction_option.select(direction_option.item_count - 1)
+		direction_option.item_selected.connect(_on_weighting_direction_selected.bind(direction_option))
+		inspector_content.add_child(direction_option)
+		inspector_content.add_child(_create_inspector_field_label("Curve"))
+		var curve_option := OptionButton.new()
+		for curve_data in [["Linear", WeightingService.LINEAR], ["Ease In", WeightingService.EASE_IN], ["Ease Out", WeightingService.EASE_OUT], ["Smooth", WeightingService.SMOOTH]]:
+			curve_option.add_item(str(curve_data[0]))
+			curve_option.set_item_metadata(curve_option.item_count - 1, str(curve_data[1]))
+			if str(style.get("parameters", {}).get("curve", "")) == str(curve_data[1]):
+				curve_option.select(curve_option.item_count - 1)
+		curve_option.item_selected.connect(_on_weighting_curve_selected.bind(curve_option))
+		inspector_content.add_child(curve_option)
+		var invert := CheckBox.new()
+		invert.text = "Invert"
+		invert.button_pressed = bool(style.get("parameters", {}).get("invert", false))
+		invert.toggled.connect(_on_weighting_invert_changed)
+		inspector_content.add_child(invert)
+	inspector_content.add_child(_create_inspector_field_label("Strength"))
+	var strength := SpinBox.new()
+	strength.min_value = 0.0
+	strength.max_value = 1.0
+	strength.step = 0.01
+	strength.set_value_no_signal(float(style.get("parameters", {}).get("strength", 1.0)))
+	strength.value_changed.connect(_on_weighting_strength_changed)
+	inspector_content.add_child(strength)
+	var status := _weighting_status(selected_asset_id, selected_component_id, component, style)
+	inspector_content.add_child(_create_inspector_section("Result"))
+	inspector_content.add_child(_create_inspector_field_label("Status: %s" % status))
+	var result: Dictionary = weighting_preview if weighting_preview_key == _weighting_preview_id(selected_asset_id, selected_component_id, selected_weighting_style_id) else style.get("bake", {})
+	if not result.is_empty():
+		inspector_content.add_child(_create_inspector_field_label("Vertices: %d" % int(result.get("weight_count", 0))))
+		inspector_content.add_child(_create_inspector_field_label("Range: %.2f → %.2f" % [float(result.get("minimum_weight", 0.0)), float(result.get("maximum_weight", 0.0))]))
+	var actions := HBoxContainer.new()
+	var generate_button := Button.new()
+	generate_button.text = "Generate"
+	generate_button.disabled = mesh_status != "Ready"
+	generate_button.pressed.connect(_generate_weighting_preview)
+	actions.add_child(generate_button)
+	var bake_button := Button.new()
+	bake_button.text = "Bake"
+	bake_button.disabled = not WeightingService.result_matches(weighting_preview, _component_mesh_bake(selected_asset_id, selected_component_id), style)
+	bake_button.pressed.connect(_bake_weighting_preview)
+	actions.add_child(bake_button)
+	inspector_content.add_child(actions)
+	var delete_button := Button.new()
+	delete_button.text = "Delete Weighting Style"
+	delete_button.pressed.connect(_delete_selected_weighting_style)
+	inspector_content.add_child(delete_button)
+
+
+func _rename_weighting_style(new_name: String) -> void:
+	var style := _weighting_style(selected_asset_id, selected_component_id, selected_weighting_style_id)
+	var name := new_name.strip_edges()
+	if style.is_empty() or name.is_empty() or name == str(style.get("name", "")):
+		return
+	_record_direct_change()
+	style["name"] = name
+	_render_outliner()
+
+
+func _delete_selected_weighting_style() -> void:
+	var document := _get_geometry_document(selected_asset_id, selected_component_id)
+	if document.is_empty() or selected_weighting_style_id.is_empty():
+		return
+	var styles: Array = document.get("weighting", {}).get("styles", [])
+	for style_index in range(styles.size()):
+		if str(styles[style_index].get("id", "")) == selected_weighting_style_id:
+			_record_direct_change()
+			styles.remove_at(style_index)
+			selected_weighting_style_id = ""
+			weighting_preview = {}
+			weighting_preview_key = ""
+			_render_outliner()
+			_render_inspector()
+			_render_canvas_context()
+			return
+
+
+func _on_weighting_method_selected(index: int, option: OptionButton) -> void:
+	if index < 0 or index >= option.item_count:
+		return
+	var style := _weighting_style(selected_asset_id, selected_component_id, selected_weighting_style_id)
+	var method := str(option.get_item_metadata(index))
+	if style.is_empty() or method == str(style.get("method", "")):
+		return
+	_record_direct_change()
+	style["method"] = method
+	style["parameters"] = WeightingService.default_parameters(method)
+	_generate_weighting_preview()
+
+
+func _on_weighting_direction_selected(index: int, option: OptionButton) -> void:
+	_update_weighting_parameter("direction", str(option.get_item_metadata(index)))
+
+
+func _on_weighting_curve_selected(index: int, option: OptionButton) -> void:
+	_update_weighting_parameter("curve", str(option.get_item_metadata(index)))
+
+
+func _on_weighting_invert_changed(enabled: bool) -> void:
+	_update_weighting_parameter("invert", enabled)
+
+
+func _on_weighting_strength_changed(value: float) -> void:
+	_update_weighting_parameter("strength", clampf(value, 0.0, 1.0), true)
+
+
+func _update_weighting_parameter(parameter_name: String, value, coalesced := false) -> void:
+	var style := _weighting_style(selected_asset_id, selected_component_id, selected_weighting_style_id)
+	if style.is_empty() or style.get("parameters", {}).get(parameter_name) == value:
+		return
+	if coalesced:
+		_record_coalesced_change()
+	else:
+		_record_direct_change()
+	style["parameters"][parameter_name] = value
+	_generate_weighting_preview()
+
+
 func _rename_selected_guide(new_name: String) -> void:
 	var guide := _get_guide(_get_asset(selected_asset_id), selected_guide_id)
 	var normalized_name := new_name.strip_edges()
@@ -6995,7 +7599,7 @@ func _rename_selected_guide(new_name: String) -> void:
 
 func _on_guide_type_selected(index: int, option: OptionButton) -> void:
 	var guide := _get_guide(_get_asset(selected_asset_id), selected_guide_id)
-	if guide.is_empty() or not guide.get("points", []).is_empty() or index < 0 or index >= option.item_count:
+	if guide.is_empty() or index < 0 or index >= option.item_count:
 		return
 	var guide_type := str(option.get_item_metadata(index))
 	if guide_type not in AssetGuide.VALID_TYPES or guide_type == str(guide.get("guide_type", "")):
@@ -7635,6 +8239,25 @@ func _render_geometry_meshing_inspector() -> void:
 		inspector_content.add_child(_create_inspector_field_label("Vertices: %d" % int(result.get("vertex_count", 0))))
 		inspector_content.add_child(_create_inspector_field_label("Triangles: %d" % int(result.get("triangle_count", 0))))
 		inspector_content.add_child(_create_inspector_field_label("Minimum Angle: %.1f°" % float(result.get("minimum_angle", 0.0))))
+	inspector_content.add_child(_create_inspector_section("Component Mesh"))
+	var component_mesh_status := _component_mesh_status(selected_asset_id, selected_component_id, component)
+	var component_mesh_reference := _component_mesh_reference(selected_asset_id, selected_component_id)
+	var component_mesh_label := _create_inspector_field_label("Status: %s" % component_mesh_status)
+	component_mesh_label.add_theme_color_override("font_color", Color("#75b88a") if component_mesh_status == "Ready" else Color("#ef8354"))
+	inspector_content.add_child(component_mesh_label)
+	if not str(component_mesh_reference.get("bake_id", "")).is_empty():
+		inspector_content.add_child(_create_inspector_field_label("Selected: %s" % _geometry_bake_method_label(str(component_mesh_reference.get("method", "")))))
+	var mesh_method := str(recipe.get("method", ""))
+	var mesh_bake := _geometry_meshing_bake(selected_asset_id, selected_component_id, mesh_method)
+	var mesh_bake_current := not mesh_bake.is_empty() and _geometry_meshing_bake_is_current(selected_asset_id, selected_component_id, component, mesh_method)
+	var mesh_is_selected := mesh_bake_current and str(component_mesh_reference.get("bake_id", "")) == str(mesh_bake.get("bake_id", ""))
+	var use_mesh_button := Button.new()
+	use_mesh_button.text = "Component Mesh Selected" if mesh_is_selected else "Use as Component Mesh"
+	use_mesh_button.custom_minimum_size = Vector2(0, 28)
+	use_mesh_button.focus_mode = Control.FOCUS_NONE
+	use_mesh_button.disabled = not mesh_bake_current or mesh_is_selected
+	use_mesh_button.pressed.connect(_use_current_bake_as_component_mesh)
+	inspector_content.add_child(use_mesh_button)
 	if geometry_meshing_preview_key == _geometry_document_key(selected_asset_id, selected_component_id) and not bool(geometry_meshing_preview.get("valid", true)):
 		for error_message in geometry_meshing_preview.get("errors", []):
 			var error_label := _create_inspector_field_label(str(error_message))
@@ -7656,6 +8279,25 @@ func _render_geometry_meshing_inspector() -> void:
 	bake_button.pressed.connect(_bake_geometry_meshing_preview)
 	actions.add_child(bake_button)
 	inspector_content.add_child(actions)
+
+
+func _use_current_bake_as_component_mesh() -> void:
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	var method := str(_geometry_meshing_recipe(selected_asset_id, selected_component_id).get("method", ""))
+	var bake := _geometry_meshing_bake(selected_asset_id, selected_component_id, method)
+	if component.is_empty() or bake.is_empty() or not _geometry_meshing_bake_is_current(selected_asset_id, selected_component_id, component, method):
+		_show_status_message("Bake a current Mesh before selecting the Component Mesh.")
+		return
+	_record_direct_change()
+	var document := _get_geometry_document(selected_asset_id, selected_component_id, true)
+	document["component_mesh"] = {
+		"bake_id": str(bake.get("bake_id", "")),
+		"method": method,
+		"mesh_fingerprint": GeometryUVMappingService.mesh_fingerprint(bake)
+	}
+	_show_status_message("%s is now the Component Mesh." % _geometry_bake_method_label(method))
+	_render_outliner()
+	_render_inspector()
 
 
 func _on_geometry_meshing_seed_source_selected(index: int, option: OptionButton) -> void:
@@ -8000,7 +8642,10 @@ func _render_inspector() -> void:
 		inspector_content.add_child(_create_inspector_field_label("Godot Scene (.tscn)"))
 		return
 	if active_module == "Style":
-		_render_material_inspector()
+		if active_style_submodule == "Weighting":
+			_render_weighting_inspector()
+		else:
+			_render_material_inspector()
 		return
 	if active_module == "Geometry":
 		if active_geometry_submodule == "Sampling":
@@ -10171,6 +10816,7 @@ func _render_canvas_context() -> void:
 	geometry_seeding_workspace.visible = false
 	geometry_meshing_workspace.visible = false
 	geometry_uv_mapping_workspace.visible = false
+	weighting_workspace.visible = false
 	if active_module == "Motion":
 		canvas_view.visible = false
 		texture_canvas.visible = false
@@ -10241,6 +10887,15 @@ func _render_canvas_context() -> void:
 		canvas_view.visible = false
 		texture_canvas.visible = false
 		import_preview.visible = false
+		if active_style_submodule == "Weighting":
+			material_graph.visible = false
+			material_preview_container.visible = false
+			weighting_workspace.visible = true
+			_refresh_weighting_workspace()
+			canvas_context_label.text = ""
+			texture_context_label.text = ""
+			import_preview_context_label.text = ""
+			return
 		var selected_material := _get_material(selected_material_id)
 		var material_is_visible := selected_material.is_empty() or bool(selected_material.get("visibility", true))
 		material_graph.visible = not selected_material_id.is_empty() and material_is_visible
@@ -10382,6 +11037,7 @@ func _render_spine_canvas(asset: Dictionary, guide: Dictionary, drawing: bool) -
 	canvas_view.set_paper_frame(Vector2.ZERO, false)
 	canvas_view.set_component_material(null)
 	canvas_view.set_guide_style(true)
+	canvas_view.set_guide_color(Color("#c084fc") if str(guide.get("guide_type", "")) == AssetGuide.ANIMATION_SPINE else Color("#f2c94c"))
 	canvas_view.set_reference_shapes(_build_reference_shapes(asset, "", target_component_id))
 	canvas_view.set_display_polygon([])
 	BezierGeometry.resolve_auto_handles(guide.get("points", []), guide.get("chains", []))
@@ -11066,7 +11722,10 @@ func _on_category_pressed(_module_name: String) -> void:
 		elif active_module == "Motion":
 			active_motion_submodule = pressed_section.active_submodule if pressed_section.active_submodule in MOTION_SUBMODULES else "Animation"
 			pressed_section.set_active_submodule(active_motion_submodule)
-	elif active_module == "Style":
+		elif active_module == "Style":
+			active_style_submodule = pressed_section.active_submodule if pressed_section.active_submodule in STYLE_SUBMODULES else "Material"
+			pressed_section.set_active_submodule(active_style_submodule)
+	elif active_module == "Style" and active_style_submodule == "Material":
 		selected_asset_id = ""
 		selected_component_id = ""
 		selected_texture_id = ""
@@ -11107,8 +11766,12 @@ func _select_submodule(module_name: String, submodule: String, section: ModuleSe
 		_render_outliner()
 		_render_inspector()
 		_render_canvas_context()
-	elif module_name == "Style" and submodule == "Material":
-		_enter_material_context(selected_material_id)
+	elif module_name == "Style" and submodule in STYLE_SUBMODULES:
+		active_style_submodule = submodule
+		if submodule == "Material":
+			_enter_material_context(selected_material_id)
+		else:
+			_enter_weighting_context()
 	elif module_name == "Motion" and submodule in MOTION_SUBMODULES:
 		_enter_motion_context(submodule)
 	return
@@ -11136,11 +11799,13 @@ func _set_create_submodule_context(submodule: String) -> void:
 
 func _enter_material_context(material_id: String = "") -> void:
 	active_module = "Style"
+	active_style_submodule = "Material"
 	selected_asset_id = ""
 	selected_component_id = ""
 	selected_texture_id = ""
 	selected_element_id = ""
 	selected_material_id = material_id
+	selected_weighting_style_id = ""
 	material_view_mode = "graph"
 	var style_section := _find_section("Style")
 	if style_section != null:
@@ -11195,6 +11860,49 @@ func _select_material(material_id: String) -> void:
 	if _get_material(material_id).is_empty():
 		return
 	_enter_material_context(material_id)
+
+
+func _enter_weighting_context() -> void:
+	active_module = "Style"
+	active_style_submodule = "Weighting"
+	selected_material_id = ""
+	var style_section := _find_section("Style")
+	if style_section != null:
+		style_section.set_expanded(true)
+		style_section.set_active_submodule("Weighting")
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _select_weighting_asset(asset_id: String) -> void:
+	var was_selected := selected_asset_id == asset_id and selected_component_id.is_empty()
+	selected_asset_id = asset_id
+	selected_component_id = ""
+	selected_weighting_style_id = ""
+	if was_selected:
+		expanded_assets[asset_id] = not bool(expanded_assets.get(asset_id, false))
+	else:
+		expanded_assets[asset_id] = true
+	_enter_weighting_context()
+
+
+func _select_weighting_component(asset_id: String, component_id: String) -> void:
+	selected_asset_id = asset_id
+	selected_component_id = component_id
+	selected_weighting_style_id = ""
+	expanded_assets[asset_id] = true
+	_enter_weighting_context()
+
+
+func _select_weighting_style(asset_id: String, component_id: String, style_id: String) -> void:
+	if _weighting_style(asset_id, component_id, style_id).is_empty():
+		return
+	selected_asset_id = asset_id
+	selected_component_id = component_id
+	selected_weighting_style_id = style_id
+	expanded_assets[asset_id] = true
+	_enter_weighting_context()
 
 
 func _select_lookdev_asset(asset_id: String) -> void:

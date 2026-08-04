@@ -14,6 +14,7 @@ func _init() -> void:
 	_test_geometry_seeding_service()
 	_test_geometry_meshing_service_and_ui()
 	_test_geometry_uv_mapping_service_and_ui()
+	_test_weighting_service_and_ui()
 	_test_asset_guides()
 	_test_motion_selection_context()
 	_test_motion_player()
@@ -143,14 +144,14 @@ func _test_geometry_sampling_service() -> void:
 	_expect(not bool(GeometrySamplingService.generate(open_component).get("valid", true)), "An open contour should fail visibly at the mesh-pipeline Sampling boundary.")
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
-	_expect(application._has_supported_schema({"schema_version": 24}) and not application._has_supported_schema({"schema_version": 26}), "Schema 25 should keep older Workspace documents readable and reject unknown future schemas.")
+	_expect(application._has_supported_schema({"schema_version": 26}) and not application._has_supported_schema({"schema_version": 28}), "Schema 27 should keep older Workspace documents readable and reject unknown future schemas.")
 	var geometry_document: Dictionary = application._default_geometry_document("asset_1", "component_1")
 	geometry_document["sampling"]["recipe"] = {"method": GeometrySamplingService.EVEN_SPACING, "parameters": {"spacing": 2.5, "feature_detail": GeometrySamplingService.DEFAULT_FEATURE_DETAIL}}
 	var baked_result := even.duplicate(true)
 	baked_result["bake_id"] = "bake_test"
 	geometry_document["sampling"]["bakes"][GeometrySamplingService.EVEN_SPACING] = baked_result
 	var serialized_geometry: Dictionary = application._serialize_geometry_document(geometry_document)
-	_expect(int(serialized_geometry.get("schema_version", 0)) == 25 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.EVEN_SPACING, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Geometry method bakes should serialize derived positions as schema-25 JSON arrays.")
+	_expect(int(serialized_geometry.get("schema_version", 0)) == 27 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.EVEN_SPACING, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Geometry method bakes should serialize derived positions as schema-27 JSON arrays.")
 	var normalized_geometry: Dictionary = application._normalize_geometry_document(serialized_geometry, "asset_1", "component_1")
 	_expect(normalized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.EVEN_SPACING, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Vector2, "Geometry method bake loading should restore local sample positions as Vector2 values.")
 	var adaptive_bake := adaptive_low.duplicate(true)
@@ -441,6 +442,11 @@ func _test_geometry_meshing_service_and_ui() -> void:
 	application._render_inspector()
 	application._render_canvas_context()
 	_expect(application.geometry_meshing_workspace.visible and application.inspector_content.get_child_count() >= 10, "Geometry Meshing should expose its dedicated Workspace and compact Inspector.")
+	_expect(application._component_mesh_status("asset_1", "component_1", component) == "Missing", "A Component should not infer its output Mesh from the current Meshing method.")
+	application._use_current_bake_as_component_mesh()
+	_expect(application._component_mesh_status("asset_1", "component_1", component) == "Ready" and str(application._component_mesh_bake("asset_1", "component_1").get("bake_id", "")) == "mesh_cdt_test", "Use as Component Mesh should persist the exact current Mesh Bake as the downstream output.")
+	var component_mesh_round_trip: Dictionary = application._normalize_geometry_document(application._serialize_geometry_document(normalized), "asset_1", "component_1")
+	_expect(str(component_mesh_round_trip.get("component_mesh", {}).get("bake_id", "")) == "mesh_cdt_test", "Component Mesh selection should survive Geometry document persistence.")
 	application._activate_geometry_meshing_method_choice()
 	var active_style := application.geometry_meshing_method_menu.get_theme_stylebox("normal") as StyleBoxFlat
 	_expect(application.active_context_command == "geometry.meshing.method" and application.geometry_meshing_method_choice_active and active_style != null and active_style.bg_color == Color("#8fd8f5"), "Meshing CMD+1 should use the shared exclusive Method command state and highlight.")
@@ -450,6 +456,7 @@ func _test_geometry_meshing_service_and_ui() -> void:
 	_expect(application.selected_geometry_bake_method == GeometryMeshingService.CONSTRAINED_DELAUNAY and application._geometry_meshing_bakes("asset_1", "component_1").size() == 2, "Meshing methods should retain and select two independent Bakes without replacement.")
 	normalized["seeding"]["bakes"][GeometrySeedingService.POISSON_FILL]["seeds"][0]["position"] += Vector2(0.1, 0.0)
 	_expect(application._geometry_meshing_status("asset_1", "component_1", component) == "Stale", "Editing an upstream Seeding Bake should make its Mesh dependency stale without reverse synchronization.")
+	_expect(application._component_mesh_status("asset_1", "component_1", component) == "Stale", "A selected Component Mesh should become stale without losing its persistent Bake reference when upstream inputs change.")
 	application.free()
 
 
@@ -539,6 +546,61 @@ func _test_geometry_uv_mapping_service_and_ui() -> void:
 	application.free()
 
 
+func _test_weighting_service_and_ui() -> void:
+	var component := _component()
+	component.merge({"id": "component_weighting", "name": "Body", "visibility": true})
+	for position in [Vector2.ZERO, Vector2(10.0, 0.0), Vector2(10.0, 10.0), Vector2(0.0, 10.0)]:
+		BezierTopology.add_point(component, position, "linear")
+	BezierTopology.close_active_chain(component)
+	var sampling := GeometrySamplingService.generate(component, {"method": GeometrySamplingService.EVEN_SPACING, "parameters": {"spacing": 2.0}})
+	sampling["bake_id"] = "sampling_weighting"
+	var seeding := GeometrySeedingService.generate(sampling, {"method": GeometrySeedingService.POISSON_FILL, "parameters": {"spacing": 2.5, "seed": 5}})
+	seeding["bake_id"] = "seeding_weighting"
+	var mesh := GeometryMeshingService.generate(sampling, seeding, {"method": GeometryMeshingService.CONSTRAINED_DELAUNAY, "parameters": {"seeding_method": GeometrySeedingService.POISSON_FILL}})
+	mesh["bake_id"] = "mesh_weighting"
+	var uniform_style := WeightingService.default_style("weight_uniform", "Uniform", "component_weighting")
+	uniform_style["parameters"]["strength"] = 0.6
+	var uniform := WeightingService.generate(mesh, uniform_style)
+	_expect(bool(uniform.get("valid", false)) and int(uniform.get("weight_count", 0)) == int(mesh.get("vertex_count", 0)) and is_equal_approx(float(uniform.get("minimum_weight", 0.0)), 0.6) and uniform == WeightingService.generate(mesh, uniform_style), "Uniform Weighting should deterministically assign the same strength to every stable Mesh Vertex ID.")
+	var gradient_style := WeightingService.default_style("weight_gradient", "Bottom to Top", "component_weighting")
+	gradient_style["method"] = WeightingService.AXIS_GRADIENT
+	gradient_style["parameters"] = WeightingService.default_parameters(WeightingService.AXIS_GRADIENT)
+	var gradient := WeightingService.generate(mesh, gradient_style)
+	_expect(bool(gradient.get("valid", false)) and is_zero_approx(float(gradient.get("minimum_weight", 1.0))) and is_equal_approx(float(gradient.get("maximum_weight", 0.0)), 1.0), "Axis Gradient should map Component-local Mesh bounds into a normalized zero-to-one Weight range.")
+	var application_script = load("res://scripts/main.gd")
+	var application: Control = application_script.new()
+	var document: Dictionary = application._default_geometry_document("asset_weighting", "component_weighting")
+	document["sampling"]["recipe"] = {"method": GeometrySamplingService.EVEN_SPACING, "parameters": {"spacing": 2.0}}
+	document["sampling"]["bakes"][GeometrySamplingService.EVEN_SPACING] = sampling
+	document["seeding"]["recipe"] = {"method": GeometrySeedingService.POISSON_FILL, "parameters": {"spacing": 2.5, "seed": 5}}
+	document["seeding"]["bakes"][GeometrySeedingService.POISSON_FILL] = seeding
+	document["meshing"]["recipe"] = {"method": GeometryMeshingService.CONSTRAINED_DELAUNAY, "parameters": {"seeding_method": GeometrySeedingService.POISSON_FILL}}
+	document["meshing"]["bakes"][GeometryMeshingService.CONSTRAINED_DELAUNAY] = mesh
+	document["component_mesh"] = {"bake_id": "mesh_weighting", "method": GeometryMeshingService.CONSTRAINED_DELAUNAY, "mesh_fingerprint": GeometryUVMappingService.mesh_fingerprint(mesh)}
+	document["weighting"]["styles"].append(gradient_style)
+	var weighting_assets: Array[Dictionary] = [{"id": "asset_weighting", "name": "Asset", "visibility": true, "components": [component], "guides": []}]
+	application.assets = weighting_assets
+	application.geometry_documents["asset_weighting/component_weighting"] = document
+	application._build_ui()
+	application.selected_asset_id = "asset_weighting"
+	application.selected_component_id = "component_weighting"
+	application.selected_weighting_style_id = "weight_gradient"
+	application.active_module = "Style"
+	application.active_style_submodule = "Weighting"
+	application._generate_weighting_preview()
+	_expect(application.weighting_workspace.visible and WeightingService.result_matches(application.weighting_preview, mesh, gradient_style), "Style Weighting should show a generated Mesh heatmap from the explicit Component Mesh and selected Style.")
+	application._set_active_context_command("style.weighting.method")
+	application._render_context_bar()
+	var weighting_popup: PopupMenu = application.weighting_method_menu.get_popup()
+	weighting_popup.emit_signal("id_pressed", 0)
+	_expect(str(gradient_style.get("method", "")) == WeightingService.UNIFORM and application.active_context_command.is_empty(), "Selecting a Weighting Method from CMD+1 must apply the method and clear the transient Context command instead of leaving the menu stuck.")
+	application._bake_weighting_preview()
+	_expect(application._weighting_status("asset_weighting", "component_weighting", component, gradient_style) == "Baked" and not gradient_style.get("bake", {}).is_empty(), "Weighting Bake should persist one derived result on its Style.")
+	var round_trip: Dictionary = application._normalize_geometry_document(application._serialize_geometry_document(document), "asset_weighting", "component_weighting")
+	_expect(round_trip.get("weighting", {}).get("styles", []).size() == 1 and int(round_trip.get("weighting", {}).get("styles", [])[0].get("bake", {}).get("weight_count", 0)) == int(mesh.get("vertex_count", 0)), "Weighting Styles and per-Vertex Bakes should survive Geometry persistence.")
+	application.free()
+
+
 func _test_asset_guides() -> void:
 	var component := _component()
 	component.merge({"id": "component_1", "name": "Body", "visibility": true, "transform": {"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}})
@@ -564,6 +626,12 @@ func _test_asset_guides() -> void:
 	_expect(serialized.get("points", [])[0].get("position", null) is Array, "Guide persistence should serialize authored Spine positions as JSON arrays.")
 	var restored: Dictionary = application._deserialize_asset_guide(serialized)
 	_expect(restored.get("points", [])[0].get("position", null) is Vector2 and str(restored.get("guide_type", "")) == AssetGuide.BODY_FLOW, "Guide loading should restore Vector2 topology and retain its semantic type.")
+	var animation_guide := AssetGuide.create("guide_animation", "Deform Spine", AssetGuide.ANIMATION_SPINE, "component_1")
+	BezierTopology.add_point(animation_guide, Vector2(1.0, 2.0), "aligned")
+	BezierTopology.add_point(animation_guide, Vector2(4.0, 6.0), "aligned")
+	var animation_round_trip: Dictionary = application._deserialize_asset_guide(application._serialize_asset_guide(animation_guide))
+	_expect(str(animation_round_trip.get("guide_type", "")) == AssetGuide.ANIMATION_SPINE and AssetGuide.display_name(AssetGuide.ANIMATION_SPINE) == "Animation Spine", "Animation Spines should persist as an independent Guide type.")
+	_expect(AssetGuide.validation_issues(animation_guide).is_empty(), "Animation Spines should use the same valid open Spine topology contract.")
 	var legacy_guide := guide.duplicate(true)
 	legacy_guide["type"] = "guide"
 	var test_asset := {"id": "asset_1", "name": "Asset", "visibility": true, "components": [component, legacy_guide], "guides": []}
@@ -592,11 +660,20 @@ func _test_asset_guides() -> void:
 	application._activate_guide_edit_state()
 	_expect(application.active_state == "edit" and application.active_edit_mode == "point", "Selected Guides should enter their own Edit Guide Point context through CMD+2.")
 	_expect(test_asset.get("guides", []).size() == 1 and str(test_asset.get("guides", [])[0].get("guide_type", "")) == AssetGuide.SAMPLER_SPINE, "Guide authoring should retain the persistent typed Guide.")
+	created_guide["guide_type"] = AssetGuide.ANIMATION_SPINE
+	_expect(str(created_guide.get("guide_type", "")) == AssetGuide.ANIMATION_SPINE and application._sampler_spines_for_component(test_asset, "component_1").is_empty(), "A populated Guide should be able to change type, while Sampler Spine queries exclude Animation Spines.")
+	created_guide["guide_type"] = AssetGuide.SAMPLER_SPINE
+	application._duplicate_selected_guide()
+	_expect(test_asset.get("guides", []).size() == 2 and str(application.selected_guide_id) != "guide_1", "CMD+D Guide duplication should create a new independent Guide ID.")
+	var duplicate_guide: Dictionary = application._get_guide(test_asset, application.selected_guide_id)
+	_expect(duplicate_guide.get("points", []).size() == created_guide.get("points", []).size() and str(duplicate_guide.get("points", [])[0].get("id", "")) != str(created_guide.get("points", [])[0].get("id", "")), "Guide duplication should deep-copy Spine topology with independent stable point IDs.")
+	duplicate_guide["guide_type"] = AssetGuide.ANIMATION_SPINE
+	_expect(application._sampler_spines_for_component(test_asset, "component_1").size() == 1 and application._animation_spines_for_component(test_asset, "component_1").size() == 1, "Sampler and Animation Spine queries should remain semantically separated after duplication.")
 	_expect(component.get("points", []).size() == component_point_count and application.selected_component_id.is_empty() and not application.selected_guide_id.is_empty(), "Spine authoring must not mutate Component topology and should select the new Guide.")
 	var snapshot: Dictionary = application._capture_history_snapshot()
 	test_asset["guides"][0]["name"] = "Changed"
 	application._restore_history_snapshot(snapshot)
-	_expect(str(application._get_guide(application._get_asset("asset_1"), application.selected_guide_id).get("name", "")) == "Sampler Guide", "Guides and their selection should participate in Undo/Redo snapshots.")
+	_expect(str(application._get_guide(application._get_asset("asset_1"), application.selected_guide_id).get("name", "")) == "Sampler Guide Copy", "Guides and their selection should participate in Undo/Redo snapshots.")
 	application.free()
 
 
@@ -897,7 +974,7 @@ func _test_motion_act_evaluator() -> void:
 	var normalized: Dictionary = application._normalize_motion_act({"id": "act_7", "parameters": {"direction": [0.0, 2.0], "distance": 12.0}}, "fallback")
 	_expect(Vector2(normalized.get("parameters", {}).get("direction", Vector2.ZERO)) == Vector2(0.0, 2.0), "Persisted Slide direction arrays should normalize back to Vector2 values.")
 	var serialized: Dictionary = application._serialize_motion_act(normalized)
-	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 25, "Act persistence should serialize vectors as JSON arrays using schema 25.")
+	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 27, "Act persistence should serialize vectors as JSON arrays using schema 27.")
 	var normalized_jump: Dictionary = application._normalize_motion_act({"id": "act_8", "primitive": "jump", "parameters": {"direction": [1.0, 0.0], "distance": 7.0, "height": 2.5, "arc": "snappy"}}, "fallback")
 	var serialized_jump: Dictionary = application._serialize_motion_act(normalized_jump)
 	_expect(str(serialized_jump.get("primitive", "")) == MotionActEvaluator.JUMP and is_equal_approx(float(serialized_jump.get("parameters", {}).get("height", 0.0)), 2.5) and str(serialized_jump.get("parameters", {}).get("arc", "")) == MotionActEvaluator.JUMP_ARC_SNAPPY, "Jump-specific parameters should survive normalization and serialization.")
