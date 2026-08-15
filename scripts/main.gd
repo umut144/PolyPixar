@@ -6423,10 +6423,10 @@ func _render_geometry_component_asset_entry(asset: Dictionary, force_expand := f
 		row.add_child(button)
 		var status_dot := Label.new()
 		status_dot.text = "●"
-		status_dot.custom_minimum_size = Vector2(22, 30)
+		status_dot.custom_minimum_size = Vector2(28, 30)
 		status_dot.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		status_dot.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		status_dot.add_theme_font_size_override("font_size", 19)
+		status_dot.add_theme_font_size_override("font_size", 23)
 		status_dot.add_theme_color_override("font_color", summary.get("color", Color("#737f91")))
 		status_dot.tooltip_text = str(summary.get("tooltip", ""))
 		row.add_child(status_dot)
@@ -6675,7 +6675,7 @@ func _geometry_status_color(status: String) -> Color:
 		return Color("#f2c94c")
 	if status == "Invalid":
 		return Color("#e56b6f")
-	return Color("#ef8354")
+	return Color("#737f91")
 
 
 func _geometry_status_symbol(status: String) -> String:
@@ -6685,7 +6685,7 @@ func _geometry_status_symbol(status: String) -> String:
 		return "🟡"
 	if status == "Invalid":
 		return "🔴"
-	return "🟠"
+	return "⚪"
 
 
 func _select_geometry_asset(asset_id: String) -> void:
