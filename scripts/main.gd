@@ -6400,6 +6400,11 @@ func _render_geometry_component_asset_entry(asset: Dictionary, force_expand := f
 	for component in components:
 		if str(component.get("type", "component")) == "guide":
 			continue
+		var draw_mode := str(component.get("draw_mode", "closed_loop"))
+		if active_geometry_submodule in ["Sampling", "Seeding"] and draw_mode in ["open_edge", "ribbon"]:
+			continue
+		if active_geometry_submodule == "Meshing" and draw_mode == "open_edge":
+			continue
 		var component_id := str(component.get("id", ""))
 		var row := HBoxContainer.new()
 		var indent := Control.new()
@@ -6418,10 +6423,10 @@ func _render_geometry_component_asset_entry(asset: Dictionary, force_expand := f
 		row.add_child(button)
 		var status_dot := Label.new()
 		status_dot.text = "●"
-		status_dot.custom_minimum_size = Vector2(16, 30)
+		status_dot.custom_minimum_size = Vector2(22, 30)
 		status_dot.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		status_dot.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		status_dot.add_theme_font_size_override("font_size", 15)
+		status_dot.add_theme_font_size_override("font_size", 19)
 		status_dot.add_theme_color_override("font_color", summary.get("color", Color("#737f91")))
 		status_dot.tooltip_text = str(summary.get("tooltip", ""))
 		row.add_child(status_dot)
@@ -6658,8 +6663,6 @@ func _geometry_status_rank(status: String) -> int:
 		return 5
 	if status == "Preview":
 		return 4
-	if status.contains("No Mesh"):
-		return 0
 	if status == "Invalid":
 		return 1
 	return 2
@@ -6670,8 +6673,6 @@ func _geometry_status_color(status: String) -> Color:
 		return Color("#75b88a")
 	if status == "Preview":
 		return Color("#f2c94c")
-	if status.contains("No Mesh"):
-		return Color("#737f91")
 	if status == "Invalid":
 		return Color("#e56b6f")
 	return Color("#ef8354")
@@ -6682,8 +6683,6 @@ func _geometry_status_symbol(status: String) -> String:
 		return "🟢"
 	if status == "Preview":
 		return "🟡"
-	if status.contains("No Mesh"):
-		return "⚪"
 	if status == "Invalid":
 		return "🔴"
 	return "🟠"
