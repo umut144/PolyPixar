@@ -112,6 +112,12 @@ it into a general scene or animation-graph abstraction prematurely.
 - Assets contain independently editable Components. `Draw Point` stores
   ordered Bézier Points on the selected Component and automatically maintains
   Edges and Chains; drawing never targets the Asset container directly.
+- A Component chooses an immutable Draw Mode when it is added: `Closed Loop`,
+  `Open Edge`, or `Ribbon`. Every mode owns at most one Chain. Open Edge and
+  Ribbon retain one open Chain, can pause drawing with Enter, and resume from
+  either selected endpoint. Closed Loop is the only mode that closes its Chain.
+  Open Edge remains outside the mesh pipeline. Open Edge and Ribbon may store
+  a same-Asset Catch Parent Component used for point/segment snapping.
 - Assets may also contain persistent typed Guides. Each Component's Outliner
   `+` action creates a scoped Guide child; `CMD/Ctrl + 1 · Draw Guide Point`
   and `CMD/Ctrl + 2 · Edit Guide Point` author its open Spine in that

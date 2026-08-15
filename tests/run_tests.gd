@@ -9,6 +9,8 @@ func _init() -> void:
 	_test_delete_multiple_points_and_protect_closed_minimum()
 	_test_ids_are_not_reused()
 	_test_insert_preserves_curve()
+	_test_component_draw_modes_and_continuation()
+	_test_catch_parent_snapping()
 	_test_geometry_sampling_service()
 	_test_geometry_sampling_ui_shell()
 	_test_geometry_seeding_service()
@@ -104,6 +106,41 @@ func _test_insert_preserves_curve() -> void:
 	_expect(not inserted_id.is_empty(), "Splitting an edge should create a point.")
 	_expect(component["points"].size() == 3 and component["edges"].size() == 2, "Splitting should replace one edge with two connected edges.")
 	_expect(BezierTopology.validate(component).is_empty(), "A split open chain should remain valid.")
+
+
+func _test_component_draw_modes_and_continuation() -> void:
+	var open_edge := _component()
+	open_edge["draw_mode"] = "open_edge"
+	var first_id := BezierTopology.start_chain(open_edge, Vector2.ZERO, "linear")
+	var second_id := BezierTopology.add_point_from(open_edge, first_id, Vector2(2.0, 0.0), "linear")
+	var prepended_id := BezierTopology.add_point_from(open_edge, first_id, Vector2(-1.0, 0.0), "linear")
+	_expect(not second_id.is_empty() and not prepended_id.is_empty(), "Open drawing should continue from either selected endpoint.")
+	_expect(open_edge.get("chains", []).size() == 1 and BezierTopology.mode_validation_issues(open_edge, true).is_empty(), "Open Edge must validate as exactly one open Chain with at least two Points.")
+	_expect(BezierTopology.start_chain(open_edge, Vector2(20.0, 20.0), "linear").is_empty(), "A Component must reject a second Chain.")
+	var closed := open_edge.duplicate(true)
+	closed["draw_mode"] = "closed_loop"
+	_expect(not BezierTopology.mode_validation_issues(closed, true).is_empty(), "Closed Loop must reject open topology.")
+	var ribbon := open_edge.duplicate(true)
+	ribbon["draw_mode"] = "ribbon"
+	_expect(BezierTopology.mode_validation_issues(ribbon, true).is_empty(), "Ribbon must accept one complete open Chain.")
+
+
+func _test_catch_parent_snapping() -> void:
+	var canvas := ComponentCanvas.new()
+	canvas.size = Vector2(400.0, 400.0)
+	canvas.set_camera_state(Vector2.ZERO, 20.0)
+	canvas.set_component_transform({"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO})
+	canvas.set_reference_shapes([{
+		"id": "parent", "transform": {"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO},
+		"bezier_points": [
+			{"id": "a", "position": Vector2.ZERO, "handle_in": Vector2.ZERO, "handle_out": Vector2.ZERO},
+			{"id": "b", "position": Vector2(10.0, 0.0), "handle_in": Vector2.ZERO, "handle_out": Vector2.ZERO}
+		],
+		"edges": [{"id": "edge", "start_point_id": "a", "end_point_id": "b"}]
+	}])
+	canvas.set_catch_parent_component("parent")
+	_expect(canvas._snap_to_catch_parent(Vector2(5.0, 0.2)).distance_to(Vector2(5.0, 0.0)) < 0.01, "Catch Parent should snap drawing to a referenced Bézier segment.")
+	canvas.free()
 
 
 func _test_geometry_sampling_service() -> void:

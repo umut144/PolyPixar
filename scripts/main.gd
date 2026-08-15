@@ -316,6 +316,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		_reset_to_default_state()
 		get_viewport().set_input_as_handled()
 		return
+	if not has_command_modifier and event.keycode in [KEY_ENTER, KEY_KP_ENTER] and active_state == "draw" and active_draw_tool == "point":
+		if _pause_draw_point():
+			get_viewport().set_input_as_handled()
+		return
 	if has_command_modifier and event.keycode == KEY_S:
 		_save_workspace()
 		get_viewport().set_input_as_handled()
@@ -735,6 +739,7 @@ func _build_ui() -> void:
 	canvas_view.bezier_points_moved.connect(_on_bezier_points_moved)
 	canvas_view.bezier_handle_changed.connect(_on_bezier_handle_changed)
 	canvas_view.bezier_edge_insert_requested.connect(_on_bezier_edge_insert_requested)
+	canvas_view.bezier_endpoint_connection_requested.connect(_on_bezier_endpoint_connection_requested)
 	canvas_view.reference_component_selected.connect(_on_reference_component_selected)
 	canvas_view.pivot_changed.connect(_on_pivot_changed)
 	canvas_view.transform_changed.connect(_on_transform_changed)
@@ -4862,6 +4867,19 @@ func _activate_draw_state() -> void:
 	canvas_view.set_draw_point_mode(active_draw_point_mode)
 
 
+func _pause_draw_point() -> bool:
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if component.is_empty():
+		return false
+	var chains: Array = component.get("chains", [])
+	if chains.is_empty() or bool(chains[0].get("closed", false)) or chains[0].get("point_ids", []).is_empty():
+		_show_status_message("Draw Point · No open contour to pause")
+		return false
+	_activate_edit_point_state(false, false)
+	_show_status_message("Drawing paused · Select an endpoint to continue")
+	return true
+
+
 func _draw_point_mode_from_key(keycode: int) -> String:
 	return ["linear", "aligned", "free", "mirrored", "corner"][keycode - KEY_1]
 
@@ -5146,6 +5164,7 @@ func _render_info_bar() -> void:
 	if active_state == "draw":
 		_add_info_option("Click: Add %s Point" % _draw_point_mode_label(active_draw_point_mode))
 		_add_info_option("1: Linear  2: Aligned  3: Free  4: Mirrored  5: Corner")
+		_add_info_option("Enter: Pause open Chain · Esc: Leave")
 	elif active_state == "edit" and active_edit_mode == "point":
 		if edit_point_set_mode:
 			_add_info_option("Click Edge: Set Point")
@@ -8929,6 +8948,35 @@ func _render_inspector() -> void:
 		_rename_selected_component(component_name_editor.text)
 	)
 	inspector_content.add_child(component_name_editor)
+	var draw_mode := str(component.get("draw_mode", "closed_loop"))
+	inspector_content.add_child(_create_inspector_field_label("Draw Mode: %s" % _draw_mode_display_name(draw_mode)))
+	var mode_issues := BezierTopology.mode_validation_issues(component, true)
+	var configured_catch_parent_id := str(component.get("catch_parent_component_id", ""))
+	if not configured_catch_parent_id.is_empty() and (configured_catch_parent_id == selected_component_id or _get_component(asset, configured_catch_parent_id).is_empty()):
+		mode_issues.append("Catch Parent references a missing Component.")
+	var mode_status := _create_inspector_field_label("Geometry: Valid" if mode_issues.is_empty() else "Geometry: Draft · %s" % mode_issues[0])
+	mode_status.add_theme_color_override("font_color", Color("#75b88a") if mode_issues.is_empty() else Color("#f2c94c"))
+	inspector_content.add_child(mode_status)
+	if draw_mode in ["open_edge", "ribbon"]:
+		inspector_content.add_child(_create_inspector_section("Drawing Reference"))
+		inspector_content.add_child(_create_inspector_field_label("Catch Parent"))
+		var catch_parent_option := OptionButton.new()
+		catch_parent_option.custom_minimum_size = Vector2(0, 26)
+		catch_parent_option.add_item("None")
+		catch_parent_option.set_item_metadata(0, "")
+		for candidate in asset.get("components", []):
+			var candidate_id := str(candidate.get("id", ""))
+			if candidate_id == selected_component_id:
+				continue
+			catch_parent_option.add_item(str(candidate.get("name", "Component")))
+			catch_parent_option.set_item_metadata(catch_parent_option.item_count - 1, candidate_id)
+		var catch_parent_id := str(component.get("catch_parent_component_id", ""))
+		for option_index in range(catch_parent_option.item_count):
+			if str(catch_parent_option.get_item_metadata(option_index)) == catch_parent_id:
+				catch_parent_option.select(option_index)
+				break
+		catch_parent_option.item_selected.connect(_on_component_catch_parent_selected.bind(catch_parent_option))
+		inspector_content.add_child(catch_parent_option)
 	inspector_content.add_child(_create_inspector_section("Transform"))
 	var transform_grid := GridContainer.new()
 	transform_grid.columns = 2
@@ -10332,6 +10380,21 @@ func _on_component_material_selected(index: int, option: OptionButton) -> void:
 	_render_outliner()
 
 
+func _on_component_catch_parent_selected(index: int, option: OptionButton) -> void:
+	var asset := _get_asset(selected_asset_id)
+	var component := _get_component(asset, selected_component_id)
+	if component.is_empty() or index < 0 or index >= option.item_count:
+		return
+	var parent_id := str(option.get_item_metadata(index))
+	if parent_id == selected_component_id or (not parent_id.is_empty() and _get_component(asset, parent_id).is_empty()):
+		return
+	if str(component.get("catch_parent_component_id", "")) == parent_id:
+		return
+	_record_direct_change()
+	component["catch_parent_component_id"] = parent_id
+	_render_canvas_context()
+
+
 func _on_edge_render_outline_changed(enabled: bool) -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	var edge := _get_edge(component, selected_edge_id)
@@ -10868,6 +10931,8 @@ func _render_canvas_context() -> void:
 	canvas_view.set_reference_image(null)
 	canvas_view.set_paper_frame(Vector2.ZERO, false)
 	canvas_view.set_guide_style(false)
+	canvas_view.set_catch_parent_component("")
+	canvas_view.set_component_draw_mode("closed_loop")
 	canvas_view.clear_draw_constraint()
 	geometry_sampling_workspace.visible = false
 	geometry_seeding_workspace.visible = false
@@ -11079,6 +11144,8 @@ func _render_canvas_context() -> void:
 	else:
 		canvas_view.set_component_material(_load_material_canvas_texture(component_material), component_material.get("tint", Color.WHITE), float(component_material.get("opacity", 1.0)), component_material.get("mapping_scale", Vector2.ONE), component_material.get("mapping_offset", Vector2.ZERO), _material_wrap_mode(component_material))
 	canvas_view.set_reference_shapes(_build_reference_shapes(asset, selected_component_id))
+	canvas_view.set_component_draw_mode(str(component.get("draw_mode", "closed_loop")))
+	canvas_view.set_catch_parent_component(str(component.get("catch_parent_component_id", "")) if str(component.get("draw_mode", "closed_loop")) in ["open_edge", "ribbon"] else "")
 	BezierGeometry.resolve_auto_handles(component.get("points", []), component.get("chains", []))
 	_refresh_component_geometry(component)
 	canvas_view.set_selected_edge_id(selected_edge_id)
@@ -11212,14 +11279,36 @@ func _on_bezier_point_added(position: Vector2, point_mode: String = "linear", dr
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	if component.is_empty():
 		return
+	var anchor_id := ""
+	if selected_point_ids.size() == 1 and BezierTopology.is_open_endpoint(component, str(selected_point_ids[0])):
+		anchor_id = str(selected_point_ids[0])
+	if anchor_id.is_empty() and not component.get("chains", []).is_empty():
+		_show_status_message("A Component may contain only one Chain · select an endpoint to continue")
+		return
 	_record_direct_change()
-	BezierTopology.add_point(component, position, point_mode if point_mode in BezierTopology.VALID_POINT_MODES else active_draw_point_mode, drawn_handle_out)
+	var resolved_mode := point_mode if point_mode in BezierTopology.VALID_POINT_MODES else active_draw_point_mode
+	var point_id := BezierTopology.add_point_from(component, anchor_id, position, resolved_mode, drawn_handle_out) if not anchor_id.is_empty() else BezierTopology.start_chain(component, position, resolved_mode, drawn_handle_out)
+	if point_id.is_empty():
+		return
+	selected_point_id = point_id
+	selected_point_ids = [point_id]
 	_refresh_component_geometry(component)
+	canvas_view.set_selected_point_id(point_id)
+
+
+func _on_bezier_endpoint_connection_requested(anchor_point_id: String, target_point_id: String) -> void:
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if component.is_empty() or str(component.get("draw_mode", "closed_loop")) != "closed_loop":
+		return
+	var anchor_chain := BezierTopology.chain_for_point(component.get("chains", []), anchor_point_id)
+	var target_chain := BezierTopology.chain_for_point(component.get("chains", []), target_point_id)
+	if not anchor_chain.is_empty() and str(anchor_chain.get("id", "")) == str(target_chain.get("id", "")) and anchor_point_id != target_point_id:
+		_on_bezier_chain_closed()
 
 
 func _on_bezier_chain_closed() -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	if component.is_empty():
+	if component.is_empty() or str(component.get("draw_mode", "closed_loop")) != "closed_loop":
 		return
 	var chains: Array = component.get("chains", [])
 	if chains.is_empty() or bool(chains.back().get("closed", false)) or chains.back().get("point_ids", []).size() < 3:

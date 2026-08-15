@@ -127,6 +127,80 @@ static func add_point(component: Dictionary, position: Vector2, requested_mode: 
 	return point_id
 
 
+static func is_open_endpoint(component: Dictionary, point_id: String) -> bool:
+	var chain := chain_for_point(component.get("chains", []), point_id)
+	if chain.is_empty() or bool(chain.get("closed", false)):
+		return false
+	var point_ids: Array = chain.get("point_ids", [])
+	return not point_ids.is_empty() and point_id in [str(point_ids.front()), str(point_ids.back())]
+
+
+static func start_chain(component: Dictionary, position: Vector2, requested_mode: String, drawn_handle_out := Vector2.ZERO) -> String:
+	if not component.get("chains", []).is_empty():
+		return ""
+	return add_point(component, position, requested_mode, drawn_handle_out)
+
+
+static func add_point_from(component: Dictionary, anchor_point_id: String, position: Vector2, requested_mode: String, drawn_handle_out := Vector2.ZERO) -> String:
+	if anchor_point_id.is_empty():
+		return start_chain(component, position, requested_mode, drawn_handle_out)
+	var chain := chain_for_point(component.get("chains", []), anchor_point_id)
+	if chain.is_empty() or bool(chain.get("closed", false)) or not is_open_endpoint(component, anchor_point_id):
+		return ""
+	var points: Array = component.get("points", [])
+	var mode := requested_mode if requested_mode in VALID_POINT_MODES else "linear"
+	var point_id := next_id(points, "point")
+	var new_point := {
+		"id": point_id,
+		"position": position,
+		"mode": mode,
+		"preserve_point": mode == "corner",
+		"handle_source": "auto",
+		"handle_in": Vector2.ZERO,
+		"handle_out": Vector2.ZERO
+	}
+	points.append(new_point)
+	var point_ids: Array = chain.get("point_ids", [])
+	if anchor_point_id == str(point_ids.front()):
+		point_ids.push_front(point_id)
+	else:
+		point_ids.append(point_id)
+	chain["point_ids"] = point_ids
+	component["points"] = points
+	_rebuild_chain_edges(component, chain)
+	BezierGeometry.resolve_auto_handles(points, component.get("chains", []))
+	if mode != "linear" and not is_zero_approx(drawn_handle_out.length_squared()):
+		new_point["handle_source"] = "manual"
+		new_point["handle_out"] = drawn_handle_out
+		if mode in ["mirrored", "aligned"]:
+			new_point["handle_in"] = -drawn_handle_out
+	return point_id
+
+
+static func mode_validation_issues(component: Dictionary, complete := true) -> Array[String]:
+	var errors := validate(component)
+	var chains: Array = component.get("chains", [])
+	if chains.size() > 1:
+		errors.append("A Component may contain only one Chain.")
+	if not complete:
+		return errors
+	if chains.is_empty():
+		errors.append("The Component needs one Chain.")
+		return errors
+	var chain: Dictionary = chains[0]
+	var point_count: int = chain.get("point_ids", []).size()
+	var draw_mode := str(component.get("draw_mode", "closed_loop"))
+	if draw_mode == "closed_loop":
+		if not bool(chain.get("closed", false)) or point_count < 3:
+			errors.append("Closed Loop requires one closed Chain with at least three Points.")
+	elif draw_mode in ["open_edge", "ribbon"]:
+		if bool(chain.get("closed", false)) or point_count < 2:
+			errors.append("%s requires one open Chain with at least two Points." % ("Ribbon" if draw_mode == "ribbon" else "Open Edge"))
+	else:
+		errors.append("Unknown Component draw mode.")
+	return errors
+
+
 static func close_active_chain(component: Dictionary) -> bool:
 	var chains: Array = component.get("chains", [])
 	if chains.is_empty():
@@ -344,3 +418,31 @@ static func _ordered_edge_ids(point_ids: Array, edges: Array, closed: bool) -> A
 				ordered_ids.append(str(edge_data.get("id", "")))
 				break
 	return ordered_ids
+
+
+static func _remove_chain_edges(component: Dictionary, chain: Dictionary) -> void:
+	var removed_ids: Array = chain.get("edge_ids", [])
+	var edges: Array = component.get("edges", [])
+	for edge_index in range(edges.size() - 1, -1, -1):
+		if str(edges[edge_index].get("id", "")) in removed_ids:
+			edges.remove_at(edge_index)
+	component["edges"] = edges
+
+
+static func _rebuild_chain_edges(component: Dictionary, chain: Dictionary) -> void:
+	_remove_chain_edges(component, chain)
+	var edges: Array = component.get("edges", [])
+	var point_ids: Array = chain.get("point_ids", [])
+	var edge_ids: Array = []
+	var edge_count := point_ids.size() if bool(chain.get("closed", false)) else maxi(point_ids.size() - 1, 0)
+	for point_index in range(edge_count):
+		var edge_id := next_id(edges, "edge")
+		edges.append({
+			"id": edge_id,
+			"start_point_id": str(point_ids[point_index]),
+			"end_point_id": str(point_ids[(point_index + 1) % point_ids.size()]),
+			"render_outline": true
+		})
+		edge_ids.append(edge_id)
+	chain["edge_ids"] = edge_ids
+	component["edges"] = edges

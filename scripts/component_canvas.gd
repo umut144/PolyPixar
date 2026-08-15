@@ -10,6 +10,7 @@ signal bezier_points_move_started(point_ids: Array)
 signal bezier_points_moved(point_ids: Array, delta: Vector2)
 signal bezier_handle_changed(point_id: String, handle_side: String, value: Vector2)
 signal bezier_edge_insert_requested(edge_id: String, t: float)
+signal bezier_endpoint_connection_requested(anchor_point_id: String, target_point_id: String)
 signal reference_component_selected(component_id: String)
 signal pivot_changed(pivot: Vector2)
 signal transform_changed(transform: Dictionary)
@@ -51,6 +52,8 @@ var guide_style := false
 var guide_color := Color("#f2c94c")
 var draw_point_mode := "linear"
 var reference_shapes: Array[Dictionary] = []
+var catch_parent_component_id := ""
+var component_draw_mode := "closed_loop"
 var draw_constraint_outer := PackedVector2Array()
 var draw_constraint_holes: Array = []
 var cursor_world := Vector2.ZERO
@@ -69,6 +72,7 @@ var selection_gizmo_drag_axis := ""
 var selection_gizmo_drag_start_world := Vector2.ZERO
 var draw_pointer_down := false
 var pending_draw_position := Vector2.ZERO
+var pending_draw_connection_target_id := ""
 var pending_draw_handle_out := Vector2.ZERO
 var pending_draw_has_handle := false
 var snap_enabled := true
@@ -148,11 +152,14 @@ func _gui_input(event: InputEvent) -> void:
 			command_shortcut_active = false
 	if event is InputEventMouseButton and event.pressed:
 		grab_focus()
+		if event.button_index == MOUSE_BUTTON_LEFT and interaction_state == "draw" and active_tool == "point" and _draw_anchor_point_id().is_empty():
+			var endpoint_id := _open_endpoint_at(event.position)
+			if not endpoint_id.is_empty():
+				_set_selected_point_ids([endpoint_id])
+				queue_redraw()
+				return
 		if event.button_index == MOUSE_BUTTON_LEFT and interaction_state == "draw" and active_tool in ["point", "spine"]:
-			draw_pointer_down = true
-			pending_draw_position = constrain_draw_position(_snap_to_grid(_world_to_local(_screen_to_world(event.position))))
-			pending_draw_handle_out = Vector2.ZERO
-			pending_draw_has_handle = false
+			_begin_draw_pointer(event.position)
 			queue_redraw()
 			return
 		if event.button_index == MOUSE_BUTTON_LEFT and interaction_state == "edit":
@@ -227,12 +234,7 @@ func _gui_input(event: InputEvent) -> void:
 				reference_component_selected.emit(component_id)
 	if event is InputEventMouseButton and not event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		if draw_pointer_down and interaction_state == "draw" and active_tool in ["point", "spine"]:
-			if active_tool == "point" and _is_near_first_chain_point(pending_draw_position):
-				bezier_chain_closed.emit()
-			else:
-				bezier_point_added.emit(pending_draw_position, draw_point_mode, pending_draw_handle_out if pending_draw_has_handle else Vector2.ZERO)
-			draw_pointer_down = false
-			pending_draw_has_handle = false
+			_commit_draw_pointer()
 			queue_redraw()
 			return
 		if selection_gizmo_dragging:
@@ -256,7 +258,7 @@ func _gui_input(event: InputEvent) -> void:
 		face_dragging = false
 	if event is InputEventMouseMotion:
 		cursor_over_canvas = true
-		cursor_world = constrain_draw_position(_snap_to_grid(_world_to_local(_screen_to_world(event.position))))
+		cursor_world = constrain_draw_position(_snap_to_catch_parent(_snap_to_grid(_world_to_local(_screen_to_world(event.position)))))
 		if point_marquee_dragging:
 			point_marquee_current = event.position
 			if point_marquee_start.distance_to(point_marquee_current) >= 4.0:
@@ -350,6 +352,30 @@ func _gui_input(event: InputEvent) -> void:
 			clear_selection()
 
 
+func _begin_draw_pointer(screen_position: Vector2) -> void:
+	draw_pointer_down = true
+	pending_draw_connection_target_id = _draw_connection_target_id(screen_position) if active_tool == "point" else ""
+	pending_draw_position = constrain_draw_position(_snap_to_catch_parent(_snap_to_grid(_world_to_local(_screen_to_world(screen_position)))))
+	pending_draw_handle_out = Vector2.ZERO
+	pending_draw_has_handle = false
+
+
+func _commit_draw_pointer() -> void:
+	var target_id := pending_draw_connection_target_id
+	var anchor_id := _draw_anchor_point_id()
+	if not target_id.is_empty() and not anchor_id.is_empty() and target_id != anchor_id:
+		bezier_endpoint_connection_requested.emit(anchor_id, target_id)
+	elif target_id == anchor_id and not target_id.is_empty():
+		pass
+	elif active_tool == "point" and component_draw_mode == "closed_loop" and _is_near_first_chain_point(pending_draw_position):
+		bezier_chain_closed.emit()
+	else:
+		bezier_point_added.emit(pending_draw_position, draw_point_mode, pending_draw_handle_out if pending_draw_has_handle else Vector2.ZERO)
+	draw_pointer_down = false
+	pending_draw_connection_target_id = ""
+	pending_draw_has_handle = false
+
+
 func set_context(context_label: String) -> void:
 	context_name = context_label
 	queue_redraw()
@@ -386,9 +412,10 @@ func set_interaction_state(state: String) -> void:
 	if state != "draw":
 		active_tool = ""
 		draw_pointer_down = false
+		pending_draw_connection_target_id = ""
 		pending_draw_has_handle = false
 		pending_draw_handle_out = Vector2.ZERO
-	if state != "edit":
+	if state not in ["edit", "draw"]:
 		clear_selection()
 		selected_edge_id = ""
 	queue_redraw()
@@ -399,6 +426,16 @@ func set_reference_shapes(shapes: Array) -> void:
 	for shape in shapes:
 		if shape is Dictionary:
 			reference_shapes.append(shape.duplicate(true))
+	queue_redraw()
+
+
+func set_catch_parent_component(component_id: String) -> void:
+	catch_parent_component_id = component_id
+	queue_redraw()
+
+
+func set_component_draw_mode(draw_mode: String) -> void:
+	component_draw_mode = draw_mode if draw_mode in ["closed_loop", "open_edge", "ribbon"] else "closed_loop"
 	queue_redraw()
 
 
@@ -1174,7 +1211,7 @@ func _draw_draw_preview() -> void:
 		return
 	_draw_draw_point_preview()
 	var preview_position := _world_to_screen(_local_to_world(cursor_world))
-	var close_to_first := active_tool == "point" and _is_near_first_chain_point(cursor_world)
+	var close_to_first := active_tool == "point" and component_draw_mode == "closed_loop" and _is_near_first_chain_point(cursor_world)
 	var preview_color := Color("#76e0a5") if close_to_first else guide_color if guide_style else Color("#f2c94c")
 	draw_circle(preview_position, 5.0, preview_color, false, 2.0)
 	if close_to_first:
@@ -1182,6 +1219,12 @@ func _draw_draw_preview() -> void:
 
 
 func _draw_draw_point_preview() -> void:
+	var anchor_id := _draw_anchor_point_id()
+	if not anchor_id.is_empty():
+		_draw_anchored_point_preview(anchor_id)
+		return
+	if active_tool == "point":
+		return
 	if bezier_chains.is_empty():
 		return
 	var chain: Dictionary = bezier_chains.back()
@@ -1194,7 +1237,7 @@ func _draw_draw_point_preview() -> void:
 	var preview_chain: Dictionary = chain.duplicate(true)
 	var preview_point_ids: Array = preview_chain.get("point_ids", []).duplicate()
 	var candidate_position := pending_draw_position if draw_pointer_down else cursor_world
-	var closing_preview := active_tool == "point" and not draw_pointer_down and _is_near_first_chain_point(cursor_world)
+	var closing_preview := active_tool == "point" and component_draw_mode == "closed_loop" and not draw_pointer_down and _is_near_first_chain_point(cursor_world)
 	var preview_end_id := ""
 	if closing_preview and point_ids.size() >= 3:
 		preview_chain["closed"] = true
@@ -1263,6 +1306,24 @@ func _draw_draw_point_preview() -> void:
 		)
 
 
+func _draw_anchored_point_preview(anchor_id: String) -> void:
+	var anchor := _point_by_id(anchor_id).duplicate(true)
+	if anchor.is_empty():
+		return
+	var chain := BezierTopology.chain_for_point(bezier_chains, anchor_id)
+	var point_ids: Array = chain.get("point_ids", [])
+	if not point_ids.is_empty() and anchor_id == str(point_ids.front()):
+		var old_in: Vector2 = anchor.get("handle_in", Vector2.ZERO)
+		anchor["handle_in"] = anchor.get("handle_out", Vector2.ZERO)
+		anchor["handle_out"] = old_in
+	var target := {
+		"id": "preview_point", "position": pending_draw_position if draw_pointer_down else cursor_world,
+		"mode": draw_point_mode, "handle_in": Vector2.ZERO,
+		"handle_out": pending_draw_handle_out if draw_pointer_down and pending_draw_has_handle else Vector2.ZERO
+	}
+	_draw_dashed_polyline(_bezier_curve_screen_points(anchor, target), Color("#f2c94caa"), 1.5)
+
+
 func _draw_dashed_polyline(points: PackedVector2Array, line_color: Color, line_width: float) -> void:
 	if points.size() < 2:
 		return
@@ -1322,6 +1383,42 @@ func _snap_to_grid(world_position: Vector2) -> Vector2:
 	)
 
 
+func _snap_to_catch_parent(local_position: Vector2) -> Vector2:
+	if catch_parent_component_id.is_empty():
+		return local_position
+	var cursor_screen := _world_to_screen(_local_to_world(local_position))
+	var best_screen := Vector2.ZERO
+	var best_distance := HANDLE_HIT_RADIUS
+	for shape in reference_shapes:
+		if str(shape.get("id", "")) != catch_parent_component_id:
+			continue
+		var transform: Dictionary = shape.get("transform", {})
+		var points: Array = shape.get("bezier_points", [])
+		var points_by_id: Dictionary = {}
+		for point in points:
+			points_by_id[str(point.get("id", ""))] = point
+			var point_screen := _world_to_screen(_local_to_world_with_transform(point.get("position", Vector2.ZERO), transform))
+			var point_distance := cursor_screen.distance_to(point_screen)
+			if point_distance <= best_distance:
+				best_distance = point_distance
+				best_screen = point_screen
+		for edge in shape.get("edges", []):
+			var start_id := str(edge.get("start_point_id", ""))
+			var end_id := str(edge.get("end_point_id", ""))
+			if not points_by_id.has(start_id) or not points_by_id.has(end_id):
+				continue
+			var curve := _bezier_edge_screen_points_with_transform(points_by_id[start_id], points_by_id[end_id], transform)
+			for index in range(curve.size() - 1):
+				var closest := Geometry2D.get_closest_point_to_segment(cursor_screen, curve[index], curve[index + 1])
+				var distance := cursor_screen.distance_to(closest)
+				if distance <= best_distance:
+					best_distance = distance
+					best_screen = closest
+	if best_distance < HANDLE_HIT_RADIUS:
+		return _world_to_local(_screen_to_world(best_screen))
+	return local_position
+
+
 func _is_near_first_chain_point(local_position: Vector2) -> bool:
 	if bezier_chains.is_empty():
 		return false
@@ -1337,6 +1434,35 @@ func _is_near_first_chain_point(local_position: Vector2) -> bool:
 			var first_position: Vector2 = point_data.get("position", Vector2.ZERO)
 			return _world_to_screen(_local_to_world(local_position)).distance_to(_world_to_screen(_local_to_world(first_position))) <= CLOSE_DISTANCE_PIXELS
 	return false
+
+
+func _draw_anchor_point_id() -> String:
+	if selected_point_ids.size() != 1:
+		return ""
+	var point_id := str(selected_point_ids[0])
+	var component := {"points": bezier_points, "edges": bezier_edges, "chains": bezier_chains}
+	return point_id if BezierTopology.is_open_endpoint(component, point_id) else ""
+
+
+func _draw_connection_target_id(screen_position: Vector2) -> String:
+	var anchor_id := _draw_anchor_point_id()
+	if anchor_id.is_empty():
+		return ""
+	var nearest_index := _nearest_bezier_point(screen_position)
+	if nearest_index < 0:
+		return ""
+	var target_id := str(bezier_points[nearest_index].get("id", ""))
+	var component := {"points": bezier_points, "edges": bezier_edges, "chains": bezier_chains}
+	return target_id if target_id == anchor_id or BezierTopology.is_open_endpoint(component, target_id) else ""
+
+
+func _open_endpoint_at(screen_position: Vector2) -> String:
+	var nearest_index := _nearest_bezier_point(screen_position)
+	if nearest_index < 0:
+		return ""
+	var point_id := str(bezier_points[nearest_index].get("id", ""))
+	var component := {"points": bezier_points, "edges": bezier_edges, "chains": bezier_chains}
+	return point_id if BezierTopology.is_open_endpoint(component, point_id) else ""
 
 
 func _selected_point_ids() -> Array:
