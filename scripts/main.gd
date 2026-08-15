@@ -14,6 +14,9 @@ const PAPER_SIZES_CM := [Vector2(21.0, 29.7), Vector2(29.7, 42.0), Vector2(42.0,
 const PAPER_LABELS := ["A4", "A3", "A2", "A1", "A0"]
 const PAPER_NONE_LEVEL := -1
 const PAPER_NONE_LABEL := "Kein Rahmen"
+const DRAW_MODES := ["closed_loop", "open_edge", "ribbon"]
+const DEFAULT_CONTOUR_WIDTH_PX := 8.0
+const DEFAULT_RIBBON_WIDTH_PX := 8.0
 # Kept available for a later Outliner presentation, but processed outputs are
 # currently reached through the Import Preview instead of additional rows.
 const SHOW_PROCESSED_OUTLINER := false
@@ -111,6 +114,7 @@ var asset_dialog: ConfirmationDialog
 var asset_name_input: LineEdit
 var component_dialog: ConfirmationDialog
 var component_name_input: LineEdit
+var component_draw_mode_menu: PopupMenu
 var guide_dialog: ConfirmationDialog
 var guide_name_input: LineEdit
 var texture_dialog: ConfirmationDialog
@@ -611,6 +615,13 @@ func _build_ui() -> void:
 	create_action_button.focus_mode = Control.FOCUS_NONE
 	create_action_button.pressed.connect(_on_create_action_pressed)
 	toolbar.add_child(create_action_button)
+	var draw_mode_status := Label.new()
+	draw_mode_status.name = "DrawModeStatus"
+	draw_mode_status.text = "Draw Mode: —"
+	draw_mode_status.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	draw_mode_status.add_theme_font_size_override("font_size", 11)
+	draw_mode_status.add_theme_color_override("font_color", Color("#9aa3b2"))
+	toolbar.add_child(draw_mode_status)
 	snap_button = Button.new()
 	snap_button.text = "Snap: %s  ▼" % ("On" if snap_enabled else "Off")
 	snap_button.custom_minimum_size = Vector2(112, 32)
@@ -827,6 +838,7 @@ func _build_ui() -> void:
 
 	_create_asset_dialog()
 	_create_component_dialog()
+	_create_component_draw_mode_menu()
 	_create_guide_dialog()
 	_create_texture_dialog()
 	_create_material_dialog()
@@ -1486,6 +1498,16 @@ func _create_component_dialog() -> void:
 	add_child(component_dialog)
 
 
+func _create_component_draw_mode_menu() -> void:
+	component_draw_mode_menu = PopupMenu.new()
+	component_draw_mode_menu.add_item("Closed Loop", 0)
+	component_draw_mode_menu.add_item("Open Edge", 1)
+	component_draw_mode_menu.add_item("Ribbon", 2)
+	_style_popup_menu(component_draw_mode_menu)
+	component_draw_mode_menu.id_pressed.connect(_on_component_draw_mode_selected)
+	add_child(component_draw_mode_menu)
+
+
 func _create_guide_dialog() -> void:
 	guide_dialog = ConfirmationDialog.new()
 	guide_dialog.title = "Add Guide"
@@ -1830,7 +1852,11 @@ func _save_workspace() -> void:
 				"transform": _serialize_transform(component.get("transform", {})),
 				"visibility": bool(component.get("visibility", true)),
 				"z_index": int(component.get("z_index", 0)),
-				"material_id": str(component.get("material_id", ""))
+				"material_id": str(component.get("material_id", "")),
+				"draw_mode": str(component.get("draw_mode", "closed_loop")),
+				"contour_width_px": maxf(DEFAULT_CONTOUR_WIDTH_PX, float(component.get("contour_width_px", DEFAULT_CONTOUR_WIDTH_PX))),
+				"ribbon_width_px": maxf(DEFAULT_RIBBON_WIDTH_PX, float(component.get("ribbon_width_px", DEFAULT_RIBBON_WIDTH_PX))),
+				"catch_parent_component_id": str(component.get("catch_parent_component_id", ""))
 			})
 		for guide in asset.get("guides", []):
 			asset_data["guides"].append(_serialize_asset_guide(guide))
@@ -2173,7 +2199,11 @@ func _load_workspace(workspace_entry: String) -> bool:
 				"transform": _deserialize_transform(component_data.get("transform", {})),
 				"visibility": bool(component_data.get("visibility", true)),
 				"z_index": int(component_data.get("z_index", 0)),
-				"material_id": str(component_data.get("material_id", ""))
+				"material_id": str(component_data.get("material_id", "")),
+				"draw_mode": str(component_data.get("draw_mode", "closed_loop")) if str(component_data.get("draw_mode", "closed_loop")) in DRAW_MODES else "closed_loop",
+				"contour_width_px": maxf(DEFAULT_CONTOUR_WIDTH_PX, float(component_data.get("contour_width_px", DEFAULT_CONTOUR_WIDTH_PX))),
+				"ribbon_width_px": maxf(DEFAULT_RIBBON_WIDTH_PX, float(component_data.get("ribbon_width_px", DEFAULT_RIBBON_WIDTH_PX))),
+				"catch_parent_component_id": str(component_data.get("catch_parent_component_id", ""))
 			})
 		for guide_data in asset_data.get("guides", []):
 			if not guide_data is Dictionary:
@@ -3610,6 +3640,10 @@ func _paper_frame_size(level: int) -> Vector2:
 func _render_context_bar() -> void:
 	if not is_instance_valid(context_bar):
 		return
+	var draw_mode_status := find_child("DrawModeStatus", true, false) as Label
+	if draw_mode_status != null:
+		var selected_component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+		draw_mode_status.text = "Draw Mode: %s" % _draw_mode_display_name(str(selected_component.get("draw_mode", "closed_loop"))) if not selected_component.is_empty() else "Draw Mode: —"
 	_update_context_action_button()
 	_clear_context_bar()
 	if active_module == "Export":
@@ -6454,7 +6488,7 @@ func _render_asset_outliner_entry(asset: Dictionary, force_expand := false, look
 	add_button.text = "Add"
 	add_button.custom_minimum_size = Vector2(48, 30)
 	add_button.focus_mode = Control.FOCUS_NONE
-	add_button.pressed.connect(_open_component_dialog.bind(asset_id))
+	add_button.pressed.connect(_open_component_dialog.bind(asset_id, add_button))
 	asset_header.add_child(add_button)
 	if not force_expand and not bool(expanded_assets.get(asset_id, false)):
 		return
@@ -6715,17 +6749,35 @@ func _select_element(texture_id: String, element_id: String) -> void:
 	_render_canvas_context()
 
 
-func _open_component_dialog(asset_id: String) -> void:
+func _open_component_dialog(asset_id: String, anchor: Control) -> void:
 	selected_asset_id = asset_id
 	selected_component_id = ""
 	selected_guide_id = ""
 	selected_texture_id = ""
 	selected_element_id = ""
+	component_draw_mode_menu.set_meta("asset_id", asset_id)
+	component_draw_mode_menu.position = Vector2i(anchor.global_position + Vector2(0.0, anchor.size.y))
+	component_draw_mode_menu.popup()
+
+
+func _on_component_draw_mode_selected(index: int) -> void:
+	if index < 0 or index >= DRAW_MODES.size():
+		return
 	component_name_input.text = ""
-	component_dialog.set_meta("asset_id", asset_id)
+	component_dialog.set_meta("asset_id", str(component_draw_mode_menu.get_meta("asset_id", "")))
+	component_dialog.set_meta("draw_mode", DRAW_MODES[index])
+	component_dialog.dialog_text = "%s Component name" % _draw_mode_display_name(DRAW_MODES[index])
 	canvas_view.set_navigation_locked(true)
 	component_dialog.popup_centered()
 	component_name_input.grab_focus()
+
+
+func _draw_mode_display_name(draw_mode: String) -> String:
+	if draw_mode == "open_edge":
+		return "Open Edge"
+	if draw_mode == "ribbon":
+		return "Ribbon"
+	return "Closed Loop"
 
 
 func _submit_component_name(_submitted_text: String) -> void:
@@ -6877,6 +6929,7 @@ func _confirm_component_creation() -> void:
 		component_name = _next_default_component_name(asset)
 	var component_id := "component_%d" % next_component_id
 	next_component_id += 1
+	var draw_mode := str(component_dialog.get_meta("draw_mode", "closed_loop"))
 	asset["components"].append({
 		"id": component_id,
 		"name": component_name,
@@ -6886,7 +6939,11 @@ func _confirm_component_creation() -> void:
 		"transform": _default_component_transform(),
 		"visibility": true,
 		"z_index": 0,
-		"material_id": ""
+		"material_id": "",
+		"draw_mode": draw_mode if draw_mode in DRAW_MODES else "closed_loop",
+		"contour_width_px": DEFAULT_CONTOUR_WIDTH_PX,
+		"ribbon_width_px": DEFAULT_RIBBON_WIDTH_PX,
+		"catch_parent_component_id": ""
 	})
 	selected_asset_id = asset_id
 	selected_component_id = component_id
