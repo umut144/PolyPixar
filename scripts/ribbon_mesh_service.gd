@@ -3,6 +3,7 @@ extends RefCounted
 
 const METHOD := "ribbon_strip"
 const PIXELS_PER_METER := 128.0
+const TOOL_CENTIMETERS_PER_METER := 10.0
 const DEFAULT_WIDTH_PX := 8.0
 const SAMPLE_SPACING_CM := 1.0
 const FEATURE_DETAIL := 0.5
@@ -10,7 +11,7 @@ const EPSILON := 0.000001
 
 
 static func width_cm(component: Dictionary) -> float:
-	return maxf(float(component.get("ribbon_width_px", DEFAULT_WIDTH_PX)) * 100.0 / PIXELS_PER_METER, EPSILON)
+	return maxf(float(component.get("ribbon_width_px", DEFAULT_WIDTH_PX)) * TOOL_CENTIMETERS_PER_METER / PIXELS_PER_METER, EPSILON)
 
 
 static func validation_issues(component: Dictionary) -> Array[String]:

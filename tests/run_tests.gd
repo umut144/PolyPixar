@@ -153,6 +153,7 @@ func _test_ribbon_strip_mesh() -> void:
 	var ribbon := _component()
 	ribbon["draw_mode"] = "ribbon"
 	ribbon["ribbon_width_px"] = 8.0
+	_expect(is_equal_approx(RibbonMeshService.width_cm(ribbon), 0.625), "At 128 px/m and 10 Tool-cm/m, an 8 px Ribbon must be 0.625 Tool-cm wide.")
 	BezierTopology.add_point(ribbon, Vector2.ZERO, "linear")
 	BezierTopology.add_point(ribbon, Vector2(4.0, 0.0), "linear")
 	BezierTopology.add_point(ribbon, Vector2(8.0, 3.0), "linear")

@@ -121,7 +121,8 @@ it into a general scene or animation-graph abstraction prematurely.
   Closed Loop is the only mode that closes its Chain.
   Open Edge remains outside the mesh pipeline. Ribbon resolves in `Geometry →
   Meshing` through the deterministic automatic `Ribbon Strip` path. It uses
-  the Component's persisted `ribbon_width_px` (8 px by default at 128 px/m),
+  the Component's persisted `ribbon_width_px` (8 px = 0.625 Tool-cm by
+  default at 128 px/m and 10 Tool-cm/m),
   bypasses Seeding, and must be baked before it can become the Component Mesh
   for Weighting, UV Mapping, or export. Open Edge and Ribbon may store a
   same-Asset Catch Parent Component used for point/segment snapping.
