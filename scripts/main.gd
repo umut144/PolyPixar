@@ -11599,6 +11599,7 @@ func _on_point_selection_set_changed(point_ids: Array) -> void:
 	if active_edit_mode == "point":
 		selected_edge_id = ""
 		_render_inspector()
+		_render_context_bar()
 
 
 func _on_edge_selection_changed(edge_id: String) -> void:
