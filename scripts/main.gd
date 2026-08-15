@@ -2,7 +2,7 @@ extends Control
 
 const SELECTION_MIRROR_SERVICE_SCRIPT = preload("res://scripts/selection_mirror_service.gd")
 const CREATE_SUBMODULES := ["Asset", "Texture"]
-const GEOMETRY_SUBMODULES := ["Sampling", "Seeding", "Meshing", "UV Mapping"]
+const GEOMETRY_SUBMODULES := ["Sampling", "Seeding", "Meshing"]
 const STYLE_SUBMODULES := ["Material", "Weighting"]
 const MOTION_SUBMODULES := ["Animation", "Path", "Act", "Sequence"]
 const INACTIVE_MODULES := ["Transform", "Effects", "Export"]
@@ -5840,7 +5840,7 @@ func _render_outliner() -> void:
 		_render_export_outliner()
 		return
 	if active_module == "Geometry":
-		if active_geometry_submodule in ["Sampling", "Seeding", "Meshing", "UV Mapping"]:
+		if active_geometry_submodule in GEOMETRY_SUBMODULES:
 			_render_geometry_component_outliner()
 		else:
 			outliner_list.add_child(_create_outliner_group_label("Geometry · Placeholder"))
