@@ -3,7 +3,8 @@ extends RefCounted
 
 const CONSTRAINED_DELAUNAY := "constrained_delaunay"
 const ORGANIC_RELAXED := "organic_relaxed"
-const VALID_METHODS := [CONSTRAINED_DELAUNAY, ORGANIC_RELAXED]
+const RIBBON_STRIP := "ribbon_strip"
+const VALID_METHODS := [CONSTRAINED_DELAUNAY, ORGANIC_RELAXED, RIBBON_STRIP]
 const DEFAULT_RELAXATION := 0.35
 const DEFAULT_PASSES := 2
 const MAX_PASSES := 8
@@ -26,6 +27,9 @@ static func normalize_recipe(raw_recipe) -> Dictionary:
 		return recipe
 	var method := str(raw_recipe.get("method", CONSTRAINED_DELAUNAY))
 	recipe["method"] = method if method in VALID_METHODS else CONSTRAINED_DELAUNAY
+	if recipe["method"] == RIBBON_STRIP:
+		recipe["parameters"] = raw_recipe.get("parameters", {}).duplicate(true) if raw_recipe.get("parameters", {}) is Dictionary else {}
+		return recipe
 	var parameters = raw_recipe.get("parameters", {})
 	var seeding_method := str(parameters.get("seeding_method", GeometrySeedingService.POISSON_FILL)) if parameters is Dictionary else GeometrySeedingService.POISSON_FILL
 	if seeding_method not in GeometrySeedingService.VALID_METHODS:

@@ -90,6 +90,9 @@ Chain. A Closed Loop Draft may temporarily contain the two open Chains created
 by `Mirror Y`; they must be explicitly joined and closed before validation.
 Mirror Y is unavailable once a Chain is closed. Open drawing can be paused with
 Enter and resumed from either endpoint. Open Edge is deliberately unmeshed.
+Ribbon is a derived, deterministic strip mesh generated from its one open
+Chain in `Geometry → Meshing`; its persisted pixel width is an input and a
+changed width makes the Ribbon Strip Bake stale.
 Open Edge and Ribbon can reference one other Component in the same Asset as a
 Catch Parent; drawing snaps to that Component's points and Bézier segments.
 

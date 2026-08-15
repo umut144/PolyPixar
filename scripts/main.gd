@@ -389,6 +389,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		var meshing_focus_owner := get_viewport().gui_get_focus_owner()
 		if meshing_focus_owner is LineEdit or meshing_focus_owner is TextEdit or meshing_focus_owner is SpinBox:
 			return
+		var meshing_component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+		if str(meshing_component.get("draw_mode", "")) in ["ribbon", "open_edge"]:
+			return
 		if has_command_modifier and event.keycode == KEY_1:
 			_activate_geometry_meshing_method_choice()
 			get_viewport().set_input_as_handled()
@@ -3256,7 +3259,8 @@ func _geometry_meshing_bakes(asset_id: String, component_id: String) -> Dictiona
 
 
 func _geometry_meshing_bake(asset_id: String, component_id: String, method := "") -> Dictionary:
-	var resolved_method := method if not method.is_empty() else str(_geometry_meshing_recipe(asset_id, component_id).get("method", ""))
+	var component := _get_component(_get_asset(asset_id), component_id)
+	var resolved_method := method if not method.is_empty() else (RibbonMeshService.METHOD if str(component.get("draw_mode", "")) == "ribbon" else str(_geometry_meshing_recipe(asset_id, component_id).get("method", "")))
 	return _geometry_meshing_bakes(asset_id, component_id).get(resolved_method, {})
 
 
@@ -3420,6 +3424,8 @@ func _geometry_meshing_input_is_current(asset_id: String, component_id: String, 
 func _geometry_meshing_result_matches(result: Dictionary, asset_id: String, component_id: String, component: Dictionary) -> bool:
 	if result.is_empty() or not bool(result.get("valid", false)):
 		return false
+	if str(component.get("draw_mode", "")) == "ribbon":
+		return RibbonMeshService.matches_source(result, component)
 	var recipe := _geometry_meshing_recipe(asset_id, component_id)
 	if not _geometry_meshing_input_is_current(asset_id, component_id, component, recipe):
 		return false
@@ -3442,6 +3448,15 @@ func _geometry_meshing_preview_matches(asset_id: String, component_id: String, c
 func _geometry_meshing_status(asset_id: String, component_id: String, component: Dictionary) -> String:
 	if component.is_empty():
 		return "Seeding Required"
+	if str(component.get("draw_mode", "")) == "open_edge":
+		return "Open Edge · No Mesh"
+	if str(component.get("draw_mode", "")) == "ribbon":
+		if not RibbonMeshService.validation_issues(component).is_empty():
+			return "Ribbon Draft"
+		if _geometry_meshing_preview_matches(asset_id, component_id, component):
+			return "Preview"
+		var ribbon_bake := _geometry_meshing_bake(asset_id, component_id, RibbonMeshService.METHOD)
+		return "Not Generated" if ribbon_bake.is_empty() else "Baked" if RibbonMeshService.matches_source(ribbon_bake, component) else "Stale"
 	if not _geometry_meshing_input_is_current(asset_id, component_id, component):
 		return "Seeding Required / Stale"
 	if geometry_meshing_preview_key == _geometry_document_key(asset_id, component_id) and not bool(geometry_meshing_preview.get("valid", true)):
@@ -3460,6 +3475,8 @@ func _geometry_meshing_bake_is_current(asset_id: String, component_id: String, c
 	var bake := _geometry_meshing_bake(asset_id, component_id, method)
 	if bake.is_empty():
 		return false
+	if method == RibbonMeshService.METHOD:
+		return RibbonMeshService.matches_source(bake, component)
 	var recipe := GeometryMeshingService.normalize_recipe({"method": method, "parameters": bake.get("parameters", {})})
 	if not _geometry_meshing_input_is_current(asset_id, component_id, component, recipe):
 		return false
@@ -4189,6 +4206,21 @@ func _set_geometry_seeding_edit_tool(tool: String) -> void:
 
 
 func _render_geometry_meshing_context_bar() -> void:
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if str(component.get("draw_mode", "")) == "ribbon":
+		var ribbon_label := Label.new()
+		ribbon_label.text = "Ribbon Strip · Automatic"
+		ribbon_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		ribbon_label.add_theme_color_override("font_color", Color("#9aa3b2"))
+		context_bar.add_child(ribbon_label)
+		return
+	if str(component.get("draw_mode", "")) == "open_edge":
+		var open_edge_label := Label.new()
+		open_edge_label.text = "Open Edge · No Mesh Output"
+		open_edge_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		open_edge_label.add_theme_color_override("font_color", Color("#9aa3b2"))
+		context_bar.add_child(open_edge_label)
+		return
 	geometry_meshing_method_menu = MenuButton.new()
 	geometry_meshing_method_menu.text = "⌘1  Method"
 	geometry_meshing_method_menu.custom_minimum_size = Vector2(118, 32)
@@ -5273,6 +5305,21 @@ func _export_validation_errors(asset: Dictionary) -> Array[String]:
 		return errors
 	for component in asset.get("components", []):
 		var component_name := str(component.get("name", "Component"))
+		if str(component.get("draw_mode", "")) == "open_edge":
+			continue
+		if str(component.get("draw_mode", "")) == "ribbon":
+			var ribbon_mesh := _component_mesh_bake(str(asset.get("id", "")), str(component.get("id", "")))
+			if not RibbonMeshService.matches_source(ribbon_mesh, component):
+				errors.append("%s: current Ribbon Strip Mesh is required." % component_name)
+				continue
+			var ribbon_material_id := str(component.get("material_id", ""))
+			if not ribbon_material_id.is_empty():
+				var ribbon_material := _get_material(ribbon_material_id)
+				if ribbon_material.is_empty():
+					errors.append("%s: assigned Material is missing." % component_name)
+				elif not str(ribbon_material.get("texture_id", "")).is_empty() and _texture_output_state(_get_texture(str(ribbon_material.get("texture_id", "")))) != "ready":
+					errors.append("%s: Material Texture is not ready." % component_name)
+			continue
 		var points: Array = BezierTopology.outer_control_polygon(component)
 		if not BezierTopology.outer_chain_closed(component):
 			errors.append("%s: contour is not closed." % component_name)
@@ -5328,9 +5375,26 @@ func _build_selected_asset_scene() -> void:
 	var root := Node2D.new()
 	root.name = _tscn_name(str(asset.get("name", "Asset")))
 	for component in asset.get("components", []):
+		if str(component.get("draw_mode", "")) == "open_edge":
+			continue
 		var polygon := Polygon2D.new()
 		polygon.name = _tscn_name(str(component.get("name", "Component")))
-		var export_points := _godot_export_points(BezierTopology.outer_control_polygon(component))
+		var export_points: Array[Vector2] = []
+		if str(component.get("draw_mode", "")) == "ribbon":
+			var ribbon_mesh := _component_mesh_bake(str(asset.get("id", "")), str(component.get("id", "")))
+			var vertex_indices: Dictionary = {}
+			for vertex in ribbon_mesh.get("vertices", []):
+				var vertex_id := str(vertex.get("id", ""))
+				vertex_indices[vertex_id] = export_points.size()
+				export_points.append(_godot_export_points([Vector2(vertex.get("position", Vector2.ZERO))])[0])
+			var ribbon_polygons: Array[PackedInt32Array] = []
+			for triangle in ribbon_mesh.get("triangles", []):
+				var ids: Array = triangle.get("vertex_ids", [])
+				if ids.size() == 3 and vertex_indices.has(str(ids[0])) and vertex_indices.has(str(ids[1])) and vertex_indices.has(str(ids[2])):
+					ribbon_polygons.append(PackedInt32Array([int(vertex_indices[str(ids[0])]), int(vertex_indices[str(ids[1])]), int(vertex_indices[str(ids[2])])]))
+			polygon.polygons = ribbon_polygons
+		else:
+			export_points = _godot_export_points(BezierTopology.outer_control_polygon(component))
 		polygon.polygon = PackedVector2Array(export_points)
 		var transform: Dictionary = component.get("transform", _default_component_transform())
 		var export_transform := _godot_export_transform(transform)
@@ -6442,6 +6506,7 @@ func _geometry_bake_methods_for_active_module(bakes: Dictionary) -> Array[String
 	else:
 		order.append(GeometryMeshingService.CONSTRAINED_DELAUNAY)
 		order.append(GeometryMeshingService.ORGANIC_RELAXED)
+		order.append(RibbonMeshService.METHOD)
 	var methods: Array[String] = []
 	for method in order:
 		if bakes.has(method):
@@ -6460,6 +6525,8 @@ func _geometry_bake_method_label(method: String) -> String:
 		return "Constrained Delaunay"
 	if method == GeometryMeshingService.ORGANIC_RELAXED:
 		return "Organic Relaxed"
+	if method == RibbonMeshService.METHOD:
+		return "Ribbon Strip"
 	return "Poisson Fill"
 
 
@@ -6467,6 +6534,8 @@ func _geometry_bake_status(method: String, bake: Dictionary, asset_id: String, c
 	if active_geometry_submodule == "Sampling":
 		return "Baked" if str(bake.get("source_fingerprint", "")) == GeometrySamplingService.source_fingerprint(component) else "Stale"
 	if active_geometry_submodule == "Meshing":
+		if method == RibbonMeshService.METHOD:
+			return "Baked" if RibbonMeshService.matches_source(bake, component) else "Stale"
 		var mesh_recipe := GeometryMeshingService.normalize_recipe({"method": method, "parameters": bake.get("parameters", {})})
 		if not _geometry_meshing_input_is_current(asset_id, component_id, component, mesh_recipe):
 			return "Input Stale"
@@ -8317,6 +8386,12 @@ func _render_geometry_meshing_inspector() -> void:
 	if component.is_empty():
 		inspector_content.add_child(_create_inspector_field_label("Select one Component to generate its derived Mesh."))
 		return
+	if str(component.get("draw_mode", "")) == "ribbon":
+		_render_ribbon_meshing_inspector(component)
+		return
+	if str(component.get("draw_mode", "")) == "open_edge":
+		inspector_content.add_child(_create_inspector_field_label("Open Edge is intentionally unmeshed."))
+		return
 	inspector_content.add_child(_create_inspector_field_label(str(component.get("name", "Component"))))
 	var recipe := _geometry_meshing_recipe(selected_asset_id, selected_component_id)
 	inspector_content.add_child(_create_inspector_field_label("Method"))
@@ -8421,9 +8496,49 @@ func _render_geometry_meshing_inspector() -> void:
 	inspector_content.add_child(actions)
 
 
+func _render_ribbon_meshing_inspector(component: Dictionary) -> void:
+	inspector_content.add_child(_create_inspector_field_label(str(component.get("name", "Ribbon"))))
+	inspector_content.add_child(_create_inspector_section("Ribbon Strip · Automatic"))
+	inspector_content.add_child(_create_inspector_field_label("Width: %.1f px (%.2f cm)" % [float(component.get("ribbon_width_px", DEFAULT_RIBBON_WIDTH_PX)), RibbonMeshService.width_cm(component)]))
+	var issues := RibbonMeshService.validation_issues(component)
+	var input_status := _create_inspector_field_label("Input: Ready" if issues.is_empty() else "Input: Draft · %s" % issues[0])
+	input_status.add_theme_color_override("font_color", Color("#75b88a") if issues.is_empty() else Color("#ef8354"))
+	inspector_content.add_child(input_status)
+	var status := _geometry_meshing_status(selected_asset_id, selected_component_id, component)
+	inspector_content.add_child(_create_inspector_section("Result"))
+	inspector_content.add_child(_create_inspector_field_label("Status: %s" % status))
+	var result := geometry_meshing_preview if _geometry_meshing_preview_matches(selected_asset_id, selected_component_id, component) else _geometry_meshing_bake(selected_asset_id, selected_component_id, RibbonMeshService.METHOD)
+	if not result.is_empty():
+		inspector_content.add_child(_create_inspector_field_label("Vertices: %d" % int(result.get("vertex_count", 0))))
+		inspector_content.add_child(_create_inspector_field_label("Triangles: %d" % int(result.get("triangle_count", 0))))
+	inspector_content.add_child(_create_inspector_section("Component Mesh"))
+	var component_mesh_status := _component_mesh_status(selected_asset_id, selected_component_id, component)
+	inspector_content.add_child(_create_inspector_field_label("Status: %s" % component_mesh_status))
+	var mesh_bake := _geometry_meshing_bake(selected_asset_id, selected_component_id, RibbonMeshService.METHOD)
+	var mesh_current := not mesh_bake.is_empty() and _geometry_meshing_bake_is_current(selected_asset_id, selected_component_id, component, RibbonMeshService.METHOD)
+	var mesh_selected := mesh_current and str(_component_mesh_reference(selected_asset_id, selected_component_id).get("bake_id", "")) == str(mesh_bake.get("bake_id", ""))
+	var use_mesh_button := Button.new()
+	use_mesh_button.text = "Component Mesh Selected" if mesh_selected else "Use as Component Mesh"
+	use_mesh_button.disabled = not mesh_current or mesh_selected
+	use_mesh_button.pressed.connect(_use_current_bake_as_component_mesh)
+	inspector_content.add_child(use_mesh_button)
+	var actions := HBoxContainer.new()
+	var generate_button := Button.new()
+	generate_button.text = "Generate"
+	generate_button.disabled = not issues.is_empty()
+	generate_button.pressed.connect(_generate_geometry_meshing_preview)
+	actions.add_child(generate_button)
+	var bake_button := Button.new()
+	bake_button.text = "Bake"
+	bake_button.disabled = not _geometry_meshing_preview_matches(selected_asset_id, selected_component_id, component)
+	bake_button.pressed.connect(_bake_geometry_meshing_preview)
+	actions.add_child(bake_button)
+	inspector_content.add_child(actions)
+
+
 func _use_current_bake_as_component_mesh() -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	var method := str(_geometry_meshing_recipe(selected_asset_id, selected_component_id).get("method", ""))
+	var method := RibbonMeshService.METHOD if str(component.get("draw_mode", "")) == "ribbon" else str(_geometry_meshing_recipe(selected_asset_id, selected_component_id).get("method", ""))
 	var bake := _geometry_meshing_bake(selected_asset_id, selected_component_id, method)
 	if component.is_empty() or bake.is_empty() or not _geometry_meshing_bake_is_current(selected_asset_id, selected_component_id, component, method):
 		_show_status_message("Bake a current Mesh before selecting the Component Mesh.")
@@ -8487,6 +8602,14 @@ func _commit_geometry_meshing_float_text(raw_text: String, field: SpinBox, param
 
 func _generate_geometry_meshing_preview() -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if str(component.get("draw_mode", "")) == "ribbon":
+		geometry_meshing_preview_key = _geometry_document_key(selected_asset_id, selected_component_id)
+		geometry_meshing_preview = RibbonMeshService.generate(component)
+		_show_status_message("Generated %d Ribbon Triangles." % int(geometry_meshing_preview.get("triangle_count", 0)) if bool(geometry_meshing_preview.get("valid", false)) else str(geometry_meshing_preview.get("errors", ["Ribbon Mesh could not be generated."])[0]))
+		_render_outliner()
+		_render_inspector()
+		_refresh_geometry_meshing_workspace()
+		return
 	var recipe := _geometry_meshing_recipe(selected_asset_id, selected_component_id)
 	if not _geometry_meshing_input_is_current(selected_asset_id, selected_component_id, component, recipe):
 		geometry_meshing_preview_key = _geometry_document_key(selected_asset_id, selected_component_id)
@@ -8530,6 +8653,10 @@ func _refresh_geometry_meshing_workspace() -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	if component.is_empty():
 		geometry_meshing_workspace.clear_context()
+		return
+	if str(component.get("draw_mode", "")) == "ribbon":
+		var ribbon_result := geometry_meshing_preview if _geometry_meshing_preview_matches(selected_asset_id, selected_component_id, component) else _geometry_meshing_bake(selected_asset_id, selected_component_id, RibbonMeshService.METHOD)
+		geometry_meshing_workspace.set_context({}, {}, ribbon_result, _geometry_meshing_status(selected_asset_id, selected_component_id, component))
 		return
 	var recipe := _geometry_meshing_recipe(selected_asset_id, selected_component_id)
 	var input := _geometry_meshing_input(selected_asset_id, selected_component_id, recipe)
@@ -9041,6 +9168,17 @@ func _render_inspector() -> void:
 				break
 		catch_parent_option.item_selected.connect(_on_component_catch_parent_selected.bind(catch_parent_option))
 		inspector_content.add_child(catch_parent_option)
+	if draw_mode == "ribbon":
+		inspector_content.add_child(_create_inspector_section("Ribbon"))
+		inspector_content.add_child(_create_inspector_field_label("Width (px)"))
+		var ribbon_width := SpinBox.new()
+		ribbon_width.min_value = 0.1
+		ribbon_width.max_value = 4096.0
+		ribbon_width.step = 0.5
+		ribbon_width.custom_arrow_step = 1.0
+		ribbon_width.value = float(component.get("ribbon_width_px", DEFAULT_RIBBON_WIDTH_PX))
+		ribbon_width.value_changed.connect(_on_component_ribbon_width_changed)
+		inspector_content.add_child(ribbon_width)
 	inspector_content.add_child(_create_inspector_section("Transform"))
 	var transform_grid := GridContainer.new()
 	transform_grid.columns = 2
@@ -10457,6 +10595,21 @@ func _on_component_catch_parent_selected(index: int, option: OptionButton) -> vo
 	_record_direct_change()
 	component["catch_parent_component_id"] = parent_id
 	_render_canvas_context()
+
+
+func _on_component_ribbon_width_changed(value: float) -> void:
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if component.is_empty() or str(component.get("draw_mode", "")) != "ribbon":
+		return
+	var width := maxf(value, 0.1)
+	if is_equal_approx(float(component.get("ribbon_width_px", DEFAULT_RIBBON_WIDTH_PX)), width):
+		return
+	_record_coalesced_change()
+	component["ribbon_width_px"] = width
+	_render_outliner()
+	if active_module == "Geometry" and active_geometry_submodule == "Meshing":
+		_render_inspector()
+		_refresh_geometry_meshing_workspace()
 
 
 func _on_edge_render_outline_changed(enabled: bool) -> void:

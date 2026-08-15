@@ -11,6 +11,7 @@ func _init() -> void:
 	_test_insert_preserves_curve()
 	_test_component_draw_modes_and_continuation()
 	_test_closed_loop_selection_mirror()
+	_test_ribbon_strip_mesh()
 	_test_catch_parent_snapping()
 	_test_geometry_sampling_service()
 	_test_geometry_sampling_ui_shell()
@@ -146,6 +147,23 @@ func _test_closed_loop_selection_mirror() -> void:
 	_expect(BezierTopology.close_active_chain(mirrored_component), "The joined Chain should close explicitly.")
 	_expect(BezierTopology.mode_validation_issues(mirrored_component, true).is_empty(), "One manually closed Mirror result should validate as a Closed Loop.")
 	_expect(not SelectionMirrorService.validation_issues(mirrored_component, source_ids, mirror_axis_start, mirror_axis_end).is_empty(), "Mirror must reject an already closed Chain.")
+
+
+func _test_ribbon_strip_mesh() -> void:
+	var ribbon := _component()
+	ribbon["draw_mode"] = "ribbon"
+	ribbon["ribbon_width_px"] = 8.0
+	BezierTopology.add_point(ribbon, Vector2.ZERO, "linear")
+	BezierTopology.add_point(ribbon, Vector2(4.0, 0.0), "linear")
+	BezierTopology.add_point(ribbon, Vector2(8.0, 3.0), "linear")
+	var first := RibbonMeshService.generate(ribbon)
+	var second := RibbonMeshService.generate(ribbon)
+	_expect(bool(first.get("valid", false)), "A complete Ribbon Component should generate a Ribbon Strip Mesh.")
+	_expect(int(first.get("vertex_count", 0)) >= 6 and int(first.get("triangle_count", 0)) >= 4, "Ribbon Strip should create paired vertices and triangle quads.")
+	_expect(str(first.get("method", "")) == RibbonMeshService.METHOD and JSON.stringify(first) == JSON.stringify(second), "Ribbon Strip output must be deterministic.")
+	_expect(RibbonMeshService.matches_source(first, ribbon), "Ribbon Strip Mesh should match its source Component.")
+	ribbon["ribbon_width_px"] = 12.0
+	_expect(not RibbonMeshService.matches_source(first, ribbon), "Changing Ribbon width must make the previous Mesh stale.")
 
 
 func _test_catch_parent_snapping() -> void:

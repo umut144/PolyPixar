@@ -37,9 +37,10 @@ static func normalize_recipe(raw_recipe) -> Dictionary:
 
 static func generate(component: Dictionary, raw_recipe = {}) -> Dictionary:
 	var recipe := normalize_recipe(raw_recipe)
+	var allow_open := bool(raw_recipe.get("allow_open", false)) if raw_recipe is Dictionary else false
 	var working_component := component.duplicate(true)
 	BezierGeometry.resolve_auto_handles(working_component.get("points", []), working_component.get("chains", []))
-	var errors := _validation_issues(working_component)
+	var errors := _validation_issues(working_component, allow_open)
 	if not errors.is_empty():
 		return _failed_result(recipe, errors, source_fingerprint(component))
 	var sampled_chains: Array = []
@@ -99,26 +100,28 @@ static func source_fingerprint(component: Dictionary) -> String:
 				",".join(chain_data.get("edge_ids", [])), int(bool(chain_data.get("closed", false))),
 				str(chain_data.get("topology_role", "outer"))
 			])
+	parts.append("draw_mode|%s" % str(component.get("draw_mode", "closed_loop")))
+	parts.append("ribbon_width_px|%.9f" % float(component.get("ribbon_width_px", 8.0)))
 	var hashing_context := HashingContext.new()
 	hashing_context.start(HashingContext.HASH_SHA256)
 	hashing_context.update("\n".join(parts).to_utf8_buffer())
 	return hashing_context.finish().hex_encode()
 
 
-static func _validation_issues(component: Dictionary) -> Array[String]:
+static func _validation_issues(component: Dictionary, allow_open := false) -> Array[String]:
 	var errors: Array[String] = BezierTopology.validate(component)
 	var chains: Array = component.get("chains", [])
 	if chains.is_empty():
 		errors.append("The Component has no Chain to sample.")
 		return errors
-	var has_closed_outer := false
+	var has_valid_outer := false
 	for chain_data in chains:
 		if not chain_data is Dictionary:
 			continue
-		if not bool(chain_data.get("closed", false)):
+		if not allow_open and not bool(chain_data.get("closed", false)):
 			errors.append("Sampling for the mesh pipeline requires closed Chains.")
-		if str(chain_data.get("topology_role", "outer")) == "outer" and bool(chain_data.get("closed", false)):
-			has_closed_outer = true
+		if str(chain_data.get("topology_role", "outer")) == "outer" and (bool(chain_data.get("closed", false)) or allow_open):
+			has_valid_outer = true
 		var chain_point_ids: Array = chain_data.get("point_ids", [])
 		var neighbor_count := chain_point_ids.size() if bool(chain_data.get("closed", false)) else maxi(chain_point_ids.size() - 1, 0)
 		for point_index in range(neighbor_count):
@@ -127,8 +130,8 @@ static func _validation_issues(component: Dictionary) -> Array[String]:
 			if bool(first.get("preserve_point", false)) and bool(second.get("preserve_point", false)) \
 				and Vector2(first.get("position", Vector2.ZERO)).is_equal_approx(Vector2(second.get("position", Vector2.ZERO))):
 				errors.append("Consecutive Preserve Points may not occupy the same position.")
-	if not has_closed_outer:
-		errors.append("The Component needs a closed outer Chain.")
+	if not has_valid_outer:
+		errors.append("The Component needs an outer Chain.")
 	return errors
 
 

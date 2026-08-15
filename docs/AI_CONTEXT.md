@@ -119,8 +119,12 @@ it into a general scene or animation-graph abstraction prematurely.
   two open Chains after `Mirror Y`; the author explicitly joins and closes them
   before validation succeeds. Mirror Y is unavailable once a Chain is closed.
   Closed Loop is the only mode that closes its Chain.
-  Open Edge remains outside the mesh pipeline. Open Edge and Ribbon may store
-  a same-Asset Catch Parent Component used for point/segment snapping.
+  Open Edge remains outside the mesh pipeline. Ribbon resolves in `Geometry →
+  Meshing` through the deterministic automatic `Ribbon Strip` path. It uses
+  the Component's persisted `ribbon_width_px` (8 px by default at 128 px/m),
+  bypasses Seeding, and must be baked before it can become the Component Mesh
+  for Weighting, UV Mapping, or export. Open Edge and Ribbon may store a
+  same-Asset Catch Parent Component used for point/segment snapping.
 - Assets may also contain persistent typed Guides. Each Component's Outliner
   `+` action creates a scoped Guide child; `CMD/Ctrl + 1 · Draw Guide Point`
   and `CMD/Ctrl + 2 · Edit Guide Point` author its open Spine in that

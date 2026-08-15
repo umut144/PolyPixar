@@ -54,6 +54,14 @@ these Chains. The author joins their endpoints explicitly, then closes the
 remaining endpoints into the final single Chain. A closed Chain cannot be
 mirrored.
 
+## Ribbon mesh derivation
+
+A Ribbon Component keeps its canonical source as one open Bézier Chain. Its
+derived `Ribbon Strip` mesh is sampled deterministically in `Geometry →
+Meshing`, offsets paired vertices by the persisted `ribbon_width_px` (8 px by
+default at 128 px/m), and triangulates each consecutive pair into a strip.
+The derived mesh never modifies Points, Edges, or Chains.
+
 ## Ownership
 
 `BezierTopology` creates IDs, adds and removes Points, splits Edges, closes

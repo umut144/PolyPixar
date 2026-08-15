@@ -78,7 +78,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), BACKGROUND)
 	_draw_grid()
-	if sampling_bake.is_empty():
+	if sampling_bake.is_empty() and mesh_result.is_empty():
 		_draw_centered_message("Bake Seeding before Meshing")
 		return
 	if not fitted:
@@ -112,6 +112,10 @@ func _fit_boundary() -> void:
 		for sample in chain_data.get("samples", []):
 			if sample is Dictionary:
 				positions.append(Vector2(sample.get("position", Vector2.ZERO)))
+	if positions.is_empty():
+		for vertex in mesh_result.get("vertices", []):
+			if vertex is Dictionary:
+				positions.append(Vector2(vertex.get("position", Vector2.ZERO)))
 	if positions.is_empty():
 		camera_position = Vector2.ZERO
 		camera_zoom = 1.0
