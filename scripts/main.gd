@@ -469,7 +469,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 	elif has_command_modifier and event.keycode == KEY_4:
-		_activate_edit_face_state()
+		var selected_component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+		if str(selected_component.get("draw_mode", "closed_loop")) == "closed_loop":
+			_activate_edit_face_state()
 		get_viewport().set_input_as_handled()
 		return
 	elif not has_command_modifier and active_state == "edit" and active_edit_mode == "point" and event.keycode == KEY_1:
@@ -504,7 +506,7 @@ func _reset_to_default_state() -> void:
 		canvas_view.set_edit_mode(active_edit_mode)
 		canvas_view.set_transform_mode(active_transform_mode)
 		canvas_view.set_selected_edge_id("")
-	_ensure_default_edit_point_state()
+	_render_inspector()
 	_render_canvas_context()
 
 
@@ -568,26 +570,6 @@ func _complete_context_method_menu(command: String, popup: PopupMenu) -> void:
 func _stop_guide_draw_state() -> void:
 	if active_draw_tool == "spine":
 		active_draw_tool = ""
-
-
-func _ensure_default_edit_point_state() -> void:
-	if active_module != "Create" or active_create_submodule != "Asset" or selected_component_id.is_empty() or not active_state.is_empty():
-		return
-	active_state = "edit"
-	_set_active_context_command("asset.edit_point")
-	active_draw_tool = ""
-	active_edit_mode = "point"
-	edit_bezier_handles = false
-	edit_point_set_mode = false
-	active_transform_mode = "transform"
-	selected_edge_id = ""
-	selected_point_id = ""
-	selected_point_ids.clear()
-	if is_instance_valid(canvas_view):
-		canvas_view.set_edit_handles_enabled(false)
-		canvas_view.set_edit_point_set_enabled(false)
-		canvas_view.set_edit_mode("point")
-		canvas_view.set_transform_mode("transform")
 
 
 func _build_ui() -> void:
@@ -3779,15 +3761,17 @@ func _render_context_bar() -> void:
 	_style_popup_menu(edit_edge_menu.get_popup())
 	edit_edge_menu.get_popup().id_pressed.connect(_on_edit_edge_menu_id)
 	context_bar.add_child(edit_edge_menu)
-	var edit_face_menu := MenuButton.new()
-	edit_face_menu.text = "⌘4  Edit Face  ▼"
-	edit_face_menu.custom_minimum_size = Vector2(134, 32)
-	edit_face_menu.focus_mode = Control.FOCUS_NONE
-	_style_context_command_button(edit_face_menu, _context_command_is("asset.edit_face"))
-	edit_face_menu.get_popup().add_item("Move Face", 0)
-	_style_popup_menu(edit_face_menu.get_popup())
-	edit_face_menu.get_popup().id_pressed.connect(_on_edit_face_menu_id)
-	context_bar.add_child(edit_face_menu)
+	var selected_component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if str(selected_component.get("draw_mode", "closed_loop")) == "closed_loop":
+		var edit_face_menu := MenuButton.new()
+		edit_face_menu.text = "⌘4  Edit Face  ▼"
+		edit_face_menu.custom_minimum_size = Vector2(134, 32)
+		edit_face_menu.focus_mode = Control.FOCUS_NONE
+		_style_context_command_button(edit_face_menu, _context_command_is("asset.edit_face"))
+		edit_face_menu.get_popup().add_item("Move Face", 0)
+		_style_popup_menu(edit_face_menu.get_popup())
+		edit_face_menu.get_popup().id_pressed.connect(_on_edit_face_menu_id)
+		context_bar.add_child(edit_face_menu)
 func _next_default_guide_name(asset: Dictionary, guide_type: String) -> String:
 	var base := AssetGuide.display_name(guide_type)
 	var index := 1
@@ -5022,7 +5006,6 @@ func _set_active_state(state: String) -> void:
 func _render_info_bar() -> void:
 	if not is_instance_valid(info_bar):
 		return
-	_ensure_default_edit_point_state()
 	if is_instance_valid(active_material_status_label):
 		if active_module == "Style" and not selected_material_id.is_empty():
 			var active_material := _get_material(selected_material_id)
@@ -8695,7 +8678,6 @@ func _refresh_geometry_uv_mapping_workspace() -> void:
 
 
 func _render_inspector() -> void:
-	_ensure_default_edit_point_state()
 	_clear(inspector_content)
 	transform_fields.clear()
 	if active_module == "Motion":
@@ -8954,6 +8936,7 @@ func _render_inspector() -> void:
 	var configured_catch_parent_id := str(component.get("catch_parent_component_id", ""))
 	if not configured_catch_parent_id.is_empty() and (configured_catch_parent_id == selected_component_id or _get_component(asset, configured_catch_parent_id).is_empty()):
 		mode_issues.append("Catch Parent references a missing Component.")
+	inspector_content.add_child(_create_inspector_section("Validation"))
 	var mode_status := _create_inspector_field_label("Geometry: Valid" if mode_issues.is_empty() else "Geometry: Draft · %s" % mode_issues[0])
 	mode_status.add_theme_color_override("font_color", Color("#75b88a") if mode_issues.is_empty() else Color("#f2c94c"))
 	inspector_content.add_child(mode_status)
@@ -10921,7 +10904,6 @@ func _render_lookdev_canvas() -> void:
 
 
 func _render_canvas_context() -> void:
-	_ensure_default_edit_point_state()
 	if active_module == "Motion" and active_motion_submodule == "Animation":
 		_sync_motion_player_document(_get_asset(selected_asset_id))
 	_render_context_bar()
