@@ -6405,13 +6405,10 @@ func _render_geometry_component_asset_entry(asset: Dictionary, force_expand := f
 		var indent := Control.new()
 		indent.custom_minimum_size = Vector2(16, 0)
 		row.add_child(indent)
+		var summary := _geometry_outliner_status_summary(asset_id, component_id, component)
 		var button := Button.new()
-		var geometry_status := _geometry_sampling_status(asset_id, component_id, component) if active_geometry_submodule == "Sampling" \
-			else _geometry_seeding_status(asset_id, component_id, component) if active_geometry_submodule == "Seeding" \
-			else _geometry_meshing_status(asset_id, component_id, component) if active_geometry_submodule == "Meshing" \
-			else _geometry_uv_mapping_status(asset_id, component_id, component)
-		button.text = "%s  ·  %s" % [str(component.get("name", "Component")), geometry_status]
-		button.tooltip_text = geometry_status
+		button.text = str(component.get("name", "Component"))
+		button.tooltip_text = str(summary.get("tooltip", ""))
 		button.custom_minimum_size = Vector2(0, 30)
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
@@ -6419,33 +6416,26 @@ func _render_geometry_component_asset_entry(asset: Dictionary, force_expand := f
 		_style_outliner_button(button, selected_asset_id == asset_id and selected_component_id == component_id and selected_geometry_bake_method.is_empty())
 		button.pressed.connect(_select_geometry_component.bind(asset_id, component_id))
 		row.add_child(button)
+		var status_dot := Label.new()
+		status_dot.text = "●"
+		status_dot.custom_minimum_size = Vector2(16, 30)
+		status_dot.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		status_dot.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		status_dot.add_theme_font_size_override("font_size", 15)
+		status_dot.add_theme_color_override("font_color", summary.get("color", Color("#737f91")))
+		status_dot.tooltip_text = str(summary.get("tooltip", ""))
+		row.add_child(status_dot)
+		var result_count := int(summary.get("count", 0))
+		if result_count >= 2:
+			var count_label := Label.new()
+			count_label.text = str(result_count)
+			count_label.custom_minimum_size = Vector2(20, 30)
+			count_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			count_label.add_theme_font_size_override("font_size", 12)
+			count_label.add_theme_color_override("font_color", Color("#9aa3b2"))
+			count_label.tooltip_text = str(summary.get("tooltip", ""))
+			row.add_child(count_label)
 		container.add_child(row)
-		if active_geometry_submodule == "UV Mapping":
-			_render_geometry_uv_mapping_bake_rows(container, asset_id, component_id, component)
-			continue
-		var bakes := _geometry_sampling_bakes(asset_id, component_id) if active_geometry_submodule == "Sampling" \
-			else _geometry_seeding_bakes(asset_id, component_id) if active_geometry_submodule == "Seeding" \
-			else _geometry_meshing_bakes(asset_id, component_id)
-		for method in _geometry_bake_methods_for_active_module(bakes):
-			var bake: Dictionary = bakes[method]
-			var bake_row := HBoxContainer.new()
-			var bake_indent := Control.new()
-			bake_indent.custom_minimum_size = Vector2(34, 0)
-			bake_row.add_child(bake_indent)
-			var bake_button := Button.new()
-			var component_mesh_marker := ""
-			if active_geometry_submodule == "Meshing" and str(_component_mesh_reference(asset_id, component_id).get("bake_id", "")) == str(bake.get("bake_id", "")):
-				component_mesh_marker = "  ·  Component Mesh"
-			bake_button.text = "%s  ·  %s%s" % [_geometry_bake_method_label(method), _geometry_bake_status(method, bake, asset_id, component_id, component), component_mesh_marker]
-			bake_button.tooltip_text = "Baked %s result" % _geometry_bake_method_label(method)
-			bake_button.custom_minimum_size = Vector2(0, 26)
-			bake_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			bake_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-			bake_button.focus_mode = Control.FOCUS_NONE
-			_style_outliner_button(bake_button, selected_asset_id == asset_id and selected_component_id == component_id and selected_geometry_bake_method == method)
-			bake_button.pressed.connect(_select_geometry_bake.bind(asset_id, component_id, method))
-			bake_row.add_child(bake_button)
-			container.add_child(bake_row)
 
 
 func _render_geometry_uv_mapping_bake_rows(container: VBoxContainer, asset_id: String, component_id: String, component: Dictionary) -> void:
@@ -6558,6 +6548,145 @@ func _geometry_bake_status(method: String, bake: Dictionary, asset_id: String, c
 	if not matches:
 		return "Stale"
 	return "Edited" if bool(bake.get("edited", false)) else "Baked"
+
+
+func _geometry_outliner_status_summary(asset_id: String, component_id: String, component: Dictionary) -> Dictionary:
+	var entries_by_key: Dictionary = {}
+	var order: Array[String] = []
+	if active_geometry_submodule == "UV Mapping":
+		var uv_bakes := _geometry_uv_mapping_bakes(asset_id, component_id)
+		var keys: Array[String] = []
+		for bake_key in uv_bakes:
+			keys.append(str(bake_key))
+		keys.sort()
+		for bake_key in keys:
+			var uv_bake: Dictionary = uv_bakes[bake_key]
+			var uv_method := str(uv_bake.get("method", GeometryUVMappingService.BOUNDS_PLANAR))
+			var mesh_method := str(uv_bake.get("mesh_method", ""))
+			entries_by_key[bake_key] = {
+				"label": _geometry_method_number_label(uv_method) + ": " + _geometry_bake_method_label(uv_method) + " · " + _geometry_bake_method_label(mesh_method) + " Mesh",
+				"status": "Baked" if _geometry_uv_mapping_bake_is_current(asset_id, component_id, component, uv_bake) else "Stale"
+			}
+			order.append(bake_key)
+	else:
+		var bakes := _geometry_sampling_bakes(asset_id, component_id) if active_geometry_submodule == "Sampling" \
+			else _geometry_seeding_bakes(asset_id, component_id) if active_geometry_submodule == "Seeding" \
+			else _geometry_meshing_bakes(asset_id, component_id)
+		for method in _geometry_bake_methods_for_active_module(bakes):
+			entries_by_key[method] = {
+				"label": _geometry_method_number_label(method) + ": " + _geometry_bake_method_label(method),
+				"status": _geometry_bake_status(method, bakes[method], asset_id, component_id, component)
+			}
+			order.append(method)
+
+	var preview := _geometry_outliner_active_preview(asset_id, component_id, component)
+	if not preview.is_empty():
+		var preview_key := str(preview.get("key", ""))
+		if not entries_by_key.has(preview_key):
+			order.append(preview_key)
+		entries_by_key[preview_key] = preview
+
+	if order.is_empty():
+		var empty_status := _geometry_sampling_status(asset_id, component_id, component) if active_geometry_submodule == "Sampling" \
+			else _geometry_seeding_status(asset_id, component_id, component) if active_geometry_submodule == "Seeding" \
+			else _geometry_meshing_status(asset_id, component_id, component) if active_geometry_submodule == "Meshing" \
+			else _geometry_uv_mapping_status(asset_id, component_id, component)
+		entries_by_key["state"] = {"label": "Current state", "status": empty_status}
+		order.append("state")
+
+	var best_rank := -1
+	var best_status := "Not Generated"
+	var tooltip_lines: Array[String] = []
+	for entry_key in order:
+		var entry: Dictionary = entries_by_key[entry_key]
+		var status := str(entry.get("status", "Not Generated"))
+		var rank := _geometry_status_rank(status)
+		if rank > best_rank:
+			best_rank = rank
+			best_status = status
+		tooltip_lines.append("%s %s — %s" % [_geometry_status_symbol(status), str(entry.get("label", "Result")), status])
+	var result_count := order.size() if not (order.size() == 1 and str(order[0]) == "state") else 0
+	var heading := "%s · %d result%s" % [str(component.get("name", "Component")), result_count, "" if result_count == 1 else "s"]
+	if result_count == 0:
+		heading = "%s · No results" % str(component.get("name", "Component"))
+	return {
+		"color": _geometry_status_color(best_status),
+		"count": result_count,
+		"tooltip": heading + "\n" + "\n".join(tooltip_lines)
+	}
+
+
+func _geometry_outliner_active_preview(asset_id: String, component_id: String, component: Dictionary) -> Dictionary:
+	var document_key := _geometry_document_key(asset_id, component_id)
+	if active_geometry_submodule == "Sampling" and geometry_sampling_preview_key == document_key:
+		var method := str(geometry_sampling_preview.get("method", ""))
+		if not method.is_empty():
+			return {"key": method, "label": _geometry_method_number_label(method) + ": " + _geometry_bake_method_label(method), "status": "Preview" if _geometry_sampling_preview_matches(asset_id, component_id, component) else "Invalid"}
+	if active_geometry_submodule == "Seeding" and geometry_seeding_preview_key == document_key:
+		var method := str(geometry_seeding_preview.get("method", ""))
+		if not method.is_empty():
+			return {"key": method, "label": _geometry_method_number_label(method) + ": " + _geometry_bake_method_label(method), "status": "Preview" if _geometry_seeding_preview_matches(asset_id, component_id, component) else "Invalid"}
+	if active_geometry_submodule == "Meshing" and geometry_meshing_preview_key == document_key:
+		var method := str(geometry_meshing_preview.get("method", ""))
+		if not method.is_empty():
+			return {"key": method, "label": _geometry_method_number_label(method) + ": " + _geometry_bake_method_label(method), "status": "Preview" if _geometry_meshing_preview_matches(asset_id, component_id, component) else "Invalid"}
+	if active_geometry_submodule == "UV Mapping" and geometry_uv_mapping_preview_key == document_key:
+		var method := str(geometry_uv_mapping_preview.get("method", ""))
+		var mesh_method := str(geometry_uv_mapping_preview.get("mesh_method", ""))
+		if not method.is_empty():
+			var preview_key := GeometryUVMappingService.bake_key(mesh_method, method)
+			return {"key": preview_key, "label": _geometry_method_number_label(method) + ": " + _geometry_bake_method_label(method) + " · " + _geometry_bake_method_label(mesh_method) + " Mesh", "status": "Preview" if _geometry_uv_mapping_preview_matches(asset_id, component_id, component) else "Invalid"}
+	return {}
+
+
+func _geometry_method_number_label(method: String) -> String:
+	var methods: Array[String] = []
+	if active_geometry_submodule == "Sampling":
+		methods = [GeometrySamplingService.ADAPTIVE, GeometrySamplingService.EVEN_SPACING]
+	elif active_geometry_submodule == "Seeding":
+		methods = [GeometrySeedingService.POISSON_FILL, GeometrySeedingService.SPINE_FLOW]
+	elif active_geometry_submodule == "Meshing":
+		methods = [GeometryMeshingService.CONSTRAINED_DELAUNAY, GeometryMeshingService.ORGANIC_RELAXED]
+	else:
+		methods = [GeometryUVMappingService.BOUNDS_PLANAR]
+	var index := methods.find(method)
+	return "Automatic" if index < 0 else str(index + 1)
+
+
+func _geometry_status_rank(status: String) -> int:
+	if status in ["Baked", "Edited", "Ready"]:
+		return 5
+	if status == "Preview":
+		return 4
+	if status.contains("No Mesh"):
+		return 0
+	if status == "Invalid":
+		return 1
+	return 2
+
+
+func _geometry_status_color(status: String) -> Color:
+	if status in ["Baked", "Edited", "Ready"]:
+		return Color("#75b88a")
+	if status == "Preview":
+		return Color("#f2c94c")
+	if status.contains("No Mesh"):
+		return Color("#737f91")
+	if status == "Invalid":
+		return Color("#e56b6f")
+	return Color("#ef8354")
+
+
+func _geometry_status_symbol(status: String) -> String:
+	if status in ["Baked", "Edited", "Ready"]:
+		return "🟢"
+	if status == "Preview":
+		return "🟡"
+	if status.contains("No Mesh"):
+		return "⚪"
+	if status == "Invalid":
+		return "🔴"
+	return "🟠"
 
 
 func _select_geometry_asset(asset_id: String) -> void:
