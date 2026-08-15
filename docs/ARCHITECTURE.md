@@ -1,4 +1,4 @@
-# AssetFlow2D – Architecture
+# PolyTools – Architecture
 
 **Status:** Draft 0.1  
 **Purpose:** Records the product decisions that are currently confirmed. It is
@@ -19,7 +19,7 @@ not a promise of every future feature and not an implementation blueprint.
 
 ## Product intent
 
-AssetFlow2D is a creative 2D asset tool. It should make the creation of
+PolyTools is a creative 2D asset tool. It should make the creation of
 stylised game assets feel direct and playful while keeping the underlying
 workflows precise enough for production use.
 
@@ -38,7 +38,7 @@ The editor workspace and default output window are 1920×1200 (16:10). The
 preview uses preserved aspect ratio (`keep`) so non-16:10 windows show
 letterboxing. This keeps the editor proportions stable across displays.
 
-The project icon is stored at `assets/assetflow_icon.png` and is configured as
+The project icon is stored at `assets/polytools_icon.png` and is configured as
 the Godot application icon.
 
 ## Working rule: minimum necessary capability

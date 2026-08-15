@@ -1,4 +1,4 @@
-# AssetFlow2D Agent Guide
+# PolyTools Agent Guide
 
 Read `docs/AI_CONTEXT.md`, `docs/ARCHITECTURE.md`, and
 `docs/BEZIER_MODEL.md` before changing editor geometry.

@@ -1,4 +1,4 @@
-# AssetFlow2D – Simulation Contract
+# PolyTools – Simulation Contract
 
 **Status:** Phase 7 persisted Asset contract. External file import, runtime
 value delivery, and Transition evaluation are not implemented yet.

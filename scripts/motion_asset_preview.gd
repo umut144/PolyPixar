@@ -66,7 +66,7 @@ func _draw() -> void:
 
 
 static func _world_offset_to_preview(world_offset: Vector2, fit_scale: float) -> Vector2:
-	# AssetFlow's canvas uses Y-up world coordinates while Control drawing uses
+	# PolyTools' canvas uses Y-up world coordinates while Control drawing uses
 	# Y-down screen coordinates. Match ComponentCanvas without touching data.
 	return Vector2(world_offset.x, -world_offset.y) * fit_scale
 

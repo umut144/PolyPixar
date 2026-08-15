@@ -1,4 +1,4 @@
-# AssetFlow2D – Motion UI Contract
+# PolyTools – Motion UI Contract
 
 **Status:** Motion is separated into Animation, Path, Act, and Sequence while
 retaining State/Transition playback and visible Outer Bob sampling.

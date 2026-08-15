@@ -1,4 +1,4 @@
-# AssetFlow2D – MVP Checklist
+# PolyTools – MVP Checklist
 
 Earlier checked Line/Polyline items below record completed historical slices.
 The current editor has superseded that implementation with the canonical
@@ -156,7 +156,7 @@ before implementing real creation tools.
       handles while keeping the module rail fixed.
 - [x] Show a compact, empty bottom status strip.
 - [x] Use a 1920×1200 (16:10) letterboxed reference workspace and a custom
-      AssetFlow2D project icon.
+      PolyTools project icon.
 - [ ] Add a contextual time area only with the first real time-based feature.
 - [ ] Review the skeleton UX before implementing real asset editing.
 - [ ] Create an Asset, add a Component, select `Draw → Line`, and draw a

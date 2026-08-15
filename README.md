@@ -1,8 +1,8 @@
-# AssetFlow2D
+# PolyTools
 
 Copyright © 2026 Umut Coşkun. All rights reserved.
 
-AssetFlow2D is proprietary software owned exclusively by Umut Coşkun.
+PolyTools is proprietary software owned exclusively by Umut Coşkun.
 
 No permission is granted to any person or organization to use, run, copy,
 reproduce, modify, adapt, distribute, publish, sublicense, sell, rent, host,
@@ -23,11 +23,11 @@ applicable to, third-party material.
 
 See [`LICENSE`](LICENSE) for the complete proprietary terms.
 
-## AssetFlow2D
+## PolyTools
 
 Copyright © 2026 Umut Coşkun. Alle Rechte vorbehalten.
 
-AssetFlow2D ist proprietäre Software und steht ausschließlich im Eigentum von
+PolyTools ist proprietäre Software und steht ausschließlich im Eigentum von
 Umut Coşkun.
 
 Es wird keiner Person oder Organisation die Erlaubnis erteilt, diese Software

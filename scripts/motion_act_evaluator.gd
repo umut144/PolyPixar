@@ -108,7 +108,7 @@ static func sample(act: Dictionary, phase: float) -> Dictionary:
 			var height := maxf(0.0, float(parameters.get("height", 0.0)))
 			var arc_value := maxf(0.0, sin(PI * eased_phase))
 			var arc_power := _jump_arc_power(str(parameters.get("arc", JUMP_ARC_SMOOTH)))
-			# AssetFlow's authoring space is Y-positive-up; screen conversion happens
+			# PolyTools' authoring space is Y-positive-up; screen conversion happens
 			# only inside the Preview renderer.
 			transform["position"] += Vector2(0.0, 1.0) * height * pow(arc_value, arc_power)
 		BLINK:

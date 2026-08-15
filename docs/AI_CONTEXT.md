@@ -1,4 +1,4 @@
-# AssetFlow2D – AI Context
+# PolyTools – AI Context
 
 **Read this file before making changes.** For stable product decisions, see
 [`ARCHITECTURE.md`](ARCHITECTURE.md). For the current result-based work items,
@@ -6,7 +6,7 @@ see [`MVP_CHECKLIST.md`](MVP_CHECKLIST.md).
 
 ## Product in one sentence
 
-AssetFlow2D is a canvas-first 2D asset creation tool built through small,
+PolyTools is a canvas-first 2D asset creation tool built through small,
 testable vertical slices rather than a complete feature set up front.
 
 ## Current phase
@@ -80,7 +80,7 @@ default timing is 50% anticipation, 40% ingress to the midpoint, and a fast
 - Project layout: `project.godot`, `scenes/main.tscn`, and `scripts/main.gd`
 - Editor workspace and default window: 1920×1200 (16:10); preview uses preserved
   aspect ratio (`keep`) so the UI proportions remain stable
-- Project icon: `assets/assetflow_icon.png`
+- Project icon: `assets/polytools_icon.png`
 - Current JSON schema version: **27**
 
 ## Confirmed vocabulary

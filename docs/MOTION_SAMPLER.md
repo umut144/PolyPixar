@@ -1,4 +1,4 @@
-# AssetFlow2D – Motion Sampler
+# PolyTools – Motion Sampler
 
 **Status:** Phase 9 visible Outer Bob in the Inspector Animation Preview.
 
@@ -34,6 +34,6 @@ the Player's target blend weight.
 Samples are applied only after this fit is known. Therefore an Entire Asset Bob
 moves visibly instead of being cancelled by per-frame auto-centering.
 
-The Preview converts AssetFlow's Y-up world coordinates to Godot Control's
+The Preview converts PolyTools' Y-up world coordinates to Godot Control's
 Y-down screen coordinates after sampling. Component transforms and authored
 Bézier Points/Edges/Chains remain unchanged.

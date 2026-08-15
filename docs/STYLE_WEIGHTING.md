@@ -1,4 +1,4 @@
-# AssetFlow2D – Style Weighting
+# PolyTools – Style Weighting
 
 **Status:** Uniform and Axis Gradient MVP.
 

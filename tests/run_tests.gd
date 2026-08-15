@@ -26,10 +26,10 @@ func _init() -> void:
 	_test_motion_module_separators()
 	_test_motion_sequence_evaluator()
 	if failures == 0:
-		print("All AssetFlow2D tests passed.")
+		print("All PolyTools tests passed.")
 		quit(0)
 	else:
-		push_error("%d AssetFlow2D test(s) failed." % failures)
+		push_error("%d PolyTools test(s) failed." % failures)
 		quit(1)
 
 
@@ -839,7 +839,7 @@ func _test_motion_asset_preview_geometry() -> void:
 	preview.set_asset({"id": "asset_preview", "components": [component]})
 	var paths := preview._asset_paths()
 	_expect(paths.size() == 1 and paths[0].get("points", []).size() > 3, "Animation Preview should derive a sampled path from a Wizard Bézier contour.")
-	_expect(MotionAssetPreview._world_offset_to_preview(Vector2(2.0, 3.0), 4.0) == Vector2(8.0, -12.0), "Animation Preview should map AssetFlow's Y-up world coordinates to Y-down screen coordinates.")
+	_expect(MotionAssetPreview._world_offset_to_preview(Vector2(2.0, 3.0), 4.0) == Vector2(8.0, -12.0), "Animation Preview should map PolyTools' Y-up world coordinates to Y-down screen coordinates.")
 	_expect(Vector2(original_point.get("handle_out", Vector2.ZERO)) == original_handle, "Animation Preview must resolve handles only on immutable geometry copies.")
 	preview.free()
 
