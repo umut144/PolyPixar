@@ -85,8 +85,10 @@ Edges and Chains are maintained automatically, and clicking the first Point
 after at least three Points closes the active Chain.
 
 Each Component selects one immutable Draw Mode at creation. `Closed Loop`
-requires one closed Chain; `Open Edge` and `Ribbon` require one open Chain.
-No Component may contain more than one Chain. Open drawing can be paused with
+requires one final closed Chain; `Open Edge` and `Ribbon` require one open
+Chain. A Closed Loop Draft may temporarily contain the two open Chains created
+by `Mirror Y`; they must be explicitly joined and closed before validation.
+Mirror Y is unavailable once a Chain is closed. Open drawing can be paused with
 Enter and resumed from either endpoint. Open Edge is deliberately unmeshed.
 Open Edge and Ribbon can reference one other Component in the same Asset as a
 Catch Parent; drawing snaps to that Component's points and Bézier segments.

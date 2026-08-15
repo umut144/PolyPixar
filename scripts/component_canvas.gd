@@ -1,6 +1,8 @@
 class_name ComponentCanvas
 extends Control
 
+const SELECTION_MIRROR_SERVICE_SCRIPT = preload("res://scripts/selection_mirror_service.gd")
+
 signal point_selection_changed(point_id: String)
 signal point_selection_set_changed(point_ids: Array)
 signal bezier_point_added(position: Vector2, point_mode: String, handle_out: Vector2)
@@ -12,6 +14,9 @@ signal bezier_handle_changed(point_id: String, handle_side: String, value: Vecto
 signal bezier_edge_insert_requested(edge_id: String, t: float)
 signal bezier_endpoint_connection_requested(anchor_point_id: String, target_point_id: String)
 signal reference_component_selected(component_id: String)
+signal mirror_axis_stage_changed(stage: String)
+signal mirror_axis_confirmed(axis_start: Vector2, axis_end: Vector2)
+signal mirror_axis_cancelled()
 signal pivot_changed(pivot: Vector2)
 signal transform_changed(transform: Dictionary)
 
@@ -48,6 +53,12 @@ var display_polygon_closed := false
 var bezier_points: Array[Dictionary] = []
 var bezier_edges: Array[Dictionary] = []
 var bezier_chains: Array[Dictionary] = []
+var mirror_command_stage := ""
+var mirror_axis_start := Vector2.ZERO
+var mirror_axis_end := Vector2.ZERO
+var mirror_axis_candidate_visible := false
+var selection_mirror_preview_points: Array[Dictionary] = []
+var selection_mirror_preview_edges: Array[Dictionary] = []
 var guide_style := false
 var guide_color := Color("#f2c94c")
 var draw_point_mode := "linear"
@@ -152,6 +163,18 @@ func _gui_input(event: InputEvent) -> void:
 			command_shortcut_active = false
 	if event is InputEventMouseButton and event.pressed:
 		grab_focus()
+		if event.button_index == MOUSE_BUTTON_LEFT and not mirror_command_stage.is_empty():
+			var axis_point := _snap_to_grid(_world_to_local(_screen_to_world(event.position)))
+			mirror_axis_candidate_visible = true
+			if mirror_command_stage == "first":
+				mirror_axis_start = axis_point
+				mirror_axis_end = axis_point
+				mirror_command_stage = "second"
+				mirror_axis_stage_changed.emit("second")
+				queue_redraw()
+			elif mirror_command_stage == "second" and mirror_axis_start.distance_squared_to(axis_point) > 0.00000001:
+				_confirm_mirror_axis(axis_point)
+			return
 		if event.button_index == MOUSE_BUTTON_LEFT and interaction_state == "draw" and active_tool == "point" and _draw_anchor_point_id().is_empty():
 			var endpoint_id := _open_endpoint_at(event.position)
 			if not endpoint_id.is_empty():
@@ -259,6 +282,16 @@ func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:
 		cursor_over_canvas = true
 		cursor_world = constrain_draw_position(_snap_to_catch_parent(_snap_to_grid(_world_to_local(_screen_to_world(event.position)))))
+		if mirror_command_stage == "first":
+			mirror_axis_end = _snap_to_grid(_world_to_local(_screen_to_world(event.position)))
+			mirror_axis_candidate_visible = true
+			queue_redraw()
+			return
+		if mirror_command_stage == "second":
+			mirror_axis_end = _snap_to_grid(_world_to_local(_screen_to_world(event.position)))
+			_update_selection_mirror_preview()
+			queue_redraw()
+			return
 		if point_marquee_dragging:
 			point_marquee_current = event.position
 			if point_marquee_start.distance_to(point_marquee_current) >= 4.0:
@@ -348,6 +381,12 @@ func _gui_input(event: InputEvent) -> void:
 				return
 		queue_redraw()
 	if event is InputEventKey and event.pressed and not event.echo:
+		if not mirror_command_stage.is_empty():
+			if event.keycode == KEY_ESCAPE:
+				cancel_mirror_command()
+			elif event.keycode in [KEY_ENTER, KEY_KP_ENTER] and mirror_command_stage == "second" and mirror_axis_start.distance_squared_to(mirror_axis_end) > 0.00000001:
+				_confirm_mirror_axis(mirror_axis_end)
+			return
 		if event.keycode == KEY_ESCAPE and interaction_state == "edit":
 			clear_selection()
 
@@ -646,6 +685,57 @@ func set_bezier_geometry(points: Array, edges: Array, chains: Array) -> void:
 	queue_redraw()
 
 
+func start_mirror_command() -> bool:
+	if selected_point_ids.is_empty():
+		return false
+	mirror_command_stage = "first"
+	mirror_axis_start = Vector2.ZERO
+	mirror_axis_end = Vector2.ZERO
+	mirror_axis_candidate_visible = false
+	selection_mirror_preview_points.clear()
+	selection_mirror_preview_edges.clear()
+	mirror_axis_stage_changed.emit("first")
+	queue_redraw()
+	return true
+
+
+func cancel_mirror_command(emit_signal := true) -> void:
+	if mirror_command_stage.is_empty():
+		return
+	mirror_command_stage = ""
+	mirror_axis_candidate_visible = false
+	selection_mirror_preview_points.clear()
+	selection_mirror_preview_edges.clear()
+	queue_redraw()
+	if emit_signal:
+		mirror_axis_cancelled.emit()
+
+
+func set_selected_point_ids(point_ids: Array) -> void:
+	_set_selected_point_ids(point_ids)
+
+
+func _confirm_mirror_axis(axis_end: Vector2) -> void:
+	var confirmed_start := mirror_axis_start
+	var confirmed_end := axis_end
+	cancel_mirror_command(false)
+	mirror_axis_confirmed.emit(confirmed_start, confirmed_end)
+
+
+func _update_selection_mirror_preview() -> void:
+	selection_mirror_preview_points.clear()
+	selection_mirror_preview_edges.clear()
+	if mirror_axis_start.distance_squared_to(mirror_axis_end) <= 0.00000001:
+		return
+	var component := {"points": bezier_points, "edges": bezier_edges, "chains": bezier_chains, "draw_mode": component_draw_mode}
+	var result: Dictionary = SELECTION_MIRROR_SERVICE_SCRIPT.preview(component, selected_point_ids, mirror_axis_start, mirror_axis_end)
+	if bool(result.get("valid", false)):
+		for point in result.get("points", []):
+			selection_mirror_preview_points.append(point)
+		for edge in result.get("edges", []):
+			selection_mirror_preview_edges.append(edge)
+
+
 func set_guide_style(enabled: bool) -> void:
 	guide_style = enabled
 	queue_redraw()
@@ -687,6 +777,7 @@ func _draw() -> void:
 	draw_line(_world_to_screen(Vector2(0.0, min_world.y)), _world_to_screen(Vector2(0.0, max_world.y)), y_axis_color, 2.0)
 	_draw_reference_image()
 	_draw_reference_shapes()
+	_draw_selection_mirror_command()
 	if not bezier_points.is_empty() and not bezier_chains.is_empty():
 		_draw_bezier_geometry()
 	_draw_pivot()
@@ -719,6 +810,28 @@ func _active_grid_package_level() -> int:
 		package_step *= 5.0
 		package_level += 1
 	return package_level
+
+
+func _draw_selection_mirror_command() -> void:
+	if mirror_command_stage == "first" and mirror_axis_candidate_visible:
+		draw_circle(_world_to_screen(mirror_axis_end), 6.0, Color("#f2c94c"), false, 2.5)
+		draw_circle(_world_to_screen(mirror_axis_end), 2.0, Color("#f2c94c"))
+	elif mirror_command_stage == "second":
+		_draw_dashed_line(_world_to_screen(mirror_axis_start), _world_to_screen(mirror_axis_end), Color("#f2c94c"))
+		draw_circle(_world_to_screen(mirror_axis_start), 6.0, Color("#f2c94c"), false, 2.5)
+		draw_circle(_world_to_screen(mirror_axis_start), 2.0, Color("#f2c94c"))
+		draw_circle(_world_to_screen(mirror_axis_end), 6.0, Color("#f2c94c"), false, 2.5)
+		draw_circle(_world_to_screen(mirror_axis_end), 2.0, Color("#f2c94c"))
+	var points_by_id: Dictionary = {}
+	for point in selection_mirror_preview_points:
+		points_by_id[str(point.get("id", ""))] = point
+	for edge in selection_mirror_preview_edges:
+		var start: Dictionary = points_by_id.get(str(edge.get("start_point_id", "")), {})
+		var end: Dictionary = points_by_id.get(str(edge.get("end_point_id", "")), {})
+		if not start.is_empty() and not end.is_empty():
+			draw_polyline(_bezier_edge_screen_points(start, end), Color("#f2c94cbb"), 2.5, true)
+	for point in selection_mirror_preview_points:
+		draw_circle(_world_to_screen(_local_to_world(Vector2(point.get("position", Vector2.ZERO)))), 4.0, Color("#f2c94c"))
 
 
 func _draw_grid_lines(step: float, line_color: Color, line_width: float) -> void:

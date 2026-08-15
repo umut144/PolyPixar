@@ -10,6 +10,7 @@ func _init() -> void:
 	_test_ids_are_not_reused()
 	_test_insert_preserves_curve()
 	_test_component_draw_modes_and_continuation()
+	_test_closed_loop_selection_mirror()
 	_test_catch_parent_snapping()
 	_test_geometry_sampling_service()
 	_test_geometry_sampling_ui_shell()
@@ -123,6 +124,28 @@ func _test_component_draw_modes_and_continuation() -> void:
 	var ribbon := open_edge.duplicate(true)
 	ribbon["draw_mode"] = "ribbon"
 	_expect(BezierTopology.mode_validation_issues(ribbon, true).is_empty(), "Ribbon must accept one complete open Chain.")
+
+
+func _test_closed_loop_selection_mirror() -> void:
+	var component := _component()
+	component["draw_mode"] = "closed_loop"
+	var source_ids: Array[String] = []
+	for point_position in [Vector2(-2.0, 0.0), Vector2(-1.0, 1.0), Vector2(-1.0, 3.0)]:
+		source_ids.append(BezierTopology.add_point(component, point_position, "linear"))
+	var mirror_axis_start := Vector2.ZERO
+	var mirror_axis_end := Vector2(0.0, 4.0)
+	var result := SelectionMirrorService.apply(component, source_ids, mirror_axis_start, mirror_axis_end)
+	_expect(bool(result.get("valid", false)), "Mirror should preserve structural topology for an open Closed Loop draft.")
+	var mirrored_component: Dictionary = result.get("component", {})
+	var mirrored_ids: Array = result.get("mirrored_point_ids", [])
+	_expect(mirrored_component.get("chains", []).size() == 2, "Mirror should create a separate second open Chain.")
+	_expect(not bool(mirrored_component["chains"][0].get("closed", false)) and not bool(mirrored_component["chains"][1].get("closed", false)), "Mirror must not close either Chain automatically.")
+	_expect(not BezierTopology.mode_validation_issues(mirrored_component, true).is_empty(), "Two open Chains must remain a Closed Loop draft.")
+	_expect(BezierTopology.join_open_chain_endpoints(mirrored_component, source_ids[0], str(mirrored_ids[0])), "Two open Mirror Chains should join only after an explicit endpoint action.")
+	_expect(mirrored_component.get("chains", []).size() == 1 and not bool(mirrored_component["chains"][0].get("closed", false)), "Joining Mirror endpoints should leave one open Chain for manual closure.")
+	_expect(BezierTopology.close_active_chain(mirrored_component), "The joined Chain should close explicitly.")
+	_expect(BezierTopology.mode_validation_issues(mirrored_component, true).is_empty(), "One manually closed Mirror result should validate as a Closed Loop.")
+	_expect(not SelectionMirrorService.validation_issues(mirrored_component, source_ids, mirror_axis_start, mirror_axis_end).is_empty(), "Mirror must reject an already closed Chain.")
 
 
 func _test_catch_parent_snapping() -> void:

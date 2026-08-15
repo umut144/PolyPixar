@@ -1,5 +1,6 @@
 extends Control
 
+const SELECTION_MIRROR_SERVICE_SCRIPT = preload("res://scripts/selection_mirror_service.gd")
 const CREATE_SUBMODULES := ["Asset", "Texture"]
 const GEOMETRY_SUBMODULES := ["Sampling", "Seeding", "Meshing", "UV Mapping"]
 const STYLE_SUBMODULES := ["Material", "Weighting"]
@@ -487,6 +488,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 func _reset_to_default_state() -> void:
 	_stop_guide_draw_state()
+	if is_instance_valid(canvas_view):
+		canvas_view.cancel_mirror_command(false)
 	_set_active_context_command("")
 	_set_geometry_command_state("")
 	selected_geometry_bake_method = ""
@@ -723,6 +726,9 @@ func _build_ui() -> void:
 	canvas_view.bezier_edge_insert_requested.connect(_on_bezier_edge_insert_requested)
 	canvas_view.bezier_endpoint_connection_requested.connect(_on_bezier_endpoint_connection_requested)
 	canvas_view.reference_component_selected.connect(_on_reference_component_selected)
+	canvas_view.mirror_axis_stage_changed.connect(_on_mirror_axis_stage_changed)
+	canvas_view.mirror_axis_confirmed.connect(_on_mirror_axis_confirmed)
+	canvas_view.mirror_axis_cancelled.connect(_on_mirror_axis_cancelled)
 	canvas_view.pivot_changed.connect(_on_pivot_changed)
 	canvas_view.transform_changed.connect(_on_transform_changed)
 	var canvas := canvas_view
@@ -3772,6 +3778,17 @@ func _render_context_bar() -> void:
 		_style_popup_menu(edit_face_menu.get_popup())
 		edit_face_menu.get_popup().id_pressed.connect(_on_edit_face_menu_id)
 		context_bar.add_child(edit_face_menu)
+		var mirror_spacer := Control.new()
+		mirror_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		context_bar.add_child(mirror_spacer)
+		var mirror_button := Button.new()
+		mirror_button.text = "Mirror Y"
+		mirror_button.tooltip_text = "Mirror a contiguous selection from the open source Chain across an interactively defined axis"
+		mirror_button.focus_mode = Control.FOCUS_NONE
+		mirror_button.disabled = not _can_activate_selection_mirror(selected_component)
+		_style_context_command_button(mirror_button, _context_command_is("asset.mirror"))
+		mirror_button.pressed.connect(_activate_selection_mirror)
+		context_bar.add_child(mirror_button)
 func _next_default_guide_name(asset: Dictionary, guide_type: String) -> String:
 	var base := AssetGuide.display_name(guide_type)
 	var index := 1
@@ -4968,6 +4985,70 @@ func _activate_edit_face_state() -> void:
 	_set_active_context_command("asset.edit_face")
 	_set_active_state("edit")
 	_set_edit_mode("face")
+
+
+func _can_activate_selection_mirror(component: Dictionary) -> bool:
+	if component.is_empty() or str(component.get("draw_mode", "closed_loop")) != "closed_loop":
+		return false
+	return SELECTION_MIRROR_SERVICE_SCRIPT.validation_issues(component, selected_point_ids, Vector2.ZERO, Vector2.RIGHT).is_empty()
+
+
+func _activate_selection_mirror() -> void:
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if not _can_activate_selection_mirror(component):
+		return
+	_set_active_context_command("asset.mirror")
+	if not canvas_view.start_mirror_command():
+		_set_active_context_command("asset.edit_point")
+		return
+	_render_context_bar()
+	_show_mirror_prompt("Mirror Y · Set the first axis Point on the snapped grid")
+
+
+func _on_mirror_axis_stage_changed(stage: String) -> void:
+	if stage == "second":
+		_show_mirror_prompt("Mirror Y · Move the second axis Point · Click or Enter to confirm · Escape to cancel")
+
+
+func _on_mirror_axis_confirmed(axis_start: Vector2, axis_end: Vector2) -> void:
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if component.is_empty():
+		_on_mirror_axis_cancelled()
+		return
+	var result: Dictionary = SELECTION_MIRROR_SERVICE_SCRIPT.apply(component, selected_point_ids, axis_start, axis_end)
+	if not bool(result.get("valid", false)):
+		var errors: Array = result.get("errors", [])
+		_show_status_message(str(errors[0]) if not errors.is_empty() else "Mirror Y could not be applied.")
+		_set_active_context_command("asset.edit_point")
+		_render_context_bar()
+		return
+	_record_direct_change()
+	var resolved: Dictionary = result.get("component", {})
+	component.clear()
+	component.merge(resolved, true)
+	selected_point_ids.clear()
+	for point_id_value in result.get("mirrored_point_ids", []):
+		selected_point_ids.append(str(point_id_value))
+	selected_point_id = selected_point_ids[0] if selected_point_ids.size() == 1 else ""
+	_activate_edit_point_state(false, false)
+	_refresh_component_geometry(component)
+	canvas_view.set_selected_point_ids(selected_point_ids)
+	_render_outliner()
+	_render_inspector()
+	_render_context_bar()
+	_show_status_message("Mirror Y applied · The two open Chains remain unconnected")
+
+
+func _on_mirror_axis_cancelled() -> void:
+	_set_active_context_command("asset.edit_point")
+	_render_context_bar()
+	_show_status_message("Mirror Y cancelled")
+
+
+func _show_mirror_prompt(message: String) -> void:
+	_show_status_message(message)
+	if is_instance_valid(status_clear_timer):
+		status_clear_timer.stop()
 
 
 func _activate_transform_state() -> void:
@@ -11284,8 +11365,17 @@ func _on_bezier_endpoint_connection_requested(anchor_point_id: String, target_po
 		return
 	var anchor_chain := BezierTopology.chain_for_point(component.get("chains", []), anchor_point_id)
 	var target_chain := BezierTopology.chain_for_point(component.get("chains", []), target_point_id)
-	if not anchor_chain.is_empty() and str(anchor_chain.get("id", "")) == str(target_chain.get("id", "")) and anchor_point_id != target_point_id:
-		_on_bezier_chain_closed()
+	if anchor_chain.is_empty() or target_chain.is_empty() or anchor_point_id == target_point_id:
+		return
+	if str(anchor_chain.get("id", "")) == str(target_chain.get("id", "")):
+		_record_direct_change()
+		if BezierTopology.close_chain(component, str(anchor_chain.get("id", ""))):
+			_refresh_component_geometry(component)
+		return
+	_record_direct_change()
+	if BezierTopology.join_open_chain_endpoints(component, anchor_point_id, target_point_id):
+		_refresh_component_geometry(component)
+		_show_status_message("Open Chains connected · Close the remaining endpoints to finish the Loop")
 
 
 func _on_bezier_chain_closed() -> void:

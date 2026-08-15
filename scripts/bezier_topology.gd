@@ -167,7 +167,7 @@ static func add_point_from(component: Dictionary, anchor_point_id: String, posit
 		point_ids.append(point_id)
 	chain["point_ids"] = point_ids
 	component["points"] = points
-	_rebuild_chain_edges(component, chain)
+	rebuild_chain_edges(component, chain)
 	BezierGeometry.resolve_auto_handles(points, component.get("chains", []))
 	if mode != "linear" and not is_zero_approx(drawn_handle_out.length_squared()):
 		new_point["handle_source"] = "manual"
@@ -180,21 +180,23 @@ static func add_point_from(component: Dictionary, anchor_point_id: String, posit
 static func mode_validation_issues(component: Dictionary, complete := true) -> Array[String]:
 	var errors := validate(component)
 	var chains: Array = component.get("chains", [])
-	if chains.size() > 1:
-		errors.append("A Component may contain only one Chain.")
 	if not complete:
 		return errors
 	if chains.is_empty():
 		errors.append("The Component needs one Chain.")
 		return errors
-	var chain: Dictionary = chains[0]
-	var point_count: int = chain.get("point_ids", []).size()
 	var draw_mode := str(component.get("draw_mode", "closed_loop"))
 	if draw_mode == "closed_loop":
-		if not bool(chain.get("closed", false)) or point_count < 3:
-			errors.append("Closed Loop requires one closed Chain with at least three Points.")
+		if chains.size() != 1:
+			errors.append("Closed Loop requires one final closed Chain.")
+		else:
+			var chain: Dictionary = chains[0]
+			if not bool(chain.get("closed", false)) or chain.get("point_ids", []).size() < 3:
+				errors.append("Closed Loop requires one closed Chain with at least three Points.")
 	elif draw_mode in ["open_edge", "ribbon"]:
-		if bool(chain.get("closed", false)) or point_count < 2:
+		if chains.size() != 1:
+			errors.append("%s requires one open Chain." % ("Ribbon" if draw_mode == "ribbon" else "Open Edge"))
+		elif bool(chains[0].get("closed", false)) or chains[0].get("point_ids", []).size() < 2:
 			errors.append("%s requires one open Chain with at least two Points." % ("Ribbon" if draw_mode == "ribbon" else "Open Edge"))
 	else:
 		errors.append("Unknown Component draw mode.")
@@ -205,7 +207,18 @@ static func close_active_chain(component: Dictionary) -> bool:
 	var chains: Array = component.get("chains", [])
 	if chains.is_empty():
 		return false
-	var chain: Dictionary = chains.back()
+	return close_chain(component, str(chains.back().get("id", "")))
+
+
+static func close_chain(component: Dictionary, chain_id: String) -> bool:
+	var chains: Array = component.get("chains", [])
+	var chain: Dictionary = {}
+	for chain_data in chains:
+		if str(chain_data.get("id", "")) == chain_id:
+			chain = chain_data
+			break
+	if chain.is_empty():
+		return false
 	var point_ids: Array = chain.get("point_ids", [])
 	if bool(chain.get("closed", false)) or point_ids.size() < 3:
 		return false
@@ -231,6 +244,36 @@ static func close_active_chain(component: Dictionary) -> bool:
 	component["edges"] = edges
 	component["chains"] = chains
 	BezierGeometry.resolve_auto_handles(points, chains)
+	return true
+
+
+## Connects endpoints from two different open Chains into one open Chain.
+## The caller may subsequently close its two remaining endpoints explicitly.
+static func join_open_chain_endpoints(component: Dictionary, anchor_point_id: String, target_point_id: String) -> bool:
+	var chains: Array = component.get("chains", [])
+	var anchor_chain := chain_for_point(chains, anchor_point_id)
+	var target_chain := chain_for_point(chains, target_point_id)
+	if anchor_chain.is_empty() or target_chain.is_empty() or str(anchor_chain.get("id", "")) == str(target_chain.get("id", "")):
+		return false
+	if bool(anchor_chain.get("closed", false)) or bool(target_chain.get("closed", false)) or not is_open_endpoint(component, anchor_point_id) or not is_open_endpoint(component, target_point_id):
+		return false
+	var anchor_ids: Array = anchor_chain.get("point_ids", []).duplicate()
+	var target_ids: Array = target_chain.get("point_ids", []).duplicate()
+	if anchor_point_id == str(anchor_ids.front()):
+		anchor_ids.reverse()
+	if target_point_id == str(target_ids.back()):
+		target_ids.reverse()
+	anchor_ids.append_array(target_ids)
+	anchor_chain["point_ids"] = anchor_ids
+	anchor_chain["closed"] = false
+	_remove_chain_edges(component, anchor_chain)
+	_remove_chain_edges(component, target_chain)
+	for chain_index in range(chains.size() - 1, -1, -1):
+		if str(chains[chain_index].get("id", "")) == str(target_chain.get("id", "")):
+			chains.remove_at(chain_index)
+	component["chains"] = chains
+	rebuild_chain_edges(component, anchor_chain)
+	BezierGeometry.resolve_auto_handles(component.get("points", []), chains)
 	return true
 
 
@@ -429,7 +472,7 @@ static func _remove_chain_edges(component: Dictionary, chain: Dictionary) -> voi
 	component["edges"] = edges
 
 
-static func _rebuild_chain_edges(component: Dictionary, chain: Dictionary) -> void:
+static func rebuild_chain_edges(component: Dictionary, chain: Dictionary) -> void:
 	_remove_chain_edges(component, chain)
 	var edges: Array = component.get("edges", [])
 	var point_ids: Array = chain.get("point_ids", [])

@@ -45,6 +45,15 @@ For an open Chain, `edge_ids.size() == point_ids.size() - 1`. For a closed
 Chain, both sizes are equal and the final Edge connects the last Point to the
 first. A closed Chain requires at least three Points.
 
+## Closed Loop drafts
+
+Closed Loop validation requires exactly one closed Chain. While authoring, a
+Mirror Y operation may temporarily create a second open Chain from a selected
+contiguous run of the sole open source Chain. Mirror never connects or closes
+these Chains. The author joins their endpoints explicitly, then closes the
+remaining endpoints into the final single Chain. A closed Chain cannot be
+mirrored.
+
 ## Ownership
 
 `BezierTopology` creates IDs, adds and removes Points, splits Edges, closes
