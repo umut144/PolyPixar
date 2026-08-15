@@ -242,7 +242,7 @@ func _test_geometry_sampling_service() -> void:
 	application.geometry_documents["asset_1/component_1"] = normalized_geometry
 	_expect(application._geometry_sampling_status("asset_1", "component_1", component) == "Baked", "A bake matching its recipe and source fingerprint should report Baked.")
 	BezierTopology.point_by_id(component["points"], curve_id)["position"] += Vector2.ONE
-	_expect(application._geometry_sampling_status("asset_1", "component_1", component) == "Stale", "Changing canonical topology should make a persisted bake stale without rewriting it.")
+	_expect(application._geometry_sampling_status("asset_1", "component_1", component) == "Ready to Bake", "Changing canonical topology should leave Sampling ready for a direct rebake without rewriting its persisted result.")
 	application.free()
 
 
@@ -372,7 +372,7 @@ func _test_geometry_seeding_service() -> void:
 	application.geometry_documents["asset_1/component_1"] = normalized
 	_expect(application._geometry_seeding_status("asset_1", "component_1", component) == "Edited", "A matching manually adjusted Seeding Bake should report Edited.")
 	normalized["seeding"]["recipe"]["parameters"]["seed"] = 18
-	_expect(application._geometry_seeding_status("asset_1", "component_1", component) == "Stale", "Changing the Seeding recipe should preserve but mark its Bake stale.")
+	_expect(application._geometry_seeding_status("asset_1", "component_1", component) == "Ready to Bake", "Changing the Seeding recipe should preserve its Bake and leave Seeding ready for a direct rebake.")
 	normalized["seeding"]["recipe"]["parameters"]["seed"] = 17
 	application._build_ui()
 	application.active_module = "Geometry"
@@ -392,11 +392,10 @@ func _test_geometry_seeding_service() -> void:
 	_expect(application.geometry_seeding_method_choice_active and not application.geometry_seeding_edit_active and str(application._geometry_seeding_recipe("asset_1", "component_1").get("method", "")) == GeometrySeedingService.SPINE_FLOW, "Seeding Method state should remain active and exclude Edit Seeds after its plain-number selection.")
 	application._set_geometry_seeding_method(GeometrySeedingService.POISSON_FILL)
 	normalized["seeding"]["bakes"][GeometrySeedingService.POISSON_FILL] = {}
-	application.geometry_seeding_preview_key = "asset_1/component_1"
-	application.geometry_seeding_preview = GeometrySeedingService.generate(sampling, normalized["seeding"]["recipe"])
-	_expect(application._geometry_seeding_status("asset_1", "component_1", component) == "Preview", "A valid generated result should be available to Edit Seeds before a separate Bake click.")
+	application._bake_geometry_seeding()
+	_expect(application._geometry_seeding_status("asset_1", "component_1", component) == "Baked", "A direct Seeding Bake should persist a valid result without a separate Generate step.")
 	application._toggle_geometry_seeding_edit()
-	_expect(application.geometry_seeding_edit_active and application.geometry_seeding_workspace.editing_enabled and not normalized["seeding"]["bakes"][GeometrySeedingService.POISSON_FILL].is_empty(), "Entering Edit Seeds from Preview should accept that Preview as a persistent Bake and enable mouse editing immediately.")
+	_expect(application.geometry_seeding_edit_active and application.geometry_seeding_workspace.editing_enabled and not normalized["seeding"]["bakes"][GeometrySeedingService.POISSON_FILL].is_empty(), "Entering Edit Seeds from a baked result should enable mouse editing immediately.")
 	application._activate_geometry_seeding_method_choice()
 	_expect(application.active_context_command == "geometry.seeding.method" and application.geometry_seeding_method_choice_active and not application.geometry_seeding_edit_active, "Entering Seeding Method must atomically select its central command and deactivate Edit Seeds.")
 	application._toggle_geometry_seeding_edit()
@@ -437,7 +436,7 @@ func _test_geometry_seeding_service() -> void:
 	application._set_geometry_seeding_method(GeometrySeedingService.SPINE_FLOW)
 	_expect(application.selected_geometry_bake_method == GeometrySeedingService.SPINE_FLOW and not application._geometry_seeding_bake("asset_1", "component_1").is_empty(), "Switching back to Spine Flow should select its existing Bake without replacing Poisson Fill.")
 	sampler_spine["points"][1]["position"] = Vector2(5.0, 5.5)
-	_expect(application._geometry_seeding_status("asset_1", "component_1", component) == "Stale", "Editing the referenced Sampler Spine should make its Spine Flow Bake stale.")
+	_expect(application._geometry_seeding_status("asset_1", "component_1", component) == "Ready to Bake", "Editing the referenced Sampler Spine should leave Spine Flow ready for a direct rebake.")
 	spacing_input.free()
 	application.free()
 
@@ -534,7 +533,7 @@ func _test_geometry_meshing_service_and_ui() -> void:
 	application._set_geometry_meshing_method(GeometryMeshingService.CONSTRAINED_DELAUNAY)
 	_expect(application.selected_geometry_bake_method == GeometryMeshingService.CONSTRAINED_DELAUNAY and application._geometry_meshing_bakes("asset_1", "component_1").size() == 2, "Meshing methods should retain and select two independent Bakes without replacement.")
 	normalized["seeding"]["bakes"][GeometrySeedingService.POISSON_FILL]["seeds"][0]["position"] += Vector2(0.1, 0.0)
-	_expect(application._geometry_meshing_status("asset_1", "component_1", component) == "Stale", "Editing an upstream Seeding Bake should make its Mesh dependency stale without reverse synchronization.")
+	_expect(application._geometry_meshing_status("asset_1", "component_1", component) == "Ready to Bake", "Editing an upstream Seeding Bake should leave Mesh ready for a direct rebake without reverse synchronization.")
 	_expect(application._component_mesh_status("asset_1", "component_1", component) == "Stale", "A selected Component Mesh should become stale without losing its persistent Bake reference when upstream inputs change.")
 	application.free()
 
