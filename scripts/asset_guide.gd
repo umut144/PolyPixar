@@ -5,6 +5,8 @@ const BODY_FLOW := "body_flow"
 const SAMPLER_SPINE := "sampler_spine"
 const ANIMATION_SPINE := "animation_spine"
 const VALID_TYPES := [BODY_FLOW, SAMPLER_SPINE, ANIMATION_SPINE]
+const SAMPLER_SPINE_COLOR := Color("#f2c94c")
+const ANIMATION_SPINE_COLOR := Color("#c084fc")
 
 
 static func create(guide_id: String, guide_name: String, guide_type: String, component_id: String) -> Dictionary:
@@ -57,6 +59,10 @@ static func display_name(guide_type: String) -> String:
 	if guide_type == ANIMATION_SPINE:
 		return "Animation Spine"
 	return "Sampler Spine"
+
+
+static func color(guide_type: String) -> Color:
+	return ANIMATION_SPINE_COLOR if guide_type == ANIMATION_SPINE else SAMPLER_SPINE_COLOR
 
 
 static func validation_issues(guide: Dictionary) -> Array[String]:

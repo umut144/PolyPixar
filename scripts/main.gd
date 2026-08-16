@@ -6929,7 +6929,7 @@ func _render_component_guide_row(container: VBoxContainer, asset_id: String, gui
 	guide_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	guide_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	guide_button.focus_mode = Control.FOCUS_NONE
-	_style_guide_outliner_button(guide_button, str(guide.get("id", "")) == selected_guide_id)
+	_style_guide_outliner_button(guide_button, str(guide.get("id", "")) == selected_guide_id, str(guide.get("guide_type", AssetGuide.SAMPLER_SPINE)))
 	guide_button.pressed.connect(_select_guide.bind(asset_id, str(guide.get("id", ""))))
 	guide_row.add_child(guide_button)
 
@@ -7530,24 +7530,22 @@ func _style_outliner_button(button: Button, selected: bool) -> void:
 	button.add_theme_color_override("font_focus_color", text_color)
 
 
-func _style_guide_outliner_button(button: Button, selected: bool) -> void:
-	_style_outliner_button(button, selected)
-	if selected:
-		return
+func _style_guide_outliner_button(button: Button, selected: bool, guide_type := AssetGuide.SAMPLER_SPINE) -> void:
+	var guide_color := AssetGuide.color(guide_type)
 	var normal := StyleBoxFlat.new()
-	normal.bg_color = Color("#4a4022")
-	normal.border_color = Color("#75622c")
+	normal.bg_color = guide_color if selected else guide_color.darkened(0.55)
+	normal.border_color = guide_color.lightened(0.2) if selected else guide_color.darkened(0.35)
 	normal.set_border_width_all(1)
 	var hover := normal.duplicate()
-	hover.bg_color = Color("#5b4e27")
+	hover.bg_color = guide_color.lightened(0.15) if selected else guide_color.darkened(0.4)
 	var pressed := normal.duplicate()
-	pressed.bg_color = Color("#6a5929")
+	pressed.bg_color = guide_color.darkened(0.1) if selected else guide_color.darkened(0.3)
 	button.add_theme_stylebox_override("normal", normal)
 	button.add_theme_stylebox_override("hover", hover)
 	button.add_theme_stylebox_override("pressed", pressed)
 	button.add_theme_stylebox_override("focus", normal)
-	button.add_theme_color_override("font_color", Color("#f4d976"))
-	button.add_theme_color_override("font_hover_color", Color("#fff0a8"))
+	button.add_theme_color_override("font_color", Color("#16181d") if selected else guide_color.lightened(0.35))
+	button.add_theme_color_override("font_hover_color", Color("#16181d") if selected else guide_color.lightened(0.55))
 
 
 func _render_material_inspector() -> void:
@@ -11575,7 +11573,7 @@ func _render_spine_canvas(asset: Dictionary, guide: Dictionary, drawing: bool) -
 	canvas_view.set_paper_frame(Vector2.ZERO, false)
 	canvas_view.set_component_material(null)
 	canvas_view.set_guide_style(true)
-	canvas_view.set_guide_color(Color("#c084fc") if str(guide.get("guide_type", "")) == AssetGuide.ANIMATION_SPINE else Color("#f2c94c"))
+	canvas_view.set_guide_color(AssetGuide.color(str(guide.get("guide_type", AssetGuide.SAMPLER_SPINE))))
 	canvas_view.set_reference_shapes(_build_reference_shapes(asset, "", target_component_id))
 	canvas_view.set_display_polygon([])
 	BezierGeometry.resolve_auto_handles(guide.get("points", []), guide.get("chains", []))
