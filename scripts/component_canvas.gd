@@ -1130,7 +1130,8 @@ func _draw_bezier_geometry() -> void:
 	if display_polygon_closed and display_polygon.size() >= 3 and is_instance_valid(material_texture):
 		_draw_material_polygon()
 	var shape_color := guide_color if guide_style else Color("#55c7d9")
-	var mode_highlight := Color("#f2c94c") if interaction_state == "edit" and edit_mode in ["point", "edge", "face"] else shape_color
+	var point_mode_highlight := Color("#f2c94c") if interaction_state == "edit" and edit_mode in ["point", "face"] else shape_color
+	var edge_mode_highlight := Color("#f2c94c") if interaction_state == "edit" and edit_mode in ["edge", "face"] else shape_color
 	var selection_color := guide_color if guide_style else Color("#8fd8f8")
 	if interaction_state == "edit" and edit_mode == "face" and face_selected and display_polygon_closed and display_polygon.size() >= 3:
 		draw_colored_polygon(PackedVector2Array(display_polygon.map(func(point: Vector2) -> Vector2: return _world_to_screen(_local_to_world(point)))), Color("#8fd8f833"))
@@ -1150,7 +1151,7 @@ func _draw_bezier_geometry() -> void:
 			var end_point: Dictionary = points_by_id[end_id]
 			var curve_points := _bezier_edge_screen_points(start_point, end_point)
 			if curve_points.size() >= 2:
-				var edge_color := selection_color if edge_id == selected_edge_id or (edit_mode == "face" and face_selected) else mode_highlight
+				var edge_color := selection_color if edge_id == selected_edge_id or (edit_mode == "face" and face_selected) else edge_mode_highlight
 				if guide_style:
 					_draw_dashed_polyline(curve_points, edge_color, 2.0)
 				else:
@@ -1158,7 +1159,8 @@ func _draw_bezier_geometry() -> void:
 	if interaction_state != "transform":
 		for point_data in bezier_points:
 			var point_position: Vector2 = point_data.get("position", Vector2.ZERO)
-			var point_color := selection_color if edit_mode == "face" and face_selected else mode_highlight
+			var point_id := str(point_data.get("id", ""))
+			var point_color := selection_color if point_id in selected_point_ids or (edit_mode == "face" and face_selected) else point_mode_highlight
 			draw_circle(_world_to_screen(_local_to_world(point_position)), 4.0, point_color)
 	if interaction_state == "edit" and edit_mode == "point" and point_numbers_visible:
 		for chain_data in bezier_chains:
@@ -1243,7 +1245,7 @@ func _draw_selection_gizmo() -> void:
 	draw_line(center, center + Vector2(0.0, -GIZMO_AXIS_LENGTH), Color("#6bcb77"), 2.0)
 	draw_circle(center + Vector2(GIZMO_AXIS_LENGTH, 0.0), 7.0, Color("#e56b6f"))
 	draw_circle(center + Vector2(0.0, -GIZMO_AXIS_LENGTH), 7.0, Color("#6bcb77"))
-	draw_rect(Rect2(center - Vector2(7.0, 7.0), Vector2(14.0, 14.0)), Color("#f2c94c"), false, 2.0)
+	draw_rect(Rect2(center - Vector2(7.0, 7.0), Vector2(14.0, 14.0)), Color("#8fd8f8"), false, 2.0)
 
 
 func _face_center_screen() -> Vector2:
