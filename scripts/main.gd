@@ -1410,6 +1410,8 @@ func _on_snap_enabled_toggled(enabled: bool) -> void:
 
 func _on_snap_mode_selected(mode: String) -> void:
 	_set_snap_mode(mode)
+	if is_instance_valid(snap_popup):
+		snap_popup.hide()
 
 
 func _set_snap_mode(mode: String) -> void:
@@ -1580,6 +1582,8 @@ func _create_component_context_menu() -> void:
 	component_context_menu.add_separator()
 	component_context_menu.add_item("Duplicate & Mirror Y · Keep Orientation", 1)
 	component_context_menu.add_item("Duplicate & Mirror Y · Flip Orientation", 2)
+	component_context_menu.add_separator()
+	component_context_menu.add_item("Detach from Parent", 3)
 	_style_popup_menu(component_context_menu)
 	component_context_menu.id_pressed.connect(_on_component_context_menu_selected)
 	add_child(component_context_menu)
@@ -5408,9 +5412,15 @@ func _export_validation_errors(asset: Dictionary) -> Array[String]:
 		return errors
 	for component in asset.get("components", []):
 		var component_name := str(component.get("name", "Component"))
-		if str(component.get("draw_mode", "")) == "open_edge":
+		var draw_mode := str(component.get("draw_mode", ""))
+		if draw_mode == "open_edge":
 			continue
-		if str(component.get("draw_mode", "")) == "ribbon":
+		var topology_errors := BezierTopology.mode_validation_issues(component, true)
+		if not topology_errors.is_empty():
+			for topology_error in topology_errors:
+				errors.append("%s: %s" % [component_name, topology_error])
+			continue
+		if draw_mode == "ribbon":
 			var ribbon_mesh := _component_mesh_bake(str(asset.get("id", "")), str(component.get("id", "")))
 			if not RibbonMeshService.matches_source(ribbon_mesh, component):
 				errors.append("%s: current Ribbon Strip Mesh is required." % component_name)
@@ -7089,6 +7099,9 @@ func _on_component_outliner_gui_input(event: InputEvent, asset_id: String, compo
 	_select_component(asset_id, component_id)
 	component_context_menu.set_meta("asset_id", asset_id)
 	component_context_menu.set_meta("component_id", component_id)
+	var component := _get_component(_get_asset(asset_id), component_id)
+	var detach_index := component_context_menu.get_item_index(3)
+	component_context_menu.set_item_disabled(detach_index, str(component.get("parent_component_id", "")).is_empty())
 	component_context_menu.position = Vector2i(button.global_position + event.position)
 	component_context_menu.popup()
 	get_viewport().set_input_as_handled()
@@ -7446,6 +7459,9 @@ func _on_component_context_menu_selected(action_id: int) -> void:
 		return
 	var asset_id := str(component_context_menu.get_meta("asset_id", ""))
 	var component_id := str(component_context_menu.get_meta("component_id", ""))
+	if action_id == 3:
+		_detach_component(asset_id, component_id)
+		return
 	var mirror_mode := "none" if action_id == 0 else "keep_orientation" if action_id == 1 else "flip_orientation"
 	if mirror_mode == "none" or mirror_mode == "keep_orientation" or mirror_mode == "flip_orientation":
 		_duplicate_component(asset_id, component_id, mirror_mode)
@@ -7460,14 +7476,22 @@ func _duplicate_component(asset_id: String, component_id: String, mirror_mode :=
 	var duplicate := _duplicate_component_record(source, asset)
 	if mirror_mode != "none":
 		var transform: Dictionary = duplicate.get("transform", _default_component_transform())
-		var position: Vector2 = transform.get("position", Vector2.ZERO)
-		position.x = -position.x
-		transform["position"] = position
 		if mirror_mode == "flip_orientation":
+			var position: Vector2 = transform.get("position", Vector2.ZERO)
+			position.x = -position.x
+			transform["position"] = position
 			transform["rotation"] = -float(transform.get("rotation", 0.0))
 			var scale: Vector2 = transform.get("scale", Vector2.ONE)
 			scale.x = -scale.x
 			transform["scale"] = scale
+		else:
+			# Keep the Component's orientation. Its visible geometry centre, not
+			# merely its pivot, determines the mirrored placement. This also works
+			# for Components whose authored points sit to one side of a zero pivot.
+			var visual_center := _component_visual_center_in_parent_space(duplicate)
+			var position: Vector2 = transform.get("position", Vector2.ZERO)
+			position.x -= visual_center.x * 2.0
+			transform["position"] = position
 		duplicate["transform"] = transform
 	asset["components"].append(duplicate)
 	selected_asset_id = asset_id
@@ -7538,6 +7562,22 @@ func _next_duplicate_component_name(asset: Dictionary, source_name: String) -> S
 		candidate = "%s %d" % [base_name, suffix]
 		suffix += 1
 	return candidate
+
+
+func _component_visual_center_in_parent_space(component: Dictionary) -> Vector2:
+	var points: Array = component.get("points", [])
+	if points.is_empty():
+		return Vector2(component.get("transform", {}).get("position", Vector2.ZERO))
+	var minimum := Vector2(INF, INF)
+	var maximum := Vector2(-INF, -INF)
+	for point in points:
+		var position: Vector2 = point.get("position", Vector2.ZERO)
+		minimum.x = minf(minimum.x, position.x)
+		minimum.y = minf(minimum.y, position.y)
+		maximum.x = maxf(maximum.x, position.x)
+		maximum.y = maxf(maximum.y, position.y)
+	var local_center := (minimum + maximum) * 0.5
+	return ComponentHierarchy.local_transform(component.get("transform", {})) * local_center
 
 
 func _duplicate_guide_record(source: Dictionary, asset: Dictionary) -> Dictionary:
@@ -9808,8 +9848,8 @@ func _render_inspector() -> void:
 	_add_transform_field(transform_grid, "Rotation", float(transform.get("rotation", 0.0)), "rotation", 1.0)
 	_add_transform_field(transform_grid, "Scale X", transform_scale.x, "scale_x", 0.01)
 	_add_transform_field(transform_grid, "Scale Y", transform_scale.y, "scale_y", 0.01)
-	_add_transform_field(transform_grid, "Pivot X (cm)", _editor_units_to_world(pivot.x), "pivot_x", 0.01)
-	_add_transform_field(transform_grid, "Pivot Y (cm)", _editor_units_to_world(pivot.y), "pivot_y", 0.01)
+	_add_transform_field(transform_grid, "Pivot X (cm)", _editor_units_to_world(pivot.x), "pivot_x", 0.001)
+	_add_transform_field(transform_grid, "Pivot Y (cm)", _editor_units_to_world(pivot.y), "pivot_y", 0.001)
 	inspector_content.add_child(_create_inspector_section("Visibility / Layer"))
 	var visibility_toggle := CheckButton.new()
 	visibility_toggle.text = "Visible"
@@ -11451,9 +11491,9 @@ func _add_transform_field(grid: GridContainer, label_text: String, value: float,
 	var field := SpinBox.new()
 	field.min_value = -100000.0
 	field.max_value = 100000.0
-	# Arrow buttons move in tenths; the embedded LineEdit still accepts
-	# hundredths for precise values such as 0.01.
-	field.step = 0.01
+	# Arrow buttons move in tenths; the embedded LineEdit accepts the field's
+	# configured precision, including thousandths for Component pivots.
+	field.step = step
 	field.custom_arrow_step = 0.1
 	field.value = value
 	field.custom_minimum_size = Vector2(96, 26)
@@ -12048,7 +12088,10 @@ func _render_canvas_context() -> void:
 	canvas_view.set_reference_shapes(_build_reference_shapes(asset, selected_component_id))
 	canvas_view.set_component_draw_mode(str(component.get("draw_mode", "closed_loop")))
 	canvas_view.set_point_numbers_visible(bool(component.get("show_point_numbers", false)))
-	canvas_view.set_catch_parent_component(str(component.get("catch_parent_component_id", "")) if str(component.get("draw_mode", "closed_loop")) in ["open_edge", "ribbon"] else "")
+	var catch_parent_id := str(component.get("parent_component_id", ""))
+	if catch_parent_id.is_empty() and str(component.get("draw_mode", "closed_loop")) in ["open_edge", "ribbon"]:
+		catch_parent_id = str(component.get("catch_parent_component_id", ""))
+	canvas_view.set_catch_parent_component(catch_parent_id)
 	BezierGeometry.resolve_auto_handles(component.get("points", []), component.get("chains", []))
 	_refresh_component_geometry(component)
 	canvas_view.set_selected_point_ids(selected_point_ids)
@@ -12301,6 +12344,31 @@ func _on_component_hierarchy_parent_selected(index: int, option: OptionButton) -
 	_render_canvas_context()
 
 
+func _detach_component(asset_id: String, component_id: String) -> void:
+	var asset := _get_asset(asset_id)
+	var component := _get_component(asset, component_id)
+	if asset.is_empty() or component.is_empty():
+		return
+	var old_parent_id := str(component.get("parent_component_id", ""))
+	if old_parent_id.is_empty():
+		return
+	var old_parent := _get_component(asset, old_parent_id)
+	var new_parent_id := str(old_parent.get("parent_component_id", ""))
+	var world_transform := ComponentHierarchy.world_transform_record(asset, component_id)
+	_record_direct_change()
+	component["parent_component_id"] = new_parent_id
+	component["transform"] = ComponentHierarchy.local_transform_from_world_record(asset, component_id, world_transform)
+	if str(component.get("catch_parent_component_id", "")) == old_parent_id:
+		component["catch_parent_component_id"] = ""
+	selected_asset_id = asset_id
+	selected_component_id = component_id
+	selected_guide_id = ""
+	_show_status_message("Detached %s from Parent." % str(component.get("name", "Component")))
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
 func _on_reference_component_selected(component_id: String) -> void:
 	if selected_asset_id.is_empty():
 		return
@@ -12430,10 +12498,10 @@ func _on_bezier_point_delete_requested(point_id: String, record_history := true)
 	selected_point_ids.clear()
 	if not selected_point_id.is_empty():
 		selected_point_ids.append(selected_point_id)
-		if guide.is_empty():
-			_refresh_component_geometry(subject)
-		else:
-			canvas_view.set_bezier_geometry(subject.get("points", []), subject.get("edges", []), subject.get("chains", []))
+	if guide.is_empty():
+		_refresh_component_geometry(subject)
+	else:
+		canvas_view.set_bezier_geometry(subject.get("points", []), subject.get("edges", []), subject.get("chains", []))
 	canvas_view.set_selected_point_id(selected_point_id)
 	_render_inspector()
 

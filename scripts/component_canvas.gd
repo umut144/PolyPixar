@@ -194,6 +194,9 @@ func _gui_input(event: InputEvent) -> void:
 		if event.button_index == MOUSE_BUTTON_LEFT and interaction_state == "asset" and _is_near_asset_pivot(event.position):
 			asset_pivot_dragging = true
 			return
+		if event.button_index == MOUSE_BUTTON_LEFT and interaction_state.is_empty() and _is_near_pivot(event.position):
+			pivot_dragging = true
+			return
 		if event.button_index == MOUSE_BUTTON_LEFT and interaction_state == "edit":
 			if edit_mode == "point" and not edit_handles_enabled and not edit_point_set_enabled:
 				var gizmo_axis := _selection_gizmo_at(event.position)
@@ -984,7 +987,11 @@ func _draw_pivot() -> void:
 		return
 	var pivot_screen := _world_to_screen(component_transform.get("position", Vector2.ZERO))
 	var pivot_color := Color("#d98cff")
-	draw_circle(pivot_screen, 7.0, pivot_color, false, 2.0)
+	if interaction_state.is_empty():
+		draw_circle(pivot_screen, 10.0, Color("#d98cff44"))
+		draw_circle(pivot_screen, 8.0, pivot_color, false, 2.0)
+	else:
+		draw_circle(pivot_screen, 7.0, pivot_color, false, 2.0)
 	draw_line(pivot_screen - Vector2(11.0, 0.0), pivot_screen + Vector2(11.0, 0.0), pivot_color, 1.0)
 	draw_line(pivot_screen - Vector2(0.0, 11.0), pivot_screen + Vector2(0.0, 11.0), pivot_color, 1.0)
 
@@ -1096,8 +1103,6 @@ func _draw_reference_bezier_shape(shape: Dictionary, points: Array, edges: Array
 			if not edges_by_id.has(edge_id):
 				continue
 			var edge_data: Dictionary = edges_by_id[edge_id]
-			if not bool(edge_data.get("render_outline", true)):
-				continue
 			var start_id := str(edge_data.get("start_point_id", ""))
 			var end_id := str(edge_data.get("end_point_id", ""))
 			if not points_by_id.has(start_id) or not points_by_id.has(end_id):
@@ -1106,7 +1111,10 @@ func _draw_reference_bezier_shape(shape: Dictionary, points: Array, edges: Array
 			var end_point: Dictionary = points_by_id[end_id]
 			var curve_points := _bezier_edge_screen_points_with_transform(start_point, end_point, transform)
 			if curve_points.size() >= 2:
-				draw_polyline(curve_points, reference_color, reference_width, true)
+				if bool(edge_data.get("render_outline", true)):
+					draw_polyline(curve_points, reference_color, reference_width, true)
+				else:
+					_draw_dashed_polyline(curve_points, reference_color, reference_width)
 	for point_data in points:
 		if point_data is Dictionary:
 			draw_circle(_world_to_screen(_local_to_world_with_transform(point_data.get("position", Vector2.ZERO), transform)), 3.0, reference_color)
@@ -1169,8 +1177,6 @@ func _draw_bezier_geometry() -> void:
 			if not edges_by_id.has(edge_id):
 				continue
 			var edge_data: Dictionary = edges_by_id[edge_id]
-			if not bool(edge_data.get("render_outline", true)):
-				continue
 			var start_id := str(edge_data.get("start_point_id", ""))
 			var end_id := str(edge_data.get("end_point_id", ""))
 			if not points_by_id.has(start_id) or not points_by_id.has(end_id):
@@ -1180,7 +1186,7 @@ func _draw_bezier_geometry() -> void:
 			var curve_points := _bezier_edge_screen_points(start_point, end_point)
 			if curve_points.size() >= 2:
 				var edge_color := selection_color if edge_id == selected_edge_id or (edit_mode == "face" and face_selected) else edge_mode_highlight
-				if guide_style:
+				if guide_style or not bool(edge_data.get("render_outline", true)):
 					_draw_dashed_polyline(curve_points, edge_color, 2.0)
 				else:
 					draw_polyline(curve_points, edge_color, 2.0, true)
@@ -1191,14 +1197,21 @@ func _draw_bezier_geometry() -> void:
 			var point_color := selection_color if point_id in selected_point_ids or (edit_mode == "face" and face_selected) else point_mode_highlight
 			draw_circle(_world_to_screen(_local_to_world(point_position)), 4.0, point_color)
 	if interaction_state == "edit" and edit_mode == "point" and point_numbers_visible:
+		var next_point_number := 1
+		var numbered_ids: Dictionary = {}
 		for chain_data in bezier_chains:
 			var chain_point_ids: Array = chain_data.get("point_ids", [])
-			for chain_index in range(chain_point_ids.size()):
-				var numbered_point := _point_by_id(str(chain_point_ids[chain_index]))
+			for point_id_value in chain_point_ids:
+				var point_id := str(point_id_value)
+				if numbered_ids.has(point_id):
+					continue
+				var numbered_point := _point_by_id(point_id)
 				if numbered_point.is_empty():
 					continue
+				numbered_ids[point_id] = true
 				var numbered_position: Vector2 = numbered_point.get("position", Vector2.ZERO)
-				draw_string(ThemeDB.fallback_font, _world_to_screen(_local_to_world(numbered_position)) + Vector2(8.0, -8.0), str(chain_index + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color("#f2c94c"))
+				draw_string(ThemeDB.fallback_font, _world_to_screen(_local_to_world(numbered_position)) + Vector2(8.0, -8.0), str(next_point_number), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color("#f2c94c"))
+				next_point_number += 1
 	if interaction_state == "edit" and edit_mode == "point" and edit_point_set_enabled and cursor_over_canvas:
 		var add_point_hit := _bezier_edge_hit(_world_to_screen(_local_to_world(cursor_world)))
 		if not add_point_hit.is_empty():

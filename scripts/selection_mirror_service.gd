@@ -56,7 +56,14 @@ static func apply(component: Dictionary, selected_point_ids: Array, axis_start: 
 	chains.append(mirrored_chain)
 	result["chains"] = chains
 	BezierTopology.rebuild_chain_edges(result, mirrored_chain)
-	var auto_connection := _merge_coincident_open_endpoints(result, source_ids, mirrored_ids)
+	var coincident_pairs := _coincident_pairs(result, source_ids, mirrored_ids)
+	var auto_connection := {"count": 0, "removed_mirrored_id": ""}
+	if coincident_pairs.size() == 1 and _pair_is_open_endpoint(result, coincident_pairs[0]):
+		auto_connection = _merge_coincident_open_endpoints(result, source_ids, mirrored_ids)
+	else:
+		for pair in coincident_pairs:
+			if _merge_coincident_point(result, str(pair.get("source_id", "")), str(pair.get("mirrored_id", ""))):
+				mirrored_ids.erase(str(pair.get("mirrored_id", "")))
 	var removed_mirrored_id := str(auto_connection.get("removed_mirrored_id", ""))
 	if not removed_mirrored_id.is_empty():
 		mirrored_ids.erase(removed_mirrored_id)
@@ -66,7 +73,57 @@ static func apply(component: Dictionary, selected_point_ids: Array, axis_start: 
 		"component": result,
 		"mirrored_point_ids": mirrored_ids,
 		"auto_connected_count": int(auto_connection.get("count", 0))
-	}
+}
+
+
+static func _coincident_pairs(component: Dictionary, source_ids: Array, mirrored_ids: Array) -> Array[Dictionary]:
+	var pairs: Array[Dictionary] = []
+	var used_mirrored: Dictionary = {}
+	for source_id_value in source_ids:
+		var source_id := str(source_id_value)
+		var source_point := BezierTopology.point_by_id(component.get("points", []), source_id)
+		if source_point.is_empty():
+			continue
+		var source_position: Vector2 = source_point.get("position", Vector2.ZERO)
+		for mirrored_id_value in mirrored_ids:
+			var mirrored_id := str(mirrored_id_value)
+			if used_mirrored.has(mirrored_id):
+				continue
+			var mirrored_point := BezierTopology.point_by_id(component.get("points", []), mirrored_id)
+			if mirrored_point.is_empty():
+				continue
+			if source_position.distance_squared_to(Vector2(mirrored_point.get("position", Vector2.ZERO))) <= COINCIDENT_ENDPOINT_EPSILON * COINCIDENT_ENDPOINT_EPSILON:
+				pairs.append({"source_id": source_id, "mirrored_id": mirrored_id})
+				used_mirrored[mirrored_id] = true
+				break
+	return pairs
+
+
+static func _pair_is_open_endpoint(component: Dictionary, pair: Dictionary) -> bool:
+	return BezierTopology.is_open_endpoint(component, str(pair.get("source_id", ""))) and BezierTopology.is_open_endpoint(component, str(pair.get("mirrored_id", "")))
+
+
+static func _merge_coincident_point(component: Dictionary, source_id: String, mirrored_id: String) -> bool:
+	if source_id.is_empty() or mirrored_id.is_empty() or source_id == mirrored_id:
+		return false
+	var mirrored_chain := BezierTopology.chain_for_point(component.get("chains", []), mirrored_id)
+	if mirrored_chain.is_empty():
+		return false
+	var mirrored_point_ids: Array = mirrored_chain.get("point_ids", []).duplicate()
+	var mirrored_index := mirrored_point_ids.find(mirrored_id)
+	if mirrored_index < 0 or source_id in mirrored_point_ids:
+		return false
+	mirrored_point_ids[mirrored_index] = source_id
+	mirrored_chain["point_ids"] = mirrored_point_ids
+	var points: Array = component.get("points", [])
+	for point_index in range(points.size() - 1, -1, -1):
+		if str(points[point_index].get("id", "")) == mirrored_id:
+			points.remove_at(point_index)
+			break
+	component["points"] = points
+	BezierTopology.rebuild_chain_edges(component, mirrored_chain)
+	BezierGeometry.resolve_auto_handles(points, component.get("chains", []))
+	return true
 
 
 ## Merges coincident endpoints into one shared Point. The original pre-mirror

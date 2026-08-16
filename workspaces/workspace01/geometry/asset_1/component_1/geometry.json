@@ -5385,7 +5385,7 @@
 			}
 		}
 	},
-	"schema_version": 26,
+	"schema_version": 27,
 	"seeding": {
 		"bakes": {
 			"poisson_fill": {
@@ -9260,5 +9260,9 @@
 				"scale": 1.0
 			}
 		}
+	},
+	"weighting": {
+		"next_style_index": 1,
+		"styles": []
 	}
 }

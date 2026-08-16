@@ -371,6 +371,11 @@ static func delete_point(component: Dictionary, point_id: String) -> bool:
 	point_ids.remove_at(chain_index)
 	chain["point_ids"] = point_ids
 	chain["edge_ids"] = _ordered_edge_ids(point_ids, edges, closed)
+	if point_ids.is_empty():
+		for empty_chain_index in range(chains.size() - 1, -1, -1):
+			if chains[empty_chain_index] == chain:
+				chains.remove_at(empty_chain_index)
+				break
 	component["points"] = points
 	component["edges"] = edges
 	component["chains"] = chains
@@ -380,6 +385,38 @@ static func delete_point(component: Dictionary, point_id: String) -> bool:
 
 static func delete_points(component: Dictionary, point_ids_to_delete: Array) -> Array[String]:
 	var deleted: Array[String] = []
+	var requested: Dictionary = {}
+	for point_id_value in point_ids_to_delete:
+		requested[str(point_id_value)] = true
+	var points: Array = component.get("points", [])
+	var edges: Array = component.get("edges", [])
+	var chains: Array = component.get("chains", [])
+	# A fully selected closed Chain is an intentional reset of that contour.
+	# Partial deletion still protects the minimum three points below.
+	for chain_index in range(chains.size() - 1, -1, -1):
+		var chain: Dictionary = chains[chain_index]
+		var chain_point_ids: Array = chain.get("point_ids", [])
+		if not bool(chain.get("closed", false)) or chain_point_ids.is_empty():
+			continue
+		var all_selected := true
+		for chain_point_id in chain_point_ids:
+			if not requested.has(str(chain_point_id)):
+				all_selected = false
+				break
+		if not all_selected:
+			continue
+		var chain_edge_ids: Array = chain.get("edge_ids", [])
+		for edge_index in range(edges.size() - 1, -1, -1):
+			if str(edges[edge_index].get("id", "")) in chain_edge_ids:
+				edges.remove_at(edge_index)
+		for point_index in range(points.size() - 1, -1, -1):
+			if str(points[point_index].get("id", "")) in chain_point_ids:
+				deleted.append(str(points[point_index].get("id", "")))
+				points.remove_at(point_index)
+		chains.remove_at(chain_index)
+	component["points"] = points
+	component["edges"] = edges
+	component["chains"] = chains
 	for point_id_value in point_ids_to_delete:
 		var point_id := str(point_id_value)
 		if point_id not in deleted and delete_point(component, point_id):
@@ -421,6 +458,18 @@ static func validate(component: Dictionary) -> Array[String]:
 		var chain_point_ids: Array = chain_data.get("point_ids", [])
 		var chain_edge_ids: Array = chain_data.get("edge_ids", [])
 		var closed := bool(chain_data.get("closed", false))
+		var chain_point_id_set: Dictionary = {}
+		for point_id_value in chain_point_ids:
+			var chain_point_id := str(point_id_value)
+			if chain_point_id_set.has(chain_point_id):
+				errors.append("Chain contains duplicate Point ID %s." % chain_point_id)
+			chain_point_id_set[chain_point_id] = true
+		var chain_edge_id_set: Dictionary = {}
+		for edge_id_value in chain_edge_ids:
+			var chain_edge_id := str(edge_id_value)
+			if chain_edge_id_set.has(chain_edge_id):
+				errors.append("Chain contains duplicate Edge ID %s." % chain_edge_id)
+			chain_edge_id_set[chain_edge_id] = true
 		if closed and chain_point_ids.size() < 3:
 			errors.append("A closed chain needs at least three points.")
 		var expected_edge_count := chain_point_ids.size() if closed else maxi(chain_point_ids.size() - 1, 0)

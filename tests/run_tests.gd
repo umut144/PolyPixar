@@ -64,6 +64,9 @@ func _test_add_close_and_validate() -> void:
 	_expect(BezierTopology.validate(component).is_empty(), "A newly closed chain should be valid.")
 	_expect(bool(BezierTopology.point_by_id(component["points"], first_id).get("preserve_point", false)), "The first closing endpoint should be preserved.")
 	_expect(bool(BezierTopology.point_by_id(component["points"], last_id).get("preserve_point", false)), "The last closing endpoint should be preserved.")
+	var duplicate_point_chain := component.duplicate(true)
+	duplicate_point_chain["chains"][0]["point_ids"][1] = duplicate_point_chain["chains"][0]["point_ids"][0]
+	_expect(not BezierTopology.validate(duplicate_point_chain).is_empty(), "A Chain with a duplicate Point ID must be invalid.")
 
 
 func _test_delete_exactly_one_point() -> void:
@@ -86,6 +89,14 @@ func _test_ids_are_not_reused() -> void:
 	BezierTopology.delete_point(component, second_id)
 	var replacement_id := BezierTopology.add_point(component, Vector2(2.0, 2.0), "linear")
 	_expect(replacement_id != first_id and replacement_id != second_id, "Point IDs must never be reused after deletion.")
+	var empty_open_component := _component()
+	var empty_first_id := BezierTopology.add_point(empty_open_component, Vector2.ZERO, "linear")
+	var empty_second_id := BezierTopology.add_point(empty_open_component, Vector2.ONE, "linear")
+	BezierTopology.delete_point(empty_open_component, empty_first_id)
+	BezierTopology.delete_point(empty_open_component, empty_second_id)
+	_expect(empty_open_component.get("chains", []).is_empty(), "Deleting every Point from an open Chain should remove the empty Chain.")
+	var restarted_id := BezierTopology.add_point(empty_open_component, Vector2(2.0, 2.0), "linear")
+	_expect(not restarted_id.is_empty() and empty_open_component.get("chains", []).size() == 1, "An Open Edge should be drawable again after all of its Points were deleted.")
 
 
 func _test_delete_multiple_points_and_protect_closed_minimum() -> void:
@@ -98,6 +109,20 @@ func _test_delete_multiple_points_and_protect_closed_minimum() -> void:
 	_expect(deleted.size() == 2, "A closed chain must stop deleting when three points remain.")
 	_expect(component["points"].size() == 3, "A closed chain must retain its minimum three points.")
 	_expect(BezierTopology.validate(component).is_empty(), "Multi-delete must retain a valid closed chain.")
+	var reset_component := _component()
+	var reset_ids: Array[String] = []
+	for point_index in range(3):
+		reset_ids.append(BezierTopology.add_point(reset_component, Vector2(point_index, 0.0), "linear"))
+	BezierTopology.close_active_chain(reset_component)
+	var reset_deleted := BezierTopology.delete_points(reset_component, reset_ids)
+	_expect(reset_deleted.size() == 3 and reset_component.get("points", []).is_empty() and reset_component.get("chains", []).is_empty(), "Deleting all points of a Closed Loop should remove the contour completely.")
+	var reset_new_id := BezierTopology.add_point(reset_component, Vector2(4.0, 0.0), "linear")
+	_expect(not reset_new_id.is_empty() and reset_component.get("chains", []).size() == 1, "A Closed Loop should be drawable again after its full contour was deleted.")
+	var ribbon_reset := _component()
+	ribbon_reset["draw_mode"] = "ribbon"
+	var ribbon_ids: Array[String] = [BezierTopology.add_point(ribbon_reset, Vector2.ZERO, "linear"), BezierTopology.add_point(ribbon_reset, Vector2.ONE, "linear")]
+	BezierTopology.delete_points(ribbon_reset, ribbon_ids)
+	_expect(ribbon_reset.get("chains", []).is_empty() and not BezierTopology.add_point(ribbon_reset, Vector2(2.0, 0.0), "linear").is_empty(), "A Ribbon should be drawable again after its full open Chain was deleted.")
 
 
 func _test_insert_preserves_curve() -> void:
@@ -158,6 +183,15 @@ func _test_closed_loop_selection_mirror() -> void:
 	_expect(int(coincident_result.get("auto_connected_count", 0)) == 1, "Mirror should merge an endpoint that lands exactly on its source endpoint.")
 	_expect(coincident_mirror.get("points", []).size() == 5, "A coincident mirrored endpoint must be removed instead of leaving two overlapping Points.")
 	_expect(coincident_mirror.get("chains", []).size() == 1 and not bool(coincident_mirror["chains"][0].get("closed", false)), "One coincident endpoint pair should join the two mirror Chains without auto-closing the contour.")
+	var multi_coincident_component := _component()
+	multi_coincident_component["draw_mode"] = "closed_loop"
+	var multi_source_ids: Array[String] = []
+	for point_position in [Vector2(0.0, 0.0), Vector2(-1.0, 1.0), Vector2(-1.0, 3.0), Vector2(0.0, 4.0)]:
+		multi_source_ids.append(BezierTopology.add_point(multi_coincident_component, point_position, "linear"))
+	var multi_result := SelectionMirrorService.apply(multi_coincident_component, multi_source_ids, mirror_axis_start, mirror_axis_end)
+	var multi_mirror: Dictionary = multi_result.get("component", {})
+	_expect(int(multi_result.get("auto_connected_count", 0)) == 0 and multi_mirror.get("points", []).size() == 6, "Mirror should fuse every coincident axis Point when more than one Point lands on the axis.")
+	_expect(multi_mirror.get("chains", []).size() == 2 and str(multi_mirror["chains"][0].get("point_ids", [])[0]) == str(multi_mirror["chains"][1].get("point_ids", []).back()) and str(multi_mirror["chains"][0].get("point_ids", []).back()) == str(multi_mirror["chains"][1].get("point_ids", [])[0]), "Multiple coincident axis Points should be shared by both open Mirror Chains without auto-closing them.")
 
 
 func _test_ribbon_strip_mesh() -> void:
@@ -819,6 +853,7 @@ func _test_asset_guides() -> void:
 	application._confirm_component_creation()
 	var child_component: Dictionary = application._get_component(application._get_asset("asset_1"), application.selected_component_id)
 	_expect(str(child_component.get("parent_component_id", "")) == "component_1" and Vector2(child_component.get("transform", {}).get("pivot", Vector2.ZERO)).is_equal_approx(Vector2(parent_component.get("transform", {}).get("pivot", Vector2.ZERO))), "Child creation should persist a real Parent relationship and inherit the Parent pivot initially.")
+	_expect(application.canvas_view.catch_parent_component_id == "component_1", "A Child Component should automatically use its hierarchy Parent as the Catch Parent while drawing.")
 	application._create_guide("asset_1", "component_1", AssetGuide.MOTION)
 	var motion_guide: Dictionary = application._get_guide(application._get_asset("asset_1"), application.selected_guide_id)
 	_expect(str(motion_guide.get("guide_type", "")) == AssetGuide.MOTION and int(motion_guide.get("ordinal", 0)) > 0, "The Component add flow should create typed Motion Guides without requesting a manual name.")
@@ -842,10 +877,17 @@ func _test_asset_guides() -> void:
 	_expect(str(plain_duplicate.get("id", "")) != "component_1" and str(plain_duplicate.get("points", [])[0].get("id", "")) != str(parent_component.get("points", [])[0].get("id", "")), "Component Duplicate should remap the Component and topology IDs independently.")
 	application._duplicate_component("asset_1", "component_1", "keep_orientation")
 	var kept_duplicate: Dictionary = application._get_component(application._get_asset("asset_1"), application.selected_component_id)
-	_expect(Vector2(kept_duplicate.get("transform", {}).get("position", Vector2.ZERO)).is_equal_approx(Vector2(3.0, 2.0)) and is_equal_approx(float(kept_duplicate.get("transform", {}).get("rotation", 0.0)), 20.0), "Keep Orientation should mirror only the Component pivot position across the Parent Y axis.")
+	var source_visual_center: Vector2 = application._component_visual_center_in_parent_space(parent_component)
+	var kept_visual_center: Vector2 = application._component_visual_center_in_parent_space(kept_duplicate)
+	_expect(is_equal_approx(kept_visual_center.x, -source_visual_center.x) and is_equal_approx(kept_visual_center.y, source_visual_center.y) and is_equal_approx(float(kept_duplicate.get("transform", {}).get("rotation", 0.0)), 20.0), "Keep Orientation should mirror the visible Component placement across the Parent Y axis without rotating it.")
 	application._duplicate_component("asset_1", "component_1", "flip_orientation")
 	var flipped_duplicate: Dictionary = application._get_component(application._get_asset("asset_1"), application.selected_component_id)
 	_expect(is_equal_approx(float(flipped_duplicate.get("transform", {}).get("rotation", 0.0)), -20.0) and is_equal_approx(Vector2(flipped_duplicate.get("transform", {}).get("scale", Vector2.ONE)).x, -1.0), "Flip Orientation should mirror the Component geometry orientation as well as its Y-axis position.")
+	var child_world_before_detach := ComponentHierarchy.world_transform_record(application._get_asset("asset_1"), str(child_component.get("id", "")))
+	application._detach_component("asset_1", str(child_component.get("id", "")))
+	var detached_child: Dictionary = application._get_component(application._get_asset("asset_1"), str(child_component.get("id", "")))
+	var child_world_after_detach := ComponentHierarchy.world_transform_record(application._get_asset("asset_1"), str(child_component.get("id", "")))
+	_expect(str(detached_child.get("parent_component_id", "")).is_empty() and child_world_before_detach["position"].is_equal_approx(child_world_after_detach["position"]) and is_equal_approx(float(child_world_before_detach["rotation"]), float(child_world_after_detach["rotation"])), "Detach from Parent should promote a Child to the Parent's level without changing its world transform.")
 	application.free()
 
 
