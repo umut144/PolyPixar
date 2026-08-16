@@ -879,7 +879,7 @@ func _draw_measurement_guides() -> void:
 	var coordinate_lines: Array[String] = []
 	coordinate_lines.append("x: %.2f cm" % (cursor_position_world.x - origin_world.x))
 	coordinate_lines.append("y: %.2f cm" % (cursor_position_world.y - origin_world.y))
-	_draw_coordinate_readout(coordinate_lines, cursor_screen, guide_color)
+	_draw_coordinate_readout(coordinate_lines, cursor_screen, guide_color, bezier_handle_drag_side != "")
 
 
 func _draw_dashed_line(line_start: Vector2, line_end: Vector2, line_color: Color) -> void:
@@ -903,14 +903,14 @@ func _draw_measurement_label(label_text: String, label_center: Vector2, label_co
 	draw_string(label_font, label_rect.position + Vector2(4.0, text_size.y), label_text, HORIZONTAL_ALIGNMENT_LEFT, -1, MEASUREMENT_FONT_SIZE, label_color)
 
 
-func _draw_coordinate_readout(lines: Array[String], cursor_screen: Vector2, label_color: Color) -> void:
+func _draw_coordinate_readout(lines: Array[String], cursor_screen: Vector2, label_color: Color, prefer_bottom_right := false) -> void:
 	var label_font := ThemeDB.fallback_font
 	var line_height := float(MEASUREMENT_FONT_SIZE + 4)
 	var max_width := 0.0
 	for line in lines:
 		max_width = maxf(max_width, label_font.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, MEASUREMENT_FONT_SIZE).x)
 	var label_size := Vector2(max_width + 12.0, line_height * lines.size() + 8.0)
-	var label_position := cursor_screen + Vector2(14.0, -label_size.y - 14.0)
+	var label_position := cursor_screen + (Vector2(64.0, 42.0) if prefer_bottom_right else Vector2(14.0, -label_size.y - 14.0))
 	label_position.x = clampf(label_position.x, 4.0, maxf(4.0, size.x - label_size.x - 4.0))
 	label_position.y = clampf(label_position.y, 4.0, maxf(4.0, size.y - label_size.y - 4.0))
 	var label_rect := Rect2(label_position, label_size)
