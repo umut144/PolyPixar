@@ -9,7 +9,7 @@ const INACTIVE_MODULES := ["Transform", "Effects", "Export"]
 const WORKSPACES_ROOT := "res://workspaces"
 const IMPORT_TEXTURES_ROOT := "res://imports/textures"
 const CONFIG_PATH := "res://configs/app_config.json"
-const SCHEMA_VERSION := 27
+const SCHEMA_VERSION := 28
 const MAX_HISTORY_SIZE := 100
 const PAPER_SIZES_CM := [Vector2(21.0, 29.7), Vector2(29.7, 42.0), Vector2(42.0, 59.4), Vector2(59.4, 84.1), Vector2(84.1, 118.9)]
 const PAPER_LABELS := ["A4", "A3", "A2", "A1", "A0"]
@@ -1865,6 +1865,7 @@ func _save_workspace() -> void:
 			asset_data["components"].append({
 				"id": str(component["id"]),
 				"name": str(component["name"]),
+				"parent_component_id": str(component.get("parent_component_id", "")),
 				"points": _serialize_bezier_points(component.get("points", [])),
 				"edges": _serialize_edges(component.get("edges", [])),
 				"chains": _serialize_chains(component.get("chains", [])),
@@ -2213,6 +2214,7 @@ func _load_workspace(workspace_entry: String) -> bool:
 			components.append({
 				"id": str(component_data.get("id", "")),
 				"name": str(component_data.get("name", "Component")),
+				"parent_component_id": str(component_data.get("parent_component_id", "")),
 				"points": topology["points"],
 				"edges": topology["edges"],
 				"chains": topology["chains"],
@@ -2230,7 +2232,7 @@ func _load_workspace(workspace_entry: String) -> bool:
 			if not guide_data is Dictionary:
 				continue
 			guides.append(_deserialize_asset_guide(guide_data))
-		loaded_assets.append({
+		var loaded_asset := {
 			"id": str(asset_data.get("id", asset_id)),
 			"name": str(asset_data.get("name", asset_id)),
 			"visibility": bool(asset_data.get("visibility", true)),
@@ -2239,7 +2241,9 @@ func _load_workspace(workspace_entry: String) -> bool:
 			"animation": MotionWorkspace.normalize_animation_document(asset_data.get("animation", {})),
 			"components": components,
 			"guides": guides
-		})
+		}
+		ComponentHierarchy.normalize_asset(loaded_asset)
+		loaded_assets.append(loaded_asset)
 	for texture_id_variant in workspace_data.get("textures", []):
 		var texture_id := str(texture_id_variant)
 		var texture_data = _read_json("%s/textures/%s/texture.json" % [workspace_root, texture_id])
@@ -2817,6 +2821,7 @@ func _serialize_asset_guide(raw_guide: Dictionary) -> Dictionary:
 		"type": "guide",
 		"guide_type": str(guide.get("guide_type", AssetGuide.SAMPLER_SPINE)),
 		"name": str(guide.get("name", "Guide")),
+		"ordinal": int(guide.get("ordinal", 1)),
 		"visibility": bool(guide.get("visibility", true)),
 		"scope": guide.get("scope", {}).duplicate(true),
 		"points": _serialize_bezier_points(guide.get("points", [])),
@@ -7244,7 +7249,9 @@ func _confirm_guide_creation() -> void:
 		guide_name = _next_default_guide_name(asset, AssetGuide.BODY_FLOW)
 	var guide_id := "guide_%d" % next_guide_id
 	next_guide_id += 1
-	var guide := AssetGuide.create(guide_id, guide_name, AssetGuide.BODY_FLOW, component_id)
+	var guide_type := AssetGuide.BODY_FLOW
+	var guide_ordinal := ComponentHierarchy.next_guide_ordinal(asset, component_id, guide_type)
+	var guide := AssetGuide.create(guide_id, guide_name, guide_type, component_id, guide_ordinal)
 	if not asset.get("guides", []) is Array:
 		asset["guides"] = []
 	asset["guides"].append(guide)
@@ -7286,6 +7293,7 @@ func _duplicate_guide_record(source: Dictionary, asset: Dictionary) -> Dictionar
 	var guide_id := "guide_%d" % next_guide_id
 	next_guide_id += 1
 	duplicate["id"] = guide_id
+	duplicate["ordinal"] = ComponentHierarchy.next_guide_ordinal(asset, str(source.get("scope", {}).get("component_id", "")), str(source.get("guide_type", AssetGuide.SAMPLE)))
 	var base_name := str(source.get("name", AssetGuide.display_name(str(source.get("guide_type", AssetGuide.SAMPLER_SPINE))))) + " Copy"
 	var candidate := base_name
 	var suffix := 2
@@ -7352,6 +7360,7 @@ func _confirm_component_creation() -> void:
 	asset["components"].append({
 		"id": component_id,
 		"name": component_name,
+		"parent_component_id": "",
 		"points": [],
 		"edges": [],
 		"chains": [],

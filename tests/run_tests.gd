@@ -19,6 +19,7 @@ func _init() -> void:
 	_test_geometry_meshing_service_and_ui()
 	_test_geometry_uv_mapping_service_and_ui()
 	_test_weighting_service_and_ui()
+	_test_component_hierarchy_model()
 	_test_asset_guides()
 	_test_motion_selection_context()
 	_test_motion_player()
@@ -233,14 +234,14 @@ func _test_geometry_sampling_service() -> void:
 	_expect(not bool(GeometrySamplingService.generate(open_component).get("valid", true)), "An open contour should fail visibly at the mesh-pipeline Sampling boundary.")
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
-	_expect(application._has_supported_schema({"schema_version": 26}) and not application._has_supported_schema({"schema_version": 28}), "Schema 27 should keep older Workspace documents readable and reject unknown future schemas.")
+	_expect(application._has_supported_schema({"schema_version": 27}) and not application._has_supported_schema({"schema_version": 29}), "Schema 28 should keep older Workspace documents readable and reject unknown future schemas.")
 	var geometry_document: Dictionary = application._default_geometry_document("asset_1", "component_1")
 	geometry_document["sampling"]["recipe"] = {"method": GeometrySamplingService.EVEN_SPACING, "parameters": {"spacing": 2.5, "feature_detail": GeometrySamplingService.DEFAULT_FEATURE_DETAIL}}
 	var baked_result := even.duplicate(true)
 	baked_result["bake_id"] = "bake_test"
 	geometry_document["sampling"]["bakes"][GeometrySamplingService.EVEN_SPACING] = baked_result
 	var serialized_geometry: Dictionary = application._serialize_geometry_document(geometry_document)
-	_expect(int(serialized_geometry.get("schema_version", 0)) == 27 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.EVEN_SPACING, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Geometry method bakes should serialize derived positions as schema-27 JSON arrays.")
+	_expect(int(serialized_geometry.get("schema_version", 0)) == 28 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.EVEN_SPACING, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Geometry method bakes should serialize derived positions as schema-28 JSON arrays.")
 	var normalized_geometry: Dictionary = application._normalize_geometry_document(serialized_geometry, "asset_1", "component_1")
 	_expect(normalized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.EVEN_SPACING, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Vector2, "Geometry method bake loading should restore local sample positions as Vector2 values.")
 	var adaptive_bake := adaptive_low.duplicate(true)
@@ -689,6 +690,36 @@ func _test_weighting_service_and_ui() -> void:
 	application.free()
 
 
+func _test_component_hierarchy_model() -> void:
+	var parent := {
+		"id": "component_parent",
+		"name": "Head",
+		"parent_component_id": "",
+		"transform": {"position": Vector2(10.0, 0.0), "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}
+	}
+	var child := {
+		"id": "component_child",
+		"name": "Eyes",
+		"parent_component_id": "component_parent",
+		"transform": {"position": Vector2(2.0, 0.0), "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}
+	}
+	var flow_1 := AssetGuide.create("guide_1", "Legacy Flow", "body_flow", "component_parent", 1)
+	var flow_2 := AssetGuide.create("guide_2", "Legacy Flow 2", "body_flow", "component_parent", 1)
+	var sample_1 := AssetGuide.create("guide_3", "Legacy Sample", "sampler_spine", "component_parent", 1)
+	var child_sample := AssetGuide.create("guide_4", "Child Sample", "sampler_spine", "component_child", 1)
+	var asset := {"components": [parent, child], "guides": [flow_1, flow_2, sample_1, child_sample]}
+	ComponentHierarchy.normalize_asset(asset)
+	_expect(ComponentHierarchy.children(asset, "component_parent").size() == 1 and ComponentHierarchy.descendants(asset, "component_parent").size() == 1, "The internal Component model should expose explicit recursive Parent-Child relationships.")
+	_expect(ComponentHierarchy.world_transform(asset, "component_child").origin.is_equal_approx(Vector2(12.0, 0.0)), "Child Component transforms should compose locally through their Parent.")
+	_expect(ComponentHierarchy.can_parent(asset, "component_parent", "component_child") == false, "Component hierarchy validation should reject cycles.")
+	_expect(str(flow_1.get("guide_type", "")) == AssetGuide.FLOW and int(flow_1.get("ordinal", 0)) == 1 and int(flow_2.get("ordinal", 0)) == 2, "Legacy Flow Guides should migrate to canonical types with stable per-Component ordinals.")
+	_expect(int(sample_1.get("ordinal", 0)) == 1 and int(child_sample.get("ordinal", 0)) == 1, "Guide numbering should be independent for every Component and Guide type.")
+	_expect(ComponentHierarchy.next_guide_ordinal(asset, "component_parent", AssetGuide.FLOW) == 3 and AssetGuide.outliner_name(child_sample, "Eyes") == "Eyes → Sample01", "Guide naming data should support stable dynamic Component-based labels.")
+	parent["parent_component_id"] = "component_child"
+	ComponentHierarchy.normalize_asset(asset)
+	_expect(str(parent.get("parent_component_id", "")).is_empty(), "Loading cyclic Component data should safely promote one participant to the Asset root.")
+
+
 func _test_asset_guides() -> void:
 	var component := _component()
 	component.merge({"id": "component_1", "name": "Body", "visibility": true, "transform": {"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}})
@@ -718,7 +749,7 @@ func _test_asset_guides() -> void:
 	BezierTopology.add_point(animation_guide, Vector2(1.0, 2.0), "aligned")
 	BezierTopology.add_point(animation_guide, Vector2(4.0, 6.0), "aligned")
 	var animation_round_trip: Dictionary = application._deserialize_asset_guide(application._serialize_asset_guide(animation_guide))
-	_expect(str(animation_round_trip.get("guide_type", "")) == AssetGuide.ANIMATION_SPINE and AssetGuide.display_name(AssetGuide.ANIMATION_SPINE) == "Animation Spine", "Animation Spines should persist as an independent Guide type.")
+	_expect(str(animation_round_trip.get("guide_type", "")) == AssetGuide.MOTION and AssetGuide.display_name(AssetGuide.MOTION) == "Motion", "Motion Guides should persist as an independent Guide type.")
 	_expect(AssetGuide.validation_issues(animation_guide).is_empty(), "Animation Spines should use the same valid open Spine topology contract.")
 	var legacy_guide := guide.duplicate(true)
 	legacy_guide["type"] = "guide"
@@ -1062,7 +1093,7 @@ func _test_motion_act_evaluator() -> void:
 	var normalized: Dictionary = application._normalize_motion_act({"id": "act_7", "parameters": {"direction": [0.0, 2.0], "distance": 12.0}}, "fallback")
 	_expect(Vector2(normalized.get("parameters", {}).get("direction", Vector2.ZERO)) == Vector2(0.0, 2.0), "Persisted Slide direction arrays should normalize back to Vector2 values.")
 	var serialized: Dictionary = application._serialize_motion_act(normalized)
-	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 27, "Act persistence should serialize vectors as JSON arrays using schema 27.")
+	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 28, "Act persistence should serialize vectors as JSON arrays using schema 28.")
 	var normalized_jump: Dictionary = application._normalize_motion_act({"id": "act_8", "primitive": "jump", "parameters": {"direction": [1.0, 0.0], "distance": 7.0, "height": 2.5, "arc": "snappy"}}, "fallback")
 	var serialized_jump: Dictionary = application._serialize_motion_act(normalized_jump)
 	_expect(str(serialized_jump.get("primitive", "")) == MotionActEvaluator.JUMP and is_equal_approx(float(serialized_jump.get("parameters", {}).get("height", 0.0)), 2.5) and str(serialized_jump.get("parameters", {}).get("arc", "")) == MotionActEvaluator.JUMP_ARC_SNAPPY, "Jump-specific parameters should survive normalization and serialization.")

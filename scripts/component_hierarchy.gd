@@ -1,0 +1,154 @@
+class_name ComponentHierarchy
+extends RefCounted
+
+
+static func normalize_asset(asset: Dictionary) -> void:
+	var components: Array = asset.get("components", []) if asset.get("components", []) is Array else []
+	asset["components"] = components
+	var known_ids: Dictionary = {}
+	for component in components:
+		if component is Dictionary and str(component.get("type", "component")) != "guide":
+			var component_id := str(component.get("id", ""))
+			if not component_id.is_empty():
+				known_ids[component_id] = true
+	for component in components:
+		if not component is Dictionary or str(component.get("type", "component")) == "guide":
+			continue
+		var component_id := str(component.get("id", ""))
+		var parent_id := str(component.get("parent_component_id", ""))
+		if parent_id == component_id or not parent_id.is_empty() and not known_ids.has(parent_id):
+			parent_id = ""
+		component["parent_component_id"] = parent_id
+	_break_cycles(components)
+	_normalize_guide_ordinals(asset)
+
+
+static func parent_id(component: Dictionary) -> String:
+	return str(component.get("parent_component_id", ""))
+
+
+static func component(asset: Dictionary, component_id: String) -> Dictionary:
+	for candidate in asset.get("components", []):
+		if candidate is Dictionary and str(candidate.get("type", "component")) != "guide" and str(candidate.get("id", "")) == component_id:
+			return candidate
+	return {}
+
+
+static func children(asset: Dictionary, parent_component_id: String) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	for candidate in asset.get("components", []):
+		if candidate is Dictionary and str(candidate.get("type", "component")) != "guide" and parent_id(candidate) == parent_component_id:
+			result.append(candidate)
+	return result
+
+
+static func descendants(asset: Dictionary, parent_component_id: String) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	var pending: Array[String] = [parent_component_id]
+	while not pending.is_empty():
+		var current_id: String = pending.pop_front()
+		for child in children(asset, current_id):
+			result.append(child)
+			pending.append(str(child.get("id", "")))
+	return result
+
+
+static func can_parent(asset: Dictionary, component_id: String, candidate_parent_id: String) -> bool:
+	if candidate_parent_id.is_empty():
+		return not component(asset, component_id).is_empty()
+	if component_id == candidate_parent_id or component(asset, component_id).is_empty() or component(asset, candidate_parent_id).is_empty():
+		return false
+	var cursor := candidate_parent_id
+	var visited: Dictionary = {}
+	while not cursor.is_empty():
+		if cursor == component_id or visited.has(cursor):
+			return false
+		visited[cursor] = true
+		cursor = parent_id(component(asset, cursor))
+	return true
+
+
+static func next_guide_ordinal(asset: Dictionary, component_id: String, guide_type: String) -> int:
+	var highest := 0
+	for guide in asset.get("guides", []):
+		if not guide is Dictionary:
+			continue
+		if str(guide.get("scope", {}).get("component_id", "")) == component_id and AssetGuide.canonical_type(str(guide.get("guide_type", ""))) == AssetGuide.canonical_type(guide_type):
+			highest = maxi(highest, int(guide.get("ordinal", 0)))
+	return highest + 1
+
+
+static func world_transform(asset: Dictionary, component_id: String) -> Transform2D:
+	var chain: Array[Dictionary] = []
+	var cursor := component(asset, component_id)
+	var visited: Dictionary = {}
+	while not cursor.is_empty():
+		var cursor_id := str(cursor.get("id", ""))
+		if visited.has(cursor_id):
+			break
+		visited[cursor_id] = true
+		chain.push_front(cursor)
+		cursor = component(asset, parent_id(cursor))
+	var result := Transform2D.IDENTITY
+	for chain_component in chain:
+		result = result * local_transform(chain_component.get("transform", {}))
+	return result
+
+
+static func local_transform(raw_transform) -> Transform2D:
+	var data: Dictionary = raw_transform if raw_transform is Dictionary else {}
+	var position := _vector(data.get("position", Vector2.ZERO), Vector2.ZERO)
+	var pivot := _vector(data.get("pivot", Vector2.ZERO), Vector2.ZERO)
+	var scale := _vector(data.get("scale", Vector2.ONE), Vector2.ONE)
+	var basis := Transform2D(deg_to_rad(float(data.get("rotation", 0.0))), scale, 0.0, Vector2.ZERO)
+	basis.origin = position - basis.basis_xform(pivot)
+	return basis
+
+
+static func _break_cycles(components: Array) -> void:
+	var by_id: Dictionary = {}
+	for candidate in components:
+		if candidate is Dictionary:
+			by_id[str(candidate.get("id", ""))] = candidate
+	for candidate in components:
+		if not candidate is Dictionary:
+			continue
+		var cursor := str(candidate.get("id", ""))
+		var visited: Dictionary = {}
+		while not cursor.is_empty() and by_id.has(cursor):
+			if visited.has(cursor):
+				candidate["parent_component_id"] = ""
+				break
+			visited[cursor] = true
+			cursor = str(by_id[cursor].get("parent_component_id", ""))
+
+
+static func _normalize_guide_ordinals(asset: Dictionary) -> void:
+	var guides: Array = asset.get("guides", []) if asset.get("guides", []) is Array else []
+	asset["guides"] = guides
+	var used_by_scope: Dictionary = {}
+	for guide in guides:
+		if not guide is Dictionary:
+			continue
+		var component_id := str(guide.get("scope", {}).get("component_id", ""))
+		var guide_type := AssetGuide.canonical_type(str(guide.get("guide_type", "")))
+		guide["guide_type"] = guide_type
+		var key := "%s\u001f%s" % [component_id, guide_type]
+		if not used_by_scope.has(key):
+			used_by_scope[key] = {}
+		var used: Dictionary = used_by_scope[key]
+		var ordinal := int(guide.get("ordinal", 0))
+		if ordinal < 1 or used.has(ordinal):
+			ordinal = 1
+			while used.has(ordinal):
+				ordinal += 1
+		guide["ordinal"] = ordinal
+		used[ordinal] = true
+
+
+static func _vector(value, fallback: Vector2) -> Vector2:
+	if value is Vector2:
+		return value
+	if value is Array and value.size() >= 2:
+		return Vector2(float(value[0]), float(value[1]))
+	return fallback
