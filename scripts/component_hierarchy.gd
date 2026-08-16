@@ -95,6 +95,35 @@ static func world_transform(asset: Dictionary, component_id: String) -> Transfor
 	return result
 
 
+static func world_transform_record(asset: Dictionary, component_id: String) -> Dictionary:
+	var current := component(asset, component_id)
+	if current.is_empty():
+		return _default_transform_record()
+	return transform_record_from_affine(world_transform(asset, component_id), _vector(current.get("transform", {}).get("pivot", Vector2.ZERO), Vector2.ZERO))
+
+
+static func local_transform_from_world_record(asset: Dictionary, component_id: String, world_record: Dictionary) -> Dictionary:
+	var current := component(asset, component_id)
+	if current.is_empty():
+		return _default_transform_record()
+	var parent_world := Transform2D.IDENTITY
+	var current_parent_id := parent_id(current)
+	if not current_parent_id.is_empty():
+		parent_world = world_transform(asset, current_parent_id)
+	var local_affine := parent_world.affine_inverse() * local_transform(world_record)
+	var pivot := _vector(current.get("transform", {}).get("pivot", Vector2.ZERO), Vector2.ZERO)
+	return transform_record_from_affine(local_affine, pivot)
+
+
+static func transform_record_from_affine(affine: Transform2D, pivot: Vector2) -> Dictionary:
+	return {
+		"position": affine * pivot,
+		"rotation": rad_to_deg(affine.get_rotation()),
+		"scale": affine.get_scale(),
+		"pivot": pivot
+	}
+
+
 static func local_transform(raw_transform) -> Transform2D:
 	var data: Dictionary = raw_transform if raw_transform is Dictionary else {}
 	var position := _vector(data.get("position", Vector2.ZERO), Vector2.ZERO)
@@ -152,3 +181,7 @@ static func _vector(value, fallback: Vector2) -> Vector2:
 	if value is Array and value.size() >= 2:
 		return Vector2(float(value[0]), float(value[1]))
 	return fallback
+
+
+static func _default_transform_record() -> Dictionary:
+	return {"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}

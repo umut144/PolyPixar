@@ -711,6 +711,14 @@ func _test_component_hierarchy_model() -> void:
 	ComponentHierarchy.normalize_asset(asset)
 	_expect(ComponentHierarchy.children(asset, "component_parent").size() == 1 and ComponentHierarchy.descendants(asset, "component_parent").size() == 1, "The internal Component model should expose explicit recursive Parent-Child relationships.")
 	_expect(ComponentHierarchy.world_transform(asset, "component_child").origin.is_equal_approx(Vector2(12.0, 0.0)), "Child Component transforms should compose locally through their Parent.")
+	var child_world_record := ComponentHierarchy.world_transform_record(asset, "component_child")
+	_expect(Vector2(child_world_record.get("position", Vector2.ZERO)).is_equal_approx(Vector2(12.0, 0.0)), "The Canvas-facing transform record should expose a Child Component at its composed world position.")
+	child["parent_component_id"] = ""
+	child["transform"] = ComponentHierarchy.local_transform_from_world_record(asset, "component_child", child_world_record)
+	_expect(ComponentHierarchy.world_transform(asset, "component_child").origin.is_equal_approx(Vector2(12.0, 0.0)), "Reparenting a Component to Root should preserve its visible world transform.")
+	child["parent_component_id"] = "component_parent"
+	child["transform"] = ComponentHierarchy.local_transform_from_world_record(asset, "component_child", child_world_record)
+	_expect(ComponentHierarchy.world_transform(asset, "component_child").origin.is_equal_approx(Vector2(12.0, 0.0)), "Reparenting a Component under another Parent should preserve its visible world transform.")
 	_expect(ComponentHierarchy.can_parent(asset, "component_parent", "component_child") == false, "Component hierarchy validation should reject cycles.")
 	_expect(str(flow_1.get("guide_type", "")) == AssetGuide.FLOW and int(flow_1.get("ordinal", 0)) == 1 and int(flow_2.get("ordinal", 0)) == 2, "Legacy Flow Guides should migrate to canonical types with stable per-Component ordinals.")
 	_expect(int(sample_1.get("ordinal", 0)) == 1 and int(child_sample.get("ordinal", 0)) == 1, "Guide numbering should be independent for every Component and Guide type.")

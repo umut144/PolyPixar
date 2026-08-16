@@ -169,6 +169,9 @@ var geometry_seeding_replace_dialog: ConfirmationDialog
 var guide_remove_dialog: ConfirmationDialog
 var pending_guide_remove_asset_id := ""
 var pending_guide_remove_id := ""
+var component_remove_dialog: ConfirmationDialog
+var pending_component_remove_asset_id := ""
+var pending_component_remove_id := ""
 var motion_phase_value_label: Label
 var motion_phase_marks: MotionPhaseMarks
 var motion_phase_slider: HSlider
@@ -858,6 +861,7 @@ func _build_ui() -> void:
 	_create_motion_resource_dialogs()
 	_create_geometry_seeding_dialogs()
 	_create_guide_dialogs()
+	_create_component_remove_dialog()
 
 
 func _create_material_graph() -> void:
@@ -1063,6 +1067,18 @@ func _create_guide_dialogs() -> void:
 		pending_guide_remove_id = ""
 	)
 	add_child(guide_remove_dialog)
+
+
+func _create_component_remove_dialog() -> void:
+	component_remove_dialog = ConfirmationDialog.new()
+	component_remove_dialog.title = "Delete Component"
+	component_remove_dialog.ok_button_text = "Delete"
+	component_remove_dialog.confirmed.connect(_confirm_component_deletion)
+	component_remove_dialog.canceled.connect(func() -> void:
+		pending_component_remove_asset_id = ""
+		pending_component_remove_id = ""
+	)
+	add_child(component_remove_dialog)
 
 
 func _create_motion_state_dialogs() -> void:
@@ -5439,52 +5455,46 @@ func _build_selected_asset_scene() -> void:
 	var root := Node2D.new()
 	root.name = _tscn_name(str(asset.get("name", "Asset")))
 	var export_asset_pivot := _godot_export_points([_asset_pivot(asset)])[0]
-	for component in asset.get("components", []):
-		if str(component.get("draw_mode", "")) == "open_edge":
+	root.set_meta("asset_pivot", export_asset_pivot)
+	var component_nodes: Dictionary = {}
+	var pending_components: Array = asset.get("components", []).duplicate()
+	while not pending_components.is_empty():
+		var progressed := false
+		for pending_index in range(pending_components.size() - 1, -1, -1):
+			var component: Dictionary = pending_components[pending_index]
+			var component_id := str(component.get("id", ""))
+			var parent_component_id := str(component.get("parent_component_id", ""))
+			if not parent_component_id.is_empty() and not component_nodes.has(parent_component_id):
+				continue
+			var component_node := Node2D.new()
+			component_node.name = _tscn_name(str(component.get("name", "Component")))
+			component_node.set_meta("component_id", component_id)
+			component_node.set_meta("draw_mode", str(component.get("draw_mode", "closed_loop")))
+			var export_transform := _godot_export_transform(component.get("transform", _default_component_transform()))
+			component_node.position = export_transform["position"]
+			if parent_component_id.is_empty():
+				# The asset anchor lives at the exported scene root; root Components
+				# remain in their established editor positions relative to it.
+				component_node.position -= export_asset_pivot
+			component_node.rotation = deg_to_rad(float(export_transform["rotation"]))
+			component_node.scale = export_transform["scale"]
+			component_node.visible = bool(asset.get("visibility", true)) and bool(component.get("visibility", true))
+			component_node.z_index = int(component.get("z_index", 0))
+			component_node.z_as_relative = false
+			var parent_node: Node2D = component_nodes[parent_component_id] if component_nodes.has(parent_component_id) else root
+			parent_node.add_child(component_node)
+			component_node.owner = root
+			component_nodes[component_id] = component_node
+			pending_components.remove_at(pending_index)
+			progressed = true
+			if str(component.get("draw_mode", "")) != "open_edge":
+				_build_export_component_geometry(component_node, asset, component, export_transform)
+		if not progressed:
+			# Documents are normalized on load, but retain a safe export fallback
+			# if malformed in-memory parent references ever slip through.
+			for orphan_component in pending_components:
+				orphan_component["parent_component_id"] = ""
 			continue
-		var polygon := Polygon2D.new()
-		polygon.name = _tscn_name(str(component.get("name", "Component")))
-		var export_points: Array[Vector2] = []
-		if str(component.get("draw_mode", "")) == "ribbon":
-			var ribbon_mesh := _component_mesh_bake(str(asset.get("id", "")), str(component.get("id", "")))
-			var vertex_indices: Dictionary = {}
-			for vertex in ribbon_mesh.get("vertices", []):
-				var vertex_id := str(vertex.get("id", ""))
-				vertex_indices[vertex_id] = export_points.size()
-				export_points.append(_godot_export_points([Vector2(vertex.get("position", Vector2.ZERO))])[0])
-			var ribbon_polygons: Array[PackedInt32Array] = []
-			for triangle in ribbon_mesh.get("triangles", []):
-				var ids: Array = triangle.get("vertex_ids", [])
-				if ids.size() == 3 and vertex_indices.has(str(ids[0])) and vertex_indices.has(str(ids[1])) and vertex_indices.has(str(ids[2])):
-					ribbon_polygons.append(PackedInt32Array([int(vertex_indices[str(ids[0])]), int(vertex_indices[str(ids[1])]), int(vertex_indices[str(ids[2])])]))
-			polygon.polygons = ribbon_polygons
-		else:
-			export_points = _godot_export_points(BezierTopology.outer_control_polygon(component))
-		polygon.polygon = PackedVector2Array(export_points)
-		var transform: Dictionary = component.get("transform", _default_component_transform())
-		var export_transform := _godot_export_transform(transform)
-		# Children are authored relative to the asset Root anchor. Subtracting
-		# the anchor keeps the visible geometry unchanged while the scene origin
-		# becomes the Asset Pivot chosen in the editor.
-		polygon.position = export_transform["position"] - export_asset_pivot
-		polygon.rotation = deg_to_rad(float(export_transform["rotation"]))
-		polygon.scale = export_transform["scale"]
-		polygon.visible = bool(asset.get("visibility", true)) and bool(component.get("visibility", true))
-		polygon.z_index = int(component.get("z_index", 0))
-		var material_data := _get_material(str(component.get("material_id", "")))
-		if not material_data.is_empty():
-			var tint: Color = material_data.get("tint", Color.WHITE)
-			polygon.color = Color(tint.r, tint.g, tint.b, tint.a * float(material_data.get("opacity", 1.0)))
-			var texture := _get_texture(str(material_data.get("texture_id", "")))
-			var texture_path := _get_texture_final_path(texture) if not texture.is_empty() else ""
-			if not texture_path.is_empty():
-				var texture_resource := load(texture_path) as Texture2D
-				polygon.texture = texture_resource
-				if texture_resource != null:
-					polygon.uv = _build_export_uvs(export_points, texture_resource.get_size(), material_data.get("mapping_scale", Vector2.ONE), material_data.get("mapping_offset", Vector2.ZERO), _material_wrap_mode(material_data))
-					polygon.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED if _material_wrap_mode(material_data) == "repeat" else CanvasItem.TEXTURE_REPEAT_DISABLED
-		root.add_child(polygon)
-		polygon.owner = root
 	var scene := PackedScene.new()
 	var pack_error := scene.pack(root)
 	if pack_error != OK:
@@ -5501,6 +5511,45 @@ func _build_selected_asset_scene() -> void:
 		return
 	_show_status_message("Built Godot Scene: %s" % scene_path)
 	_render_export_workspace()
+
+
+func _build_export_component_geometry(component_node: Node2D, asset: Dictionary, component: Dictionary, export_transform: Dictionary) -> void:
+	var polygon := Polygon2D.new()
+	polygon.name = "Geometry"
+	var export_points: Array[Vector2] = []
+	if str(component.get("draw_mode", "")) == "ribbon":
+		var ribbon_mesh := _component_mesh_bake(str(asset.get("id", "")), str(component.get("id", "")))
+		var vertex_indices: Dictionary = {}
+		for vertex in ribbon_mesh.get("vertices", []):
+			var vertex_id := str(vertex.get("id", ""))
+			vertex_indices[vertex_id] = export_points.size()
+			export_points.append(_godot_export_points([Vector2(vertex.get("position", Vector2.ZERO))])[0])
+		var ribbon_polygons: Array[PackedInt32Array] = []
+		for triangle in ribbon_mesh.get("triangles", []):
+			var ids: Array = triangle.get("vertex_ids", [])
+			if ids.size() == 3 and vertex_indices.has(str(ids[0])) and vertex_indices.has(str(ids[1])) and vertex_indices.has(str(ids[2])):
+				ribbon_polygons.append(PackedInt32Array([int(vertex_indices[str(ids[0])]), int(vertex_indices[str(ids[1])]), int(vertex_indices[str(ids[2])])]))
+		polygon.polygons = ribbon_polygons
+	else:
+		export_points = _godot_export_points(BezierTopology.outer_control_polygon(component))
+	polygon.polygon = PackedVector2Array(export_points)
+	# Geometry is stored in Component-local coordinates; offsetting it by the
+	# pivot lets its Node2D parent own the component transform exactly once.
+	polygon.position = -Vector2(export_transform.get("pivot", Vector2.ZERO))
+	var material_data := _get_material(str(component.get("material_id", "")))
+	if not material_data.is_empty():
+		var tint: Color = material_data.get("tint", Color.WHITE)
+		polygon.color = Color(tint.r, tint.g, tint.b, tint.a * float(material_data.get("opacity", 1.0)))
+		var texture := _get_texture(str(material_data.get("texture_id", "")))
+		var texture_path := _get_texture_final_path(texture) if not texture.is_empty() else ""
+		if not texture_path.is_empty():
+			var texture_resource := load(texture_path) as Texture2D
+			polygon.texture = texture_resource
+			if texture_resource != null:
+				polygon.uv = _build_export_uvs(export_points, texture_resource.get_size(), material_data.get("mapping_scale", Vector2.ONE), material_data.get("mapping_offset", Vector2.ZERO), _material_wrap_mode(material_data))
+				polygon.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED if _material_wrap_mode(material_data) == "repeat" else CanvasItem.TEXTURE_REPEAT_DISABLED
+	component_node.add_child(polygon)
+	polygon.owner = component_node.owner
 
 
 func _build_export_uvs(points: Array, texture_size: Vector2, mapping_scale: Vector2, mapping_offset: Vector2, wrap_mode: String) -> PackedVector2Array:
@@ -7531,21 +7580,58 @@ func _delete_selected_component() -> void:
 	var asset := _get_asset(selected_asset_id)
 	if asset.is_empty() or selected_component_id.is_empty():
 		return
-	var component_index := -1
-	for index in range(asset["components"].size()):
-		if str(asset["components"][index]["id"]) == selected_component_id:
-			component_index = index
-			break
-	if component_index < 0:
+	var component := _get_component(asset, selected_component_id)
+	if component.is_empty():
 		return
+	pending_component_remove_asset_id = selected_asset_id
+	pending_component_remove_id = selected_component_id
+	var removed_component_ids: Dictionary = {selected_component_id: true}
+	for descendant in ComponentHierarchy.descendants(asset, selected_component_id):
+		removed_component_ids[str(descendant.get("id", ""))] = true
+	var removed_guide_count := 0
+	for guide in asset.get("guides", []):
+		if removed_component_ids.has(str(guide.get("scope", {}).get("component_id", ""))):
+			removed_guide_count += 1
+	var component_count := removed_component_ids.size()
+	var description := "Delete Component ‘%s’" % str(component.get("name", "Component"))
+	if component_count > 1:
+		description += " and %d Child Components" % (component_count - 1)
+	if removed_guide_count > 0:
+		description += " plus %d Guide%s" % [removed_guide_count, "s" if removed_guide_count != 1 else ""]
+	description += "? This cannot be undone except through Undo."
+	if is_instance_valid(component_remove_dialog):
+		component_remove_dialog.dialog_text = description
+		component_remove_dialog.popup_centered()
+	else:
+		_confirm_component_deletion()
+
+
+func _confirm_component_deletion() -> void:
+	var asset := _get_asset(pending_component_remove_asset_id)
+	var component_id := pending_component_remove_id
+	pending_component_remove_asset_id = ""
+	pending_component_remove_id = ""
+	if asset.is_empty() or component_id.is_empty() or _get_component(asset, component_id).is_empty():
+		return
+	var removed_component_ids: Dictionary = {component_id: true}
+	for descendant in ComponentHierarchy.descendants(asset, component_id):
+		removed_component_ids[str(descendant.get("id", ""))] = true
 	_record_direct_change()
-	asset["components"].remove_at(component_index)
+	var surviving_components: Array = []
+	for existing_component in asset.get("components", []):
+		if not removed_component_ids.has(str(existing_component.get("id", ""))):
+			surviving_components.append(existing_component)
+	asset["components"] = surviving_components
 	var surviving_guides: Array = []
 	for guide in asset.get("guides", []):
-		if str(guide.get("scope", {}).get("component_id", "")) != selected_component_id:
+		if not removed_component_ids.has(str(guide.get("scope", {}).get("component_id", ""))):
 			surviving_guides.append(guide)
 	asset["guides"] = surviving_guides
+	for surviving_component in surviving_components:
+		if removed_component_ids.has(str(surviving_component.get("catch_parent_component_id", ""))):
+			surviving_component["catch_parent_component_id"] = ""
 	selected_component_id = ""
+	selected_guide_id = ""
 	active_state = ""
 	_render_outliner()
 	_render_inspector()
@@ -9511,6 +9597,25 @@ func _render_inspector() -> void:
 		_rename_selected_component(component_name_editor.text)
 	)
 	inspector_content.add_child(component_name_editor)
+	inspector_content.add_child(_create_inspector_section("Hierarchy"))
+	inspector_content.add_child(_create_inspector_field_label("Parent Component"))
+	var hierarchy_parent_option := OptionButton.new()
+	hierarchy_parent_option.custom_minimum_size = Vector2(0, 26)
+	hierarchy_parent_option.add_item("Root")
+	hierarchy_parent_option.set_item_metadata(0, "")
+	for candidate in asset.get("components", []):
+		var candidate_id := str(candidate.get("id", ""))
+		if candidate_id == selected_component_id or not ComponentHierarchy.can_parent(asset, selected_component_id, candidate_id):
+			continue
+		hierarchy_parent_option.add_item(str(candidate.get("name", "Component")))
+		hierarchy_parent_option.set_item_metadata(hierarchy_parent_option.item_count - 1, candidate_id)
+	var hierarchy_parent_id := str(component.get("parent_component_id", ""))
+	for option_index in range(hierarchy_parent_option.item_count):
+		if str(hierarchy_parent_option.get_item_metadata(option_index)) == hierarchy_parent_id:
+			hierarchy_parent_option.select(option_index)
+			break
+	hierarchy_parent_option.item_selected.connect(_on_component_hierarchy_parent_selected.bind(hierarchy_parent_option))
+	inspector_content.add_child(hierarchy_parent_option)
 	var draw_mode := str(component.get("draw_mode", "closed_loop"))
 	inspector_content.add_child(_create_inspector_field_label("Draw Mode: %s" % _draw_mode_display_name(draw_mode)))
 	var mode_issues := BezierTopology.mode_validation_issues(component, true)
@@ -11538,7 +11643,7 @@ func _render_lookdev_canvas() -> void:
 	canvas_view.set_context(str(component.get("name", "Component")))
 	canvas_view.set_interaction_state("")
 	canvas_view.set_tool_mode("")
-	var component_transform: Dictionary = component.get("transform", _default_component_transform()).duplicate(true)
+	var component_transform := ComponentHierarchy.world_transform_record(asset, lookdev_target_component_id)
 	component_transform["visibility"] = bool(asset.get("visibility", true)) and bool(component.get("visibility", true))
 	component_transform["z_index"] = int(component.get("z_index", 0))
 	canvas_view.set_component_transform(component_transform)
@@ -11766,7 +11871,7 @@ func _render_canvas_context() -> void:
 	else:
 		canvas_view.set_tool_mode("")
 	canvas_view.set_paper_frame(Vector2.ZERO, false)
-	var component_transform: Dictionary = component.get("transform", _default_component_transform()).duplicate(true)
+	var component_transform := ComponentHierarchy.world_transform_record(asset, selected_component_id)
 	component_transform["visibility"] = bool(asset.get("visibility", true)) and bool(component.get("visibility", true))
 	component_transform["z_index"] = int(component.get("z_index", 0))
 	canvas_view.set_component_transform(component_transform)
@@ -11803,7 +11908,7 @@ func _render_spine_canvas(asset: Dictionary, guide: Dictionary, drawing: bool) -
 	if target_component.is_empty():
 		canvas_view.set_component_transform(_default_component_transform())
 	else:
-		var target_transform: Dictionary = target_component.get("transform", _default_component_transform()).duplicate(true)
+		var target_transform := ComponentHierarchy.world_transform_record(asset, target_component_id)
 		target_transform["visibility"] = bool(asset.get("visibility", true)) and bool(guide.get("visibility", true))
 		canvas_view.set_component_transform(target_transform)
 	if drawing:
@@ -11863,7 +11968,7 @@ func _build_reference_shapes(asset: Dictionary, excluded_component_id := "", emp
 			"edges": component.get("edges", []).duplicate(true),
 			"chains": component.get("chains", []).duplicate(true),
 			"closed": BezierTopology.outer_chain_closed(component),
-			"transform": component.get("transform", _default_component_transform()).duplicate(true),
+			"transform": ComponentHierarchy.world_transform_record(asset, str(component.get("id", ""))),
 			"visibility": asset_is_visible and bool(component.get("visibility", true)),
 			"z_index": int(component.get("z_index", 0)),
 			"emphasized": str(component["id"]) == emphasized_component_id
@@ -11986,17 +12091,19 @@ func _on_asset_pivot_changed(pivot: Vector2) -> void:
 
 
 func _on_transform_changed(transform: Dictionary) -> void:
-	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	var asset := _get_asset(selected_asset_id)
+	var component := _get_component(asset, selected_component_id)
 	if not component.is_empty():
 		_record_coalesced_change()
-		component["transform"] = transform.duplicate(true)
-		var transform_position: Vector2 = transform.get("position", Vector2.ZERO)
-		var transform_scale: Vector2 = transform.get("scale", Vector2.ONE)
-		var pivot: Vector2 = transform.get("pivot", Vector2.ZERO)
+		var local_transform := ComponentHierarchy.local_transform_from_world_record(asset, selected_component_id, transform)
+		component["transform"] = local_transform
+		var transform_position: Vector2 = local_transform.get("position", Vector2.ZERO)
+		var transform_scale: Vector2 = local_transform.get("scale", Vector2.ONE)
+		var pivot: Vector2 = local_transform.get("pivot", Vector2.ZERO)
 		var values := {
 			"position_x": transform_position.x,
 			"position_y": transform_position.y,
-			"rotation": float(transform.get("rotation", 0.0)),
+			"rotation": float(local_transform.get("rotation", 0.0)),
 			"scale_x": transform_scale.x,
 			"scale_y": transform_scale.y,
 			"pivot_x": pivot.x,
@@ -12006,6 +12113,25 @@ func _on_transform_changed(transform: Dictionary) -> void:
 			var field = transform_fields.get(property_name)
 			if is_instance_valid(field):
 				field.set_value_no_signal(float(values[property_name]))
+		# A moved Parent also changes every visible Child reference immediately.
+		canvas_view.set_reference_shapes(_build_reference_shapes(asset, selected_component_id))
+
+
+func _on_component_hierarchy_parent_selected(index: int, option: OptionButton) -> void:
+	var asset := _get_asset(selected_asset_id)
+	var component := _get_component(asset, selected_component_id)
+	if asset.is_empty() or component.is_empty() or index < 0:
+		return
+	var new_parent_id := str(option.get_item_metadata(index))
+	if str(component.get("parent_component_id", "")) == new_parent_id or not ComponentHierarchy.can_parent(asset, selected_component_id, new_parent_id):
+		return
+	var world_transform := ComponentHierarchy.world_transform_record(asset, selected_component_id)
+	_record_direct_change()
+	component["parent_component_id"] = new_parent_id
+	component["transform"] = ComponentHierarchy.local_transform_from_world_record(asset, selected_component_id, world_transform)
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
 
 
 func _on_reference_component_selected(component_id: String) -> void:
@@ -12039,8 +12165,8 @@ func _on_bezier_points_moved(point_ids: Array, world_delta: Vector2) -> void:
 		return
 	if bezier_point_move_component_id != selected_component_id or bezier_point_move_guide_id != selected_guide_id or bezier_point_move_start_positions.is_empty():
 		_on_bezier_points_move_started(point_ids)
-	var transform_subject := _get_component(asset, str(guide.get("scope", {}).get("component_id", ""))) if not guide.is_empty() else subject
-	var transform: Dictionary = transform_subject.get("transform", _default_component_transform())
+	var transform_component_id := str(guide.get("scope", {}).get("component_id", "")) if not guide.is_empty() else selected_component_id
+	var transform := ComponentHierarchy.world_transform_record(asset, transform_component_id)
 	var rotation := deg_to_rad(float(transform.get("rotation", 0.0)))
 	var scale: Vector2 = transform.get("scale", Vector2.ONE)
 	var local_delta := world_delta.rotated(-rotation)
