@@ -214,6 +214,7 @@ var snap_rotation_step := 15.0
 var snap_button: Button
 var snap_popup: PopupPanel
 var snap_mode_buttons: Array[CheckBox] = []
+var snap_grid_info_label: Label
 var snap_rotation_slider: HSlider
 var snap_rotation_value_label: Label
 var paper_menu: MenuButton
@@ -1247,6 +1248,8 @@ func _create_snap_popup() -> void:
 	var grid_modes := [
 		["Coarse", "coarse"],
 		["Fine", "fine"],
+		["Finer", "finer"],
+		["Ultra Fine", "ultra_fine"],
 		["No Snap", "none"]
 	]
 	for grid_mode in grid_modes:
@@ -1256,10 +1259,9 @@ func _create_snap_popup() -> void:
 		mode_button.pressed.connect(_on_snap_mode_selected.bind(str(grid_mode[1])))
 		content.add_child(mode_button)
 		snap_mode_buttons.append(mode_button)
-	var snap_grid_info := Label.new()
-	snap_grid_info.text = "Fine = 1/5 of Coarse."
-	snap_grid_info.add_theme_color_override("font_color", Color("#9aa3b2"))
-	content.add_child(snap_grid_info)
+	snap_grid_info_label = Label.new()
+	snap_grid_info_label.add_theme_color_override("font_color", Color("#9aa3b2"))
+	content.add_child(snap_grid_info_label)
 	snap_rotation_value_label = Label.new()
 	content.add_child(snap_rotation_value_label)
 	snap_rotation_slider = _create_snap_slider(1.0, 90.0, 1.0, snap_rotation_step)
@@ -1389,7 +1391,7 @@ func _on_snap_mode_selected(mode: String) -> void:
 
 
 func _set_snap_mode(mode: String) -> void:
-	if mode not in ["coarse", "fine", "none"]:
+	if mode not in ["coarse", "fine", "finer", "ultra_fine", "none"]:
 		return
 	snap_mode = mode
 	snap_enabled = mode != "none"
@@ -1401,7 +1403,11 @@ func _set_snap_mode(mode: String) -> void:
 
 
 func _snap_base_step() -> float:
-	return world_grid_size / 5.0 if snap_mode == "fine" else world_grid_size
+	match snap_mode:
+		"fine": return world_grid_size / 5.0
+		"finer": return world_grid_size / 10.0
+		"ultra_fine": return world_grid_size / 50.0
+		_: return world_grid_size
 
 
 func _on_snap_rotation_changed(value: float) -> void:
@@ -1415,20 +1421,28 @@ func _update_snap_popup_labels() -> void:
 		snap_button.text = "Snap: %s  ▼" % _snap_mode_label()
 	for mode_index in range(snap_mode_buttons.size()):
 		var mode_button := snap_mode_buttons[mode_index]
-		var mode: String = ["coarse", "fine", "none"][mode_index]
+		var mode: String = ["coarse", "fine", "finer", "ultra_fine", "none"][mode_index]
 		mode_button.set_pressed_no_signal(mode == snap_mode)
 	if is_instance_valid(snap_rotation_slider):
 		snap_rotation_slider.set_value_no_signal(snap_rotation_step)
+	if is_instance_valid(snap_grid_info_label):
+		snap_grid_info_label.text = "Coarse %s cm · Fine %s cm · Finer %s cm · Ultra Fine %s cm" % [
+			_format_scale_value(world_grid_size),
+			_format_scale_value(world_grid_size / 5.0),
+			_format_scale_value(world_grid_size / 10.0),
+			_format_scale_value(world_grid_size / 50.0)
+		]
 	if is_instance_valid(snap_rotation_value_label):
 		snap_rotation_value_label.text = "Rotation Step: %d°" % int(snap_rotation_step)
 
 
 func _snap_mode_label() -> String:
-	if snap_mode == "fine":
-		return "Fine"
-	if snap_mode == "none":
-		return "No Snap"
-	return "Coarse"
+	match snap_mode:
+		"fine": return "Fine"
+		"finer": return "Finer"
+		"ultra_fine": return "Ultra Fine"
+		"none": return "No Snap"
+		_: return "Coarse"
 
 
 func _opaque_popup_style() -> StyleBoxFlat:
@@ -2544,7 +2558,7 @@ func _apply_snap_settings(settings) -> void:
 		snap_mode = "fine"
 	elif snap_mode == "none":
 		snap_enabled = false
-	elif snap_mode not in ["coarse", "fine"]:
+	elif snap_mode not in ["coarse", "fine", "finer", "ultra_fine"]:
 		snap_mode = "coarse"
 	if not snap_enabled:
 		snap_mode = "none"
