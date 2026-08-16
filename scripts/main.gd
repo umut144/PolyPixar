@@ -117,6 +117,9 @@ var asset_name_input: LineEdit
 var component_dialog: ConfirmationDialog
 var component_name_input: LineEdit
 var component_draw_mode_menu: PopupMenu
+var component_add_menu: PopupMenu
+var component_add_child_menu: PopupMenu
+var component_add_guide_menu: PopupMenu
 var guide_dialog: ConfirmationDialog
 var guide_name_input: LineEdit
 var texture_dialog: ConfirmationDialog
@@ -839,6 +842,7 @@ func _build_ui() -> void:
 	_create_asset_dialog()
 	_create_component_dialog()
 	_create_component_draw_mode_menu()
+	_create_component_add_menu()
 	_create_guide_dialog()
 	_create_texture_dialog()
 	_create_material_dialog()
@@ -1524,6 +1528,31 @@ func _create_component_draw_mode_menu() -> void:
 	_style_popup_menu(component_draw_mode_menu)
 	component_draw_mode_menu.id_pressed.connect(_on_component_draw_mode_selected)
 	add_child(component_draw_mode_menu)
+
+
+func _create_component_add_menu() -> void:
+	component_add_menu = PopupMenu.new()
+	component_add_menu.name = "ComponentAddMenu"
+	component_add_child_menu = PopupMenu.new()
+	component_add_child_menu.name = "ChildTypes"
+	component_add_child_menu.add_item("Closed Loop", 0)
+	component_add_child_menu.add_item("Open Edge", 1)
+	component_add_child_menu.add_item("Ribbon", 2)
+	component_add_child_menu.id_pressed.connect(_on_component_add_child_selected)
+	component_add_menu.add_child(component_add_child_menu)
+	component_add_guide_menu = PopupMenu.new()
+	component_add_guide_menu.name = "GuideTypes"
+	component_add_guide_menu.add_item("Sample", 0)
+	component_add_guide_menu.add_item("Motion", 1)
+	component_add_guide_menu.add_item("Flow", 2)
+	component_add_guide_menu.id_pressed.connect(_on_component_add_guide_selected)
+	component_add_menu.add_child(component_add_guide_menu)
+	component_add_menu.add_submenu_item("Child", "ChildTypes")
+	component_add_menu.add_submenu_item("Guide", "GuideTypes")
+	_style_popup_menu(component_add_menu)
+	_style_popup_menu(component_add_child_menu)
+	_style_popup_menu(component_add_guide_menu)
+	add_child(component_add_menu)
 
 
 func _create_guide_dialog() -> void:
@@ -6926,39 +6955,57 @@ func _render_asset_outliner_entry(asset: Dictionary, force_expand := false, look
 	components.sort_custom(_sort_named_documents)
 	guides.sort_custom(func(left: Dictionary, right: Dictionary) -> bool: return _guide_display_name(asset, left).naturalnocasecmp_to(_guide_display_name(asset, right)) < 0)
 	asset_container.add_child(_create_outliner_child_group_label("Components"))
+	var rendered_component_ids: Dictionary = {}
 	for component in components:
-		var component_id := str(component["id"])
-		var component_row := HBoxContainer.new()
-		component_row.add_theme_constant_override("separation", 0)
-		asset_container.add_child(component_row)
-		var child_placeholder := Control.new()
-		child_placeholder.custom_minimum_size = Vector2(16, 0)
-		component_row.add_child(child_placeholder)
-		component_row.add_child(_create_visibility_checkbox(bool(component.get("visibility", true)), _on_component_visibility_entry_changed.bind(asset_id, component_id)))
-		var component_button := Button.new()
-		var component_name := str(component["name"])
-		component_button.text = component_name if bool(component.get("visibility", true)) else _strikethrough_text(component_name)
-		component_button.custom_minimum_size = Vector2(0, 30)
-		component_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		component_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		component_button.focus_mode = Control.FOCUS_NONE
-		_style_outliner_button(component_button, component_id == (lookdev_target_component_id if lookdev else selected_component_id) and asset_id == (lookdev_target_asset_id if lookdev else selected_asset_id))
-		if lookdev:
-			component_button.pressed.connect(_select_lookdev_component.bind(asset_id, component_id))
-		else:
-			component_button.pressed.connect(_select_component.bind(asset_id, component_id))
-		component_row.add_child(component_button)
-		if not lookdev:
-			var add_guide_button := Button.new()
-			add_guide_button.text = "+"
-			add_guide_button.custom_minimum_size = Vector2(28, 30)
-			add_guide_button.focus_mode = Control.FOCUS_NONE
-			add_guide_button.tooltip_text = "Add Guide"
-			add_guide_button.pressed.connect(_open_guide_dialog.bind(asset_id, component_id))
-			component_row.add_child(add_guide_button)
+		if str(component.get("parent_component_id", "")).is_empty():
+			_render_component_outliner_tree(asset_container, asset, component, lookdev, 16, rendered_component_ids)
+	# A malformed in-memory document should remain editable even before its next load migration.
+	for component in components:
+		if not rendered_component_ids.has(str(component.get("id", ""))):
+			_render_component_outliner_tree(asset_container, asset, component, lookdev, 16, rendered_component_ids)
 	asset_container.add_child(_create_outliner_child_group_label("Guides"))
 	for guide in guides:
 		_render_component_guide_row(asset_container, asset, guide)
+
+
+func _render_component_outliner_tree(container: VBoxContainer, asset: Dictionary, component: Dictionary, lookdev: bool, indent: int, rendered_component_ids: Dictionary) -> void:
+	var asset_id := str(asset.get("id", ""))
+	var component_id := str(component.get("id", ""))
+	if component_id.is_empty() or rendered_component_ids.has(component_id):
+		return
+	rendered_component_ids[component_id] = true
+	var component_row := HBoxContainer.new()
+	component_row.add_theme_constant_override("separation", 0)
+	container.add_child(component_row)
+	var child_placeholder := Control.new()
+	child_placeholder.custom_minimum_size = Vector2(indent, 0)
+	component_row.add_child(child_placeholder)
+	component_row.add_child(_create_visibility_checkbox(bool(component.get("visibility", true)), _on_component_visibility_entry_changed.bind(asset_id, component_id)))
+	var component_button := Button.new()
+	var component_name := str(component.get("name", "Component"))
+	component_button.text = component_name if bool(component.get("visibility", true)) else _strikethrough_text(component_name)
+	component_button.custom_minimum_size = Vector2(0, 30)
+	component_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	component_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	component_button.focus_mode = Control.FOCUS_NONE
+	_style_outliner_button(component_button, component_id == (lookdev_target_component_id if lookdev else selected_component_id) and asset_id == (lookdev_target_asset_id if lookdev else selected_asset_id))
+	if lookdev:
+		component_button.pressed.connect(_select_lookdev_component.bind(asset_id, component_id))
+	else:
+		component_button.pressed.connect(_select_component.bind(asset_id, component_id))
+	component_row.add_child(component_button)
+	if not lookdev:
+		var add_button := Button.new()
+		add_button.text = "+"
+		add_button.custom_minimum_size = Vector2(28, 30)
+		add_button.focus_mode = Control.FOCUS_NONE
+		add_button.tooltip_text = "Add Child or Guide"
+		add_button.pressed.connect(_open_component_add_menu.bind(asset_id, component_id, add_button))
+		component_row.add_child(add_button)
+	var children := ComponentHierarchy.children(asset, component_id)
+	children.sort_custom(_sort_named_documents)
+	for child in children:
+		_render_component_outliner_tree(container, asset, child, lookdev, indent + 16, rendered_component_ids)
 
 
 func _render_component_guide_row(container: VBoxContainer, asset: Dictionary, guide: Dictionary) -> void:
@@ -7171,8 +7218,38 @@ func _open_component_dialog(asset_id: String, anchor: Control) -> void:
 	selected_texture_id = ""
 	selected_element_id = ""
 	component_draw_mode_menu.set_meta("asset_id", asset_id)
+	component_draw_mode_menu.set_meta("parent_component_id", "")
 	component_draw_mode_menu.position = Vector2i(anchor.global_position + Vector2(0.0, anchor.size.y))
 	component_draw_mode_menu.popup()
+
+
+func _open_component_add_menu(asset_id: String, parent_component_id: String, anchor: Control) -> void:
+	if _get_component(_get_asset(asset_id), parent_component_id).is_empty():
+		return
+	component_add_menu.set_meta("asset_id", asset_id)
+	component_add_menu.set_meta("parent_component_id", parent_component_id)
+	component_add_menu.position = Vector2i(anchor.global_position + Vector2(0.0, anchor.size.y))
+	component_add_menu.popup()
+
+
+func _on_component_add_child_selected(index: int) -> void:
+	if index < 0 or index >= DRAW_MODES.size():
+		return
+	component_name_input.text = ""
+	component_dialog.set_meta("asset_id", str(component_add_menu.get_meta("asset_id", "")))
+	component_dialog.set_meta("parent_component_id", str(component_add_menu.get_meta("parent_component_id", "")))
+	component_dialog.set_meta("draw_mode", DRAW_MODES[index])
+	component_dialog.dialog_text = "%s Child name" % _draw_mode_display_name(DRAW_MODES[index])
+	canvas_view.set_navigation_locked(true)
+	component_dialog.popup_centered()
+	component_name_input.grab_focus()
+
+
+func _on_component_add_guide_selected(index: int) -> void:
+	var guide_types := [AssetGuide.SAMPLE, AssetGuide.MOTION, AssetGuide.FLOW]
+	if index < 0 or index >= guide_types.size():
+		return
+	_create_guide(str(component_add_menu.get_meta("asset_id", "")), str(component_add_menu.get_meta("parent_component_id", "")), str(guide_types[index]))
 
 
 func _on_component_draw_mode_selected(index: int) -> void:
@@ -7180,6 +7257,7 @@ func _on_component_draw_mode_selected(index: int) -> void:
 		return
 	component_name_input.text = ""
 	component_dialog.set_meta("asset_id", str(component_draw_mode_menu.get_meta("asset_id", "")))
+	component_dialog.set_meta("parent_component_id", str(component_draw_mode_menu.get_meta("parent_component_id", "")))
 	component_dialog.set_meta("draw_mode", DRAW_MODES[index])
 	component_dialog.dialog_text = "%s Component name" % _draw_mode_display_name(DRAW_MODES[index])
 	canvas_view.set_navigation_locked(true)
@@ -7213,7 +7291,7 @@ func _open_guide_dialog(asset_id: String, component_id: String) -> void:
 	guide_name_input.text = ""
 	guide_dialog.set_meta("asset_id", asset_id)
 	guide_dialog.set_meta("component_id", component_id)
-	_confirm_guide_creation()
+	_create_guide(asset_id, component_id, AssetGuide.FLOW)
 
 
 func _submit_guide_name(_submitted_text: String) -> void:
@@ -7225,20 +7303,21 @@ func _on_guide_dialog_canceled() -> void:
 
 
 func _confirm_guide_creation() -> void:
-	var asset_id := str(guide_dialog.get_meta("asset_id", ""))
-	var component_id := str(guide_dialog.get_meta("component_id", ""))
+	_create_guide(str(guide_dialog.get_meta("asset_id", "")), str(guide_dialog.get_meta("component_id", "")), AssetGuide.FLOW, guide_name_input.text.strip_edges())
+
+
+func _create_guide(asset_id: String, component_id: String, guide_type: String, legacy_name := "") -> void:
 	var asset := _get_asset(asset_id)
 	if asset.is_empty() or _get_component(asset, component_id).is_empty():
 		guide_dialog.hide()
 		canvas_view.set_navigation_locked(false)
 		return
 	_record_direct_change()
-	var guide_name := guide_name_input.text.strip_edges()
+	var guide_name := legacy_name.strip_edges()
 	if guide_name.is_empty():
-		guide_name = _next_default_guide_name(asset, AssetGuide.BODY_FLOW)
+		guide_name = _next_default_guide_name(asset, guide_type)
 	var guide_id := "guide_%d" % next_guide_id
 	next_guide_id += 1
-	var guide_type := AssetGuide.BODY_FLOW
 	var guide_ordinal := ComponentHierarchy.next_guide_ordinal(asset, component_id, guide_type)
 	var guide := AssetGuide.create(guide_id, guide_name, guide_type, component_id, guide_ordinal)
 	if not asset.get("guides", []) is Array:
@@ -7346,14 +7425,25 @@ func _confirm_component_creation() -> void:
 	var component_id := "component_%d" % next_component_id
 	next_component_id += 1
 	var draw_mode := str(component_dialog.get_meta("draw_mode", "closed_loop"))
+	var parent_component_id := str(component_dialog.get_meta("parent_component_id", ""))
+	if not parent_component_id.is_empty() and _get_component(asset, parent_component_id).is_empty():
+		parent_component_id = ""
+	var component_transform := _default_component_transform()
+	if not parent_component_id.is_empty():
+		var parent_component := _get_component(asset, parent_component_id)
+		var parent_transform := _deserialize_transform(parent_component.get("transform", {}))
+		var inherited_pivot: Vector2 = parent_transform.get("pivot", Vector2.ZERO)
+		# Local child position is the Parent-local point that maps to the Parent pivot.
+		component_transform["position"] = inherited_pivot
+		component_transform["pivot"] = inherited_pivot
 	asset["components"].append({
 		"id": component_id,
 		"name": component_name,
-		"parent_component_id": "",
+		"parent_component_id": parent_component_id,
 		"points": [],
 		"edges": [],
 		"chains": [],
-		"transform": _default_component_transform(),
+		"transform": component_transform,
 		"visibility": true,
 		"z_index": 0,
 		"material_id": "",

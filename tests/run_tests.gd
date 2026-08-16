@@ -796,6 +796,19 @@ func _test_asset_guides() -> void:
 	test_asset["guides"][0]["name"] = "Changed"
 	application._restore_history_snapshot(snapshot)
 	_expect(str(application._get_guide(application._get_asset("asset_1"), application.selected_guide_id).get("name", "")) == "Sampler Guide Copy", "Guides and their selection should participate in Undo/Redo snapshots.")
+	var parent_component: Dictionary = application._get_component(application._get_asset("asset_1"), "component_1")
+	application.next_component_id = 2
+	application.component_name_input.text = "Eyes"
+	application.component_dialog.set_meta("asset_id", "asset_1")
+	application.component_dialog.set_meta("parent_component_id", "component_1")
+	application.component_dialog.set_meta("draw_mode", "open_edge")
+	application._confirm_component_creation()
+	var child_component: Dictionary = application._get_component(application._get_asset("asset_1"), application.selected_component_id)
+	_expect(str(child_component.get("parent_component_id", "")) == "component_1" and Vector2(child_component.get("transform", {}).get("pivot", Vector2.ZERO)).is_equal_approx(Vector2(parent_component.get("transform", {}).get("pivot", Vector2.ZERO))), "Child creation should persist a real Parent relationship and inherit the Parent pivot initially.")
+	application._create_guide("asset_1", "component_1", AssetGuide.MOTION)
+	var motion_guide: Dictionary = application._get_guide(application._get_asset("asset_1"), application.selected_guide_id)
+	_expect(str(motion_guide.get("guide_type", "")) == AssetGuide.MOTION and int(motion_guide.get("ordinal", 0)) > 0, "The Component add flow should create typed Motion Guides without requesting a manual name.")
+	_expect(application.component_add_child_menu.item_count == 3 and application.component_add_guide_menu.item_count == 3, "Every Component add menu should expose Child draw modes and all three Guide types.")
 	application.free()
 
 
