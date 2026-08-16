@@ -5544,6 +5544,7 @@ func _on_reference_image_file_selected(source_path: String) -> void:
 	if source_image.load(source_path) != OK or source_image.is_empty():
 		_show_status_message("Reference Image could not be loaded.")
 		return
+	_apply_reference_image_orientation(source_image, source_path)
 	reference_image_crop_dialog.open_for_image(source_image)
 
 
@@ -5560,6 +5561,9 @@ func _save_reference_image_result(reference_image_result: Image) -> void:
 		return
 	var reference_image := _normalize_reference_image(asset.get("reference_image", {}))
 	reference_image["file"] = reference_filename
+	# A newly imported reference must always be visible, even if the image it
+	# replaces had been hidden in the Inspector.
+	reference_image["visible"] = true
 	# Every newly loaded reference starts from a neutral transform. The
 	# selected target height and pivot remain unchanged.
 	reference_image["position"] = Vector2.ZERO
@@ -5568,6 +5572,91 @@ func _save_reference_image_result(reference_image_result: Image) -> void:
 	asset["reference_image"] = reference_image
 	_render_inspector()
 	_render_canvas_context()
+
+
+func _apply_reference_image_orientation(image: Image, source_path: String) -> void:
+	if image == null or image.is_empty() or source_path.get_extension().to_lower() not in ["jpg", "jpeg"]:
+		return
+	var orientation := _jpeg_exif_orientation(source_path)
+	if orientation == 3:
+		image.rotate_90(0)
+		image.rotate_90(0)
+	elif orientation == 6:
+		image.rotate_90(0)
+	elif orientation == 8:
+		image.rotate_90(1)
+	elif orientation == 2:
+		image.flip_x()
+	elif orientation == 4:
+		image.flip_y()
+	elif orientation == 5:
+		image.flip_x()
+		image.rotate_90(0)
+	elif orientation == 7:
+		image.flip_x()
+		image.rotate_90(1)
+
+
+func _jpeg_exif_orientation(path: String) -> int:
+	var file := FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		return 1
+	var data := file.get_buffer(file.get_length())
+	if data.size() < 12 or data[0] != 0xff or data[1] != 0xd8:
+		return 1
+	var offset := 2
+	while offset + 4 <= data.size():
+		if data[offset] != 0xff:
+			offset += 1
+			continue
+		while offset < data.size() and data[offset] == 0xff:
+			offset += 1
+		if offset >= data.size():
+			break
+		var marker := int(data[offset])
+		offset += 1
+		if marker in [0xd8, 0xd9] or marker >= 0xd0 and marker <= 0xd7:
+			continue
+		if offset + 2 > data.size():
+			break
+		var segment_length := _read_u16_big_endian(data, offset)
+		if segment_length < 2 or offset + segment_length > data.size():
+			break
+		if marker == 0xe1 and segment_length >= 16 \
+			and data[offset + 2] == 0x45 and data[offset + 3] == 0x78 and data[offset + 4] == 0x69 and data[offset + 5] == 0x66 \
+			and data[offset + 6] == 0x00 and data[offset + 7] == 0x00:
+			var tiff_offset := offset + 8
+			var little_endian := data[tiff_offset] == 0x49 and data[tiff_offset + 1] == 0x49
+			var big_endian := data[tiff_offset] == 0x4d and data[tiff_offset + 1] == 0x4d
+			if not little_endian and not big_endian:
+				return 1
+			var ifd_offset := tiff_offset + _read_u32(data, tiff_offset + 4, little_endian)
+			if ifd_offset + 2 > data.size():
+				return 1
+			var entry_count := _read_u16(data, ifd_offset, little_endian)
+			for entry_index in range(entry_count):
+				var entry_offset := ifd_offset + 2 + entry_index * 12
+				if entry_offset + 12 > data.size():
+					return 1
+				if _read_u16(data, entry_offset, little_endian) == 0x0112:
+					var orientation := _read_u16(data, entry_offset + 8, little_endian)
+					return orientation if orientation >= 1 and orientation <= 8 else 1
+		offset += segment_length
+	return 1
+
+
+func _read_u16_big_endian(data: PackedByteArray, offset: int) -> int:
+	return (int(data[offset]) << 8) | int(data[offset + 1])
+
+
+func _read_u16(data: PackedByteArray, offset: int, little_endian: bool) -> int:
+	return int(data[offset]) | (int(data[offset + 1]) << 8) if little_endian else _read_u16_big_endian(data, offset)
+
+
+func _read_u32(data: PackedByteArray, offset: int, little_endian: bool) -> int:
+	if little_endian:
+		return int(data[offset]) | (int(data[offset + 1]) << 8) | (int(data[offset + 2]) << 16) | (int(data[offset + 3]) << 24)
+	return (int(data[offset]) << 24) | (int(data[offset + 1]) << 16) | (int(data[offset + 2]) << 8) | int(data[offset + 3])
 
 
 func _clear_reference_image() -> void:
