@@ -721,6 +721,7 @@ func _build_ui() -> void:
 	canvas_view.bezier_point_added.connect(_on_bezier_point_added)
 	canvas_view.bezier_chain_closed.connect(_on_bezier_chain_closed)
 	canvas_view.edge_selection_changed.connect(_on_edge_selection_changed)
+	canvas_view.face_selection_changed.connect(_on_face_selection_changed)
 	canvas_view.point_selection_changed.connect(_on_point_selection_changed)
 	canvas_view.point_selection_set_changed.connect(_on_point_selection_set_changed)
 	canvas_view.bezier_points_move_started.connect(_on_bezier_points_move_started)
@@ -4942,6 +4943,7 @@ func _set_edit_mode(mode: String) -> void:
 		selected_point_ids.clear()
 		edit_bezier_handles = false
 		edit_point_set_mode = false
+	canvas_view.set_face_selected(false)
 	canvas_view.set_edit_mode(active_edit_mode)
 	canvas_view.set_edit_handles_enabled(edit_bezier_handles)
 	canvas_view.set_edit_point_set_enabled(edit_point_set_mode)
@@ -9328,6 +9330,29 @@ func _render_inspector() -> void:
 		_add_selected_point_settings(component, point_ids)
 		_add_component_debug_inspector(component)
 		return
+	if active_state == "edit" and active_edit_mode == "edge":
+		var edge := _get_edge(component, selected_edge_id) if not selected_edge_id.is_empty() else {}
+		inspector_content.add_child(_create_inspector_field_label("Edge"))
+		inspector_content.add_child(_create_inspector_section("Edge Settings"))
+		if edge.is_empty():
+			var edge_hint := _create_inspector_field_label("Select an edge to edit it.")
+			edge_hint.add_theme_color_override("font_color", Color("#9aa3b2"))
+			inspector_content.add_child(edge_hint)
+		else:
+			var render_outline := CheckButton.new()
+			render_outline.text = "Render Outline"
+			render_outline.custom_minimum_size = Vector2(0, 26)
+			render_outline.button_pressed = bool(edge.get("render_outline", true))
+			render_outline.toggled.connect(_on_edge_render_outline_changed)
+			inspector_content.add_child(render_outline)
+		return
+	if active_state == "edit" and active_edit_mode == "face":
+		inspector_content.add_child(_create_inspector_field_label("Face"))
+		inspector_content.add_child(_create_inspector_section("Face Settings"))
+		var face_hint := _create_inspector_field_label("Face selected." if canvas_view.face_selected else "Select the face to edit it.")
+		face_hint.add_theme_color_override("font_color", Color("#8fd8f8") if canvas_view.face_selected else Color("#9aa3b2"))
+		inspector_content.add_child(face_hint)
+		return
 	if not selected_edge_id.is_empty():
 		var selected_edge := _get_edge(component, selected_edge_id)
 		if not selected_edge.is_empty():
@@ -11990,6 +12015,10 @@ func _on_point_selection_set_changed(point_ids: Array) -> void:
 func _on_edge_selection_changed(edge_id: String) -> void:
 	selected_edge_id = edge_id
 	canvas_view.set_selected_edge_id(edge_id)
+	_render_inspector()
+
+
+func _on_face_selection_changed(selected: bool) -> void:
 	_render_inspector()
 
 
