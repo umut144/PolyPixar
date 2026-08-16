@@ -2028,6 +2028,9 @@ func _capture_history_snapshot() -> Dictionary:
 		"selected_asset_id": selected_asset_id,
 		"selected_component_id": selected_component_id,
 		"selected_guide_id": selected_guide_id,
+		"selected_edge_id": selected_edge_id,
+		"selected_point_id": selected_point_id,
+		"selected_point_ids": selected_point_ids.duplicate(),
 		"selected_texture_id": selected_texture_id,
 		"selected_element_id": selected_element_id,
 		"selected_material_id": selected_material_id,
@@ -2080,6 +2083,7 @@ func _restore_history_snapshot(snapshot: Dictionary) -> void:
 	# Keep the interaction state when the same component remains selected.
 	var retained_module := active_module
 	var retained_component_id := selected_component_id
+	var retained_guide_id := selected_guide_id
 	var retained_active_state := active_state
 	var retained_draw_tool := active_draw_tool
 	var retained_draw_point_mode := active_draw_point_mode
@@ -2114,6 +2118,9 @@ func _restore_history_snapshot(snapshot: Dictionary) -> void:
 	selected_asset_id = str(snapshot.get("selected_asset_id", ""))
 	selected_component_id = str(snapshot.get("selected_component_id", ""))
 	selected_guide_id = str(snapshot.get("selected_guide_id", ""))
+	selected_edge_id = str(snapshot.get("selected_edge_id", ""))
+	selected_point_id = str(snapshot.get("selected_point_id", ""))
+	selected_point_ids = snapshot.get("selected_point_ids", []).duplicate()
 	selected_texture_id = str(snapshot.get("selected_texture_id", ""))
 	selected_element_id = str(snapshot.get("selected_element_id", ""))
 	selected_material_id = str(snapshot.get("selected_material_id", ""))
@@ -2175,11 +2182,11 @@ func _restore_history_snapshot(snapshot: Dictionary) -> void:
 		if motion_section != null:
 			motion_section.set_expanded(true)
 			motion_section.set_active_submodule(active_motion_submodule)
-	var can_retain_component_tool := retained_module == "Create" \
+	var can_retain_authoring_tool := retained_module == "Create" \
 		and active_module == "Create" \
-		and not selected_component_id.is_empty() \
-		and selected_component_id == retained_component_id
-	if can_retain_component_tool:
+		and ((not selected_component_id.is_empty() and selected_component_id == retained_component_id) \
+			or (not selected_guide_id.is_empty() and selected_guide_id == retained_guide_id))
+	if can_retain_authoring_tool:
 		active_state = retained_active_state
 		active_draw_tool = retained_draw_tool if retained_active_state == "draw" else ""
 		active_draw_point_mode = retained_draw_point_mode
@@ -2187,6 +2194,8 @@ func _restore_history_snapshot(snapshot: Dictionary) -> void:
 		edit_bezier_handles = retained_edit_handles
 		edit_point_set_mode = retained_edit_point_set_mode
 		active_transform_mode = retained_transform_mode
+		if active_state == "draw":
+			_restore_draw_anchor_selection()
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
@@ -11134,6 +11143,35 @@ func _valid_selected_point_ids(component: Dictionary) -> Array[String]:
 	return valid_ids
 
 
+func _restore_draw_anchor_selection() -> void:
+	var asset := _get_asset(selected_asset_id)
+	var subject := _get_guide(asset, selected_guide_id) if not selected_guide_id.is_empty() else _get_component(asset, selected_component_id)
+	if subject.is_empty():
+		return
+	var valid_ids := _valid_selected_point_ids(subject)
+	if valid_ids.size() == 1 and BezierTopology.is_open_endpoint(subject, valid_ids[0]):
+		selected_point_ids = valid_ids
+		selected_point_id = valid_ids[0]
+		return
+	# Snapshots made before selection state was persisted, or a deleted point,
+	# fall back to the end of the most recently authored open Chain.
+	var chains: Array = subject.get("chains", [])
+	for chain_index in range(chains.size() - 1, -1, -1):
+		var chain: Dictionary = chains[chain_index]
+		if bool(chain.get("closed", false)):
+			continue
+		var point_ids: Array = chain.get("point_ids", [])
+		if point_ids.is_empty():
+			continue
+		var endpoint_id := str(point_ids.back())
+		if BezierTopology.is_open_endpoint(subject, endpoint_id):
+			selected_point_id = endpoint_id
+			selected_point_ids = [endpoint_id]
+			return
+	selected_point_id = ""
+	selected_point_ids.clear()
+
+
 func _add_selected_point_settings(component: Dictionary, point_ids: Array[String]) -> void:
 	var shared_mode := ""
 	var mode_mixed := false
@@ -11886,6 +11924,7 @@ func _render_canvas_context() -> void:
 	canvas_view.set_catch_parent_component(str(component.get("catch_parent_component_id", "")) if str(component.get("draw_mode", "closed_loop")) in ["open_edge", "ribbon"] else "")
 	BezierGeometry.resolve_auto_handles(component.get("points", []), component.get("chains", []))
 	_refresh_component_geometry(component)
+	canvas_view.set_selected_point_ids(selected_point_ids)
 	canvas_view.set_selected_edge_id(selected_edge_id)
 	canvas_view.call_deferred("grab_focus")
 
@@ -11905,6 +11944,7 @@ func _render_spine_canvas(asset: Dictionary, guide: Dictionary, drawing: bool) -
 	canvas_view.set_display_polygon([])
 	BezierGeometry.resolve_auto_handles(guide.get("points", []), guide.get("chains", []))
 	canvas_view.set_bezier_geometry(guide.get("points", []), guide.get("edges", []), guide.get("chains", []))
+	canvas_view.set_selected_point_ids(selected_point_ids)
 	if target_component.is_empty():
 		canvas_view.set_component_transform(_default_component_transform())
 	else:
