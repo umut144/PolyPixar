@@ -147,6 +147,15 @@ func _test_closed_loop_selection_mirror() -> void:
 	_expect(BezierTopology.close_active_chain(mirrored_component), "The joined Chain should close explicitly.")
 	_expect(BezierTopology.mode_validation_issues(mirrored_component, true).is_empty(), "One manually closed Mirror result should validate as a Closed Loop.")
 	_expect(not SelectionMirrorService.validation_issues(mirrored_component, source_ids, mirror_axis_start, mirror_axis_end).is_empty(), "Mirror must reject an already closed Chain.")
+	var coincident_component := _component()
+	coincident_component["draw_mode"] = "closed_loop"
+	var coincident_source_ids: Array[String] = []
+	for point_position in [Vector2(0.0, 0.0), Vector2(-1.0, 1.0), Vector2(-1.0, 3.0)]:
+		coincident_source_ids.append(BezierTopology.add_point(coincident_component, point_position, "linear"))
+	var coincident_result := SelectionMirrorService.apply(coincident_component, coincident_source_ids, mirror_axis_start, mirror_axis_end)
+	var coincident_mirror: Dictionary = coincident_result.get("component", {})
+	_expect(int(coincident_result.get("auto_connected_count", 0)) == 1, "Mirror should connect an endpoint that lands exactly on its source endpoint.")
+	_expect(coincident_mirror.get("chains", []).size() == 1 and not bool(coincident_mirror["chains"][0].get("closed", false)), "One coincident endpoint pair should join the two mirror Chains without auto-closing the contour.")
 
 
 func _test_ribbon_strip_mesh() -> void:

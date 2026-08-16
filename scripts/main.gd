@@ -5094,7 +5094,11 @@ func _on_mirror_axis_confirmed(axis_start: Vector2, axis_end: Vector2) -> void:
 	_render_outliner()
 	_render_inspector()
 	_render_context_bar()
-	_show_status_message("Mirror Y applied · The two open Chains remain unconnected")
+	var auto_connected_count := int(result.get("auto_connected_count", 0))
+	if auto_connected_count > 0:
+		_show_status_message("Mirror Y applied · Overlapping endpoints connected")
+	else:
+		_show_status_message("Mirror Y applied · The two open Chains remain unconnected")
 
 
 func _on_mirror_axis_cancelled() -> void:

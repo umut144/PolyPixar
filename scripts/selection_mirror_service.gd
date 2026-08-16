@@ -3,8 +3,9 @@ extends RefCounted
 
 
 ## Mirrors one contiguous Point selection from the sole open Chain of a
-## Closed Loop Component. The result deliberately stays a separate open Chain:
-## joining the two endpoints remains an explicit authoring action.
+## Closed Loop Component. The result stays a separate open Chain unless a
+## source and mirrored open endpoint land at exactly the same position.
+const COINCIDENT_ENDPOINT_EPSILON := 0.0001
 static func preview(component: Dictionary, selected_point_ids: Array, axis_start: Vector2, axis_end: Vector2) -> Dictionary:
 	var validation := validation_issues(component, selected_point_ids, axis_start, axis_end)
 	if not validation.is_empty():
@@ -55,12 +56,36 @@ static func apply(component: Dictionary, selected_point_ids: Array, axis_start: 
 	chains.append(mirrored_chain)
 	result["chains"] = chains
 	BezierTopology.rebuild_chain_edges(result, mirrored_chain)
+	var auto_connected_count := _connect_coincident_open_endpoints(result, source_ids, mirrored_ids)
 	return {
 		"valid": BezierTopology.validate(result).is_empty(),
 		"errors": BezierTopology.validate(result),
 		"component": result,
-		"mirrored_point_ids": mirrored_ids
+		"mirrored_point_ids": mirrored_ids,
+		"auto_connected_count": auto_connected_count
 	}
+
+
+static func _connect_coincident_open_endpoints(component: Dictionary, source_ids: Array, mirrored_ids: Array) -> int:
+	if source_ids.is_empty() or mirrored_ids.is_empty():
+		return 0
+	var source_endpoints := [str(source_ids.front()), str(source_ids.back())]
+	var mirrored_endpoints := [str(mirrored_ids.front()), str(mirrored_ids.back())]
+	for source_endpoint in source_endpoints:
+		var source_point := BezierTopology.point_by_id(component.get("points", []), source_endpoint)
+		if source_point.is_empty():
+			continue
+		for mirrored_endpoint in mirrored_endpoints:
+			var mirrored_point := BezierTopology.point_by_id(component.get("points", []), mirrored_endpoint)
+			if mirrored_point.is_empty():
+				continue
+			var source_position: Vector2 = source_point.get("position", Vector2.ZERO)
+			var mirrored_position: Vector2 = mirrored_point.get("position", Vector2.ZERO)
+			if source_position.distance_squared_to(mirrored_position) > COINCIDENT_ENDPOINT_EPSILON * COINCIDENT_ENDPOINT_EPSILON:
+				continue
+			if BezierTopology.join_open_chain_endpoints(component, source_endpoint, mirrored_endpoint):
+				return 1
+	return 0
 
 
 static func validation_issues(component: Dictionary, selected_point_ids: Array, axis_start: Vector2, axis_end: Vector2) -> Array[String]:
