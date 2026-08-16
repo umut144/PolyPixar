@@ -615,8 +615,8 @@ func _build_ui() -> void:
 	draw_mode_status.add_theme_color_override("font_color", Color("#9aa3b2"))
 	toolbar.add_child(draw_mode_status)
 	snap_button = Button.new()
-	snap_button.text = "Snap: %s  ▼" % ("On" if snap_enabled else "Off")
-	snap_button.custom_minimum_size = Vector2(112, 32)
+	snap_button.text = "Snap: %s  ▼" % _snap_mode_label()
+	snap_button.custom_minimum_size = Vector2(128, 32)
 	snap_button.focus_mode = Control.FOCUS_NONE
 	snap_button.pressed.connect(_toggle_snap_popup)
 	toolbar.add_child(snap_button)
@@ -1243,7 +1243,8 @@ func _create_snap_popup() -> void:
 	snap_mode_buttons.clear()
 	var grid_modes := [
 		["Coarse", "coarse"],
-		["Fine", "fine"]
+		["Fine", "fine"],
+		["No Snap", "none"]
 	]
 	for grid_mode in grid_modes:
 		var mode_button := CheckBox.new()
@@ -1385,10 +1386,10 @@ func _on_snap_mode_selected(mode: String) -> void:
 
 
 func _set_snap_mode(mode: String) -> void:
-	if mode not in ["coarse", "fine"]:
+	if mode not in ["coarse", "fine", "none"]:
 		return
 	snap_mode = mode
-	snap_enabled = true
+	snap_enabled = mode != "none"
 	snap_grid_step = _snap_base_step()
 	if is_instance_valid(canvas_view):
 		canvas_view.set_snap_settings(snap_enabled, snap_grid_step, snap_rotation_step)
@@ -1411,7 +1412,7 @@ func _update_snap_popup_labels() -> void:
 		snap_button.text = "Snap: %s  ▼" % _snap_mode_label()
 	for mode_index in range(snap_mode_buttons.size()):
 		var mode_button := snap_mode_buttons[mode_index]
-		var mode: String = ["coarse", "fine"][mode_index]
+		var mode: String = ["coarse", "fine", "none"][mode_index]
 		mode_button.set_pressed_no_signal(mode == snap_mode)
 	if is_instance_valid(snap_rotation_slider):
 		snap_rotation_slider.set_value_no_signal(snap_rotation_step)
@@ -1420,7 +1421,11 @@ func _update_snap_popup_labels() -> void:
 
 
 func _snap_mode_label() -> String:
-	return "Fine" if snap_mode == "fine" else "Coarse"
+	if snap_mode == "fine":
+		return "Fine"
+	if snap_mode == "none":
+		return "No Snap"
+	return "Coarse"
 
 
 func _opaque_popup_style() -> StyleBoxFlat:
@@ -2530,12 +2535,15 @@ func _apply_snap_settings(settings) -> void:
 		snap_rotation_step = 15.0
 	if snap_mode in ["fine_on", "fine_off"]:
 		snap_mode = "fine"
+	elif snap_mode == "none":
+		snap_enabled = false
 	elif snap_mode not in ["coarse", "fine"]:
 		snap_mode = "coarse"
-	# Coarse/Fine are now the two active snap modes. Restore the mode and the
-	# runtime snap state together so the UI cannot show Fine while the canvas
-	# still has snapping disabled.
-	snap_enabled = true
+	if not snap_enabled:
+		snap_mode = "none"
+	# Keep the persisted mode and runtime state synchronized so No Snap really
+	# disables grid and rotation snapping after workspace restore.
+	snap_enabled = snap_mode != "none"
 	snap_grid_step = _snap_base_step()
 	if is_instance_valid(canvas_view):
 		canvas_view.set_snap_settings(snap_enabled, snap_grid_step, snap_rotation_step)
