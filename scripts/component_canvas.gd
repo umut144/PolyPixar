@@ -47,6 +47,7 @@ var interaction_state := ""
 var edit_mode := "select"
 var edit_handles_enabled := false
 var edit_point_set_enabled := false
+var point_numbers_visible := false
 var transform_mode := "transform"
 var display_polygon: Array[Vector2] = []
 var display_polygon_closed := false
@@ -536,6 +537,11 @@ func set_edit_handles_enabled(enabled: bool) -> void:
 
 func set_edit_point_set_enabled(enabled: bool) -> void:
 	edit_point_set_enabled = enabled
+	queue_redraw()
+
+
+func set_point_numbers_visible(visible: bool) -> void:
+	point_numbers_visible = visible
 	queue_redraw()
 
 
@@ -1131,6 +1137,26 @@ func _draw_bezier_geometry() -> void:
 		for point_data in bezier_points:
 			var point_position: Vector2 = point_data.get("position", Vector2.ZERO)
 			draw_circle(_world_to_screen(_local_to_world(point_position)), 4.0, shape_color)
+	if interaction_state == "edit" and edit_mode == "point" and point_numbers_visible:
+		for chain_data in bezier_chains:
+			var chain_point_ids: Array = chain_data.get("point_ids", [])
+			for chain_index in range(chain_point_ids.size()):
+				var numbered_point := _point_by_id(str(chain_point_ids[chain_index]))
+				if numbered_point.is_empty():
+					continue
+				var numbered_position: Vector2 = numbered_point.get("position", Vector2.ZERO)
+				draw_string(ThemeDB.fallback_font, _world_to_screen(_local_to_world(numbered_position)) + Vector2(8.0, -8.0), str(chain_index + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color("#f2c94c"))
+	if interaction_state == "edit" and edit_mode == "point" and edit_point_set_enabled and cursor_over_canvas:
+		var add_point_hit := _bezier_edge_hit(_world_to_screen(_local_to_world(cursor_world)))
+		if not add_point_hit.is_empty():
+			var preview_edge := _edge_by_id(str(add_point_hit.get("id", "")))
+			var preview_start := _point_by_id(str(preview_edge.get("start_point_id", "")))
+			var preview_end := _point_by_id(str(preview_edge.get("end_point_id", "")))
+			if not preview_start.is_empty() and not preview_end.is_empty():
+				var preview_position := BezierGeometry.cubic_position(BezierGeometry.cubic_controls(preview_start, preview_end), float(add_point_hit.get("t", 0.5)))
+				var preview_screen := _world_to_screen(_local_to_world(preview_position))
+				draw_circle(preview_screen, 8.0, Color("#f2c94c"), false, 2.5)
+				draw_circle(preview_screen, 3.0, Color("#f2c94c"))
 	var selected_point := _point_by_id(selected_point_id)
 	if interaction_state == "edit" and not selected_point.is_empty():
 		var selected_position: Vector2 = selected_point.get("position", Vector2.ZERO)
@@ -1599,6 +1625,13 @@ func _point_index_by_id(point_id: String) -> int:
 func _point_by_id(point_id: String) -> Dictionary:
 	var point_index := _point_index_by_id(point_id)
 	return bezier_points[point_index] if point_index >= 0 else {}
+
+
+func _edge_by_id(edge_id: String) -> Dictionary:
+	for edge_data in bezier_edges:
+		if str(edge_data.get("id", "")) == edge_id:
+			return edge_data
+	return {}
 
 
 func _nearest_bezier_edge(screen_position: Vector2) -> String:

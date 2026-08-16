@@ -1857,7 +1857,8 @@ func _save_workspace() -> void:
 				"draw_mode": str(component.get("draw_mode", "closed_loop")),
 				"contour_width_px": maxf(DEFAULT_CONTOUR_WIDTH_PX, float(component.get("contour_width_px", DEFAULT_CONTOUR_WIDTH_PX))),
 				"ribbon_width_px": maxf(DEFAULT_RIBBON_WIDTH_PX, float(component.get("ribbon_width_px", DEFAULT_RIBBON_WIDTH_PX))),
-				"catch_parent_component_id": str(component.get("catch_parent_component_id", ""))
+				"catch_parent_component_id": str(component.get("catch_parent_component_id", "")),
+				"show_point_numbers": bool(component.get("show_point_numbers", false))
 			})
 		for guide in asset.get("guides", []):
 			asset_data["guides"].append(_serialize_asset_guide(guide))
@@ -2204,7 +2205,8 @@ func _load_workspace(workspace_entry: String) -> bool:
 				"draw_mode": str(component_data.get("draw_mode", "closed_loop")) if str(component_data.get("draw_mode", "closed_loop")) in DRAW_MODES else "closed_loop",
 				"contour_width_px": maxf(DEFAULT_CONTOUR_WIDTH_PX, float(component_data.get("contour_width_px", DEFAULT_CONTOUR_WIDTH_PX))),
 				"ribbon_width_px": maxf(DEFAULT_RIBBON_WIDTH_PX, float(component_data.get("ribbon_width_px", DEFAULT_RIBBON_WIDTH_PX))),
-				"catch_parent_component_id": str(component_data.get("catch_parent_component_id", ""))
+				"catch_parent_component_id": str(component_data.get("catch_parent_component_id", "")),
+				"show_point_numbers": bool(component_data.get("show_point_numbers", false))
 			})
 		for guide_data in asset_data.get("guides", []):
 			if not guide_data is Dictionary:
@@ -3771,7 +3773,7 @@ func _render_context_bar() -> void:
 	_style_context_command_button(edit_point_menu, _context_command_is("asset.edit_point"))
 	edit_point_menu.get_popup().add_item("1: Select", 0)
 	edit_point_menu.get_popup().add_item("2: Bezier Handle", 1)
-	edit_point_menu.get_popup().add_item("3: Set", 2)
+	edit_point_menu.get_popup().add_item("3: Add Point", 2)
 	_style_popup_menu(edit_point_menu.get_popup())
 	edit_point_menu.get_popup().id_pressed.connect(_on_edit_menu_id)
 	context_bar.add_child(edit_point_menu)
@@ -5263,7 +5265,7 @@ func _render_info_bar() -> void:
 		_add_info_option("Enter: Pause open Chain · Esc: Leave")
 	elif active_state == "edit" and active_edit_mode == "point":
 		if edit_point_set_mode:
-			_add_info_option("Click Edge: Set Point")
+			_add_info_option("Move over Contour: Preview · Click: Add Point")
 		elif edit_bezier_handles:
 			_add_info_option("Drag: Bezier Handle")
 		else:
@@ -7311,7 +7313,8 @@ func _confirm_component_creation() -> void:
 		"draw_mode": draw_mode if draw_mode in DRAW_MODES else "closed_loop",
 		"contour_width_px": DEFAULT_CONTOUR_WIDTH_PX,
 		"ribbon_width_px": DEFAULT_RIBBON_WIDTH_PX,
-		"catch_parent_component_id": ""
+		"catch_parent_component_id": "",
+		"show_point_numbers": false
 	})
 	selected_asset_id = asset_id
 	selected_component_id = component_id
@@ -9303,6 +9306,7 @@ func _render_inspector() -> void:
 			var selection_hint := _create_inspector_field_label("Select one or more points to edit them.")
 			selection_hint.add_theme_color_override("font_color", Color("#9aa3b2"))
 			inspector_content.add_child(selection_hint)
+			_add_component_debug_inspector(component)
 			return
 		var is_multi_point_selection := point_ids.size() > 1
 		inspector_content.add_child(_create_inspector_field_label("%d Points" % point_ids.size() if is_multi_point_selection else "Point"))
@@ -9322,6 +9326,7 @@ func _render_inspector() -> void:
 		inspector_content.add_child(point_transform_grid)
 		inspector_content.add_child(_create_inspector_section("Point Settings"))
 		_add_selected_point_settings(component, point_ids)
+		_add_component_debug_inspector(component)
 		return
 	if not selected_edge_id.is_empty():
 		var selected_edge := _get_edge(component, selected_edge_id)
@@ -10828,6 +10833,27 @@ func _on_edge_render_outline_changed(enabled: bool) -> void:
 	_render_canvas_context()
 
 
+func _add_component_debug_inspector(component: Dictionary) -> void:
+	inspector_content.add_child(_create_inspector_section("Debug"))
+	var show_numbers := CheckButton.new()
+	show_numbers.text = "Show Point Numbers"
+	show_numbers.focus_mode = Control.FOCUS_NONE
+	show_numbers.button_pressed = bool(component.get("show_point_numbers", false))
+	show_numbers.toggled.connect(_on_component_debug_point_numbers_toggled)
+	inspector_content.add_child(show_numbers)
+
+
+func _on_component_debug_point_numbers_toggled(enabled: bool) -> void:
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if component.is_empty():
+		return
+	_record_direct_change()
+	component["show_point_numbers"] = enabled
+	canvas_view.set_point_numbers_visible(enabled)
+	_render_inspector()
+	_render_canvas_context()
+
+
 func _valid_selected_point_ids(component: Dictionary) -> Array[String]:
 	var valid_ids: Array[String] = []
 	for point_id_value in selected_point_ids:
@@ -11351,6 +11377,7 @@ func _render_canvas_context() -> void:
 	canvas_view.set_reference_image(null)
 	canvas_view.set_paper_frame(Vector2.ZERO, false)
 	canvas_view.set_guide_style(false)
+	canvas_view.set_point_numbers_visible(false)
 	canvas_view.set_catch_parent_component("")
 	canvas_view.set_component_draw_mode("closed_loop")
 	canvas_view.clear_draw_constraint()
@@ -11565,6 +11592,7 @@ func _render_canvas_context() -> void:
 		canvas_view.set_component_material(_load_material_canvas_texture(component_material), component_material.get("tint", Color.WHITE), float(component_material.get("opacity", 1.0)), component_material.get("mapping_scale", Vector2.ONE), component_material.get("mapping_offset", Vector2.ZERO), _material_wrap_mode(component_material))
 	canvas_view.set_reference_shapes(_build_reference_shapes(asset, selected_component_id))
 	canvas_view.set_component_draw_mode(str(component.get("draw_mode", "closed_loop")))
+	canvas_view.set_point_numbers_visible(bool(component.get("show_point_numbers", false)))
 	canvas_view.set_catch_parent_component(str(component.get("catch_parent_component_id", "")) if str(component.get("draw_mode", "closed_loop")) in ["open_edge", "ribbon"] else "")
 	BezierGeometry.resolve_auto_handles(component.get("points", []), component.get("chains", []))
 	_refresh_component_geometry(component)
