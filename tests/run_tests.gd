@@ -154,7 +154,8 @@ func _test_closed_loop_selection_mirror() -> void:
 		coincident_source_ids.append(BezierTopology.add_point(coincident_component, point_position, "linear"))
 	var coincident_result := SelectionMirrorService.apply(coincident_component, coincident_source_ids, mirror_axis_start, mirror_axis_end)
 	var coincident_mirror: Dictionary = coincident_result.get("component", {})
-	_expect(int(coincident_result.get("auto_connected_count", 0)) == 1, "Mirror should connect an endpoint that lands exactly on its source endpoint.")
+	_expect(int(coincident_result.get("auto_connected_count", 0)) == 1, "Mirror should merge an endpoint that lands exactly on its source endpoint.")
+	_expect(coincident_mirror.get("points", []).size() == 5, "A coincident mirrored endpoint must be removed instead of leaving two overlapping Points.")
 	_expect(coincident_mirror.get("chains", []).size() == 1 and not bool(coincident_mirror["chains"][0].get("closed", false)), "One coincident endpoint pair should join the two mirror Chains without auto-closing the contour.")
 
 
