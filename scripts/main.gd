@@ -120,6 +120,7 @@ var component_draw_mode_menu: PopupMenu
 var component_add_menu: PopupMenu
 var component_add_child_menu: PopupMenu
 var component_add_guide_menu: PopupMenu
+var component_context_menu: PopupMenu
 var guide_dialog: ConfirmationDialog
 var guide_name_input: LineEdit
 var texture_dialog: ConfirmationDialog
@@ -846,6 +847,7 @@ func _build_ui() -> void:
 	_create_component_dialog()
 	_create_component_draw_mode_menu()
 	_create_component_add_menu()
+	_create_component_context_menu()
 	_create_guide_dialog()
 	_create_texture_dialog()
 	_create_material_dialog()
@@ -1569,6 +1571,18 @@ func _create_component_add_menu() -> void:
 	_style_popup_menu(component_add_child_menu)
 	_style_popup_menu(component_add_guide_menu)
 	add_child(component_add_menu)
+
+
+func _create_component_context_menu() -> void:
+	component_context_menu = PopupMenu.new()
+	component_context_menu.name = "ComponentContextMenu"
+	component_context_menu.add_item("Duplicate", 0)
+	component_context_menu.add_separator()
+	component_context_menu.add_item("Duplicate & Mirror Y · Keep Orientation", 1)
+	component_context_menu.add_item("Duplicate & Mirror Y · Flip Orientation", 2)
+	_style_popup_menu(component_context_menu)
+	component_context_menu.id_pressed.connect(_on_component_context_menu_selected)
+	add_child(component_context_menu)
 
 
 func _create_guide_dialog() -> void:
@@ -7051,6 +7065,7 @@ func _render_component_outliner_tree(container: VBoxContainer, asset: Dictionary
 		component_button.pressed.connect(_select_lookdev_component.bind(asset_id, component_id))
 	else:
 		component_button.pressed.connect(_select_component.bind(asset_id, component_id))
+		component_button.gui_input.connect(_on_component_outliner_gui_input.bind(asset_id, component_id, component_button))
 	component_row.add_child(component_button)
 	if not lookdev:
 		var add_button := Button.new()
@@ -7064,6 +7079,19 @@ func _render_component_outliner_tree(container: VBoxContainer, asset: Dictionary
 	children.sort_custom(_sort_named_documents)
 	for child in children:
 		_render_component_outliner_tree(container, asset, child, lookdev, indent + 16, rendered_component_ids)
+
+
+func _on_component_outliner_gui_input(event: InputEvent, asset_id: String, component_id: String, button: Button) -> void:
+	if not event is InputEventMouseButton or event.button_index != MOUSE_BUTTON_RIGHT or not event.pressed:
+		return
+	if not is_instance_valid(component_context_menu):
+		return
+	_select_component(asset_id, component_id)
+	component_context_menu.set_meta("asset_id", asset_id)
+	component_context_menu.set_meta("component_id", component_id)
+	component_context_menu.position = Vector2i(button.global_position + event.position)
+	component_context_menu.popup()
+	get_viewport().set_input_as_handled()
 
 
 func _render_component_guide_row(container: VBoxContainer, asset: Dictionary, guide: Dictionary) -> void:
@@ -7411,6 +7439,105 @@ func _duplicate_selected_guide() -> void:
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
+
+
+func _on_component_context_menu_selected(action_id: int) -> void:
+	if not is_instance_valid(component_context_menu):
+		return
+	var asset_id := str(component_context_menu.get_meta("asset_id", ""))
+	var component_id := str(component_context_menu.get_meta("component_id", ""))
+	var mirror_mode := "none" if action_id == 0 else "keep_orientation" if action_id == 1 else "flip_orientation"
+	if mirror_mode == "none" or mirror_mode == "keep_orientation" or mirror_mode == "flip_orientation":
+		_duplicate_component(asset_id, component_id, mirror_mode)
+
+
+func _duplicate_component(asset_id: String, component_id: String, mirror_mode := "none") -> void:
+	var asset := _get_asset(asset_id)
+	var source := _get_component(asset, component_id)
+	if asset.is_empty() or source.is_empty():
+		return
+	_record_direct_change()
+	var duplicate := _duplicate_component_record(source, asset)
+	if mirror_mode != "none":
+		var transform: Dictionary = duplicate.get("transform", _default_component_transform())
+		var position: Vector2 = transform.get("position", Vector2.ZERO)
+		position.x = -position.x
+		transform["position"] = position
+		if mirror_mode == "flip_orientation":
+			transform["rotation"] = -float(transform.get("rotation", 0.0))
+			var scale: Vector2 = transform.get("scale", Vector2.ONE)
+			scale.x = -scale.x
+			transform["scale"] = scale
+		duplicate["transform"] = transform
+	asset["components"].append(duplicate)
+	selected_asset_id = asset_id
+	selected_component_id = str(duplicate.get("id", ""))
+	selected_guide_id = ""
+	selected_point_id = ""
+	selected_point_ids.clear()
+	selected_edge_id = ""
+	active_state = ""
+	expanded_assets[asset_id] = true
+	_show_status_message("Duplicated %s." % str(duplicate.get("name", "Component")))
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _duplicate_component_record(source: Dictionary, asset: Dictionary) -> Dictionary:
+	var duplicate := source.duplicate(true)
+	duplicate["id"] = "component_%d" % next_component_id
+	next_component_id += 1
+	duplicate["name"] = _next_duplicate_component_name(asset, str(source.get("name", "Component")))
+	# The duplicated Component stays beside its source: same Parent, no copied
+	# descendants, and no copied Guides.
+	duplicate["parent_component_id"] = str(source.get("parent_component_id", ""))
+	var point_id_map: Dictionary = {}
+	var new_points: Array = []
+	for point in source.get("points", []):
+		var point_copy: Dictionary = point.duplicate(true)
+		var new_point_id := BezierTopology.next_id(new_points, "point")
+		point_id_map[str(point.get("id", ""))] = new_point_id
+		point_copy["id"] = new_point_id
+		new_points.append(point_copy)
+	var edge_id_map: Dictionary = {}
+	var new_edges: Array = []
+	for edge in source.get("edges", []):
+		var edge_copy: Dictionary = edge.duplicate(true)
+		var new_edge_id := BezierTopology.next_id(new_edges, "edge")
+		edge_id_map[str(edge.get("id", ""))] = new_edge_id
+		edge_copy["id"] = new_edge_id
+		edge_copy["start_point_id"] = str(point_id_map.get(str(edge.get("start_point_id", "")), ""))
+		edge_copy["end_point_id"] = str(point_id_map.get(str(edge.get("end_point_id", "")), ""))
+		new_edges.append(edge_copy)
+	var new_chains: Array = []
+	for chain in source.get("chains", []):
+		var chain_copy: Dictionary = chain.duplicate(true)
+		chain_copy["id"] = BezierTopology.next_id(new_chains, "chain")
+		var remapped_points: Array = []
+		for point_id in chain.get("point_ids", []):
+			remapped_points.append(str(point_id_map.get(str(point_id), "")))
+		var remapped_edges: Array = []
+		for edge_id in chain.get("edge_ids", []):
+			remapped_edges.append(str(edge_id_map.get(str(edge_id), "")))
+		chain_copy["point_ids"] = remapped_points
+		chain_copy["edge_ids"] = remapped_edges
+		new_chains.append(chain_copy)
+	duplicate["points"] = new_points
+	duplicate["edges"] = new_edges
+	duplicate["chains"] = new_chains
+	BezierGeometry.resolve_auto_handles(new_points, new_chains)
+	return duplicate
+
+
+func _next_duplicate_component_name(asset: Dictionary, source_name: String) -> String:
+	var base_name := "%s Copy" % source_name
+	var candidate := base_name
+	var suffix := 2
+	while _has_component_name(asset, candidate):
+		candidate = "%s %d" % [base_name, suffix]
+		suffix += 1
+	return candidate
 
 
 func _duplicate_guide_record(source: Dictionary, asset: Dictionary) -> Dictionary:

@@ -832,6 +832,20 @@ func _test_asset_guides() -> void:
 	application._on_bezier_point_added(Vector2(15.0, 5.0), "aligned", Vector2.ZERO)
 	_expect(application.active_state == "draw" and Vector2(flow_guide.get("points", [])[0].get("position", Vector2.ZERO)).is_equal_approx(Vector2(10.0, 5.0)), "Flow Guides should catch Draw Guide Points on their parent Component contour just like Sample Guides.")
 	_expect(application.component_add_child_menu.item_count == 3 and application.component_add_guide_menu.item_count == 3, "Every Component add menu should expose Child draw modes and all three Guide types.")
+	parent_component["transform"] = {"position": Vector2(-3.0, 2.0), "rotation": 20.0, "scale": Vector2(1.0, 1.5), "pivot": Vector2.ZERO}
+	var duplicate_asset: Dictionary = application._get_asset("asset_1")
+	var component_count_before_duplicate: int = duplicate_asset.get("components", []).size()
+	var guide_count_before_duplicate: int = duplicate_asset.get("guides", []).size()
+	application._duplicate_component("asset_1", "component_1")
+	var plain_duplicate: Dictionary = application._get_component(application._get_asset("asset_1"), application.selected_component_id)
+	_expect(application._get_asset("asset_1").get("components", []).size() == component_count_before_duplicate + 1 and application._get_asset("asset_1").get("guides", []).size() == guide_count_before_duplicate and str(plain_duplicate.get("parent_component_id", "")) == str(parent_component.get("parent_component_id", "")), "Component Duplicate should copy only the selected Component beside its source, without Children or Guides.")
+	_expect(str(plain_duplicate.get("id", "")) != "component_1" and str(plain_duplicate.get("points", [])[0].get("id", "")) != str(parent_component.get("points", [])[0].get("id", "")), "Component Duplicate should remap the Component and topology IDs independently.")
+	application._duplicate_component("asset_1", "component_1", "keep_orientation")
+	var kept_duplicate: Dictionary = application._get_component(application._get_asset("asset_1"), application.selected_component_id)
+	_expect(Vector2(kept_duplicate.get("transform", {}).get("position", Vector2.ZERO)).is_equal_approx(Vector2(3.0, 2.0)) and is_equal_approx(float(kept_duplicate.get("transform", {}).get("rotation", 0.0)), 20.0), "Keep Orientation should mirror only the Component pivot position across the Parent Y axis.")
+	application._duplicate_component("asset_1", "component_1", "flip_orientation")
+	var flipped_duplicate: Dictionary = application._get_component(application._get_asset("asset_1"), application.selected_component_id)
+	_expect(is_equal_approx(float(flipped_duplicate.get("transform", {}).get("rotation", 0.0)), -20.0) and is_equal_approx(Vector2(flipped_duplicate.get("transform", {}).get("scale", Vector2.ONE)).x, -1.0), "Flip Orientation should mirror the Component geometry orientation as well as its Y-axis position.")
 	application.free()
 
 
