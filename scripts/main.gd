@@ -92,6 +92,7 @@ var selected_guide_id := ""
 var selected_edge_id := ""
 var selected_point_id := ""
 var selected_point_ids: Array[String] = []
+var asset_pivot_fields: Dictionary = {}
 var bezier_point_move_start_positions: Dictionary = {}
 var bezier_point_move_component_id := ""
 var bezier_point_move_guide_id := ""
@@ -734,6 +735,7 @@ func _build_ui() -> void:
 	canvas_view.mirror_axis_confirmed.connect(_on_mirror_axis_confirmed)
 	canvas_view.mirror_axis_cancelled.connect(_on_mirror_axis_cancelled)
 	canvas_view.pivot_changed.connect(_on_pivot_changed)
+	canvas_view.asset_pivot_changed.connect(_on_asset_pivot_changed)
 	canvas_view.transform_changed.connect(_on_transform_changed)
 	var canvas := canvas_view
 	canvas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -1839,6 +1841,7 @@ func _save_workspace() -> void:
 			"id": asset_id,
 			"name": str(asset["name"]),
 			"visibility": bool(asset.get("visibility", true)),
+			"asset_pivot": _serialize_vector(_asset_pivot(asset)),
 			"reference_image": _serialize_reference_image(asset.get("reference_image", {})),
 			"animation": MotionWorkspace.normalize_animation_document(asset.get("animation", {})).duplicate(true),
 			"components": [],
@@ -2217,6 +2220,7 @@ func _load_workspace(workspace_entry: String) -> bool:
 			"id": str(asset_data.get("id", asset_id)),
 			"name": str(asset_data.get("name", asset_id)),
 			"visibility": bool(asset_data.get("visibility", true)),
+			"asset_pivot": _deserialize_vector(asset_data.get("asset_pivot", [0.0, 0.0]), Vector2.ZERO),
 			"reference_image": _normalize_reference_image(asset_data.get("reference_image", {})),
 			"animation": MotionWorkspace.normalize_animation_document(asset_data.get("animation", {})),
 			"components": components,
@@ -2684,6 +2688,10 @@ func _default_component_transform() -> Dictionary:
 		"scale": Vector2.ONE,
 		"pivot": Vector2.ZERO
 	}
+
+
+func _asset_pivot(asset: Dictionary) -> Vector2:
+	return _deserialize_vector(asset.get("asset_pivot", [0.0, 0.0]), Vector2.ZERO)
 
 
 func _serialize_transform(transform: Dictionary) -> Dictionary:
@@ -5378,6 +5386,7 @@ func _build_selected_asset_scene() -> void:
 		return
 	var root := Node2D.new()
 	root.name = _tscn_name(str(asset.get("name", "Asset")))
+	var export_asset_pivot := _godot_export_points([_asset_pivot(asset)])[0]
 	for component in asset.get("components", []):
 		if str(component.get("draw_mode", "")) == "open_edge":
 			continue
@@ -5402,7 +5411,10 @@ func _build_selected_asset_scene() -> void:
 		polygon.polygon = PackedVector2Array(export_points)
 		var transform: Dictionary = component.get("transform", _default_component_transform())
 		var export_transform := _godot_export_transform(transform)
-		polygon.position = export_transform["position"]
+		# Children are authored relative to the asset Root anchor. Subtracting
+		# the anchor keeps the visible geometry unchanged while the scene origin
+		# becomes the Asset Pivot chosen in the editor.
+		polygon.position = export_transform["position"] - export_asset_pivot
 		polygon.rotation = deg_to_rad(float(export_transform["rotation"]))
 		polygon.scale = export_transform["scale"]
 		polygon.visible = bool(asset.get("visibility", true)) and bool(component.get("visibility", true))
@@ -5515,7 +5527,7 @@ func _confirm_asset_creation() -> void:
 		asset_name = _next_default_asset_name()
 	var asset_id := "asset_%d" % next_asset_id
 	next_asset_id += 1
-	assets.append({"id": asset_id, "name": asset_name, "visibility": true, "reference_image": _default_reference_image(), "animation": MotionWorkspace.create_default_animation_document(), "components": [], "guides": []})
+	assets.append({"id": asset_id, "name": asset_name, "visibility": true, "asset_pivot": Vector2.ZERO, "reference_image": _default_reference_image(), "animation": MotionWorkspace.create_default_animation_document(), "components": [], "guides": []})
 	selected_asset_id = asset_id
 	selected_component_id = ""
 	selected_guide_id = ""
@@ -5721,6 +5733,23 @@ func _on_reference_image_property_changed(value: float, property_name: String) -
 	_record_direct_change()
 	asset["reference_image"] = reference_image
 	_render_canvas_context()
+
+
+func _on_asset_pivot_property_changed(value: float, property_name: String) -> void:
+	if property_name not in ["pivot_x", "pivot_y"]:
+		return
+	var asset := _get_asset(selected_asset_id)
+	if asset.is_empty() or not selected_component_id.is_empty():
+		return
+	var pivot := _asset_pivot(asset)
+	var editor_value := _world_to_editor_units(value)
+	if property_name == "pivot_x":
+		pivot.x = editor_value
+	else:
+		pivot.y = editor_value
+	_record_direct_change()
+	asset["asset_pivot"] = pivot
+	canvas_view.set_asset_pivot(pivot)
 
 
 func _update_reference_image_property(property_name: String, value) -> void:
@@ -9097,6 +9126,7 @@ func _refresh_geometry_uv_mapping_workspace() -> void:
 func _render_inspector() -> void:
 	_clear(inspector_content)
 	transform_fields.clear()
+	asset_pivot_fields.clear()
 	if active_module == "Motion":
 		if active_motion_submodule == "Path":
 			_render_motion_path_inspector()
@@ -9221,6 +9251,15 @@ func _render_inspector() -> void:
 			_rename_selected_asset(asset_name_editor.text)
 		)
 		inspector_content.add_child(asset_name_editor)
+		inspector_content.add_child(_create_inspector_section("Asset Transform"))
+		var asset_transform_grid := GridContainer.new()
+		asset_transform_grid.columns = 2
+		asset_transform_grid.add_theme_constant_override("h_separation", 8)
+		asset_transform_grid.add_theme_constant_override("v_separation", 4)
+		var asset_pivot := _asset_pivot(asset)
+		_add_asset_pivot_field(asset_transform_grid, "Pivot X (cm)", _editor_units_to_world(asset_pivot.x), "pivot_x")
+		_add_asset_pivot_field(asset_transform_grid, "Pivot Y (cm)", _editor_units_to_world(asset_pivot.y), "pivot_y")
+		inspector_content.add_child(asset_transform_grid)
 		var reference_image := _normalize_reference_image(asset.get("reference_image", {}))
 		inspector_content.add_child(_create_inspector_section("Reference Image"))
 		var reference_buttons := HBoxContainer.new()
@@ -9269,7 +9308,6 @@ func _render_inspector() -> void:
 		pivot_option.item_selected.connect(_on_reference_image_pivot_selected.bind(pivot_option))
 		inspector_content.add_child(pivot_option)
 		if not str(reference_image.get("file", "")).is_empty():
-			inspector_content.add_child(_create_inspector_section("Reference Image Settings"))
 			var reference_visibility := CheckBox.new()
 			reference_visibility.text = "Visible"
 			reference_visibility.focus_mode = Control.FOCUS_NONE
@@ -11012,6 +11050,26 @@ func _add_reference_image_field(grid: GridContainer, label_text: String, value: 
 	grid.add_child(field)
 
 
+func _add_asset_pivot_field(grid: GridContainer, label_text: String, value: float, property_name: String) -> void:
+	var label := Label.new()
+	label.text = label_text
+	label.add_theme_font_size_override("font_size", 10)
+	label.add_theme_color_override("font_color", Color("#7f8a9b"))
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	grid.add_child(label)
+	var field := SpinBox.new()
+	field.min_value = -100000.0
+	field.max_value = 100000.0
+	field.step = 0.01
+	field.custom_arrow_step = 0.1
+	field.set_value_no_signal(value)
+	field.custom_minimum_size = Vector2(96, 26)
+	field.add_theme_font_size_override("font_size", 11)
+	field.value_changed.connect(_on_asset_pivot_property_changed.bind(property_name))
+	asset_pivot_fields[property_name] = field
+	grid.add_child(field)
+
+
 func _add_transform_field(grid: GridContainer, label_text: String, value: float, property_name: String, step: float) -> void:
 	var label := Label.new()
 	label.text = label_text
@@ -11568,6 +11626,7 @@ func _render_canvas_context() -> void:
 		canvas_context_label.text = "Asset: %s" % str(asset["name"])
 		canvas_view.set_context(str(asset["name"]))
 		canvas_view.set_interaction_state("asset")
+		canvas_view.set_asset_pivot(_asset_pivot(asset))
 		canvas_view.set_paper_frame(_paper_frame_size(paper_level) if paper_level >= 0 else Vector2.ZERO, paper_level >= 0)
 		canvas_view.set_tool_mode("")
 		canvas_view.set_component_transform({})
@@ -11808,6 +11867,20 @@ func _on_pivot_changed(pivot: Vector2) -> void:
 	var transform: Dictionary = component.get("transform", _default_component_transform())
 	transform["pivot"] = pivot
 	component["transform"] = transform
+
+
+func _on_asset_pivot_changed(pivot: Vector2) -> void:
+	var asset := _get_asset(selected_asset_id)
+	if asset.is_empty() or not selected_component_id.is_empty():
+		return
+	_record_coalesced_change()
+	asset["asset_pivot"] = pivot
+	for property_name in ["pivot_x", "pivot_y"]:
+		var field = asset_pivot_fields.get(property_name)
+		if not is_instance_valid(field):
+			continue
+		var value := _editor_units_to_world(pivot.x if property_name == "pivot_x" else pivot.y)
+		field.set_value_no_signal(value)
 
 
 func _on_transform_changed(transform: Dictionary) -> void:

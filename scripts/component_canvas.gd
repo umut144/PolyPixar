@@ -19,6 +19,7 @@ signal mirror_axis_stage_changed(stage: String)
 signal mirror_axis_confirmed(axis_start: Vector2, axis_end: Vector2)
 signal mirror_axis_cancelled()
 signal pivot_changed(pivot: Vector2)
+signal asset_pivot_changed(pivot: Vector2)
 signal transform_changed(transform: Dictionary)
 
 const PAN_SPEED := 420.0
@@ -99,6 +100,7 @@ var component_transform: Dictionary = {
 	"scale": Vector2.ONE,
 	"pivot": Vector2.ZERO
 }
+var asset_pivot := Vector2.ZERO
 var material_texture: Texture2D
 var material_modulate := Color.WHITE
 var material_mapping_scale := Vector2.ONE
@@ -114,6 +116,7 @@ var paper_frame_size := Vector2.ZERO
 var navigation_locked := false
 var command_shortcut_active := false
 var pivot_dragging := false
+var asset_pivot_dragging := false
 var transform_drag_axis := ""
 var transform_drag_start_world := Vector2.ZERO
 var transform_drag_start_position := Vector2.ZERO
@@ -187,6 +190,9 @@ func _gui_input(event: InputEvent) -> void:
 		if event.button_index == MOUSE_BUTTON_LEFT and interaction_state == "draw" and active_tool in ["point", "spine"]:
 			_begin_draw_pointer(event.position)
 			queue_redraw()
+			return
+		if event.button_index == MOUSE_BUTTON_LEFT and interaction_state == "asset" and _is_near_asset_pivot(event.position):
+			asset_pivot_dragging = true
 			return
 		if event.button_index == MOUSE_BUTTON_LEFT and interaction_state == "edit":
 			if edit_mode == "point" and not edit_handles_enabled and not edit_point_set_enabled:
@@ -286,6 +292,7 @@ func _gui_input(event: InputEvent) -> void:
 			return
 		bezier_handle_drag_side = ""
 		pivot_dragging = false
+		asset_pivot_dragging = false
 		transform_drag_axis = ""
 		face_dragging = false
 	if event is InputEventMouseMotion:
@@ -336,6 +343,11 @@ func _gui_input(event: InputEvent) -> void:
 			component_transform["position"] = transform_position
 			pivot_changed.emit(new_pivot)
 			transform_changed.emit(component_transform.duplicate(true))
+			queue_redraw()
+			return
+		if asset_pivot_dragging:
+			asset_pivot = _snap_to_grid(_screen_to_world(event.position))
+			asset_pivot_changed.emit(asset_pivot)
 			queue_redraw()
 			return
 		if interaction_state == "transform" and transform_drag_axis != "":
@@ -607,6 +619,11 @@ func set_component_transform(transform: Dictionary) -> void:
 	component_transform = transform.duplicate(true)
 	if not component_transform.has("pivot") or not component_transform["pivot"] is Vector2:
 		component_transform["pivot"] = Vector2.ZERO
+	queue_redraw()
+
+
+func set_asset_pivot(pivot: Vector2) -> void:
+	asset_pivot = pivot
 	queue_redraw()
 
 
@@ -956,7 +973,14 @@ func _draw_reference_image() -> void:
 
 
 func _draw_pivot() -> void:
-	if context_name.is_empty() or interaction_state == "asset":
+	if context_name.is_empty():
+		return
+	if interaction_state == "asset":
+		var asset_pivot_screen := _world_to_screen(asset_pivot)
+		var asset_pivot_color := Color("#d98cff")
+		draw_circle(asset_pivot_screen, 8.0, asset_pivot_color, false, 2.0)
+		draw_line(asset_pivot_screen - Vector2(13.0, 0.0), asset_pivot_screen + Vector2(13.0, 0.0), asset_pivot_color, 1.5)
+		draw_line(asset_pivot_screen - Vector2(0.0, 13.0), asset_pivot_screen + Vector2(0.0, 13.0), asset_pivot_color, 1.5)
 		return
 	var pivot_screen := _world_to_screen(component_transform.get("position", Vector2.ZERO))
 	var pivot_color := Color("#d98cff")
@@ -1017,6 +1041,10 @@ func _is_near_pivot(screen_position: Vector2) -> bool:
 		return false
 	var pivot_position: Vector2 = component_transform.get("position", Vector2.ZERO)
 	return screen_position.distance_to(_world_to_screen(pivot_position)) <= 12.0
+
+
+func _is_near_asset_pivot(screen_position: Vector2) -> bool:
+	return interaction_state == "asset" and screen_position.distance_to(_world_to_screen(asset_pivot)) <= 14.0
 
 
 func _draw_reference_shapes() -> void:
