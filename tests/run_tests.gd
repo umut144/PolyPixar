@@ -715,6 +715,9 @@ func _test_component_hierarchy_model() -> void:
 	_expect(str(flow_1.get("guide_type", "")) == AssetGuide.FLOW and int(flow_1.get("ordinal", 0)) == 1 and int(flow_2.get("ordinal", 0)) == 2, "Legacy Flow Guides should migrate to canonical types with stable per-Component ordinals.")
 	_expect(int(sample_1.get("ordinal", 0)) == 1 and int(child_sample.get("ordinal", 0)) == 1, "Guide numbering should be independent for every Component and Guide type.")
 	_expect(ComponentHierarchy.next_guide_ordinal(asset, "component_parent", AssetGuide.FLOW) == 3 and AssetGuide.outliner_name(child_sample, "Eyes") == "Eyes → Sample01", "Guide naming data should support stable dynamic Component-based labels.")
+	parent["name"] = "Face"
+	_expect(AssetGuide.outliner_name(flow_1, str(parent.get("name", ""))) == "Face → Flow01", "Guide labels should immediately follow Component renames without mutating Guide data.")
+	_expect(AssetGuide.color(AssetGuide.FLOW) == Color("#4267b2") and AssetGuide.color(AssetGuide.FLOW) != AssetGuide.color(AssetGuide.SAMPLE) and AssetGuide.color(AssetGuide.SAMPLE) != AssetGuide.color(AssetGuide.MOTION), "Flow, Sample, and Motion Guides should retain three distinct semantic colors.")
 	parent["parent_component_id"] = "component_child"
 	ComponentHierarchy.normalize_asset(asset)
 	_expect(str(parent.get("parent_component_id", "")).is_empty(), "Loading cyclic Component data should safely promote one participant to the Asset root.")

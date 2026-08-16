@@ -8,8 +8,11 @@ const BODY_FLOW := FLOW
 const SAMPLER_SPINE := SAMPLE
 const ANIMATION_SPINE := MOTION
 const VALID_TYPES := [FLOW, SAMPLE, MOTION]
-const SAMPLER_SPINE_COLOR := Color("#f2c94c")
-const ANIMATION_SPINE_COLOR := Color("#c084fc")
+const FLOW_COLOR := Color("#4267b2")
+const SAMPLE_COLOR := Color("#f2c94c")
+const MOTION_COLOR := Color("#c084fc")
+const SAMPLER_SPINE_COLOR := SAMPLE_COLOR
+const ANIMATION_SPINE_COLOR := MOTION_COLOR
 
 
 static func create(guide_id: String, guide_name: String, guide_type: String, component_id: String, ordinal := 1) -> Dictionary:
@@ -83,7 +86,12 @@ static func outliner_name(guide: Dictionary, component_name: String) -> String:
 
 
 static func color(guide_type: String) -> Color:
-	return ANIMATION_SPINE_COLOR if guide_type == ANIMATION_SPINE else SAMPLER_SPINE_COLOR
+	match canonical_type(guide_type):
+		FLOW:
+			return FLOW_COLOR
+		MOTION:
+			return MOTION_COLOR
+	return SAMPLE_COLOR
 
 
 static func validation_issues(guide: Dictionary) -> Array[String]:

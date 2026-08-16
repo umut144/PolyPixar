@@ -6454,7 +6454,7 @@ func _asset_matches_search(asset: Dictionary, search_text: String) -> bool:
 		if str(component.get("name", "")).to_lower().contains(search_text):
 			return true
 	for guide in asset.get("guides", []):
-		if str(guide.get("name", "")).to_lower().contains(search_text):
+		if _guide_display_name(asset, guide).to_lower().contains(search_text):
 			return true
 	return false
 
@@ -6917,8 +6917,6 @@ func _render_asset_outliner_entry(asset: Dictionary, force_expand := false, look
 	if not force_expand and not bool(expanded_assets.get(asset_id, false)):
 		return
 	var components: Array = []
-	var guides_by_component: Dictionary = {}
-	var unscoped_guides: Array = []
 	var guides: Array = asset.get("guides", []).duplicate(true)
 	for component in asset.get("components", []):
 		if str(component.get("type", "component")) == "guide":
@@ -6926,17 +6924,7 @@ func _render_asset_outliner_entry(asset: Dictionary, force_expand := false, look
 		else:
 			components.append(component)
 	components.sort_custom(_sort_named_documents)
-	for guide in guides:
-		var guide_component_id := str(guide.get("scope", {}).get("component_id", ""))
-		if guide_component_id.is_empty():
-			unscoped_guides.append(guide)
-		else:
-			if not guides_by_component.has(guide_component_id):
-				guides_by_component[guide_component_id] = []
-			guides_by_component[guide_component_id].append(guide)
-	for component_guides in guides_by_component.values():
-		component_guides.sort_custom(_sort_named_documents)
-	unscoped_guides.sort_custom(_sort_named_documents)
+	guides.sort_custom(func(left: Dictionary, right: Dictionary) -> bool: return _guide_display_name(asset, left).naturalnocasecmp_to(_guide_display_name(asset, right)) < 0)
 	asset_container.add_child(_create_outliner_child_group_label("Components"))
 	for component in components:
 		var component_id := str(component["id"])
@@ -6968,25 +6956,22 @@ func _render_asset_outliner_entry(asset: Dictionary, force_expand := false, look
 			add_guide_button.tooltip_text = "Add Guide"
 			add_guide_button.pressed.connect(_open_guide_dialog.bind(asset_id, component_id))
 			component_row.add_child(add_guide_button)
-		for guide in guides_by_component.get(component_id, []):
-			_render_component_guide_row(asset_container, asset_id, guide)
-	for guide in unscoped_guides:
-		_render_component_guide_row(asset_container, asset_id, guide)
+	asset_container.add_child(_create_outliner_child_group_label("Guides"))
+	for guide in guides:
+		_render_component_guide_row(asset_container, asset, guide)
 
 
-func _render_component_guide_row(container: VBoxContainer, asset_id: String, guide: Dictionary) -> void:
+func _render_component_guide_row(container: VBoxContainer, asset: Dictionary, guide: Dictionary) -> void:
+	var asset_id := str(asset.get("id", ""))
 	var guide_row := HBoxContainer.new()
 	guide_row.add_theme_constant_override("separation", 0)
 	container.add_child(guide_row)
 	var component_indent := Control.new()
 	component_indent.custom_minimum_size = Vector2(16, 0)
 	guide_row.add_child(component_indent)
-	var guide_indent := Control.new()
-	guide_indent.custom_minimum_size = Vector2(16, 0)
-	guide_row.add_child(guide_indent)
 	guide_row.add_child(_create_visibility_checkbox(bool(guide.get("visibility", true)), _on_guide_visibility_entry_changed.bind(asset_id, str(guide.get("id", "")))))
 	var guide_button := Button.new()
-	var guide_name := str(guide.get("name", "Guide"))
+	var guide_name := _guide_display_name(asset, guide)
 	guide_button.text = guide_name if bool(guide.get("visibility", true)) else _strikethrough_text(guide_name)
 	guide_button.tooltip_text = AssetGuide.display_name(str(guide.get("guide_type", AssetGuide.SAMPLER_SPINE)))
 	guide_button.custom_minimum_size = Vector2(0, 30)
@@ -6996,6 +6981,12 @@ func _render_component_guide_row(container: VBoxContainer, asset_id: String, gui
 	_style_guide_outliner_button(guide_button, str(guide.get("id", "")) == selected_guide_id, str(guide.get("guide_type", AssetGuide.SAMPLER_SPINE)))
 	guide_button.pressed.connect(_select_guide.bind(asset_id, str(guide.get("id", ""))))
 	guide_row.add_child(guide_button)
+
+
+func _guide_display_name(asset: Dictionary, guide: Dictionary) -> String:
+	var target_component := _get_component(asset, str(guide.get("scope", {}).get("component_id", "")))
+	var component_name := str(target_component.get("name", "Unassigned"))
+	return AssetGuide.outliner_name(guide, component_name)
 
 
 func _render_texture_outliner_entry(texture: Dictionary, force_expand := false) -> void:
@@ -7222,9 +7213,7 @@ func _open_guide_dialog(asset_id: String, component_id: String) -> void:
 	guide_name_input.text = ""
 	guide_dialog.set_meta("asset_id", asset_id)
 	guide_dialog.set_meta("component_id", component_id)
-	canvas_view.set_navigation_locked(true)
-	guide_dialog.popup_centered()
-	guide_name_input.grab_focus()
+	_confirm_guide_creation()
 
 
 func _submit_guide_name(_submitted_text: String) -> void:
@@ -7263,7 +7252,7 @@ func _confirm_guide_creation() -> void:
 	expanded_assets[asset_id] = true
 	guide_dialog.hide()
 	canvas_view.set_navigation_locked(false)
-	_show_status_message("Created %s." % guide_name)
+	_show_status_message("Created %s." % _guide_display_name(asset, guide))
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
@@ -7281,7 +7270,7 @@ func _duplicate_selected_guide() -> void:
 	selected_component_id = ""
 	active_state = ""
 	expanded_assets[selected_asset_id] = true
-	_show_status_message("Duplicated %s." % str(duplicate.get("name", "Guide")))
+	_show_status_message("Duplicated %s." % _guide_display_name(asset, duplicate))
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
@@ -7613,8 +7602,11 @@ func _style_guide_outliner_button(button: Button, selected: bool, guide_type := 
 	button.add_theme_stylebox_override("hover", hover)
 	button.add_theme_stylebox_override("pressed", pressed)
 	button.add_theme_stylebox_override("focus", normal)
-	button.add_theme_color_override("font_color", Color("#16181d") if selected else guide_color.lightened(0.35))
-	button.add_theme_color_override("font_hover_color", Color("#16181d") if selected else guide_color.lightened(0.55))
+	var selected_text_color := Color("#16181d") if guide_color.get_luminance() > 0.55 else Color("#f4f7ff")
+	button.add_theme_color_override("font_color", selected_text_color if selected else guide_color.lightened(0.35))
+	button.add_theme_color_override("font_hover_color", selected_text_color if selected else guide_color.lightened(0.55))
+	button.add_theme_color_override("font_pressed_color", selected_text_color)
+	button.add_theme_color_override("font_focus_color", selected_text_color if selected else guide_color.lightened(0.35))
 
 
 func _render_material_inspector() -> void:
@@ -7867,17 +7859,14 @@ func _render_guide_inspector(asset: Dictionary, guide: Dictionary) -> void:
 		inspector_content.add_child(_create_inspector_field_label("Guide not found."))
 		return
 	inspector_content.add_child(_create_inspector_field_label("Name"))
-	var name_editor := _create_name_editor(str(guide.get("name", "Guide")), "Guide name")
-	name_editor.text_submitted.connect(_rename_selected_guide)
-	name_editor.focus_exited.connect(func() -> void: _rename_selected_guide(name_editor.text))
-	inspector_content.add_child(name_editor)
+	inspector_content.add_child(_create_inspector_field_label(_guide_display_name(asset, guide)))
 	inspector_content.add_child(_create_inspector_field_label("Type"))
 	var type_option := OptionButton.new()
-	type_option.add_item("Body Flow")
+	type_option.add_item("Flow")
 	type_option.set_item_metadata(0, AssetGuide.BODY_FLOW)
-	type_option.add_item("Sampler Spine")
+	type_option.add_item("Sample")
 	type_option.set_item_metadata(1, AssetGuide.SAMPLER_SPINE)
-	type_option.add_item("Animation Spine")
+	type_option.add_item("Motion")
 	type_option.set_item_metadata(2, AssetGuide.ANIMATION_SPINE)
 	var guide_type := str(guide.get("guide_type", AssetGuide.BODY_FLOW))
 	for type_index in range(type_option.item_count):
@@ -8069,41 +8058,36 @@ func _update_weighting_parameter(parameter_name: String, value, coalesced := fal
 	_generate_weighting_preview()
 
 
-func _rename_selected_guide(new_name: String) -> void:
-	var guide := _get_guide(_get_asset(selected_asset_id), selected_guide_id)
-	var normalized_name := new_name.strip_edges()
-	if guide.is_empty() or normalized_name.is_empty() or normalized_name == str(guide.get("name", "")):
-		return
-	_record_direct_change()
-	guide["name"] = normalized_name
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
-
-
 func _on_guide_type_selected(index: int, option: OptionButton) -> void:
-	var guide := _get_guide(_get_asset(selected_asset_id), selected_guide_id)
+	var asset := _get_asset(selected_asset_id)
+	var guide := _get_guide(asset, selected_guide_id)
 	if guide.is_empty() or index < 0 or index >= option.item_count:
 		return
 	var guide_type := str(option.get_item_metadata(index))
 	if guide_type not in AssetGuide.VALID_TYPES or guide_type == str(guide.get("guide_type", "")):
 		return
 	_record_direct_change()
+	var guide_ordinal := ComponentHierarchy.next_guide_ordinal(asset, str(guide.get("scope", {}).get("component_id", "")), guide_type)
 	guide["guide_type"] = guide_type
+	guide["ordinal"] = guide_ordinal
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
 
 
 func _on_guide_target_selected(index: int, option: OptionButton) -> void:
-	var guide := _get_guide(_get_asset(selected_asset_id), selected_guide_id)
+	var asset := _get_asset(selected_asset_id)
+	var guide := _get_guide(asset, selected_guide_id)
 	if guide.is_empty() or not guide.get("points", []).is_empty() or index < 0 or index >= option.item_count:
 		return
 	var component_id := str(option.get_item_metadata(index))
 	if str(guide.get("scope", {}).get("component_id", "")) == component_id:
 		return
 	_record_direct_change()
+	var guide_ordinal := ComponentHierarchy.next_guide_ordinal(asset, component_id, str(guide.get("guide_type", AssetGuide.SAMPLE)))
 	guide["scope"] = {"kind": "component", "component_id": component_id}
+	guide["ordinal"] = guide_ordinal
+	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
 
@@ -8136,7 +8120,7 @@ func _delete_selected_guide() -> void:
 	pending_guide_remove_id = selected_guide_id
 	var guide := _get_guide(asset, selected_guide_id)
 	if is_instance_valid(guide_remove_dialog):
-		guide_remove_dialog.dialog_text = "Delete Guide ‘%s’?" % str(guide.get("name", "Guide"))
+		guide_remove_dialog.dialog_text = "Delete Guide ‘%s’?" % _guide_display_name(asset, guide)
 		guide_remove_dialog.popup_centered()
 	else:
 		_confirm_guide_deletion()
@@ -8361,10 +8345,10 @@ func _render_geometry_seeding_inspector() -> void:
 	var guide_ready := true
 	if str(recipe.get("method", "")) == GeometrySeedingService.SPINE_FLOW:
 		var sampler_guides := _sampler_spines_for_component(_get_asset(selected_asset_id), selected_component_id)
-		inspector_content.add_child(_create_inspector_field_label("Sampler Spine"))
+		inspector_content.add_child(_create_inspector_field_label("Sample Guide"))
 		var guide_option := OptionButton.new()
 		for guide in sampler_guides:
-			guide_option.add_item(str(guide.get("name", "Sampler Spine")))
+			guide_option.add_item(_guide_display_name(_get_asset(selected_asset_id), guide))
 			guide_option.set_item_metadata(guide_option.item_count - 1, str(guide.get("id", "")))
 			if str(guide.get("id", "")) == str(recipe.get("parameters", {}).get("guide_id", "")):
 				guide_option.select(guide_option.item_count - 1)
@@ -8373,7 +8357,7 @@ func _render_geometry_seeding_inspector() -> void:
 		guide_option.item_selected.connect(_on_geometry_seeding_guide_selected.bind(guide_option))
 		inspector_content.add_child(guide_option)
 		if sampler_guides.is_empty():
-			var missing_guide := _create_inspector_field_label("Create and author a Sampler Spine on this Component.")
+			var missing_guide := _create_inspector_field_label("Create and author a Sample Guide on this Component.")
 			missing_guide.add_theme_color_override("font_color", Color("#ef8354"))
 			inspector_content.add_child(missing_guide)
 		_add_geometry_seeding_float_parameter("Along Spacing", recipe, "along_spacing", GeometrySeedingService.MIN_SPACING, 10000.0)
@@ -10137,7 +10121,7 @@ func _render_motion_authoring_inspector(state: Dictionary, motion: Dictionary) -
 	inspector_content.add_child(primitive_option)
 	var primitive := str(motion.get("primitive", MotionWorkspace.BOB))
 	if domain == MotionWorkspace.INNER:
-		_add_unavailable_motion_guide_field("Animation Guides", "Animation Spine authoring is not available yet.")
+		_add_unavailable_motion_guide_field("Motion Guides", "Motion Guide authoring is not available yet.")
 	inspector_content.add_child(_create_inspector_section("Parameters"))
 	if primitive == MotionWorkspace.BOB:
 		_add_motion_number_parameter("Distance", state_id, motion_id, "distance", float(motion.get("parameters", {}).get("distance", 0.25)), 0.0, 1000.0, 0.05)
@@ -11715,8 +11699,9 @@ func _render_spine_canvas(asset: Dictionary, guide: Dictionary, drawing: bool) -
 	var target_component_id := str(guide.get("scope", {}).get("component_id", ""))
 	var target_component := _get_component(asset, target_component_id)
 	var type_name := AssetGuide.display_name(str(guide.get("guide_type", AssetGuide.SAMPLER_SPINE)))
-	canvas_context_label.text = "%s: %s%s" % [type_name, str(guide.get("name", type_name)), " · Draft" if drawing else ""]
-	canvas_view.set_context(str(guide.get("name", type_name)))
+	var guide_name := _guide_display_name(asset, guide)
+	canvas_context_label.text = "%s: %s%s" % [type_name, guide_name, " · Draft" if drawing else ""]
+	canvas_view.set_context(guide_name)
 	canvas_view.set_paper_frame(Vector2.ZERO, false)
 	canvas_view.set_component_material(null)
 	canvas_view.set_guide_style(true)
