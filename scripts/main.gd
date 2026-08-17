@@ -117,8 +117,13 @@ var asset_name_input: LineEdit
 var component_dialog: ConfirmationDialog
 var component_name_input: LineEdit
 var component_draw_mode_menu: PopupMenu
+var circle_primitive_dialog: ConfirmationDialog
+var circle_primitive_name_input: LineEdit
+var circle_primitive_radius_field: SpinBox
+var circle_primitive_samples_field: SpinBox
 var component_add_menu: PopupMenu
 var component_add_child_menu: PopupMenu
+var component_add_primitive_menu: PopupMenu
 var component_add_guide_menu: PopupMenu
 var component_context_menu: PopupMenu
 var guide_dialog: ConfirmationDialog
@@ -846,6 +851,7 @@ func _build_ui() -> void:
 	_create_asset_dialog()
 	_create_component_dialog()
 	_create_component_draw_mode_menu()
+	_create_circle_primitive_dialog()
 	_create_component_add_menu()
 	_create_component_context_menu()
 	_create_guide_dialog()
@@ -1540,11 +1546,48 @@ func _create_component_dialog() -> void:
 	add_child(component_dialog)
 
 
+func _create_circle_primitive_dialog() -> void:
+	circle_primitive_dialog = ConfirmationDialog.new()
+	circle_primitive_dialog.title = "Add Circle Primitive"
+	circle_primitive_dialog.size = Vector2i(380, 280)
+	circle_primitive_dialog.confirmed.connect(_confirm_circle_primitive_creation)
+	circle_primitive_dialog.canceled.connect(_on_circle_primitive_dialog_canceled)
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 6)
+	circle_primitive_name_input = LineEdit.new()
+	circle_primitive_name_input.placeholder_text = "Component name"
+	circle_primitive_name_input.custom_minimum_size = Vector2(320, 30)
+	content.add_child(circle_primitive_name_input)
+	var radius_label := Label.new()
+	radius_label.text = "Radius (cm)"
+	content.add_child(radius_label)
+	circle_primitive_radius_field = SpinBox.new()
+	circle_primitive_radius_field.min_value = 0.001
+	circle_primitive_radius_field.max_value = 100000.0
+	circle_primitive_radius_field.step = 0.001
+	circle_primitive_radius_field.value = 1.0
+	circle_primitive_radius_field.custom_minimum_size = Vector2(320, 28)
+	content.add_child(circle_primitive_radius_field)
+	var samples_label := Label.new()
+	samples_label.text = "Samples"
+	content.add_child(samples_label)
+	circle_primitive_samples_field = SpinBox.new()
+	circle_primitive_samples_field.min_value = 3
+	circle_primitive_samples_field.max_value = 256
+	circle_primitive_samples_field.step = 1
+	circle_primitive_samples_field.value = 32
+	circle_primitive_samples_field.custom_minimum_size = Vector2(320, 28)
+	content.add_child(circle_primitive_samples_field)
+	circle_primitive_dialog.add_child(content)
+	add_child(circle_primitive_dialog)
+
+
 func _create_component_draw_mode_menu() -> void:
 	component_draw_mode_menu = PopupMenu.new()
 	component_draw_mode_menu.add_item("Closed Loop", 0)
 	component_draw_mode_menu.add_item("Open Edge", 1)
 	component_draw_mode_menu.add_item("Ribbon", 2)
+	component_draw_mode_menu.add_item("Circle Primitive", 3)
 	_style_popup_menu(component_draw_mode_menu)
 	component_draw_mode_menu.id_pressed.connect(_on_component_draw_mode_selected)
 	add_child(component_draw_mode_menu)
@@ -1560,6 +1603,11 @@ func _create_component_add_menu() -> void:
 	component_add_child_menu.add_item("Ribbon", 2)
 	component_add_child_menu.id_pressed.connect(_on_component_add_child_selected)
 	component_add_menu.add_child(component_add_child_menu)
+	component_add_primitive_menu = PopupMenu.new()
+	component_add_primitive_menu.name = "PrimitiveTypes"
+	component_add_primitive_menu.add_item("Circle", 0)
+	component_add_primitive_menu.id_pressed.connect(_on_component_add_primitive_selected)
+	component_add_menu.add_child(component_add_primitive_menu)
 	component_add_guide_menu = PopupMenu.new()
 	component_add_guide_menu.name = "GuideTypes"
 	component_add_guide_menu.add_item("Sample", 0)
@@ -1568,9 +1616,11 @@ func _create_component_add_menu() -> void:
 	component_add_guide_menu.id_pressed.connect(_on_component_add_guide_selected)
 	component_add_menu.add_child(component_add_guide_menu)
 	component_add_menu.add_submenu_item("Child", "ChildTypes")
+	component_add_menu.add_submenu_item("Primitive", "PrimitiveTypes")
 	component_add_menu.add_submenu_item("Guide", "GuideTypes")
 	_style_popup_menu(component_add_menu)
 	_style_popup_menu(component_add_child_menu)
+	_style_popup_menu(component_add_primitive_menu)
 	_style_popup_menu(component_add_guide_menu)
 	add_child(component_add_menu)
 
@@ -7344,6 +7394,12 @@ func _on_component_add_child_selected(index: int) -> void:
 	component_name_input.grab_focus()
 
 
+func _on_component_add_primitive_selected(index: int) -> void:
+	if index != 0:
+		return
+	_open_circle_primitive_dialog(str(component_add_menu.get_meta("asset_id", "")), str(component_add_menu.get_meta("parent_component_id", "")))
+
+
 func _on_component_add_guide_selected(index: int) -> void:
 	var guide_types := [AssetGuide.SAMPLE, AssetGuide.MOTION, AssetGuide.FLOW]
 	if index < 0 or index >= guide_types.size():
@@ -7352,6 +7408,9 @@ func _on_component_add_guide_selected(index: int) -> void:
 
 
 func _on_component_draw_mode_selected(index: int) -> void:
+	if index == 3:
+		_open_circle_primitive_dialog(str(component_draw_mode_menu.get_meta("asset_id", "")), str(component_draw_mode_menu.get_meta("parent_component_id", "")))
+		return
 	if index < 0 or index >= DRAW_MODES.size():
 		return
 	component_name_input.text = ""
@@ -7377,6 +7436,23 @@ func _submit_component_name(_submitted_text: String) -> void:
 
 
 func _on_component_dialog_canceled() -> void:
+	canvas_view.set_navigation_locked(false)
+
+
+func _open_circle_primitive_dialog(asset_id: String, parent_component_id: String) -> void:
+	if _get_asset(asset_id).is_empty():
+		return
+	circle_primitive_dialog.set_meta("asset_id", asset_id)
+	circle_primitive_dialog.set_meta("parent_component_id", parent_component_id)
+	circle_primitive_name_input.text = ""
+	circle_primitive_radius_field.value = 1.0
+	circle_primitive_samples_field.value = 32
+	canvas_view.set_navigation_locked(true)
+	circle_primitive_dialog.popup_centered()
+	circle_primitive_name_input.grab_focus()
+
+
+func _on_circle_primitive_dialog_canceled() -> void:
 	canvas_view.set_navigation_locked(false)
 
 
@@ -7687,6 +7763,68 @@ func _confirm_component_creation() -> void:
 	expanded_assets[asset_id] = true
 	component_dialog.hide()
 	canvas_view.set_navigation_locked(false)
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _confirm_circle_primitive_creation() -> void:
+	var asset_id := str(circle_primitive_dialog.get_meta("asset_id", ""))
+	var asset := _get_asset(asset_id)
+	if asset.is_empty():
+		circle_primitive_dialog.hide()
+		canvas_view.set_navigation_locked(false)
+		return
+	var parent_component_id := str(circle_primitive_dialog.get_meta("parent_component_id", ""))
+	if not parent_component_id.is_empty() and _get_component(asset, parent_component_id).is_empty():
+		parent_component_id = ""
+	var radius := maxf(float(circle_primitive_radius_field.value), 0.001)
+	var samples := clampi(int(circle_primitive_samples_field.value), 3, 256)
+	var component_name := circle_primitive_name_input.text.strip_edges()
+	if component_name.is_empty():
+		component_name = _next_default_component_name(asset)
+	_record_direct_change()
+	var component_id := "component_%d" % next_component_id
+	next_component_id += 1
+	var component_transform := _default_component_transform()
+	if not parent_component_id.is_empty():
+		var parent_component := _get_component(asset, parent_component_id)
+		var parent_transform := _deserialize_transform(parent_component.get("transform", {}))
+		var inherited_pivot: Vector2 = parent_transform.get("pivot", Vector2.ZERO)
+		component_transform["position"] = inherited_pivot
+		component_transform["pivot"] = inherited_pivot
+	var component := {
+		"id": component_id,
+		"name": component_name,
+		"parent_component_id": parent_component_id,
+		"points": [],
+		"edges": [],
+		"chains": [],
+		"transform": component_transform,
+		"visibility": true,
+		"z_index": 0,
+		"material_id": "",
+		"draw_mode": "closed_loop",
+		"contour_width_px": DEFAULT_CONTOUR_WIDTH_PX,
+		"ribbon_width_px": DEFAULT_RIBBON_WIDTH_PX,
+		"catch_parent_component_id": "",
+		"show_point_numbers": false
+	}
+	for sample_index in range(samples):
+		var angle := TAU * float(sample_index) / float(samples)
+		BezierTopology.add_point(component, Vector2(cos(angle), sin(angle)) * radius, "aligned")
+	BezierTopology.close_active_chain(component)
+	asset["components"].append(component)
+	selected_asset_id = asset_id
+	selected_component_id = component_id
+	selected_guide_id = ""
+	selected_texture_id = ""
+	selected_element_id = ""
+	active_state = ""
+	expanded_assets[asset_id] = true
+	circle_primitive_dialog.hide()
+	canvas_view.set_navigation_locked(false)
+	_show_status_message("Created Circle %s with %d samples." % [component_name, samples])
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()

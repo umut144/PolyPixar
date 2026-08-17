@@ -888,6 +888,14 @@ func _test_asset_guides() -> void:
 	var detached_child: Dictionary = application._get_component(application._get_asset("asset_1"), str(child_component.get("id", "")))
 	var child_world_after_detach := ComponentHierarchy.world_transform_record(application._get_asset("asset_1"), str(child_component.get("id", "")))
 	_expect(str(detached_child.get("parent_component_id", "")).is_empty() and child_world_before_detach["position"].is_equal_approx(child_world_after_detach["position"]) and is_equal_approx(float(child_world_before_detach["rotation"]), float(child_world_after_detach["rotation"])), "Detach from Parent should promote a Child to the Parent's level without changing its world transform.")
+	application.circle_primitive_dialog.set_meta("asset_id", "asset_1")
+	application.circle_primitive_dialog.set_meta("parent_component_id", "component_1")
+	application.circle_primitive_name_input.text = "Pupil"
+	application.circle_primitive_radius_field.value = 1.25
+	application.circle_primitive_samples_field.value = 24
+	application._confirm_circle_primitive_creation()
+	var pupil_component: Dictionary = application._get_component(application._get_asset("asset_1"), application.selected_component_id)
+	_expect(str(pupil_component.get("parent_component_id", "")) == "component_1" and str(pupil_component.get("draw_mode", "")) == "closed_loop" and pupil_component.get("points", []).size() == 24 and bool(pupil_component.get("chains", [])[0].get("closed", false)), "Circle Primitive should create a closed sampled Child Component with the configured Parent.")
 	application.free()
 
 
