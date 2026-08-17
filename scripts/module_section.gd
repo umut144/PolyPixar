@@ -50,7 +50,8 @@ func set_expanded(value: bool) -> void:
 
 
 func _toggle() -> void:
-	set_expanded(not expanded)
+	# Product categories stay open; the header only activates the category.
+	set_expanded(true)
 	module_pressed.emit(module_name)
 
 

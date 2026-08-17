@@ -57,9 +57,10 @@ mirrored.
 ## Ribbon mesh derivation
 
 A Ribbon Component keeps its canonical source as one open Bézier Chain. Its
-derived `Ribbon Strip` mesh is sampled deterministically in `Geometry →
+derived `Ribbon Strip` mesh is sampled deterministically in `Mesh →
 Meshing`, offsets paired vertices by the persisted `ribbon_width_px` (8 px =
-0.625 Tool-cm by default at 128 px/m and 10 Tool-cm/m), and triangulates each
+0.625 internal units, displayed as 6.25 cm at 128 px/m and 10 cm per internal
+unit), and triangulates each
 consecutive pair into a strip.
 The derived mesh never modifies Points, Edges, or Chains.
 

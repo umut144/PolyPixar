@@ -67,7 +67,7 @@ func _draw() -> void:
 		return
 	_draw_source_mesh(left_rect)
 	_draw_uv_space(right_rect)
-	draw_string(ThemeDB.fallback_font, Vector2(10.0, size.y - 10.0), "Geometry → UV Mapping · %s" % status, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 12, Color("#9aa3b2"))
+	draw_string(ThemeDB.fallback_font, Vector2(10.0, size.y - 10.0), "Mesh → UV Mapping · %s" % status, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 12, Color("#9aa3b2"))
 
 
 func _draw_source_mesh(rect: Rect2) -> void:

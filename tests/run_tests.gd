@@ -302,9 +302,16 @@ func _test_geometry_sampling_ui_shell() -> void:
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
 	application._build_ui()
+	var visible_categories: Array[String] = []
+	var every_category_expanded := true
+	for module_section in application.module_sections:
+		visible_categories.append(module_section.module_name)
+		every_category_expanded = every_category_expanded and module_section.expanded
+	_expect(visible_categories == ["Create", "Mesh", "Style", "Export"], "The module rail should omit Texture, Material, Motion, Transform, and Effects categories.")
+	_expect(every_category_expanded, "Every visible category should remain expanded.")
 	var test_assets: Array[Dictionary] = [{"id": "asset_1", "name": "Wizard", "visibility": true, "components": [component]}]
 	application.assets = test_assets
-	application.active_module = "Geometry"
+	application.active_module = "Mesh"
 	application.active_geometry_submodule = "Sampling"
 	application.selected_asset_id = "asset_1"
 	application.selected_component_id = "component_1"
@@ -338,10 +345,21 @@ func _test_geometry_sampling_ui_shell() -> void:
 	application._restore_history_snapshot(history_snapshot)
 	_expect(is_equal_approx(float(application.geometry_documents["asset_1/component_1"]["sampling"]["recipe"]["parameters"]["spacing"]), GeometrySamplingService.DEFAULT_SPACING), "Geometry recipes and bakes should participate in Workspace Undo/Redo snapshots.")
 	var create_section: ModuleSection = application._find_section("Create")
-	application._select_submodule("Create", "Texture", create_section)
-	_expect(application.active_module == "Create" and application.active_create_submodule == "Texture" and application.texture_canvas.visible and not application.geometry_sampling_workspace.visible, "Selecting Create Texture from the module rail should immediately render the Texture workspace.")
-	application._select_submodule("Create", "Asset", create_section)
-	_expect(application.active_create_submodule == "Asset" and application.canvas_view.visible and not application.texture_canvas.visible, "Selecting Create Asset from the module rail should immediately render the Asset workspace.")
+	application._select_submodule("Create", "Props", create_section)
+	_expect(application.active_module == "Create" and application.active_create_submodule == "Props" and application.canvas_view.visible and not application.geometry_sampling_workspace.visible, "Selecting Create Props should immediately render the shared asset workspace.")
+	_expect(application._find_section("Mesh").active_submodule.is_empty() and application._find_section("Style").active_submodule.is_empty(), "Only the selected module should remain highlighted across always-expanded categories.")
+	application.asset_name_input.text = "Shield"
+	application._confirm_asset_creation()
+	_expect(str(application.assets[-1].get("asset_type", "")) == "props", "Create Props should persist the stable props Asset type.")
+	_expect(application._normalize_asset_type("") == "character" and application._asset_type_create_submodule("icon") == "Icon", "Missing Asset types should normalize to Character while valid types map back to their Create module.")
+	application._on_outliner_asset_type_filter_toggled(false, "character")
+	_expect(not application.outliner_asset_type_filters["character"] and application.outliner_asset_type_filters["props"], "Mesh and Style filters should support independent Asset type checkboxes.")
+	application.active_module = "Style"
+	application._render_outliner()
+	application._set_all_outliner_asset_type_filters()
+	_expect(application.outliner_asset_type_filters["character"] and application.outliner_asset_type_filter_panel.visible, "Style should show the shared Asset filter and restore all types with All.")
+	application._select_submodule("Create", "Character", create_section)
+	_expect(application.active_create_submodule == "Character" and application.canvas_view.visible, "Selecting Create Character should immediately render the shared asset workspace.")
 	application.selected_asset_id = "asset_1"
 	application.selected_component_id = "component_1"
 	application._render_context_bar()
@@ -420,7 +438,7 @@ func _test_geometry_seeding_service() -> void:
 	_expect(application._geometry_seeding_status("asset_1", "component_1", component) == "Ready to Bake", "Changing the Seeding recipe should preserve its Bake and leave Seeding ready for a direct rebake.")
 	normalized["seeding"]["recipe"]["parameters"]["seed"] = 17
 	application._build_ui()
-	application.active_module = "Geometry"
+	application.active_module = "Mesh"
 	application.active_geometry_submodule = "Seeding"
 	application.selected_asset_id = "asset_1"
 	application.selected_component_id = "component_1"
@@ -556,7 +574,7 @@ func _test_geometry_meshing_service_and_ui() -> void:
 	application.assets = test_assets
 	application.geometry_documents["asset_1/component_1"] = normalized
 	application._build_ui()
-	application.active_module = "Geometry"
+	application.active_module = "Mesh"
 	application.active_geometry_submodule = "Meshing"
 	application.selected_asset_id = "asset_1"
 	application.selected_component_id = "component_1"
@@ -636,7 +654,7 @@ func _test_geometry_uv_mapping_service_and_ui() -> void:
 	application.assets = test_assets
 	application.geometry_documents["asset_1/component_1"] = normalized
 	application._build_ui()
-	application.active_module = "Geometry"
+	application.active_module = "Mesh"
 	application.active_geometry_submodule = "UV Mapping"
 	application.selected_asset_id = "asset_1"
 	application.selected_component_id = "component_1"
@@ -804,7 +822,7 @@ func _test_asset_guides() -> void:
 	application.assets = test_assets
 	application._build_ui()
 	application.active_module = "Create"
-	application.active_create_submodule = "Asset"
+	application.active_create_submodule = "Character"
 	application.selected_asset_id = "asset_1"
 	application.selected_component_id = "component_1"
 	application.guide_dialog.set_meta("asset_id", "asset_1")
@@ -895,7 +913,9 @@ func _test_asset_guides() -> void:
 	application.circle_primitive_samples_field.value = 24
 	application._confirm_circle_primitive_creation()
 	var pupil_component: Dictionary = application._get_component(application._get_asset("asset_1"), application.selected_component_id)
-	_expect(str(pupil_component.get("parent_component_id", "")) == "component_1" and str(pupil_component.get("draw_mode", "")) == "closed_loop" and pupil_component.get("points", []).size() == 24 and bool(pupil_component.get("chains", [])[0].get("closed", false)), "Circle Primitive should create a closed sampled Child Component with the configured Parent.")
+	var pupil_points: Array = pupil_component.get("points", [])
+	var pupil_radius := Vector2(pupil_points[0].get("position", Vector2.ZERO)).length() if not pupil_points.is_empty() else 0.0
+	_expect(str(pupil_component.get("parent_component_id", "")) == "component_1" and str(pupil_component.get("draw_mode", "")) == "closed_loop" and pupil_points.size() == 24 and bool(pupil_component.get("chains", [])[0].get("closed", false)) and is_equal_approx(pupil_radius, 0.125), "Circle Primitive should create a closed sampled Child Component with the configured Parent and convert its cm radius into Tool units.")
 	application.free()
 
 
@@ -1225,16 +1245,18 @@ func _test_motion_module_separators() -> void:
 	_expect(separator_count == 1 and separator_height == 6 and section.content_list.get_child_count() == 5, "Motion should use one thick non-interactive separator between its Core and Extended workspace groups.")
 	section.free()
 	var create_section := ModuleSection.new()
-	create_section.setup("Create", ["Asset", "Texture"], false)
+	create_section.setup("Create", ["Character", "Props", "Terrain", "Icon"], true)
 	var create_separator_count := 0
 	for child in create_section.content_list.get_children():
 		if child is ColorRect:
 			create_separator_count += 1
-	_expect(create_separator_count == 0 and create_section.content_list.get_child_count() == 2, "Create should contain only its two Core authoring modules.")
+	_expect(create_separator_count == 0 and create_section.content_list.get_child_count() == 4, "Create should contain Character, Props, Terrain, and Icon.")
+	create_section._toggle()
+	_expect(create_section.expanded, "Product categories should remain expanded when their headers are pressed.")
 	create_section.free()
 	var geometry_section := ModuleSection.new()
-	geometry_section.setup("Geometry", ["Sampling", "Seeding", "Meshing", "UV Mapping"], false)
-	_expect(geometry_section.content_list.get_child_count() == 4, "Geometry should expose Sampling, Seeding, Meshing, and UV Mapping module entries.")
+	geometry_section.setup("Mesh", ["Sampling", "Seeding", "Meshing"], true)
+	_expect(geometry_section.content_list.get_child_count() == 3, "Mesh should expose Sampling, Seeding, and Meshing module entries.")
 	geometry_section.free()
 
 

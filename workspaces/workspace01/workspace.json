@@ -6,42 +6,42 @@
 		"asset_3"
 	],
 	"editor_state": {
+		"active_create_submodule": "Character",
 		"active_geometry_submodule": "Sampling",
 		"active_module": "Create",
 		"active_motion_submodule": "Animation",
-		"active_style_submodule": "Material",
+		"active_style_submodule": "Weighting",
 		"camera": {
 			"position": [
-				-0.093349814414978,
-				6.38907194137573
+				0.275659322738647,
+				1.00091981887817
 			],
-			"zoom": 75.0994063175336
+			"zoom": 246.159865936521
 		},
 		"expanded_assets": {
 			"asset_1": false,
 			"asset_2": false,
 			"asset_3": true
 		},
-		"expanded_textures": {},
-		"lookdev_target_asset_id": "",
-		"lookdev_target_component_id": "",
-		"material_view_mode": "graph",
 		"motion_act_preview_asset_id": "asset_1",
 		"motion_act_preview_loop": true,
 		"motion_path_preview_asset_id": "asset_1",
 		"motion_sequence_preview_loop": true,
 		"motion_sequence_view": "composition",
+		"outliner_asset_type_filters": {
+			"character": true,
+			"icon": true,
+			"props": true,
+			"terrain": true
+		},
 		"paper_level": 0,
 		"selected_asset_id": "asset_3",
-		"selected_component_id": "component_23",
-		"selected_element_id": "",
+		"selected_component_id": "component_21",
 		"selected_guide_id": "",
-		"selected_material_id": "",
 		"selected_motion_act_id": "",
 		"selected_motion_path_id": "",
 		"selected_motion_sequence_entry_id": "",
 		"selected_motion_sequence_id": "",
-		"selected_texture_id": "",
 		"selected_weighting_style_id": "",
 		"snap": {
 			"enabled": true,
@@ -54,7 +54,6 @@
 			"unit": "cm"
 		}
 	},
-	"materials": [],
 	"name": "workspace01",
 	"paths": [
 		"path_1"
@@ -62,6 +61,5 @@
 	"schema_version": 28,
 	"sequences": [
 		"sequence_1"
-	],
-	"textures": []
+	]
 }

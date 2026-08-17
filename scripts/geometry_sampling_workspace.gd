@@ -88,7 +88,7 @@ func _draw() -> void:
 		_fit_component()
 	_draw_authored_curves()
 	_draw_samples()
-	draw_string(ThemeDB.fallback_font, Vector2(10.0, 20.0), "Geometry → Sampling · %s" % status, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 12, Color("#9aa3b2"))
+	draw_string(ThemeDB.fallback_font, Vector2(10.0, 20.0), "Mesh → Sampling · %s" % status, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 12, Color("#9aa3b2"))
 
 
 func _draw_grid() -> void:

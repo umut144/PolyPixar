@@ -213,6 +213,7 @@
 		0.0,
 		0.0
 	],
+	"asset_type": "character",
 	"components": [
 		{
 			"catch_parent_component_id": "",
@@ -307,7 +308,6 @@
 				}
 			],
 			"id": "component_18",
-			"material_id": "",
 			"name": "Head",
 			"parent_component_id": "",
 			"points": [
@@ -518,7 +518,6 @@
 				}
 			],
 			"id": "component_19",
-			"material_id": "",
 			"name": "HeadTip",
 			"parent_component_id": "",
 			"points": [
@@ -639,8 +638,7 @@
 				}
 			],
 			"id": "component_20",
-			"material_id": "",
-			"name": "EyeL",
+			"name": "EyeR",
 			"parent_component_id": "component_18",
 			"points": [
 				{
@@ -760,8 +758,7 @@
 				}
 			],
 			"id": "component_21",
-			"material_id": "",
-			"name": "EyeR",
+			"name": "EyeL",
 			"parent_component_id": "component_18",
 			"points": [
 				{
@@ -932,7 +929,6 @@
 				}
 			],
 			"id": "component_22",
-			"material_id": "",
 			"name": "Body",
 			"parent_component_id": "",
 			"points": [
@@ -1194,7 +1190,6 @@
 				}
 			],
 			"id": "component_23",
-			"material_id": "",
 			"name": "Belly",
 			"parent_component_id": "component_22",
 			"points": [

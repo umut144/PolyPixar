@@ -86,7 +86,7 @@ func _draw() -> void:
 	_draw_mesh()
 	_draw_boundaries()
 	_draw_seeds()
-	draw_string(ThemeDB.fallback_font, Vector2(10.0, 20.0), "Geometry → Meshing · %s" % status, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 12, Color("#9aa3b2"))
+	draw_string(ThemeDB.fallback_font, Vector2(10.0, 20.0), "Mesh → Meshing · %s" % status, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 12, Color("#9aa3b2"))
 
 
 func _draw_grid() -> void:

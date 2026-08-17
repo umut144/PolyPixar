@@ -101,11 +101,6 @@ var component_transform: Dictionary = {
 	"pivot": Vector2.ZERO
 }
 var asset_pivot := Vector2.ZERO
-var material_texture: Texture2D
-var material_modulate := Color.WHITE
-var material_mapping_scale := Vector2.ONE
-var material_mapping_offset := Vector2.ZERO
-var material_wrap_mode := "clamp"
 var reference_image: Texture2D
 var reference_image_visible := true
 var reference_image_opacity := 0.5
@@ -630,15 +625,6 @@ func set_asset_pivot(pivot: Vector2) -> void:
 	queue_redraw()
 
 
-func set_component_material(texture: Texture2D, tint := Color.WHITE, opacity := 1.0, mapping_scale := Vector2.ONE, mapping_offset := Vector2.ZERO, wrap_mode := "clamp") -> void:
-	material_texture = texture
-	material_modulate = Color(tint.r, tint.g, tint.b, clampf(float(opacity), 0.0, 1.0))
-	material_mapping_scale = Vector2(maxf(mapping_scale.x, 0.01), maxf(mapping_scale.y, 0.01))
-	material_mapping_offset = mapping_offset
-	material_wrap_mode = wrap_mode
-	queue_redraw()
-
-
 func set_reference_image(texture: Texture2D, image_visible := true, image_opacity := 0.5, image_position := Vector2.ZERO, image_scale := 1.0) -> void:
 	reference_image = texture
 	reference_image_visible = image_visible
@@ -921,8 +907,8 @@ func _draw_measurement_guides() -> void:
 	var cursor_screen := _world_to_screen(cursor_position_world)
 	var guide_color := Color("#f2c94c")
 	var coordinate_lines: Array[String] = []
-	coordinate_lines.append("x: %.2f cm" % (cursor_position_world.x - origin_world.x))
-	coordinate_lines.append("y: %.2f cm" % (cursor_position_world.y - origin_world.y))
+	coordinate_lines.append("x: %.2f cm" % ToolUnits.to_centimeters(cursor_position_world.x - origin_world.x))
+	coordinate_lines.append("y: %.2f cm" % ToolUnits.to_centimeters(cursor_position_world.y - origin_world.y))
 	_draw_coordinate_readout(coordinate_lines, cursor_screen, guide_color, interaction_state == "edit")
 
 
@@ -1163,8 +1149,6 @@ func _draw_bezier_geometry() -> void:
 	var edges_by_id: Dictionary = {}
 	for edge_data in bezier_edges:
 		edges_by_id[str(edge_data.get("id", ""))] = edge_data
-	if display_polygon_closed and display_polygon.size() >= 3 and is_instance_valid(material_texture):
-		_draw_material_polygon()
 	var shape_color := guide_color if guide_style else Color("#55c7d9")
 	var point_mode_highlight := Color("#f2c94c") if interaction_state == "edit" and edit_mode in ["point", "face"] else shape_color
 	var edge_mode_highlight := Color("#f2c94c") if interaction_state == "edit" and edit_mode in ["edge", "face"] else shape_color
@@ -1377,30 +1361,6 @@ func _draw_bezier_handle_preview(point_data: Dictionary) -> void:
 		draw_circle(handle_out_screen, 5.0, handle_out_color, false, 1.5)
 		draw_string(ThemeDB.fallback_font, handle_out_screen + Vector2(7.0, -6.0), "Out", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, handle_out_color)
 
-
-func _draw_material_polygon() -> void:
-	texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED if material_wrap_mode == "repeat" else CanvasItem.TEXTURE_REPEAT_DISABLED
-	var min_point := display_polygon[0]
-	var max_point := display_polygon[0]
-	for point in display_polygon:
-		min_point.x = minf(min_point.x, point.x)
-		min_point.y = minf(min_point.y, point.y)
-		max_point.x = maxf(max_point.x, point.x)
-		max_point.y = maxf(max_point.y, point.y)
-	var extent := max_point - min_point
-	if is_zero_approx(extent.x):
-		extent.x = 1.0
-	if is_zero_approx(extent.y):
-		extent.y = 1.0
-	var screen_points := PackedVector2Array()
-	var uvs := PackedVector2Array()
-	var colors := PackedColorArray()
-	for point in display_polygon:
-		screen_points.append(_world_to_screen(_local_to_world(point)))
-		var base_uv := Vector2((point.x - min_point.x) / extent.x, (point.y - min_point.y) / extent.y)
-		uvs.append(base_uv if material_wrap_mode == "fit" else base_uv / material_mapping_scale + material_mapping_offset)
-		colors.append(material_modulate)
-	draw_polygon(screen_points, colors, uvs, material_texture)
 
 func _nearest_bezier_point(screen_position: Vector2) -> int:
 	var nearest_index := -1

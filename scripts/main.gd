@@ -1,13 +1,11 @@
 extends Control
 
 const SELECTION_MIRROR_SERVICE_SCRIPT = preload("res://scripts/selection_mirror_service.gd")
-const CREATE_SUBMODULES := ["Asset", "Texture"]
+const CREATE_SUBMODULES := ["Character", "Props", "Terrain", "Icon"]
 const GEOMETRY_SUBMODULES := ["Sampling", "Seeding", "Meshing"]
-const STYLE_SUBMODULES := ["Material", "Weighting"]
+const STYLE_SUBMODULES := ["Weighting"]
 const MOTION_SUBMODULES := ["Animation", "Path", "Act", "Sequence"]
-const INACTIVE_MODULES := ["Transform", "Effects", "Export"]
 const WORKSPACES_ROOT := "res://workspaces"
-const IMPORT_TEXTURES_ROOT := "res://imports/textures"
 const CONFIG_PATH := "res://configs/app_config.json"
 const SCHEMA_VERSION := 28
 const MAX_HISTORY_SIZE := 100
@@ -18,23 +16,31 @@ const PAPER_NONE_LABEL := "Kein Rahmen"
 const DRAW_MODES := ["closed_loop", "open_edge", "ribbon"]
 const DEFAULT_CONTOUR_WIDTH_PX := 8.0
 const DEFAULT_RIBBON_WIDTH_PX := 8.0
+const GRID_BOX_TOOL_UNITS := 0.5
+const GAME_TILE_CENTIMETERS := 50.0
 # Kept available for a later Outliner presentation, but processed outputs are
 # currently reached through the Import Preview instead of additional rows.
 const SHOW_PROCESSED_OUTLINER := false
 
-var active_create_submodule := "Asset"
+var active_create_submodule := "Character"
 var active_geometry_submodule := "Sampling"
-var active_style_submodule := "Material"
+var active_style_submodule := "Weighting"
 var active_motion_submodule := "Animation"
 var active_module := "Create"
 var active_context_command := ""
 var outliner_list: VBoxContainer
 var outliner_search_input: LineEdit
+var outliner_asset_type_filter_panel: VBoxContainer
+var outliner_asset_type_filter_checkboxes: Dictionary = {}
+var outliner_asset_type_filters: Dictionary = {
+	"character": true,
+	"props": true,
+	"terrain": true,
+	"icon": true
+}
 var inspector_content: VBoxContainer
 var module_sections: Array[ModuleSection] = []
 var assets: Array[Dictionary] = []
-var textures: Array[Dictionary] = []
-var materials: Array[Dictionary] = []
 var motion_paths: Array[Dictionary] = []
 var motion_acts: Array[Dictionary] = []
 var motion_sequences: Array[Dictionary] = []
@@ -96,22 +102,11 @@ var asset_pivot_fields: Dictionary = {}
 var bezier_point_move_start_positions: Dictionary = {}
 var bezier_point_move_component_id := ""
 var bezier_point_move_guide_id := ""
-var selected_texture_id := ""
-var selected_element_id := ""
-var selected_material_id := ""
 var selected_weighting_style_id := ""
-# Legacy workspace fields are retained for backwards-compatible JSON loading.
-# The active Material workflow is now always the Graph workspace.
-var material_view_mode := "graph"
-var lookdev_target_asset_id := ""
-var lookdev_target_component_id := ""
 var expanded_assets: Dictionary = {}
-var expanded_textures: Dictionary = {}
 var next_asset_id := 1
 var next_component_id := 1
 var next_guide_id := 1
-var next_texture_id := 1
-var next_material_id := 1
 var asset_dialog: ConfirmationDialog
 var asset_name_input: LineEdit
 var component_dialog: ConfirmationDialog
@@ -128,11 +123,6 @@ var component_add_guide_menu: PopupMenu
 var component_context_menu: PopupMenu
 var guide_dialog: ConfirmationDialog
 var guide_name_input: LineEdit
-var texture_dialog: ConfirmationDialog
-var texture_name_input: LineEdit
-var material_dialog: ConfirmationDialog
-var material_name_input: LineEdit
-var texture_import_dialog: FileDialog
 var reference_image_dialog: FileDialog
 var reference_image_crop_dialog: ReferenceImageCropDialog
 var element_dialog: ConfirmationDialog
@@ -142,15 +132,6 @@ var component_name_editor: LineEdit
 var transform_fields: Dictionary = {}
 var canvas_context_label: Label
 var canvas_view: ComponentCanvas
-var texture_canvas: TextureCanvas
-var import_preview: ImportPreview
-var material_graph: GraphEdit
-var material_preview_container: CenterContainer
-var material_preview_surface: PanelContainer
-var material_preview_content: CenterContainer
-var material_preview_texture: TextureRect
-var material_preview_label: Label
-var material_preview_shader: ShaderMaterial
 var export_workspace: VBoxContainer
 var motion_workspace: MotionWorkspace
 var motion_path_workspace: MotionPathWorkspace
@@ -201,13 +182,10 @@ var motion_sequence_dialog: ConfirmationDialog
 var motion_sequence_name_input: LineEdit
 var export_summary_label: Label
 var export_validation_label: Label
-var texture_context_label: Label
-var import_preview_context_label: Label
 var context_bar: HBoxContainer
 var create_action_button: Button
 var info_bar: HBoxContainer
 var program_status_label: Label
-var active_material_status_label: Label
 var status_clear_timer: Timer
 var active_draw_tool := ""
 var active_draw_point_mode := "linear"
@@ -247,7 +225,7 @@ var redo_history: Array[Dictionary] = []
 var history_coalesce_timer: Timer
 var history_coalescing := false
 var world_unit := "cm"
-var world_grid_size := 0.5
+var world_grid_size := GRID_BOX_TOOL_UNITS
 
 
 func _ready() -> void:
@@ -310,9 +288,7 @@ func _focus_active_canvas_after_startup() -> void:
 	# Let the workspace restore finish creating/focusing its controls first.
 	await get_tree().process_frame
 	await get_tree().process_frame
-	if active_module == "Create" and active_create_submodule == "Texture" and is_instance_valid(texture_canvas) and texture_canvas.visible:
-		texture_canvas.grab_focus()
-	elif is_instance_valid(canvas_view) and canvas_view.visible:
+	if is_instance_valid(canvas_view) and canvas_view.visible:
 		canvas_view.grab_focus()
 
 
@@ -363,7 +339,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			_set_motion_sequence_view(MotionSequenceWorkspace.VIEW_COMPOSITION if event.keycode == KEY_1 else MotionSequenceWorkspace.VIEW_PLAYER)
 			get_viewport().set_input_as_handled()
 		return
-	if active_module == "Geometry" and active_geometry_submodule == "Sampling" and event.keycode in [KEY_1, KEY_2]:
+	if active_module == "Mesh" and active_geometry_submodule == "Sampling" and event.keycode in [KEY_1, KEY_2]:
 		var geometry_focus_owner := get_viewport().gui_get_focus_owner()
 		if geometry_focus_owner is LineEdit or geometry_focus_owner is TextEdit or geometry_focus_owner is SpinBox:
 			return
@@ -375,7 +351,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			_set_geometry_sampling_method(GeometrySamplingService.ADAPTIVE if event.keycode == KEY_1 else GeometrySamplingService.EVEN_SPACING)
 			get_viewport().set_input_as_handled()
 			return
-	if active_module == "Geometry" and active_geometry_submodule == "Seeding":
+	if active_module == "Mesh" and active_geometry_submodule == "Seeding":
 		var seeding_focus_owner := get_viewport().gui_get_focus_owner()
 		if not (seeding_focus_owner is LineEdit or seeding_focus_owner is TextEdit or seeding_focus_owner is SpinBox):
 			if has_command_modifier and event.keycode == KEY_1:
@@ -399,7 +375,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 					geometry_seeding_workspace.delete_selected_seed()
 				get_viewport().set_input_as_handled()
 				return
-	if active_module == "Geometry" and active_geometry_submodule == "Meshing" and event.keycode in [KEY_1, KEY_2]:
+	if active_module == "Mesh" and active_geometry_submodule == "Meshing" and event.keycode in [KEY_1, KEY_2]:
 		var meshing_focus_owner := get_viewport().gui_get_focus_owner()
 		if meshing_focus_owner is LineEdit or meshing_focus_owner is TextEdit or meshing_focus_owner is SpinBox:
 			return
@@ -414,7 +390,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			_set_geometry_meshing_method(GeometryMeshingService.CONSTRAINED_DELAUNAY if event.keycode == KEY_1 else GeometryMeshingService.ORGANIC_RELAXED)
 			get_viewport().set_input_as_handled()
 			return
-	if active_module == "Geometry" and active_geometry_submodule == "UV Mapping" and event.keycode == KEY_1:
+	if active_module == "Mesh" and active_geometry_submodule == "UV Mapping" and event.keycode == KEY_1:
 		var uv_focus_owner := get_viewport().gui_get_focus_owner()
 		if uv_focus_owner is LineEdit or uv_focus_owner is TextEdit or uv_focus_owner is SpinBox:
 			return
@@ -457,22 +433,6 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			return
 		return
 	if selected_component_id.is_empty():
-		if not selected_texture_id.is_empty() and not selected_element_id.is_empty():
-			var selected_texture := _get_texture(selected_texture_id)
-			var selected_element := _get_element(selected_texture, selected_element_id)
-			if not selected_element.is_empty() and str(selected_element.get("type", "generator")) == "import":
-				if has_command_modifier and event.keycode == KEY_1:
-					_render_context_bar()
-					get_viewport().set_input_as_handled()
-					return
-				if not has_command_modifier and event.keycode == KEY_1:
-					_set_import_preview_mode("original")
-					get_viewport().set_input_as_handled()
-					return
-				if not has_command_modifier and event.keycode == KEY_2:
-					_set_import_preview_mode("white_to_alpha")
-					get_viewport().set_input_as_handled()
-					return
 		return
 	if has_command_modifier and event.keycode == KEY_1:
 		_activate_draw_state()
@@ -664,11 +624,10 @@ func _build_ui() -> void:
 	module_rail.add_theme_constant_override("separation", 4)
 	module_rail_panel.add_child(module_rail)
 	_add_module_section(module_rail, "Create", CREATE_SUBMODULES, true)
-	_add_module_section(module_rail, "Geometry", GEOMETRY_SUBMODULES, false, false, -1)
-	_add_module_section(module_rail, "Style", STYLE_SUBMODULES)
-	_add_module_section(module_rail, "Motion", MOTION_SUBMODULES, false, false, 3)
-	for module_name in INACTIVE_MODULES:
-		_add_module_section(module_rail, module_name, [])
+	_add_module_section(module_rail, "Mesh", GEOMETRY_SUBMODULES, true, false, -1)
+	_add_module_section(module_rail, "Style", STYLE_SUBMODULES, true)
+	_add_module_section(module_rail, "Export", [], true)
+	_set_active_module_visual("Create", active_create_submodule)
 
 	var workspace_split := HSplitContainer.new()
 	workspace_split.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -693,6 +652,39 @@ func _build_ui() -> void:
 	outliner_search_input.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	outliner_search_input.text_changed.connect(func(_text: String) -> void: _render_outliner())
 	outliner_tools.add_child(outliner_search_input)
+	outliner_asset_type_filter_panel = VBoxContainer.new()
+	outliner_asset_type_filter_panel.name = "AssetTypeFilter"
+	outliner_asset_type_filter_panel.add_theme_constant_override("separation", 2)
+	outliner_content.add_child(outliner_asset_type_filter_panel)
+	var filter_header := HBoxContainer.new()
+	filter_header.add_theme_constant_override("separation", 4)
+	var filter_label := _create_panel_label("Asset Filter")
+	filter_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	filter_header.add_child(filter_label)
+	var filter_reset := Button.new()
+	filter_reset.text = "All"
+	filter_reset.custom_minimum_size = Vector2(34, 22)
+	filter_reset.focus_mode = Control.FOCUS_NONE
+	filter_reset.tooltip_text = "Show all Asset types"
+	filter_reset.pressed.connect(_set_all_outliner_asset_type_filters)
+	filter_header.add_child(filter_reset)
+	outliner_asset_type_filter_panel.add_child(filter_header)
+	var filter_grid := GridContainer.new()
+	filter_grid.columns = 2
+	filter_grid.add_theme_constant_override("h_separation", 4)
+	filter_grid.add_theme_constant_override("v_separation", 0)
+	var asset_type_labels := {"character": "Character", "props": "Props", "terrain": "Terrain", "icon": "Icon"}
+	for asset_type in ["character", "props", "terrain", "icon"]:
+		var type_checkbox := CheckBox.new()
+		type_checkbox.text = asset_type_labels[asset_type]
+		type_checkbox.button_pressed = bool(outliner_asset_type_filters.get(asset_type, true))
+		type_checkbox.focus_mode = Control.FOCUS_NONE
+		type_checkbox.custom_minimum_size = Vector2(0, 24)
+		type_checkbox.toggled.connect(_on_outliner_asset_type_filter_toggled.bind(asset_type))
+		outliner_asset_type_filter_checkboxes[asset_type] = type_checkbox
+		filter_grid.add_child(type_checkbox)
+	outliner_asset_type_filter_panel.add_child(filter_grid)
+	outliner_asset_type_filter_panel.visible = false
 	var outliner_scroll := ScrollContainer.new()
 	outliner_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	outliner_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -754,31 +746,6 @@ func _build_ui() -> void:
 	canvas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	canvas_panel.add_child(canvas)
-	texture_canvas = TextureCanvas.new()
-	texture_canvas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	texture_canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	texture_canvas.visible = false
-	texture_canvas.origin_changed.connect(_on_texture_origin_changed)
-	canvas_panel.add_child(texture_canvas)
-	import_preview = ImportPreview.new()
-	import_preview.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	import_preview.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	import_preview.visible = false
-	canvas_panel.add_child(import_preview)
-	import_preview_context_label = Label.new()
-	import_preview_context_label.position = Vector2(8, 6)
-	import_preview_context_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	import_preview_context_label.add_theme_font_size_override("font_size", 11)
-	import_preview_context_label.add_theme_color_override("font_color", Color("#9aa3b2"))
-	import_preview.add_child(import_preview_context_label)
-	material_graph = GraphEdit.new()
-	material_graph.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	material_graph.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	material_graph.show_grid = true
-	material_graph.visible = false
-	canvas_panel.add_child(material_graph)
-	_create_material_graph()
-	_create_material_preview()
 	_create_export_workspace(canvas_panel)
 	_create_motion_workspace(canvas_panel)
 	_create_motion_path_workspace(canvas_panel)
@@ -789,12 +756,6 @@ func _build_ui() -> void:
 	_create_geometry_meshing_workspace(canvas_panel)
 	_create_geometry_uv_mapping_workspace(canvas_panel)
 	_create_weighting_workspace(canvas_panel)
-	texture_context_label = Label.new()
-	texture_context_label.position = Vector2(8, 6)
-	texture_context_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	texture_context_label.add_theme_font_size_override("font_size", 11)
-	texture_context_label.add_theme_color_override("font_color", Color("#9aa3b2"))
-	texture_canvas.add_child(texture_context_label)
 	canvas_context_label = Label.new()
 	canvas_context_label.position = Vector2(8, 6)
 	canvas_context_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -836,12 +797,6 @@ func _build_ui() -> void:
 	status_right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	status_right.size_flags_stretch_ratio = 17.0
 	status_layout.add_child(status_right)
-	active_material_status_label = Label.new()
-	active_material_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	active_material_status_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	active_material_status_label.add_theme_font_size_override("font_size", 11)
-	active_material_status_label.add_theme_color_override("font_color", Color("#9aa3b2"))
-	status_right.add_child(active_material_status_label)
 	status_clear_timer = Timer.new()
 	status_clear_timer.one_shot = true
 	status_clear_timer.wait_time = 2.5
@@ -855,99 +810,17 @@ func _build_ui() -> void:
 	_create_component_add_menu()
 	_create_component_context_menu()
 	_create_guide_dialog()
-	_create_texture_dialog()
-	_create_material_dialog()
-	_create_texture_import_dialog()
 	_create_reference_image_dialog()
 	reference_image_crop_dialog = ReferenceImageCropDialog.new()
 	reference_image_crop_dialog.image_accepted.connect(_save_reference_image_result)
 	reference_image_crop_dialog.image_cropped.connect(_save_reference_image_result)
 	add_child(reference_image_crop_dialog)
-	_create_element_dialog()
 	_create_workspace_dialogs()
 	_create_motion_state_dialogs()
 	_create_motion_resource_dialogs()
 	_create_geometry_seeding_dialogs()
 	_create_guide_dialogs()
 	_create_component_remove_dialog()
-
-
-func _create_material_graph() -> void:
-	var source_node := GraphNode.new()
-	source_node.name = "texture_source"
-	source_node.title = "Texture Source"
-	source_node.position_offset = Vector2(180, 220)
-	source_node.size = Vector2(190, 76)
-	var source_label := Label.new()
-	source_label.text = "Ready Texture reference"
-	source_node.add_child(source_label)
-	source_node.set_slot(0, false, 0, Color.WHITE, true, 0, Color("#f2c94c"))
-	material_graph.add_child(source_node)
-
-	var output_node := GraphNode.new()
-	output_node.name = "material_output"
-	output_node.title = "Material Output"
-	output_node.position_offset = Vector2(520, 220)
-	output_node.size = Vector2(190, 76)
-	var output_label := Label.new()
-	output_label.text = "Final Material"
-	output_node.add_child(output_label)
-	output_node.set_slot(0, true, 0, Color("#f2c94c"), false, 0, Color.WHITE)
-	material_graph.add_child(output_node)
-	material_graph.connect_node("texture_source", 0, "material_output", 0)
-
-
-func _create_material_preview() -> void:
-	material_preview_container = CenterContainer.new()
-	material_preview_container.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	material_preview_container.offset_left = -292.0
-	material_preview_container.offset_top = 12.0
-	material_preview_container.offset_right = -12.0
-	material_preview_container.offset_bottom = 192.0
-	material_preview_container.visible = false
-	material_graph.get_parent().add_child(material_preview_container)
-	material_preview_surface = PanelContainer.new()
-	material_preview_surface.custom_minimum_size = Vector2(280, 180)
-	var surface_style := StyleBoxFlat.new()
-	surface_style.bg_color = Color("#d9dde4")
-	surface_style.border_color = Color("#697386")
-	surface_style.set_border_width_all(1)
-	material_preview_surface.add_theme_stylebox_override("panel", surface_style)
-	material_preview_container.add_child(material_preview_surface)
-	var preview_stack := VBoxContainer.new()
-	preview_stack.alignment = BoxContainer.ALIGNMENT_CENTER
-	material_preview_surface.add_child(preview_stack)
-	material_preview_content = CenterContainer.new()
-	material_preview_content.custom_minimum_size = Vector2(320, 320)
-	preview_stack.add_child(material_preview_content)
-	material_preview_texture = TextureRect.new()
-	material_preview_texture.custom_minimum_size = Vector2(320, 320)
-	material_preview_texture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	material_preview_texture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	var preview_shader := Shader.new()
-	preview_shader.code = """shader_type canvas_item;
-uniform vec2 mapping_scale = vec2(1.0);
-uniform vec2 mapping_offset = vec2(0.0);
-uniform int wrap_mode = 1;
-void fragment() {
-	vec2 uv = UV;
-	if (wrap_mode == 1) {
-		uv = clamp(UV / max(mapping_scale, vec2(0.0001)) + mapping_offset, vec2(0.0), vec2(1.0));
-	} else if (wrap_mode == 2) {
-		uv = fract(UV / max(mapping_scale, vec2(0.0001)) + mapping_offset);
-	}
-	COLOR = texture(TEXTURE, uv) * COLOR;
-}"""
-	material_preview_shader = ShaderMaterial.new()
-	material_preview_shader.shader = preview_shader
-	material_preview_texture.material = material_preview_shader
-	material_preview_content.add_child(material_preview_texture)
-	material_preview_label = Label.new()
-	material_preview_label.text = "No ready Texture"
-	material_preview_label.add_theme_color_override("font_color", Color("#5c6675"))
-	material_preview_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	material_preview_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	preview_stack.add_child(material_preview_label)
 
 
 func _create_export_workspace(parent: Control) -> void:
@@ -1323,13 +1196,13 @@ func _create_world_scale_popup() -> void:
 	world_unit_option.disabled = true
 	content.add_child(world_unit_option)
 	var grid_size_label := Label.new()
-	grid_size_label.text = "Grid Size per Tile (cm)"
+	grid_size_label.text = "Grid Box Size (cm)"
 	content.add_child(grid_size_label)
 	world_grid_size_field = SpinBox.new()
 	world_grid_size_field.min_value = 0.0001
 	world_grid_size_field.max_value = 1000.0
 	world_grid_size_field.step = 0.001
-	world_grid_size_field.value = world_grid_size
+	world_grid_size_field.value = _editor_units_to_world(world_grid_size)
 	world_grid_size_field.custom_minimum_size = Vector2(260, 26)
 	world_grid_size_field.value_changed.connect(_on_world_grid_size_changed)
 	content.add_child(world_grid_size_field)
@@ -1350,7 +1223,7 @@ func _toggle_world_scale_popup() -> void:
 
 
 func _on_world_grid_size_changed(value: float) -> void:
-	world_grid_size = maxf(value, 0.0001)
+	world_grid_size = maxf(_world_to_editor_units(value), 0.0001)
 	_apply_world_scale()
 
 
@@ -1366,10 +1239,14 @@ func _apply_world_scale() -> void:
 
 func _update_world_scale_popup() -> void:
 	if is_instance_valid(world_grid_size_field):
-		world_grid_size_field.set_value_no_signal(world_grid_size)
+		world_grid_size_field.set_value_no_signal(_editor_units_to_world(world_grid_size))
 	if is_instance_valid(world_scale_summary_label):
-		var tiles_per_meter := 100.0 / world_grid_size
-		world_scale_summary_label.text = "1 Tile = %s cm\n10 cm = 1 m\n1 m = %.0f Tiles" % [_format_scale_value(world_grid_size), tiles_per_meter]
+		var boxes_per_game_tile := GAME_TILE_CENTIMETERS / _editor_units_to_world(world_grid_size)
+		world_scale_summary_label.text = "1 Grid Box = %s cm\n1 Spiel-Tile = %s cm (%s Grid-Boxen)" % [
+			_format_scale_value(_editor_units_to_world(world_grid_size)),
+			_format_scale_value(GAME_TILE_CENTIMETERS),
+			_format_scale_value(boxes_per_game_tile)
+		]
 
 
 func _format_scale_value(value: float) -> String:
@@ -1382,11 +1259,11 @@ func _format_scale_value(value: float) -> String:
 
 
 func _editor_units_to_world(value: float) -> float:
-	return value
+	return ToolUnits.to_centimeters(value)
 
 
 func _world_to_editor_units(value: float) -> float:
-	return value
+	return ToolUnits.from_centimeters(value)
 
 
 func _create_snap_slider(minimum: float, maximum: float, step: float, value: float) -> HSlider:
@@ -1457,10 +1334,10 @@ func _update_snap_popup_labels() -> void:
 		snap_rotation_slider.set_value_no_signal(snap_rotation_step)
 	if is_instance_valid(snap_grid_info_label):
 		snap_grid_info_label.text = "Coarse %s cm · Fine %s cm · Finer %s cm · Ultra Fine %s cm" % [
-			_format_scale_value(world_grid_size),
-			_format_scale_value(world_grid_size / 5.0),
-			_format_scale_value(world_grid_size / 10.0),
-			_format_scale_value(world_grid_size / 50.0)
+			_format_scale_value(_editor_units_to_world(world_grid_size)),
+			_format_scale_value(_editor_units_to_world(world_grid_size / 5.0)),
+			_format_scale_value(_editor_units_to_world(world_grid_size / 10.0)),
+			_format_scale_value(_editor_units_to_world(world_grid_size / 50.0))
 		]
 	if is_instance_valid(snap_rotation_value_label):
 		snap_rotation_value_label.text = "Rotation Step: %d°" % int(snap_rotation_step)
@@ -1655,50 +1532,6 @@ func _create_guide_dialog() -> void:
 	add_child(guide_dialog)
 
 
-func _create_texture_dialog() -> void:
-	texture_dialog = ConfirmationDialog.new()
-	texture_dialog.title = "New Texture"
-	texture_dialog.dialog_text = "Enter a texture name"
-	texture_dialog.size = Vector2i(360, 160)
-	texture_dialog.confirmed.connect(_confirm_texture_creation)
-	texture_name_input = LineEdit.new()
-	texture_name_input.placeholder_text = "Texture name"
-	texture_name_input.custom_minimum_size = Vector2(320, 32)
-	texture_name_input.focus_mode = Control.FOCUS_ALL
-	texture_name_input.text_submitted.connect(_submit_texture_name)
-	texture_dialog.add_child(texture_name_input)
-	add_child(texture_dialog)
-
-
-func _create_material_dialog() -> void:
-	material_dialog = ConfirmationDialog.new()
-	material_dialog.title = "New Material"
-	material_dialog.dialog_text = "Enter a material name"
-	material_dialog.size = Vector2i(360, 160)
-	material_dialog.confirmed.connect(_confirm_material_creation)
-	material_name_input = LineEdit.new()
-	material_name_input.placeholder_text = "Material name"
-	material_name_input.custom_minimum_size = Vector2(320, 32)
-	material_name_input.focus_mode = Control.FOCUS_ALL
-	material_name_input.text_submitted.connect(_submit_material_name)
-	material_dialog.add_child(material_name_input)
-	add_child(material_dialog)
-
-
-func _create_texture_import_dialog() -> void:
-	texture_import_dialog = FileDialog.new()
-	texture_import_dialog.title = "Import Texture"
-	texture_import_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
-	texture_import_dialog.access = FileDialog.ACCESS_FILESYSTEM
-	texture_import_dialog.use_native_dialog = true
-	texture_import_dialog.filters = PackedStringArray([
-		"*.png, *.jpg, *.jpeg, *.webp ; Image files"
-	])
-	texture_import_dialog.current_dir = ProjectSettings.globalize_path(IMPORT_TEXTURES_ROOT)
-	texture_import_dialog.file_selected.connect(_on_texture_import_file_selected)
-	add_child(texture_import_dialog)
-
-
 func _create_reference_image_dialog() -> void:
 	reference_image_dialog = FileDialog.new()
 	reference_image_dialog.title = "Load Reference Image"
@@ -1711,21 +1544,6 @@ func _create_reference_image_dialog() -> void:
 	reference_image_dialog.current_dir = _reference_art_directory()
 	reference_image_dialog.file_selected.connect(_on_reference_image_file_selected)
 	add_child(reference_image_dialog)
-
-
-func _create_element_dialog() -> void:
-	element_dialog = ConfirmationDialog.new()
-	element_dialog.title = "Add Element"
-	element_dialog.dialog_text = "Enter an element name"
-	element_dialog.size = Vector2i(360, 160)
-	element_dialog.confirmed.connect(_confirm_element_creation)
-	element_name_input = LineEdit.new()
-	element_name_input.placeholder_text = "Element name"
-	element_name_input.custom_minimum_size = Vector2(320, 32)
-	element_name_input.focus_mode = Control.FOCUS_ALL
-	element_name_input.text_submitted.connect(_submit_element_name)
-	element_dialog.add_child(element_name_input)
-	add_child(element_dialog)
 
 
 func _create_workspace_dialogs() -> void:
@@ -1758,12 +1576,8 @@ func _create_workspace_dialogs() -> void:
 
 
 func _on_create_action_pressed() -> void:
-	if active_module == "Create" and active_create_submodule == "Asset":
+	if active_module == "Create" and active_create_submodule in CREATE_SUBMODULES:
 		_open_new_asset_dialog()
-	elif active_module == "Create" and active_create_submodule == "Texture":
-		_open_new_texture_dialog()
-	elif active_module == "Style" and active_style_submodule == "Material":
-		_open_new_material_dialog()
 	elif active_module == "Style" and active_style_submodule == "Weighting":
 		_create_weighting_style(selected_asset_id, selected_component_id)
 	elif active_module == "Motion" and active_motion_submodule == "Path":
@@ -1781,21 +1595,17 @@ func _on_create_action_pressed() -> void:
 func _update_context_action_button() -> void:
 	if not is_instance_valid(create_action_button):
 		return
-	create_action_button.visible = (active_module == "Create" and active_create_submodule in ["Asset", "Texture"]) or active_module == "Style" or (active_module == "Motion" and active_motion_submodule in ["Path", "Sequence"])
+	create_action_button.visible = (active_module == "Create" and active_create_submodule in CREATE_SUBMODULES) or (active_module == "Style" and active_style_submodule == "Weighting")
 	create_action_button.disabled = active_module == "Style" and active_style_submodule == "Weighting" and selected_component_id.is_empty()
-	var show_asset_create_controls := active_module == "Create" and active_create_submodule == "Asset"
+	var show_asset_create_controls := active_module == "Create" and active_create_submodule in CREATE_SUBMODULES
 	if is_instance_valid(snap_button):
 		snap_button.visible = show_asset_create_controls
 	if is_instance_valid(paper_menu):
 		paper_menu.visible = show_asset_create_controls
 	if not show_asset_create_controls and is_instance_valid(snap_popup):
 		snap_popup.hide()
-	if active_module == "Create" and active_create_submodule == "Asset":
-		create_action_button.text = "Create Asset"
-	elif active_module == "Create" and active_create_submodule == "Texture":
-		create_action_button.text = "Create Texture"
-	elif active_module == "Style" and active_style_submodule == "Material":
-		create_action_button.text = "Create Material"
+	if active_module == "Create" and active_create_submodule in CREATE_SUBMODULES:
+		create_action_button.text = "Create %s" % active_create_submodule
 	elif active_module == "Style" and active_style_submodule == "Weighting":
 		create_action_button.text = "Create Weighting Style"
 	elif active_module == "Motion" and active_motion_submodule == "Path":
@@ -1833,8 +1643,6 @@ func _confirm_new_workspace() -> void:
 	new_name = _sanitize_workspace_name(new_name)
 	workspace_name = new_name
 	assets.clear()
-	textures.clear()
-	materials.clear()
 	motion_paths.clear()
 	motion_acts.clear()
 	motion_sequences.clear()
@@ -1853,8 +1661,6 @@ func _confirm_new_workspace() -> void:
 	next_asset_id = 1
 	next_component_id = 1
 	next_guide_id = 1
-	next_texture_id = 1
-	next_material_id = 1
 	next_motion_path_id = 1
 	next_motion_act_id = 1
 	next_motion_sequence_id = 1
@@ -1940,33 +1746,77 @@ func _sanitize_workspace_name(value: String) -> String:
 	return sanitized
 
 
+func _sanitize_asset_storage_name(value: String, fallback: String = "asset") -> String:
+	var sanitized := value.strip_edges()
+	for character in ["/", "\\", ":", "*", "?", "\"", "<", ">", "|"]:
+		sanitized = sanitized.replace(character, "_")
+	sanitized = sanitized.replace(".", "_")
+	while sanitized.contains("  "):
+		sanitized = sanitized.replace("  ", " ")
+	sanitized = sanitized.replace(" ", "_")
+	if sanitized.is_empty() or sanitized == "." or sanitized == "..":
+		return fallback
+	return sanitized
+
+
+func _asset_storage_name(asset: Dictionary) -> String:
+	var base := _sanitize_asset_storage_name(str(asset.get("name", "")), str(asset.get("id", "asset")))
+	var duplicate := false
+	for other_asset in assets:
+		if other_asset == asset:
+			continue
+		if _sanitize_asset_storage_name(str(other_asset.get("name", "")), str(other_asset.get("id", "asset"))) == base:
+			duplicate = true
+			break
+	return "%s__%s" % [base, str(asset.get("id", "asset"))] if duplicate else base
+
+
+func _asset_storage_root(workspace_root: String, asset: Dictionary) -> String:
+	return "%s/assets/%s" % [workspace_root, _asset_storage_name(asset)]
+
+
+func _read_asset_data(workspace_root: String, asset_id: String):
+	var legacy_data = _read_json("%s/assets/%s/asset.json" % [workspace_root, asset_id])
+	var directory := DirAccess.open("%s/assets" % workspace_root)
+	if directory == null:
+		return legacy_data if legacy_data is Dictionary else {}
+	for entry in directory.get_directories():
+		var asset_directory := "%s/assets/%s" % [workspace_root, entry]
+		for file_name in DirAccess.get_files_at(ProjectSettings.globalize_path(asset_directory)):
+			if not str(file_name).to_lower().ends_with(".json"):
+				continue
+			var candidate = _read_json("%s/%s" % [asset_directory, file_name])
+			if candidate is Dictionary and str(candidate.get("id", "")) == asset_id:
+				if str(file_name).to_lower() != "asset.json" or entry != asset_id:
+					return candidate
+	return legacy_data if legacy_data is Dictionary else {}
+
+
 func _save_workspace() -> void:
 	if workspace_name.is_empty():
 		_open_new_workspace_dialog(true)
 		return
 	var workspace_root := "%s/%s" % [WORKSPACES_ROOT, workspace_name]
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("%s/assets" % workspace_root))
-	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("%s/textures" % workspace_root))
-	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("%s/materials" % workspace_root))
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("%s/paths" % workspace_root))
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("%s/acts" % workspace_root))
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("%s/sequences" % workspace_root))
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("%s/geometry" % workspace_root))
 	var asset_ids: Array[String] = []
-	var texture_ids: Array[String] = []
-	var material_ids: Array[String] = []
 	var motion_path_ids: Array[String] = []
 	var motion_act_ids: Array[String] = []
 	var motion_sequence_ids: Array[String] = []
 	for asset in assets:
 		var asset_id := str(asset["id"])
 		asset_ids.append(asset_id)
-		var asset_root := "%s/assets/%s" % [workspace_root, asset_id]
+		var asset_storage_name := _asset_storage_name(asset)
+		var asset_root := _asset_storage_root(workspace_root, asset)
 		DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(asset_root))
 		var asset_data := {
 			"schema_version": SCHEMA_VERSION,
 			"id": asset_id,
 			"name": str(asset["name"]),
+			"asset_type": _asset_type(asset),
 			"visibility": bool(asset.get("visibility", true)),
 			"asset_pivot": _serialize_vector(_asset_pivot(asset)),
 			"reference_image": _serialize_reference_image(asset.get("reference_image", {})),
@@ -1985,7 +1835,6 @@ func _save_workspace() -> void:
 				"transform": _serialize_transform(component.get("transform", {})),
 				"visibility": bool(component.get("visibility", true)),
 				"z_index": int(component.get("z_index", 0)),
-				"material_id": str(component.get("material_id", "")),
 				"draw_mode": str(component.get("draw_mode", "closed_loop")),
 				"contour_width_px": maxf(DEFAULT_CONTOUR_WIDTH_PX, float(component.get("contour_width_px", DEFAULT_CONTOUR_WIDTH_PX))),
 				"ribbon_width_px": maxf(DEFAULT_RIBBON_WIDTH_PX, float(component.get("ribbon_width_px", DEFAULT_RIBBON_WIDTH_PX))),
@@ -1994,47 +1843,13 @@ func _save_workspace() -> void:
 			})
 		for guide in asset.get("guides", []):
 			asset_data["guides"].append(_serialize_asset_guide(guide))
-		_write_json("%s/asset.json" % asset_root, asset_data)
+		_write_json("%s/%s.json" % [asset_root, asset_storage_name], asset_data)
 		for component in asset.get("components", []):
 			var geometry_key := _geometry_document_key(asset_id, str(component.get("id", "")))
 			if not geometry_documents.has(geometry_key):
 				continue
-			var geometry_path := "%s/geometry/%s/%s/geometry.json" % [workspace_root, asset_id, str(component.get("id", ""))]
+			var geometry_path := "%s/geometry/%s/%s/geometry.json" % [workspace_root, asset_storage_name, str(component.get("id", ""))]
 			_write_json(geometry_path, _serialize_geometry_document(geometry_documents[geometry_key]))
-	for texture in textures:
-		var texture_id := str(texture["id"])
-		texture_ids.append(texture_id)
-		var texture_root := "%s/textures/%s" % [workspace_root, texture_id]
-		_write_json("%s/texture.json" % texture_root, {
-			"schema_version": SCHEMA_VERSION,
-			"id": texture_id,
-			"name": str(texture["name"]),
-			"visibility": bool(texture.get("visibility", true)),
-			"canvas": {
-				"width": int(texture.get("canvas_width", 512)),
-				"height": int(texture.get("canvas_height", 512))
-			},
-			"origin_mode": str(texture.get("origin_mode", "bottom_left")),
-			"final_output_element_id": str(texture.get("final_output_element_id", "")),
-			"elements": texture.get("elements", []).duplicate(true)
-		})
-	for material_record in materials:
-		var material_id := str(material_record["id"])
-		material_ids.append(material_id)
-		var material_root := "%s/materials/%s" % [workspace_root, material_id]
-		_write_json("%s/material.json" % material_root, {
-			"schema_version": SCHEMA_VERSION,
-			"id": material_id,
-			"name": str(material_record.get("name", material_id)),
-			"visibility": bool(material_record.get("visibility", true)),
-			"texture_id": str(material_record.get("texture_id", "")),
-			"tint": _serialize_color(material_record.get("tint", Color.WHITE)),
-			"opacity": clampf(float(material_record.get("opacity", 1.0)), 0.0, 1.0),
-			"mapping_scale": _serialize_vector(material_record.get("mapping_scale", Vector2.ONE)),
-			"mapping_offset": _serialize_vector(material_record.get("mapping_offset", Vector2.ZERO)),
-			"mapping_wrap_mode": str(material_record.get("mapping_wrap_mode", "clamp")),
-			"mapping_repeat": bool(material_record.get("mapping_repeat", false))
-		})
 	for path_document in motion_paths:
 		var path_id := str(path_document.get("id", ""))
 		motion_path_ids.append(path_id)
@@ -2065,8 +1880,6 @@ func _save_workspace() -> void:
 		"schema_version": SCHEMA_VERSION,
 		"name": workspace_name,
 		"assets": asset_ids,
-		"textures": texture_ids,
-		"materials": material_ids,
 		"paths": motion_path_ids,
 		"acts": motion_act_ids,
 		"sequences": motion_sequence_ids,
@@ -2082,10 +1895,6 @@ func _capture_history_snapshot() -> Dictionary:
 		"next_asset_id": next_asset_id,
 		"next_component_id": next_component_id,
 		"next_guide_id": next_guide_id,
-		"textures": textures.duplicate(true),
-		"next_texture_id": next_texture_id,
-		"materials": materials.duplicate(true),
-		"next_material_id": next_material_id,
 		"motion_paths": motion_paths.duplicate(true),
 		"next_motion_path_id": next_motion_path_id,
 		"motion_acts": motion_acts.duplicate(true),
@@ -2099,9 +1908,6 @@ func _capture_history_snapshot() -> Dictionary:
 		"selected_edge_id": selected_edge_id,
 		"selected_point_id": selected_point_id,
 		"selected_point_ids": selected_point_ids.duplicate(),
-		"selected_texture_id": selected_texture_id,
-		"selected_element_id": selected_element_id,
-		"selected_material_id": selected_material_id,
 		"selected_weighting_style_id": selected_weighting_style_id,
 		"selected_motion_path_id": selected_motion_path_id,
 		"selected_motion_act_id": selected_motion_act_id,
@@ -2110,12 +1916,10 @@ func _capture_history_snapshot() -> Dictionary:
 		"motion_path_preview_asset_id": motion_path_preview_asset_id,
 		"motion_act_preview_asset_id": motion_act_preview_asset_id,
 		"active_module": active_module,
+		"active_create_submodule": active_create_submodule,
 		"active_geometry_submodule": active_geometry_submodule,
 		"active_style_submodule": active_style_submodule,
 		"active_motion_submodule": active_motion_submodule,
-		"material_view_mode": material_view_mode,
-		"lookdev_target_asset_id": lookdev_target_asset_id,
-		"lookdev_target_component_id": lookdev_target_component_id,
 		"expanded_assets": expanded_assets.duplicate(true)
 	}
 
@@ -2160,8 +1964,6 @@ func _restore_history_snapshot(snapshot: Dictionary) -> void:
 	var retained_edit_point_set_mode := edit_point_set_mode
 	var retained_transform_mode := active_transform_mode
 	assets = snapshot.get("assets", []).duplicate(true)
-	textures = snapshot.get("textures", []).duplicate(true)
-	materials = snapshot.get("materials", []).duplicate(true)
 	motion_paths = snapshot.get("motion_paths", []).duplicate(true)
 	motion_acts = snapshot.get("motion_acts", []).duplicate(true)
 	motion_sequences = snapshot.get("motion_sequences", []).duplicate(true)
@@ -2178,8 +1980,6 @@ func _restore_history_snapshot(snapshot: Dictionary) -> void:
 	next_asset_id = int(snapshot.get("next_asset_id", 1))
 	next_component_id = int(snapshot.get("next_component_id", 1))
 	next_guide_id = int(snapshot.get("next_guide_id", 1))
-	next_texture_id = int(snapshot.get("next_texture_id", 1))
-	next_material_id = int(snapshot.get("next_material_id", 1))
 	next_motion_path_id = int(snapshot.get("next_motion_path_id", 1))
 	next_motion_act_id = int(snapshot.get("next_motion_act_id", 1))
 	next_motion_sequence_id = int(snapshot.get("next_motion_sequence_id", 1))
@@ -2189,9 +1989,6 @@ func _restore_history_snapshot(snapshot: Dictionary) -> void:
 	selected_edge_id = str(snapshot.get("selected_edge_id", ""))
 	selected_point_id = str(snapshot.get("selected_point_id", ""))
 	selected_point_ids = snapshot.get("selected_point_ids", []).duplicate()
-	selected_texture_id = str(snapshot.get("selected_texture_id", ""))
-	selected_element_id = str(snapshot.get("selected_element_id", ""))
-	selected_material_id = str(snapshot.get("selected_material_id", ""))
 	selected_weighting_style_id = str(snapshot.get("selected_weighting_style_id", ""))
 	selected_motion_path_id = str(snapshot.get("selected_motion_path_id", ""))
 	selected_motion_act_id = str(snapshot.get("selected_motion_act_id", ""))
@@ -2201,11 +1998,9 @@ func _restore_history_snapshot(snapshot: Dictionary) -> void:
 	motion_act_preview_asset_id = str(snapshot.get("motion_act_preview_asset_id", ""))
 	active_module = str(snapshot.get("active_module", "Create"))
 	active_geometry_submodule = str(snapshot.get("active_geometry_submodule", "Sampling"))
-	active_style_submodule = str(snapshot.get("active_style_submodule", "Material"))
+	active_create_submodule = str(snapshot.get("active_create_submodule", "Character"))
+	active_style_submodule = str(snapshot.get("active_style_submodule", "Weighting"))
 	active_motion_submodule = str(snapshot.get("active_motion_submodule", "Animation"))
-	material_view_mode = "graph"
-	lookdev_target_asset_id = ""
-	lookdev_target_component_id = ""
 	expanded_assets = snapshot.get("expanded_assets", {}).duplicate(true)
 	if _get_asset(selected_asset_id).is_empty():
 		selected_asset_id = ""
@@ -2229,21 +2024,19 @@ func _restore_history_snapshot(snapshot: Dictionary) -> void:
 	if _get_asset(motion_act_preview_asset_id).is_empty():
 		motion_act_preview_asset_id = _default_motion_path_preview_asset_id()
 	if active_module == "Create":
-		_set_create_submodule_context("Texture" if not selected_texture_id.is_empty() else "Asset")
-	elif active_module == "Geometry":
+		_set_create_submodule_context(active_create_submodule)
+	elif active_module == "Mesh":
 		active_geometry_submodule = active_geometry_submodule if active_geometry_submodule in GEOMETRY_SUBMODULES else "Sampling"
-		var geometry_section := _find_section("Geometry")
+		var geometry_section := _find_section("Mesh")
 		if geometry_section != null:
-			geometry_section.set_expanded(true)
-			geometry_section.set_active_submodule(active_geometry_submodule)
+			_set_active_module_visual("Mesh", active_geometry_submodule)
 	elif active_module == "Style":
-		active_style_submodule = active_style_submodule if active_style_submodule in STYLE_SUBMODULES else "Material"
+		active_style_submodule = active_style_submodule if active_style_submodule in STYLE_SUBMODULES else "Weighting"
 		if active_style_submodule == "Weighting" and _weighting_style(selected_asset_id, selected_component_id, selected_weighting_style_id).is_empty():
 			selected_weighting_style_id = ""
 		var style_section := _find_section("Style")
 		if style_section != null:
-			style_section.set_expanded(true)
-			style_section.set_active_submodule(active_style_submodule)
+			_set_active_module_visual("Style", active_style_submodule)
 	elif active_module == "Motion":
 		active_motion_submodule = active_motion_submodule if active_motion_submodule in MOTION_SUBMODULES else "Animation"
 		var motion_section := _find_section("Motion")
@@ -2314,10 +2107,9 @@ func _load_workspace(workspace_entry: String) -> bool:
 	if not _has_supported_schema(workspace_data):
 		return false
 	var loaded_assets: Array[Dictionary] = []
-	var loaded_textures: Array[Dictionary] = []
 	for asset_id_variant in workspace_data.get("assets", []):
 		var asset_id := str(asset_id_variant)
-		var asset_data = _read_json("%s/assets/%s/asset.json" % [workspace_root, asset_id])
+		var asset_data = _read_asset_data(workspace_root, asset_id)
 		if not _has_supported_schema(asset_data):
 			continue
 		var components: Array[Dictionary] = []
@@ -2343,7 +2135,6 @@ func _load_workspace(workspace_entry: String) -> bool:
 				"transform": _deserialize_transform(component_data.get("transform", {})),
 				"visibility": bool(component_data.get("visibility", true)),
 				"z_index": int(component_data.get("z_index", 0)),
-				"material_id": str(component_data.get("material_id", "")),
 				"draw_mode": str(component_data.get("draw_mode", "closed_loop")) if str(component_data.get("draw_mode", "closed_loop")) in DRAW_MODES else "closed_loop",
 				"contour_width_px": maxf(DEFAULT_CONTOUR_WIDTH_PX, float(component_data.get("contour_width_px", DEFAULT_CONTOUR_WIDTH_PX))),
 				"ribbon_width_px": maxf(DEFAULT_RIBBON_WIDTH_PX, float(component_data.get("ribbon_width_px", DEFAULT_RIBBON_WIDTH_PX))),
@@ -2357,6 +2148,7 @@ func _load_workspace(workspace_entry: String) -> bool:
 		var loaded_asset := {
 			"id": str(asset_data.get("id", asset_id)),
 			"name": str(asset_data.get("name", asset_id)),
+			"asset_type": _normalize_asset_type(asset_data.get("asset_type", "character")),
 			"visibility": bool(asset_data.get("visibility", true)),
 			"asset_pivot": _deserialize_vector(asset_data.get("asset_pivot", [0.0, 0.0]), Vector2.ZERO),
 			"reference_image": _normalize_reference_image(asset_data.get("reference_image", {})),
@@ -2366,39 +2158,15 @@ func _load_workspace(workspace_entry: String) -> bool:
 		}
 		ComponentHierarchy.normalize_asset(loaded_asset)
 		loaded_assets.append(loaded_asset)
-	for texture_id_variant in workspace_data.get("textures", []):
-		var texture_id := str(texture_id_variant)
-		var texture_data = _read_json("%s/textures/%s/texture.json" % [workspace_root, texture_id])
-		if not _has_supported_schema(texture_data):
-			continue
-		var canvas_data = texture_data.get("canvas", {})
-		var legacy_import_source = texture_data.get("import_source", {})
-		var normalized_elements := _normalize_texture_elements(texture_data.get("elements", []), legacy_import_source)
-		loaded_textures.append({
-			"id": str(texture_data.get("id", texture_id)),
-			"name": str(texture_data.get("name", texture_id)),
-			"visibility": bool(texture_data.get("visibility", true)),
-			"canvas_width": int(canvas_data.get("width", 512)) if canvas_data is Dictionary else 512,
-			"canvas_height": int(canvas_data.get("height", 512)) if canvas_data is Dictionary else 512,
-			"origin_mode": str(texture_data.get("origin_mode", "bottom_left")),
-			"elements": normalized_elements,
-			"final_output_element_id": _normalize_final_output_element_id(normalized_elements, str(texture_data.get("final_output_element_id", "")))
-		})
-	var loaded_materials: Array[Dictionary] = []
+	assets = loaded_assets
 	var loaded_geometry_documents: Dictionary = {}
 	for loaded_asset in loaded_assets:
 		var loaded_asset_id := str(loaded_asset.get("id", ""))
 		for loaded_component in loaded_asset.get("components", []):
 			var loaded_component_id := str(loaded_component.get("id", ""))
-			var geometry_data = _read_json("%s/geometry/%s/%s/geometry.json" % [workspace_root, loaded_asset_id, loaded_component_id])
+			var geometry_data = _read_json("%s/geometry/%s/%s/geometry.json" % [workspace_root, _asset_storage_name(loaded_asset), loaded_component_id])
 			if _has_supported_schema(geometry_data):
 				loaded_geometry_documents[_geometry_document_key(loaded_asset_id, loaded_component_id)] = _normalize_geometry_document(geometry_data, loaded_asset_id, loaded_component_id)
-	for material_id_variant in workspace_data.get("materials", []):
-		var material_id := str(material_id_variant)
-		var material_data = _read_json("%s/materials/%s/material.json" % [workspace_root, material_id])
-		if not _has_supported_schema(material_data):
-			continue
-		loaded_materials.append(_normalize_material(material_data, material_id))
 	var loaded_motion_paths: Array[Dictionary] = []
 	for path_id_variant in workspace_data.get("paths", []):
 		var path_id := str(path_id_variant)
@@ -2417,9 +2185,6 @@ func _load_workspace(workspace_entry: String) -> bool:
 		var act_data = _read_json("%s/acts/%s/act.json" % [workspace_root, act_id])
 		if _has_supported_schema(act_data):
 			loaded_motion_acts.append(_normalize_motion_act(act_data, act_id))
-	assets = loaded_assets
-	textures = loaded_textures
-	materials = loaded_materials
 	motion_paths = loaded_motion_paths
 	motion_acts = loaded_motion_acts
 	motion_sequences = loaded_motion_sequences
@@ -2461,9 +2226,6 @@ func _serialize_editor_state() -> Dictionary:
 		"selected_asset_id": selected_asset_id,
 		"selected_component_id": selected_component_id,
 		"selected_guide_id": selected_guide_id,
-		"selected_texture_id": selected_texture_id,
-		"selected_element_id": selected_element_id,
-		"selected_material_id": selected_material_id,
 		"selected_weighting_style_id": selected_weighting_style_id,
 		"selected_motion_path_id": selected_motion_path_id,
 		"selected_motion_act_id": selected_motion_act_id,
@@ -2475,14 +2237,12 @@ func _serialize_editor_state() -> Dictionary:
 		"motion_sequence_view": motion_sequence_view,
 		"motion_sequence_preview_loop": motion_sequence_preview_loop,
 		"active_module": active_module,
+		"active_create_submodule": active_create_submodule,
 		"active_geometry_submodule": active_geometry_submodule,
 		"active_style_submodule": active_style_submodule,
 		"active_motion_submodule": active_motion_submodule,
-		"material_view_mode": material_view_mode,
-		"lookdev_target_asset_id": lookdev_target_asset_id,
-		"lookdev_target_component_id": lookdev_target_component_id,
+		"outliner_asset_type_filters": outliner_asset_type_filters.duplicate(true),
 		"expanded_assets": expanded_state,
-		"expanded_textures": expanded_textures.duplicate(true),
 		"camera": camera_state,
 		"paper_level": paper_level,
 		"world_scale": {
@@ -2502,9 +2262,6 @@ func _restore_editor_state(state) -> void:
 	selected_asset_id = ""
 	selected_component_id = ""
 	selected_guide_id = ""
-	selected_texture_id = ""
-	selected_element_id = ""
-	selected_material_id = ""
 	selected_weighting_style_id = ""
 	selected_motion_path_id = ""
 	selected_motion_act_id = ""
@@ -2516,14 +2273,13 @@ func _restore_editor_state(state) -> void:
 	motion_sequence_view = MotionSequenceWorkspace.VIEW_COMPOSITION
 	motion_sequence_preview_loop = true
 	active_module = "Create"
+	active_create_submodule = "Character"
 	active_geometry_submodule = "Sampling"
-	active_style_submodule = "Material"
+	active_style_submodule = "Weighting"
 	active_motion_submodule = "Animation"
-	material_view_mode = "graph"
-	lookdev_target_asset_id = ""
-	lookdev_target_component_id = ""
+	outliner_asset_type_filters = {"character": true, "props": true, "terrain": true, "icon": true}
+	_apply_outliner_asset_type_filter_checkboxes()
 	expanded_assets.clear()
-	expanded_textures.clear()
 	for asset in assets:
 		expanded_assets[str(asset["id"])] = false
 	if not state is Dictionary:
@@ -2548,30 +2304,19 @@ func _restore_editor_state(state) -> void:
 				expanded_assets[asset_id] = bool(saved_expanded[asset_id])
 	if not selected_component_id.is_empty() or not selected_guide_id.is_empty():
 		expanded_assets[selected_asset_id] = true
-	var requested_texture_id := str(state.get("selected_texture_id", ""))
-	var selected_texture := _get_texture(requested_texture_id)
-	if not selected_texture.is_empty() and selected_asset_id.is_empty():
-		selected_texture_id = requested_texture_id
-		var requested_element_id := str(state.get("selected_element_id", ""))
-		if not _get_element(selected_texture, requested_element_id).is_empty():
-			selected_element_id = requested_element_id
-		else:
-			selected_element_id = ""
-		expanded_textures[selected_texture_id] = true
-	var requested_material_id := str(state.get("selected_material_id", ""))
-	if selected_asset_id.is_empty() and selected_texture_id.is_empty() and not _get_material(requested_material_id).is_empty():
-		selected_material_id = requested_material_id
-		active_module = "Style"
-		var style_section := _find_section("Style")
-		if style_section != null:
-			style_section.set_expanded(true)
-			style_section.set_active_submodule("Material")
-	else:
-		active_module = "Create"
-		_set_create_submodule_context("Texture" if not selected_texture_id.is_empty() else "Asset")
-	var requested_motion_submodule := str(state.get("active_motion_submodule", "Animation"))
+	active_module = "Create"
+	var requested_create_submodule := str(state.get("active_create_submodule", "Character"))
+	if not selected_asset_id.is_empty():
+		requested_create_submodule = _asset_type_create_submodule(_asset_type(_get_asset(selected_asset_id)))
+	_set_create_submodule_context(requested_create_submodule)
 	var requested_geometry_submodule := str(state.get("active_geometry_submodule", "Sampling"))
-	var requested_style_submodule := str(state.get("active_style_submodule", "Material"))
+	var requested_style_submodule := str(state.get("active_style_submodule", "Weighting"))
+	var saved_asset_type_filters = state.get("outliner_asset_type_filters", {})
+	if saved_asset_type_filters is Dictionary:
+		for asset_type in outliner_asset_type_filters.keys():
+			if saved_asset_type_filters.has(asset_type):
+				outliner_asset_type_filters[asset_type] = bool(saved_asset_type_filters[asset_type])
+	_apply_outliner_asset_type_filter_checkboxes()
 	if str(state.get("active_module", "")) == "Style" and requested_style_submodule == "Weighting" and not selected_component_id.is_empty():
 		active_module = "Style"
 		active_style_submodule = "Weighting"
@@ -2579,50 +2324,13 @@ func _restore_editor_state(state) -> void:
 		selected_weighting_style_id = requested_weighting_style_id if not _weighting_style(selected_asset_id, selected_component_id, requested_weighting_style_id).is_empty() else ""
 		var weighting_style_section := _find_section("Style")
 		if weighting_style_section != null:
-			weighting_style_section.set_expanded(true)
-			weighting_style_section.set_active_submodule("Weighting")
-	if str(state.get("active_module", "")) == "Geometry" and requested_geometry_submodule in GEOMETRY_SUBMODULES:
-		active_module = "Geometry"
+			_set_active_module_visual("Style", "Weighting")
+	if str(state.get("active_module", "")) == "Mesh" and requested_geometry_submodule in GEOMETRY_SUBMODULES:
+		active_module = "Mesh"
 		active_geometry_submodule = requested_geometry_submodule
-		var geometry_section := _find_section("Geometry")
+		var geometry_section := _find_section("Mesh")
 		if geometry_section != null:
-			geometry_section.set_expanded(true)
-			geometry_section.set_active_submodule(active_geometry_submodule)
-	if str(state.get("active_module", "")) == "Motion" and requested_motion_submodule in MOTION_SUBMODULES:
-		active_module = "Motion"
-		active_motion_submodule = requested_motion_submodule
-		var requested_path_id := str(state.get("selected_motion_path_id", ""))
-		var requested_act_id := str(state.get("selected_motion_act_id", ""))
-		var requested_sequence_id := str(state.get("selected_motion_sequence_id", ""))
-		selected_motion_path_id = requested_path_id if not _get_motion_path(requested_path_id).is_empty() else ""
-		selected_motion_act_id = requested_act_id if not _get_motion_act(requested_act_id).is_empty() else ""
-		selected_motion_sequence_id = requested_sequence_id if not _get_motion_sequence(requested_sequence_id).is_empty() else ""
-		var requested_sequence_entry_id := str(state.get("selected_motion_sequence_entry_id", ""))
-		selected_motion_sequence_entry_id = requested_sequence_entry_id if not _get_motion_sequence_entry(_get_motion_sequence(selected_motion_sequence_id), requested_sequence_entry_id).is_empty() else str(_first_motion_sequence_entry(_get_motion_sequence(selected_motion_sequence_id)).get("id", ""))
-		motion_sequence_view = str(state.get("motion_sequence_view", MotionSequenceWorkspace.VIEW_COMPOSITION))
-		if motion_sequence_view not in [MotionSequenceWorkspace.VIEW_COMPOSITION, MotionSequenceWorkspace.VIEW_PLAYER]:
-			motion_sequence_view = MotionSequenceWorkspace.VIEW_COMPOSITION
-		motion_sequence_preview_loop = bool(state.get("motion_sequence_preview_loop", true))
-		motion_act_preview_loop = bool(state.get("motion_act_preview_loop", true))
-		var requested_preview_asset_id := str(state.get("motion_path_preview_asset_id", ""))
-		motion_path_preview_asset_id = requested_preview_asset_id if not _get_asset(requested_preview_asset_id).is_empty() else _default_motion_path_preview_asset_id()
-		var requested_act_preview_asset_id := str(state.get("motion_act_preview_asset_id", ""))
-		motion_act_preview_asset_id = requested_act_preview_asset_id if not _get_asset(requested_act_preview_asset_id).is_empty() else _default_motion_path_preview_asset_id()
-		var motion_section := _find_section("Motion")
-		if motion_section != null:
-			motion_section.set_expanded(true)
-			motion_section.set_active_submodule(active_motion_submodule)
-	# Older editor_state files may contain View/LookDev fields. They are read
-	# only for compatibility; the current workflow always opens the Graph.
-	material_view_mode = "graph"
-	lookdev_target_asset_id = ""
-	lookdev_target_component_id = ""
-	var saved_expanded_textures = state.get("expanded_textures", {})
-	if saved_expanded_textures is Dictionary:
-		for texture in textures:
-			var texture_id := str(texture["id"])
-			if saved_expanded_textures.has(texture_id):
-				expanded_textures[texture_id] = bool(saved_expanded_textures[texture_id])
+			_set_active_module_visual("Mesh", active_geometry_submodule)
 	_apply_world_scale_settings(state.get("world_scale", {}))
 	paper_level = clampi(int(state.get("paper_level", 0)), PAPER_NONE_LEVEL, PAPER_SIZES_CM.size() - 1)
 	_apply_snap_settings(state.get("snap", {}))
@@ -2638,13 +2346,13 @@ func _apply_world_scale_settings(settings) -> void:
 		var saved_unit := str(settings.get("unit", "cm"))
 		if saved_unit == "m":
 			world_unit = "cm"
-			world_grid_size = 0.5
+			world_grid_size = GRID_BOX_TOOL_UNITS
 		else:
 			world_unit = "cm"
-			world_grid_size = maxf(float(settings.get("grid_size", 0.5)), 0.0001)
+			world_grid_size = maxf(float(settings.get("grid_size", GRID_BOX_TOOL_UNITS)), 0.0001)
 	else:
 		world_unit = "cm"
-		world_grid_size = 0.5
+		world_grid_size = GRID_BOX_TOOL_UNITS
 	_apply_world_scale()
 
 
@@ -2888,7 +2596,7 @@ func _reference_image_path(asset: Dictionary) -> String:
 	var reference_file := str(reference_image.get("file", ""))
 	if workspace_name.is_empty() or reference_file.is_empty():
 		return ""
-	return "%s/%s/assets/%s/%s" % [WORKSPACES_ROOT, workspace_name, str(asset.get("id", "")), reference_file]
+	return "%s/%s" % [_asset_storage_root("%s/%s" % [WORKSPACES_ROOT, workspace_name], asset), reference_file]
 
 
 func _reference_image_filename(asset: Dictionary) -> String:
@@ -3734,8 +3442,6 @@ func _update_next_ids() -> void:
 	next_asset_id = 1
 	next_component_id = 1
 	next_guide_id = 1
-	next_texture_id = 1
-	next_material_id = 1
 	next_motion_path_id = 1
 	next_motion_act_id = 1
 	next_motion_sequence_id = 1
@@ -3745,10 +3451,6 @@ func _update_next_ids() -> void:
 			next_component_id = maxi(next_component_id, _id_suffix_number(str(component["id"])) + 1)
 		for guide in asset.get("guides", []):
 			next_guide_id = maxi(next_guide_id, _id_suffix_number(str(guide.get("id", ""))) + 1)
-	for texture in textures:
-		next_texture_id = maxi(next_texture_id, _id_suffix_number(str(texture["id"])) + 1)
-	for material_record in materials:
-		next_material_id = maxi(next_material_id, _id_suffix_number(str(material_record["id"])) + 1)
 	for path_document in motion_paths:
 		next_motion_path_id = maxi(next_motion_path_id, _id_suffix_number(str(path_document.get("id", ""))) + 1)
 	for act_document in motion_acts:
@@ -3846,7 +3548,7 @@ func _render_context_bar() -> void:
 			context_bar.add_child(boundary_label)
 		_render_info_bar()
 		return
-	if active_module == "Geometry":
+	if active_module == "Mesh":
 		if active_geometry_submodule == "Sampling":
 			_render_geometry_sampling_context_bar()
 		elif active_geometry_submodule == "Seeding":
@@ -3857,7 +3559,7 @@ func _render_context_bar() -> void:
 			_render_geometry_uv_mapping_context_bar()
 		else:
 			var geometry_label := Label.new()
-			geometry_label.text = "Geometry → %s" % active_geometry_submodule
+			geometry_label.text = "Mesh → %s" % active_geometry_submodule
 			geometry_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 			geometry_label.add_theme_color_override("font_color", Color("#9aa3b2"))
 			context_bar.add_child(geometry_label)
@@ -3869,17 +3571,7 @@ func _render_context_bar() -> void:
 		_render_info_bar()
 		return
 	if active_module == "Style":
-		if active_style_submodule == "Weighting":
-			_render_weighting_context_bar()
-		elif not selected_material_id.is_empty():
-			_render_material_context_bar()
-		_render_info_bar()
-		return
-	if not selected_texture_id.is_empty():
-		_render_texture_context_bar()
-		_render_info_bar()
-		return
-	if active_module == "Create" and active_create_submodule == "Texture":
+		_render_weighting_context_bar()
 		_render_info_bar()
 		return
 	if not selected_guide_id.is_empty():
@@ -4594,12 +4286,6 @@ func _motion_sequence_is_previewable(entry: Dictionary) -> bool:
 	return MotionSequenceEvaluator.validation_issues(entry, context.get("asset", {}), context.get("path", {})).is_empty()
 
 
-func _render_material_context_bar() -> void:
-	# Reserved for future Material Graph node actions. The material workspace
-	# opens directly into the graph and has no view-switching menu.
-	return
-
-
 func _render_weighting_context_bar() -> void:
 	weighting_method_menu = MenuButton.new()
 	weighting_method_menu.text = "⌘1  Method  ▼"
@@ -4632,89 +4318,12 @@ func _set_weighting_method(method_value: Variant) -> void:
 	_generate_weighting_preview()
 
 
-func _on_material_view_menu_id(id: int) -> void:
-	if id == 0:
-		_set_material_view("graph")
-	elif id == 1:
-		_set_material_view("preview")
-	elif id == 2:
-		_set_material_view("lookdev")
-
-
-func _set_material_view(mode: String) -> void:
-	if mode != "graph" and mode != "preview" and mode != "lookdev":
-		return
-	material_view_mode = mode
-	_render_outliner()
-	_render_context_bar()
-	_render_inspector()
-	_render_info_bar()
-	_render_canvas_context()
-
-
-func _render_texture_context_bar() -> void:
-	var texture := _get_texture(selected_texture_id)
-	if texture.is_empty():
-		return
-	var selected_element := _get_element(texture, selected_element_id)
-	if not selected_element.is_empty() and str(selected_element.get("type", "generator")) == "import":
-		var preview_menu := MenuButton.new()
-		preview_menu.text = "⌘1  Previews  ▼"
-		preview_menu.custom_minimum_size = Vector2(132, 32)
-		preview_menu.focus_mode = Control.FOCUS_NONE
-		_style_context_command_button(preview_menu, true)
-		var preview_popup := preview_menu.get_popup()
-		_style_popup_menu(preview_popup)
-		preview_popup.add_item("1: Original", 0)
-		preview_popup.add_item("2: White to Alpha", 1)
-		preview_popup.id_pressed.connect(_on_import_preview_menu_id)
-		context_bar.add_child(preview_menu)
-		return
-	var import_button := Button.new()
-	import_button.text = "Import Texture"
-	import_button.custom_minimum_size = Vector2(116, 32)
-	import_button.focus_mode = Control.FOCUS_NONE
-	import_button.pressed.connect(_open_texture_import_dialog)
-	context_bar.add_child(import_button)
-	var origin_menu := MenuButton.new()
-	origin_menu.text = "Origin: %s  ▼" % _origin_mode_label(str(texture.get("origin_mode", "bottom_left")))
-	origin_menu.custom_minimum_size = Vector2(150, 32)
-	origin_menu.focus_mode = Control.FOCUS_NONE
-	var origin_popup := origin_menu.get_popup()
-	_style_popup_menu(origin_popup)
-	origin_popup.add_item("Bottom Left", 0)
-	origin_popup.add_item("Top Left", 1)
-	origin_popup.add_item("Center", 2)
-	origin_popup.id_pressed.connect(_on_texture_origin_menu_id)
-	context_bar.add_child(origin_menu)
-
-
 func _origin_mode_label(mode: String) -> String:
 	return {
 		"bottom_left": "Bottom Left",
 		"top_left": "Top Left",
 		"center": "Center"
 	}.get(mode, "Bottom Left")
-
-
-func _on_texture_origin_menu_id(id: int) -> void:
-	var modes := ["bottom_left", "top_left", "center"]
-	if id < 0 or id >= modes.size():
-		return
-	_on_texture_origin_changed(modes[id])
-
-
-func _on_texture_origin_changed(mode: String) -> void:
-	var texture := _get_texture(selected_texture_id)
-	if texture.is_empty():
-		return
-	if texture.get("origin_mode", "bottom_left") == mode:
-		return
-	_record_direct_change()
-	texture["origin_mode"] = mode
-	texture_canvas.set_origin_mode(mode)
-	_render_context_bar()
-	_render_info_bar()
 
 
 func _on_import_preview_menu_id(id: int) -> void:
@@ -4732,63 +4341,6 @@ func _set_import_preview_mode(mode: String) -> void:
 	_render_canvas_context()
 
 
-func _open_texture_import_dialog() -> void:
-	if selected_texture_id.is_empty() or _get_texture(selected_texture_id).is_empty():
-		return
-	if workspace_name.is_empty():
-		_show_status_message("Create or load a Workspace before importing.")
-		return
-	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(IMPORT_TEXTURES_ROOT))
-	texture_import_dialog.current_dir = ProjectSettings.globalize_path(IMPORT_TEXTURES_ROOT)
-	texture_import_dialog.popup_centered_ratio(0.75)
-
-
-func _on_texture_import_file_selected(source_path: String) -> void:
-	var texture := _get_texture(selected_texture_id)
-	if texture.is_empty() or workspace_name.is_empty():
-		return
-	var source_extension := source_path.get_extension().to_lower()
-	if not ["png", "jpg", "jpeg", "webp"].has(source_extension):
-		_show_status_message("Unsupported texture format.")
-		return
-	var texture_root := "%s/%s/textures/%s" % [WORKSPACES_ROOT, workspace_name, str(texture["id"])]
-	var destination_filename := _next_texture_source_filename(texture_root, source_extension)
-	var destination_path := "%s/%s" % [texture_root, destination_filename]
-	if not _copy_external_file(source_path, destination_path):
-		_show_status_message("Texture import failed.")
-		return
-	_record_direct_change()
-	var import_element := _find_import_element(texture)
-	if import_element.is_empty():
-		var import_name := source_path.get_file().get_basename()
-		import_element = {
-			"id": "element_%d" % _next_element_id(texture),
-			"name": import_name if not import_name.is_empty() else "Import Element",
-			"type": "import",
-			"source": {},
-			"pipeline": {"mode": "white_to_alpha", "threshold": 0.05},
-			"output": {"state": "not_ready", "file": ""}
-		}
-		texture["elements"].append(import_element)
-	import_element["type"] = "import"
-	import_element["source"] = {
-		"file": destination_filename,
-		"original_name": source_path.get_file()
-	}
-	import_element["pipeline"] = {"mode": "white_to_alpha", "threshold": 0.05}
-	import_element["output"] = {"state": "not_ready", "file": ""}
-	_show_status_message("Imported Texture: %s" % source_path.get_file())
-	_render_inspector()
-	_render_canvas_context()
-
-
-func _next_texture_source_filename(texture_root: String, extension: String) -> String:
-	var index := 1
-	while FileAccess.file_exists("%s/source_%03d.%s" % [texture_root, index, extension]):
-		index += 1
-	return "source_%03d.%s" % [index, extension]
-
-
 func _copy_external_file(source_path: String, destination_path: String) -> bool:
 	var source_file := FileAccess.open(source_path, FileAccess.READ)
 	if source_file == null:
@@ -4804,50 +4356,6 @@ func _copy_external_file(source_path: String, destination_path: String) -> bool:
 	return true
 
 
-func _process_selected_import_element() -> void:
-	var texture := _get_texture(selected_texture_id)
-	var element := _get_element(texture, selected_element_id)
-	if texture.is_empty() or element.is_empty() or str(element.get("type", "")) != "import":
-		return
-	var source_path := _get_texture_source_path(texture, element)
-	if source_path.is_empty() or not FileAccess.file_exists(source_path):
-		_show_status_message("Import source is missing.")
-		return
-	var source_image := Image.new()
-	if source_image.load(source_path) != OK or source_image.is_empty():
-		_show_status_message("Import source could not be read.")
-		return
-	var pipeline = element.get("pipeline", {})
-	if not pipeline is Dictionary:
-		pipeline = {}
-	var threshold := _read_import_threshold()
-	var output_image = _create_white_to_alpha_image(source_image, threshold)
-	if output_image == null or output_image.is_empty():
-		_show_status_message("Texture processing failed.")
-		return
-	var texture_root := "%s/%s/textures/%s" % [WORKSPACES_ROOT, workspace_name, str(texture["id"])]
-	var output_filename := _next_texture_output_filename(texture_root)
-	var output_path := "%s/%s" % [texture_root, output_filename]
-	if output_image.save_png(ProjectSettings.globalize_path(output_path)) != OK:
-		_show_status_message("Texture processing failed.")
-		return
-	_record_direct_change()
-	element["pipeline"] = {"mode": "white_to_alpha", "threshold": threshold}
-	element["output"] = {"state": "ready", "file": output_filename}
-	texture["final_output_element_id"] = str(element.get("id", ""))
-	_show_status_message("Processed Texture: White to Alpha")
-	active_import_preview_mode = "white_to_alpha"
-	_render_inspector()
-	_render_canvas_context()
-
-
-func _next_texture_output_filename(texture_root: String) -> String:
-	var index := 1
-	while FileAccess.file_exists("%s/output_%03d.png" % [texture_root, index]):
-		index += 1
-	return "output_%03d.png" % index
-
-
 func _create_white_to_alpha_image(source_image: Image, threshold: float):
 	if source_image == null or source_image.is_empty():
 		return null
@@ -4859,157 +4367,6 @@ func _create_white_to_alpha_image(source_image: Image, threshold: float):
 			var alpha := clampf((darkness - threshold) / maxf(1.0 - threshold, 0.001), 0.0, 1.0)
 			output_image.set_pixel(x, y, Color(source_color.r, source_color.g, source_color.b, alpha))
 	return output_image
-
-
-func _normalize_texture_elements(raw_elements, legacy_import_source) -> Array:
-	var normalized: Array = []
-	var has_import_element := false
-	if raw_elements is Array:
-		for element_variant in raw_elements:
-			if not element_variant is Dictionary:
-				continue
-			var element: Dictionary = element_variant.duplicate(true)
-			var element_type := str(element.get("type", "generator"))
-			if element_type != "import" and element_type != "generator":
-				element_type = "generator"
-			element["type"] = element_type
-			element["visibility"] = bool(element.get("visibility", true))
-			if element_type == "import":
-				has_import_element = true
-				if not element.get("source", {}) is Dictionary:
-					element["source"] = {}
-				var pipeline = element.get("pipeline", {})
-				if not pipeline is Dictionary:
-					pipeline = {}
-				pipeline["mode"] = "white_to_alpha"
-				pipeline["threshold"] = clampf(float(pipeline.get("threshold", 0.05)), 0.0, 1.0)
-				element["pipeline"] = pipeline
-			var output = element.get("output", {})
-			if not output is Dictionary:
-				output = {}
-			var output_state := str(output.get("state", "not_ready"))
-			if output_state != "ready" or str(output.get("file", "")).get_file().is_empty():
-				output_state = "not_ready"
-			output["state"] = output_state
-			if output_state != "ready":
-				output["file"] = ""
-			element["output"] = output
-			normalized.append(element)
-	if legacy_import_source is Dictionary and not legacy_import_source.is_empty() and not has_import_element:
-		var original_name := str(legacy_import_source.get("original_name", "Imported Texture"))
-		var import_name := original_name.get_basename()
-		if import_name.is_empty():
-			import_name = "Import Element"
-		normalized.append({
-			"id": "element_%d" % _next_element_id_from_list(normalized),
-			"name": import_name,
-			"type": "import",
-			"visibility": true,
-			"source": legacy_import_source.duplicate(true),
-			"pipeline": {"mode": "white_to_alpha", "threshold": 0.05},
-			"output": {"state": "not_ready", "file": ""}
-		})
-	return normalized
-
-
-func _normalize_material(raw_material, fallback_id: String) -> Dictionary:
-	var data: Dictionary = raw_material if raw_material is Dictionary else {}
-	return {
-		"id": str(data.get("id", fallback_id)),
-		"name": str(data.get("name", fallback_id)),
-		"visibility": bool(data.get("visibility", true)),
-		"texture_id": str(data.get("texture_id", "")),
-		"tint": _deserialize_color(data.get("tint", [1.0, 1.0, 1.0, 1.0]), Color.WHITE),
-		"opacity": clampf(float(data.get("opacity", 1.0)), 0.0, 1.0),
-		"mapping_scale": _deserialize_vector(data.get("mapping_scale", [1.0, 1.0]), Vector2.ONE),
-		"mapping_offset": _deserialize_vector(data.get("mapping_offset", [0.0, 0.0]), Vector2.ZERO),
-		"mapping_wrap_mode": str(data.get("mapping_wrap_mode", "repeat" if bool(data.get("mapping_repeat", false)) else "clamp")),
-		"mapping_repeat": bool(data.get("mapping_repeat", false))
-	}
-
-
-func _material_wrap_mode(material_data: Dictionary) -> String:
-	var mode := str(material_data.get("mapping_wrap_mode", "repeat" if bool(material_data.get("mapping_repeat", false)) else "clamp"))
-	return mode if mode == "fit" or mode == "clamp" or mode == "repeat" else "clamp"
-
-
-func _find_import_element(texture: Dictionary) -> Dictionary:
-	for element in texture.get("elements", []):
-		if str(element.get("type", "generator")) == "import":
-			return element
-	return {}
-
-
-func _normalize_final_output_element_id(elements: Array, requested_id: String) -> String:
-	for element in elements:
-		if str(element.get("id", "")) == requested_id and _element_output_state(element) == "ready":
-			return requested_id
-	for element in elements:
-		if _element_output_state(element) == "ready":
-			return str(element.get("id", ""))
-	return ""
-
-
-func _get_texture_final_output_element(texture: Dictionary) -> Dictionary:
-	var requested_id := str(texture.get("final_output_element_id", ""))
-	var requested_element := _get_element(texture, requested_id)
-	if not requested_element.is_empty() and _element_output_state(requested_element) == "ready":
-		return requested_element
-	for element in texture.get("elements", []):
-		if _element_output_state(element) == "ready":
-			return element
-	return {}
-
-
-func _get_texture_final_path(texture: Dictionary) -> String:
-	if workspace_name.is_empty():
-		return ""
-	var final_output_element := _get_texture_final_output_element(texture)
-	if final_output_element.is_empty():
-		return ""
-	var output = final_output_element.get("output", {})
-	var output_file := str(output.get("file", "")).get_file() if output is Dictionary else ""
-	if output_file.is_empty():
-		return ""
-	return "%s/%s/textures/%s/%s" % [WORKSPACES_ROOT, workspace_name, str(texture.get("id", "")), output_file]
-
-
-func _get_texture_source_path(texture: Dictionary, element: Dictionary) -> String:
-	if workspace_name.is_empty() or texture.is_empty() or element.is_empty():
-		return ""
-	var source = element.get("source", {})
-	if not source is Dictionary:
-		return ""
-	var source_file := str(source.get("file", "")).get_file()
-	if source_file.is_empty():
-		return ""
-	return "%s/%s/textures/%s/%s" % [WORKSPACES_ROOT, workspace_name, str(texture.get("id", "")), source_file]
-
-
-func _get_texture_preview_path(texture: Dictionary, element: Dictionary) -> String:
-	if element.is_empty():
-		return ""
-	var output = element.get("output", {})
-	if output is Dictionary and str(output.get("state", "not_ready")) == "ready":
-		var output_file := str(output.get("file", "")).get_file()
-		var output_path := "%s/%s/textures/%s/%s" % [WORKSPACES_ROOT, workspace_name, str(texture.get("id", "")), output_file]
-		if not output_file.is_empty() and FileAccess.file_exists(output_path):
-			return output_path
-	return _get_texture_source_path(texture, element)
-
-
-func _element_output_state(element: Dictionary) -> String:
-	var output = element.get("output", {})
-	if output is Dictionary and str(output.get("state", "not_ready")) == "ready" and not str(output.get("file", "")).get_file().is_empty():
-		return "ready"
-	return "not_ready"
-
-
-func _texture_output_state(texture: Dictionary) -> String:
-	for element in texture.get("elements", []):
-		if _element_output_state(element) == "ready":
-			return "ready"
-	return "not_ready"
 
 
 func _on_draw_menu_id(id: int) -> void:
@@ -5276,12 +4633,6 @@ func _set_active_state(state: String) -> void:
 func _render_info_bar() -> void:
 	if not is_instance_valid(info_bar):
 		return
-	if is_instance_valid(active_material_status_label):
-		if active_module == "Style" and not selected_material_id.is_empty():
-			var active_material := _get_material(selected_material_id)
-			active_material_status_label.text = "Material: %s" % str(active_material.get("name", "Material")) if not active_material.is_empty() else ""
-		else:
-			active_material_status_label.text = ""
 	_clear(info_bar)
 	if active_module == "Motion":
 		if active_motion_submodule == "Path":
@@ -5316,7 +4667,7 @@ func _render_info_bar() -> void:
 		if not motion_last_marker.is_empty():
 			_add_info_option("Marker %s" % motion_last_marker)
 		return
-	if active_module == "Geometry":
+	if active_module == "Mesh":
 		var geometry_state_label := Label.new()
 		if active_geometry_submodule == "Sampling" and geometry_sampling_method_choice_active:
 			geometry_state_label.text = "State: Sampling Method"
@@ -5347,7 +4698,7 @@ func _render_info_bar() -> void:
 		else:
 			geometry_state_label.text = "State: Default"
 			info_bar.add_child(geometry_state_label)
-			_add_info_option("Geometry: %s" % active_geometry_submodule)
+			_add_info_option("Mesh: %s" % active_geometry_submodule)
 			_add_info_option("⌘1: Method")
 			if active_geometry_submodule == "Seeding":
 				_add_info_option("⌘2: Edit Seeds")
@@ -5362,8 +4713,6 @@ func _render_info_bar() -> void:
 			var style := _weighting_style(selected_asset_id, selected_component_id, selected_weighting_style_id)
 			if not style.is_empty():
 				_add_info_option(str(style.get("name", "Weighting Style")))
-		elif not selected_material_id.is_empty():
-			_add_info_option("Material Graph")
 		return
 	if active_module == "Export":
 		var build_state := Label.new()
@@ -5371,16 +4720,6 @@ func _render_info_bar() -> void:
 		info_bar.add_child(build_state)
 		_add_info_option("Validate")
 		_add_info_option("Build")
-		return
-	if not selected_texture_id.is_empty():
-		var texture := _get_texture(selected_texture_id)
-		var selected_element := _get_element(texture, selected_element_id)
-		var texture_state_label := Label.new()
-		texture_state_label.text = "State: Default"
-		info_bar.add_child(texture_state_label)
-		if not selected_element.is_empty() and str(selected_element.get("type", "generator")) == "import":
-			_add_info_option("1: Original")
-			_add_info_option("2: White to Alpha")
 		return
 	if not selected_guide_id.is_empty():
 		var selected_guide := _get_guide(_get_asset(selected_asset_id), selected_guide_id)
@@ -5474,14 +4813,6 @@ func _export_validation_errors(asset: Dictionary) -> Array[String]:
 			var ribbon_mesh := _component_mesh_bake(str(asset.get("id", "")), str(component.get("id", "")))
 			if not RibbonMeshService.matches_source(ribbon_mesh, component):
 				errors.append("%s: current Ribbon Strip Mesh is required." % component_name)
-				continue
-			var ribbon_material_id := str(component.get("material_id", ""))
-			if not ribbon_material_id.is_empty():
-				var ribbon_material := _get_material(ribbon_material_id)
-				if ribbon_material.is_empty():
-					errors.append("%s: assigned Material is missing." % component_name)
-				elif not str(ribbon_material.get("texture_id", "")).is_empty() and _texture_output_state(_get_texture(str(ribbon_material.get("texture_id", "")))) != "ready":
-					errors.append("%s: Material Texture is not ready." % component_name)
 			continue
 		var points: Array = BezierTopology.outer_control_polygon(component)
 		if not BezierTopology.outer_chain_closed(component):
@@ -5496,16 +4827,6 @@ func _export_validation_errors(asset: Dictionary) -> Array[String]:
 				packed_points.append(point)
 		if packed_points.size() != points.size() or Geometry2D.triangulate_polygon(packed_points).is_empty():
 			errors.append("%s: contour cannot be triangulated." % component_name)
-		var material_id := str(component.get("material_id", ""))
-		if material_id.is_empty():
-			continue
-		var material_data := _get_material(material_id)
-		if material_data.is_empty():
-			errors.append("%s: assigned Material is missing." % component_name)
-			continue
-		var texture_id := str(material_data.get("texture_id", ""))
-		if not texture_id.is_empty() and _texture_output_state(_get_texture(texture_id)) != "ready":
-			errors.append("%s: Material Texture is not ready." % component_name)
 	return errors
 
 
@@ -5539,6 +4860,7 @@ func _build_selected_asset_scene() -> void:
 	root.name = _tscn_name(str(asset.get("name", "Asset")))
 	var export_asset_pivot := _godot_export_points([_asset_pivot(asset)])[0]
 	root.set_meta("asset_pivot", export_asset_pivot)
+	root.set_meta("asset_type", _asset_type(asset))
 	var component_nodes: Dictionary = {}
 	var pending_components: Array = asset.get("components", []).duplicate()
 	while not pending_components.is_empty():
@@ -5619,46 +4941,8 @@ func _build_export_component_geometry(component_node: Node2D, asset: Dictionary,
 	# Geometry is stored in Component-local coordinates; offsetting it by the
 	# pivot lets its Node2D parent own the component transform exactly once.
 	polygon.position = -Vector2(export_transform.get("pivot", Vector2.ZERO))
-	var material_data := _get_material(str(component.get("material_id", "")))
-	if not material_data.is_empty():
-		var tint: Color = material_data.get("tint", Color.WHITE)
-		polygon.color = Color(tint.r, tint.g, tint.b, tint.a * float(material_data.get("opacity", 1.0)))
-		var texture := _get_texture(str(material_data.get("texture_id", "")))
-		var texture_path := _get_texture_final_path(texture) if not texture.is_empty() else ""
-		if not texture_path.is_empty():
-			var texture_resource := load(texture_path) as Texture2D
-			polygon.texture = texture_resource
-			if texture_resource != null:
-				polygon.uv = _build_export_uvs(export_points, texture_resource.get_size(), material_data.get("mapping_scale", Vector2.ONE), material_data.get("mapping_offset", Vector2.ZERO), _material_wrap_mode(material_data))
-				polygon.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED if _material_wrap_mode(material_data) == "repeat" else CanvasItem.TEXTURE_REPEAT_DISABLED
 	component_node.add_child(polygon)
 	polygon.owner = component_node.owner
-
-
-func _build_export_uvs(points: Array, texture_size: Vector2, mapping_scale: Vector2, mapping_offset: Vector2, wrap_mode: String) -> PackedVector2Array:
-	var uvs := PackedVector2Array()
-	if points.is_empty():
-		return uvs
-	var min_point: Vector2 = points[0] if points[0] is Vector2 else Vector2.ZERO
-	var max_point := min_point
-	for point in points:
-		if not point is Vector2:
-			continue
-		min_point.x = minf(min_point.x, point.x)
-		min_point.y = minf(min_point.y, point.y)
-		max_point.x = maxf(max_point.x, point.x)
-		max_point.y = maxf(max_point.y, point.y)
-	var extent := max_point - min_point
-	if is_zero_approx(extent.x):
-		extent.x = 1.0
-	if is_zero_approx(extent.y):
-		extent.y = 1.0
-	var safe_scale := Vector2(maxf(mapping_scale.x, 0.01), maxf(mapping_scale.y, 0.01))
-	for point in points:
-		var local_point: Vector2 = point if point is Vector2 else Vector2.ZERO
-		var normalized_uv := Vector2((local_point.x - min_point.x) / extent.x, (local_point.y - min_point.y) / extent.y)
-		uvs.append((normalized_uv if wrap_mode == "fit" else normalized_uv / safe_scale + mapping_offset) * texture_size)
-	return uvs
 
 
 func _tscn_name(value: String) -> String:
@@ -5666,24 +4950,22 @@ func _tscn_name(value: String) -> String:
 
 
 func _godot_export_points(points: Array) -> Array[Vector2]:
-	const CENTIMETERS_TO_METERS := 0.1
 	var converted: Array[Vector2] = []
 	for point in points:
 		if point is Vector2:
-			converted.append(Vector2(point.x * CENTIMETERS_TO_METERS, -point.y * CENTIMETERS_TO_METERS))
+			converted.append(Vector2(point.x * ToolUnits.TO_METERS, -point.y * ToolUnits.TO_METERS))
 	return converted
 
 
 func _godot_export_transform(transform: Dictionary) -> Dictionary:
-	const CENTIMETERS_TO_METERS := 0.1
 	var normalized := _deserialize_transform(transform)
 	var export_position_value: Vector2 = normalized["position"]
 	var export_pivot_value: Vector2 = normalized["pivot"]
 	return {
-		"position": Vector2(export_position_value.x * CENTIMETERS_TO_METERS, -export_position_value.y * CENTIMETERS_TO_METERS),
+		"position": Vector2(export_position_value.x * ToolUnits.TO_METERS, -export_position_value.y * ToolUnits.TO_METERS),
 		"rotation": -float(normalized["rotation"]),
 		"scale": normalized["scale"],
-		"pivot": Vector2(export_pivot_value.x * CENTIMETERS_TO_METERS, -export_pivot_value.y * CENTIMETERS_TO_METERS)
+		"pivot": Vector2(export_pivot_value.x * ToolUnits.TO_METERS, -export_pivot_value.y * ToolUnits.TO_METERS)
 	}
 
 
@@ -5711,12 +4993,10 @@ func _confirm_asset_creation() -> void:
 		asset_name = _next_default_asset_name()
 	var asset_id := "asset_%d" % next_asset_id
 	next_asset_id += 1
-	assets.append({"id": asset_id, "name": asset_name, "visibility": true, "asset_pivot": Vector2.ZERO, "reference_image": _default_reference_image(), "animation": MotionWorkspace.create_default_animation_document(), "components": [], "guides": []})
+	assets.append({"id": asset_id, "name": asset_name, "asset_type": _create_submodule_asset_type(active_create_submodule), "visibility": true, "asset_pivot": Vector2.ZERO, "reference_image": _default_reference_image(), "animation": MotionWorkspace.create_default_animation_document(), "components": [], "guides": []})
 	selected_asset_id = asset_id
 	selected_component_id = ""
 	selected_guide_id = ""
-	selected_texture_id = ""
-	selected_element_id = ""
 	active_state = ""
 	expanded_assets[asset_id] = true
 	asset_dialog.hide()
@@ -5738,7 +5018,7 @@ func _open_reference_image_dialog() -> void:
 func _reference_art_directory() -> String:
 	var documents_directory := OS.get_system_dir(OS.SYSTEM_DIR_DOCUMENTS)
 	if documents_directory.is_empty():
-		return ProjectSettings.globalize_path(IMPORT_TEXTURES_ROOT)
+		return ProjectSettings.globalize_path("res://imports")
 	var reference_art_directory := documents_directory.path_join("RefArt")
 	DirAccess.make_dir_recursive_absolute(reference_art_directory)
 	return reference_art_directory
@@ -5761,7 +5041,7 @@ func _save_reference_image_result(reference_image_result: Image) -> void:
 	if asset.is_empty() or workspace_name.is_empty() or reference_image_result == null or reference_image_result.is_empty():
 		return
 	var reference_filename := _reference_image_filename(asset)
-	var asset_root := "%s/%s/assets/%s" % [WORKSPACES_ROOT, workspace_name, str(asset.get("id", ""))]
+	var asset_root := _asset_storage_root("%s/%s" % [WORKSPACES_ROOT, workspace_name], asset)
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(asset_root))
 	var destination_path := "%s/%s" % [asset_root, reference_filename]
 	if reference_image_result.save_png(ProjectSettings.globalize_path(destination_path)) != OK:
@@ -5948,174 +5228,6 @@ func _update_reference_image_property(property_name: String, value) -> void:
 	_render_canvas_context()
 
 
-func _open_new_texture_dialog() -> void:
-	texture_name_input.text = ""
-	texture_dialog.popup_centered()
-	texture_name_input.grab_focus()
-
-
-func _submit_texture_name(_submitted_text: String) -> void:
-	_confirm_texture_creation()
-
-
-func _confirm_texture_creation() -> void:
-	_record_direct_change()
-	var texture_name := texture_name_input.text.strip_edges()
-	if texture_name.is_empty():
-		texture_name = _next_default_texture_name()
-	var texture_id := "texture_%d" % next_texture_id
-	next_texture_id += 1
-	textures.append({
-		"id": texture_id,
-		"name": texture_name,
-		"visibility": true,
-		"canvas_width": 512,
-		"canvas_height": 512,
-		"origin_mode": "bottom_left",
-		"final_output_element_id": "",
-		"elements": []
-	})
-	selected_texture_id = texture_id
-	selected_element_id = ""
-	selected_asset_id = ""
-	selected_component_id = ""
-	active_state = ""
-	expanded_textures[texture_id] = true
-	texture_dialog.hide()
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
-
-
-func _open_new_material_dialog() -> void:
-	material_name_input.text = ""
-	material_dialog.popup_centered()
-	material_name_input.grab_focus()
-
-
-func _submit_material_name(_submitted_text: String) -> void:
-	_confirm_material_creation()
-
-
-func _confirm_material_creation() -> void:
-	_record_direct_change()
-	var material_name := material_name_input.text.strip_edges()
-	if material_name.is_empty():
-		material_name = _next_default_material_name()
-	var material_id := "material_%d" % next_material_id
-	next_material_id += 1
-	materials.append({
-		"id": material_id,
-		"name": material_name,
-		"visibility": true,
-		"texture_id": "",
-		"tint": Color.WHITE,
-		"opacity": 1.0,
-		"mapping_scale": Vector2.ONE,
-		"mapping_offset": Vector2.ZERO,
-		"mapping_wrap_mode": "clamp",
-		"mapping_repeat": false
-	})
-	material_dialog.hide()
-	_enter_material_context(material_id)
-
-
-func _next_default_material_name() -> String:
-	var index := 1
-	while _has_material_name("material%02d" % index):
-		index += 1
-	return "material%02d" % index
-
-
-func _has_material_name(material_name: String) -> bool:
-	for material_record in materials:
-		if str(material_record.get("name", "")).to_lower() == material_name.to_lower():
-			return true
-	return false
-
-
-func _next_default_texture_name() -> String:
-	var index := 1
-	while _has_texture_name("texture%02d" % index):
-		index += 1
-	return "texture%02d" % index
-
-
-func _has_texture_name(texture_name: String) -> bool:
-	for texture in textures:
-		if str(texture["name"]).to_lower() == texture_name.to_lower():
-			return true
-	return false
-
-
-func _open_element_dialog(texture_id: String) -> void:
-	selected_texture_id = texture_id
-	selected_element_id = ""
-	selected_asset_id = ""
-	selected_component_id = ""
-	element_name_input.text = ""
-	element_dialog.set_meta("texture_id", texture_id)
-	element_dialog.popup_centered()
-	element_name_input.grab_focus()
-
-
-func _submit_element_name(_submitted_text: String) -> void:
-	_confirm_element_creation()
-
-
-func _confirm_element_creation() -> void:
-	var texture_id := str(element_dialog.get_meta("texture_id", ""))
-	var texture := _get_texture(texture_id)
-	if texture.is_empty():
-		element_dialog.hide()
-		return
-	_record_direct_change()
-	var element_name := element_name_input.text.strip_edges()
-	if element_name.is_empty():
-		element_name = _next_default_element_name(texture)
-	var element_id := "element_%d" % _next_element_id(texture)
-	texture["elements"].append({
-		"id": element_id,
-		"name": element_name,
-		"visibility": true,
-		"type": "generator",
-		"output": {"state": "not_ready", "file": ""}
-	})
-	selected_texture_id = texture_id
-	selected_element_id = element_id
-	expanded_textures[texture_id] = true
-	element_dialog.hide()
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
-
-
-func _next_element_id(texture: Dictionary) -> int:
-	return _next_element_id_from_list(texture.get("elements", []))
-
-
-func _next_element_id_from_list(elements: Array) -> int:
-	var next_id := 1
-	for element in elements:
-		if element is Dictionary:
-			next_id = maxi(next_id, _id_suffix_number(str(element.get("id", ""))) + 1)
-	return next_id
-
-
-func _next_default_element_name(texture: Dictionary) -> String:
-	var index := 1
-	while _has_element_name(texture, "element%02d" % index):
-		index += 1
-	return "element%02d" % index
-
-
-func _has_element_name(texture: Dictionary, element_name: String) -> bool:
-	for element in texture.get("elements", []):
-		if str(element.get("name", "")).to_lower() == element_name.to_lower():
-			return true
-	return false
-
-
 func _next_default_asset_name() -> String:
 	var index := 1
 	while _has_asset_name("asset%02d" % index):
@@ -6133,46 +5245,65 @@ func _has_asset_name(asset_name: String) -> bool:
 func _render_outliner() -> void:
 	_clear(outliner_list)
 	_update_context_action_button()
+	_update_outliner_asset_type_filter_visibility()
 	if active_module == "Motion":
 		_render_motion_outliner()
 		return
 	if active_module == "Style":
-		if active_style_submodule == "Weighting":
-			_render_weighting_outliner()
-		else:
-			_render_material_outliner()
+		_render_weighting_outliner()
 		return
 	if active_module == "Export":
 		_render_export_outliner()
 		return
-	if active_module == "Geometry":
+	if active_module == "Mesh":
 		if active_geometry_submodule in GEOMETRY_SUBMODULES:
 			_render_geometry_component_outliner()
 		else:
-			outliner_list.add_child(_create_outliner_group_label("Geometry · Placeholder"))
+			outliner_list.add_child(_create_outliner_group_label("Mesh · Placeholder"))
 			outliner_list.add_child(_create_inspector_field_label("%s authoring will be introduced in a later phase." % active_geometry_submodule))
 		return
 	var search_text := outliner_search_input.text.strip_edges().to_lower() if is_instance_valid(outliner_search_input) else ""
-	var show_assets := active_create_submodule == "Asset"
-	var show_textures := active_create_submodule == "Texture"
-	if show_assets:
+	if active_module == "Create" and active_create_submodule in CREATE_SUBMODULES:
 		var visible_assets: Array = []
 		for asset in assets:
-			if _asset_matches_search(asset, search_text):
+			if _asset_type(asset) == _create_submodule_asset_type(active_create_submodule) and _asset_matches_search(asset, search_text):
 				visible_assets.append(asset)
 		visible_assets.sort_custom(_sort_named_documents)
-		outliner_list.add_child(_create_outliner_group_label("Assets"))
+		outliner_list.add_child(_create_outliner_group_label(active_create_submodule))
 		for asset in visible_assets:
 			_render_asset_outliner_entry(asset, not search_text.is_empty())
-	if show_textures:
-		var visible_textures: Array = []
-		for texture in textures:
-			if _texture_matches_search(texture, search_text):
-				visible_textures.append(texture)
-		visible_textures.sort_custom(_sort_named_documents)
-		outliner_list.add_child(_create_outliner_group_label("Textures"))
-		for texture in visible_textures:
-			_render_texture_outliner_entry(texture, not search_text.is_empty())
+
+
+func _update_outliner_asset_type_filter_visibility() -> void:
+	if not is_instance_valid(outliner_asset_type_filter_panel):
+		return
+	outliner_asset_type_filter_panel.visible = active_module in ["Mesh", "Style"]
+
+
+func _on_outliner_asset_type_filter_toggled(enabled: bool, asset_type: String) -> void:
+	outliner_asset_type_filters[asset_type] = enabled
+	_render_outliner()
+
+
+func _set_all_outliner_asset_type_filters() -> void:
+	for asset_type in outliner_asset_type_filters.keys():
+		outliner_asset_type_filters[asset_type] = true
+	for asset_type in outliner_asset_type_filter_checkboxes.keys():
+		var checkbox := outliner_asset_type_filter_checkboxes[asset_type] as CheckBox
+		if checkbox != null:
+			checkbox.set_pressed_no_signal(true)
+	_render_outliner()
+
+
+func _apply_outliner_asset_type_filter_checkboxes() -> void:
+	for asset_type in outliner_asset_type_filter_checkboxes.keys():
+		var checkbox := outliner_asset_type_filter_checkboxes[asset_type] as CheckBox
+		if checkbox != null:
+			checkbox.set_pressed_no_signal(bool(outliner_asset_type_filters.get(asset_type, true)))
+
+
+func _asset_type_filter_matches(asset: Dictionary) -> bool:
+	return bool(outliner_asset_type_filters.get(_asset_type(asset), false))
 
 
 func _render_motion_outliner() -> void:
@@ -6452,9 +5583,6 @@ func _select_motion_asset(asset_id: String) -> void:
 		return
 	selected_asset_id = asset_id
 	selected_component_id = ""
-	selected_texture_id = ""
-	selected_element_id = ""
-	selected_material_id = ""
 	motion_selection.select_asset(asset_id)
 	if is_instance_valid(motion_workspace):
 		motion_workspace.set_asset(asset_id, str(asset.get("name", "Asset")), asset.get("components", []), _ensure_asset_animation(asset))
@@ -6464,35 +5592,13 @@ func _select_motion_asset(asset_id: String) -> void:
 	_render_canvas_context()
 
 
-func _render_material_outliner() -> void:
-	var search_text := outliner_search_input.text.strip_edges().to_lower() if is_instance_valid(outliner_search_input) else ""
-	var visible_materials: Array[Dictionary] = []
-	for material_record in materials:
-		if search_text.is_empty() or str(material_record.get("name", "")).to_lower().contains(search_text):
-			visible_materials.append(material_record)
-	visible_materials.sort_custom(_sort_named_documents)
-	outliner_list.add_child(_create_outliner_group_label("Material"))
-	for material_record in visible_materials:
-		var material_row := HBoxContainer.new()
-		material_row.add_theme_constant_override("separation", 2)
-		outliner_list.add_child(material_row)
-		var material_id := str(material_record.get("id", ""))
-		material_row.add_child(_create_visibility_checkbox(bool(material_record.get("visibility", true)), _on_material_visibility_changed.bind(material_id)))
-		var material_button := Button.new()
-		material_button.text = str(material_record.get("name", "Material"))
-		material_button.custom_minimum_size = Vector2(0, 30)
-		material_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		material_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		material_button.focus_mode = Control.FOCUS_NONE
-		_style_outliner_button(material_button, material_id == selected_material_id)
-		material_button.pressed.connect(_select_material.bind(material_id))
-		material_row.add_child(material_button)
-
-
 func _render_weighting_outliner() -> void:
 	var search_text := outliner_search_input.text.strip_edges().to_lower() if is_instance_valid(outliner_search_input) else ""
 	outliner_list.add_child(_create_outliner_group_label("Weighting"))
+	var visible_asset_count := 0
 	for asset in assets:
+		if not _asset_type_filter_matches(asset):
+			continue
 		var asset_id := str(asset.get("id", ""))
 		var asset_matches := search_text.is_empty() or str(asset.get("name", "")).to_lower().contains(search_text)
 		var component_matches := false
@@ -6505,6 +5611,7 @@ func _render_weighting_outliner() -> void:
 					component_matches = true
 		if not asset_matches and not component_matches:
 			continue
+		visible_asset_count += 1
 		var asset_button := Button.new()
 		asset_button.text = str(asset.get("name", "Asset"))
 		asset_button.custom_minimum_size = Vector2(0, 30)
@@ -6555,6 +5662,8 @@ func _render_weighting_outliner() -> void:
 				style_button.pressed.connect(_select_weighting_style.bind(asset_id, component_id, str(style.get("id", ""))))
 				style_row.add_child(style_button)
 				outliner_list.add_child(style_row)
+	if visible_asset_count == 0:
+		outliner_list.add_child(_create_inspector_field_label("No Assets match the selected types."))
 
 
 func _render_export_outliner() -> void:
@@ -6587,25 +5696,10 @@ func _select_export_source_asset(asset_id: String) -> void:
 		return
 	selected_asset_id = asset_id
 	selected_component_id = ""
-	selected_texture_id = ""
-	selected_element_id = ""
-	selected_material_id = ""
 	active_state = ""
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
-
-
-func _render_lookdev_outliner() -> void:
-	var search_text := outliner_search_input.text.strip_edges().to_lower() if is_instance_valid(outliner_search_input) else ""
-	var visible_assets: Array[Dictionary] = []
-	for asset in assets:
-		if _asset_matches_search(asset, search_text):
-			visible_assets.append(asset)
-	visible_assets.sort_custom(_sort_named_documents)
-	outliner_list.add_child(_create_outliner_group_label("Assets"))
-	for asset in visible_assets:
-		_render_asset_outliner_entry(asset, not search_text.is_empty(), true)
 
 
 func _asset_matches_search(asset: Dictionary, search_text: String) -> bool:
@@ -6617,20 +5711,6 @@ func _asset_matches_search(asset: Dictionary, search_text: String) -> bool:
 	for guide in asset.get("guides", []):
 		if _guide_display_name(asset, guide).to_lower().contains(search_text):
 			return true
-	return false
-
-
-func _texture_matches_search(texture: Dictionary, search_text: String) -> bool:
-	if search_text.is_empty() or str(texture.get("name", "")).to_lower().contains(search_text):
-		return true
-	for element in texture.get("elements", []):
-		if str(element.get("name", "")).to_lower().contains(search_text):
-			return true
-		if str(element.get("type", "generator")) == "import":
-			# Processed outputs are derived children of an Import Element, but
-			# remain searchable so a pipeline stage can be found directly.
-			if "processed elements".contains(search_text) or "white to alpha".contains(search_text):
-				return true
 	return false
 
 
@@ -6676,12 +5756,14 @@ func _render_geometry_component_outliner() -> void:
 	var search_text := outliner_search_input.text.strip_edges().to_lower() if is_instance_valid(outliner_search_input) else ""
 	var visible_assets: Array = []
 	for asset in assets:
-		if _asset_matches_search(asset, search_text):
+		if _asset_type_filter_matches(asset) and _asset_matches_search(asset, search_text):
 			visible_assets.append(asset)
 	visible_assets.sort_custom(_sort_named_documents)
 	outliner_list.add_child(_create_outliner_group_label("%s · Components" % active_geometry_submodule))
 	for asset in visible_assets:
 		_render_geometry_component_asset_entry(asset, not search_text.is_empty())
+	if visible_assets.is_empty():
+		outliner_list.add_child(_create_inspector_field_label("No Assets match the selected types."))
 
 
 func _render_geometry_component_asset_entry(asset: Dictionary, force_expand := false) -> void:
@@ -6998,10 +6080,7 @@ func _select_geometry_asset(asset_id: String) -> void:
 	selected_asset_id = asset_id
 	selected_component_id = ""
 	selected_geometry_bake_method = ""
-	selected_texture_id = ""
-	selected_element_id = ""
-	selected_material_id = ""
-	active_module = "Geometry"
+	active_module = "Mesh"
 	active_state = ""
 	_set_geometry_command_state("")
 	if was_selected:
@@ -7015,10 +6094,7 @@ func _select_geometry_component(asset_id: String, component_id: String) -> void:
 	selected_asset_id = asset_id
 	selected_component_id = component_id
 	selected_guide_id = ""
-	selected_texture_id = ""
-	selected_element_id = ""
-	selected_material_id = ""
-	active_module = "Geometry"
+	active_module = "Mesh"
 	active_state = ""
 	selected_geometry_bake_method = ""
 	_set_geometry_command_state("")
@@ -7046,7 +6122,7 @@ func _select_geometry_bake(asset_id: String, component_id: String, method: Strin
 		_set_geometry_meshing_method(method)
 
 
-func _render_asset_outliner_entry(asset: Dictionary, force_expand := false, lookdev := false) -> void:
+func _render_asset_outliner_entry(asset: Dictionary, force_expand := false) -> void:
 	var asset_id := str(asset["id"])
 	var asset_container := VBoxContainer.new()
 	asset_container.add_theme_constant_override("separation", 0)
@@ -7061,13 +6137,8 @@ func _render_asset_outliner_entry(asset: Dictionary, force_expand := false, look
 	asset_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	asset_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	asset_button.focus_mode = Control.FOCUS_NONE
-	var active_asset_id := lookdev_target_asset_id if lookdev else selected_asset_id
-	var active_component_id := lookdev_target_component_id if lookdev else selected_component_id
-	_style_outliner_button(asset_button, asset_id == active_asset_id and active_component_id.is_empty() and (lookdev or selected_guide_id.is_empty()))
-	if lookdev:
-		asset_button.pressed.connect(_select_lookdev_asset.bind(asset_id))
-	else:
-		asset_button.pressed.connect(_select_asset.bind(asset_id))
+	_style_outliner_button(asset_button, asset_id == selected_asset_id and selected_component_id.is_empty() and selected_guide_id.is_empty())
+	asset_button.pressed.connect(_select_asset.bind(asset_id))
 	asset_header.add_child(asset_button)
 	var add_button := Button.new()
 	add_button.text = "Add"
@@ -7090,17 +6161,17 @@ func _render_asset_outliner_entry(asset: Dictionary, force_expand := false, look
 	var rendered_component_ids: Dictionary = {}
 	for component in components:
 		if str(component.get("parent_component_id", "")).is_empty():
-			_render_component_outliner_tree(asset_container, asset, component, lookdev, 16, rendered_component_ids)
+			_render_component_outliner_tree(asset_container, asset, component, 16, rendered_component_ids)
 	# A malformed in-memory document should remain editable even before its next load migration.
 	for component in components:
 		if not rendered_component_ids.has(str(component.get("id", ""))):
-			_render_component_outliner_tree(asset_container, asset, component, lookdev, 16, rendered_component_ids)
+			_render_component_outliner_tree(asset_container, asset, component, 16, rendered_component_ids)
 	asset_container.add_child(_create_outliner_child_group_label("Guides"))
 	for guide in guides:
 		_render_component_guide_row(asset_container, asset, guide)
 
 
-func _render_component_outliner_tree(container: VBoxContainer, asset: Dictionary, component: Dictionary, lookdev: bool, indent: int, rendered_component_ids: Dictionary) -> void:
+func _render_component_outliner_tree(container: VBoxContainer, asset: Dictionary, component: Dictionary, indent: int, rendered_component_ids: Dictionary) -> void:
 	var asset_id := str(asset.get("id", ""))
 	var component_id := str(component.get("id", ""))
 	if component_id.is_empty() or rendered_component_ids.has(component_id):
@@ -7120,25 +6191,21 @@ func _render_component_outliner_tree(container: VBoxContainer, asset: Dictionary
 	component_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	component_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	component_button.focus_mode = Control.FOCUS_NONE
-	_style_outliner_button(component_button, component_id == (lookdev_target_component_id if lookdev else selected_component_id) and asset_id == (lookdev_target_asset_id if lookdev else selected_asset_id))
-	if lookdev:
-		component_button.pressed.connect(_select_lookdev_component.bind(asset_id, component_id))
-	else:
-		component_button.pressed.connect(_select_component.bind(asset_id, component_id))
-		component_button.gui_input.connect(_on_component_outliner_gui_input.bind(asset_id, component_id, component_button))
+	_style_outliner_button(component_button, component_id == selected_component_id and asset_id == selected_asset_id)
+	component_button.pressed.connect(_select_component.bind(asset_id, component_id))
+	component_button.gui_input.connect(_on_component_outliner_gui_input.bind(asset_id, component_id, component_button))
 	component_row.add_child(component_button)
-	if not lookdev:
-		var add_button := Button.new()
-		add_button.text = "+"
-		add_button.custom_minimum_size = Vector2(28, 30)
-		add_button.focus_mode = Control.FOCUS_NONE
-		add_button.tooltip_text = "Add Child or Guide"
-		add_button.pressed.connect(_open_component_add_menu.bind(asset_id, component_id, add_button))
-		component_row.add_child(add_button)
+	var add_button := Button.new()
+	add_button.text = "+"
+	add_button.custom_minimum_size = Vector2(28, 30)
+	add_button.focus_mode = Control.FOCUS_NONE
+	add_button.tooltip_text = "Add Child or Guide"
+	add_button.pressed.connect(_open_component_add_menu.bind(asset_id, component_id, add_button))
+	component_row.add_child(add_button)
 	var children := ComponentHierarchy.children(asset, component_id)
 	children.sort_custom(_sort_named_documents)
 	for child in children:
-		_render_component_outliner_tree(container, asset, child, lookdev, indent + 16, rendered_component_ids)
+		_render_component_outliner_tree(container, asset, child, indent + 16, rendered_component_ids)
 
 
 func _on_component_outliner_gui_input(event: InputEvent, asset_id: String, component_id: String, button: Button) -> void:
@@ -7185,112 +6252,6 @@ func _guide_display_name(asset: Dictionary, guide: Dictionary) -> String:
 	return AssetGuide.outliner_name(guide, component_name)
 
 
-func _render_texture_outliner_entry(texture: Dictionary, force_expand := false) -> void:
-	var texture_id := str(texture["id"])
-	var texture_container := VBoxContainer.new()
-	texture_container.add_theme_constant_override("separation", 0)
-	outliner_list.add_child(texture_container)
-	var texture_header := HBoxContainer.new()
-	texture_header.add_theme_constant_override("separation", 2)
-	texture_container.add_child(texture_header)
-	texture_header.add_child(_create_visibility_checkbox(bool(texture.get("visibility", true)), _on_texture_visibility_changed.bind(texture_id)))
-	var texture_button := Button.new()
-	texture_button.text = str(texture["name"])
-	texture_button.custom_minimum_size = Vector2(0, 30)
-	texture_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	texture_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	texture_button.focus_mode = Control.FOCUS_NONE
-	_style_outliner_button(texture_button, texture_id == selected_texture_id and selected_element_id.is_empty())
-	texture_button.pressed.connect(_select_texture.bind(texture_id))
-	texture_header.add_child(texture_button)
-	var add_button := Button.new()
-	add_button.text = "Add"
-	add_button.custom_minimum_size = Vector2(48, 30)
-	add_button.focus_mode = Control.FOCUS_NONE
-	add_button.pressed.connect(_open_element_dialog.bind(texture_id))
-	texture_header.add_child(add_button)
-	if not force_expand and not bool(expanded_textures.get(texture_id, false)):
-		return
-	var import_elements: Array = []
-	var generator_elements: Array = []
-	for element in texture.get("elements", []):
-		if str(element.get("type", "generator")) == "import":
-			import_elements.append(element)
-		else:
-			generator_elements.append(element)
-	import_elements.sort_custom(_sort_named_documents)
-	generator_elements.sort_custom(_sort_named_documents)
-	texture_container.add_child(_create_outliner_child_group_label("Import Elements"))
-	for element in import_elements:
-		_render_texture_element_row(texture_container, texture_id, element)
-	texture_container.add_child(_create_outliner_child_group_label("Generator Elements"))
-	for element in generator_elements:
-		_render_texture_element_row(texture_container, texture_id, element)
-
-
-func _render_texture_element_row(texture_container: VBoxContainer, texture_id: String, element: Dictionary) -> void:
-	var element_row := HBoxContainer.new()
-	element_row.add_theme_constant_override("separation", 0)
-	texture_container.add_child(element_row)
-	var child_placeholder := Control.new()
-	child_placeholder.custom_minimum_size = Vector2(16, 0)
-	element_row.add_child(child_placeholder)
-	element_row.add_child(_create_visibility_checkbox(bool(element.get("visibility", true)), _on_element_visibility_changed.bind(texture_id, str(element.get("id", "")))))
-	var element_button := Button.new()
-	element_button.text = str(element.get("name", "Element"))
-	element_button.custom_minimum_size = Vector2(0, 30)
-	element_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	element_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	element_button.focus_mode = Control.FOCUS_NONE
-	_style_outliner_button(element_button, texture_id == selected_texture_id and str(element.get("id", "")) == selected_element_id)
-	element_button.pressed.connect(_select_element.bind(texture_id, str(element.get("id", ""))))
-	element_row.add_child(element_button)
-	if SHOW_PROCESSED_OUTLINER and str(element.get("type", "generator")) == "import":
-		# Processing results are derived from the import and therefore shown as
-		# nested rows instead of independent texture elements.
-		texture_container.add_child(_create_outliner_child_group_label("Processed Elements", 32))
-		_render_processed_element_row(texture_container, texture_id, element)
-
-
-func _render_processed_element_row(texture_container: VBoxContainer, texture_id: String, import_element: Dictionary) -> void:
-	var processed_row := HBoxContainer.new()
-	processed_row.add_theme_constant_override("separation", 0)
-	texture_container.add_child(processed_row)
-	var processed_placeholder := Control.new()
-	processed_placeholder.custom_minimum_size = Vector2(32, 0)
-	processed_row.add_child(processed_placeholder)
-	processed_row.add_child(_create_visibility_checkbox(bool(import_element.get("visibility", true)), _on_element_visibility_changed.bind(texture_id, str(import_element.get("id", "")))))
-	var processed_button := Button.new()
-	processed_button.text = "White to Alpha"
-	processed_button.custom_minimum_size = Vector2(0, 28)
-	processed_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	processed_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	processed_button.focus_mode = Control.FOCUS_NONE
-	var is_selected := texture_id == selected_texture_id \
-		and str(import_element.get("id", "")) == selected_element_id \
-		and active_import_preview_mode == "white_to_alpha"
-	_style_outliner_button(processed_button, is_selected)
-	processed_button.pressed.connect(_select_processed_preview.bind(texture_id, str(import_element.get("id", ""))))
-	if _element_output_state(import_element) != "ready":
-		processed_button.add_theme_color_override("font_color", Color("#737f91"))
-		processed_button.add_theme_color_override("font_hover_color", Color("#aab3c2"))
-		processed_button.tooltip_text = "Not ready — process the Import Element first"
-	processed_row.add_child(processed_button)
-
-
-func _select_processed_preview(texture_id: String, element_id: String) -> void:
-	selected_texture_id = texture_id
-	selected_element_id = element_id
-	selected_asset_id = ""
-	selected_component_id = ""
-	active_state = ""
-	active_import_preview_mode = "white_to_alpha"
-	expanded_textures[texture_id] = true
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
-
-
 func _strikethrough_text(text: String) -> String:
 	var result := ""
 	var strike_mark := String.chr(0x0336)
@@ -7304,13 +6265,11 @@ func _select_asset(asset_id: String) -> void:
 	_set_active_context_command("")
 	var was_selected := selected_asset_id == asset_id and selected_component_id.is_empty() and selected_guide_id.is_empty()
 	active_module = "Create"
-	_set_create_submodule_context("Asset")
+	var selected_asset := _get_asset(asset_id)
+	_set_create_submodule_context(_asset_type_create_submodule(_asset_type(selected_asset)))
 	selected_asset_id = asset_id
 	selected_component_id = ""
 	selected_guide_id = ""
-	selected_texture_id = ""
-	selected_element_id = ""
-	selected_material_id = ""
 	active_state = ""
 	canvas_view.set_interaction_state("")
 	if was_selected:
@@ -7320,52 +6279,10 @@ func _select_asset(asset_id: String) -> void:
 	_render_canvas_context()
 
 
-func _select_texture(texture_id: String) -> void:
-	_stop_guide_draw_state()
-	_set_active_context_command("")
-	var was_selected := selected_texture_id == texture_id and selected_element_id.is_empty()
-	active_module = "Create"
-	_set_create_submodule_context("Texture")
-	active_import_preview_mode = "original"
-	selected_texture_id = texture_id
-	selected_element_id = ""
-	selected_asset_id = ""
-	selected_component_id = ""
-	selected_guide_id = ""
-	selected_material_id = ""
-	active_state = ""
-	if was_selected:
-		expanded_textures[texture_id] = not bool(expanded_textures.get(texture_id, false))
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
-
-
-func _select_element(texture_id: String, element_id: String) -> void:
-	_stop_guide_draw_state()
-	_set_active_context_command("")
-	active_import_preview_mode = "original"
-	active_module = "Create"
-	_set_create_submodule_context("Texture")
-	selected_texture_id = texture_id
-	selected_element_id = element_id
-	selected_asset_id = ""
-	selected_component_id = ""
-	selected_guide_id = ""
-	selected_material_id = ""
-	active_state = ""
-	expanded_textures[texture_id] = true
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
-
-
 func _open_component_dialog(asset_id: String, anchor: Control) -> void:
 	selected_asset_id = asset_id
 	selected_component_id = ""
 	selected_guide_id = ""
-	selected_texture_id = ""
-	selected_element_id = ""
 	component_draw_mode_menu.set_meta("asset_id", asset_id)
 	component_draw_mode_menu.set_meta("parent_component_id", "")
 	component_draw_mode_menu.position = Vector2i(anchor.global_position + Vector2(0.0, anchor.size.y))
@@ -7747,7 +6664,6 @@ func _confirm_component_creation() -> void:
 		"transform": component_transform,
 		"visibility": true,
 		"z_index": 0,
-		"material_id": "",
 		"draw_mode": draw_mode if draw_mode in DRAW_MODES else "closed_loop",
 		"contour_width_px": DEFAULT_CONTOUR_WIDTH_PX,
 		"ribbon_width_px": DEFAULT_RIBBON_WIDTH_PX,
@@ -7757,8 +6673,6 @@ func _confirm_component_creation() -> void:
 	selected_asset_id = asset_id
 	selected_component_id = component_id
 	selected_guide_id = ""
-	selected_texture_id = ""
-	selected_element_id = ""
 	active_state = ""
 	expanded_assets[asset_id] = true
 	component_dialog.hide()
@@ -7778,7 +6692,7 @@ func _confirm_circle_primitive_creation() -> void:
 	var parent_component_id := str(circle_primitive_dialog.get_meta("parent_component_id", ""))
 	if not parent_component_id.is_empty() and _get_component(asset, parent_component_id).is_empty():
 		parent_component_id = ""
-	var radius := maxf(float(circle_primitive_radius_field.value), 0.001)
+	var radius := maxf(_world_to_editor_units(float(circle_primitive_radius_field.value)), 0.0001)
 	var samples := clampi(int(circle_primitive_samples_field.value), 3, 256)
 	var component_name := circle_primitive_name_input.text.strip_edges()
 	if component_name.is_empty():
@@ -7803,7 +6717,6 @@ func _confirm_circle_primitive_creation() -> void:
 		"transform": component_transform,
 		"visibility": true,
 		"z_index": 0,
-		"material_id": "",
 		"draw_mode": "closed_loop",
 		"contour_width_px": DEFAULT_CONTOUR_WIDTH_PX,
 		"ribbon_width_px": DEFAULT_RIBBON_WIDTH_PX,
@@ -7818,8 +6731,6 @@ func _confirm_circle_primitive_creation() -> void:
 	selected_asset_id = asset_id
 	selected_component_id = component_id
 	selected_guide_id = ""
-	selected_texture_id = ""
-	selected_element_id = ""
 	active_state = ""
 	expanded_assets[asset_id] = true
 	circle_primitive_dialog.hide()
@@ -7855,9 +6766,6 @@ func _select_component(asset_id: String, component_id: String) -> void:
 	selected_edge_id = ""
 	selected_point_id = ""
 	selected_point_ids.clear()
-	selected_texture_id = ""
-	selected_element_id = ""
-	selected_material_id = ""
 	active_state = ""
 	canvas_view.set_interaction_state("")
 	expanded_assets[asset_id] = true
@@ -7880,9 +6788,6 @@ func _select_guide(asset_id: String, guide_id: String) -> void:
 	selected_edge_id = ""
 	selected_point_id = ""
 	selected_point_ids.clear()
-	selected_texture_id = ""
-	selected_element_id = ""
-	selected_material_id = ""
 	active_state = ""
 	expanded_assets[asset_id] = true
 	_render_outliner()
@@ -7961,80 +6866,8 @@ func _delete_current_outliner_selection() -> void:
 		_delete_selected_guide()
 	elif not selected_component_id.is_empty():
 		_delete_selected_component()
-	elif not selected_element_id.is_empty():
-		_delete_selected_element()
-	elif not selected_texture_id.is_empty():
-		_delete_selected_texture()
-	elif not selected_material_id.is_empty():
-		_delete_selected_material()
 	elif not selected_asset_id.is_empty():
 		_delete_selected_asset()
-
-
-func _delete_selected_element() -> void:
-	var texture := _get_texture(selected_texture_id)
-	if texture.is_empty() or selected_element_id.is_empty():
-		return
-	var element_index := -1
-	for index in range(texture.get("elements", []).size()):
-		if str(texture["elements"][index].get("id", "")) == selected_element_id:
-			element_index = index
-			break
-	if element_index < 0:
-		return
-	_record_direct_change()
-	texture["elements"].remove_at(element_index)
-	selected_element_id = ""
-	active_import_preview_mode = "original"
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
-
-
-func _delete_selected_texture() -> void:
-	if selected_texture_id.is_empty():
-		return
-	var texture_index := -1
-	for index in range(textures.size()):
-		if str(textures[index].get("id", "")) == selected_texture_id:
-			texture_index = index
-			break
-	if texture_index < 0:
-		return
-	_record_direct_change()
-	for material_record in materials:
-		if str(material_record.get("texture_id", "")) == selected_texture_id:
-			material_record["texture_id"] = ""
-	textures.remove_at(texture_index)
-	expanded_textures.erase(selected_texture_id)
-	selected_texture_id = ""
-	selected_element_id = ""
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
-
-
-func _delete_selected_material() -> void:
-	if selected_material_id.is_empty():
-		return
-	var material_index := -1
-	for index in range(materials.size()):
-		if str(materials[index].get("id", "")) == selected_material_id:
-			material_index = index
-			break
-	if material_index < 0:
-		return
-	_record_direct_change()
-	for asset in assets:
-		for component in asset.get("components", []):
-			if str(component.get("material_id", "")) == selected_material_id:
-				component["material_id"] = ""
-	materials.remove_at(material_index)
-	selected_material_id = ""
-	active_module = "Style"
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
 
 
 func _delete_selected_asset() -> void:
@@ -8097,250 +6930,6 @@ func _style_guide_outliner_button(button: Button, selected: bool, guide_type := 
 	button.add_theme_color_override("font_hover_color", selected_text_color if selected else guide_color.lightened(0.55))
 	button.add_theme_color_override("font_pressed_color", selected_text_color)
 	button.add_theme_color_override("font_focus_color", selected_text_color if selected else guide_color.lightened(0.35))
-
-
-func _render_material_inspector() -> void:
-	var material_data := _get_material(selected_material_id)
-	if material_data.is_empty():
-		return
-	inspector_content.add_child(_create_inspector_field_label("Name"))
-	var name_editor := _create_name_editor(str(material_data.get("name", "Material")), "Material name")
-	name_editor.text_submitted.connect(_rename_selected_material)
-	name_editor.focus_exited.connect(func() -> void: _rename_selected_material(name_editor.text))
-	inspector_content.add_child(name_editor)
-
-	inspector_content.add_child(_create_inspector_section("Appearance"))
-	inspector_content.add_child(_create_inspector_field_label("Texture"))
-	var texture_option := OptionButton.new()
-	texture_option.custom_minimum_size = Vector2(0, 26)
-	texture_option.add_item("None")
-	texture_option.set_item_metadata(0, "")
-	var ready_textures: Array[Dictionary] = []
-	for texture in textures:
-		if _texture_output_state(texture) == "ready":
-			ready_textures.append(texture)
-	ready_textures.sort_custom(_sort_named_documents)
-	for texture in ready_textures:
-		texture_option.add_item(str(texture.get("name", "Texture")))
-		texture_option.set_item_metadata(texture_option.item_count - 1, str(texture.get("id", "")))
-	var material_texture_id := str(material_data.get("texture_id", ""))
-	for index in range(texture_option.item_count):
-		if str(texture_option.get_item_metadata(index)) == material_texture_id:
-			texture_option.select(index)
-			break
-	texture_option.item_selected.connect(_on_material_texture_selected.bind(texture_option))
-	inspector_content.add_child(texture_option)
-
-	inspector_content.add_child(_create_inspector_field_label("Tint"))
-	var tint_button := ColorPickerButton.new()
-	tint_button.custom_minimum_size = Vector2(0, 26)
-	tint_button.color = material_data.get("tint", Color.WHITE)
-	tint_button.color_changed.connect(_on_material_tint_changed)
-	inspector_content.add_child(tint_button)
-
-	inspector_content.add_child(_create_inspector_field_label("Opacity"))
-	var opacity_field := SpinBox.new()
-	opacity_field.min_value = 0.0
-	opacity_field.max_value = 1.0
-	opacity_field.step = 0.01
-	opacity_field.custom_arrow_step = 0.1
-	opacity_field.custom_minimum_size = Vector2(0, 26)
-	opacity_field.set_value_no_signal(clampf(float(material_data.get("opacity", 1.0)), 0.0, 1.0))
-	opacity_field.value_changed.connect(_on_material_opacity_changed)
-	inspector_content.add_child(opacity_field)
-
-	inspector_content.add_child(_create_inspector_section("Mapping"))
-	var mapping_grid := GridContainer.new()
-	mapping_grid.columns = 2
-	mapping_grid.add_theme_constant_override("h_separation", 8)
-	mapping_grid.add_theme_constant_override("v_separation", 4)
-	inspector_content.add_child(mapping_grid)
-	var mapping_scale: Vector2 = material_data.get("mapping_scale", Vector2.ONE)
-	_add_material_mapping_field(mapping_grid, "Scale X", mapping_scale.x, "scale_x")
-	_add_material_mapping_field(mapping_grid, "Scale Y", mapping_scale.y, "scale_y")
-	var mapping_offset: Vector2 = material_data.get("mapping_offset", Vector2.ZERO)
-	_add_material_mapping_field(mapping_grid, "Offset X", mapping_offset.x, "offset_x")
-	_add_material_mapping_field(mapping_grid, "Offset Y", mapping_offset.y, "offset_y")
-	inspector_content.add_child(_create_inspector_field_label("Wrap Mode"))
-	var wrap_option := OptionButton.new()
-	wrap_option.custom_minimum_size = Vector2(0, 26)
-	wrap_option.add_item("Fit")
-	wrap_option.set_item_metadata(0, "fit")
-	wrap_option.add_item("Clamp")
-	wrap_option.set_item_metadata(1, "clamp")
-	wrap_option.add_item("Repeat")
-	wrap_option.set_item_metadata(2, "repeat")
-	var wrap_mode := _material_wrap_mode(material_data)
-	for index in range(wrap_option.item_count):
-		if str(wrap_option.get_item_metadata(index)) == wrap_mode:
-			wrap_option.select(index)
-			break
-	wrap_option.item_selected.connect(_on_material_wrap_mode_selected.bind(wrap_option))
-	inspector_content.add_child(wrap_option)
-
-
-func _render_lookdev_material_target_inspector() -> void:
-	var material_data := _get_material(selected_material_id)
-	var asset := _get_asset(lookdev_target_asset_id)
-	var component := _get_component(asset, lookdev_target_component_id)
-	if material_data.is_empty() or asset.is_empty() or component.is_empty():
-		_render_material_inspector()
-		return
-	inspector_content.add_child(_create_inspector_field_label("Name"))
-	var component_name := _create_inspector_field_label(str(component.get("name", "Component")))
-	component_name.add_theme_color_override("font_color", Color("#d7dce5"))
-	inspector_content.add_child(component_name)
-	inspector_content.add_child(_create_inspector_field_label("Asset"))
-	var asset_name := _create_inspector_field_label(str(asset.get("name", "Asset")))
-	asset_name.add_theme_color_override("font_color", Color("#9aa3b2"))
-	inspector_content.add_child(asset_name)
-	inspector_content.add_child(_create_inspector_section("Material Assignment"))
-	inspector_content.add_child(_create_inspector_field_label("Selected Material"))
-	var selected_name := _create_inspector_field_label(str(material_data.get("name", "Material")))
-	selected_name.add_theme_color_override("font_color", Color("#d7dce5"))
-	inspector_content.add_child(selected_name)
-	var assigned_id := str(component.get("material_id", ""))
-	var assigned_name := "None"
-	if not assigned_id.is_empty():
-		assigned_name = str(_get_material(assigned_id).get("name", assigned_id))
-	inspector_content.add_child(_create_inspector_field_label("Assigned: %s" % assigned_name))
-	var assign_button := Button.new()
-	assign_button.text = "Assign Material"
-	assign_button.custom_minimum_size = Vector2(0, 26)
-	assign_button.focus_mode = Control.FOCUS_NONE
-	assign_button.disabled = assigned_id == selected_material_id
-	assign_button.pressed.connect(_assign_selected_material_to_lookdev_target)
-	inspector_content.add_child(assign_button)
-
-
-func _add_material_mapping_field(grid: GridContainer, label_text: String, value: float, property_name: String) -> void:
-	grid.add_child(_create_inspector_field_label(label_text))
-	var field := SpinBox.new()
-	field.min_value = -100.0 if property_name.begins_with("offset") else 0.01
-	field.max_value = 100.0
-	field.step = 0.01
-	field.custom_arrow_step = 0.1
-	field.custom_minimum_size = Vector2(96, 26)
-	field.set_value_no_signal(value)
-	field.value_changed.connect(_on_material_mapping_changed.bind(property_name))
-	grid.add_child(field)
-
-
-func _on_material_mapping_changed(value: float, property_name: String) -> void:
-	var material_data := _get_material(selected_material_id)
-	if material_data.is_empty():
-		return
-	_record_direct_change()
-	var mapping_scale_value: Vector2 = material_data.get("mapping_scale", Vector2.ONE)
-	var mapping_offset_value: Vector2 = material_data.get("mapping_offset", Vector2.ZERO)
-	if property_name == "scale_x":
-		mapping_scale_value.x = maxf(value, 0.01)
-	elif property_name == "scale_y":
-		mapping_scale_value.y = maxf(value, 0.01)
-	elif property_name == "offset_x":
-		mapping_offset_value.x = value
-	elif property_name == "offset_y":
-		mapping_offset_value.y = value
-	material_data["mapping_scale"] = mapping_scale_value
-	material_data["mapping_offset"] = mapping_offset_value
-	_render_canvas_context()
-
-
-func _on_material_wrap_mode_selected(index: int, option: OptionButton) -> void:
-	var material_data := _get_material(selected_material_id)
-	if material_data.is_empty() or index < 0 or index >= option.item_count:
-		return
-	var wrap_mode := str(option.get_item_metadata(index))
-	if _material_wrap_mode(material_data) == wrap_mode:
-		return
-	_record_direct_change()
-	material_data["mapping_wrap_mode"] = wrap_mode
-	material_data["mapping_repeat"] = wrap_mode == "repeat"
-	_render_canvas_context()
-
-
-func _render_lookdev_asset_inspector() -> void:
-	var asset := _get_asset(lookdev_target_asset_id)
-	if asset.is_empty():
-		_render_material_inspector()
-		return
-	inspector_content.add_child(_create_inspector_field_label("Name"))
-	var name_editor := _create_name_editor(str(asset.get("name", "Asset")), "Asset name")
-	name_editor.text_submitted.connect(_rename_lookdev_asset)
-	name_editor.focus_exited.connect(func() -> void: _rename_lookdev_asset(name_editor.text))
-	inspector_content.add_child(name_editor)
-	inspector_content.add_child(_create_inspector_field_label("Components"))
-	var component_count := _create_inspector_field_label(str(asset.get("components", []).size()))
-	component_count.add_theme_color_override("font_color", Color("#9aa3b2"))
-	inspector_content.add_child(component_count)
-
-
-func _rename_lookdev_asset(new_name: String) -> void:
-	var asset := _get_asset(lookdev_target_asset_id)
-	var asset_name := new_name.strip_edges()
-	if asset.is_empty() or asset_name.is_empty() or asset_name == str(asset.get("name", "")):
-		return
-	_record_direct_change()
-	asset["name"] = asset_name
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
-
-
-func _assign_selected_material_to_lookdev_target() -> void:
-	var material_data := _get_material(selected_material_id)
-	var asset := _get_asset(lookdev_target_asset_id)
-	var component := _get_component(asset, lookdev_target_component_id)
-	if material_data.is_empty() or component.is_empty() or str(component.get("material_id", "")) == selected_material_id:
-		return
-	_record_direct_change()
-	component["material_id"] = selected_material_id
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
-
-
-func _rename_selected_material(new_name: String) -> void:
-	var material_data := _get_material(selected_material_id)
-	var material_name := new_name.strip_edges()
-	if material_data.is_empty():
-		return
-	if material_name.is_empty() or material_name == str(material_data.get("name", "")):
-		return
-	_record_direct_change()
-	material_data["name"] = material_name
-	_render_outliner()
-	_render_inspector()
-
-
-func _on_material_texture_selected(index: int, option: OptionButton) -> void:
-	var material_data := _get_material(selected_material_id)
-	if material_data.is_empty():
-		return
-	if index < 0 or index >= option.item_count:
-		return
-	_record_direct_change()
-	material_data["texture_id"] = str(option.get_item_metadata(index))
-	_render_inspector()
-	_render_canvas_context()
-
-
-func _on_material_tint_changed(color: Color) -> void:
-	var material_data := _get_material(selected_material_id)
-	if material_data.is_empty():
-		return
-	_record_direct_change()
-	material_data["tint"] = color
-	_render_canvas_context()
-
-
-func _on_material_opacity_changed(value: float) -> void:
-	var material_data := _get_material(selected_material_id)
-	if material_data.is_empty():
-		return
-	_record_direct_change()
-	material_data["opacity"] = clampf(value, 0.0, 1.0)
-	_render_canvas_context()
 
 
 func _render_guide_inspector(asset: Dictionary, guide: Dictionary) -> void:
@@ -9238,7 +7827,7 @@ func _render_geometry_meshing_inspector() -> void:
 func _render_ribbon_meshing_inspector(component: Dictionary) -> void:
 	inspector_content.add_child(_create_inspector_field_label(str(component.get("name", "Ribbon"))))
 	inspector_content.add_child(_create_inspector_section("Ribbon Strip · Automatic"))
-	inspector_content.add_child(_create_inspector_field_label("Width: %.1f px (%.2f cm)" % [float(component.get("ribbon_width_px", DEFAULT_RIBBON_WIDTH_PX)), RibbonMeshService.width_cm(component)]))
+	inspector_content.add_child(_create_inspector_field_label("Width: %.1f px (%.2f cm)" % [float(component.get("ribbon_width_px", DEFAULT_RIBBON_WIDTH_PX)), _editor_units_to_world(RibbonMeshService.width_cm(component))]))
 	var issues := RibbonMeshService.validation_issues(component)
 	var input_status := _create_inspector_field_label("Input: Ready" if issues.is_empty() else "Input: Draft · %s" % issues[0])
 	input_status.add_theme_color_override("font_color", Color("#75b88a") if issues.is_empty() else Color("#ef8354"))
@@ -9648,12 +8237,9 @@ func _render_inspector() -> void:
 		inspector_content.add_child(_create_inspector_field_label("Godot Scene (.tscn)"))
 		return
 	if active_module == "Style":
-		if active_style_submodule == "Weighting":
-			_render_weighting_inspector()
-		else:
-			_render_material_inspector()
+		_render_weighting_inspector()
 		return
-	if active_module == "Geometry":
+	if active_module == "Mesh":
 		if active_geometry_submodule == "Sampling":
 			_render_geometry_sampling_inspector()
 		elif active_geometry_submodule == "Seeding":
@@ -9665,78 +8251,7 @@ func _render_inspector() -> void:
 		else:
 			inspector_content.add_child(_create_inspector_section(active_geometry_submodule))
 			inspector_content.add_child(_create_inspector_field_label("Placeholder module"))
-			inspector_content.add_child(_create_inspector_field_label("Geometry pipeline tooling is planned for a later phase."))
-		return
-	if not selected_texture_id.is_empty():
-		var texture := _get_texture(selected_texture_id)
-		if texture.is_empty():
-			return
-		inspector_content.add_child(_create_inspector_field_label("Name"))
-		var texture_name_editor := _create_name_editor(str(texture["name"] if selected_element_id.is_empty() else _get_element(texture, selected_element_id).get("name", "Element")), "Texture name")
-		if selected_element_id.is_empty():
-			texture_name_editor.text_submitted.connect(_rename_selected_texture)
-			texture_name_editor.focus_exited.connect(func() -> void: _rename_selected_texture(texture_name_editor.text))
-		else:
-			texture_name_editor.text_submitted.connect(_rename_selected_element)
-			texture_name_editor.focus_exited.connect(func() -> void: _rename_selected_element(texture_name_editor.text))
-		inspector_content.add_child(texture_name_editor)
-		var output_element := _get_element(texture, selected_element_id) if not selected_element_id.is_empty() else _get_texture_final_output_element(texture)
-		inspector_content.add_child(_create_inspector_section("Output"))
-		var output_state_label := Label.new()
-		output_state_label.text = _element_output_state(output_element) if not output_element.is_empty() else _texture_output_state(texture)
-		output_state_label.custom_minimum_size = Vector2(0, 20)
-		output_state_label.add_theme_font_size_override("font_size", 11)
-		output_state_label.add_theme_color_override("font_color", Color("#f2c94c") if output_state_label.text == "not_ready" else Color("#75b88a"))
-		inspector_content.add_child(output_state_label)
-		if selected_element_id.is_empty():
-			if not output_element.is_empty():
-				inspector_content.add_child(_create_inspector_field_label("Final Output"))
-				var final_output_label := Label.new()
-				final_output_label.text = str(output_element.get("name", "Element"))
-				final_output_label.add_theme_font_size_override("font_size", 11)
-				final_output_label.add_theme_color_override("font_color", Color("#9aa3b2"))
-				inspector_content.add_child(final_output_label)
-			var import_element := _find_import_element(texture)
-			var import_source = import_element.get("source", {}) if not import_element.is_empty() else {}
-			if import_source is Dictionary and not import_source.is_empty():
-				inspector_content.add_child(_create_inspector_field_label("Source"))
-				var source_label := Label.new()
-				source_label.text = str(import_source.get("original_name", import_source.get("file", "")))
-				source_label.add_theme_font_size_override("font_size", 11)
-				source_label.add_theme_color_override("font_color", Color("#9aa3b2"))
-				inspector_content.add_child(source_label)
-		elif not output_element.is_empty() and str(output_element.get("type", "generator")) == "import":
-			inspector_content.add_child(_create_inspector_section("Processing"))
-			var pipeline = output_element.get("pipeline", {})
-			if not pipeline is Dictionary:
-				pipeline = {}
-			var processing_label := _create_inspector_field_label("White to Alpha")
-			inspector_content.add_child(processing_label)
-			var threshold_label := _create_inspector_field_label("Threshold")
-			inspector_content.add_child(threshold_label)
-			var threshold_field := SpinBox.new()
-			import_threshold_field = threshold_field
-			threshold_field.min_value = 0.0
-			threshold_field.max_value = 1.0
-			threshold_field.step = 0.01
-			threshold_field.custom_arrow_step = 0.1
-			threshold_field.custom_minimum_size = Vector2(0, 26)
-			threshold_field.add_theme_font_size_override("font_size", 11)
-			pending_import_threshold = clampf(float(pipeline.get("threshold", 0.05)), 0.0, 1.0)
-			# Rebuilding the Inspector must not emit value_changed and overwrite
-			# the user's current threshold with the default value.
-			threshold_field.set_value_no_signal(pending_import_threshold)
-			# SpinBox text entry can commit without a reliable value_changed event;
-			# listen to the embedded LineEdit as the source of truth as well.
-			threshold_field.get_line_edit().text_changed.connect(_on_import_threshold_text_changed)
-			inspector_content.add_child(threshold_field)
-			var process_button := Button.new()
-			process_button.text = "Process"
-			process_button.custom_minimum_size = Vector2(0, 26)
-			process_button.add_theme_font_size_override("font_size", 11)
-			process_button.focus_mode = Control.FOCUS_NONE
-			process_button.pressed.connect(_process_selected_import_element)
-			inspector_content.add_child(process_button)
+			inspector_content.add_child(_create_inspector_field_label("Mesh pipeline tooling is planned for a later phase."))
 		return
 	var asset := _get_asset(selected_asset_id)
 	if asset.is_empty():
@@ -10007,24 +8522,6 @@ func _render_inspector() -> void:
 	z_index_field.add_theme_font_size_override("font_size", 11)
 	z_index_field.value_changed.connect(_on_component_z_index_changed)
 	inspector_content.add_child(z_index_field)
-	inspector_content.add_child(_create_inspector_section("Material"))
-	var material_option := OptionButton.new()
-	material_option.custom_minimum_size = Vector2(0, 26)
-	inspector_content.add_child(_create_inspector_field_label("Assigned Material"))
-	material_option.add_item("None")
-	material_option.set_item_metadata(0, "")
-	var sorted_materials: Array[Dictionary] = materials.duplicate(true)
-	sorted_materials.sort_custom(_sort_named_documents)
-	for material_record in sorted_materials:
-		material_option.add_item(str(material_record.get("name", "Material")))
-		material_option.set_item_metadata(material_option.item_count - 1, str(material_record.get("id", "")))
-	var assigned_material_id := str(component.get("material_id", ""))
-	for index in range(material_option.item_count):
-		if str(material_option.get_item_metadata(index)) == assigned_material_id:
-			material_option.select(index)
-			break
-	material_option.item_selected.connect(_on_component_material_selected.bind(material_option))
-	inspector_content.add_child(material_option)
 
 
 func _render_motion_inspector() -> void:
@@ -11362,18 +9859,6 @@ func _confirm_motion_item_removal() -> void:
 		_show_status_message("%s removed from the Asset Animation." % ("Transition" if kind == MotionSelection.TRANSITION else "Marker"))
 
 
-func _on_component_material_selected(index: int, option: OptionButton) -> void:
-	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	if component.is_empty() or index < 0 or index >= option.item_count:
-		return
-	var material_id := str(option.get_item_metadata(index))
-	if str(component.get("material_id", "")) == material_id:
-		return
-	_record_direct_change()
-	component["material_id"] = material_id
-	_render_outliner()
-
-
 func _on_component_catch_parent_selected(index: int, option: OptionButton) -> void:
 	var asset := _get_asset(selected_asset_id)
 	var component := _get_component(asset, selected_component_id)
@@ -11399,7 +9884,7 @@ func _on_component_ribbon_width_changed(value: float) -> void:
 	_record_coalesced_change()
 	component["ribbon_width_px"] = width
 	_render_outliner()
-	if active_module == "Geometry" and active_geometry_submodule == "Meshing":
+	if active_module == "Mesh" and active_geometry_submodule == "Meshing":
 		_render_inspector()
 		_refresh_geometry_meshing_workspace()
 
@@ -11789,37 +10274,6 @@ func _on_component_visibility_entry_changed(visibility_enabled: bool, asset_id: 
 	_render_canvas_context()
 
 
-func _on_texture_visibility_changed(visibility_enabled: bool, texture_id: String) -> void:
-	var texture := _get_texture(texture_id)
-	if texture.is_empty():
-		return
-	_record_direct_change()
-	texture["visibility"] = visibility_enabled
-	_render_outliner()
-	_render_canvas_context()
-
-
-func _on_element_visibility_changed(visibility_enabled: bool, texture_id: String, element_id: String) -> void:
-	var texture := _get_texture(texture_id)
-	var element := _get_element(texture, element_id)
-	if element.is_empty():
-		return
-	_record_direct_change()
-	element["visibility"] = visibility_enabled
-	_render_outliner()
-	_render_canvas_context()
-
-
-func _on_material_visibility_changed(visibility_enabled: bool, material_id: String) -> void:
-	var material_data := _get_material(material_id)
-	if material_data.is_empty():
-		return
-	_record_direct_change()
-	material_data["visibility"] = visibility_enabled
-	_render_outliner()
-	_render_canvas_context()
-
-
 func _on_component_z_index_changed(value: float) -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	if not component.is_empty():
@@ -11861,29 +10315,6 @@ func _rename_selected_component(new_name: String) -> void:
 	_render_canvas_context()
 
 
-func _rename_selected_texture(new_name: String) -> void:
-	var texture_name := new_name.strip_edges()
-	var texture := _get_texture(selected_texture_id)
-	if texture.is_empty() or texture_name.is_empty() or texture_name == str(texture["name"]):
-		return
-	_record_direct_change()
-	texture["name"] = texture_name
-	_render_outliner()
-	_render_inspector()
-
-
-func _rename_selected_element(new_name: String) -> void:
-	var element_name := new_name.strip_edges()
-	var texture := _get_texture(selected_texture_id)
-	var element := _get_element(texture, selected_element_id)
-	if element.is_empty() or element_name.is_empty() or element_name == str(element.get("name", "")):
-		return
-	_record_direct_change()
-	element["name"] = element_name
-	_render_outliner()
-	_render_inspector()
-
-
 func _on_import_threshold_changed(value: float) -> void:
 	pending_import_threshold = clampf(value, 0.0, 1.0)
 
@@ -11899,104 +10330,6 @@ func _read_import_threshold() -> float:
 		if entered_text.is_valid_float():
 			return clampf(float(entered_text), 0.0, 1.0)
 	return clampf(pending_import_threshold, 0.0, 1.0)
-
-
-func _render_material_preview() -> void:
-	var material_data := _get_material(selected_material_id)
-	if material_data.is_empty():
-		return
-	var texture := _get_texture(str(material_data.get("texture_id", "")))
-	var texture_path := _get_texture_final_path(texture) if not texture.is_empty() else ""
-	material_preview_texture.texture = null
-	material_preview_texture.modulate = Color(
-		Color(material_data.get("tint", Color.WHITE)).r,
-		Color(material_data.get("tint", Color.WHITE)).g,
-		Color(material_data.get("tint", Color.WHITE)).b,
-		clampf(float(material_data.get("opacity", 1.0)), 0.0, 1.0)
-	)
-	material_preview_label.visible = texture_path.is_empty()
-	if texture_path.is_empty():
-		material_preview_surface.custom_minimum_size = Vector2(280, 180)
-		material_preview_content.custom_minimum_size = Vector2(240, 140)
-		material_preview_texture.custom_minimum_size = Vector2(240, 140)
-		return
-	var image := Image.new()
-	if image.load(ProjectSettings.globalize_path(texture_path)) != OK or image.is_empty():
-		material_preview_label.visible = true
-		return
-	var image_size := Vector2(image.get_width(), image.get_height())
-	var max_preview_size := Vector2(240, 140)
-	var fit_scale := minf(max_preview_size.x / maxf(image_size.x, 1.0), max_preview_size.y / maxf(image_size.y, 1.0))
-	var fitted_size := image_size * fit_scale
-	material_preview_surface.custom_minimum_size = fitted_size + Vector2(40, 64)
-	material_preview_content.custom_minimum_size = fitted_size
-	material_preview_texture.custom_minimum_size = fitted_size
-	material_preview_texture.texture = ImageTexture.create_from_image(image)
-	if is_instance_valid(material_preview_shader):
-		var wrap_mode := _material_wrap_mode(material_data)
-		material_preview_shader.set_shader_parameter("mapping_scale", material_data.get("mapping_scale", Vector2.ONE))
-		material_preview_shader.set_shader_parameter("mapping_offset", material_data.get("mapping_offset", Vector2.ZERO))
-		material_preview_shader.set_shader_parameter("wrap_mode", 0 if wrap_mode == "fit" else 2 if wrap_mode == "repeat" else 1)
-	material_preview_label.visible = false
-
-
-func _load_material_canvas_texture(material_data: Dictionary) -> Texture2D:
-	var texture := _get_texture(str(material_data.get("texture_id", "")))
-	if texture.is_empty():
-		return null
-	var texture_path := _get_texture_final_path(texture)
-	if texture_path.is_empty():
-		return null
-	var image := Image.new()
-	if image.load(ProjectSettings.globalize_path(texture_path)) != OK or image.is_empty():
-		return null
-	return ImageTexture.create_from_image(image)
-
-
-func _render_lookdev_canvas() -> void:
-	canvas_view.visible = true
-	canvas_view.clear_draw_constraint()
-	texture_canvas.visible = false
-	import_preview.visible = false
-	var asset := _get_asset(lookdev_target_asset_id)
-	if asset.is_empty():
-		canvas_view.set_component_material(null)
-		canvas_context_label.text = "LookDev: Select an Asset"
-		canvas_view.set_context("")
-		canvas_view.set_interaction_state("")
-		canvas_view.set_tool_mode("")
-		canvas_view.set_component_transform({})
-		canvas_view.set_component_material(null)
-		canvas_view.set_reference_shapes([])
-		canvas_view.set_display_polygon([])
-		return
-	var component := _get_component(asset, lookdev_target_component_id)
-	if component.is_empty():
-		canvas_view.set_component_material(null)
-		canvas_context_label.text = "LookDev: %s" % str(asset.get("name", "Asset"))
-		canvas_view.set_context(str(asset.get("name", "Asset")))
-		canvas_view.set_interaction_state("asset")
-		canvas_view.set_tool_mode("")
-		canvas_view.set_component_transform({})
-		canvas_view.set_component_material(null)
-		canvas_view.set_reference_shapes(_build_reference_shapes(asset))
-		canvas_view.set_display_polygon([])
-		return
-	canvas_context_label.text = "LookDev: %s / %s" % [str(asset.get("name", "Asset")), str(component.get("name", "Component"))]
-	canvas_view.set_context(str(component.get("name", "Component")))
-	canvas_view.set_interaction_state("")
-	canvas_view.set_tool_mode("")
-	var component_transform := ComponentHierarchy.world_transform_record(asset, lookdev_target_component_id)
-	component_transform["visibility"] = bool(asset.get("visibility", true)) and bool(component.get("visibility", true))
-	component_transform["z_index"] = int(component.get("z_index", 0))
-	canvas_view.set_component_transform(component_transform)
-	var material_data := _get_material(str(component.get("material_id", "")))
-	if material_data.is_empty():
-		canvas_view.set_component_material(null)
-	else:
-		canvas_view.set_component_material(_load_material_canvas_texture(material_data), material_data.get("tint", Color.WHITE), float(material_data.get("opacity", 1.0)), material_data.get("mapping_scale", Vector2.ONE), material_data.get("mapping_offset", Vector2.ZERO), _material_wrap_mode(material_data))
-	canvas_view.set_reference_shapes(_build_reference_shapes(asset, lookdev_target_component_id))
-	_refresh_component_geometry(component)
 
 
 func _render_canvas_context() -> void:
@@ -12020,10 +10353,6 @@ func _render_canvas_context() -> void:
 	weighting_workspace.visible = false
 	if active_module == "Motion":
 		canvas_view.visible = false
-		texture_canvas.visible = false
-		import_preview.visible = false
-		material_graph.visible = false
-		material_preview_container.visible = false
 		export_workspace.visible = false
 		motion_workspace.visible = active_motion_submodule == "Animation"
 		motion_path_workspace.visible = active_motion_submodule == "Path"
@@ -12040,8 +10369,6 @@ func _render_canvas_context() -> void:
 		else:
 			_refresh_motion_sequence_workspace()
 		canvas_context_label.text = ""
-		texture_context_label.text = ""
-		import_preview_context_label.text = ""
 		return
 	motion_path_workspace.visible = false
 	motion_act_workspace.visible = false
@@ -12049,24 +10376,14 @@ func _render_canvas_context() -> void:
 	if active_module == "Export":
 		motion_workspace.visible = false
 		canvas_view.visible = false
-		texture_canvas.visible = false
-		import_preview.visible = false
-		material_graph.visible = false
-		material_preview_container.visible = false
 		export_workspace.visible = true
 		_render_export_workspace()
 		canvas_context_label.text = ""
-		texture_context_label.text = ""
-		import_preview_context_label.text = ""
 		return
 	export_workspace.visible = false
-	if active_module == "Geometry":
+	if active_module == "Mesh":
 		motion_workspace.visible = false
 		canvas_view.visible = false
-		texture_canvas.visible = false
-		import_preview.visible = false
-		material_graph.visible = false
-		material_preview_container.visible = false
 		geometry_sampling_workspace.visible = active_geometry_submodule == "Sampling"
 		geometry_seeding_workspace.visible = active_geometry_submodule == "Seeding"
 		geometry_meshing_workspace.visible = active_geometry_submodule == "Meshing"
@@ -12079,81 +10396,17 @@ func _render_canvas_context() -> void:
 			_refresh_geometry_meshing_workspace()
 		elif active_geometry_submodule == "UV Mapping":
 			_refresh_geometry_uv_mapping_workspace()
-		canvas_context_label.text = "" if active_geometry_submodule in ["Sampling", "Seeding", "Meshing", "UV Mapping"] else "Geometry → %s · Placeholder" % active_geometry_submodule
-		texture_context_label.text = ""
-		import_preview_context_label.text = ""
+		canvas_context_label.text = "" if active_geometry_submodule in ["Sampling", "Seeding", "Meshing", "UV Mapping"] else "Mesh → %s · Placeholder" % active_geometry_submodule
 		return
 	if active_module == "Style":
 		motion_workspace.visible = false
 		canvas_view.visible = false
-		texture_canvas.visible = false
-		import_preview.visible = false
-		if active_style_submodule == "Weighting":
-			material_graph.visible = false
-			material_preview_container.visible = false
-			weighting_workspace.visible = true
-			_refresh_weighting_workspace()
-			canvas_context_label.text = ""
-			texture_context_label.text = ""
-			import_preview_context_label.text = ""
-			return
-		var selected_material := _get_material(selected_material_id)
-		var material_is_visible := selected_material.is_empty() or bool(selected_material.get("visibility", true))
-		material_graph.visible = not selected_material_id.is_empty() and material_is_visible
-		material_preview_container.visible = not selected_material_id.is_empty() and material_is_visible
-		if material_preview_container.visible:
-			_render_material_preview()
-		canvas_context_label.text = "Material: %s" % str(_get_material(selected_material_id).get("name", "")) if not selected_material_id.is_empty() else ""
-		texture_context_label.text = ""
-		import_preview_context_label.text = ""
+		weighting_workspace.visible = true
+		_refresh_weighting_workspace()
+		canvas_context_label.text = ""
 		return
-	material_graph.visible = false
-	material_preview_container.visible = false
 	motion_workspace.visible = false
-	if not selected_texture_id.is_empty():
-		var texture := _get_texture(selected_texture_id)
-		if texture.is_empty():
-			return
-		canvas_view.visible = false
-		var selected_element := _get_element(texture, selected_element_id)
-		var is_import_element := not selected_element.is_empty() and str(selected_element.get("type", "generator")) == "import"
-		var texture_is_visible := bool(texture.get("visibility", true))
-		var element_is_visible := selected_element.is_empty() or bool(selected_element.get("visibility", true))
-		var effective_texture_visibility := texture_is_visible and element_is_visible
-		texture_canvas.visible = not is_import_element and effective_texture_visibility
-		import_preview.visible = is_import_element and effective_texture_visibility
-		texture_context_label.text = "Texture: %s" % str(texture["name"]) if selected_element_id.is_empty() else "Element: %s" % str(selected_element.get("name", "Element"))
-		import_preview_context_label.text = "Import Element: %s" % str(selected_element.get("name", "Element")) if is_import_element else ""
-		texture_canvas.set_origin_mode(str(texture.get("origin_mode", "bottom_left")))
-		texture_canvas.set_final_texture_path(_get_texture_final_path(texture) if selected_element_id.is_empty() else "")
-		texture_canvas.set_selected_element(str(selected_element.get("name", "")) if not selected_element.is_empty() else "")
-		if is_import_element:
-			# Processing is an explicit action. Until Process is pressed, the
-			# White to Alpha preview must not change live with the threshold field.
-			# Show the source until a ready processed output exists.
-			if active_import_preview_mode == "white_to_alpha" and _element_output_state(selected_element) == "ready":
-				import_preview.set_preview_path(_get_texture_preview_path(texture, selected_element))
-			else:
-				import_preview.set_preview_path(_get_texture_source_path(texture, selected_element))
-		else:
-			import_preview.set_preview_path("")
-		return
-	if active_module == "Create" and active_create_submodule == "Texture":
-		canvas_view.visible = false
-		texture_canvas.visible = true
-		import_preview.visible = false
-		texture_canvas.set_final_texture_path("")
-		texture_canvas.set_selected_element("")
-		texture_context_label.text = "Texture: Select a Texture"
-		import_preview_context_label.text = ""
-		texture_canvas.call_deferred("grab_focus")
-		return
 	canvas_view.visible = true
-	texture_canvas.visible = false
-	import_preview.visible = false
-	texture_context_label.text = ""
-	import_preview_context_label.text = ""
-	import_preview.set_preview_path("")
 	var asset := _get_asset(selected_asset_id)
 	if asset.is_empty():
 		canvas_context_label.text = ""
@@ -12179,7 +10432,6 @@ func _render_canvas_context() -> void:
 		canvas_view.set_paper_frame(_paper_frame_size(paper_level) if paper_level >= 0 else Vector2.ZERO, paper_level >= 0)
 		canvas_view.set_tool_mode("")
 		canvas_view.set_component_transform({})
-		canvas_view.set_component_material(null)
 		canvas_view.set_reference_shapes(_build_reference_shapes(asset))
 		canvas_view.set_display_polygon([])
 		canvas_view.set_bezier_geometry([], [], [])
@@ -12218,11 +10470,6 @@ func _render_canvas_context() -> void:
 	component_transform["visibility"] = bool(asset.get("visibility", true)) and bool(component.get("visibility", true))
 	component_transform["z_index"] = int(component.get("z_index", 0))
 	canvas_view.set_component_transform(component_transform)
-	var component_material := _get_material(str(component.get("material_id", "")))
-	if component_material.is_empty():
-		canvas_view.set_component_material(null)
-	else:
-		canvas_view.set_component_material(_load_material_canvas_texture(component_material), component_material.get("tint", Color.WHITE), float(component_material.get("opacity", 1.0)), component_material.get("mapping_scale", Vector2.ONE), component_material.get("mapping_offset", Vector2.ZERO), _material_wrap_mode(component_material))
 	canvas_view.set_reference_shapes(_build_reference_shapes(asset, selected_component_id))
 	canvas_view.set_component_draw_mode(str(component.get("draw_mode", "closed_loop")))
 	canvas_view.set_point_numbers_visible(bool(component.get("show_point_numbers", false)))
@@ -12245,7 +10492,6 @@ func _render_spine_canvas(asset: Dictionary, guide: Dictionary, drawing: bool) -
 	canvas_context_label.text = "%s: %s%s" % [type_name, guide_name, " · Draft" if drawing else ""]
 	canvas_view.set_context(guide_name)
 	canvas_view.set_paper_frame(Vector2.ZERO, false)
-	canvas_view.set_component_material(null)
 	canvas_view.set_guide_style(true)
 	canvas_view.set_guide_color(AssetGuide.color(str(guide.get("guide_type", AssetGuide.SAMPLER_SPINE))))
 	canvas_view.set_reference_shapes(_build_reference_shapes(asset, "", target_component_id))
@@ -12449,13 +10695,13 @@ func _on_transform_changed(transform: Dictionary) -> void:
 		var transform_scale: Vector2 = local_transform.get("scale", Vector2.ONE)
 		var pivot: Vector2 = local_transform.get("pivot", Vector2.ZERO)
 		var values := {
-			"position_x": transform_position.x,
-			"position_y": transform_position.y,
+			"position_x": _editor_units_to_world(transform_position.x),
+			"position_y": _editor_units_to_world(transform_position.y),
 			"rotation": float(local_transform.get("rotation", 0.0)),
 			"scale_x": transform_scale.x,
 			"scale_y": transform_scale.y,
-			"pivot_x": pivot.x,
-			"pivot_y": pivot.y
+			"pivot_x": _editor_units_to_world(pivot.x),
+			"pivot_y": _editor_units_to_world(pivot.y)
 		}
 		for property_name in values:
 			var field = transform_fields.get(property_name)
@@ -12703,6 +10949,31 @@ func _get_asset(asset_id: String) -> Dictionary:
 	return {}
 
 
+func _normalize_asset_type(value) -> String:
+	var normalized := str(value).strip_edges().to_lower()
+	return normalized if normalized in ["character", "props", "terrain", "icon"] else "character"
+
+
+func _asset_type(asset: Dictionary) -> String:
+	return _normalize_asset_type(asset.get("asset_type", "character"))
+
+
+func _create_submodule_asset_type(submodule: String) -> String:
+	return _normalize_asset_type(submodule)
+
+
+func _asset_type_create_submodule(asset_type: String) -> String:
+	match _normalize_asset_type(asset_type):
+		"props":
+			return "Props"
+		"terrain":
+			return "Terrain"
+		"icon":
+			return "Icon"
+		_:
+			return "Character"
+
+
 func _ensure_asset_animation(asset: Dictionary) -> Dictionary:
 	if asset.is_empty():
 		return {}
@@ -12947,29 +11218,6 @@ func _get_edge(component: Dictionary, edge_id: String) -> Dictionary:
 	return {}
 
 
-func _get_texture(texture_id: String) -> Dictionary:
-	for texture in textures:
-		if str(texture["id"]) == texture_id:
-			return texture
-	return {}
-
-
-func _get_material(material_id: String) -> Dictionary:
-	for material_record in materials:
-		if str(material_record.get("id", "")) == material_id:
-			return material_record
-	return {}
-
-
-func _get_element(texture: Dictionary, element_id: String) -> Dictionary:
-	if texture.is_empty():
-		return {}
-	for element in texture.get("elements", []):
-		if str(element.get("id", "")) == element_id:
-			return element
-	return {}
-
-
 func _clear(container: Node) -> void:
 	for child in container.get_children():
 		child.queue_free()
@@ -12996,48 +11244,38 @@ func _on_category_pressed(_module_name: String) -> void:
 		motion_path_playing = false
 		motion_act_playing = false
 		motion_sequence_playing = false
-	if active_module != "Style":
-		selected_material_id = ""
 	if active_module == "Motion":
 		selected_component_id = ""
-		selected_texture_id = ""
-		selected_element_id = ""
 		active_state = ""
 		selected_geometry_bake_method = ""
 		if active_motion_submodule == "Animation" and not _get_asset(selected_asset_id).is_empty():
 			motion_selection.select_asset(selected_asset_id)
-	if active_module == "Geometry":
-		selected_texture_id = ""
-		selected_element_id = ""
-		selected_material_id = ""
+	if active_module == "Mesh":
 		active_state = ""
 		active_geometry_submodule = active_geometry_submodule if active_geometry_submodule in GEOMETRY_SUBMODULES else "Sampling"
 	if active_module == "Export":
 		selected_component_id = ""
-		selected_texture_id = ""
-		selected_element_id = ""
 		active_state = ""
 	var pressed_section := _find_section(_module_name)
 	for section in module_sections:
-		section.set_expanded(section == pressed_section and section.expanded)
+		section.set_expanded(true)
+		if section != pressed_section:
+			section.set_active_submodule("")
 	if pressed_section != null and not pressed_section.active_submodule.is_empty():
 		if active_module == "Create":
 			_set_create_submodule_context(pressed_section.active_submodule)
-		elif active_module == "Geometry":
+		elif active_module == "Mesh":
 			active_geometry_submodule = pressed_section.active_submodule if pressed_section.active_submodule in GEOMETRY_SUBMODULES else "Sampling"
 			pressed_section.set_active_submodule(active_geometry_submodule)
-		elif active_module == "Motion":
-			active_motion_submodule = pressed_section.active_submodule if pressed_section.active_submodule in MOTION_SUBMODULES else "Animation"
-			pressed_section.set_active_submodule(active_motion_submodule)
 		elif active_module == "Style":
-			active_style_submodule = pressed_section.active_submodule if pressed_section.active_submodule in STYLE_SUBMODULES else "Material"
+			active_style_submodule = pressed_section.active_submodule if pressed_section.active_submodule in STYLE_SUBMODULES else "Weighting"
 			pressed_section.set_active_submodule(active_style_submodule)
-	elif active_module == "Style" and active_style_submodule == "Material":
-		selected_asset_id = ""
-		selected_component_id = ""
-		selected_texture_id = ""
-		selected_element_id = ""
-		active_state = ""
+	elif active_module == "Create":
+		_set_create_submodule_context(active_create_submodule)
+	elif active_module == "Mesh":
+		_set_active_module_visual("Mesh", active_geometry_submodule)
+	elif active_module == "Style":
+		_set_active_module_visual("Style", active_style_submodule)
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
@@ -13050,10 +11288,16 @@ func _find_section(module_name: String) -> ModuleSection:
 	return null
 
 
+func _set_active_module_visual(module_name: String, submodule: String) -> void:
+	for module_section in module_sections:
+		module_section.set_expanded(true)
+		module_section.set_active_submodule(submodule if module_section.module_name == module_name else "")
+
+
 func _select_submodule(module_name: String, submodule: String, section: ModuleSection) -> void:
 	if active_draw_tool == "spine":
 		_stop_guide_draw_state()
-	section.set_active_submodule(submodule)
+	_set_active_module_visual(module_name, submodule)
 	active_module = module_name
 	if module_name == "Create":
 		_set_create_submodule_context(submodule)
@@ -13061,75 +11305,37 @@ func _select_submodule(module_name: String, submodule: String, section: ModuleSe
 		_render_inspector()
 		_render_context_bar()
 		_render_canvas_context()
-	elif module_name == "Geometry" and submodule in GEOMETRY_SUBMODULES:
+	elif module_name == "Mesh" and submodule in GEOMETRY_SUBMODULES:
 		active_geometry_submodule = submodule
-		active_module = "Geometry"
+		active_module = "Mesh"
 		_set_geometry_command_state("")
 		selected_geometry_bake_method = ""
-		selected_texture_id = ""
-		selected_element_id = ""
-		selected_material_id = ""
 		active_state = ""
 		_render_outliner()
 		_render_inspector()
 		_render_canvas_context()
 	elif module_name == "Style" and submodule in STYLE_SUBMODULES:
 		active_style_submodule = submodule
-		if submodule == "Material":
-			_enter_material_context(selected_material_id)
-		else:
-			_enter_weighting_context()
-	elif module_name == "Motion" and submodule in MOTION_SUBMODULES:
-		_enter_motion_context(submodule)
+		_enter_weighting_context()
 	return
 
 
 func _set_create_submodule_context(submodule: String) -> void:
-	active_create_submodule = submodule
-	selected_material_id = ""
+	active_create_submodule = submodule if submodule in CREATE_SUBMODULES else "Character"
 	active_state = ""
-	if submodule == "Asset":
-		selected_texture_id = ""
-		selected_element_id = ""
-	elif submodule == "Texture":
+	var selected_asset := _get_asset(selected_asset_id)
+	if selected_asset.is_empty() or _asset_type(selected_asset) != _create_submodule_asset_type(active_create_submodule):
 		selected_asset_id = ""
 		selected_component_id = ""
-	else:
-		selected_asset_id = ""
-		selected_component_id = ""
-		selected_texture_id = ""
-		selected_element_id = ""
 	var create_section := _find_section("Create")
 	if create_section != null:
-		create_section.set_active_submodule(submodule)
-
-
-func _enter_material_context(material_id: String = "") -> void:
-	active_module = "Style"
-	active_style_submodule = "Material"
-	selected_asset_id = ""
-	selected_component_id = ""
-	selected_texture_id = ""
-	selected_element_id = ""
-	selected_material_id = material_id
-	selected_weighting_style_id = ""
-	material_view_mode = "graph"
-	var style_section := _find_section("Style")
-	if style_section != null:
-		style_section.set_expanded(true)
-		style_section.set_active_submodule("Material")
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+		_set_active_module_visual("Create", active_create_submodule)
 
 
 func _enter_motion_context(submodule := "Animation") -> void:
 	active_module = "Motion"
 	active_motion_submodule = submodule if submodule in MOTION_SUBMODULES else "Animation"
 	selected_component_id = ""
-	selected_texture_id = ""
-	selected_element_id = ""
-	selected_material_id = ""
 	active_state = ""
 	if active_motion_submodule != "Path":
 		motion_path_playing = false
@@ -13163,20 +11369,12 @@ func _enter_motion_context(submodule := "Animation") -> void:
 	_render_canvas_context()
 
 
-func _select_material(material_id: String) -> void:
-	if _get_material(material_id).is_empty():
-		return
-	_enter_material_context(material_id)
-
-
 func _enter_weighting_context() -> void:
 	active_module = "Style"
 	active_style_submodule = "Weighting"
-	selected_material_id = ""
 	var style_section := _find_section("Style")
 	if style_section != null:
-		style_section.set_expanded(true)
-		style_section.set_active_submodule("Weighting")
+		_set_active_module_visual("Style", "Weighting")
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
@@ -13210,28 +11408,3 @@ func _select_weighting_style(asset_id: String, component_id: String, style_id: S
 	selected_weighting_style_id = style_id
 	expanded_assets[asset_id] = true
 	_enter_weighting_context()
-
-
-func _select_lookdev_asset(asset_id: String) -> void:
-	var was_selected := lookdev_target_asset_id == asset_id and lookdev_target_component_id.is_empty()
-	lookdev_target_asset_id = asset_id
-	lookdev_target_component_id = ""
-	if was_selected:
-		var expanded := bool(expanded_assets.get(asset_id, false))
-		expanded_assets[asset_id] = not expanded
-	else:
-		expanded_assets[asset_id] = true
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
-
-
-func _select_lookdev_component(asset_id: String, component_id: String) -> void:
-	if _get_component(_get_asset(asset_id), component_id).is_empty():
-		return
-	lookdev_target_asset_id = asset_id
-	lookdev_target_component_id = component_id
-	expanded_assets[asset_id] = true
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()

@@ -146,7 +146,7 @@ func _draw() -> void:
 	_draw_boundaries()
 	_draw_sampler_spine()
 	_draw_seeds()
-	draw_string(ThemeDB.fallback_font, Vector2(10.0, 20.0), "Geometry → Seeding · %s" % status, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 12, Color("#9aa3b2"))
+	draw_string(ThemeDB.fallback_font, Vector2(10.0, 20.0), "Mesh → Seeding · %s" % status, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 12, Color("#9aa3b2"))
 
 
 func _draw_grid() -> void:
