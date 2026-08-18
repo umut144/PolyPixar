@@ -32,6 +32,7 @@ var outliner_list: VBoxContainer
 var outliner_search_input: LineEdit
 var outliner_asset_type_filter_panel: VBoxContainer
 var outliner_asset_type_filter_checkboxes: Dictionary = {}
+var outliner_component_navigation_active := false
 var outliner_asset_type_filters: Dictionary = {
 	"character": true,
 	"props": true,
@@ -290,9 +291,13 @@ func _focus_active_canvas_after_startup() -> void:
 
 func _input(event: InputEvent) -> void:
 	# Control focus navigation consumes arrow keys before _unhandled_key_input.
-	# A selected Point in Edit → Select owns those keys, so intercept them at
-	# the input stage and keep keyboard focus on the canvas.
+	# The focused Outliner and a selected Point in Edit → Select own those keys,
+	# so intercept them before Godot moves focus to an unrelated control.
 	if not event is InputEventKey or not event.pressed:
+		return
+	if not event.meta_pressed and not event.ctrl_pressed and event.keycode in [KEY_UP, KEY_DOWN] and _outliner_component_navigation_has_focus():
+		_navigate_outliner_component(-1 if event.keycode == KEY_UP else 1)
+		get_viewport().set_input_as_handled()
 		return
 	if event.meta_pressed or event.ctrl_pressed or event.keycode not in [KEY_LEFT, KEY_RIGHT, KEY_UP, KEY_DOWN] or not _can_nudge_selected_point():
 		return
@@ -320,6 +325,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	var has_command_modifier: bool = event.meta_pressed or event.ctrl_pressed
 	if not has_command_modifier and event.keycode == KEY_P and active_state.is_empty() and not selected_component_id.is_empty() and is_instance_valid(canvas_view):
 		if canvas_view.place_pivot_at_mouse():
+			outliner_component_navigation_active = false
+			canvas_view.grab_focus()
 			get_viewport().set_input_as_handled()
 		return
 	if has_command_modifier and event.keycode == KEY_Q:
@@ -772,6 +779,7 @@ func _build_ui() -> void:
 	outliner_list = VBoxContainer.new()
 	outliner_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	outliner_list.add_theme_constant_override("separation", 0)
+	outliner_list.focus_mode = Control.FOCUS_ALL
 	outliner_scroll.add_child(outliner_list)
 
 	var canvas_split := HSplitContainer.new()
@@ -5470,6 +5478,55 @@ func _set_outliner_asset_expanded(asset_id: String, expanded: bool) -> void:
 		expanded_assets[asset_id] = false
 
 
+func _outliner_component_navigation_has_focus() -> bool:
+	if not outliner_component_navigation_active or not active_state.is_empty() or selected_component_id.is_empty():
+		return false
+	var focus_owner := get_viewport().gui_get_focus_owner()
+	return not (focus_owner is LineEdit or focus_owner is TextEdit or focus_owner is SpinBox)
+
+
+func _visible_outliner_component_ids(asset: Dictionary) -> Array[String]:
+	var component_ids: Array[String] = []
+	var components: Array = []
+	for component in asset.get("components", []):
+		if str(component.get("type", "component")) != "guide":
+			components.append(component)
+	components.sort_custom(_sort_named_documents)
+	var rendered_ids: Dictionary = {}
+	for component in components:
+		if str(component.get("parent_component_id", "")).is_empty():
+			_append_outliner_component_ids(asset, component, rendered_ids, component_ids)
+	for component in components:
+		if not rendered_ids.has(str(component.get("id", ""))):
+			_append_outliner_component_ids(asset, component, rendered_ids, component_ids)
+	return component_ids
+
+
+func _append_outliner_component_ids(asset: Dictionary, component: Dictionary, rendered_ids: Dictionary, component_ids: Array[String]) -> void:
+	var component_id := str(component.get("id", ""))
+	if component_id.is_empty() or rendered_ids.has(component_id):
+		return
+	rendered_ids[component_id] = true
+	component_ids.append(component_id)
+	var children := ComponentHierarchy.children(asset, component_id)
+	children.sort_custom(_sort_named_documents)
+	for child in children:
+		_append_outliner_component_ids(asset, child, rendered_ids, component_ids)
+
+
+func _navigate_outliner_component(direction: int) -> void:
+	var asset := _get_asset(selected_asset_id)
+	if asset.is_empty() or direction == 0:
+		return
+	var component_ids := _visible_outliner_component_ids(asset)
+	var current_index := component_ids.find(selected_component_id)
+	if current_index < 0:
+		return
+	var next_index := clampi(current_index + direction, 0, component_ids.size() - 1)
+	if next_index != current_index:
+		_select_component(selected_asset_id, component_ids[next_index], true)
+
+
 func _render_motion_outliner() -> void:
 	var search_text := outliner_search_input.text.strip_edges().to_lower() if is_instance_valid(outliner_search_input) else ""
 	if active_motion_submodule == "Path":
@@ -6358,7 +6415,7 @@ func _render_component_outliner_tree(container: VBoxContainer, asset: Dictionary
 	component_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	component_button.focus_mode = Control.FOCUS_NONE
 	_style_outliner_button(component_button, component_id == selected_component_id and asset_id == selected_asset_id)
-	component_button.pressed.connect(_select_component.bind(asset_id, component_id))
+	component_button.pressed.connect(_select_component.bind(asset_id, component_id, true))
 	component_button.gui_input.connect(_on_component_outliner_gui_input.bind(asset_id, component_id, component_button))
 	component_row.add_child(component_button)
 	var add_button := Button.new()
@@ -6884,7 +6941,7 @@ func _has_component_name(asset: Dictionary, component_name: String) -> bool:
 	return false
 
 
-func _select_component(asset_id: String, component_id: String) -> void:
+func _select_component(asset_id: String, component_id: String, focus_outliner := false) -> void:
 	_stop_guide_draw_state()
 	_set_active_context_command("")
 	active_module = "Create"
@@ -6895,12 +6952,15 @@ func _select_component(asset_id: String, component_id: String) -> void:
 	selected_edge_id = ""
 	selected_point_id = ""
 	selected_point_ids.clear()
+	outliner_component_navigation_active = focus_outliner
 	active_state = ""
 	canvas_view.set_interaction_state("")
 	_set_outliner_asset_expanded(asset_id, true)
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
+	if is_instance_valid(canvas_view):
+		canvas_view.grab_focus()
 
 
 func _select_guide(asset_id: String, guide_id: String) -> void:
