@@ -13,7 +13,7 @@ const PAPER_SIZES_CM := [Vector2(21.0, 29.7), Vector2(29.7, 42.0), Vector2(42.0,
 const PAPER_LABELS := ["A4", "A3", "A2", "A1", "A0"]
 const PAPER_NONE_LEVEL := -1
 const PAPER_NONE_LABEL := "Kein Rahmen"
-const DRAW_MODES := ["closed_loop", "open_edge", "ribbon"]
+const DRAW_MODES := ["closed_loop", "open_edge", "ribbon", "primitive"]
 const DEFAULT_CONTOUR_WIDTH_PX := 8.0
 const DEFAULT_RIBBON_WIDTH_PX := 8.0
 const GRID_BOX_TOOL_UNITS := 0.5
@@ -96,6 +96,7 @@ var selected_asset_id := ""
 var selected_component_id := ""
 var selected_guide_id := ""
 var selected_edge_id := ""
+var selected_edge_ids: Array[String] = []
 var selected_point_id := ""
 var selected_point_ids: Array[String] = []
 var asset_pivot_fields: Dictionary = {}
@@ -112,13 +113,8 @@ var asset_name_input: LineEdit
 var component_dialog: ConfirmationDialog
 var component_name_input: LineEdit
 var component_draw_mode_menu: PopupMenu
-var circle_primitive_dialog: ConfirmationDialog
-var circle_primitive_name_input: LineEdit
-var circle_primitive_diameter_field: SpinBox
-var circle_primitive_samples_field: SpinBox
 var component_add_menu: PopupMenu
 var component_add_child_menu: PopupMenu
-var component_add_primitive_menu: PopupMenu
 var component_add_guide_menu: PopupMenu
 var component_context_menu: PopupMenu
 var guide_dialog: ConfirmationDialog
@@ -292,14 +288,40 @@ func _focus_active_canvas_after_startup() -> void:
 		canvas_view.grab_focus()
 
 
+func _input(event: InputEvent) -> void:
+	# Control focus navigation consumes arrow keys before _unhandled_key_input.
+	# A selected Point in Edit → Select owns those keys, so intercept them at
+	# the input stage and keep keyboard focus on the canvas.
+	if not event is InputEventKey or not event.pressed:
+		return
+	if event.meta_pressed or event.ctrl_pressed or event.keycode not in [KEY_LEFT, KEY_RIGHT, KEY_UP, KEY_DOWN] or not _can_nudge_selected_point():
+		return
+	var nudge_delta := Vector2.ZERO
+	match event.keycode:
+		KEY_LEFT: nudge_delta.x = -1.0
+		KEY_RIGHT: nudge_delta.x = 1.0
+		KEY_UP: nudge_delta.y = 1.0
+		KEY_DOWN: nudge_delta.y = -1.0
+	_nudge_selected_point(nudge_delta)
+	if is_instance_valid(canvas_view):
+		canvas_view.grab_focus()
+	get_viewport().set_input_as_handled()
+
+
 func _unhandled_key_input(event: InputEvent) -> void:
 	if not event is InputEventKey:
 		return
 	if is_instance_valid(canvas_view) and (event.meta_pressed or event.ctrl_pressed or event.keycode in [KEY_META, KEY_CTRL]):
 		canvas_view.set_command_shortcut_active(event.meta_pressed or event.ctrl_pressed)
-	if not event.pressed or event.echo:
+	if not event.pressed:
+		return
+	if event.echo and not _can_nudge_selected_point():
 		return
 	var has_command_modifier: bool = event.meta_pressed or event.ctrl_pressed
+	if not has_command_modifier and event.keycode == KEY_P and active_state.is_empty() and not selected_component_id.is_empty() and is_instance_valid(canvas_view):
+		if canvas_view.place_pivot_at_mouse():
+			get_viewport().set_input_as_handled()
+		return
 	if has_command_modifier and event.keycode == KEY_Q:
 		get_viewport().set_input_as_handled()
 		return
@@ -409,6 +431,16 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			_on_bezier_points_delete_requested(selected_point_ids.duplicate())
 		get_viewport().set_input_as_handled()
 		return
+	if not has_command_modifier and _can_nudge_selected_point() and event.keycode in [KEY_LEFT, KEY_RIGHT, KEY_UP, KEY_DOWN]:
+		var nudge_delta := Vector2.ZERO
+		match event.keycode:
+			KEY_LEFT: nudge_delta.x = -1.0
+			KEY_RIGHT: nudge_delta.x = 1.0
+			KEY_UP: nudge_delta.y = 1.0
+			KEY_DOWN: nudge_delta.y = -1.0
+		_nudge_selected_point(nudge_delta)
+		get_viewport().set_input_as_handled()
+		return
 	if not has_command_modifier and (event.keycode == KEY_BACKSPACE or event.keycode == KEY_DELETE) and active_state.is_empty():
 		_delete_current_outliner_selection()
 		get_viewport().set_input_as_handled()
@@ -434,6 +466,20 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		return
 	if selected_component_id.is_empty():
 		return
+	var selected_component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if str(selected_component.get("draw_mode", "")) == "primitive":
+		if has_command_modifier and event.keycode == KEY_1 and selected_component.get("primitive", {}).is_empty():
+			_set_active_state("draw")
+			_set_active_context_command("asset.create_primitive")
+			canvas_view.start_circle_primitive_preview()
+			_render_context_bar()
+			get_viewport().set_input_as_handled()
+			return
+		if has_command_modifier and event.keycode == KEY_2:
+			_activate_transform_state()
+			get_viewport().set_input_as_handled()
+			return
+		return
 	if has_command_modifier and event.keycode == KEY_1:
 		_activate_draw_state()
 		get_viewport().set_input_as_handled()
@@ -447,7 +493,6 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 	elif has_command_modifier and event.keycode == KEY_4:
-		var selected_component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 		if str(selected_component.get("draw_mode", "closed_loop")) == "closed_loop":
 			_activate_edit_face_state()
 		get_viewport().set_input_as_handled()
@@ -461,6 +506,40 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	elif not has_command_modifier and active_state == "edit" and active_edit_mode == "point" and event.keycode == KEY_3:
 		_activate_edit_point_state(false, true)
 		get_viewport().set_input_as_handled()
+
+
+func _can_nudge_selected_point() -> bool:
+	return not Input.is_key_pressed(KEY_META) and not Input.is_key_pressed(KEY_CTRL) \
+		and selected_guide_id.is_empty() \
+		and active_state == "edit" \
+		and active_edit_mode == "point" \
+		and not edit_bezier_handles \
+		and not edit_point_set_mode \
+		and not selected_point_ids.is_empty()
+
+
+func _nudge_selected_point(direction: Vector2) -> void:
+	if not _can_nudge_selected_point():
+		return
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if component.is_empty() or direction.is_zero_approx():
+		return
+	var points_to_move: Array[Dictionary] = []
+	for point_id in selected_point_ids:
+		var point := BezierTopology.point_by_id(component.get("points", []), str(point_id))
+		if not point.is_empty():
+			points_to_move.append(point)
+	if points_to_move.is_empty():
+		return
+	var step := snap_grid_step if snap_enabled else world_grid_size
+	step = maxf(step, 0.0001)
+	_record_direct_change()
+	for point in points_to_move:
+		point["position"] = Vector2(point.get("position", Vector2.ZERO)) + direction * step
+	BezierGeometry.resolve_auto_handles(component.get("points", []), component.get("chains", []))
+	_refresh_component_geometry(component)
+	_render_inspector()
+	_render_canvas_context()
 
 
 func _reset_to_default_state() -> void:
@@ -477,6 +556,7 @@ func _reset_to_default_state() -> void:
 	edit_point_set_mode = false
 	active_transform_mode = "transform"
 	selected_edge_id = ""
+	selected_edge_ids.clear()
 	selected_point_id = ""
 	selected_point_ids.clear()
 	active_import_preview_mode = "original"
@@ -485,7 +565,7 @@ func _reset_to_default_state() -> void:
 		canvas_view.set_tool_mode("")
 		canvas_view.set_edit_mode(active_edit_mode)
 		canvas_view.set_transform_mode(active_transform_mode)
-		canvas_view.set_selected_edge_id("")
+		canvas_view.set_selected_edge_ids([])
 	_render_inspector()
 	_render_canvas_context()
 
@@ -727,6 +807,7 @@ func _build_ui() -> void:
 	canvas_view.bezier_point_added.connect(_on_bezier_point_added)
 	canvas_view.bezier_chain_closed.connect(_on_bezier_chain_closed)
 	canvas_view.edge_selection_changed.connect(_on_edge_selection_changed)
+	canvas_view.edge_selection_set_changed.connect(_on_edge_selection_set_changed)
 	canvas_view.face_selection_changed.connect(_on_face_selection_changed)
 	canvas_view.point_selection_changed.connect(_on_point_selection_changed)
 	canvas_view.point_selection_set_changed.connect(_on_point_selection_set_changed)
@@ -742,6 +823,9 @@ func _build_ui() -> void:
 	canvas_view.pivot_changed.connect(_on_pivot_changed)
 	canvas_view.asset_pivot_changed.connect(_on_asset_pivot_changed)
 	canvas_view.transform_changed.connect(_on_transform_changed)
+	canvas_view.primitive_placed.connect(_on_primitive_placed)
+	canvas_view.primitive_center_changed.connect(_on_primitive_center_changed)
+	canvas_view.primitive_preview_cancelled.connect(_on_primitive_preview_cancelled)
 	var canvas := canvas_view
 	canvas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -806,7 +890,6 @@ func _build_ui() -> void:
 	_create_asset_dialog()
 	_create_component_dialog()
 	_create_component_draw_mode_menu()
-	_create_circle_primitive_dialog()
 	_create_component_add_menu()
 	_create_component_context_menu()
 	_create_guide_dialog()
@@ -1423,48 +1506,12 @@ func _create_component_dialog() -> void:
 	add_child(component_dialog)
 
 
-func _create_circle_primitive_dialog() -> void:
-	circle_primitive_dialog = ConfirmationDialog.new()
-	circle_primitive_dialog.title = "Add Circle Primitive"
-	circle_primitive_dialog.size = Vector2i(380, 280)
-	circle_primitive_dialog.confirmed.connect(_confirm_circle_primitive_creation)
-	circle_primitive_dialog.canceled.connect(_on_circle_primitive_dialog_canceled)
-	var content := VBoxContainer.new()
-	content.add_theme_constant_override("separation", 6)
-	circle_primitive_name_input = LineEdit.new()
-	circle_primitive_name_input.placeholder_text = "Component name"
-	circle_primitive_name_input.custom_minimum_size = Vector2(320, 30)
-	content.add_child(circle_primitive_name_input)
-	var diameter_label := Label.new()
-	diameter_label.text = "Durchmesser (cm)"
-	content.add_child(diameter_label)
-	circle_primitive_diameter_field = SpinBox.new()
-	circle_primitive_diameter_field.min_value = 0.001
-	circle_primitive_diameter_field.max_value = 100000.0
-	circle_primitive_diameter_field.step = 0.001
-	circle_primitive_diameter_field.value = 2.0
-	circle_primitive_diameter_field.custom_minimum_size = Vector2(320, 28)
-	content.add_child(circle_primitive_diameter_field)
-	var samples_label := Label.new()
-	samples_label.text = "Samples"
-	content.add_child(samples_label)
-	circle_primitive_samples_field = SpinBox.new()
-	circle_primitive_samples_field.min_value = 3
-	circle_primitive_samples_field.max_value = 256
-	circle_primitive_samples_field.step = 1
-	circle_primitive_samples_field.value = 32
-	circle_primitive_samples_field.custom_minimum_size = Vector2(320, 28)
-	content.add_child(circle_primitive_samples_field)
-	circle_primitive_dialog.add_child(content)
-	add_child(circle_primitive_dialog)
-
-
 func _create_component_draw_mode_menu() -> void:
 	component_draw_mode_menu = PopupMenu.new()
 	component_draw_mode_menu.add_item("Closed Loop", 0)
 	component_draw_mode_menu.add_item("Open Edge", 1)
 	component_draw_mode_menu.add_item("Ribbon", 2)
-	component_draw_mode_menu.add_item("Circle Primitive", 3)
+	component_draw_mode_menu.add_item("Primitive", 3)
 	_style_popup_menu(component_draw_mode_menu)
 	component_draw_mode_menu.id_pressed.connect(_on_component_draw_mode_selected)
 	add_child(component_draw_mode_menu)
@@ -1478,13 +1525,9 @@ func _create_component_add_menu() -> void:
 	component_add_child_menu.add_item("Closed Loop", 0)
 	component_add_child_menu.add_item("Open Edge", 1)
 	component_add_child_menu.add_item("Ribbon", 2)
+	component_add_child_menu.add_item("Primitive", 3)
 	component_add_child_menu.id_pressed.connect(_on_component_add_child_selected)
 	component_add_menu.add_child(component_add_child_menu)
-	component_add_primitive_menu = PopupMenu.new()
-	component_add_primitive_menu.name = "PrimitiveTypes"
-	component_add_primitive_menu.add_item("Circle", 0)
-	component_add_primitive_menu.id_pressed.connect(_on_component_add_primitive_selected)
-	component_add_menu.add_child(component_add_primitive_menu)
 	component_add_guide_menu = PopupMenu.new()
 	component_add_guide_menu.name = "GuideTypes"
 	component_add_guide_menu.add_item("Sample", 0)
@@ -1493,11 +1536,9 @@ func _create_component_add_menu() -> void:
 	component_add_guide_menu.id_pressed.connect(_on_component_add_guide_selected)
 	component_add_menu.add_child(component_add_guide_menu)
 	component_add_menu.add_submenu_item("Child", "ChildTypes")
-	component_add_menu.add_submenu_item("Primitive", "PrimitiveTypes")
 	component_add_menu.add_submenu_item("Guide", "GuideTypes")
 	_style_popup_menu(component_add_menu)
 	_style_popup_menu(component_add_child_menu)
-	_style_popup_menu(component_add_primitive_menu)
 	_style_popup_menu(component_add_guide_menu)
 	add_child(component_add_menu)
 
@@ -1840,7 +1881,7 @@ func _save_workspace() -> void:
 				"ribbon_width_px": maxf(DEFAULT_RIBBON_WIDTH_PX, float(component.get("ribbon_width_px", DEFAULT_RIBBON_WIDTH_PX))),
 				"catch_parent_component_id": str(component.get("catch_parent_component_id", "")),
 				"show_point_numbers": bool(component.get("show_point_numbers", false)),
-				"primitive": component.get("primitive", {}).duplicate(true) if component.get("primitive", {}) is Dictionary else {}
+				"primitive": _serialize_primitive(component.get("primitive", {}))
 			})
 		for guide in asset.get("guides", []):
 			asset_data["guides"].append(_serialize_asset_guide(guide))
@@ -1907,6 +1948,7 @@ func _capture_history_snapshot() -> Dictionary:
 		"selected_component_id": selected_component_id,
 		"selected_guide_id": selected_guide_id,
 		"selected_edge_id": selected_edge_id,
+		"selected_edge_ids": selected_edge_ids.duplicate(),
 		"selected_point_id": selected_point_id,
 		"selected_point_ids": selected_point_ids.duplicate(),
 		"selected_weighting_style_id": selected_weighting_style_id,
@@ -1988,6 +2030,9 @@ func _restore_history_snapshot(snapshot: Dictionary) -> void:
 	selected_component_id = str(snapshot.get("selected_component_id", ""))
 	selected_guide_id = str(snapshot.get("selected_guide_id", ""))
 	selected_edge_id = str(snapshot.get("selected_edge_id", ""))
+	selected_edge_ids.clear()
+	for edge_id_value in snapshot.get("selected_edge_ids", []):
+		selected_edge_ids.append(str(edge_id_value))
 	selected_point_id = str(snapshot.get("selected_point_id", ""))
 	selected_point_ids = snapshot.get("selected_point_ids", []).duplicate()
 	selected_weighting_style_id = str(snapshot.get("selected_weighting_style_id", ""))
@@ -2141,7 +2186,7 @@ func _load_workspace(workspace_entry: String) -> bool:
 				"ribbon_width_px": maxf(DEFAULT_RIBBON_WIDTH_PX, float(component_data.get("ribbon_width_px", DEFAULT_RIBBON_WIDTH_PX))),
 				"catch_parent_component_id": str(component_data.get("catch_parent_component_id", "")),
 				"show_point_numbers": bool(component_data.get("show_point_numbers", false)),
-				"primitive": component_data.get("primitive", {}).duplicate(true) if component_data.get("primitive", {}) is Dictionary else {}
+				"primitive": _deserialize_primitive(component_data.get("primitive", {}))
 			})
 		for guide_data in asset_data.get("guides", []):
 			if not guide_data is Dictionary:
@@ -2228,6 +2273,7 @@ func _serialize_editor_state() -> Dictionary:
 		"selected_asset_id": selected_asset_id,
 		"selected_component_id": selected_component_id,
 		"selected_guide_id": selected_guide_id,
+		"selected_edge_ids": selected_edge_ids.duplicate(),
 		"selected_weighting_style_id": selected_weighting_style_id,
 		"selected_motion_path_id": selected_motion_path_id,
 		"selected_motion_act_id": selected_motion_act_id,
@@ -2264,6 +2310,8 @@ func _restore_editor_state(state) -> void:
 	selected_asset_id = ""
 	selected_component_id = ""
 	selected_guide_id = ""
+	selected_edge_id = ""
+	selected_edge_ids.clear()
 	selected_weighting_style_id = ""
 	selected_motion_path_id = ""
 	selected_motion_act_id = ""
@@ -2298,6 +2346,10 @@ func _restore_editor_state(state) -> void:
 		if not _get_guide(selected_asset, requested_guide_id).is_empty():
 			selected_guide_id = requested_guide_id
 			selected_component_id = ""
+	selected_edge_ids.clear()
+	for edge_id_value in state.get("selected_edge_ids", []):
+		selected_edge_ids.append(str(edge_id_value))
+	selected_edge_id = selected_edge_ids[0] if not selected_edge_ids.is_empty() else ""
 	var saved_expanded = state.get("expanded_assets", {})
 	if saved_expanded is Dictionary:
 		for asset in assets:
@@ -2339,7 +2391,7 @@ func _restore_editor_state(state) -> void:
 	var saved_camera = state.get("camera", {})
 	if saved_camera is Dictionary and not saved_camera.is_empty() and is_instance_valid(canvas_view):
 		var camera_position := _deserialize_vector(saved_camera.get("position", [0.0, 0.0]), Vector2.ZERO)
-		var camera_zoom := clampf(float(saved_camera.get("zoom", 1.0)), 0.25, 1024.0)
+		var camera_zoom := clampf(float(saved_camera.get("zoom", 1.0)), 0.25, 4096.0)
 		canvas_view.set_camera_state(camera_position, camera_zoom)
 
 
@@ -2644,6 +2696,26 @@ func _deserialize_vector(value, fallback: Vector2) -> Vector2:
 	if value is Array and value.size() >= 2:
 		return Vector2(float(value[0]), float(value[1]))
 	return fallback
+
+
+func _serialize_primitive(raw_primitive) -> Dictionary:
+	if not raw_primitive is Dictionary or str(raw_primitive.get("type", "")) != "circle":
+		return {}
+	return {
+		"type": "circle",
+		"diameter_cm": maxf(float(raw_primitive.get("diameter_cm", 1.0)), 0.001),
+		"center": _serialize_vector(PrimitiveGeometryService.center({"draw_mode": "primitive", "primitive": raw_primitive}))
+	}
+
+
+func _deserialize_primitive(raw_primitive) -> Dictionary:
+	if not raw_primitive is Dictionary or str(raw_primitive.get("type", "")) != "circle":
+		return {}
+	return {
+		"type": "circle",
+		"diameter_cm": maxf(float(raw_primitive.get("diameter_cm", 1.0)), 0.001),
+		"center": _deserialize_vector(raw_primitive.get("center", [0.0, 0.0]), Vector2.ZERO)
+	}
 
 
 func _serialize_asset_guide(raw_guide: Dictionary) -> Dictionary:
@@ -3597,6 +3669,24 @@ func _render_context_bar() -> void:
 		active_draw_tool = ""
 		_render_info_bar()
 		return
+	var primitive_component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if str(primitive_component.get("draw_mode", "")) == "primitive":
+		var create_primitive_button := Button.new()
+		create_primitive_button.text = "⌘1  Create Primitive"
+		create_primitive_button.disabled = not primitive_component.get("primitive", {}).is_empty()
+		create_primitive_button.pressed.connect(func() -> void:
+			_set_active_state("draw")
+			_set_active_context_command("asset.create_primitive")
+			canvas_view.start_circle_primitive_preview()
+			_render_context_bar()
+		)
+		context_bar.add_child(create_primitive_button)
+		var transform_primitive_button := Button.new()
+		transform_primitive_button.text = "⌘2  Transform"
+		transform_primitive_button.pressed.connect(_activate_transform_state)
+		context_bar.add_child(transform_primitive_button)
+		_render_info_bar()
+		return
 	var draw_menu := MenuButton.new()
 	draw_menu.text = "⌘1  Draw Point  ▼"
 	draw_menu.custom_minimum_size = Vector2(156, 32)
@@ -3644,6 +3734,13 @@ func _render_context_bar() -> void:
 		var mirror_spacer := Control.new()
 		mirror_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		context_bar.add_child(mirror_spacer)
+		var flip_x_button := Button.new()
+		flip_x_button.text = "Flip X"
+		flip_x_button.tooltip_text = "Flip the complete Closed Loop around the Component Pivot's vertical axis"
+		flip_x_button.focus_mode = Control.FOCUS_NONE
+		_style_context_command_button(flip_x_button, false)
+		flip_x_button.pressed.connect(_flip_selected_component_geometry_x)
+		context_bar.add_child(flip_x_button)
 		var mirror_button := Button.new()
 		mirror_button.text = "Mirror Y"
 		mirror_button.tooltip_text = "Mirror a contiguous selection from the open source Chain across an interactively defined axis"
@@ -4446,6 +4543,7 @@ func _set_edit_mode(mode: String) -> void:
 	active_edit_mode = mode
 	if mode != "edge":
 		selected_edge_id = ""
+		selected_edge_ids.clear()
 	if mode != "point":
 		selected_point_id = ""
 		selected_point_ids.clear()
@@ -4455,7 +4553,7 @@ func _set_edit_mode(mode: String) -> void:
 	canvas_view.set_edit_mode(active_edit_mode)
 	canvas_view.set_edit_handles_enabled(edit_bezier_handles)
 	canvas_view.set_edit_point_set_enabled(edit_point_set_mode)
-	canvas_view.set_selected_edge_id(selected_edge_id)
+	canvas_view.set_selected_edge_ids(selected_edge_ids)
 	_render_context_bar()
 	_render_info_bar()
 
@@ -4535,6 +4633,41 @@ func _can_activate_selection_mirror(component: Dictionary) -> bool:
 	if component.is_empty() or str(component.get("draw_mode", "closed_loop")) != "closed_loop":
 		return false
 	return SELECTION_MIRROR_SERVICE_SCRIPT.validation_issues(component, selected_point_ids, Vector2.ZERO, Vector2.RIGHT).is_empty()
+
+
+func _flip_selected_component_geometry_x() -> void:
+	_flip_component_geometry_x(selected_asset_id, selected_component_id)
+
+
+func _flip_component_geometry_x(asset_id: String, component_id: String) -> void:
+	var asset := _get_asset(asset_id)
+	var component := _get_component(asset, component_id)
+	if asset.is_empty() or component.is_empty() or str(component.get("draw_mode", "")) != "closed_loop":
+		return
+	var points: Array = component.get("points", [])
+	if points.is_empty():
+		return
+	var transform: Dictionary = component.get("transform", {})
+	var pivot: Vector2 = transform.get("pivot", Vector2.ZERO)
+	_record_direct_change()
+	for point_data in points:
+		if not point_data is Dictionary:
+			continue
+		var position: Vector2 = point_data.get("position", Vector2.ZERO)
+		position.x = 2.0 * pivot.x - position.x
+		point_data["position"] = position
+		var handle_in: Vector2 = point_data.get("handle_in", Vector2.ZERO)
+		handle_in.x = -handle_in.x
+		point_data["handle_in"] = handle_in
+		var handle_out: Vector2 = point_data.get("handle_out", Vector2.ZERO)
+		handle_out.x = -handle_out.x
+		point_data["handle_out"] = handle_out
+	BezierGeometry.resolve_auto_handles(points, component.get("chains", []))
+	if asset_id == selected_asset_id and component_id == selected_component_id:
+		_refresh_component_geometry(component)
+		_render_inspector()
+		_render_canvas_context()
+	_show_status_message("Flipped Closed Loop across the Pivot's vertical axis.")
 
 
 func _activate_selection_mirror() -> void:
@@ -4806,6 +4939,12 @@ func _export_validation_errors(asset: Dictionary) -> Array[String]:
 		var draw_mode := str(component.get("draw_mode", ""))
 		if draw_mode == "open_edge":
 			continue
+		if draw_mode == "primitive":
+			var primitive_errors := PrimitiveGeometryService.validation_issues(component)
+			if not primitive_errors.is_empty():
+				for primitive_error in primitive_errors:
+					errors.append("%s: %s" % [component_name, primitive_error])
+			continue
 		var topology_errors := BezierTopology.mode_validation_issues(component, true)
 		if not topology_errors.is_empty():
 			for topology_error in topology_errors:
@@ -4938,7 +5077,8 @@ func _build_export_component_geometry(component_node: Node2D, asset: Dictionary,
 				ribbon_polygons.append(PackedInt32Array([int(vertex_indices[str(ids[0])]), int(vertex_indices[str(ids[1])]), int(vertex_indices[str(ids[2])])]))
 		polygon.polygons = ribbon_polygons
 	else:
-		export_points = _godot_export_points(BezierTopology.outer_control_polygon(component))
+		var contour := PrimitiveGeometryService.contour(component, PrimitiveGeometryService.CIRCLE_MESH_SEGMENTS) if PrimitiveGeometryService.has_circle(component) else BezierTopology.outer_control_polygon(component)
+		export_points = _godot_export_points(contour)
 	polygon.polygon = PackedVector2Array(export_points)
 	# Geometry is stored in Component-local coordinates; offsetting it by the
 	# pivot lets its Node2D parent own the component transform exactly once.
@@ -6339,12 +6479,6 @@ func _on_component_add_child_selected(index: int) -> void:
 	component_name_input.grab_focus()
 
 
-func _on_component_add_primitive_selected(index: int) -> void:
-	if index != 0:
-		return
-	_open_circle_primitive_dialog(str(component_add_menu.get_meta("asset_id", "")), str(component_add_menu.get_meta("parent_component_id", "")))
-
-
 func _on_component_add_guide_selected(index: int) -> void:
 	var guide_types := [AssetGuide.SAMPLE, AssetGuide.MOTION, AssetGuide.FLOW]
 	if index < 0 or index >= guide_types.size():
@@ -6353,9 +6487,6 @@ func _on_component_add_guide_selected(index: int) -> void:
 
 
 func _on_component_draw_mode_selected(index: int) -> void:
-	if index == 3:
-		_open_circle_primitive_dialog(str(component_draw_mode_menu.get_meta("asset_id", "")), str(component_draw_mode_menu.get_meta("parent_component_id", "")))
-		return
 	if index < 0 or index >= DRAW_MODES.size():
 		return
 	component_name_input.text = ""
@@ -6373,6 +6504,8 @@ func _draw_mode_display_name(draw_mode: String) -> String:
 		return "Open Edge"
 	if draw_mode == "ribbon":
 		return "Ribbon"
+	if draw_mode == "primitive":
+		return "Primitive"
 	return "Closed Loop"
 
 
@@ -6381,23 +6514,6 @@ func _submit_component_name(_submitted_text: String) -> void:
 
 
 func _on_component_dialog_canceled() -> void:
-	canvas_view.set_navigation_locked(false)
-
-
-func _open_circle_primitive_dialog(asset_id: String, parent_component_id: String) -> void:
-	if _get_asset(asset_id).is_empty():
-		return
-	circle_primitive_dialog.set_meta("asset_id", asset_id)
-	circle_primitive_dialog.set_meta("parent_component_id", parent_component_id)
-	circle_primitive_name_input.text = ""
-	circle_primitive_diameter_field.value = 2.0
-	circle_primitive_samples_field.value = 32
-	canvas_view.set_navigation_locked(true)
-	circle_primitive_dialog.popup_centered()
-	circle_primitive_name_input.grab_focus()
-
-
-func _on_circle_primitive_dialog_canceled() -> void:
 	canvas_view.set_navigation_locked(false)
 
 
@@ -6494,46 +6610,67 @@ func _duplicate_component(asset_id: String, component_id: String, mirror_mode :=
 	if asset.is_empty() or source.is_empty():
 		return
 	_record_direct_change()
-	var duplicate := _duplicate_component_record(source, asset)
-	if mirror_mode != "none":
-		var transform: Dictionary = duplicate.get("transform", _default_component_transform())
-		if mirror_mode == "flip_orientation":
-			var position: Vector2 = transform.get("position", Vector2.ZERO)
-			position.x = -position.x
-			transform["position"] = position
-			transform["rotation"] = -float(transform.get("rotation", 0.0))
-			var scale: Vector2 = transform.get("scale", Vector2.ONE)
-			scale.x = -scale.x
-			transform["scale"] = scale
-		else:
-			# Keep the Component's orientation. Its visible geometry centre, not
-			# merely its pivot, determines the mirrored placement. This also works
-			# for Components whose authored points sit to one side of a zero pivot.
-			var visual_center := _component_visual_center_in_parent_space(duplicate)
-			var position: Vector2 = transform.get("position", Vector2.ZERO)
-			position.x -= visual_center.x * 2.0
-			transform["position"] = position
-		duplicate["transform"] = transform
-	asset["components"].append(duplicate)
+	var source_tree: Array[Dictionary] = [source]
+	for descendant in ComponentHierarchy.descendants(asset, component_id):
+		source_tree.append(descendant)
+	var id_map: Dictionary = {}
+	for source_node in source_tree:
+		var new_id := "component_%d" % next_component_id
+		next_component_id += 1
+		id_map[str(source_node.get("id", ""))] = new_id
+	var duplicate_root: Dictionary = {}
+	for source_node in source_tree:
+		var source_node_id := str(source_node.get("id", ""))
+		var duplicate := _duplicate_component_record(source_node, asset, str(id_map[source_node_id]))
+		duplicate["name"] = _next_duplicate_component_name(asset, str(source_node.get("name", "Component")))
+		var source_parent_id := str(source_node.get("parent_component_id", ""))
+		duplicate["parent_component_id"] = str(id_map.get(source_parent_id, source_parent_id))
+		if mirror_mode != "none" and source_node_id == component_id:
+			# The mirrored root carries the complete subtree through the
+			# hierarchy transform. Child-local transforms must remain unchanged;
+			# mirroring them again would apply the reflection twice.
+			duplicate["transform"] = _mirrored_duplicate_transform(duplicate, mirror_mode)
+		asset["components"].append(duplicate)
+		if source_node_id == component_id:
+			duplicate_root = duplicate
 	selected_asset_id = asset_id
-	selected_component_id = str(duplicate.get("id", ""))
+	selected_component_id = str(duplicate_root.get("id", ""))
 	selected_guide_id = ""
 	selected_point_id = ""
 	selected_point_ids.clear()
 	selected_edge_id = ""
 	active_state = ""
 	_set_outliner_asset_expanded(asset_id, true)
-	_show_status_message("Duplicated %s." % str(duplicate.get("name", "Component")))
+	_show_status_message("Duplicated %s subtree." % str(duplicate_root.get("name", "Component")) if source_tree.size() > 1 else "Duplicated %s." % str(duplicate_root.get("name", "Component")))
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
 
 
-func _duplicate_component_record(source: Dictionary, asset: Dictionary) -> Dictionary:
+func _mirrored_duplicate_transform(component: Dictionary, mirror_mode: String) -> Dictionary:
+	var transform: Dictionary = component.get("transform", _default_component_transform()).duplicate(true)
+	if mirror_mode == "flip_orientation":
+		var position: Vector2 = transform.get("position", Vector2.ZERO)
+		position.x = -position.x
+		transform["position"] = position
+		transform["rotation"] = -float(transform.get("rotation", 0.0))
+		var scale: Vector2 = transform.get("scale", Vector2.ONE)
+		scale.x = -scale.x
+		transform["scale"] = scale
+	else:
+		# Keep the component orientation while reflecting its visible placement.
+		# Applying this to every local level mirrors the complete subtree.
+		var visual_center := _component_visual_center_in_parent_space(component)
+		var position: Vector2 = transform.get("position", Vector2.ZERO)
+		position.x -= visual_center.x * 2.0
+		transform["position"] = position
+	return transform
+func _duplicate_component_record(source: Dictionary, asset: Dictionary, forced_id := "") -> Dictionary:
 	var duplicate := source.duplicate(true)
-	duplicate["id"] = "component_%d" % next_component_id
-	next_component_id += 1
-	duplicate["name"] = _next_duplicate_component_name(asset, str(source.get("name", "Component")))
+	duplicate["id"] = forced_id if not forced_id.is_empty() else "component_%d" % next_component_id
+	if forced_id.is_empty():
+		next_component_id += 1
+	duplicate["name"] = str(source.get("name", "Component"))
 	# The duplicated Component stays beside its source: same Parent, no copied
 	# descendants, and no copied Guides.
 	duplicate["parent_component_id"] = str(source.get("parent_component_id", ""))
@@ -6576,7 +6713,9 @@ func _duplicate_component_record(source: Dictionary, asset: Dictionary) -> Dicti
 
 
 func _next_duplicate_component_name(asset: Dictionary, source_name: String) -> String:
-	var base_name := "%s Copy" % source_name
+	var base_name := _mirrored_terminal_name(source_name)
+	if base_name.is_empty():
+		base_name = "%s Copy" % source_name
 	var candidate := base_name
 	var suffix := 2
 	while _has_component_name(asset, candidate):
@@ -6585,8 +6724,27 @@ func _next_duplicate_component_name(asset: Dictionary, source_name: String) -> S
 	return candidate
 
 
+func _mirrored_terminal_name(source_name: String) -> String:
+	if source_name.ends_with("L"):
+		return source_name.substr(0, source_name.length() - 1) + "R"
+	if source_name.ends_with("R"):
+		return source_name.substr(0, source_name.length() - 1) + "L"
+	return ""
+
+
 func _component_visual_center_in_parent_space(component: Dictionary) -> Vector2:
 	var points: Array = component.get("points", [])
+	if points.is_empty() and PrimitiveGeometryService.has_circle(component):
+		var primitive_contour := PrimitiveGeometryService.contour(component)
+		if not primitive_contour.is_empty():
+			var primitive_minimum := Vector2(INF, INF)
+			var primitive_maximum := Vector2(-INF, -INF)
+			for primitive_point in primitive_contour:
+				primitive_minimum.x = minf(primitive_minimum.x, primitive_point.x)
+				primitive_minimum.y = minf(primitive_minimum.y, primitive_point.y)
+				primitive_maximum.x = maxf(primitive_maximum.x, primitive_point.x)
+				primitive_maximum.y = maxf(primitive_maximum.y, primitive_point.y)
+			return ComponentHierarchy.local_transform(component.get("transform", {})) * ((primitive_minimum + primitive_maximum) * 0.5)
 	if points.is_empty():
 		return Vector2(component.get("transform", {}).get("position", Vector2.ZERO))
 	var minimum := Vector2(INF, INF)
@@ -6693,6 +6851,8 @@ func _confirm_component_creation() -> void:
 		"visibility": true,
 		"z_index": 0,
 		"draw_mode": draw_mode if draw_mode in DRAW_MODES else "closed_loop",
+		"geometry_source": "primitive" if draw_mode == "primitive" else "bezier",
+		"primitive": {},
 		"contour_width_px": DEFAULT_CONTOUR_WIDTH_PX,
 		"ribbon_width_px": DEFAULT_RIBBON_WIDTH_PX,
 		"catch_parent_component_id": "",
@@ -6705,78 +6865,6 @@ func _confirm_component_creation() -> void:
 	_set_outliner_asset_expanded(asset_id, true)
 	component_dialog.hide()
 	canvas_view.set_navigation_locked(false)
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
-
-
-func _confirm_circle_primitive_creation() -> void:
-	var asset_id := str(circle_primitive_dialog.get_meta("asset_id", ""))
-	var asset := _get_asset(asset_id)
-	if asset.is_empty():
-		circle_primitive_dialog.hide()
-		canvas_view.set_navigation_locked(false)
-		return
-	var parent_component_id := str(circle_primitive_dialog.get_meta("parent_component_id", ""))
-	if not parent_component_id.is_empty() and _get_component(asset, parent_component_id).is_empty():
-		parent_component_id = ""
-	var diameter := maxf(_world_to_editor_units(float(circle_primitive_diameter_field.value)), 0.0001)
-	var radius := diameter * 0.5
-	var samples := clampi(int(circle_primitive_samples_field.value), 3, 256)
-	var component_name := circle_primitive_name_input.text.strip_edges()
-	if component_name.is_empty():
-		component_name = _next_default_component_name(asset)
-	_record_direct_change()
-	var component_id := "component_%d" % next_component_id
-	next_component_id += 1
-	var component_transform := _default_component_transform()
-	if not parent_component_id.is_empty():
-		var parent_component := _get_component(asset, parent_component_id)
-		var parent_transform := _deserialize_transform(parent_component.get("transform", {}))
-		var inherited_pivot: Vector2 = parent_transform.get("pivot", Vector2.ZERO)
-		# A primitive created from the Parent's + button is centered on the
-		# Parent's local pivot. The new Component pivot remains at its origin so
-		# the circle's geometry is not shifted back by the transform pivot.
-		component_transform["position"] = inherited_pivot
-		component_transform["pivot"] = Vector2.ZERO
-	var component := {
-		"id": component_id,
-		"name": component_name,
-		"parent_component_id": parent_component_id,
-		"points": [],
-		"edges": [],
-		"chains": [],
-		"transform": component_transform,
-		"visibility": true,
-		"z_index": 0,
-		"draw_mode": "closed_loop",
-		"contour_width_px": DEFAULT_CONTOUR_WIDTH_PX,
-		"ribbon_width_px": DEFAULT_RIBBON_WIDTH_PX,
-		"catch_parent_component_id": "",
-		"show_point_numbers": false
-	}
-	for sample_index in range(samples):
-		var angle := TAU * float(sample_index) / float(samples)
-		BezierTopology.add_point(component, Vector2(cos(angle), sin(angle)) * radius, "aligned")
-	BezierTopology.close_active_chain(component)
-	var generated_positions: Array = []
-	for point in component.get("points", []):
-		generated_positions.append(_serialize_vector(Vector2(point.get("position", Vector2.ZERO))))
-	component["primitive"] = {
-		"type": "circle",
-		"diameter_cm": float(circle_primitive_diameter_field.value),
-		"samples": samples,
-		"generated_positions": generated_positions
-	}
-	asset["components"].append(component)
-	selected_asset_id = asset_id
-	selected_component_id = component_id
-	selected_guide_id = ""
-	active_state = ""
-	_set_outliner_asset_expanded(asset_id, true)
-	circle_primitive_dialog.hide()
-	canvas_view.set_navigation_locked(false)
-	_show_status_message("Created Circle %s with %d samples." % [component_name, samples])
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
@@ -8254,50 +8342,6 @@ func _refresh_geometry_uv_mapping_workspace() -> void:
 	geometry_uv_mapping_workspace.set_context(mesh_bake, result, _geometry_uv_mapping_status(selected_asset_id, selected_component_id, component), geometry_uv_mapping_checker_overlay)
 
 
-func _circle_primitive_status(component: Dictionary) -> String:
-	var primitive = component.get("primitive", {})
-	if not primitive is Dictionary or str(primitive.get("type", "")) != "circle":
-		return ""
-	var generated_positions: Array = primitive.get("generated_positions", [])
-	var points: Array = component.get("points", [])
-	if generated_positions.size() != points.size():
-		return "Manually Adjusted"
-	for index in range(points.size()):
-		var expected := _deserialize_vector(generated_positions[index], Vector2.ZERO)
-		var actual: Vector2 = points[index].get("position", Vector2.ZERO)
-		if expected.distance_squared_to(actual) > 0.00000001:
-			return "Manually Adjusted"
-	return "Parametric"
-
-
-func _regenerate_circle_primitive() -> void:
-	var asset := _get_asset(selected_asset_id)
-	var component := _get_component(asset, selected_component_id)
-	var primitive = component.get("primitive", {})
-	if asset.is_empty() or component.is_empty() or not primitive is Dictionary or str(primitive.get("type", "")) != "circle":
-		return
-	if _circle_primitive_status(component) == "Manually Adjusted":
-		return
-	_record_direct_change()
-	var diameter := maxf(ToolUnits.from_centimeters(float(primitive.get("diameter_cm", 2.0))), 0.0001)
-	var radius := diameter * 0.5
-	var samples := clampi(int(primitive.get("samples", 32)), 3, 256)
-	component["points"] = []
-	component["edges"] = []
-	component["chains"] = []
-	for sample_index in range(samples):
-		var angle := TAU * float(sample_index) / float(samples)
-		BezierTopology.add_point(component, Vector2(cos(angle), sin(angle)) * radius, "aligned")
-	BezierTopology.close_active_chain(component)
-	var generated_positions: Array = []
-	for point in component.get("points", []):
-		generated_positions.append(_serialize_vector(Vector2(point.get("position", Vector2.ZERO))))
-	primitive["generated_positions"] = generated_positions
-	component["primitive"] = primitive
-	_refresh_component_geometry(component)
-	_render_inspector()
-
-
 func _render_inspector() -> void:
 	_clear(inspector_content)
 	transform_fields.clear()
@@ -8470,10 +8514,18 @@ func _render_inspector() -> void:
 		_add_component_debug_inspector(component)
 		return
 	if active_state == "edit" and active_edit_mode == "edge":
-		var edge := _get_edge(component, selected_edge_id) if not selected_edge_id.is_empty() else {}
-		inspector_content.add_child(_create_inspector_field_label("Edge"))
+		var selected_edges: Array[Dictionary] = []
+		for edge_id in selected_edge_ids:
+			var candidate := _get_edge(component, edge_id)
+			if not candidate.is_empty():
+				selected_edges.append(candidate)
+		if selected_edges.is_empty() and not selected_edge_id.is_empty():
+			var fallback_edge := _get_edge(component, selected_edge_id)
+			if not fallback_edge.is_empty():
+				selected_edges.append(fallback_edge)
+		inspector_content.add_child(_create_inspector_field_label("%d Edges" % selected_edges.size() if selected_edges.size() > 1 else "Edge"))
 		inspector_content.add_child(_create_inspector_section("Edge Settings"))
-		if edge.is_empty():
+		if selected_edges.is_empty():
 			var edge_hint := _create_inspector_field_label("Select an edge to edit it.")
 			edge_hint.add_theme_color_override("font_color", Color("#9aa3b2"))
 			inspector_content.add_child(edge_hint)
@@ -8481,7 +8533,10 @@ func _render_inspector() -> void:
 			var render_outline := CheckButton.new()
 			render_outline.text = "Render Outline"
 			render_outline.custom_minimum_size = Vector2(0, 26)
-			render_outline.button_pressed = bool(edge.get("render_outline", true))
+			var all_rendered := true
+			for edge in selected_edges:
+				all_rendered = all_rendered and bool(edge.get("render_outline", true))
+			render_outline.button_pressed = all_rendered
 			render_outline.toggled.connect(_on_edge_render_outline_changed)
 			inspector_content.add_child(render_outline)
 		return
@@ -8534,21 +8589,17 @@ func _render_inspector() -> void:
 	inspector_content.add_child(_create_inspector_field_label("Draw Mode: %s" % _draw_mode_display_name(draw_mode)))
 	var primitive = component.get("primitive", {})
 	if primitive is Dictionary and str(primitive.get("type", "")) == "circle":
-		inspector_content.add_child(_create_inspector_section("Primitive"))
+		inspector_content.add_child(_create_inspector_section("Geometry"))
 		inspector_content.add_child(_create_inspector_field_label("Type: Circle"))
-		inspector_content.add_child(_create_inspector_field_label("Diameter: %.3f cm" % float(primitive.get("diameter_cm", 0.0))))
-		inspector_content.add_child(_create_inspector_field_label("Samples: %d" % int(primitive.get("samples", 0))))
-		var primitive_status := _circle_primitive_status(component)
-		var status_label := _create_inspector_field_label("Status: %s" % primitive_status)
-		status_label.add_theme_color_override("font_color", Color("#75b88a") if primitive_status == "Parametric" else Color("#f2c94c"))
-		inspector_content.add_child(status_label)
-		var regenerate_button := Button.new()
-		regenerate_button.text = "Regenerate"
-		regenerate_button.disabled = primitive_status == "Manually Adjusted"
-		regenerate_button.tooltip_text = "Rebuild the Circle from its stored parameters."
-		regenerate_button.pressed.connect(_regenerate_circle_primitive)
-		inspector_content.add_child(regenerate_button)
-	var mode_issues := BezierTopology.mode_validation_issues(component, true)
+		inspector_content.add_child(_create_inspector_field_label("Diameter (cm)"))
+		var diameter_field := SpinBox.new()
+		diameter_field.min_value = 0.1
+		diameter_field.max_value = 100000.0
+		diameter_field.step = 0.1
+		diameter_field.value = float(primitive.get("diameter_cm", 1.0))
+		diameter_field.value_changed.connect(_on_circle_primitive_diameter_changed)
+		inspector_content.add_child(diameter_field)
+	var mode_issues := PrimitiveGeometryService.validation_issues(component) if draw_mode == "primitive" else BezierTopology.mode_validation_issues(component, true)
 	var configured_catch_parent_id := str(component.get("catch_parent_component_id", ""))
 	if not configured_catch_parent_id.is_empty() and (configured_catch_parent_id == selected_component_id or _get_component(asset, configured_catch_parent_id).is_empty()):
 		mode_issues.append("Catch Parent references a missing Component.")
@@ -9992,14 +10043,32 @@ func _on_component_ribbon_width_changed(value: float) -> void:
 
 func _on_edge_render_outline_changed(enabled: bool) -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	var edge := _get_edge(component, selected_edge_id)
-	if edge.is_empty():
+	var edge_ids := selected_edge_ids.duplicate()
+	if edge_ids.is_empty() and not selected_edge_id.is_empty():
+		edge_ids.append(selected_edge_id)
+	var valid_edge_ids: Array[String] = []
+	for edge_id_value in edge_ids:
+		var edge_id := str(edge_id_value)
+		if not _get_edge(component, edge_id).is_empty():
+			valid_edge_ids.append(edge_id)
+	if valid_edge_ids.is_empty():
 		return
+	var restored_edge_ids: Array[String] = valid_edge_ids.duplicate()
 	_record_direct_change()
-	edge["render_outline"] = enabled
+	for edge in component.get("edges", []):
+		if str(edge.get("id", "")) in valid_edge_ids:
+			edge["render_outline"] = enabled
 	canvas_view.set_bezier_geometry(component.get("points", []), component.get("edges", []), component.get("chains", []))
+	canvas_view.selected_edge_ids = restored_edge_ids.duplicate()
+	canvas_view.selected_edge_id = canvas_view.selected_edge_ids[0] if not canvas_view.selected_edge_ids.is_empty() else ""
+	canvas_view.queue_redraw()
 	_render_inspector()
 	_render_canvas_context()
+	selected_edge_ids = restored_edge_ids.duplicate()
+	selected_edge_id = selected_edge_ids[0]
+	canvas_view.selected_edge_ids = restored_edge_ids.duplicate()
+	canvas_view.selected_edge_id = canvas_view.selected_edge_ids[0]
+	canvas_view.queue_redraw()
 
 
 func _add_component_debug_inspector(component: Dictionary) -> void:
@@ -10347,6 +10416,16 @@ func _on_component_visibility_changed(visibility_enabled: bool) -> void:
 		_render_canvas_context()
 
 
+func _on_circle_primitive_diameter_changed(value: float) -> void:
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if not PrimitiveGeometryService.has_circle(component):
+		return
+	_record_direct_change()
+	component["primitive"]["diameter_cm"] = maxf(value, 0.1)
+	_refresh_component_geometry(component)
+	_render_canvas_context()
+
+
 func _on_asset_visibility_changed(visibility_enabled: bool, asset_id: String) -> void:
 	var asset := _get_asset(asset_id)
 	if asset.is_empty():
@@ -10656,13 +10735,14 @@ func _build_reference_shapes(asset: Dictionary, excluded_component_id := "", emp
 			continue
 		if str(component["id"]) == excluded_component_id:
 			continue
+		var primitive_component := PrimitiveGeometryService.has_circle(component)
 		shapes.append({
 			"id": str(component["id"]),
-			"points": BezierTopology.outer_control_polygon(component),
+			"points": PrimitiveGeometryService.contour(component) if primitive_component else BezierTopology.outer_control_polygon(component),
 			"bezier_points": component.get("points", []).duplicate(true),
 			"edges": component.get("edges", []).duplicate(true),
 			"chains": component.get("chains", []).duplicate(true),
-			"closed": BezierTopology.outer_chain_closed(component),
+			"closed": primitive_component or BezierTopology.outer_chain_closed(component),
 			"transform": ComponentHierarchy.world_transform_record(asset, str(component.get("id", ""))),
 			"visibility": asset_is_visible and bool(component.get("visibility", true)),
 			"z_index": int(component.get("z_index", 0)),
@@ -10676,6 +10756,8 @@ func _component_guide_boundaries(component: Dictionary) -> Dictionary:
 	var holes: Array = []
 	if component.is_empty():
 		return {"outer": outer, "holes": holes}
+	if PrimitiveGeometryService.has_circle(component):
+		return {"outer": PackedVector2Array(PrimitiveGeometryService.contour(component)), "holes": holes}
 	var resolved_component := component.duplicate(true)
 	BezierGeometry.resolve_auto_handles(resolved_component.get("points", []), resolved_component.get("chains", []))
 	for chain_data in resolved_component.get("chains", []):
@@ -10695,8 +10777,46 @@ func _component_guide_boundaries(component: Dictionary) -> Dictionary:
 func _refresh_component_geometry(component: Dictionary) -> void:
 	if component.is_empty() or not is_instance_valid(canvas_view):
 		return
-	canvas_view.set_display_polygon(BezierTopology.outer_control_polygon(component), BezierTopology.outer_chain_closed(component))
+	var contour := PrimitiveGeometryService.contour(component) if PrimitiveGeometryService.has_circle(component) else BezierTopology.outer_control_polygon(component)
+	canvas_view.set_display_polygon(contour, PrimitiveGeometryService.has_circle(component) or BezierTopology.outer_chain_closed(component))
 	canvas_view.set_bezier_geometry(component.get("points", []), component.get("edges", []), component.get("chains", []))
+
+
+func _on_primitive_placed(center: Vector2, diameter_cm: float) -> void:
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if component.is_empty() or str(component.get("draw_mode", "")) != "primitive" or not component.get("primitive", {}).is_empty():
+		return
+	_record_direct_change()
+	component["geometry_source"] = "primitive"
+	component["primitive"] = {"type": "circle", "diameter_cm": maxf(diameter_cm, 0.1), "center": center}
+	_set_active_state("")
+	_set_active_context_command("")
+	_refresh_component_geometry(component)
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _on_primitive_center_changed(center: Vector2) -> void:
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if not PrimitiveGeometryService.has_circle(component):
+		return
+	var primitive: Dictionary = component["primitive"]
+	if PrimitiveGeometryService.center(component).is_equal_approx(center):
+		return
+	_record_direct_change()
+	primitive["center"] = center
+	component["primitive"] = primitive
+	_refresh_component_geometry(component)
+
+
+func _on_primitive_preview_cancelled() -> void:
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if str(component.get("draw_mode", "")) != "primitive" or not component.get("primitive", {}).is_empty():
+		return
+	_set_active_state("")
+	_set_active_context_command("")
+	_render_canvas_context()
 
 
 func _on_bezier_point_added(position: Vector2, point_mode: String = "linear", drawn_handle_out: Vector2 = Vector2.ZERO) -> void:
@@ -11017,6 +11137,7 @@ func _on_point_selection_changed(point_id: String) -> void:
 	selected_point_id = point_id
 	if active_edit_mode == "point":
 		selected_edge_id = ""
+		selected_edge_ids.clear()
 		_render_inspector()
 
 
@@ -11029,14 +11150,30 @@ func _on_point_selection_set_changed(point_ids: Array) -> void:
 	selected_point_id = selected_point_ids[0] if selected_point_ids.size() == 1 else ""
 	if active_edit_mode == "point":
 		selected_edge_id = ""
+		selected_edge_ids.clear()
 		_render_inspector()
 		_render_context_bar()
 
 
 func _on_edge_selection_changed(edge_id: String) -> void:
 	selected_edge_id = edge_id
-	canvas_view.set_selected_edge_id(edge_id)
+	if edge_id.is_empty():
+		selected_edge_ids.clear()
+	elif edge_id not in selected_edge_ids:
+		selected_edge_ids = [edge_id]
 	_render_inspector()
+	_render_context_bar()
+
+
+func _on_edge_selection_set_changed(edge_ids: Array) -> void:
+	selected_edge_ids.clear()
+	for edge_id_value in edge_ids:
+		var edge_id := str(edge_id_value)
+		if not edge_id.is_empty() and edge_id not in selected_edge_ids:
+			selected_edge_ids.append(edge_id)
+	selected_edge_id = selected_edge_ids[0] if not selected_edge_ids.is_empty() else ""
+	_render_inspector()
+	_render_context_bar()
 
 
 func _on_face_selection_changed(selected: bool) -> void:

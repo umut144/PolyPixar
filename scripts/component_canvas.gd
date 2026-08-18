@@ -8,6 +8,7 @@ signal point_selection_set_changed(point_ids: Array)
 signal bezier_point_added(position: Vector2, point_mode: String, handle_out: Vector2)
 signal bezier_chain_closed()
 signal edge_selection_changed(edge_id: String)
+signal edge_selection_set_changed(edge_ids: Array)
 signal face_selection_changed(selected: bool)
 signal bezier_points_move_started(point_ids: Array)
 signal bezier_points_moved(point_ids: Array, delta: Vector2)
@@ -21,12 +22,15 @@ signal mirror_axis_cancelled()
 signal pivot_changed(pivot: Vector2)
 signal asset_pivot_changed(pivot: Vector2)
 signal transform_changed(transform: Dictionary)
+signal primitive_placed(center: Vector2, diameter_cm: float)
+signal primitive_center_changed(center: Vector2)
+signal primitive_preview_cancelled()
 
 const PAN_SPEED := 420.0
 const MIN_ZOOM := 0.25
-# Allows detailed millimeter-level editing while keeping the existing zoom
+# Allows detailed sub-millimeter editing while keeping the existing zoom
 # progression and grid package logic unchanged.
-const MAX_ZOOM := 1024.0
+const MAX_ZOOM := 4096.0
 const DEFAULT_ZOOM := 1.0
 const DEFAULT_PAPER_SIZE_CM := Vector2(14.8, 21.0) # DIN A5, portrait
 const DEFAULT_PAPER_MARGIN := 0.9
@@ -75,6 +79,7 @@ var cursor_over_canvas := false
 var selected_point_id := ""
 var selected_point_ids: Array[String] = []
 var selected_edge_id := ""
+var selected_edge_ids: Array[String] = []
 var face_selected := false
 var bezier_handle_drag_side := ""
 var point_marquee_dragging := false
@@ -82,6 +87,11 @@ var point_marquee_moved := false
 var point_marquee_start := Vector2.ZERO
 var point_marquee_current := Vector2.ZERO
 var point_press_edge_hit: Dictionary = {}
+var edge_marquee_dragging := false
+var edge_marquee_moved := false
+var edge_marquee_start := Vector2.ZERO
+var edge_marquee_current := Vector2.ZERO
+var edge_marquee_additive := false
 var selection_gizmo_dragging := false
 var selection_gizmo_drag_axis := ""
 var selection_gizmo_drag_start_world := Vector2.ZERO
@@ -120,6 +130,8 @@ var transform_drag_start_rotation := 0.0
 var transform_drag_start_scale := Vector2.ONE
 var face_dragging := false
 var face_drag_start_world := Vector2.ZERO
+var primitive_preview_active := false
+var primitive_preview_diameter_cm := 1.0
 
 
 func _ready() -> void:
@@ -164,6 +176,15 @@ func _gui_input(event: InputEvent) -> void:
 			command_shortcut_active = false
 	if event is InputEventMouseButton and event.pressed:
 		grab_focus()
+		if event.button_index == MOUSE_BUTTON_LEFT and primitive_preview_active:
+			primitive_placed.emit(_snap_to_grid(_world_to_local(_screen_to_world(event.position))), primitive_preview_diameter_cm)
+			primitive_preview_active = false
+			queue_redraw()
+			return
+		if primitive_preview_active and event.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
+			primitive_preview_diameter_cm = maxf(0.1, primitive_preview_diameter_cm + (0.1 if event.button_index == MOUSE_BUTTON_WHEEL_UP else -0.1))
+			queue_redraw()
+			return
 		if event.button_index == MOUSE_BUTTON_LEFT and not mirror_command_stage.is_empty():
 			var axis_point := _snap_to_grid(_world_to_local(_screen_to_world(event.position)))
 			mirror_axis_candidate_visible = true
@@ -205,8 +226,17 @@ func _gui_input(event: InputEvent) -> void:
 				pivot_dragging = true
 				return
 			if edit_mode == "edge":
-				selected_edge_id = _nearest_bezier_edge(event.position)
-				edge_selection_changed.emit(selected_edge_id)
+				var edge_hit := _nearest_bezier_edge(event.position)
+				if not edge_hit.is_empty():
+					_select_edge_by_click(edge_hit, event.shift_pressed)
+				else:
+					edge_marquee_dragging = true
+					edge_marquee_moved = false
+					edge_marquee_start = event.position
+					edge_marquee_current = event.position
+					edge_marquee_additive = event.shift_pressed
+					if not event.shift_pressed:
+						_set_selected_edge_ids([])
 				queue_redraw()
 				return
 			if edit_mode == "face":
@@ -255,6 +285,9 @@ func _gui_input(event: InputEvent) -> void:
 				queue_redraw()
 				return
 		elif event.button_index == MOUSE_BUTTON_LEFT and interaction_state == "transform":
+			if _is_near_primitive_center(event.position):
+				transform_drag_axis = "primitive_move"
+				return
 			var handle_axis := _transform_handle_at(event.position)
 			if handle_axis != "":
 				transform_drag_axis = handle_axis
@@ -288,6 +321,16 @@ func _gui_input(event: InputEvent) -> void:
 			point_press_edge_hit = {}
 			queue_redraw()
 			return
+		if edge_marquee_dragging:
+			if edge_marquee_moved:
+				_select_edges_in_marquee(edge_marquee_additive)
+			elif not edge_marquee_additive:
+				_set_selected_edge_ids([])
+			edge_marquee_dragging = false
+			edge_marquee_moved = false
+			edge_marquee_additive = false
+			queue_redraw()
+			return
 		bezier_handle_drag_side = ""
 		pivot_dragging = false
 		asset_pivot_dragging = false
@@ -310,6 +353,12 @@ func _gui_input(event: InputEvent) -> void:
 			point_marquee_current = event.position
 			if point_marquee_start.distance_to(point_marquee_current) >= 4.0:
 				point_marquee_moved = true
+			queue_redraw()
+			return
+		if edge_marquee_dragging:
+			edge_marquee_current = event.position
+			if edge_marquee_start.distance_to(edge_marquee_current) >= 4.0:
+				edge_marquee_moved = true
 			queue_redraw()
 			return
 		if selection_gizmo_dragging:
@@ -349,6 +398,10 @@ func _gui_input(event: InputEvent) -> void:
 			queue_redraw()
 			return
 		if interaction_state == "transform" and transform_drag_axis != "":
+			if transform_drag_axis == "primitive_move":
+				primitive_center_changed.emit(_snap_to_grid(_world_to_local(_screen_to_world(event.position))))
+				queue_redraw()
+				return
 			var current_world := _screen_to_world(event.position)
 			if transform_drag_axis == "rotate":
 				var angle_delta := rad_to_deg(_angle_from_transform_center(event.position) - transform_drag_start_angle)
@@ -400,6 +453,11 @@ func _gui_input(event: InputEvent) -> void:
 				return
 		queue_redraw()
 	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_ESCAPE and primitive_preview_active:
+			primitive_preview_active = false
+			primitive_preview_cancelled.emit()
+			queue_redraw()
+			return
 		if not mirror_command_stage.is_empty():
 			if event.keycode == KEY_ESCAPE:
 				cancel_mirror_command()
@@ -458,6 +516,17 @@ func set_tool_mode(tool_name: String) -> void:
 	queue_redraw()
 
 
+func start_circle_primitive_preview() -> void:
+	primitive_preview_active = true
+	primitive_preview_diameter_cm = 1.0
+	queue_redraw()
+
+
+func set_primitive_preview_active(active: bool) -> void:
+	primitive_preview_active = active
+	queue_redraw()
+
+
 func set_draw_point_mode(mode: String) -> void:
 	if mode not in ["linear", "aligned", "free", "mirrored", "corner"]:
 		return
@@ -475,7 +544,7 @@ func set_interaction_state(state: String) -> void:
 		pending_draw_handle_out = Vector2.ZERO
 	if state not in ["edit", "draw"]:
 		clear_selection()
-		selected_edge_id = ""
+		_set_selected_edge_ids([])
 	queue_redraw()
 
 
@@ -493,7 +562,7 @@ func set_catch_parent_component(component_id: String) -> void:
 
 
 func set_component_draw_mode(draw_mode: String) -> void:
-	component_draw_mode = draw_mode if draw_mode in ["closed_loop", "open_edge", "ribbon"] else "closed_loop"
+	component_draw_mode = draw_mode if draw_mode in ["closed_loop", "open_edge", "ribbon", "primitive"] else "closed_loop"
 	queue_redraw()
 
 
@@ -544,7 +613,7 @@ func set_edit_mode(mode: String) -> void:
 	if edit_mode != "point":
 		clear_selection()
 	if edit_mode != "edge":
-		selected_edge_id = ""
+		_set_selected_edge_ids([])
 	if edit_mode != "face":
 		face_selected = false
 	queue_redraw()
@@ -566,7 +635,22 @@ func set_point_numbers_visible(visible: bool) -> void:
 
 
 func set_selected_edge_id(edge_id: String) -> void:
-	selected_edge_id = edge_id
+	_set_selected_edge_ids([edge_id] if not edge_id.is_empty() else [])
+
+
+func set_selected_edge_ids(edge_ids: Array) -> void:
+	_set_selected_edge_ids(edge_ids)
+
+
+func _set_selected_edge_ids(edge_ids: Array) -> void:
+	selected_edge_ids.clear()
+	for edge_id_value in edge_ids:
+		var edge_id := str(edge_id_value)
+		if not edge_id.is_empty() and not _edge_by_id(edge_id).is_empty() and edge_id not in selected_edge_ids:
+			selected_edge_ids.append(edge_id)
+	selected_edge_id = selected_edge_ids[0] if not selected_edge_ids.is_empty() else ""
+	edge_selection_changed.emit(selected_edge_id)
+	edge_selection_set_changed.emit(selected_edge_ids.duplicate())
 	queue_redraw()
 
 
@@ -681,6 +765,7 @@ func clear_selection() -> void:
 	selected_point_ids.clear()
 	point_selection_changed.emit(selected_point_id)
 	point_selection_set_changed.emit([])
+	_set_selected_edge_ids([])
 	face_selected = false
 	face_selection_changed.emit(false)
 
@@ -712,6 +797,11 @@ func set_bezier_geometry(points: Array, edges: Array, chains: Array) -> void:
 			valid_selection.append(point_id)
 	selected_point_ids = valid_selection
 	selected_point_id = selected_point_ids[0] if selected_point_ids.size() == 1 else ""
+	var valid_edge_selection: Array[String] = []
+	for edge_id in selected_edge_ids:
+		if not _edge_by_id(edge_id).is_empty():
+			valid_edge_selection.append(edge_id)
+	_set_selected_edge_ids(valid_edge_selection)
 	queue_redraw()
 
 
@@ -743,6 +833,23 @@ func cancel_mirror_command(emit_signal := true) -> void:
 
 func set_selected_point_ids(point_ids: Array) -> void:
 	_set_selected_point_ids(point_ids)
+
+
+func place_pivot_at_mouse() -> bool:
+	if context_name.is_empty() or interaction_state != "":
+		return false
+	var old_pivot: Vector2 = component_transform.get("pivot", Vector2.ZERO)
+	var new_pivot := _snap_to_grid(_world_to_local(_screen_to_world(get_local_mouse_position())))
+	var transform_scale: Vector2 = component_transform.get("scale", Vector2.ONE)
+	var transform_rotation := deg_to_rad(float(component_transform.get("rotation", 0.0)))
+	var transform_position: Vector2 = component_transform.get("position", Vector2.ZERO)
+	transform_position += ((new_pivot - old_pivot) * transform_scale).rotated(transform_rotation)
+	component_transform["pivot"] = new_pivot
+	component_transform["position"] = transform_position
+	pivot_changed.emit(new_pivot)
+	transform_changed.emit(component_transform.duplicate(true))
+	queue_redraw()
+	return true
 
 
 func _confirm_mirror_axis(axis_end: Vector2) -> void:
@@ -810,11 +917,15 @@ func _draw() -> void:
 	_draw_selection_mirror_command()
 	if not bezier_points.is_empty() and not bezier_chains.is_empty():
 		_draw_bezier_geometry()
+	elif display_polygon_closed and display_polygon.size() >= 3:
+		_draw_primitive_geometry()
 	_draw_pivot()
 	_draw_transform_gizmo()
 	_draw_selection_gizmo()
 	_draw_point_selection_marquee()
+	_draw_edge_selection_marquee()
 	_draw_draw_preview()
+	_draw_primitive_preview()
 	_draw_measurement_guides()
 
 
@@ -1140,6 +1251,44 @@ func _reference_component_at(world_position: Vector2) -> String:
 	return nearest_id
 
 
+func _draw_primitive_preview() -> void:
+	if not primitive_preview_active or not cursor_over_canvas:
+		return
+	var center := _local_to_world(cursor_world)
+	var radius := ToolUnits.from_centimeters(primitive_preview_diameter_cm) * 0.5
+	var screen_center := _world_to_screen(center)
+	draw_arc(screen_center, radius * zoom, 0.0, TAU, 64, Color("#f2c94c"), 2.0, true)
+	draw_circle(screen_center, 5.0, Color("#f2c94c"))
+	_draw_measurement_label("Circle · %.1f cm" % primitive_preview_diameter_cm, screen_center + Vector2(0.0, -radius * zoom - 16.0), Color("#f2c94c"))
+
+
+func _draw_primitive_geometry() -> void:
+	if not bool(component_transform.get("visibility", true)):
+		return
+	var screen_points := PackedVector2Array()
+	for point in display_polygon:
+		screen_points.append(_world_to_screen(_local_to_world(point)))
+	draw_colored_polygon(screen_points, Color("#55c7d922"))
+	var outline := screen_points.duplicate()
+	outline.append(screen_points[0])
+	draw_polyline(outline, Color("#55c7d9"), 2.0, true)
+	var center := Vector2.ZERO
+	for point in display_polygon:
+		center += point
+	center /= float(display_polygon.size())
+	draw_circle(_world_to_screen(_local_to_world(center)), 6.0, Color("#f2c94c"))
+
+
+func _is_near_primitive_center(screen_position: Vector2) -> bool:
+	if display_polygon.is_empty():
+		return false
+	var center := Vector2.ZERO
+	for point in display_polygon:
+		center += point
+	center /= float(display_polygon.size())
+	return screen_position.distance_to(_world_to_screen(_local_to_world(center))) <= 12.0
+
+
 func _draw_bezier_geometry() -> void:
 	if not bool(component_transform.get("visibility", true)):
 		return
@@ -1169,7 +1318,7 @@ func _draw_bezier_geometry() -> void:
 			var end_point: Dictionary = points_by_id[end_id]
 			var curve_points := _bezier_edge_screen_points(start_point, end_point)
 			if curve_points.size() >= 2:
-				var edge_color := selection_color if edge_id == selected_edge_id or (edit_mode == "face" and face_selected) else edge_mode_highlight
+				var edge_color := selection_color if edge_id in selected_edge_ids or (edit_mode == "face" and face_selected) else edge_mode_highlight
 				if guide_style or not bool(edge_data.get("render_outline", true)):
 					_draw_dashed_polyline(curve_points, edge_color, 2.0)
 				else:
@@ -1293,12 +1442,54 @@ func _select_points_in_marquee() -> void:
 	_set_selected_point_ids(selected_ids)
 
 
+func _select_edge_by_click(edge_id: String, additive: bool) -> void:
+	var next_selection := selected_edge_ids.duplicate()
+	if additive:
+		if edge_id in next_selection:
+			next_selection.erase(edge_id)
+		else:
+			next_selection.append(edge_id)
+	else:
+		next_selection = [edge_id]
+	_set_selected_edge_ids(next_selection)
+
+
+func _select_edges_in_marquee(additive: bool) -> void:
+	var selection_rect := Rect2(edge_marquee_start, edge_marquee_current - edge_marquee_start).abs()
+	var marquee_ids: Array = []
+	var points_by_id: Dictionary = {}
+	for point_data in bezier_points:
+		points_by_id[str(point_data.get("id", ""))] = point_data
+	for edge_data in bezier_edges:
+		var start_point: Dictionary = points_by_id.get(str(edge_data.get("start_point_id", "")), {})
+		var end_point: Dictionary = points_by_id.get(str(edge_data.get("end_point_id", "")), {})
+		if start_point.is_empty() or end_point.is_empty():
+			continue
+		for screen_point in _bezier_edge_screen_points(start_point, end_point):
+			if selection_rect.has_point(screen_point):
+				marquee_ids.append(str(edge_data.get("id", "")))
+				break
+	var next_selection := selected_edge_ids.duplicate() if additive else []
+	for edge_id in marquee_ids:
+		if edge_id not in next_selection:
+			next_selection.append(edge_id)
+	_set_selected_edge_ids(next_selection)
+
+
 func _draw_point_selection_marquee() -> void:
 	if not point_marquee_dragging or not point_marquee_moved:
 		return
 	var selection_rect := Rect2(point_marquee_start, point_marquee_current - point_marquee_start).abs()
 	draw_rect(selection_rect, Color("#f2c94c22"), true)
 	draw_rect(selection_rect, Color("#f2c94c"), false, 1.0)
+
+
+func _draw_edge_selection_marquee() -> void:
+	if not edge_marquee_dragging or not edge_marquee_moved:
+		return
+	var selection_rect := Rect2(edge_marquee_start, edge_marquee_current - edge_marquee_start).abs()
+	draw_rect(selection_rect, Color("#8fd8f822"), true)
+	draw_rect(selection_rect, Color("#8fd8f8"), false, 1.0)
 
 
 func _bezier_edge_screen_points(start_point: Dictionary, end_point: Dictionary) -> PackedVector2Array:

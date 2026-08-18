@@ -27,16 +27,20 @@ category is disabled. Transform and Effects categories do not exist.
   topology validation.
 - `BezierGeometry` owns cubic Bézier evaluation, flattening, and handle
   resolution.
+- `PrimitiveGeometryService` owns typed primitive validation and deterministic
+  derived contours. It does not create or own Bézier topology.
 - `ComponentHierarchy` owns parent/child normalization and world/local
   transform conversion.
 - `ComponentCanvas` renders immutable copies and emits user intent.
 - `main.gd` applies intent to the selected Workspace document and records
   history.
 
-Component geometry contains only `points`, `edges`, and `chains`. Fill and hit
-test polygons are derived. Do not add `outer_shape`, Component-level `closed`,
-the old Line tool, or synchronization from a display polygon back into source
-topology.
+Each Component declares a geometry source. Bézier sources contain only
+`points`, `edges`, and `chains`; primitive sources contain one typed primitive
+definition, currently `circle` with `center` and `diameter_cm`. Generated
+primitive contours, samples, fill, and hit-test polygons are derived and are
+never persisted. Do not add `outer_shape`, Component-level `closed`, the old
+Line tool, or synchronization from a display polygon back into source geometry.
 
 ## Documents
 
@@ -47,7 +51,7 @@ An Asset contains:
 - Components and Guides;
 - retained asset-local animation data.
 
-A Component contains its topology, hierarchy reference, local transform,
+A Component contains its geometry source, hierarchy reference, local transform,
 visibility/layer settings, draw mode, widths, catch-parent reference, and point
 number display setting. It has no Material assignment.
 
@@ -79,8 +83,9 @@ number ordering. A successful build creates a Godot scene whose root stores:
 - `asset_type`: `character`, `props`, `terrain`, or `icon`.
 
 Component hierarchy becomes nested `Node2D` nodes. Closed-loop geometry is
-derived from Bézier topology; Ribbon geometry uses a matching accepted Ribbon
-mesh. Open edges do not emit fill geometry.
+derived from Bézier topology, while primitive geometry is derived from its
+typed definition. Ribbon geometry uses a matching accepted Ribbon mesh. Open
+edges do not emit fill geometry.
 
 ## Testing
 

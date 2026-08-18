@@ -1,7 +1,9 @@
 # Bézier Topology Model
 
-Component geometry has exactly one persisted source of truth: ordered Bézier
-topology stored in `points`, `edges`, and `chains`.
+For Bézier draw modes, Component geometry has exactly one persisted source of
+truth: ordered Bézier topology stored in `points`, `edges`, and `chains`.
+Primitive draw mode is a separate source model and is documented below; it
+does not serialize generated Bézier topology.
 
 ## Point
 
@@ -71,6 +73,15 @@ Chains, rebuilds ordered Edge references, and validates invariants.
 `BezierGeometry` resolves handles and performs cubic curve mathematics.
 `ComponentCanvas` receives copies for presentation and emits intent using
 stable IDs.
+
+## Primitive geometry
+
+A `primitive` Component owns a typed `primitive` record rather than Bézier
+topology. The first supported form is `{ type: "circle", center, diameter_cm }`.
+Its render contour, mesh samples, hit-test polygon, and export polygon are all
+derived deterministically from those parameters. The Circle center handle moves
+`center`; the Component pivot remains independent. Primitive Components cannot
+be edited with Bézier point, edge, or face tools.
 
 The current fill and Godot export derive a control polygon from the outer
 Chain. Production mesh sampling is intentionally separate and may later

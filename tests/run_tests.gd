@@ -118,6 +118,15 @@ func _test_delete_multiple_points_and_protect_closed_minimum() -> void:
 	_expect(reset_deleted.size() == 3 and reset_component.get("points", []).is_empty() and reset_component.get("chains", []).is_empty(), "Deleting all points of a Closed Loop should remove the contour completely.")
 	var reset_new_id := BezierTopology.add_point(reset_component, Vector2(4.0, 0.0), "linear")
 	_expect(not reset_new_id.is_empty() and reset_component.get("chains", []).size() == 1, "A Closed Loop should be drawable again after its full contour was deleted.")
+	var mirrored_reset := _component()
+	var mirrored_ids: Array[String] = []
+	for point_index in range(4):
+		mirrored_ids.append(BezierTopology.add_point(mirrored_reset, Vector2(point_index, 0.0), "linear"))
+	BezierTopology.close_active_chain(mirrored_reset)
+	BezierTopology.add_point(mirrored_reset, Vector2(10.0, 0.0), "linear")
+	BezierTopology.add_point(mirrored_reset, Vector2(11.0, 0.0), "linear")
+	var mirrored_reset_deleted := BezierTopology.delete_points(mirrored_reset, mirrored_ids)
+	_expect(mirrored_reset_deleted.size() == 6 and mirrored_reset.get("points", []).is_empty() and mirrored_reset.get("chains", []).is_empty(), "Resetting a mirrored Closed Loop should also remove stale mirror chains.")
 	var ribbon_reset := _component()
 	ribbon_reset["draw_mode"] = "ribbon"
 	var ribbon_ids: Array[String] = [BezierTopology.add_point(ribbon_reset, Vector2.ZERO, "linear"), BezierTopology.add_point(ribbon_reset, Vector2.ONE, "linear")]
@@ -364,6 +373,19 @@ func _test_geometry_sampling_ui_shell() -> void:
 	application.selected_component_id = "component_1"
 	application._render_context_bar()
 	application._activate_edit_edge_state()
+	application._refresh_component_geometry(component)
+	var edge_ids: Array[String] = []
+	for edge_data in component.get("edges", []):
+		edge_ids.append(str(edge_data.get("id", "")))
+	_expect(edge_ids.size() >= 2, "Edit Edge test component should expose at least two edges.")
+	application.canvas_view._select_edge_by_click(edge_ids[0], false)
+	application.canvas_view._select_edge_by_click(edge_ids[1], true)
+	_expect(application.selected_edge_ids.size() == 2, "Shift-click should preserve a multi-edge selection.")
+	application._on_edge_render_outline_changed(false)
+	var selected_component_after_outline: Dictionary = application._get_component(application._get_asset("asset_1"), "component_1")
+	_expect(not bool(selected_component_after_outline.get("edges", [])[0].get("render_outline", true)) and not bool(selected_component_after_outline.get("edges", [])[1].get("render_outline", true)), "Render Outline should apply to every selected edge.")
+	application.canvas_view._select_edge_by_click(edge_ids[0], true)
+	_expect(application.selected_edge_ids.size() == 1 and application.selected_edge_ids[0] == edge_ids[1], "Shift-clicking a selected edge should remove it from the selection.")
 	var edge_command := _context_menu(application, "⌘3")
 	_expect(application.active_context_command == "asset.edit_edge" and application.active_edit_mode == "edge" and edge_command != null and edge_command.button_pressed and not edge_command.flat, "Asset Edit Edge should update its central command and highlight on the first CMD+3 state change.")
 	application._activate_edit_face_state()
@@ -372,6 +394,14 @@ func _test_geometry_sampling_ui_shell() -> void:
 	application._activate_edit_point_state()
 	var point_command := _context_menu(application, "⌘2")
 	_expect(application.active_context_command == "asset.edit_point" and application.active_edit_mode == "point" and point_command != null and point_command.button_pressed and not point_command.flat, "Returning to Asset Edit Point should update its central command and highlight immediately.")
+	var nudge_component: Dictionary = application._get_component(application._get_asset("asset_1"), "component_1")
+	var nudge_ids: Array = [str(nudge_component.get("points", [])[0].get("id", "")), str(nudge_component.get("points", [])[1].get("id", ""))]
+	var nudge_before: Array[Vector2] = [Vector2(nudge_component.get("points", [])[0].get("position", Vector2.ZERO)), Vector2(nudge_component.get("points", [])[1].get("position", Vector2.ZERO))]
+	application.canvas_view.set_selected_point_ids(nudge_ids)
+	application._nudge_selected_point(Vector2.RIGHT)
+	var nudge_after: Array[Vector2] = [Vector2(nudge_component.get("points", [])[0].get("position", Vector2.ZERO)), Vector2(nudge_component.get("points", [])[1].get("position", Vector2.ZERO))]
+	var nudge_step: float = application.snap_grid_step if application.snap_enabled else application.world_grid_size
+	_expect(nudge_after[0].x == nudge_before[0].x + nudge_step and nudge_after[1].x == nudge_before[1].x + nudge_step, "Arrow nudging should move every selected point by one snap step.")
 	application.free()
 
 
@@ -863,6 +893,19 @@ func _test_asset_guides() -> void:
 	application._restore_history_snapshot(snapshot)
 	_expect(str(application._get_guide(application._get_asset("asset_1"), application.selected_guide_id).get("name", "")) == "Sampler Guide Copy", "Guides and their selection should participate in Undo/Redo snapshots.")
 	var parent_component: Dictionary = application._get_component(application._get_asset("asset_1"), "component_1")
+	application.selected_component_id = "component_1"
+	application.selected_guide_id = ""
+	application.selected_point_ids.clear()
+	application.selected_point_ids.append(str(parent_component.get("points", [])[0].get("id", "")))
+	application.selected_point_id = application.selected_point_ids[0]
+	application.snap_enabled = true
+	application.snap_grid_step = 0.5
+	application._activate_edit_point_state(false, false)
+	var point_before_nudge := Vector2(parent_component.get("points", [])[0].get("position", Vector2.ZERO))
+	application._nudge_selected_point(Vector2.RIGHT)
+	var point_after_nudge := Vector2(parent_component.get("points", [])[0].get("position", Vector2.ZERO))
+	_expect(is_equal_approx(point_after_nudge.x, point_before_nudge.x + 0.5) and is_equal_approx(point_after_nudge.y, point_before_nudge.y), "Arrow keys in Edit Point Select mode should move the selected point by the configured Snap step.")
+	application._nudge_selected_point(Vector2.LEFT)
 	application.next_component_id = 2
 	application.component_name_input.text = "Eyes"
 	application.component_dialog.set_meta("asset_id", "asset_1")
@@ -884,42 +927,52 @@ func _test_asset_guides() -> void:
 	application._activate_guide_draw_state()
 	application._on_bezier_point_added(Vector2(15.0, 5.0), "aligned", Vector2.ZERO)
 	_expect(application.active_state == "draw" and Vector2(flow_guide.get("points", [])[0].get("position", Vector2.ZERO)).is_equal_approx(Vector2(10.0, 5.0)), "Flow Guides should catch Draw Guide Points on their parent Component contour just like Sample Guides.")
-	_expect(application.component_add_child_menu.item_count == 3 and application.component_add_guide_menu.item_count == 3, "Every Component add menu should expose Child draw modes and all three Guide types.")
+	_expect(application.component_add_child_menu.item_count == 4 and application.component_add_guide_menu.item_count == 3, "Every Component add menu should expose all four Child draw modes and all three Guide types.")
 	parent_component["transform"] = {"position": Vector2(-3.0, 2.0), "rotation": 20.0, "scale": Vector2(1.0, 1.5), "pivot": Vector2.ZERO}
+	parent_component["name"] = "EyeBrowL"
+	child_component["name"] = "EyeL"
 	var duplicate_asset: Dictionary = application._get_asset("asset_1")
 	var component_count_before_duplicate: int = duplicate_asset.get("components", []).size()
 	var guide_count_before_duplicate: int = duplicate_asset.get("guides", []).size()
+	var descendant_count_before_duplicate: int = ComponentHierarchy.descendants(duplicate_asset, "component_1").size()
 	application._duplicate_component("asset_1", "component_1")
 	var plain_duplicate: Dictionary = application._get_component(application._get_asset("asset_1"), application.selected_component_id)
-	_expect(application._get_asset("asset_1").get("components", []).size() == component_count_before_duplicate + 1 and application._get_asset("asset_1").get("guides", []).size() == guide_count_before_duplicate and str(plain_duplicate.get("parent_component_id", "")) == str(parent_component.get("parent_component_id", "")), "Component Duplicate should copy only the selected Component beside its source, without Children or Guides.")
+	var plain_duplicate_children := ComponentHierarchy.children(application._get_asset("asset_1"), str(plain_duplicate.get("id", "")))
+	_expect(application._get_asset("asset_1").get("components", []).size() == component_count_before_duplicate + 1 + descendant_count_before_duplicate and application._get_asset("asset_1").get("guides", []).size() == guide_count_before_duplicate and str(plain_duplicate.get("parent_component_id", "")) == str(parent_component.get("parent_component_id", "")) and str(plain_duplicate.get("name", "")) == "EyeBrowR" and plain_duplicate_children.size() == descendant_count_before_duplicate and str(plain_duplicate_children[0].get("name", "")) == "EyeR", "Component Duplicate should copy the complete Component subtree and swap terminal L/R names.")
 	_expect(str(plain_duplicate.get("id", "")) != "component_1" and str(plain_duplicate.get("points", [])[0].get("id", "")) != str(parent_component.get("points", [])[0].get("id", "")), "Component Duplicate should remap the Component and topology IDs independently.")
 	application._duplicate_component("asset_1", "component_1", "keep_orientation")
 	var kept_duplicate: Dictionary = application._get_component(application._get_asset("asset_1"), application.selected_component_id)
+	var kept_children := ComponentHierarchy.children(application._get_asset("asset_1"), str(kept_duplicate.get("id", "")))
+	_expect(kept_children.size() == descendant_count_before_duplicate and kept_children[0].get("transform", {}) == child_component.get("transform", {}), "Keep Orientation should mirror only the subtree root; Child-local transforms must be inherited through the mirrored Parent.")
 	var source_visual_center: Vector2 = application._component_visual_center_in_parent_space(parent_component)
 	var kept_visual_center: Vector2 = application._component_visual_center_in_parent_space(kept_duplicate)
 	_expect(is_equal_approx(kept_visual_center.x, -source_visual_center.x) and is_equal_approx(kept_visual_center.y, source_visual_center.y) and is_equal_approx(float(kept_duplicate.get("transform", {}).get("rotation", 0.0)), 20.0), "Keep Orientation should mirror the visible Component placement across the Parent Y axis without rotating it.")
 	application._duplicate_component("asset_1", "component_1", "flip_orientation")
 	var flipped_duplicate: Dictionary = application._get_component(application._get_asset("asset_1"), application.selected_component_id)
 	_expect(is_equal_approx(float(flipped_duplicate.get("transform", {}).get("rotation", 0.0)), -20.0) and is_equal_approx(Vector2(flipped_duplicate.get("transform", {}).get("scale", Vector2.ONE)).x, -1.0), "Flip Orientation should mirror the Component geometry orientation as well as its Y-axis position.")
+	var original_flip_position := Vector2(parent_component.get("points", [])[0].get("position", Vector2.ZERO))
+	var flip_pivot := Vector2(parent_component.get("transform", {}).get("pivot", Vector2.ZERO))
+	application._flip_component_geometry_x("asset_1", "component_1")
+	var flipped_position := Vector2(parent_component.get("points", [])[0].get("position", Vector2.ZERO))
+	_expect(is_equal_approx(flipped_position.x, 2.0 * flip_pivot.x - original_flip_position.x) and is_equal_approx(flipped_position.y, original_flip_position.y), "Flip X should reflect every Closed Loop point around the Component Pivot's vertical axis.")
 	var child_world_before_detach := ComponentHierarchy.world_transform_record(application._get_asset("asset_1"), str(child_component.get("id", "")))
 	application._detach_component("asset_1", str(child_component.get("id", "")))
 	var detached_child: Dictionary = application._get_component(application._get_asset("asset_1"), str(child_component.get("id", "")))
 	var child_world_after_detach := ComponentHierarchy.world_transform_record(application._get_asset("asset_1"), str(child_component.get("id", "")))
 	_expect(str(detached_child.get("parent_component_id", "")).is_empty() and child_world_before_detach["position"].is_equal_approx(child_world_after_detach["position"]) and is_equal_approx(float(child_world_before_detach["rotation"]), float(child_world_after_detach["rotation"])), "Detach from Parent should promote a Child to the Parent's level without changing its world transform.")
-	application.circle_primitive_dialog.set_meta("asset_id", "asset_1")
-	application.circle_primitive_dialog.set_meta("parent_component_id", "component_1")
-	application.circle_primitive_name_input.text = "Pupil"
-	application.circle_primitive_diameter_field.value = 2.5
-	application.circle_primitive_samples_field.value = 24
-	application._confirm_circle_primitive_creation()
+	application.component_name_input.text = "Pupil"
+	application.component_dialog.set_meta("asset_id", "asset_1")
+	application.component_dialog.set_meta("parent_component_id", "component_1")
+	application.component_dialog.set_meta("draw_mode", "primitive")
+	application._confirm_component_creation()
 	var pupil_component: Dictionary = application._get_component(application._get_asset("asset_1"), application.selected_component_id)
-	var pupil_points: Array = pupil_component.get("points", [])
-	var pupil_radius := Vector2(pupil_points[0].get("position", Vector2.ZERO)).length() if not pupil_points.is_empty() else 0.0
-	var pupil_transform: Dictionary = pupil_component.get("transform", {})
-	_expect(str(pupil_component.get("parent_component_id", "")) == "component_1" and str(pupil_component.get("draw_mode", "")) == "closed_loop" and pupil_points.size() == 24 and bool(pupil_component.get("chains", [])[0].get("closed", false)) and is_equal_approx(pupil_radius, 0.125) and Vector2(pupil_transform.get("pivot", Vector2.ONE)) == Vector2.ZERO, "Circle Primitive should create a closed sampled Child Component with the configured Parent, convert its diameter to a Tool radius, and keep its pivot at the Parent pivot.")
-	_expect(application._circle_primitive_status(pupil_component) == "Parametric", "A newly created Circle Primitive should retain a parametric status until its topology is edited.")
-	pupil_points[0]["position"] = Vector2(pupil_points[0].get("position", Vector2.ZERO)) + Vector2(0.01, 0.0)
-	_expect(application._circle_primitive_status(pupil_component) == "Manually Adjusted", "Editing a Circle's topology should mark its Primitive as manually adjusted.")
+	_expect(str(pupil_component.get("parent_component_id", "")) == "component_1" and str(pupil_component.get("draw_mode", "")) == "primitive" and pupil_component.get("points", []).is_empty() and pupil_component.get("edges", []).is_empty() and pupil_component.get("chains", []).is_empty() and pupil_component.get("primitive", {}).is_empty(), "Primitive Child creation should create an empty Primitive Component without generated Bézier topology.")
+	application._on_primitive_placed(Vector2(0.25, -0.5), 2.5)
+	_expect(PrimitiveGeometryService.has_circle(pupil_component) and is_equal_approx(float(pupil_component.get("primitive", {}).get("diameter_cm", 0.0)), 2.5) and PrimitiveGeometryService.center(pupil_component).is_equal_approx(Vector2(0.25, -0.5)), "Circle placement should persist only its parametric center and diameter.")
+	var primitive_sampling := GeometrySamplingService.generate(pupil_component)
+	_expect(bool(primitive_sampling.get("valid", false)) and int(primitive_sampling.get("sample_count", 0)) == PrimitiveGeometryService.CIRCLE_MESH_SEGMENTS and pupil_component.get("points", []).is_empty(), "Primitive sampling should derive mesh samples without storing them in Component topology.")
+	application._on_primitive_center_changed(Vector2(0.5, -0.25))
+	_expect(PrimitiveGeometryService.center(pupil_component).is_equal_approx(Vector2(0.5, -0.25)), "The Primitive center handle should move the parametric center without changing its Component pivot.")
 	application.free()
 
 

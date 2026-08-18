@@ -38,6 +38,16 @@ static func normalize_recipe(raw_recipe) -> Dictionary:
 static func generate(component: Dictionary, raw_recipe = {}) -> Dictionary:
 	var recipe := normalize_recipe(raw_recipe)
 	var allow_open := bool(raw_recipe.get("allow_open", false)) if raw_recipe is Dictionary else false
+	if PrimitiveGeometryService.has_circle(component):
+		var contour := PrimitiveGeometryService.contour(component, PrimitiveGeometryService.CIRCLE_MESH_SEGMENTS)
+		var samples: Array = []
+		for index in range(contour.size()):
+			samples.append({"id": "primitive:circle:%d" % index, "position": contour[index], "source_point_id": "", "preserved": false})
+		return {
+			"valid": true, "errors": [], "method": recipe["method"], "parameters": recipe["parameters"].duplicate(true),
+			"source_fingerprint": source_fingerprint(component), "chains": [{"chain_id": "primitive:circle", "topology_role": "outer", "closed": true, "samples": samples}],
+			"sample_count": samples.size(), "preserve_count": 0
+		}
 	var working_component := component.duplicate(true)
 	BezierGeometry.resolve_auto_handles(working_component.get("points", []), working_component.get("chains", []))
 	var errors := _validation_issues(working_component, allow_open)
@@ -101,6 +111,13 @@ static func source_fingerprint(component: Dictionary) -> String:
 				str(chain_data.get("topology_role", "outer"))
 			])
 	parts.append("draw_mode|%s" % str(component.get("draw_mode", "closed_loop")))
+	if PrimitiveGeometryService.has_circle(component):
+		var primitive_center := PrimitiveGeometryService.center(component)
+		parts.append("primitive|circle|%.9f|%.9f|%.9f" % [
+			primitive_center.x,
+			primitive_center.y,
+			float(component.get("primitive", {}).get("diameter_cm", 1.0))
+		])
 	parts.append("ribbon_width_px|%.9f" % float(component.get("ribbon_width_px", 8.0)))
 	var hashing_context := HashingContext.new()
 	hashing_context.start(HashingContext.HASH_SHA256)

@@ -37,15 +37,22 @@ later without changing Asset topology.
 
 ## Geometry model
 
-Component geometry is canonical only as `points`, `edges`, and `chains`.
-`BezierTopology` owns structural changes and validation. `BezierGeometry` owns
-cubic mathematics and handle resolution. `ComponentCanvas` receives immutable
-view copies, renders them, and emits intent; it never mutates Workspace
-topology directly. Polygon arrays for fill, hit testing, and export are derived
-on demand.
+Components have an explicit geometry source. Bézier Components are canonical
+only as `points`, `edges`, and `chains`; `BezierTopology` owns their structural
+changes and validation, and `BezierGeometry` owns cubic mathematics and handle
+resolution. Primitive Components instead own a typed `primitive` record and
+never store generated Bézier points, edges, chains, or samples. The currently
+supported primitive is `{ type: "circle", center, diameter_cm }`.
 
-Components support `closed_loop`, `open_edge`, and `ribbon` draw modes. Guides
-remain independent topology records scoped to an Asset or Component. Derived
+`ComponentCanvas` receives immutable view copies, renders them, and emits user
+intent; it never mutates Workspace geometry directly. Polygon arrays for fill,
+hit testing, sampling, meshing, and export are derived on demand from either
+source. A Primitive's center handle moves its `primitive.center`; its Component
+pivot remains an independent transform handle.
+
+Components support `closed_loop`, `open_edge`, `ribbon`, and `primitive` draw
+modes. Primitive sampling is derived at mesh resolution, so it has no user
+editable sample count. Guides remain independent topology records scoped to an Asset or Component. Derived
 Sampling, Seeding, Meshing, UV, and Weighting records are stored separately
 from source topology.
 
@@ -58,8 +65,8 @@ polygons or reverse synchronization into Component topology.
 
 Export validates topology before building a Godot scene. The scene root owns
 the exported Asset pivot and `asset_type`; child `Node2D` records preserve the
-Component hierarchy and `Polygon2D` geometry is derived from the canonical
-topology or an accepted Ribbon mesh.
+Component hierarchy and `Polygon2D` geometry is derived from Bézier topology,
+a primitive definition, or an accepted Ribbon mesh.
 
 ## Verification
 

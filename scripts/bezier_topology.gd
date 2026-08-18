@@ -393,6 +393,25 @@ static func delete_points(component: Dictionary, point_ids_to_delete: Array) -> 
 	var chains: Array = component.get("chains", [])
 	# A fully selected closed Chain is an intentional reset of that contour.
 	# Partial deletion still protects the minimum three points below.
+	for chain in chains:
+		if not bool(chain.get("closed", false)):
+			continue
+		var chain_point_ids: Array = chain.get("point_ids", [])
+		var all_selected := not chain_point_ids.is_empty()
+		for chain_point_id in chain_point_ids:
+			if not requested.has(str(chain_point_id)):
+				all_selected = false
+				break
+		if all_selected:
+			# Closed Loop components represent one contour. If a previous Mirror
+			# left an additional chain behind, a full contour reset must remove
+			# that stale chain as well so the next drawing starts cleanly.
+			for point_data in points:
+				deleted.append(str(point_data.get("id", "")))
+			component["points"] = []
+			component["edges"] = []
+			component["chains"] = []
+			return deleted
 	for chain_index in range(chains.size() - 1, -1, -1):
 		var chain: Dictionary = chains[chain_index]
 		var chain_point_ids: Array = chain.get("point_ids", [])
