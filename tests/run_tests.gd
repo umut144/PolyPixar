@@ -909,13 +909,17 @@ func _test_asset_guides() -> void:
 	application.circle_primitive_dialog.set_meta("asset_id", "asset_1")
 	application.circle_primitive_dialog.set_meta("parent_component_id", "component_1")
 	application.circle_primitive_name_input.text = "Pupil"
-	application.circle_primitive_radius_field.value = 1.25
+	application.circle_primitive_diameter_field.value = 2.5
 	application.circle_primitive_samples_field.value = 24
 	application._confirm_circle_primitive_creation()
 	var pupil_component: Dictionary = application._get_component(application._get_asset("asset_1"), application.selected_component_id)
 	var pupil_points: Array = pupil_component.get("points", [])
 	var pupil_radius := Vector2(pupil_points[0].get("position", Vector2.ZERO)).length() if not pupil_points.is_empty() else 0.0
-	_expect(str(pupil_component.get("parent_component_id", "")) == "component_1" and str(pupil_component.get("draw_mode", "")) == "closed_loop" and pupil_points.size() == 24 and bool(pupil_component.get("chains", [])[0].get("closed", false)) and is_equal_approx(pupil_radius, 0.125), "Circle Primitive should create a closed sampled Child Component with the configured Parent and convert its cm radius into Tool units.")
+	var pupil_transform: Dictionary = pupil_component.get("transform", {})
+	_expect(str(pupil_component.get("parent_component_id", "")) == "component_1" and str(pupil_component.get("draw_mode", "")) == "closed_loop" and pupil_points.size() == 24 and bool(pupil_component.get("chains", [])[0].get("closed", false)) and is_equal_approx(pupil_radius, 0.125) and Vector2(pupil_transform.get("pivot", Vector2.ONE)) == Vector2.ZERO, "Circle Primitive should create a closed sampled Child Component with the configured Parent, convert its diameter to a Tool radius, and keep its pivot at the Parent pivot.")
+	_expect(application._circle_primitive_status(pupil_component) == "Parametric", "A newly created Circle Primitive should retain a parametric status until its topology is edited.")
+	pupil_points[0]["position"] = Vector2(pupil_points[0].get("position", Vector2.ZERO)) + Vector2(0.01, 0.0)
+	_expect(application._circle_primitive_status(pupil_component) == "Manually Adjusted", "Editing a Circle's topology should mark its Primitive as manually adjusted.")
 	application.free()
 
 

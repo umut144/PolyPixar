@@ -3,7 +3,8 @@
 	"assets": [
 		"asset_1",
 		"asset_2",
-		"asset_3"
+		"asset_3",
+		"asset_4"
 	],
 	"editor_state": {
 		"active_create_submodule": "Character",
@@ -13,19 +14,20 @@
 		"active_style_submodule": "Weighting",
 		"camera": {
 			"position": [
-				0.275659322738647,
-				1.00091981887817
+				-0.789615035057068,
+				4.06667804718018
 			],
-			"zoom": 246.159865936521
+			"zoom": 1024.0
 		},
 		"expanded_assets": {
 			"asset_1": false,
 			"asset_2": false,
-			"asset_3": true
+			"asset_3": false,
+			"asset_4": true
 		},
-		"motion_act_preview_asset_id": "asset_1",
+		"motion_act_preview_asset_id": "",
 		"motion_act_preview_loop": true,
-		"motion_path_preview_asset_id": "asset_1",
+		"motion_path_preview_asset_id": "",
 		"motion_sequence_preview_loop": true,
 		"motion_sequence_view": "composition",
 		"outliner_asset_type_filters": {
@@ -35,8 +37,8 @@
 			"terrain": true
 		},
 		"paper_level": 0,
-		"selected_asset_id": "asset_3",
-		"selected_component_id": "component_21",
+		"selected_asset_id": "asset_4",
+		"selected_component_id": "",
 		"selected_guide_id": "",
 		"selected_motion_act_id": "",
 		"selected_motion_path_id": "",
@@ -45,8 +47,8 @@
 		"selected_weighting_style_id": "",
 		"snap": {
 			"enabled": true,
-			"grid_step": 0.05,
-			"mode": "finer",
+			"grid_step": 0.01,
+			"mode": "ultra_fine",
 			"rotation_step": 15.0
 		},
 		"world_scale": {

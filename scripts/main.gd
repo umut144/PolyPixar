@@ -114,7 +114,7 @@ var component_name_input: LineEdit
 var component_draw_mode_menu: PopupMenu
 var circle_primitive_dialog: ConfirmationDialog
 var circle_primitive_name_input: LineEdit
-var circle_primitive_radius_field: SpinBox
+var circle_primitive_diameter_field: SpinBox
 var circle_primitive_samples_field: SpinBox
 var component_add_menu: PopupMenu
 var component_add_child_menu: PopupMenu
@@ -1435,16 +1435,16 @@ func _create_circle_primitive_dialog() -> void:
 	circle_primitive_name_input.placeholder_text = "Component name"
 	circle_primitive_name_input.custom_minimum_size = Vector2(320, 30)
 	content.add_child(circle_primitive_name_input)
-	var radius_label := Label.new()
-	radius_label.text = "Radius (cm)"
-	content.add_child(radius_label)
-	circle_primitive_radius_field = SpinBox.new()
-	circle_primitive_radius_field.min_value = 0.001
-	circle_primitive_radius_field.max_value = 100000.0
-	circle_primitive_radius_field.step = 0.001
-	circle_primitive_radius_field.value = 1.0
-	circle_primitive_radius_field.custom_minimum_size = Vector2(320, 28)
-	content.add_child(circle_primitive_radius_field)
+	var diameter_label := Label.new()
+	diameter_label.text = "Durchmesser (cm)"
+	content.add_child(diameter_label)
+	circle_primitive_diameter_field = SpinBox.new()
+	circle_primitive_diameter_field.min_value = 0.001
+	circle_primitive_diameter_field.max_value = 100000.0
+	circle_primitive_diameter_field.step = 0.001
+	circle_primitive_diameter_field.value = 2.0
+	circle_primitive_diameter_field.custom_minimum_size = Vector2(320, 28)
+	content.add_child(circle_primitive_diameter_field)
 	var samples_label := Label.new()
 	samples_label.text = "Samples"
 	content.add_child(samples_label)
@@ -1839,7 +1839,8 @@ func _save_workspace() -> void:
 				"contour_width_px": maxf(DEFAULT_CONTOUR_WIDTH_PX, float(component.get("contour_width_px", DEFAULT_CONTOUR_WIDTH_PX))),
 				"ribbon_width_px": maxf(DEFAULT_RIBBON_WIDTH_PX, float(component.get("ribbon_width_px", DEFAULT_RIBBON_WIDTH_PX))),
 				"catch_parent_component_id": str(component.get("catch_parent_component_id", "")),
-				"show_point_numbers": bool(component.get("show_point_numbers", false))
+				"show_point_numbers": bool(component.get("show_point_numbers", false)),
+				"primitive": component.get("primitive", {}).duplicate(true) if component.get("primitive", {}) is Dictionary else {}
 			})
 		for guide in asset.get("guides", []):
 			asset_data["guides"].append(_serialize_asset_guide(guide))
@@ -2139,7 +2140,8 @@ func _load_workspace(workspace_entry: String) -> bool:
 				"contour_width_px": maxf(DEFAULT_CONTOUR_WIDTH_PX, float(component_data.get("contour_width_px", DEFAULT_CONTOUR_WIDTH_PX))),
 				"ribbon_width_px": maxf(DEFAULT_RIBBON_WIDTH_PX, float(component_data.get("ribbon_width_px", DEFAULT_RIBBON_WIDTH_PX))),
 				"catch_parent_component_id": str(component_data.get("catch_parent_component_id", "")),
-				"show_point_numbers": bool(component_data.get("show_point_numbers", false))
+				"show_point_numbers": bool(component_data.get("show_point_numbers", false)),
+				"primitive": component_data.get("primitive", {}).duplicate(true) if component_data.get("primitive", {}) is Dictionary else {}
 			})
 		for guide_data in asset_data.get("guides", []):
 			if not guide_data is Dictionary:
@@ -2303,7 +2305,7 @@ func _restore_editor_state(state) -> void:
 			if saved_expanded.has(asset_id):
 				expanded_assets[asset_id] = bool(saved_expanded[asset_id])
 	if not selected_component_id.is_empty() or not selected_guide_id.is_empty():
-		expanded_assets[selected_asset_id] = true
+		_set_outliner_asset_expanded(selected_asset_id, true)
 	active_module = "Create"
 	var requested_create_submodule := str(state.get("active_create_submodule", "Character"))
 	if not selected_asset_id.is_empty():
@@ -3202,7 +3204,7 @@ func _create_weighting_style(asset_id: String, component_id: String) -> void:
 	selected_weighting_style_id = style_id
 	active_module = "Style"
 	active_style_submodule = "Weighting"
-	expanded_assets[asset_id] = true
+	_set_outliner_asset_expanded(asset_id, true)
 	_generate_weighting_preview()
 
 
@@ -4998,7 +5000,7 @@ func _confirm_asset_creation() -> void:
 	selected_component_id = ""
 	selected_guide_id = ""
 	active_state = ""
-	expanded_assets[asset_id] = true
+	_set_outliner_asset_expanded(asset_id, true)
 	asset_dialog.hide()
 	_render_outliner()
 	_render_inspector()
@@ -5266,7 +5268,7 @@ func _render_outliner() -> void:
 	if active_module == "Create" and active_create_submodule in CREATE_SUBMODULES:
 		var visible_assets: Array = []
 		for asset in assets:
-			if _asset_type(asset) == _create_submodule_asset_type(active_create_submodule) and _asset_matches_search(asset, search_text):
+			if _outliner_asset_is_visible(asset) and _asset_type(asset) == _create_submodule_asset_type(active_create_submodule) and _asset_matches_search(asset, search_text):
 				visible_assets.append(asset)
 		visible_assets.sort_custom(_sort_named_documents)
 		outliner_list.add_child(_create_outliner_group_label(active_create_submodule))
@@ -5304,6 +5306,28 @@ func _apply_outliner_asset_type_filter_checkboxes() -> void:
 
 func _asset_type_filter_matches(asset: Dictionary) -> bool:
 	return bool(outliner_asset_type_filters.get(_asset_type(asset), false))
+
+
+func _outliner_focus_asset_id() -> String:
+	for asset in assets:
+		var asset_id := str(asset.get("id", ""))
+		if bool(expanded_assets.get(asset_id, false)):
+			return asset_id
+	return ""
+
+
+func _outliner_asset_is_visible(asset: Dictionary) -> bool:
+	var focused_asset_id := _outliner_focus_asset_id()
+	return focused_asset_id.is_empty() or focused_asset_id == str(asset.get("id", ""))
+
+
+func _set_outliner_asset_expanded(asset_id: String, expanded: bool) -> void:
+	if expanded:
+		for asset in assets:
+			expanded_assets[str(asset.get("id", ""))] = false
+		expanded_assets[asset_id] = true
+	else:
+		expanded_assets[asset_id] = false
 
 
 func _render_motion_outliner() -> void:
@@ -5597,7 +5621,7 @@ func _render_weighting_outliner() -> void:
 	outliner_list.add_child(_create_outliner_group_label("Weighting"))
 	var visible_asset_count := 0
 	for asset in assets:
-		if not _asset_type_filter_matches(asset):
+		if not _outliner_asset_is_visible(asset) or not _asset_type_filter_matches(asset):
 			continue
 		var asset_id := str(asset.get("id", ""))
 		var asset_matches := search_text.is_empty() or str(asset.get("name", "")).to_lower().contains(search_text)
@@ -5756,7 +5780,7 @@ func _render_geometry_component_outliner() -> void:
 	var search_text := outliner_search_input.text.strip_edges().to_lower() if is_instance_valid(outliner_search_input) else ""
 	var visible_assets: Array = []
 	for asset in assets:
-		if _asset_type_filter_matches(asset) and _asset_matches_search(asset, search_text):
+		if _outliner_asset_is_visible(asset) and _asset_type_filter_matches(asset) and _asset_matches_search(asset, search_text):
 			visible_assets.append(asset)
 	visible_assets.sort_custom(_sort_named_documents)
 	outliner_list.add_child(_create_outliner_group_label("%s · Components" % active_geometry_submodule))
@@ -6084,7 +6108,9 @@ func _select_geometry_asset(asset_id: String) -> void:
 	active_state = ""
 	_set_geometry_command_state("")
 	if was_selected:
-		expanded_assets[asset_id] = not bool(expanded_assets.get(asset_id, false))
+		_set_outliner_asset_expanded(asset_id, not bool(expanded_assets.get(asset_id, false)))
+	else:
+		_set_outliner_asset_expanded(asset_id, true)
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
@@ -6098,7 +6124,7 @@ func _select_geometry_component(asset_id: String, component_id: String) -> void:
 	active_state = ""
 	selected_geometry_bake_method = ""
 	_set_geometry_command_state("")
-	expanded_assets[asset_id] = true
+	_set_outliner_asset_expanded(asset_id, true)
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
@@ -6273,7 +6299,9 @@ func _select_asset(asset_id: String) -> void:
 	active_state = ""
 	canvas_view.set_interaction_state("")
 	if was_selected:
-		expanded_assets[asset_id] = not bool(expanded_assets.get(asset_id, false))
+		_set_outliner_asset_expanded(asset_id, not bool(expanded_assets.get(asset_id, false)))
+	else:
+		_set_outliner_asset_expanded(asset_id, true)
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
@@ -6362,7 +6390,7 @@ func _open_circle_primitive_dialog(asset_id: String, parent_component_id: String
 	circle_primitive_dialog.set_meta("asset_id", asset_id)
 	circle_primitive_dialog.set_meta("parent_component_id", parent_component_id)
 	circle_primitive_name_input.text = ""
-	circle_primitive_radius_field.value = 1.0
+	circle_primitive_diameter_field.value = 2.0
 	circle_primitive_samples_field.value = 32
 	canvas_view.set_navigation_locked(true)
 	circle_primitive_dialog.popup_centered()
@@ -6420,7 +6448,7 @@ func _create_guide(asset_id: String, component_id: String, guide_type: String, l
 	selected_guide_id = guide_id
 	active_state = ""
 	active_draw_tool = ""
-	expanded_assets[asset_id] = true
+	_set_outliner_asset_expanded(asset_id, true)
 	guide_dialog.hide()
 	canvas_view.set_navigation_locked(false)
 	_show_status_message("Created %s." % _guide_display_name(asset, guide))
@@ -6440,7 +6468,7 @@ func _duplicate_selected_guide() -> void:
 	selected_guide_id = str(duplicate.get("id", ""))
 	selected_component_id = ""
 	active_state = ""
-	expanded_assets[selected_asset_id] = true
+	_set_outliner_asset_expanded(selected_asset_id, true)
 	_show_status_message("Duplicated %s." % _guide_display_name(asset, duplicate))
 	_render_outliner()
 	_render_inspector()
@@ -6494,7 +6522,7 @@ func _duplicate_component(asset_id: String, component_id: String, mirror_mode :=
 	selected_point_ids.clear()
 	selected_edge_id = ""
 	active_state = ""
-	expanded_assets[asset_id] = true
+	_set_outliner_asset_expanded(asset_id, true)
 	_show_status_message("Duplicated %s." % str(duplicate.get("name", "Component")))
 	_render_outliner()
 	_render_inspector()
@@ -6674,7 +6702,7 @@ func _confirm_component_creation() -> void:
 	selected_component_id = component_id
 	selected_guide_id = ""
 	active_state = ""
-	expanded_assets[asset_id] = true
+	_set_outliner_asset_expanded(asset_id, true)
 	component_dialog.hide()
 	canvas_view.set_navigation_locked(false)
 	_render_outliner()
@@ -6692,7 +6720,8 @@ func _confirm_circle_primitive_creation() -> void:
 	var parent_component_id := str(circle_primitive_dialog.get_meta("parent_component_id", ""))
 	if not parent_component_id.is_empty() and _get_component(asset, parent_component_id).is_empty():
 		parent_component_id = ""
-	var radius := maxf(_world_to_editor_units(float(circle_primitive_radius_field.value)), 0.0001)
+	var diameter := maxf(_world_to_editor_units(float(circle_primitive_diameter_field.value)), 0.0001)
+	var radius := diameter * 0.5
 	var samples := clampi(int(circle_primitive_samples_field.value), 3, 256)
 	var component_name := circle_primitive_name_input.text.strip_edges()
 	if component_name.is_empty():
@@ -6705,8 +6734,11 @@ func _confirm_circle_primitive_creation() -> void:
 		var parent_component := _get_component(asset, parent_component_id)
 		var parent_transform := _deserialize_transform(parent_component.get("transform", {}))
 		var inherited_pivot: Vector2 = parent_transform.get("pivot", Vector2.ZERO)
+		# A primitive created from the Parent's + button is centered on the
+		# Parent's local pivot. The new Component pivot remains at its origin so
+		# the circle's geometry is not shifted back by the transform pivot.
 		component_transform["position"] = inherited_pivot
-		component_transform["pivot"] = inherited_pivot
+		component_transform["pivot"] = Vector2.ZERO
 	var component := {
 		"id": component_id,
 		"name": component_name,
@@ -6727,12 +6759,21 @@ func _confirm_circle_primitive_creation() -> void:
 		var angle := TAU * float(sample_index) / float(samples)
 		BezierTopology.add_point(component, Vector2(cos(angle), sin(angle)) * radius, "aligned")
 	BezierTopology.close_active_chain(component)
+	var generated_positions: Array = []
+	for point in component.get("points", []):
+		generated_positions.append(_serialize_vector(Vector2(point.get("position", Vector2.ZERO))))
+	component["primitive"] = {
+		"type": "circle",
+		"diameter_cm": float(circle_primitive_diameter_field.value),
+		"samples": samples,
+		"generated_positions": generated_positions
+	}
 	asset["components"].append(component)
 	selected_asset_id = asset_id
 	selected_component_id = component_id
 	selected_guide_id = ""
 	active_state = ""
-	expanded_assets[asset_id] = true
+	_set_outliner_asset_expanded(asset_id, true)
 	circle_primitive_dialog.hide()
 	canvas_view.set_navigation_locked(false)
 	_show_status_message("Created Circle %s with %d samples." % [component_name, samples])
@@ -6768,7 +6809,7 @@ func _select_component(asset_id: String, component_id: String) -> void:
 	selected_point_ids.clear()
 	active_state = ""
 	canvas_view.set_interaction_state("")
-	expanded_assets[asset_id] = true
+	_set_outliner_asset_expanded(asset_id, true)
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
@@ -6789,7 +6830,7 @@ func _select_guide(asset_id: String, guide_id: String) -> void:
 	selected_point_id = ""
 	selected_point_ids.clear()
 	active_state = ""
-	expanded_assets[asset_id] = true
+	_set_outliner_asset_expanded(asset_id, true)
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
@@ -8213,6 +8254,50 @@ func _refresh_geometry_uv_mapping_workspace() -> void:
 	geometry_uv_mapping_workspace.set_context(mesh_bake, result, _geometry_uv_mapping_status(selected_asset_id, selected_component_id, component), geometry_uv_mapping_checker_overlay)
 
 
+func _circle_primitive_status(component: Dictionary) -> String:
+	var primitive = component.get("primitive", {})
+	if not primitive is Dictionary or str(primitive.get("type", "")) != "circle":
+		return ""
+	var generated_positions: Array = primitive.get("generated_positions", [])
+	var points: Array = component.get("points", [])
+	if generated_positions.size() != points.size():
+		return "Manually Adjusted"
+	for index in range(points.size()):
+		var expected := _deserialize_vector(generated_positions[index], Vector2.ZERO)
+		var actual: Vector2 = points[index].get("position", Vector2.ZERO)
+		if expected.distance_squared_to(actual) > 0.00000001:
+			return "Manually Adjusted"
+	return "Parametric"
+
+
+func _regenerate_circle_primitive() -> void:
+	var asset := _get_asset(selected_asset_id)
+	var component := _get_component(asset, selected_component_id)
+	var primitive = component.get("primitive", {})
+	if asset.is_empty() or component.is_empty() or not primitive is Dictionary or str(primitive.get("type", "")) != "circle":
+		return
+	if _circle_primitive_status(component) == "Manually Adjusted":
+		return
+	_record_direct_change()
+	var diameter := maxf(ToolUnits.from_centimeters(float(primitive.get("diameter_cm", 2.0))), 0.0001)
+	var radius := diameter * 0.5
+	var samples := clampi(int(primitive.get("samples", 32)), 3, 256)
+	component["points"] = []
+	component["edges"] = []
+	component["chains"] = []
+	for sample_index in range(samples):
+		var angle := TAU * float(sample_index) / float(samples)
+		BezierTopology.add_point(component, Vector2(cos(angle), sin(angle)) * radius, "aligned")
+	BezierTopology.close_active_chain(component)
+	var generated_positions: Array = []
+	for point in component.get("points", []):
+		generated_positions.append(_serialize_vector(Vector2(point.get("position", Vector2.ZERO))))
+	primitive["generated_positions"] = generated_positions
+	component["primitive"] = primitive
+	_refresh_component_geometry(component)
+	_render_inspector()
+
+
 func _render_inspector() -> void:
 	_clear(inspector_content)
 	transform_fields.clear()
@@ -8447,6 +8532,22 @@ func _render_inspector() -> void:
 	inspector_content.add_child(hierarchy_parent_option)
 	var draw_mode := str(component.get("draw_mode", "closed_loop"))
 	inspector_content.add_child(_create_inspector_field_label("Draw Mode: %s" % _draw_mode_display_name(draw_mode)))
+	var primitive = component.get("primitive", {})
+	if primitive is Dictionary and str(primitive.get("type", "")) == "circle":
+		inspector_content.add_child(_create_inspector_section("Primitive"))
+		inspector_content.add_child(_create_inspector_field_label("Type: Circle"))
+		inspector_content.add_child(_create_inspector_field_label("Diameter: %.3f cm" % float(primitive.get("diameter_cm", 0.0))))
+		inspector_content.add_child(_create_inspector_field_label("Samples: %d" % int(primitive.get("samples", 0))))
+		var primitive_status := _circle_primitive_status(component)
+		var status_label := _create_inspector_field_label("Status: %s" % primitive_status)
+		status_label.add_theme_color_override("font_color", Color("#75b88a") if primitive_status == "Parametric" else Color("#f2c94c"))
+		inspector_content.add_child(status_label)
+		var regenerate_button := Button.new()
+		regenerate_button.text = "Regenerate"
+		regenerate_button.disabled = primitive_status == "Manually Adjusted"
+		regenerate_button.tooltip_text = "Rebuild the Circle from its stored parameters."
+		regenerate_button.pressed.connect(_regenerate_circle_primitive)
+		inspector_content.add_child(regenerate_button)
 	var mode_issues := BezierTopology.mode_validation_issues(component, true)
 	var configured_catch_parent_id := str(component.get("catch_parent_component_id", ""))
 	if not configured_catch_parent_id.is_empty() and (configured_catch_parent_id == selected_component_id or _get_component(asset, configured_catch_parent_id).is_empty()):
@@ -10534,7 +10635,7 @@ func _set_reference_image_canvas(asset: Dictionary) -> void:
 	var reference_position: Vector2 = reference_image.get("position", Vector2.ZERO)
 	var reference_scale := float(reference_image.get("scale", 1.0))
 	if is_instance_valid(reference_texture) and reference_texture.get_height() > 0:
-		var target_height := float(reference_image.get("target_height_cm", 13.0))
+		var target_height := ToolUnits.from_centimeters(float(reference_image.get("target_height_cm", 13.0)))
 		reference_scale *= target_height / float(reference_texture.get_height())
 		if str(reference_image.get("pivot_mode", "bottom_center")) == "bottom_center":
 			reference_position += Vector2(0.0, target_height * 0.5 * reference_image.get("scale", 1.0))
@@ -11386,9 +11487,9 @@ func _select_weighting_asset(asset_id: String) -> void:
 	selected_component_id = ""
 	selected_weighting_style_id = ""
 	if was_selected:
-		expanded_assets[asset_id] = not bool(expanded_assets.get(asset_id, false))
+		_set_outliner_asset_expanded(asset_id, not bool(expanded_assets.get(asset_id, false)))
 	else:
-		expanded_assets[asset_id] = true
+		_set_outliner_asset_expanded(asset_id, true)
 	_enter_weighting_context()
 
 
@@ -11396,7 +11497,7 @@ func _select_weighting_component(asset_id: String, component_id: String) -> void
 	selected_asset_id = asset_id
 	selected_component_id = component_id
 	selected_weighting_style_id = ""
-	expanded_assets[asset_id] = true
+	_set_outliner_asset_expanded(asset_id, true)
 	_enter_weighting_context()
 
 
@@ -11406,5 +11507,5 @@ func _select_weighting_style(asset_id: String, component_id: String, style_id: S
 	selected_asset_id = asset_id
 	selected_component_id = component_id
 	selected_weighting_style_id = style_id
-	expanded_assets[asset_id] = true
+	_set_outliner_asset_expanded(asset_id, true)
 	_enter_weighting_context()
