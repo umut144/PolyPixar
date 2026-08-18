@@ -968,7 +968,7 @@
 			"catch_parent_component_id": "",
 			"chains": [
 				{
-					"closed": false,
+					"closed": true,
 					"edge_ids": [
 						"edge_9003547350706427197",
 						"edge_5586157527166246208",
@@ -990,7 +990,8 @@
 						"edge_2675042865372904413",
 						"edge_3050386416439367475",
 						"edge_218103337006514395",
-						"edge_7007910882014664587"
+						"edge_7007910882014664587",
+						"edge_8345077535716179006"
 					],
 					"id": "chain_1516379966837428628",
 					"point_ids": [
@@ -1148,6 +1149,12 @@
 					"id": "edge_7007910882014664587",
 					"render_outline": true,
 					"start_point_id": "mirror_point_4759564808844033646"
+				},
+				{
+					"end_point_id": "point_7057143395255644538",
+					"id": "edge_8345077535716179006",
+					"render_outline": true,
+					"start_point_id": "mirror_point_8942625195273180311"
 				}
 			],
 			"id": "component_5",
@@ -1171,7 +1178,7 @@
 						0.0,
 						8.5
 					],
-					"preserve_point": false
+					"preserve_point": true
 				},
 				{
 					"handle_in": [
@@ -1369,7 +1376,7 @@
 						0.0,
 						8.5
 					],
-					"preserve_point": false
+					"preserve_point": true
 				},
 				{
 					"handle_in": [

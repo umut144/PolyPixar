@@ -166,7 +166,7 @@ func _test_closed_loop_selection_mirror() -> void:
 	var component := _component()
 	component["draw_mode"] = "closed_loop"
 	var source_ids: Array[String] = []
-	for point_position in [Vector2(-2.0, 0.0), Vector2(-1.0, 1.0), Vector2(-1.0, 3.0)]:
+	for point_position in [Vector2(0.0, 0.0), Vector2(-1.0, 1.0), Vector2(0.0, 4.0)]:
 		source_ids.append(BezierTopology.add_point(component, point_position, "linear"))
 	var mirror_axis_start := Vector2.ZERO
 	var mirror_axis_end := Vector2(0.0, 4.0)
@@ -174,13 +174,9 @@ func _test_closed_loop_selection_mirror() -> void:
 	_expect(bool(result.get("valid", false)), "Mirror should preserve structural topology for an open Closed Loop draft.")
 	var mirrored_component: Dictionary = result.get("component", {})
 	var mirrored_ids: Array = result.get("mirrored_point_ids", [])
-	_expect(mirrored_component.get("chains", []).size() == 2, "Mirror should create a separate second open Chain.")
-	_expect(not bool(mirrored_component["chains"][0].get("closed", false)) and not bool(mirrored_component["chains"][1].get("closed", false)), "Mirror must not close either Chain automatically.")
-	_expect(not BezierTopology.mode_validation_issues(mirrored_component, true).is_empty(), "Two open Chains must remain a Closed Loop draft.")
-	_expect(BezierTopology.join_open_chain_endpoints(mirrored_component, source_ids[0], str(mirrored_ids[0])), "Two open Mirror Chains should join only after an explicit endpoint action.")
-	_expect(mirrored_component.get("chains", []).size() == 1 and not bool(mirrored_component["chains"][0].get("closed", false)), "Joining Mirror endpoints should leave one open Chain for manual closure.")
-	_expect(BezierTopology.close_active_chain(mirrored_component), "The joined Chain should close explicitly.")
-	_expect(BezierTopology.mode_validation_issues(mirrored_component, true).is_empty(), "One manually closed Mirror result should validate as a Closed Loop.")
+	_expect(mirrored_component.get("chains", []).size() == 1 and bool(mirrored_component["chains"][0].get("closed", false)), "Mirroring a half-contour with two coincident axis endpoints should produce one closed Chain.")
+	_expect(mirrored_ids.size() == 1, "Only the mirrored interior point should remain selected after automatic loop closure.")
+	_expect(BezierTopology.mode_validation_issues(mirrored_component, true).is_empty(), "A mirrored half-contour should validate immediately as a Closed Loop.")
 	_expect(not SelectionMirrorService.validation_issues(mirrored_component, source_ids, mirror_axis_start, mirror_axis_end).is_empty(), "Mirror must reject an already closed Chain.")
 	var coincident_component := _component()
 	coincident_component["draw_mode"] = "closed_loop"
@@ -191,7 +187,7 @@ func _test_closed_loop_selection_mirror() -> void:
 	var coincident_mirror: Dictionary = coincident_result.get("component", {})
 	_expect(int(coincident_result.get("auto_connected_count", 0)) == 1, "Mirror should merge an endpoint that lands exactly on its source endpoint.")
 	_expect(coincident_mirror.get("points", []).size() == 5, "A coincident mirrored endpoint must be removed instead of leaving two overlapping Points.")
-	_expect(coincident_mirror.get("chains", []).size() == 1 and not bool(coincident_mirror["chains"][0].get("closed", false)), "One coincident endpoint pair should join the two mirror Chains without auto-closing the contour.")
+	_expect(coincident_mirror.get("chains", []).size() == 1 and not bool(coincident_mirror["chains"][0].get("closed", false)), "A single coincident endpoint pair should join the two mirror Chains but leave the remaining endpoints open.")
 	var multi_coincident_component := _component()
 	multi_coincident_component["draw_mode"] = "closed_loop"
 	var multi_source_ids: Array[String] = []
@@ -199,8 +195,8 @@ func _test_closed_loop_selection_mirror() -> void:
 		multi_source_ids.append(BezierTopology.add_point(multi_coincident_component, point_position, "linear"))
 	var multi_result := SelectionMirrorService.apply(multi_coincident_component, multi_source_ids, mirror_axis_start, mirror_axis_end)
 	var multi_mirror: Dictionary = multi_result.get("component", {})
-	_expect(int(multi_result.get("auto_connected_count", 0)) == 0 and multi_mirror.get("points", []).size() == 6, "Mirror should fuse every coincident axis Point when more than one Point lands on the axis.")
-	_expect(multi_mirror.get("chains", []).size() == 2 and str(multi_mirror["chains"][0].get("point_ids", [])[0]) == str(multi_mirror["chains"][1].get("point_ids", []).back()) and str(multi_mirror["chains"][0].get("point_ids", []).back()) == str(multi_mirror["chains"][1].get("point_ids", [])[0]), "Multiple coincident axis Points should be shared by both open Mirror Chains without auto-closing them.")
+	_expect(int(multi_result.get("auto_connected_count", 0)) == 2 and multi_mirror.get("points", []).size() == 6, "Mirror should fuse both coincident axis endpoints and remove their duplicate Points.")
+	_expect(multi_mirror.get("chains", []).size() == 1 and bool(multi_mirror["chains"][0].get("closed", false)) and BezierTopology.mode_validation_issues(multi_mirror, true).is_empty(), "Multiple coincident axis endpoints should produce one valid closed Mirror Chain.")
 
 
 func _test_ribbon_strip_mesh() -> void:

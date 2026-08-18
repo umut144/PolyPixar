@@ -6164,6 +6164,17 @@ func _render_geometry_component_asset_entry(asset: Dictionary, force_expand := f
 		return
 	container.add_child(_create_outliner_child_group_label("Components"))
 	var components: Array = asset.get("components", []).duplicate()
+	var references: Array = []
+	var guides: Array = asset.get("guides", []).duplicate(true) if active_geometry_submodule == "Sampling" else []
+	if active_geometry_submodule == "Sampling":
+		components.clear()
+		for component in asset.get("components", []):
+			if str(component.get("type", "component")) == "guide":
+				guides.append(component)
+			elif _is_reference_component(component):
+				references.append(component)
+			else:
+				components.append(component)
 	components.sort_custom(_sort_named_documents)
 	for component in components:
 		if str(component.get("type", "component")) == "guide":
@@ -6189,6 +6200,7 @@ func _render_geometry_component_asset_entry(asset: Dictionary, force_expand := f
 		_style_outliner_button(button, selected_asset_id == asset_id and selected_component_id == component_id and selected_geometry_bake_method.is_empty())
 		button.pressed.connect(_select_geometry_component.bind(asset_id, component_id))
 		row.add_child(button)
+		row.add_child(_create_geometry_role_badge(str(component.get("topology_role", "outer"))))
 		var status_dot := Label.new()
 		status_dot.text = "●"
 		status_dot.custom_minimum_size = Vector2(28, 30)
@@ -6209,6 +6221,75 @@ func _render_geometry_component_asset_entry(asset: Dictionary, force_expand := f
 			count_label.tooltip_text = str(summary.get("tooltip", ""))
 			row.add_child(count_label)
 		container.add_child(row)
+	if active_geometry_submodule != "Sampling":
+		return
+	references.sort_custom(_sort_named_documents)
+	container.add_child(_create_outliner_child_group_label("References"))
+	for reference in references:
+		_render_geometry_reference_row(container, asset, reference)
+	guides.sort_custom(func(left: Dictionary, right: Dictionary) -> bool: return _guide_display_name(asset, left).naturalnocasecmp_to(_guide_display_name(asset, right)) < 0)
+	container.add_child(_create_outliner_child_group_label("Guides"))
+	for guide in guides:
+		_render_geometry_sampling_guide_row(container, asset, guide)
+
+
+func _render_geometry_reference_row(container: VBoxContainer, asset: Dictionary, reference: Dictionary) -> void:
+	var asset_id := str(asset.get("id", ""))
+	var reference_id := str(reference.get("id", ""))
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 2)
+	var indent := Control.new()
+	indent.custom_minimum_size = Vector2(16, 0)
+	row.add_child(indent)
+	row.add_child(_create_visibility_checkbox(bool(reference.get("visibility", true)), _on_component_visibility_entry_changed.bind(asset_id, reference_id)))
+	var button := Button.new()
+	button.text = _component_outliner_name(asset, reference)
+	button.tooltip_text = "Sampling dependency · select the parent Component to edit this contour"
+	button.custom_minimum_size = Vector2(0, 30)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	button.focus_mode = Control.FOCUS_NONE
+	_style_outliner_button(button, false, str(reference.get("topology_role", "outer")))
+	button.pressed.connect(_select_geometry_sampling_reference.bind(asset_id, str(reference.get("parent_component_id", ""))))
+	row.add_child(button)
+	row.add_child(_create_geometry_role_badge(str(reference.get("topology_role", "outer"))))
+	container.add_child(row)
+
+
+func _render_geometry_sampling_guide_row(container: VBoxContainer, asset: Dictionary, guide: Dictionary) -> void:
+	var asset_id := str(asset.get("id", ""))
+	var guide_id := str(guide.get("id", ""))
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 2)
+	var indent := Control.new()
+	indent.custom_minimum_size = Vector2(16, 0)
+	row.add_child(indent)
+	row.add_child(_create_visibility_checkbox(bool(guide.get("visibility", true)), _on_guide_visibility_entry_changed.bind(asset_id, guide_id)))
+	var button := Button.new()
+	var guide_name := _guide_display_name(asset, guide)
+	button.text = guide_name if bool(guide.get("visibility", true)) else _strikethrough_text(guide_name)
+	button.tooltip_text = "Sampling constraint · %s" % AssetGuide.display_name(str(guide.get("guide_type", AssetGuide.SAMPLER_SPINE)))
+	button.custom_minimum_size = Vector2(0, 30)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	button.focus_mode = Control.FOCUS_NONE
+	_style_guide_outliner_button(button, str(guide.get("id", "")) == selected_guide_id, str(guide.get("guide_type", AssetGuide.SAMPLER_SPINE)))
+	button.pressed.connect(_select_guide.bind(asset_id, guide_id))
+	row.add_child(button)
+	row.add_child(_create_geometry_role_badge("Cut" if str(guide.get("guide_type", "")) == AssetGuide.CUT else "Guide"))
+	container.add_child(row)
+
+
+func _create_geometry_role_badge(role: String) -> Label:
+	var badge := Label.new()
+	badge.text = role.capitalize()
+	badge.custom_minimum_size = Vector2(42, 24)
+	badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	badge.add_theme_font_size_override("font_size", 9)
+	var badge_color := Color("#ef6c78") if role.to_lower() == "hole" else Color("#737f91") if role.to_lower() == "outer" else Color("#ef6c78")
+	badge.add_theme_color_override("font_color", badge_color.lightened(0.35))
+	return badge
 
 
 func _render_geometry_uv_mapping_bake_rows(container: VBoxContainer, asset_id: String, component_id: String, component: Dictionary) -> void:
@@ -6493,6 +6574,13 @@ func _select_geometry_component(asset_id: String, component_id: String) -> void:
 		geometry_meshing_workspace.grab_focus()
 	elif active_geometry_submodule == "UV Mapping" and is_instance_valid(geometry_uv_mapping_workspace):
 		geometry_uv_mapping_workspace.grab_focus()
+
+
+func _select_geometry_sampling_reference(asset_id: String, parent_component_id: String) -> void:
+	if parent_component_id.is_empty():
+		_select_geometry_asset(asset_id)
+		return
+	_select_geometry_component(asset_id, parent_component_id)
 
 
 func _select_geometry_bake(asset_id: String, component_id: String, method: String) -> void:
@@ -7169,6 +7257,21 @@ func _select_guide(asset_id: String, guide_id: String) -> void:
 	var guide := _get_guide(_get_asset(asset_id), guide_id)
 	if guide.is_empty():
 		return
+	if active_module == "Mesh" and active_geometry_submodule == "Sampling":
+		var parent_component_id := str(guide.get("scope", {}).get("component_id", ""))
+		if not _get_component(_get_asset(asset_id), parent_component_id).is_empty():
+			selected_asset_id = asset_id
+			selected_component_id = parent_component_id
+			selected_guide_id = guide_id
+			selected_edge_id = ""
+			selected_point_id = ""
+			selected_point_ids.clear()
+			active_state = ""
+			_set_outliner_asset_expanded(asset_id, true)
+			_render_outliner()
+			_render_inspector()
+			_render_canvas_context()
+			return
 	active_module = "Create"
 	_set_create_submodule_context(_asset_type_create_submodule(_asset_type(_get_asset(asset_id))))
 	selected_asset_id = asset_id
@@ -7786,7 +7889,32 @@ func _refresh_geometry_sampling_workspace() -> void:
 	var preview := geometry_sampling_preview if geometry_sampling_preview_key == _geometry_document_key(selected_asset_id, selected_component_id) \
 		and str(geometry_sampling_preview.get("source_fingerprint", "")) == GeometrySamplingService.source_fingerprint(component, cut_guides) else {}
 	var bake := _geometry_sampling_bake(selected_asset_id, selected_component_id)
-	geometry_sampling_workspace.set_context(component, preview, bake, _geometry_sampling_status(selected_asset_id, selected_component_id, component))
+	var overlays := _geometry_sampling_overlays(_get_asset(selected_asset_id), selected_component_id)
+	geometry_sampling_workspace.set_context(component, preview, bake, _geometry_sampling_status(selected_asset_id, selected_component_id, component), overlays)
+
+
+func _geometry_sampling_overlays(asset: Dictionary, component_id: String) -> Dictionary:
+	var overlays := {"holes": [], "guides": []}
+	var parent_world := ComponentHierarchy.world_transform(asset, component_id)
+	var parent_inverse := parent_world.affine_inverse()
+	for reference in asset.get("components", []):
+		if not reference is Dictionary or not _is_reference_component(reference):
+			continue
+		if str(reference.get("parent_component_id", "")) != component_id or str(reference.get("topology_role", "outer")) != "hole":
+			continue
+		for shape in _reference_asset_shapes(asset, reference, ""):
+			var local_points: Array[Vector2] = []
+			for point in shape.get("points", []):
+				local_points.append(parent_inverse * Vector2(point))
+			if local_points.size() >= 3:
+				overlays["holes"].append({"points": local_points, "closed": true})
+	for guide in _cut_guides_for_component(asset, component_id):
+		if not guide is Dictionary:
+			continue
+		var local_guide: Dictionary = guide.duplicate(true)
+		local_guide["points"] = guide.get("points", []).duplicate(true)
+		overlays["guides"].append(local_guide)
+	return overlays
 
 
 func _render_geometry_seeding_inspector() -> void:

@@ -11,6 +11,7 @@ const PRESERVE_COLOR := Color("#ef8354")
 
 var component: Dictionary = {}
 var preview: Dictionary = {}
+var overlays: Dictionary = {}
 var status := "Not Generated"
 var camera_position := Vector2.ZERO
 var camera_zoom := 1.0
@@ -24,9 +25,10 @@ func _ready() -> void:
 	queue_redraw()
 
 
-func set_context(component_data: Dictionary, preview_data: Dictionary, bake_data: Dictionary, status_value: String) -> void:
+func set_context(component_data: Dictionary, preview_data: Dictionary, bake_data: Dictionary, status_value: String, overlay_data: Dictionary = {}) -> void:
 	component = component_data.duplicate(true)
 	preview = preview_data.duplicate(true) if not preview_data.is_empty() else bake_data.duplicate(true)
+	overlays = overlay_data.duplicate(true)
 	status = status_value
 	BezierGeometry.resolve_auto_handles(component.get("points", []), component.get("chains", []))
 	fitted = false
@@ -36,6 +38,7 @@ func set_context(component_data: Dictionary, preview_data: Dictionary, bake_data
 func clear_context() -> void:
 	component = {}
 	preview = {}
+	overlays = {}
 	status = "Not Generated"
 	fitted = false
 	queue_redraw()
@@ -87,6 +90,8 @@ func _draw() -> void:
 	if not fitted:
 		_fit_component()
 	_draw_authored_curves()
+	_draw_hole_overlays()
+	_draw_guide_overlays()
 	_draw_samples()
 	draw_string(ThemeDB.fallback_font, Vector2(10.0, 20.0), "Mesh → Sampling · %s" % status, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 12, Color("#9aa3b2"))
 
@@ -166,6 +171,41 @@ func _draw_samples() -> void:
 			var position := _to_screen(Vector2(sample.get("position", Vector2.ZERO)))
 			var preserved := bool(sample.get("preserved", false))
 			draw_circle(position, 4.5 if preserved else 3.0, PRESERVE_COLOR if preserved else SAMPLE_POINT_COLOR)
+	for cut in preview.get("cuts", []):
+		if not cut is Dictionary or not bool(cut.get("valid", false)):
+			continue
+		var samples: Array = cut.get("samples", [])
+		for sample_index in range(1, samples.size()):
+			draw_dashed_line(_to_screen(Vector2(samples[sample_index - 1].get("position", Vector2.ZERO))), _to_screen(Vector2(samples[sample_index].get("position", Vector2.ZERO))), Color("#ef6c78"), 2.5, 5.0)
+
+
+func _draw_hole_overlays() -> void:
+	for hole in overlays.get("holes", []):
+		if not hole is Dictionary:
+			continue
+		var points: Array = hole.get("points", [])
+		if points.size() < 2:
+			continue
+		for point_index in range(points.size()):
+			var start := _to_screen(Vector2(points[point_index]))
+			var end := _to_screen(Vector2(points[(point_index + 1) % points.size()]))
+			draw_line(start, end, Color("#ef6c78"), 2.5, true)
+
+
+func _draw_guide_overlays() -> void:
+	for guide in overlays.get("guides", []):
+		if not guide is Dictionary:
+			continue
+		var points: Array = guide.get("points", [])
+		var edges: Array = guide.get("edges", [])
+		for edge_data in edges:
+			var start_id := str(edge_data.get("start_point_id", ""))
+			var end_id := str(edge_data.get("end_point_id", ""))
+			var start_point := BezierTopology.point_by_id(points, start_id)
+			var end_point := BezierTopology.point_by_id(points, end_id)
+			if start_point.is_empty() or end_point.is_empty():
+				continue
+			draw_dashed_line(_to_screen(Vector2(start_point.get("position", Vector2.ZERO))), _to_screen(Vector2(end_point.get("position", Vector2.ZERO))), Color("#ef6c78"), 2.0, 5.0)
 
 
 func _to_screen(world_position: Vector2) -> Vector2:

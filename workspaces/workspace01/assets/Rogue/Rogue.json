@@ -219,14 +219,20 @@
 			"catch_parent_component_id": "",
 			"chains": [
 				{
-					"closed": false,
+					"closed": true,
 					"edge_ids": [
-						"edge_7211781846896498094",
-						"edge_4644482126433174175",
-						"edge_3541885322057099780",
-						"edge_2273498571563216494",
-						"edge_1488721429216209738",
-						"edge_3129669784589689554"
+						"edge_8626031926191027878",
+						"edge_2184060021276452819",
+						"edge_7057587453779983544",
+						"edge_5208770870746252877",
+						"edge_326602867177247949",
+						"edge_8582525795705406051",
+						"edge_7338134005600355040",
+						"edge_1718970586025186648",
+						"edge_2444798942313608015",
+						"edge_2295930329954670776",
+						"edge_1292711022159517651",
+						"edge_7414706896330012774"
 					],
 					"id": "chain_5703594976202898033",
 					"point_ids": [
@@ -236,29 +242,12 @@
 						"point_9089153093198010133",
 						"point_4920594694415826297",
 						"point_319220921698945209",
-						"point_553247314585199094"
-					],
-					"topology_role": "outer"
-				},
-				{
-					"closed": false,
-					"edge_ids": [
-						"edge_4985388022436570791",
-						"edge_6950790149098114817",
-						"edge_4450217036153297716",
-						"edge_766422568158523846",
-						"edge_3370142797317650988",
-						"edge_7873662140394511626"
-					],
-					"id": "mirror_chain_7998038545062303332",
-					"point_ids": [
 						"point_553247314585199094",
 						"mirror_point_8459942177296288676",
 						"mirror_point_461649894113113846",
 						"mirror_point_8848579539494912471",
 						"mirror_point_6564265203965348132",
-						"mirror_point_5488926326933754961",
-						"point_6753556724782535219"
+						"mirror_point_5488926326933754961"
 					],
 					"topology_role": "outer"
 				}
@@ -268,73 +257,73 @@
 			"edges": [
 				{
 					"end_point_id": "point_4885692581233672086",
-					"id": "edge_7211781846896498094",
+					"id": "edge_8626031926191027878",
 					"render_outline": true,
 					"start_point_id": "point_6753556724782535219"
 				},
 				{
 					"end_point_id": "point_2591509371097675502",
-					"id": "edge_4644482126433174175",
+					"id": "edge_2184060021276452819",
 					"render_outline": true,
 					"start_point_id": "point_4885692581233672086"
 				},
 				{
 					"end_point_id": "point_9089153093198010133",
-					"id": "edge_3541885322057099780",
+					"id": "edge_7057587453779983544",
 					"render_outline": true,
 					"start_point_id": "point_2591509371097675502"
 				},
 				{
 					"end_point_id": "point_4920594694415826297",
-					"id": "edge_2273498571563216494",
+					"id": "edge_5208770870746252877",
 					"render_outline": true,
 					"start_point_id": "point_9089153093198010133"
 				},
 				{
 					"end_point_id": "point_319220921698945209",
-					"id": "edge_1488721429216209738",
+					"id": "edge_326602867177247949",
 					"render_outline": true,
 					"start_point_id": "point_4920594694415826297"
 				},
 				{
 					"end_point_id": "point_553247314585199094",
-					"id": "edge_3129669784589689554",
+					"id": "edge_8582525795705406051",
 					"render_outline": true,
 					"start_point_id": "point_319220921698945209"
 				},
 				{
 					"end_point_id": "mirror_point_8459942177296288676",
-					"id": "edge_4985388022436570791",
+					"id": "edge_7338134005600355040",
 					"render_outline": true,
 					"start_point_id": "point_553247314585199094"
 				},
 				{
 					"end_point_id": "mirror_point_461649894113113846",
-					"id": "edge_6950790149098114817",
+					"id": "edge_1718970586025186648",
 					"render_outline": true,
 					"start_point_id": "mirror_point_8459942177296288676"
 				},
 				{
 					"end_point_id": "mirror_point_8848579539494912471",
-					"id": "edge_4450217036153297716",
+					"id": "edge_2444798942313608015",
 					"render_outline": true,
 					"start_point_id": "mirror_point_461649894113113846"
 				},
 				{
 					"end_point_id": "mirror_point_6564265203965348132",
-					"id": "edge_766422568158523846",
+					"id": "edge_2295930329954670776",
 					"render_outline": true,
 					"start_point_id": "mirror_point_8848579539494912471"
 				},
 				{
 					"end_point_id": "mirror_point_5488926326933754961",
-					"id": "edge_3370142797317650988",
+					"id": "edge_1292711022159517651",
 					"render_outline": true,
 					"start_point_id": "mirror_point_6564265203965348132"
 				},
 				{
 					"end_point_id": "point_6753556724782535219",
-					"id": "edge_7873662140394511626",
+					"id": "edge_7414706896330012774",
 					"render_outline": true,
 					"start_point_id": "mirror_point_5488926326933754961"
 				}
@@ -589,15 +578,22 @@
 			"catch_parent_component_id": "",
 			"chains": [
 				{
-					"closed": false,
+					"closed": true,
 					"edge_ids": [
-						"edge_2621112907265338314",
-						"edge_4326846317174350766",
-						"edge_4695739195127689182",
-						"edge_7672421980877416310",
-						"edge_7157345374595352088",
-						"edge_1990002080346041382",
-						"edge_6956625345388564266"
+						"edge_8705422402502226170",
+						"edge_2366290682960923194",
+						"edge_4113269730759193753",
+						"edge_539558257426596724",
+						"edge_716758449356688198",
+						"edge_5471147295026805905",
+						"edge_3895233051732650968",
+						"edge_8653762834509692793",
+						"edge_8499340652774623286",
+						"edge_2075965188830465430",
+						"edge_4494333957389823473",
+						"edge_5801963987268184383",
+						"edge_7531385197832340995",
+						"edge_852558928195823372"
 					],
 					"id": "chain_2664687927316610439",
 					"point_ids": [
@@ -608,31 +604,13 @@
 						"point_7630755834011446061",
 						"point_2817009310241723429",
 						"point_2138093754399223631",
-						"point_3319750011514817219"
-					],
-					"topology_role": "outer"
-				},
-				{
-					"closed": false,
-					"edge_ids": [
-						"edge_4854197032259197547",
-						"edge_3711726432470139270",
-						"edge_3383061142202651913",
-						"edge_1481316716928196418",
-						"edge_6100381145208517072",
-						"edge_5565496420498414681",
-						"edge_1613899584582512587"
-					],
-					"id": "mirror_chain_5273743016783715875",
-					"point_ids": [
 						"point_3319750011514817219",
 						"mirror_point_2056267595804092307",
 						"mirror_point_858893666258556539",
 						"mirror_point_3308654567958098312",
 						"mirror_point_9037895411325450357",
 						"mirror_point_452382712208819259",
-						"mirror_point_4342616343280153248",
-						"point_7424194910461177270"
+						"mirror_point_4342616343280153248"
 					],
 					"topology_role": "outer"
 				}
@@ -642,85 +620,85 @@
 			"edges": [
 				{
 					"end_point_id": "point_4939253682735459788",
-					"id": "edge_2621112907265338314",
+					"id": "edge_8705422402502226170",
 					"render_outline": true,
 					"start_point_id": "point_7424194910461177270"
 				},
 				{
 					"end_point_id": "point_2682830154669869682",
-					"id": "edge_4326846317174350766",
+					"id": "edge_2366290682960923194",
 					"render_outline": true,
 					"start_point_id": "point_4939253682735459788"
 				},
 				{
 					"end_point_id": "point_6906153022036333848",
-					"id": "edge_4695739195127689182",
+					"id": "edge_4113269730759193753",
 					"render_outline": true,
 					"start_point_id": "point_2682830154669869682"
 				},
 				{
 					"end_point_id": "point_7630755834011446061",
-					"id": "edge_7672421980877416310",
+					"id": "edge_539558257426596724",
 					"render_outline": true,
 					"start_point_id": "point_6906153022036333848"
 				},
 				{
 					"end_point_id": "point_2817009310241723429",
-					"id": "edge_7157345374595352088",
+					"id": "edge_716758449356688198",
 					"render_outline": true,
 					"start_point_id": "point_7630755834011446061"
 				},
 				{
 					"end_point_id": "point_2138093754399223631",
-					"id": "edge_1990002080346041382",
+					"id": "edge_5471147295026805905",
 					"render_outline": true,
 					"start_point_id": "point_2817009310241723429"
 				},
 				{
 					"end_point_id": "point_3319750011514817219",
-					"id": "edge_6956625345388564266",
+					"id": "edge_3895233051732650968",
 					"render_outline": true,
 					"start_point_id": "point_2138093754399223631"
 				},
 				{
 					"end_point_id": "mirror_point_2056267595804092307",
-					"id": "edge_4854197032259197547",
+					"id": "edge_8653762834509692793",
 					"render_outline": true,
 					"start_point_id": "point_3319750011514817219"
 				},
 				{
 					"end_point_id": "mirror_point_858893666258556539",
-					"id": "edge_3711726432470139270",
+					"id": "edge_8499340652774623286",
 					"render_outline": true,
 					"start_point_id": "mirror_point_2056267595804092307"
 				},
 				{
 					"end_point_id": "mirror_point_3308654567958098312",
-					"id": "edge_3383061142202651913",
+					"id": "edge_2075965188830465430",
 					"render_outline": true,
 					"start_point_id": "mirror_point_858893666258556539"
 				},
 				{
 					"end_point_id": "mirror_point_9037895411325450357",
-					"id": "edge_1481316716928196418",
+					"id": "edge_4494333957389823473",
 					"render_outline": true,
 					"start_point_id": "mirror_point_3308654567958098312"
 				},
 				{
 					"end_point_id": "mirror_point_452382712208819259",
-					"id": "edge_6100381145208517072",
+					"id": "edge_5801963987268184383",
 					"render_outline": true,
 					"start_point_id": "mirror_point_9037895411325450357"
 				},
 				{
 					"end_point_id": "mirror_point_4342616343280153248",
-					"id": "edge_5565496420498414681",
+					"id": "edge_7531385197832340995",
 					"render_outline": true,
 					"start_point_id": "mirror_point_452382712208819259"
 				},
 				{
 					"end_point_id": "point_7424194910461177270",
-					"id": "edge_1613899584582512587",
+					"id": "edge_852558928195823372",
 					"render_outline": true,
 					"start_point_id": "mirror_point_4342616343280153248"
 				}
@@ -858,11 +836,11 @@
 				},
 				{
 					"handle_in": [
-						0.0833333358168602,
-						0.0166666507720947
+						0.08498365432024,
+						0.0
 					],
 					"handle_out": [
-						0.0,
+						-0.08498365432024,
 						0.0
 					],
 					"handle_source": "auto",

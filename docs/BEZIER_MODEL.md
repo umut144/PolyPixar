@@ -55,11 +55,12 @@ the referenced Symbol.
 ## Closed Loop drafts
 
 Closed Loop validation requires exactly one closed Chain. While authoring, a
-Mirror Y operation may temporarily create a second open Chain from a selected
-contiguous run of the sole open source Chain. Mirror never connects or closes
-these Chains. The author joins their endpoints explicitly, then closes the
-remaining endpoints into the final single Chain. A closed Chain cannot be
-mirrored.
+Mirror Y operation may create a second open Chain from a selected contiguous
+run of the sole open source Chain. If both mirrored endpoints coincide with
+the source endpoints, Mirror automatically joins and closes the two halves
+into the final single Chain. A single coincident endpoint remains an open
+joined Chain so the remaining endpoint can be authored manually. A closed
+Chain cannot be mirrored.
 
 ## Ribbon mesh derivation
 
