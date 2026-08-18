@@ -8,11 +8,11 @@ contains always-expanded Create, Mesh, Style, and Export categories. A single
 `active_module` plus its category-specific submodule identifies the one active
 workspace.
 
-Create has four database views over the same Asset implementation:
-`Character`, `Props`, `Terrain`, and `Icon`. Their stable persisted discriminator
+Create has five database views over the same Asset implementation:
+`Character`, `Props`, `Terrain`, `Icon`, and `Symbols`. Their stable persisted discriminator
 is `asset_type`; missing or invalid values normalize to `character`.
 
-Mesh and Style share a multi-select Outliner Asset filter. Its four checkbox
+Mesh and Style share a multi-select Outliner Asset filter. Its five checkbox
 states are persisted in `editor_state`; the filter is applied together with
 the Outliner search and does not alter the selected Asset or document data.
 
@@ -80,7 +80,7 @@ Export first runs topology validation, including chain continuity and point
 number ordering. A successful build creates a Godot scene whose root stores:
 
 - `asset_pivot`: the exported pivot in Godot coordinates;
-- `asset_type`: `character`, `props`, `terrain`, or `icon`.
+- `asset_type`: `character`, `props`, `terrain`, `icon`, or `symbols`.
 
 Component hierarchy becomes nested `Node2D` nodes. Closed-loop geometry is
 derived from Bézier topology, while primitive geometry is derived from its

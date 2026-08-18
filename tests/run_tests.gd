@@ -337,7 +337,7 @@ func _test_geometry_sampling_ui_shell() -> void:
 	application._activate_geometry_sampling_method_choice()
 	_expect(application.geometry_sampling_method_choice_active and not application.geometry_method_menu.get_popup().visible, "Sampling CMD+1 should enter a keyboard Method choice state without opening the mouse dropdown.")
 	var sampling_active_style := application.geometry_method_menu.get_theme_stylebox("normal") as StyleBoxFlat
-	_expect(sampling_active_style != null and sampling_active_style.bg_color == Color("#8fd8f5") and not application.geometry_method_menu.flat, "An active Sampling Method MenuButton should render the shared light-blue background in its normal state.")
+	_expect(sampling_active_style != null and sampling_active_style.bg_color == Color("#783943") and not application.geometry_method_menu.flat, "An active Sampling Method MenuButton should render the shared red background in its normal state.")
 	application._set_geometry_sampling_method(GeometrySamplingService.EVEN_SPACING)
 	_expect(application.geometry_sampling_method_choice_active and str(application._geometry_sampling_recipe("asset_1", "component_1").get("method", "")) == GeometrySamplingService.EVEN_SPACING, "Sampling Method state should remain active after its plain-number selection.")
 	var spacing_input := SpinBox.new()
@@ -480,7 +480,7 @@ func _test_geometry_seeding_service() -> void:
 	application._activate_geometry_seeding_method_choice()
 	_expect(application.geometry_seeding_method_choice_active and not application.geometry_seeding_method_menu.get_popup().visible, "Seeding CMD+1 should enter a keyboard Method choice state without opening the mouse dropdown.")
 	var seeding_active_style := application.geometry_seeding_method_menu.get_theme_stylebox("normal") as StyleBoxFlat
-	_expect(seeding_active_style != null and seeding_active_style.bg_color == Color("#8fd8f5") and not application.geometry_seeding_method_menu.flat, "An active Seeding Method MenuButton should render the shared light-blue background in its normal state.")
+	_expect(seeding_active_style != null and seeding_active_style.bg_color == Color("#783943") and not application.geometry_seeding_method_menu.flat, "An active Seeding Method MenuButton should render the shared red background in its normal state.")
 	application._set_geometry_seeding_method(GeometrySeedingService.SPINE_FLOW)
 	_expect(application.geometry_seeding_method_choice_active and not application.geometry_seeding_edit_active and str(application._geometry_seeding_recipe("asset_1", "component_1").get("method", "")) == GeometrySeedingService.SPINE_FLOW, "Seeding Method state should remain active and exclude Edit Seeds after its plain-number selection.")
 	application._set_geometry_seeding_method(GeometrySeedingService.POISSON_FILL)
@@ -620,7 +620,7 @@ func _test_geometry_meshing_service_and_ui() -> void:
 	_expect(str(component_mesh_round_trip.get("component_mesh", {}).get("bake_id", "")) == "mesh_cdt_test", "Component Mesh selection should survive Geometry document persistence.")
 	application._activate_geometry_meshing_method_choice()
 	var active_style := application.geometry_meshing_method_menu.get_theme_stylebox("normal") as StyleBoxFlat
-	_expect(application.active_context_command == "geometry.meshing.method" and application.geometry_meshing_method_choice_active and active_style != null and active_style.bg_color == Color("#8fd8f5"), "Meshing CMD+1 should use the shared exclusive Method command state and highlight.")
+	_expect(application.active_context_command == "geometry.meshing.method" and application.geometry_meshing_method_choice_active and active_style != null and active_style.bg_color == Color("#783943"), "Meshing CMD+1 should use the shared exclusive Method command state and red highlight.")
 	application._set_geometry_meshing_method(GeometryMeshingService.ORGANIC_RELAXED)
 	_expect(application.selected_geometry_bake_method == GeometryMeshingService.ORGANIC_RELAXED and application._geometry_meshing_status("asset_1", "component_1", component) == "Baked", "Selecting Organic Relaxed should select its matching persistent Bake.")
 	application._set_geometry_meshing_method(GeometryMeshingService.CONSTRAINED_DELAUNAY)
@@ -695,7 +695,7 @@ func _test_geometry_uv_mapping_service_and_ui() -> void:
 	_expect(application.geometry_uv_mapping_workspace.visible and application.inspector_content.get_child_count() >= 14, "UV Mapping should expose its dedicated split Workspace and compact Bounds / Planar Inspector.")
 	application._activate_geometry_uv_mapping_method_choice()
 	var active_style := application.geometry_uv_mapping_method_menu.get_theme_stylebox("normal") as StyleBoxFlat
-	_expect(application.active_context_command == "geometry.uv_mapping.method" and application.geometry_uv_mapping_method_choice_active and active_style != null and active_style.bg_color == Color("#8fd8f5"), "UV Mapping CMD+1 should use the shared exclusive Method state and highlight.")
+	_expect(application.active_context_command == "geometry.uv_mapping.method" and application.geometry_uv_mapping_method_choice_active and active_style != null and active_style.bg_color == Color("#783943"), "UV Mapping CMD+1 should use the shared exclusive Method state and red highlight.")
 	application._set_geometry_uv_mapping_method(GeometryUVMappingService.BOUNDS_PLANAR)
 	_expect(application.selected_geometry_bake_method == uv_key and application._geometry_uv_mapping_status("asset_1", "component_1", component) == "Baked", "Selecting Bounds / Planar should select the matching Mesh-specific UV Bake.")
 	application._on_geometry_uv_mapping_checker_overlay_changed(false)
@@ -1302,12 +1302,12 @@ func _test_motion_module_separators() -> void:
 	_expect(separator_count == 1 and separator_height == 6 and section.content_list.get_child_count() == 5, "Motion should use one thick non-interactive separator between its Core and Extended workspace groups.")
 	section.free()
 	var create_section := ModuleSection.new()
-	create_section.setup("Create", ["Character", "Props", "Terrain", "Icon"], true)
+	create_section.setup("Create", ["Character", "Props", "Terrain", "Icon", "Symbols"], true)
 	var create_separator_count := 0
 	for child in create_section.content_list.get_children():
 		if child is ColorRect:
 			create_separator_count += 1
-	_expect(create_separator_count == 0 and create_section.content_list.get_child_count() == 4, "Create should contain Character, Props, Terrain, and Icon.")
+	_expect(create_separator_count == 0 and create_section.content_list.get_child_count() == 5, "Create should contain Character, Props, Terrain, Icon, and Symbols.")
 	create_section._toggle()
 	_expect(create_section.expanded, "Product categories should remain expanded when their headers are pressed.")
 	create_section.free()

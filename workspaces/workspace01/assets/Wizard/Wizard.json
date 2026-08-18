@@ -450,6 +450,7 @@
 			],
 			"id": "component_4",
 			"name": "Hat",
+			"name_mode": "manual",
 			"parent_component_id": "",
 			"points": [
 				{
@@ -942,6 +943,7 @@
 			"primitive": {},
 			"ribbon_width_px": 8.0,
 			"show_point_numbers": true,
+			"source_asset_id": "",
 			"transform": {
 				"pivot": [
 					0.0,
@@ -957,6 +959,7 @@
 					1.0
 				]
 			},
+			"type": "component",
 			"visibility": true,
 			"z_index": 0
 		},
@@ -1148,6 +1151,7 @@
 			],
 			"id": "component_5",
 			"name": "Head",
+			"name_mode": "manual",
 			"parent_component_id": "",
 			"points": [
 				{
@@ -1550,6 +1554,7 @@
 			"primitive": {},
 			"ribbon_width_px": 8.0,
 			"show_point_numbers": false,
+			"source_asset_id": "",
 			"transform": {
 				"pivot": [
 					0.0,
@@ -1565,6 +1570,7 @@
 					1.0
 				]
 			},
+			"type": "component",
 			"visibility": true,
 			"z_index": 0
 		},
@@ -1747,6 +1753,7 @@
 			],
 			"id": "component_6",
 			"name": "Body",
+			"name_mode": "manual",
 			"parent_component_id": "",
 			"points": [
 				{
@@ -2113,6 +2120,7 @@
 			"primitive": {},
 			"ribbon_width_px": 8.0,
 			"show_point_numbers": false,
+			"source_asset_id": "",
 			"transform": {
 				"pivot": [
 					0.0,
@@ -2128,6 +2136,7 @@
 					1.0
 				]
 			},
+			"type": "component",
 			"visibility": true,
 			"z_index": 0
 		},
@@ -2254,6 +2263,7 @@
 			],
 			"id": "component_7",
 			"name": "EyeL",
+			"name_mode": "manual",
 			"parent_component_id": "component_5",
 			"points": [
 				{
@@ -2494,6 +2504,7 @@
 			"primitive": {},
 			"ribbon_width_px": 8.0,
 			"show_point_numbers": false,
+			"source_asset_id": "",
 			"transform": {
 				"pivot": [
 					-0.300000011920929,
@@ -2509,6 +2520,7 @@
 					1.0
 				]
 			},
+			"type": "component",
 			"visibility": true,
 			"z_index": 0
 		},
@@ -2635,6 +2647,7 @@
 			],
 			"id": "component_8",
 			"name": "EyeR",
+			"name_mode": "manual",
 			"parent_component_id": "component_5",
 			"points": [
 				{
@@ -2875,6 +2888,7 @@
 			"primitive": {},
 			"ribbon_width_px": 8.0,
 			"show_point_numbers": false,
+			"source_asset_id": "",
 			"transform": {
 				"pivot": [
 					-0.300000011920929,
@@ -2890,6 +2904,7 @@
 					1.0
 				]
 			},
+			"type": "component",
 			"visibility": true,
 			"z_index": 0
 		},
@@ -2961,6 +2976,7 @@
 			],
 			"id": "component_9",
 			"name": "ArmLine",
+			"name_mode": "manual",
 			"parent_component_id": "component_6",
 			"points": [
 				{
@@ -3093,6 +3109,7 @@
 			"primitive": {},
 			"ribbon_width_px": 8.0,
 			"show_point_numbers": false,
+			"source_asset_id": "",
 			"transform": {
 				"pivot": [
 					0.0,
@@ -3108,6 +3125,7 @@
 					1.0
 				]
 			},
+			"type": "component",
 			"visibility": true,
 			"z_index": 0
 		}

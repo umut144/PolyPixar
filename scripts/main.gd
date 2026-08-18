@@ -1,7 +1,7 @@
 extends Control
 
 const SELECTION_MIRROR_SERVICE_SCRIPT = preload("res://scripts/selection_mirror_service.gd")
-const CREATE_SUBMODULES := ["Character", "Props", "Terrain", "Icon"]
+const CREATE_SUBMODULES := ["Character", "Props", "Terrain", "Icon", "Symbols"]
 const GEOMETRY_SUBMODULES := ["Sampling", "Seeding", "Meshing"]
 const STYLE_SUBMODULES := ["Weighting"]
 const MOTION_SUBMODULES := ["Animation", "Path", "Act", "Sequence"]
@@ -37,7 +37,8 @@ var outliner_asset_type_filters: Dictionary = {
 	"character": true,
 	"props": true,
 	"terrain": true,
-	"icon": true
+	"icon": true,
+	"symbols": true
 }
 var inspector_content: VBoxContainer
 var module_sections: Array[ModuleSection] = []
@@ -117,6 +118,7 @@ var component_draw_mode_menu: PopupMenu
 var component_add_menu: PopupMenu
 var component_add_child_menu: PopupMenu
 var component_add_guide_menu: PopupMenu
+var component_add_reference_menu: PopupMenu
 var component_context_menu: PopupMenu
 var guide_dialog: ConfirmationDialog
 var guide_name_input: LineEdit
@@ -760,8 +762,8 @@ func _build_ui() -> void:
 	filter_grid.columns = 2
 	filter_grid.add_theme_constant_override("h_separation", 4)
 	filter_grid.add_theme_constant_override("v_separation", 0)
-	var asset_type_labels := {"character": "Character", "props": "Props", "terrain": "Terrain", "icon": "Icon"}
-	for asset_type in ["character", "props", "terrain", "icon"]:
+	var asset_type_labels := {"character": "Character", "props": "Props", "terrain": "Terrain", "icon": "Icon", "symbols": "Symbols"}
+	for asset_type in ["character", "props", "terrain", "icon", "symbols"]:
 		var type_checkbox := CheckBox.new()
 		type_checkbox.text = asset_type_labels[asset_type]
 		type_checkbox.button_pressed = bool(outliner_asset_type_filters.get(asset_type, true))
@@ -1463,14 +1465,14 @@ func _style_context_command_button(button: BaseButton, active: bool) -> void:
 	elif button is Button:
 		(button as Button).flat = not active
 	var active_style := StyleBoxFlat.new()
-	active_style.bg_color = Color("#8fd8f5")
-	active_style.border_color = Color("#c5efff")
+	active_style.bg_color = Color("#783943")
+	active_style.border_color = Color("#c45b68")
 	active_style.set_border_width_all(1)
 	active_style.corner_radius_top_left = 3
 	active_style.corner_radius_top_right = 3
 	active_style.corner_radius_bottom_left = 3
 	active_style.corner_radius_bottom_right = 3
-	var active_text := Color("#10202a")
+	var active_text := Color("#fff1f2")
 	if active:
 		for style_name in ["normal", "hover", "pressed", "hover_pressed", "focus"]:
 			button.add_theme_stylebox_override(style_name, active_style)
@@ -1543,11 +1545,17 @@ func _create_component_add_menu() -> void:
 	component_add_guide_menu.add_item("Flow", 2)
 	component_add_guide_menu.id_pressed.connect(_on_component_add_guide_selected)
 	component_add_menu.add_child(component_add_guide_menu)
+	component_add_reference_menu = PopupMenu.new()
+	component_add_reference_menu.name = "ReferenceSymbols"
+	component_add_reference_menu.id_pressed.connect(_on_component_add_reference_selected)
+	component_add_menu.add_child(component_add_reference_menu)
 	component_add_menu.add_submenu_item("Child", "ChildTypes")
 	component_add_menu.add_submenu_item("Guide", "GuideTypes")
+	component_add_menu.add_submenu_item("Reference", "ReferenceSymbols")
 	_style_popup_menu(component_add_menu)
 	_style_popup_menu(component_add_child_menu)
 	_style_popup_menu(component_add_guide_menu)
+	_style_popup_menu(component_add_reference_menu)
 	add_child(component_add_menu)
 
 
@@ -1654,7 +1662,7 @@ func _update_context_action_button() -> void:
 	if not show_asset_create_controls and is_instance_valid(snap_popup):
 		snap_popup.hide()
 	if active_module == "Create" and active_create_submodule in CREATE_SUBMODULES:
-		create_action_button.text = "Create %s" % active_create_submodule
+		create_action_button.text = "Create Symbol" if active_create_submodule == "Symbols" else "Create %s" % active_create_submodule
 	elif active_module == "Style" and active_style_submodule == "Weighting":
 		create_action_button.text = "Create Weighting Style"
 	elif active_module == "Motion" and active_motion_submodule == "Path":
@@ -1876,7 +1884,10 @@ func _save_workspace() -> void:
 		for component in asset["components"]:
 			asset_data["components"].append({
 				"id": str(component["id"]),
+				"type": str(component.get("type", "component")),
 				"name": str(component["name"]),
+				"name_mode": str(component.get("name_mode", "manual")),
+				"source_asset_id": str(component.get("source_asset_id", "")),
 				"parent_component_id": str(component.get("parent_component_id", "")),
 				"points": _serialize_bezier_points(component.get("points", [])),
 				"edges": _serialize_edges(component.get("edges", [])),
@@ -2179,9 +2190,13 @@ func _load_workspace(workspace_entry: String) -> bool:
 				legacy_guide["chains"] = topology["chains"]
 				guides.append(AssetGuide.normalize(legacy_guide))
 				continue
+			var component_type := str(component_data.get("type", "component"))
 			components.append({
 				"id": str(component_data.get("id", "")),
+				"type": component_type,
 				"name": str(component_data.get("name", "Component")),
+				"name_mode": str(component_data.get("name_mode", "manual")),
+				"source_asset_id": str(component_data.get("source_asset_id", "")),
 				"parent_component_id": str(component_data.get("parent_component_id", "")),
 				"points": topology["points"],
 				"edges": topology["edges"],
@@ -2335,7 +2350,7 @@ func _restore_editor_state(state) -> void:
 	active_geometry_submodule = "Sampling"
 	active_style_submodule = "Weighting"
 	active_motion_submodule = "Animation"
-	outliner_asset_type_filters = {"character": true, "props": true, "terrain": true, "icon": true}
+	outliner_asset_type_filters = {"character": true, "props": true, "terrain": true, "icon": true, "symbols": true}
 	_apply_outliner_asset_type_filter_checkboxes()
 	expanded_assets.clear()
 	for asset in assets:
@@ -3678,6 +3693,15 @@ func _render_context_bar() -> void:
 		_render_info_bar()
 		return
 	var primitive_component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if _is_reference_component(primitive_component):
+		var transform_reference_button := Button.new()
+		transform_reference_button.text = "⌘1  Transform"
+		transform_reference_button.custom_minimum_size = Vector2(132, 32)
+		transform_reference_button.focus_mode = Control.FOCUS_NONE
+		transform_reference_button.pressed.connect(_activate_transform_state)
+		context_bar.add_child(transform_reference_button)
+		_render_info_bar()
+		return
 	if str(primitive_component.get("draw_mode", "")) == "primitive":
 		var create_primitive_button := Button.new()
 		create_primitive_button.text = "⌘1  Create Primitive"
@@ -4796,6 +4820,8 @@ func _render_info_bar() -> void:
 			var sequence_document := _get_motion_sequence(selected_motion_sequence_id)
 			_add_info_option("Motion: Sequence")
 			_add_info_option(str(sequence_document.get("name", "No Sequence selected")))
+			_add_info_mode_option("⌘1: Composition", motion_sequence_view == MotionSequenceWorkspace.VIEW_COMPOSITION)
+			_add_info_mode_option("⌘2: Player", motion_sequence_view == MotionSequenceWorkspace.VIEW_PLAYER)
 			_add_info_option("Composition" if motion_sequence_view == MotionSequenceWorkspace.VIEW_COMPOSITION else "Player · Phase %.2f" % motion_sequence_phase)
 			if motion_sequence_view == MotionSequenceWorkspace.VIEW_PLAYER:
 				_add_info_option("Playing" if motion_sequence_playing else "Paused")
@@ -4842,9 +4868,9 @@ func _render_info_bar() -> void:
 			geometry_state_label.text = "State: Default"
 			info_bar.add_child(geometry_state_label)
 			_add_info_option("Mesh: %s" % active_geometry_submodule)
-			_add_info_option("⌘1: Method")
+			_add_info_command_option("⌘1: Method", "geometry.%s.method" % active_geometry_submodule.to_lower().replace(" ", "_"))
 			if active_geometry_submodule == "Seeding":
-				_add_info_option("⌘2: Edit Seeds")
+				_add_info_command_option("⌘2: Edit Seeds", "geometry.seeding.edit_seeds")
 		return
 	if active_module == "Style":
 		var style_state_label := Label.new()
@@ -4852,7 +4878,7 @@ func _render_info_bar() -> void:
 		info_bar.add_child(style_state_label)
 		if active_style_submodule == "Weighting":
 			_add_info_option("Weighting")
-			_add_info_option("⌘1: Method")
+			_add_info_command_option("⌘1: Method", "style.weighting.method")
 			var style := _weighting_style(selected_asset_id, selected_component_id, selected_weighting_style_id)
 			if not style.is_empty():
 				_add_info_option(str(style.get("name", "Weighting Style")))
@@ -4875,8 +4901,8 @@ func _render_info_bar() -> void:
 		elif active_state == "edit":
 			_add_info_option("Click: Select · Drag: Move · Delete: Remove")
 		else:
-			_add_info_option("⌘1: Draw Guide Point")
-			_add_info_option("⌘2: Edit Guide Point")
+			_add_info_command_option("⌘1: Draw Guide Point", "guide.draw_point")
+			_add_info_command_option("⌘2: Edit Guide Point", "guide.edit_point")
 		return
 	if selected_component_id.is_empty():
 		if active_module == "Create":
@@ -4897,8 +4923,15 @@ func _render_info_bar() -> void:
 	state_label.text = "State: %s" % state_name
 	info_bar.add_child(state_label)
 	if active_state == "draw":
-		_add_info_option("Click: Add %s Point" % _draw_point_mode_label(active_draw_point_mode))
-		_add_info_option("1: Linear  2: Aligned  3: Free  4: Mirrored  5: Corner")
+		var draw_point_modes := [
+			["1: Linear", "linear"],
+			["2: Aligned", "aligned"],
+			["3: Free", "free"],
+			["4: Mirrored", "mirrored"],
+			["5: Corner", "corner"]
+		]
+		for mode_data in draw_point_modes:
+			_add_info_mode_option(str(mode_data[0]), str(mode_data[1]) == active_draw_point_mode)
 		_add_info_option("Enter: Pause open Chain · Esc: Leave")
 	elif active_state == "edit" and active_edit_mode == "point":
 		if edit_point_set_mode:
@@ -4913,10 +4946,10 @@ func _render_info_bar() -> void:
 	elif active_state == "edit" and active_edit_mode == "face":
 		_add_info_option("Drag: Move Face")
 	else:
-		_add_info_option("⌘1: Draw Point")
-		_add_info_option("⌘2: Edit Point")
-		_add_info_option("⌘3: Edit Edge")
-		_add_info_option("⌘4: Edit Face")
+		_add_info_command_option("⌘1: Draw Point", "asset.draw_point")
+		_add_info_command_option("⌘2: Edit Point", "asset.edit_point")
+		_add_info_command_option("⌘3: Edit Edge", "asset.edit_edge")
+		_add_info_command_option("⌘4: Edit Face", "asset.edit_face")
 
 
 func _draw_point_mode_label(mode: String) -> String:
@@ -4943,6 +4976,11 @@ func _export_validation_errors(asset: Dictionary) -> Array[String]:
 		errors.append("Select an Asset source.")
 		return errors
 	for component in asset.get("components", []):
+		if _is_reference_component(component):
+			var source_asset := _get_asset(str(component.get("source_asset_id", "")))
+			if source_asset.is_empty() or source_asset == asset:
+				errors.append("%s: source Symbol is missing or cyclic." % str(component.get("name", "Reference")))
+			continue
 		var component_name := str(component.get("name", "Component"))
 		var draw_mode := str(component.get("draw_mode", ""))
 		if draw_mode == "open_edge":
@@ -5041,7 +5079,9 @@ func _build_selected_asset_scene() -> void:
 			component_nodes[component_id] = component_node
 			pending_components.remove_at(pending_index)
 			progressed = true
-			if str(component.get("draw_mode", "")) != "open_edge":
+			if _is_reference_component(component):
+				_build_export_reference_geometry(component_node, component)
+			elif str(component.get("draw_mode", "")) != "open_edge":
 				_build_export_component_geometry(component_node, asset, component, export_transform)
 		if not progressed:
 			# Documents are normalized on load, but retain a safe export fallback
@@ -5095,6 +5135,25 @@ func _build_export_component_geometry(component_node: Node2D, asset: Dictionary,
 	polygon.owner = component_node.owner
 
 
+func _build_export_reference_geometry(reference_node: Node2D, reference: Dictionary) -> void:
+	var source_asset := _get_asset(str(reference.get("source_asset_id", "")))
+	if source_asset.is_empty():
+		return
+	for source_component in source_asset.get("components", []):
+		if _is_reference_component(source_component) or str(source_component.get("draw_mode", "")) == "open_edge":
+			continue
+		var source_node := Node2D.new()
+		source_node.name = _tscn_name(str(source_component.get("name", "Component")))
+		var source_transform := _godot_export_transform(ComponentHierarchy.world_transform_record(source_asset, str(source_component.get("id", ""))))
+		source_node.position = source_transform["position"]
+		source_node.rotation = deg_to_rad(float(source_transform["rotation"]))
+		source_node.scale = source_transform["scale"]
+		source_node.visible = bool(source_component.get("visibility", true))
+		reference_node.add_child(source_node)
+		source_node.owner = reference_node.owner
+		_build_export_component_geometry(source_node, source_asset, source_component, source_transform)
+
+
 func _tscn_name(value: String) -> String:
 	return value.replace("\"", "'") if not value.is_empty() else "Component"
 
@@ -5124,6 +5183,28 @@ func _add_info_option(text: String) -> void:
 	label.text = text
 	label.add_theme_color_override("font_color", Color("#aab3c2"))
 	info_bar.add_child(label)
+
+
+func _add_info_command_option(text: String, command: String) -> void:
+	_add_info_mode_option(text, _context_command_is(command))
+
+
+func _add_info_mode_option(text: String, active: bool) -> void:
+	var option := PanelContainer.new()
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color("#783943") if active else Color("#20242c")
+	style.border_color = Color("#c45b68") if active else Color("#363d48")
+	style.set_border_width_all(1)
+	style.content_margin_left = 7.0
+	style.content_margin_right = 7.0
+	style.content_margin_top = 1.0
+	style.content_margin_bottom = 1.0
+	option.add_theme_stylebox_override("panel", style)
+	var label := Label.new()
+	label.text = text
+	label.add_theme_color_override("font_color", Color("#fff1f2") if active else Color("#aab3c2"))
+	option.add_child(label)
+	info_bar.add_child(option)
 
 
 func _open_new_asset_dialog() -> void:
@@ -6372,10 +6453,13 @@ func _render_asset_outliner_entry(asset: Dictionary, force_expand := false) -> v
 	if not force_expand and not bool(expanded_assets.get(asset_id, false)):
 		return
 	var components: Array = []
+	var references: Array = []
 	var guides: Array = asset.get("guides", []).duplicate(true)
 	for component in asset.get("components", []):
 		if str(component.get("type", "component")) == "guide":
 			guides.append(component)
+		elif _is_reference_component(component):
+			references.append(component)
 		else:
 			components.append(component)
 	components.sort_custom(_sort_named_documents)
@@ -6389,6 +6473,10 @@ func _render_asset_outliner_entry(asset: Dictionary, force_expand := false) -> v
 	for component in components:
 		if not rendered_component_ids.has(str(component.get("id", ""))):
 			_render_component_outliner_tree(asset_container, asset, component, 16, rendered_component_ids)
+	asset_container.add_child(_create_outliner_child_group_label("References"))
+	references.sort_custom(_sort_named_documents)
+	for reference in references:
+		_render_component_outliner_tree(asset_container, asset, reference, 16, rendered_component_ids)
 	asset_container.add_child(_create_outliner_child_group_label("Guides"))
 	for guide in guides:
 		_render_component_guide_row(asset_container, asset, guide)
@@ -6418,6 +6506,8 @@ func _render_component_outliner_tree(container: VBoxContainer, asset: Dictionary
 	component_button.pressed.connect(_select_component.bind(asset_id, component_id, true))
 	component_button.gui_input.connect(_on_component_outliner_gui_input.bind(asset_id, component_id, component_button))
 	component_row.add_child(component_button)
+	if _is_reference_component(component):
+		return
 	var add_button := Button.new()
 	add_button.text = "+"
 	add_button.custom_minimum_size = Vector2(28, 30)
@@ -6519,6 +6609,12 @@ func _open_component_add_menu(asset_id: String, parent_component_id: String, anc
 		return
 	component_add_menu.set_meta("asset_id", asset_id)
 	component_add_menu.set_meta("parent_component_id", parent_component_id)
+	component_add_reference_menu.clear()
+	for source_asset in assets:
+		if _asset_type(source_asset) != "symbols" or str(source_asset.get("id", "")) == asset_id:
+			continue
+		component_add_reference_menu.add_item(str(source_asset.get("name", "Symbol")), component_add_reference_menu.item_count)
+		component_add_reference_menu.set_item_metadata(component_add_reference_menu.item_count - 1, str(source_asset.get("id", "")))
 	component_add_menu.position = Vector2i(anchor.global_position + Vector2(0.0, anchor.size.y))
 	component_add_menu.popup()
 
@@ -6541,6 +6637,27 @@ func _on_component_add_guide_selected(index: int) -> void:
 	if index < 0 or index >= guide_types.size():
 		return
 	_create_guide(str(component_add_menu.get_meta("asset_id", "")), str(component_add_menu.get_meta("parent_component_id", "")), str(guide_types[index]))
+
+
+func _on_component_add_reference_selected(index: int) -> void:
+	var item_index := component_add_reference_menu.get_item_index(index)
+	var source_asset := _get_asset(str(component_add_reference_menu.get_item_metadata(item_index)))
+	var asset := _get_asset(str(component_add_menu.get_meta("asset_id", "")))
+	if source_asset.is_empty() or asset.is_empty():
+		return
+	_record_direct_change()
+	var reference_id := "component_%d" % next_component_id
+	next_component_id += 1
+	asset["components"].append({"id": reference_id, "type": "reference", "name": "%s_ref" % str(source_asset.get("name", "Symbol")), "name_mode": "auto", "source_asset_id": str(source_asset.get("id", "")), "parent_component_id": str(component_add_menu.get_meta("parent_component_id", "")), "transform": _default_component_transform(), "visibility": true, "z_index": 0, "points": [], "edges": [], "chains": []})
+	selected_asset_id = str(asset.get("id", ""))
+	selected_component_id = reference_id
+	selected_guide_id = ""
+	active_state = "transform"
+	_set_outliner_asset_expanded(selected_asset_id, true)
+	_show_status_message("Added reference %s." % str(source_asset.get("name", "Symbol")))
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
 
 
 func _on_component_draw_mode_selected(index: int) -> void:
@@ -6945,7 +7062,10 @@ func _select_component(asset_id: String, component_id: String, focus_outliner :=
 	_stop_guide_draw_state()
 	_set_active_context_command("")
 	active_module = "Create"
-	_set_create_submodule_context("Asset")
+	# Keep the asset's Create database view when selecting a component.  Passing
+	# the generic "Asset" label here normalizes to Character and hides Symbols
+	# (and the other non-character asset types) from the Outliner.
+	_set_create_submodule_context(_asset_type_create_submodule(_asset_type(_get_asset(asset_id))))
 	selected_asset_id = asset_id
 	selected_component_id = component_id
 	selected_guide_id = ""
@@ -6970,7 +7090,7 @@ func _select_guide(asset_id: String, guide_id: String) -> void:
 	if guide.is_empty():
 		return
 	active_module = "Create"
-	_set_create_submodule_context("Asset")
+	_set_create_submodule_context(_asset_type_create_submodule(_asset_type(_get_asset(asset_id))))
 	selected_asset_id = asset_id
 	selected_component_id = ""
 	selected_guide_id = guide_id
@@ -10534,6 +10654,10 @@ func _rename_selected_asset(new_name: String) -> void:
 		return
 	_record_direct_change()
 	asset["name"] = asset_name
+	for candidate_asset in assets:
+		for candidate_component in candidate_asset.get("components", []):
+			if _is_reference_component(candidate_component) and str(candidate_component.get("source_asset_id", "")) == selected_asset_id and str(candidate_component.get("name_mode", "manual")) == "auto":
+				candidate_component["name"] = "%s_ref" % asset_name
 	_render_outliner()
 	_render_canvas_context()
 
@@ -10690,6 +10814,16 @@ func _render_canvas_context() -> void:
 		canvas_view.set_bezier_geometry([], [], [])
 		canvas_view.call_deferred("grab_focus")
 		return
+	if _is_reference_component(component):
+		canvas_context_label.text = "Reference: %s" % str(component.get("name", "Reference"))
+		canvas_view.set_context(str(component.get("name", "Reference")))
+		canvas_view.set_interaction_state("transform")
+		canvas_view.set_tool_mode("")
+		canvas_view.set_component_transform(ComponentHierarchy.world_transform_record(asset, selected_component_id))
+		canvas_view.set_reference_shapes(_build_reference_shapes(asset))
+		canvas_view.set_display_polygon([])
+		canvas_view.set_bezier_geometry([], [], [])
+		return
 	canvas_context_label.text = "Component: %s" % str(component["name"])
 	canvas_view.set_context(str(component["name"]))
 	canvas_view.set_interaction_state(active_state)
@@ -10795,6 +10929,9 @@ func _build_reference_shapes(asset: Dictionary, excluded_component_id := "", emp
 			continue
 		if str(component["id"]) == excluded_component_id:
 			continue
+		if _is_reference_component(component):
+			shapes.append_array(_reference_asset_shapes(asset, component, emphasized_component_id))
+			continue
 		var primitive_component := PrimitiveGeometryService.has_circle(component)
 		shapes.append({
 			"id": str(component["id"]),
@@ -10809,6 +10946,33 @@ func _build_reference_shapes(asset: Dictionary, excluded_component_id := "", emp
 			"emphasized": str(component["id"]) == emphasized_component_id
 		})
 	return shapes
+
+
+func _is_reference_component(component: Dictionary) -> bool:
+	return str(component.get("type", "component")) == "reference"
+
+
+func _reference_asset_shapes(target_asset: Dictionary, reference: Dictionary, emphasized_component_id: String) -> Array:
+	var result: Array = []
+	var source_asset := _get_asset(str(reference.get("source_asset_id", "")))
+	if source_asset.is_empty() or source_asset == target_asset:
+		return result
+	var reference_transform := ComponentHierarchy.world_transform_record(target_asset, str(reference.get("id", "")))
+	for source_component in source_asset.get("components", []):
+		if _is_reference_component(source_component) or not bool(source_component.get("visibility", true)):
+			continue
+		var points: Array[Vector2] = []
+		var source_transform := ComponentHierarchy.world_transform_record(source_asset, str(source_component.get("id", "")))
+		var contour := PrimitiveGeometryService.contour(source_component) if PrimitiveGeometryService.has_circle(source_component) else BezierTopology.outer_control_polygon(source_component)
+		for point in contour:
+			points.append(_transform_point(_transform_point(Vector2(point), source_transform), reference_transform))
+		result.append({"id": str(reference.get("id", "")), "points": points, "closed": PrimitiveGeometryService.has_circle(source_component) or BezierTopology.outer_chain_closed(source_component), "transform": _default_component_transform(), "visibility": bool(target_asset.get("visibility", true)) and bool(reference.get("visibility", true)), "z_index": int(reference.get("z_index", 0)), "emphasized": str(reference.get("id", "")) == emphasized_component_id})
+	return result
+
+
+func _transform_point(point: Vector2, transform: Dictionary) -> Vector2:
+	var pivot: Vector2 = transform.get("pivot", Vector2.ZERO)
+	return Vector2(transform.get("position", Vector2.ZERO)) + ((point - pivot) * Vector2(transform.get("scale", Vector2.ONE))).rotated(deg_to_rad(float(transform.get("rotation", 0.0))))
 
 
 func _component_guide_boundaries(component: Dictionary) -> Dictionary:
@@ -11249,7 +11413,7 @@ func _get_asset(asset_id: String) -> Dictionary:
 
 func _normalize_asset_type(value) -> String:
 	var normalized := str(value).strip_edges().to_lower()
-	return normalized if normalized in ["character", "props", "terrain", "icon"] else "character"
+	return normalized if normalized in ["character", "props", "terrain", "icon", "symbols"] else "character"
 
 
 func _asset_type(asset: Dictionary) -> String:
@@ -11268,6 +11432,8 @@ func _asset_type_create_submodule(asset_type: String) -> String:
 			return "Terrain"
 		"icon":
 			return "Icon"
+		"symbols":
+			return "Symbols"
 		_:
 			return "Character"
 

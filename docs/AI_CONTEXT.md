@@ -8,7 +8,7 @@ small and database-oriented.
 
 The left rail is always expanded and exposes exactly these categories:
 
-- `Create`: `Character`, `Props`, `Terrain`, `Icon`
+- `Create`: `Character`, `Props`, `Terrain`, `Icon`, `Symbols`
 - `Mesh`: `Sampling`, `Seeding`, `Meshing`
 - `Style`: `Weighting`
 - `Export`
@@ -20,13 +20,13 @@ categories. Texture and Material authoring are not part of the application.
 
 ## Asset kinds
 
-All four Create modules use the same Asset, Component, Guide, canvas, and
+All five Create modules use the same Asset, Component, Guide, canvas, and
 Inspector implementation. An Asset stores one stable `asset_type` value:
-`character`, `props`, `terrain`, or `icon`. Create views filter the Outliner by
+`character`, `props`, `terrain`, `icon`, or `symbols`. Create views filter the Outliner by
 that value. Documents without an `asset_type` normalize to `character`.
 
 Mesh and Style show a shared multi-select Asset filter above the Outliner
-search field. Character, Props, Terrain, and Icon are checked by default;
+search field. Character, Props, Terrain, Icon, and Symbols are checked by default;
 search text and checked types are combined. The filter is an editor-state
 preference, not a document mutation.
 

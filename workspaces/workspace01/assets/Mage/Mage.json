@@ -426,6 +426,7 @@
 			],
 			"id": "component_11",
 			"name": "Hat",
+			"name_mode": "manual",
 			"parent_component_id": "",
 			"points": [
 				{
@@ -864,6 +865,7 @@
 			"primitive": {},
 			"ribbon_width_px": 8.0,
 			"show_point_numbers": false,
+			"source_asset_id": "",
 			"transform": {
 				"pivot": [
 					0.0,
@@ -879,6 +881,7 @@
 					1.0
 				]
 			},
+			"type": "component",
 			"visibility": true,
 			"z_index": 0
 		},
@@ -1045,6 +1048,7 @@
 			],
 			"id": "component_12",
 			"name": "HatTip",
+			"name_mode": "manual",
 			"parent_component_id": "component_11",
 			"points": [
 				{
@@ -1375,6 +1379,7 @@
 			"primitive": {},
 			"ribbon_width_px": 8.0,
 			"show_point_numbers": false,
+			"source_asset_id": "",
 			"transform": {
 				"pivot": [
 					0.0,
@@ -1390,6 +1395,7 @@
 					1.0
 				]
 			},
+			"type": "component",
 			"visibility": true,
 			"z_index": 1
 		},
@@ -1567,6 +1573,7 @@
 			],
 			"id": "component_13",
 			"name": "Head",
+			"name_mode": "manual",
 			"parent_component_id": "",
 			"points": [
 				{
@@ -1897,6 +1904,7 @@
 			"primitive": {},
 			"ribbon_width_px": 8.0,
 			"show_point_numbers": false,
+			"source_asset_id": "",
 			"transform": {
 				"pivot": [
 					0.0,
@@ -1912,6 +1920,7 @@
 					1.0
 				]
 			},
+			"type": "component",
 			"visibility": true,
 			"z_index": 0
 		},
@@ -2014,6 +2023,7 @@
 			],
 			"id": "component_14",
 			"name": "EyeL",
+			"name_mode": "manual",
 			"parent_component_id": "component_13",
 			"points": [
 				{
@@ -2200,6 +2210,7 @@
 			"primitive": {},
 			"ribbon_width_px": 8.0,
 			"show_point_numbers": true,
+			"source_asset_id": "",
 			"transform": {
 				"pivot": [
 					-0.264999985694885,
@@ -2215,6 +2226,7 @@
 					1.29999995231628
 				]
 			},
+			"type": "component",
 			"visibility": true,
 			"z_index": 0
 		},
@@ -2317,6 +2329,7 @@
 			],
 			"id": "component_15",
 			"name": "EyeR",
+			"name_mode": "manual",
 			"parent_component_id": "component_13",
 			"points": [
 				{
@@ -2503,6 +2516,7 @@
 			"primitive": {},
 			"ribbon_width_px": 8.0,
 			"show_point_numbers": true,
+			"source_asset_id": "",
 			"transform": {
 				"pivot": [
 					-0.264999985694885,
@@ -2518,6 +2532,7 @@
 					1.29999995231628
 				]
 			},
+			"type": "component",
 			"visibility": true,
 			"z_index": 0
 		},
@@ -2711,6 +2726,7 @@
 			],
 			"id": "component_16",
 			"name": "Body",
+			"name_mode": "manual",
 			"parent_component_id": "",
 			"points": [
 				{
@@ -3077,6 +3093,7 @@
 			"primitive": {},
 			"ribbon_width_px": 8.0,
 			"show_point_numbers": false,
+			"source_asset_id": "",
 			"transform": {
 				"pivot": [
 					0.0,
@@ -3092,6 +3109,7 @@
 					1.0
 				]
 			},
+			"type": "component",
 			"visibility": true,
 			"z_index": 0
 		},
@@ -3147,6 +3165,7 @@
 			],
 			"id": "component_17",
 			"name": "ArmLine",
+			"name_mode": "manual",
 			"parent_component_id": "component_16",
 			"points": [
 				{
@@ -3243,6 +3262,7 @@
 			"primitive": {},
 			"ribbon_width_px": 8.0,
 			"show_point_numbers": false,
+			"source_asset_id": "",
 			"transform": {
 				"pivot": [
 					0.0,
@@ -3258,6 +3278,7 @@
 					1.0
 				]
 			},
+			"type": "component",
 			"visibility": true,
 			"z_index": 0
 		}

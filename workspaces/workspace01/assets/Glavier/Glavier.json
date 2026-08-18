@@ -309,6 +309,7 @@
 			],
 			"id": "component_18",
 			"name": "Head",
+			"name_mode": "manual",
 			"parent_component_id": "",
 			"points": [
 				{
@@ -459,6 +460,7 @@
 			"primitive": {},
 			"ribbon_width_px": 8.0,
 			"show_point_numbers": true,
+			"source_asset_id": "",
 			"transform": {
 				"pivot": [
 					0.0,
@@ -474,6 +476,7 @@
 					1.0
 				]
 			},
+			"type": "component",
 			"visibility": true,
 			"z_index": 0
 		},
@@ -520,6 +523,7 @@
 			],
 			"id": "component_19",
 			"name": "HeadTip",
+			"name_mode": "manual",
 			"parent_component_id": "",
 			"points": [
 				{
@@ -580,6 +584,7 @@
 			"primitive": {},
 			"ribbon_width_px": 8.0,
 			"show_point_numbers": false,
+			"source_asset_id": "",
 			"transform": {
 				"pivot": [
 					0.0,
@@ -595,6 +600,7 @@
 					1.0
 				]
 			},
+			"type": "component",
 			"visibility": true,
 			"z_index": 0
 		},
@@ -641,6 +647,7 @@
 			],
 			"id": "component_20",
 			"name": "EyeR",
+			"name_mode": "manual",
 			"parent_component_id": "component_18",
 			"points": [
 				{
@@ -701,6 +708,7 @@
 			"primitive": {},
 			"ribbon_width_px": 8.0,
 			"show_point_numbers": false,
+			"source_asset_id": "",
 			"transform": {
 				"pivot": [
 					0.75,
@@ -716,6 +724,7 @@
 					1.0
 				]
 			},
+			"type": "component",
 			"visibility": true,
 			"z_index": 0
 		},
@@ -762,6 +771,7 @@
 			],
 			"id": "component_21",
 			"name": "EyeL",
+			"name_mode": "manual",
 			"parent_component_id": "component_18",
 			"points": [
 				{
@@ -822,6 +832,7 @@
 			"primitive": {},
 			"ribbon_width_px": 8.0,
 			"show_point_numbers": false,
+			"source_asset_id": "",
 			"transform": {
 				"pivot": [
 					0.75,
@@ -837,6 +848,7 @@
 					-1.0
 				]
 			},
+			"type": "component",
 			"visibility": true,
 			"z_index": 0
 		},
@@ -934,6 +946,7 @@
 			],
 			"id": "component_22",
 			"name": "Body",
+			"name_mode": "manual",
 			"parent_component_id": "",
 			"points": [
 				{
@@ -1084,6 +1097,7 @@
 			"primitive": {},
 			"ribbon_width_px": 8.0,
 			"show_point_numbers": false,
+			"source_asset_id": "",
 			"transform": {
 				"pivot": [
 					0.0,
@@ -1099,6 +1113,7 @@
 					1.0
 				]
 			},
+			"type": "component",
 			"visibility": true,
 			"z_index": 0
 		},
@@ -1196,6 +1211,7 @@
 			],
 			"id": "component_23",
 			"name": "Belly",
+			"name_mode": "manual",
 			"parent_component_id": "component_22",
 			"points": [
 				{
@@ -1346,6 +1362,7 @@
 			"primitive": {},
 			"ribbon_width_px": 8.0,
 			"show_point_numbers": false,
+			"source_asset_id": "",
 			"transform": {
 				"pivot": [
 					0.0,
@@ -1361,6 +1378,7 @@
 					1.0
 				]
 			},
+			"type": "component",
 			"visibility": true,
 			"z_index": 0
 		}
