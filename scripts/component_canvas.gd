@@ -1169,8 +1169,10 @@ func _draw_reference_shapes() -> void:
 		var transform: Dictionary = shape.get("transform", {})
 		var closed := bool(shape.get("closed", points.size() >= 3))
 		var emphasized := bool(shape.get("emphasized", false))
-		var reference_color := Color("#55c7d9") if emphasized else Color("#55c7d966")
-		var reference_width := 2.5 if emphasized else 2.0
+		var is_hole := str(shape.get("topology_role", "outer")) == "hole"
+		var role_color := Color("#ef6c78") if is_hole else Color("#55c7d9")
+		var reference_color := role_color if emphasized else Color(role_color.r, role_color.g, role_color.b, 0.4)
+		var reference_width := 3.5 if emphasized else 2.0
 		var edge_count := points.size() if closed and points.size() >= 3 else maxi(points.size() - 1, 0)
 		for index in range(edge_count):
 			var next_index := (index + 1) % points.size()
@@ -1190,8 +1192,10 @@ func _draw_reference_bezier_shape(shape: Dictionary, points: Array, edges: Array
 		if edge_data is Dictionary:
 			edges_by_id[str(edge_data.get("id", ""))] = edge_data
 	var emphasized := bool(shape.get("emphasized", false))
-	var reference_color := Color("#55c7d9") if emphasized else Color("#55c7d966")
-	var reference_width := 2.5 if emphasized else 2.0
+	var is_hole := str(shape.get("topology_role", "outer")) == "hole"
+	var role_color := Color("#ef6c78") if is_hole else Color("#55c7d9")
+	var reference_color := role_color if emphasized else Color(role_color.r, role_color.g, role_color.b, 0.4)
+	var reference_width := 3.5 if emphasized else 2.0
 	for chain_data in chains:
 		if not chain_data is Dictionary:
 			continue

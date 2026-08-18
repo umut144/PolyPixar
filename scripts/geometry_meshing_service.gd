@@ -52,6 +52,7 @@ static func generate(sampling_bake: Dictionary, seeding_bake: Dictionary, raw_re
 	if not bool(triangulation.get("valid", false)):
 		return _failed_result(sampling_bake, seeding_bake, recipe, triangulation.get("errors", []))
 	var triangles: Array = triangulation.get("triangles", [])
+	_duplicate_cut_seam_vertices(vertices, triangles, constraints)
 	if str(recipe["method"]) == ORGANIC_RELAXED:
 		for _pass_index in range(int(recipe["parameters"]["passes"])):
 			_relax_interior_vertices(vertices, triangles, sampling_bake, float(recipe["parameters"]["relaxation"]))
@@ -143,6 +144,22 @@ static func _source_vertices(sampling_bake: Dictionary, seeding_bake: Dictionary
 				"source_id": str(seed_data.get("id", "")),
 				"preserved": false
 			})
+	for cut in sampling_bake.get("cuts", []):
+		if not cut is Dictionary or not bool(cut.get("valid", false)):
+			continue
+		for sample in cut.get("samples", []):
+			if not sample is Dictionary:
+				continue
+			var position := Vector2(sample.get("position", Vector2.ZERO))
+			var vertex_id := ""
+			for existing in vertices:
+				if Vector2(existing.get("position", Vector2.ZERO)).distance_squared_to(position) <= EPSILON * EPSILON:
+					vertex_id = str(existing.get("id", ""))
+					break
+			if vertex_id.is_empty():
+				vertex_id = "vertex:cut:%s" % str(sample.get("id", ""))
+				vertices.append({"id": vertex_id, "position": position, "origin": "cut", "source_id": str(sample.get("id", "")), "preserved": true})
+			sample["vertex_id"] = vertex_id
 	return vertices
 
 
@@ -161,7 +178,53 @@ static func _boundary_constraints(sampling_bake: Dictionary) -> Array:
 					"vertex:boundary:%s" % str(samples[(sample_index + 1) % samples.size()].get("id", ""))
 				]
 			})
+	for cut in sampling_bake.get("cuts", []):
+		if not cut is Dictionary or not bool(cut.get("valid", false)):
+			continue
+		var samples: Array = cut.get("samples", [])
+		for sample_index in range(samples.size() - 1):
+			var first_id := str(samples[sample_index].get("vertex_id", ""))
+			var second_id := str(samples[sample_index + 1].get("vertex_id", ""))
+			if not first_id.is_empty() and not second_id.is_empty() and first_id != second_id:
+				constraints.append({"chain_id": "cut:%s" % str(cut.get("guide_id", "")), "topology_role": "cut", "vertex_ids": [first_id, second_id]})
 	return constraints
+
+
+static func _duplicate_cut_seam_vertices(vertices: Array, triangles: Array, constraints: Array) -> void:
+	var positions: Dictionary = {}
+	for vertex in vertices:
+		positions[str(vertex.get("id", ""))] = Vector2(vertex.get("position", Vector2.ZERO))
+	var duplicate_by_source: Dictionary = {}
+	for constraint in constraints:
+		if str(constraint.get("topology_role", "")) != "cut":
+			continue
+		var ids: Array = constraint.get("vertex_ids", [])
+		if ids.size() != 2:
+			continue
+		var first_id := str(ids[0])
+		var second_id := str(ids[1])
+		var first: Vector2 = positions.get(first_id, Vector2.ZERO)
+		var second: Vector2 = positions.get(second_id, Vector2.ZERO)
+		var affected: Array = []
+		for triangle in triangles:
+			var triangle_ids: Array = triangle.get("vertex_ids", [])
+			if first_id not in triangle_ids or second_id not in triangle_ids:
+				continue
+			var centroid := Vector2.ZERO
+			for triangle_id in triangle_ids:
+				centroid += positions.get(str(triangle_id), Vector2.ZERO)
+			centroid /= float(triangle_ids.size())
+			if (second - first).cross(centroid - first) > EPSILON:
+				affected.append(triangle)
+		for triangle in affected:
+			var triangle_ids: Array = triangle.get("vertex_ids", [])
+			for vertex_id in [first_id, second_id]:
+				if not duplicate_by_source.has(vertex_id):
+					var duplicate_id := "%s:seam" % vertex_id
+					duplicate_by_source[vertex_id] = duplicate_id
+					vertices.append({"id": duplicate_id, "position": positions[vertex_id], "origin": "cut_seam", "source_id": vertex_id, "preserved": true})
+				triangle_ids[triangle_ids.find(vertex_id)] = duplicate_by_source[vertex_id]
+			triangle["vertex_ids"] = triangle_ids
 
 
 static func _triangulate(vertices: Array, constraints: Array, sampling_bake: Dictionary) -> Dictionary:

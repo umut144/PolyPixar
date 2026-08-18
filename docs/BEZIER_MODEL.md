@@ -47,6 +47,11 @@ For an open Chain, `edge_ids.size() == point_ids.size() - 1`. For a closed
 Chain, both sizes are equal and the final Edge connects the last Point to the
 first. A closed Chain requires at least three Points.
 
+Closed-loop Components also store `topology_role: outer | hole`. New Closed
+Loops default to `outer`; changing a Component to `hole` updates its closed
+contour Chain role as well. Symbol References own this role independently from
+the referenced Symbol.
+
 ## Closed Loop drafts
 
 Closed Loop validation requires exactly one closed Chain. While authoring, a

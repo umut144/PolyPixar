@@ -35,7 +35,7 @@ static func normalize_recipe(raw_recipe) -> Dictionary:
 	return recipe
 
 
-static func generate(component: Dictionary, raw_recipe = {}) -> Dictionary:
+static func generate(component: Dictionary, raw_recipe = {}, cut_guides: Array = []) -> Dictionary:
 	var recipe := normalize_recipe(raw_recipe)
 	var allow_open := bool(raw_recipe.get("allow_open", false)) if raw_recipe is Dictionary else false
 	if PrimitiveGeometryService.has_circle(component):
@@ -45,7 +45,7 @@ static func generate(component: Dictionary, raw_recipe = {}) -> Dictionary:
 			samples.append({"id": "primitive:circle:%d" % index, "position": contour[index], "source_point_id": "", "preserved": false})
 		return {
 			"valid": true, "errors": [], "method": recipe["method"], "parameters": recipe["parameters"].duplicate(true),
-			"source_fingerprint": source_fingerprint(component), "chains": [{"chain_id": "primitive:circle", "topology_role": "outer", "closed": true, "samples": samples}],
+			"source_fingerprint": source_fingerprint(component, cut_guides), "chains": [{"chain_id": "primitive:circle", "topology_role": "outer", "closed": true, "samples": samples}], "cuts": [],
 			"sample_count": samples.size(), "preserve_count": 0
 		}
 	var working_component := component.duplicate(true)
@@ -74,20 +74,27 @@ static func generate(component: Dictionary, raw_recipe = {}) -> Dictionary:
 			"samples": samples
 		})
 	if not errors.is_empty():
-		return _failed_result(recipe, errors, source_fingerprint(component))
+		return _failed_result(recipe, errors, source_fingerprint(component, cut_guides))
+	var cuts := _sample_cut_guides(cut_guides, recipe)
+	for cut in cuts:
+		if not bool(cut.get("valid", false)):
+			errors.append_array(cut.get("errors", []))
+	if not errors.is_empty():
+		return _failed_result(recipe, errors, source_fingerprint(component, cut_guides))
 	return {
 		"valid": true,
 		"errors": [],
 		"method": recipe["method"],
 		"parameters": recipe["parameters"].duplicate(true),
-		"source_fingerprint": source_fingerprint(component),
+		"source_fingerprint": source_fingerprint(component, cut_guides),
 		"chains": sampled_chains,
+		"cuts": cuts,
 		"sample_count": sample_count,
 		"preserve_count": preserved_ids.size()
 	}
 
 
-static func source_fingerprint(component: Dictionary) -> String:
+static func source_fingerprint(component: Dictionary, cut_guides: Array = []) -> String:
 	var parts: PackedStringArray = []
 	for point_data in component.get("points", []):
 		if not point_data is Dictionary:
@@ -111,6 +118,9 @@ static func source_fingerprint(component: Dictionary) -> String:
 				str(chain_data.get("topology_role", "outer"))
 			])
 	parts.append("draw_mode|%s" % str(component.get("draw_mode", "closed_loop")))
+	for guide in cut_guides:
+		if guide is Dictionary:
+			parts.append("cut|%s|%s" % [str(guide.get("id", "")), source_fingerprint(guide)])
 	if PrimitiveGeometryService.has_circle(component):
 		var primitive_center := PrimitiveGeometryService.center(component)
 		parts.append("primitive|circle|%.9f|%.9f|%.9f" % [
@@ -123,6 +133,29 @@ static func source_fingerprint(component: Dictionary) -> String:
 	hashing_context.start(HashingContext.HASH_SHA256)
 	hashing_context.update("\n".join(parts).to_utf8_buffer())
 	return hashing_context.finish().hex_encode()
+
+
+static func _sample_cut_guides(cut_guides: Array, recipe: Dictionary) -> Array:
+	var results: Array = []
+	for guide in cut_guides:
+		if not guide is Dictionary:
+			continue
+		var chains: Array = guide.get("chains", [])
+		if str(guide.get("guide_type", "")) != AssetGuide.CUT or chains.size() != 1:
+			continue
+		var sampled := _sample_chain(guide, chains[0], recipe)
+		if not bool(sampled.get("valid", false)):
+			results.append({"valid": false, "errors": sampled.get("errors", []), "guide_id": str(guide.get("id", "")), "samples": []})
+			continue
+		var samples: Array = []
+		for sample_index in range(sampled.get("samples", []).size()):
+			var source_sample: Dictionary = sampled["samples"][sample_index]
+			var cut_sample := source_sample.duplicate(true)
+			cut_sample["id"] = "cut:%s:%d" % [str(guide.get("id", "")), sample_index]
+			cut_sample["guide_id"] = str(guide.get("id", ""))
+			samples.append(cut_sample)
+		results.append({"valid": true, "errors": [], "guide_id": str(guide.get("id", "")), "samples": samples})
+	return results
 
 
 static func _validation_issues(component: Dictionary, allow_open := false) -> Array[String]:

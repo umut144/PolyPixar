@@ -721,6 +721,7 @@
 			"ribbon_width_px": 8.0,
 			"show_point_numbers": false,
 			"source_asset_id": "",
+			"topology_role": "outer",
 			"transform": {
 				"pivot": [
 					0.0,
@@ -819,7 +820,7 @@
 			"id": "component_56",
 			"name": "Trapez",
 			"name_mode": "manual",
-			"parent_component_id": "component_55",
+			"parent_component_id": "",
 			"points": [
 				{
 					"handle_in": [
@@ -934,6 +935,7 @@
 			"ribbon_width_px": 8.0,
 			"show_point_numbers": false,
 			"source_asset_id": "",
+			"topology_role": "outer",
 			"transform": {
 				"pivot": [
 					0.0,
@@ -952,9 +954,117 @@
 			"type": "component",
 			"visibility": true,
 			"z_index": 0
+		},
+		{
+			"catch_parent_component_id": "",
+			"chains": [],
+			"contour_width_px": 8.0,
+			"draw_mode": "closed_loop",
+			"edges": [],
+			"id": "component_58",
+			"name": "Orb_ref",
+			"name_mode": "auto",
+			"parent_component_id": "component_55",
+			"points": [],
+			"primitive": {},
+			"ribbon_width_px": 8.0,
+			"show_point_numbers": false,
+			"source_asset_id": "asset_7",
+			"topology_role": "hole",
+			"transform": {
+				"pivot": [
+					0.0,
+					0.0
+				],
+				"position": [
+					0.0,
+					5.55000019073486
+				],
+				"rotation": 0.0,
+				"scale": [
+					1.0,
+					1.0
+				]
+			},
+			"type": "reference",
+			"visibility": true,
+			"z_index": 0
 		}
 	],
-	"guides": [],
+	"guides": [
+		{
+			"chains": [
+				{
+					"closed": false,
+					"edge_ids": [
+						"edge_7338650747584170902"
+					],
+					"id": "chain_9099242778418822093",
+					"point_ids": [
+						"point_9057481007500264664",
+						"point_5995034640713391399"
+					],
+					"topology_role": "outer"
+				}
+			],
+			"edges": [
+				{
+					"end_point_id": "point_5995034640713391399",
+					"id": "edge_7338650747584170902",
+					"render_outline": true,
+					"start_point_id": "point_9057481007500264664"
+				}
+			],
+			"guide_type": "cut",
+			"id": "guide_1",
+			"name": "Cut 01",
+			"ordinal": 1,
+			"points": [
+				{
+					"handle_in": [
+						0.0,
+						0.0
+					],
+					"handle_out": [
+						0.0,
+						2.60000014305115
+					],
+					"handle_source": "auto",
+					"id": "point_9057481007500264664",
+					"mode": "aligned",
+					"position": [
+						0.0,
+						1.95000004768372
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.0,
+						-2.60000014305115
+					],
+					"handle_out": [
+						0.0,
+						0.0
+					],
+					"handle_source": "auto",
+					"id": "point_5995034640713391399",
+					"mode": "aligned",
+					"position": [
+						0.0,
+						9.75
+					],
+					"preserve_point": false
+				}
+			],
+			"scope": {
+				"component_id": "component_55",
+				"kind": "component"
+			},
+			"type": "guide",
+			"visibility": true
+		}
+	],
 	"id": "asset_9",
 	"name": "Barde",
 	"reference_image": {

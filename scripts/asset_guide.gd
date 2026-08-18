@@ -4,10 +4,11 @@ extends RefCounted
 const FLOW := "flow"
 const SAMPLE := "sample"
 const MOTION := "motion"
+const CUT := "cut"
 const BODY_FLOW := FLOW
 const SAMPLER_SPINE := SAMPLE
 const ANIMATION_SPINE := MOTION
-const VALID_TYPES := [FLOW, SAMPLE, MOTION]
+const VALID_TYPES := [FLOW, SAMPLE, MOTION, CUT]
 const FLOW_COLOR := Color("#4267b2")
 const SAMPLE_COLOR := Color("#f2c94c")
 const MOTION_COLOR := Color("#c084fc")
@@ -67,6 +68,8 @@ static func display_name(guide_type: String) -> String:
 		return "Flow"
 	if normalized_type == MOTION:
 		return "Motion"
+	if normalized_type == CUT:
+		return "Cut"
 	return "Sample"
 
 
@@ -76,6 +79,8 @@ static func canonical_type(guide_type: String) -> String:
 			return FLOW
 		MOTION, "animation_spine":
 			return MOTION
+		CUT:
+			return CUT
 		SAMPLE, "sampler_spine":
 			return SAMPLE
 	return SAMPLE
@@ -91,6 +96,8 @@ static func color(guide_type: String) -> Color:
 			return FLOW_COLOR
 		MOTION:
 			return MOTION_COLOR
+		CUT:
+			return Color("#ef6c78")
 	return SAMPLE_COLOR
 
 

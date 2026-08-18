@@ -187,10 +187,15 @@ static func mode_validation_issues(component: Dictionary, complete := true) -> A
 		return errors
 	var draw_mode := str(component.get("draw_mode", "closed_loop"))
 	if draw_mode == "closed_loop":
+		var topology_role := str(component.get("topology_role", "outer"))
+		if topology_role not in ["outer", "hole"]:
+			topology_role = "outer"
 		if chains.size() != 1:
 			errors.append("Closed Loop requires one final closed Chain.")
 		else:
 			var chain: Dictionary = chains[0]
+			if str(chain.get("topology_role", "outer")) != topology_role:
+				errors.append("Closed Loop chain role must be %s." % topology_role)
 			if not bool(chain.get("closed", false)) or chain.get("point_ids", []).size() < 3:
 				errors.append("Closed Loop requires one closed Chain with at least three Points.")
 	elif draw_mode in ["open_edge", "ribbon"]:

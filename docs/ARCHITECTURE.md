@@ -42,6 +42,11 @@ primitive contours, samples, fill, and hit-test polygons are derived and are
 never persisted. Do not add `outer_shape`, Component-level `closed`, the old
 Line tool, or synchronization from a display polygon back into source geometry.
 
+Closed-loop Components also carry a persisted `topology_role`: `outer` by
+default or `hole` when authored as a hole. A Symbol Reference owns its role
+independently from the referenced Symbol, so the reference may be `hole` while
+the source Symbol remains `outer`.
+
 ## Documents
 
 An Asset contains:
@@ -86,6 +91,9 @@ Component hierarchy becomes nested `Node2D` nodes. Closed-loop geometry is
 derived from Bézier topology, while primitive geometry is derived from its
 typed definition. Ribbon geometry uses a matching accepted Ribbon mesh. Open
 edges do not emit fill geometry.
+Exported Component nodes preserve `topology_role` metadata. For Symbol
+References, the reference node preserves its selected role and expanded source
+Components preserve their own roles independently.
 
 ## Testing
 

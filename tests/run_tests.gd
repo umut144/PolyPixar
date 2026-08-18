@@ -337,7 +337,7 @@ func _test_geometry_sampling_ui_shell() -> void:
 	application._activate_geometry_sampling_method_choice()
 	_expect(application.geometry_sampling_method_choice_active and not application.geometry_method_menu.get_popup().visible, "Sampling CMD+1 should enter a keyboard Method choice state without opening the mouse dropdown.")
 	var sampling_active_style := application.geometry_method_menu.get_theme_stylebox("normal") as StyleBoxFlat
-	_expect(sampling_active_style != null and sampling_active_style.bg_color == Color("#783943") and not application.geometry_method_menu.flat, "An active Sampling Method MenuButton should render the shared red background in its normal state.")
+	_expect(sampling_active_style != null and sampling_active_style.bg_color == Color("#8fd8f5") and not application.geometry_method_menu.flat, "An active Sampling Method MenuButton should render the shared light-blue background in its normal state.")
 	application._set_geometry_sampling_method(GeometrySamplingService.EVEN_SPACING)
 	_expect(application.geometry_sampling_method_choice_active and str(application._geometry_sampling_recipe("asset_1", "component_1").get("method", "")) == GeometrySamplingService.EVEN_SPACING, "Sampling Method state should remain active after its plain-number selection.")
 	var spacing_input := SpinBox.new()
@@ -480,7 +480,7 @@ func _test_geometry_seeding_service() -> void:
 	application._activate_geometry_seeding_method_choice()
 	_expect(application.geometry_seeding_method_choice_active and not application.geometry_seeding_method_menu.get_popup().visible, "Seeding CMD+1 should enter a keyboard Method choice state without opening the mouse dropdown.")
 	var seeding_active_style := application.geometry_seeding_method_menu.get_theme_stylebox("normal") as StyleBoxFlat
-	_expect(seeding_active_style != null and seeding_active_style.bg_color == Color("#783943") and not application.geometry_seeding_method_menu.flat, "An active Seeding Method MenuButton should render the shared red background in its normal state.")
+	_expect(seeding_active_style != null and seeding_active_style.bg_color == Color("#8fd8f5") and not application.geometry_seeding_method_menu.flat, "An active Seeding Method MenuButton should render the shared light-blue background in its normal state.")
 	application._set_geometry_seeding_method(GeometrySeedingService.SPINE_FLOW)
 	_expect(application.geometry_seeding_method_choice_active and not application.geometry_seeding_edit_active and str(application._geometry_seeding_recipe("asset_1", "component_1").get("method", "")) == GeometrySeedingService.SPINE_FLOW, "Seeding Method state should remain active and exclude Edit Seeds after its plain-number selection.")
 	application._set_geometry_seeding_method(GeometrySeedingService.POISSON_FILL)
@@ -620,7 +620,7 @@ func _test_geometry_meshing_service_and_ui() -> void:
 	_expect(str(component_mesh_round_trip.get("component_mesh", {}).get("bake_id", "")) == "mesh_cdt_test", "Component Mesh selection should survive Geometry document persistence.")
 	application._activate_geometry_meshing_method_choice()
 	var active_style := application.geometry_meshing_method_menu.get_theme_stylebox("normal") as StyleBoxFlat
-	_expect(application.active_context_command == "geometry.meshing.method" and application.geometry_meshing_method_choice_active and active_style != null and active_style.bg_color == Color("#783943"), "Meshing CMD+1 should use the shared exclusive Method command state and red highlight.")
+	_expect(application.active_context_command == "geometry.meshing.method" and application.geometry_meshing_method_choice_active and active_style != null and active_style.bg_color == Color("#8fd8f5"), "Meshing CMD+1 should use the shared exclusive Method command state and highlight.")
 	application._set_geometry_meshing_method(GeometryMeshingService.ORGANIC_RELAXED)
 	_expect(application.selected_geometry_bake_method == GeometryMeshingService.ORGANIC_RELAXED and application._geometry_meshing_status("asset_1", "component_1", component) == "Baked", "Selecting Organic Relaxed should select its matching persistent Bake.")
 	application._set_geometry_meshing_method(GeometryMeshingService.CONSTRAINED_DELAUNAY)
@@ -695,7 +695,7 @@ func _test_geometry_uv_mapping_service_and_ui() -> void:
 	_expect(application.geometry_uv_mapping_workspace.visible and application.inspector_content.get_child_count() >= 14, "UV Mapping should expose its dedicated split Workspace and compact Bounds / Planar Inspector.")
 	application._activate_geometry_uv_mapping_method_choice()
 	var active_style := application.geometry_uv_mapping_method_menu.get_theme_stylebox("normal") as StyleBoxFlat
-	_expect(application.active_context_command == "geometry.uv_mapping.method" and application.geometry_uv_mapping_method_choice_active and active_style != null and active_style.bg_color == Color("#783943"), "UV Mapping CMD+1 should use the shared exclusive Method state and red highlight.")
+	_expect(application.active_context_command == "geometry.uv_mapping.method" and application.geometry_uv_mapping_method_choice_active and active_style != null and active_style.bg_color == Color("#8fd8f5"), "UV Mapping CMD+1 should use the shared exclusive Method state and highlight.")
 	application._set_geometry_uv_mapping_method(GeometryUVMappingService.BOUNDS_PLANAR)
 	_expect(application.selected_geometry_bake_method == uv_key and application._geometry_uv_mapping_status("asset_1", "component_1", component) == "Baked", "Selecting Bounds / Planar should select the matching Mesh-specific UV Bake.")
 	application._on_geometry_uv_mapping_checker_overlay_changed(false)
@@ -927,7 +927,7 @@ func _test_asset_guides() -> void:
 	application._activate_guide_draw_state()
 	application._on_bezier_point_added(Vector2(15.0, 5.0), "aligned", Vector2.ZERO)
 	_expect(application.active_state == "draw" and Vector2(flow_guide.get("points", [])[0].get("position", Vector2.ZERO)).is_equal_approx(Vector2(10.0, 5.0)), "Flow Guides should catch Draw Guide Points on their parent Component contour just like Sample Guides.")
-	_expect(application.component_add_child_menu.item_count == 4 and application.component_add_guide_menu.item_count == 3, "Every Component add menu should expose all four Child draw modes and all three Guide types.")
+	_expect(application.component_add_child_menu.item_count == 4 and application.component_add_guide_menu.item_count == 4, "Every Component add menu should expose all four Child draw modes and all four Guide types.")
 	parent_component["transform"] = {"position": Vector2(-3.0, 2.0), "rotation": 20.0, "scale": Vector2(1.0, 1.5), "pivot": Vector2.ZERO}
 	parent_component["name"] = "EyeBrowL"
 	child_component["name"] = "EyeL"

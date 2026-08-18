@@ -213,27 +213,20 @@
 		0.0,
 		0.0
 	],
-	"asset_type": "symbols",
+	"asset_type": "props",
 	"components": [
 		{
 			"catch_parent_component_id": "",
 			"chains": [],
 			"contour_width_px": 8.0,
-			"draw_mode": "primitive",
+			"draw_mode": "closed_loop",
 			"edges": [],
-			"id": "component_53",
-			"name": "orb",
+			"id": "component_57",
+			"name": "Trunk",
 			"name_mode": "manual",
 			"parent_component_id": "",
 			"points": [],
-			"primitive": {
-				"center": [
-					0.0,
-					0.0
-				],
-				"diameter_cm": 20.0,
-				"type": "circle"
-			},
+			"primitive": {},
 			"ribbon_width_px": 8.0,
 			"show_point_numbers": false,
 			"source_asset_id": "",
@@ -259,8 +252,8 @@
 		}
 	],
 	"guides": [],
-	"id": "asset_7",
-	"name": "Orb",
+	"id": "asset_10",
+	"name": "Tree",
 	"reference_image": {
 		"file": "",
 		"opacity": 0.5,
