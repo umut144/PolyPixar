@@ -11,6 +11,8 @@ const BACKGROUND := Color("#1b1e24")
 const GRID_MINOR := Color("#252a33")
 const GRID_MAJOR := Color("#303744")
 const BOUNDARY_COLOR := Color("#7b8492")
+const HOLE_COLOR := Color("#ef6c78")
+const CUT_COLOR := Color("#ff7f8d")
 const GUIDE_COLOR := Color("#f2c94c")
 const GENERATED_COLOR := Color("#68d391")
 const MANUAL_COLOR := Color("#ef8354")
@@ -18,7 +20,8 @@ const ADJUSTED_COLOR := Color("#63b3ed")
 
 var sampling_bake: Dictionary = {}
 var seeding_result: Dictionary = {}
-var sampler_spine: Dictionary = {}
+var sampler_spines: Array[Dictionary] = []
+var selected_input_id := ""
 var status := "Sampling Required"
 var editing_enabled := false
 var edit_tool := "select"
@@ -36,11 +39,12 @@ func _ready() -> void:
 	queue_redraw()
 
 
-func set_context(sampling_data: Dictionary, seeding_data: Dictionary, guide_data: Dictionary, status_value: String, can_edit: bool, tool: String) -> void:
+func set_context(sampling_data: Dictionary, seeding_data: Dictionary, guide_data: Array[Dictionary], status_value: String, can_edit: bool, tool: String, selected_input := "") -> void:
 	var boundary_changed := sampling_bake != sampling_data
 	sampling_bake = sampling_data.duplicate(true)
 	seeding_result = seeding_data.duplicate(true)
-	sampler_spine = guide_data.duplicate(true)
+	sampler_spines = guide_data.duplicate(true)
+	selected_input_id = selected_input
 	status = status_value
 	editing_enabled = can_edit
 	edit_tool = tool if tool in ["select", "add", "remove"] else "select"
@@ -55,7 +59,8 @@ func set_context(sampling_data: Dictionary, seeding_data: Dictionary, guide_data
 func clear_context() -> void:
 	sampling_bake = {}
 	seeding_result = {}
-	sampler_spine = {}
+	sampler_spines = []
+	selected_input_id = ""
 	status = "Sampling Required"
 	editing_enabled = false
 	selected_seed_id = ""
@@ -172,6 +177,10 @@ func _fit_boundary() -> void:
 		for sample in chain_data.get("samples", []):
 			if sample is Dictionary:
 				positions.append(Vector2(sample.get("position", Vector2.ZERO)))
+	for cut_data in sampling_bake.get("cuts", []):
+		for sample in cut_data.get("samples", []):
+			if sample is Dictionary:
+				positions.append(Vector2(sample.get("position", Vector2.ZERO)))
 	if positions.is_empty():
 		camera_position = Vector2.ZERO
 		camera_zoom = 1.0
@@ -192,6 +201,10 @@ func _draw_boundaries() -> void:
 		var samples: Array = chain_data.get("samples", [])
 		if samples.size() < 2:
 			continue
+		var role := str(chain_data.get("topology_role", "outer"))
+		var input_id := str(chain_data.get("input_id", ""))
+		var color := HOLE_COLOR if role == "hole" else BOUNDARY_COLOR
+		var width := 3.0 if not input_id.is_empty() and input_id == selected_input_id else 1.5
 		for sample_index in range(samples.size()):
 			var current := _to_screen(Vector2(samples[sample_index].get("position", Vector2.ZERO)))
 			var next_index := sample_index + 1
@@ -200,19 +213,29 @@ func _draw_boundaries() -> void:
 					continue
 				next_index = 0
 			var next := _to_screen(Vector2(samples[next_index].get("position", Vector2.ZERO)))
-			draw_line(current, next, BOUNDARY_COLOR, 1.5, true)
+			draw_line(current, next, color, width, true)
+	for cut_data in sampling_bake.get("cuts", []):
+		if not cut_data is Dictionary or not bool(cut_data.get("valid", false)):
+			continue
+		var samples: Array = cut_data.get("samples", [])
+		var guide_id := str(cut_data.get("guide_id", ""))
+		var width := 3.0 if guide_id == selected_input_id else 1.5
+		for sample_index in range(samples.size() - 1):
+			draw_dashed_line(_to_screen(Vector2(samples[sample_index].get("position", Vector2.ZERO))), _to_screen(Vector2(samples[sample_index + 1].get("position", Vector2.ZERO))), CUT_COLOR, width, 6.0, true)
 
 
 func _draw_sampler_spine() -> void:
-	if sampler_spine.is_empty() or sampler_spine.get("chains", []).is_empty():
-		return
-	var resolved := sampler_spine.duplicate(true)
-	BezierGeometry.resolve_auto_handles(resolved.get("points", []), resolved.get("chains", []))
-	var polyline := BezierGeometry.flatten_chain(resolved, resolved.get("chains", [])[0], 32)
-	if polyline.size() < 2:
-		return
-	for index in range(polyline.size() - 1):
-		draw_line(_to_screen(polyline[index]), _to_screen(polyline[index + 1]), GUIDE_COLOR, 2.0, true)
+	for spine_index in range(sampler_spines.size()):
+		var sampler_spine := sampler_spines[spine_index]
+		if sampler_spine.get("chains", []).is_empty():
+			continue
+		var resolved := sampler_spine.duplicate(true)
+		BezierGeometry.resolve_auto_handles(resolved.get("points", []), resolved.get("chains", []))
+		var polyline := BezierGeometry.flatten_chain(resolved, resolved.get("chains", [])[0], 32)
+		var color := GUIDE_COLOR.lightened(minf(float(spine_index) * 0.08, 0.28))
+		var width := 4.0 if str(sampler_spine.get("id", "")) == selected_input_id else 2.0
+		for index in range(polyline.size() - 1):
+			draw_line(_to_screen(polyline[index]), _to_screen(polyline[index + 1]), color, width, true)
 
 
 func _draw_seeds() -> void:
@@ -224,6 +247,10 @@ func _draw_seeds() -> void:
 		var seed_id := str(seed_data.get("id", ""))
 		var origin := str(seed_data.get("origin", "generated"))
 		var color := GENERATED_COLOR
+		var provenance: Dictionary = seed_data.get("provenance", {})
+		if str(provenance.get("placement", "")) == "flow":
+			var guide_order := int(provenance.get("guide_order", 0))
+			color = GUIDE_COLOR.lightened(minf(float(guide_order) * 0.08, 0.28))
 		if origin == "manual":
 			color = MANUAL_COLOR
 		elif origin == "manual_adjusted":

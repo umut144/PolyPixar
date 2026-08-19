@@ -74,6 +74,16 @@ remain analytic through sampling, including their transform into Body-local
 space. A debounced transient Preview is generated once per settled recipe and
 an explicit Bake copies that exact Preview without regenerating it.
 
+Seeding derives a shared constraint domain from that accepted Sampling Bake.
+Outer and Hole contours bound valid Seed positions, while open Cuts are
+two-sided internal barriers. Poisson Fill applies automatic constraint
+clearance; Spine Flow clips rows against the same constraints and combines all
+enabled Sampler Spines into one deterministic globally spaced result. Seeding
+also uses debounced Preview plus explicit exact Preview Bake. Its Artistic
+recipe derives Across from Seed Spacing and Along from Spacing times Flow
+Stretch while retaining explicit technical overrides for compatibility. Manual
+editing is available only on a current accepted Bake.
+
 ## Persistence
 
 `workspace.json` indexes Assets by stable ID plus retained motion/derived

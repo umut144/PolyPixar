@@ -7,7 +7,7 @@ const STYLE_SUBMODULES := ["Weighting"]
 const MOTION_SUBMODULES := ["Animation", "Path", "Act", "Sequence"]
 const WORKSPACES_ROOT := "res://workspaces"
 const CONFIG_PATH := "res://configs/app_config.json"
-const SCHEMA_VERSION := 29
+const SCHEMA_VERSION := 30
 const MAX_HISTORY_SIZE := 100
 const PAPER_SIZES_CM := [Vector2(21.0, 29.7), Vector2(29.7, 42.0), Vector2(42.0, 59.4), Vector2(59.4, 84.1), Vector2(84.1, 118.9)]
 const PAPER_LABELS := ["A4", "A3", "A2", "A1", "A0"]
@@ -53,6 +53,10 @@ var geometry_sampling_preview_state := "idle"
 var geometry_sampling_preview_revision := 0
 var geometry_seeding_preview: Dictionary = {}
 var geometry_seeding_preview_key := ""
+var geometry_seeding_preview_state := "idle"
+var geometry_seeding_preview_revision := 0
+var geometry_seeding_bake_button: Button
+var geometry_seeding_advanced_pattern_expanded := false
 var geometry_meshing_preview: Dictionary = {}
 var geometry_meshing_preview_key := ""
 var geometry_uv_mapping_preview: Dictionary = {}
@@ -1705,6 +1709,8 @@ func _confirm_new_workspace() -> void:
 	geometry_sampling_preview_revision += 1
 	geometry_seeding_preview = {}
 	geometry_seeding_preview_key = ""
+	geometry_seeding_preview_state = "idle"
+	geometry_seeding_preview_revision += 1
 	_set_geometry_command_state("")
 	geometry_seeding_enter_edit_after_bake = false
 	_stop_guide_draw_state()
@@ -2034,6 +2040,8 @@ func _restore_history_snapshot(snapshot: Dictionary) -> void:
 	geometry_sampling_preview_revision += 1
 	geometry_seeding_preview = {}
 	geometry_seeding_preview_key = ""
+	geometry_seeding_preview_state = "idle"
+	geometry_seeding_preview_revision += 1
 	weighting_preview = {}
 	weighting_preview_key = ""
 	_set_geometry_command_state("")
@@ -2266,6 +2274,8 @@ func _load_workspace(workspace_entry: String) -> bool:
 	geometry_sampling_preview_revision += 1
 	geometry_seeding_preview = {}
 	geometry_seeding_preview_key = ""
+	geometry_seeding_preview_state = "idle"
+	geometry_seeding_preview_revision += 1
 	_set_geometry_command_state("")
 	geometry_seeding_enter_edit_after_bake = false
 	_stop_guide_draw_state()
@@ -3220,15 +3230,24 @@ func _animation_spines_for_component(asset: Dictionary, component_id: String) ->
 
 
 func _geometry_seeding_sampler_spine(asset_id: String, component_id: String, recipe: Dictionary = {}) -> Dictionary:
+	var guides := _geometry_seeding_sampler_spines(asset_id, component_id, recipe)
+	return guides[0] if not guides.is_empty() else {}
+
+
+func _geometry_seeding_sampler_spines(asset_id: String, component_id: String, recipe: Dictionary = {}) -> Array[Dictionary]:
 	var resolved_recipe := recipe if not recipe.is_empty() else _geometry_seeding_recipe(asset_id, component_id)
 	if str(resolved_recipe.get("method", "")) != GeometrySeedingService.SPINE_FLOW:
-		return {}
-	var guide_id := str(resolved_recipe.get("parameters", {}).get("guide_id", ""))
-	var guide := _get_guide(_get_asset(asset_id), guide_id)
-	if guide.is_empty() or str(guide.get("guide_type", "")) != AssetGuide.SAMPLER_SPINE \
-		or str(guide.get("scope", {}).get("component_id", "")) != component_id:
-		return {}
-	return guide
+		return []
+	var result: Array[Dictionary] = []
+	var asset := _get_asset(asset_id)
+	for input in resolved_recipe.get("parameters", {}).get("spine_inputs", []):
+		if not input is Dictionary or not bool(input.get("enabled", true)):
+			continue
+		var guide := _get_guide(asset, str(input.get("guide_id", "")))
+		if not guide.is_empty() and str(guide.get("guide_type", "")) == AssetGuide.SAMPLER_SPINE \
+			and str(guide.get("scope", {}).get("component_id", "")) == component_id:
+			result.append(guide)
+	return result
 
 
 func _geometry_seeding_result_matches(result: Dictionary, asset_id: String, component_id: String, component: Dictionary) -> bool:
@@ -3236,17 +3255,20 @@ func _geometry_seeding_result_matches(result: Dictionary, asset_id: String, comp
 		return false
 	var sampling_bake := _geometry_sampling_bake(asset_id, component_id)
 	var recipe := _geometry_seeding_recipe(asset_id, component_id)
-	var matches: bool = str(result.get("sampling_bake_id", "")) == str(sampling_bake.get("bake_id", "")) \
+	var matches: bool = int(result.get("algorithm_version", 0)) == GeometrySeedingService.ALGORITHM_VERSION \
+		and str(result.get("sampling_bake_id", "")) == str(sampling_bake.get("bake_id", "")) \
 		and str(result.get("sampling_fingerprint", "")) == GeometrySeedingService.sampling_fingerprint(sampling_bake) \
 		and str(result.get("method", "")) == str(recipe.get("method", "")) \
 		and result.get("parameters", {}) == recipe.get("parameters", {})
 	if not matches:
 		return false
 	if str(recipe.get("method", "")) == GeometrySeedingService.SPINE_FLOW:
-		var guide := _geometry_seeding_sampler_spine(asset_id, component_id, recipe)
-		return not guide.is_empty() \
-			and str(result.get("guide_id", "")) == str(guide.get("id", "")) \
-			and str(result.get("guide_fingerprint", "")) == GeometrySeedingService.guide_fingerprint(guide)
+		var guides := _geometry_seeding_sampler_spines(asset_id, component_id, recipe)
+		var guide_ids: Array[String] = []
+		for guide in guides:
+			guide_ids.append(str(guide.get("id", "")))
+		return result.get("guide_ids", []) == guide_ids \
+			and str(result.get("guides_fingerprint", "")) == GeometrySeedingService.guides_fingerprint(guides)
 	return true
 
 
@@ -3257,17 +3279,26 @@ func _geometry_seeding_preview_matches(asset_id: String, component_id: String, c
 
 func _geometry_seeding_status(asset_id: String, component_id: String, component: Dictionary) -> String:
 	if component.is_empty() or _geometry_sampling_bake(asset_id, component_id).is_empty():
-		return "Blocked"
+		return "Sampling Required"
 	if not _geometry_sampling_bake_is_current(asset_id, component_id, component):
-		return "Blocked"
+		return "Sampling Required"
 	var recipe := _geometry_seeding_recipe(asset_id, component_id)
-	if not GeometrySeedingService.validation_issues(_geometry_sampling_bake(asset_id, component_id), recipe, _geometry_seeding_sampler_spine(asset_id, component_id, recipe)).is_empty():
+	var guides := _geometry_seeding_sampler_spines(asset_id, component_id, recipe)
+	if not GeometrySeedingService.validation_issues(_geometry_sampling_bake(asset_id, component_id), recipe, guides).is_empty():
 		return "Invalid"
+	var document_key := _geometry_document_key(asset_id, component_id)
+	if geometry_seeding_preview_key == document_key:
+		if geometry_seeding_preview_state == "calculating":
+			return "Calculating"
+		if geometry_seeding_preview_state == "invalid":
+			return "Invalid"
+		if geometry_seeding_preview_state == "ready" and _geometry_seeding_preview_matches(asset_id, component_id, component):
+			return "Preview Ready"
 	var bake := _geometry_seeding_bake(asset_id, component_id)
 	if bake.is_empty():
-		return "Ready to Bake"
+		return "Ready to Preview"
 	if not _geometry_seeding_result_matches(bake, asset_id, component_id, component):
-		return "Ready to Bake"
+		return "Ready to Preview"
 	return "Edited" if bool(bake.get("edited", false)) else "Baked"
 
 
@@ -3431,13 +3462,17 @@ func _geometry_meshing_input_is_current(asset_id: String, component_id: String, 
 	if str(seeding_bake.get("sampling_bake_id", "")) != str(sampling_bake.get("bake_id", "")) \
 		or str(seeding_bake.get("sampling_fingerprint", "")) != GeometrySeedingService.sampling_fingerprint(sampling_bake):
 		return false
+	if int(seeding_bake.get("algorithm_version", 0)) != GeometrySeedingService.ALGORITHM_VERSION:
+		return false
 	if str(seeding_bake.get("method", "")) != str(resolved_recipe.get("parameters", {}).get("seeding_method", "")):
 		return false
 	if str(seeding_bake.get("method", "")) == GeometrySeedingService.SPINE_FLOW:
 		var seed_recipe := GeometrySeedingService.normalize_recipe({"method": GeometrySeedingService.SPINE_FLOW, "parameters": seeding_bake.get("parameters", {})})
-		var guide := _geometry_seeding_sampler_spine(asset_id, component_id, seed_recipe)
-		if guide.is_empty() or str(seeding_bake.get("guide_id", "")) != str(guide.get("id", "")) \
-			or str(seeding_bake.get("guide_fingerprint", "")) != GeometrySeedingService.guide_fingerprint(guide):
+		var guides := _geometry_seeding_sampler_spines(asset_id, component_id, seed_recipe)
+		var guide_ids: Array[String] = []
+		for guide in guides:
+			guide_ids.append(str(guide.get("id", "")))
+		if seeding_bake.get("guide_ids", []) != guide_ids or str(seeding_bake.get("guides_fingerprint", "")) != GeometrySeedingService.guides_fingerprint(guides):
 			return false
 	return true
 
@@ -4155,8 +4190,8 @@ func _render_geometry_seeding_context_bar() -> void:
 	var edit_button := Button.new()
 	edit_button.text = "⌘2  Edit Seeds"
 	_style_context_command_button(edit_button, _context_command_is("geometry.seeding.edit_seeds"))
-	edit_button.disabled = status not in ["Preview", "Baked", "Edited"]
-	edit_button.tooltip_text = "Accept the current Preview and edit it" if status == "Preview" else "Edit the current Seeding Bake"
+	edit_button.disabled = status not in ["Preview Ready", "Baked", "Edited"]
+	edit_button.tooltip_text = "Bake the current Preview and edit it" if status == "Preview Ready" else "Edit the current Seeding Bake"
 	edit_button.focus_mode = Control.FOCUS_NONE
 	edit_button.pressed.connect(_toggle_geometry_seeding_edit)
 	context_bar.add_child(edit_button)
@@ -4171,6 +4206,8 @@ func _set_geometry_seeding_method(method: String) -> void:
 		_render_inspector()
 		_render_context_bar()
 		_refresh_geometry_seeding_workspace()
+		if _geometry_seeding_status(selected_asset_id, selected_component_id, _get_component(_get_asset(selected_asset_id), selected_component_id)) == "Ready to Preview":
+			_schedule_geometry_seeding_preview()
 		return
 	_record_direct_change()
 	var document := _get_geometry_document(selected_asset_id, selected_component_id, true)
@@ -4178,19 +4215,21 @@ func _set_geometry_seeding_method(method: String) -> void:
 	var matching_bake := _geometry_seeding_bake(selected_asset_id, selected_component_id, method)
 	if not matching_bake.is_empty():
 		next_recipe["parameters"] = matching_bake.get("parameters", {}).duplicate(true)
-	if method == GeometrySeedingService.SPINE_FLOW and str(next_recipe.get("parameters", {}).get("guide_id", "")).is_empty():
+	if method == GeometrySeedingService.SPINE_FLOW and next_recipe.get("parameters", {}).get("spine_inputs", []).is_empty():
 		var guides := _sampler_spines_for_component(_get_asset(selected_asset_id), selected_component_id)
-		if not guides.is_empty():
-			next_recipe["parameters"]["guide_id"] = str(guides[0].get("id", ""))
+		for guide in guides:
+			next_recipe["parameters"]["spine_inputs"].append({"guide_id": str(guide.get("id", "")), "enabled": true})
 	document["seeding"]["recipe"] = next_recipe
 	geometry_seeding_preview = {}
 	geometry_seeding_preview_key = ""
+	geometry_seeding_preview_state = "idle"
+	geometry_seeding_preview_revision += 1
 	_render_outliner()
 	_render_inspector()
 	_render_context_bar()
 	_refresh_geometry_seeding_workspace()
-	if matching_bake.is_empty():
-		call_deferred("_refresh_geometry_after_recipe_change")
+	if matching_bake.is_empty() or not _geometry_seeding_result_matches(matching_bake, selected_asset_id, selected_component_id, _get_component(_get_asset(selected_asset_id), selected_component_id)):
+		call_deferred("_schedule_geometry_seeding_preview")
 
 
 func _activate_geometry_seeding_method_choice() -> void:
@@ -4207,7 +4246,7 @@ func _toggle_geometry_seeding_edit() -> void:
 	var status := _geometry_seeding_status(selected_asset_id, selected_component_id, component)
 	if geometry_seeding_edit_active:
 		_set_geometry_command_state("")
-	elif status == "Preview":
+	elif status == "Preview Ready":
 		_set_geometry_command_state("")
 		_bake_geometry_seeding_preview(true)
 		return
@@ -6190,8 +6229,8 @@ func _render_geometry_component_asset_entry(asset: Dictionary, force_expand := f
 	container.add_child(_create_outliner_child_group_label("Components"))
 	var components: Array = asset.get("components", []).duplicate()
 	var references: Array = []
-	var guides: Array = asset.get("guides", []).duplicate(true) if active_geometry_submodule == "Sampling" else []
-	if active_geometry_submodule == "Sampling":
+	var guides: Array = asset.get("guides", []).duplicate(true) if active_geometry_submodule in ["Sampling", "Seeding"] else []
+	if active_geometry_submodule in ["Sampling", "Seeding"]:
 		components.clear()
 		for component in asset.get("components", []):
 			if str(component.get("type", "component")) == "guide":
@@ -6255,6 +6294,21 @@ func _render_geometry_component_asset_entry(asset: Dictionary, force_expand := f
 			for guide in guides:
 				if str(guide.get("scope", {}).get("component_id", "")) == component_id and str(guide.get("guide_type", "")) == AssetGuide.CUT:
 					_render_geometry_sampling_guide_row(container, asset, guide)
+		elif active_geometry_submodule == "Seeding":
+			_render_geometry_seeding_dependency_row(container, asset_id, component_id, component)
+			_render_geometry_seeding_input_row(container, asset_id, component_id, "", "outer", "Outer · %s" % str(component.get("name", "Component")), "Clearance", "Outer")
+			for reference in references:
+				if str(reference.get("parent_component_id", "")) == component_id and str(reference.get("topology_role", "outer")) == "hole":
+					_render_geometry_seeding_input_row(container, asset_id, component_id, str(reference.get("id", "")), "hole", "Hole · %s" % _component_outliner_name(asset, reference), "Excluded", "Hole")
+			for guide in guides:
+				if str(guide.get("scope", {}).get("component_id", "")) != component_id:
+					continue
+				var guide_type := str(guide.get("guide_type", ""))
+				if guide_type == AssetGuide.CUT:
+					_render_geometry_seeding_input_row(container, asset_id, component_id, str(guide.get("id", "")), "cut", "Cut · %s" % _guide_display_name(asset, guide), "Barrier", "Cut")
+				elif guide_type == AssetGuide.SAMPLER_SPINE:
+					var enabled := _geometry_seeding_spine_enabled(_geometry_seeding_recipe(asset_id, component_id), str(guide.get("id", "")))
+					_render_geometry_seeding_input_row(container, asset_id, component_id, str(guide.get("id", "")), "spine", "Spine · %s" % _guide_display_name(asset, guide), "Enabled" if enabled else "Disabled", "Spine")
 	if active_geometry_submodule != "Sampling":
 		return
 
@@ -6307,6 +6361,69 @@ func _render_geometry_sampling_guide_row(container: VBoxContainer, asset: Dictio
 	container.add_child(row)
 
 
+func _render_geometry_seeding_dependency_row(container: VBoxContainer, asset_id: String, component_id: String, component: Dictionary) -> void:
+	var row := HBoxContainer.new()
+	var indent := Control.new()
+	indent.custom_minimum_size = Vector2(34, 0)
+	row.add_child(indent)
+	var button := Button.new()
+	var ready := _geometry_sampling_bake_is_current(asset_id, component_id, component)
+	button.text = "Sampling · Adaptive  ·  %s" % ("Baked" if ready else "Required")
+	button.custom_minimum_size = Vector2(0, 26)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	button.focus_mode = Control.FOCUS_NONE
+	button.pressed.connect(_open_sampling_dependency.bind(asset_id, component_id))
+	row.add_child(button)
+	container.add_child(row)
+
+
+func _open_sampling_dependency(asset_id: String, component_id: String) -> void:
+	active_geometry_submodule = "Sampling"
+	_set_active_module_visual("Mesh", "Sampling")
+	_select_geometry_component(asset_id, component_id)
+
+
+func _render_geometry_seeding_input_row(container: VBoxContainer, asset_id: String, component_id: String, input_id: String, role: String, title: String, treatment: String, badge: String) -> void:
+	var count := 0
+	var sampling_bake := _geometry_sampling_bake(asset_id, component_id)
+	for stat in sampling_bake.get("boundary_stats", []):
+		if str(stat.get("input_id", "")) == input_id and str(stat.get("role", "")) == role:
+			count += int(stat.get("sample_count", 0))
+	if role == "spine":
+		var component := _get_component(_get_asset(asset_id), component_id)
+		var seeding_result := geometry_seeding_preview if _geometry_seeding_preview_matches(asset_id, component_id, component) else _geometry_seeding_bake(asset_id, component_id)
+		for stat in seeding_result.get("guide_stats", []):
+			if str(stat.get("guide_id", "")) == input_id:
+				count = int(stat.get("seed_count", 0))
+	var row := HBoxContainer.new()
+	var indent := Control.new()
+	indent.custom_minimum_size = Vector2(34, 0)
+	row.add_child(indent)
+	var button := Button.new()
+	button.text = "%s  ·  %s%s" % [title, treatment, "  ·  %d" % count if count > 0 else ""]
+	button.custom_minimum_size = Vector2(0, 26)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	button.focus_mode = Control.FOCUS_NONE
+	_style_outliner_button(button, not input_id.is_empty() and selected_sampling_input_id == input_id)
+	button.pressed.connect(_select_geometry_seeding_input.bind(asset_id, component_id, input_id, role))
+	row.add_child(button)
+	row.add_child(_create_geometry_role_badge(badge))
+	container.add_child(row)
+
+
+func _select_geometry_seeding_input(asset_id: String, component_id: String, input_id: String, role: String) -> void:
+	if selected_asset_id != asset_id or selected_component_id != component_id:
+		_select_geometry_component(asset_id, component_id)
+	selected_sampling_input_id = input_id
+	selected_sampling_input_kind = role
+	selected_guide_id = input_id if role in ["cut", "spine"] else ""
+	_render_outliner()
+	_render_inspector()
+	_refresh_geometry_seeding_workspace()
+
+
 func _geometry_sampling_input_summary(asset_id: String, component_id: String, input_id: String, role: String) -> Dictionary:
 	var component := _get_component(_get_asset(asset_id), component_id)
 	var result := geometry_sampling_preview if _geometry_sampling_preview_matches(asset_id, component_id, component) else _geometry_sampling_bake(asset_id, component_id)
@@ -6317,7 +6434,7 @@ func _geometry_sampling_input_summary(asset_id: String, component_id: String, in
 	var recipe := _geometry_sampling_recipe(asset_id, component_id)
 	var has_adjustment := _geometry_sampling_input_has_override(recipe, input_id)
 	var factor := float(recipe.get("parameters", {}).get("boundary_refinements", {}).get(input_id, {}).get("factor", 1.0))
-	var state_label := "%.2g×" % factor if has_adjustment else "↳"
+	var state_label := "%s×" % _format_scale_value(factor) if has_adjustment else "↳"
 	if count > 0:
 		state_label += "  %d" % count
 	return {"label": state_label, "count": count, "factor": factor}
@@ -6330,7 +6447,8 @@ func _create_geometry_role_badge(role: String) -> Label:
 	badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	badge.add_theme_font_size_override("font_size", 9)
-	var badge_color := Color("#ef6c78") if role.to_lower() == "hole" else Color("#737f91") if role.to_lower() == "outer" else Color("#ef6c78")
+	var normalized_role := role.to_lower()
+	var badge_color := Color("#ef6c78") if normalized_role in ["hole", "cut"] else Color("#f2c94c") if normalized_role == "spine" else Color("#737f91")
 	badge.add_theme_color_override("font_color", badge_color.lightened(0.35))
 	return badge
 
@@ -6437,12 +6555,17 @@ func _geometry_bake_status(method: String, bake: Dictionary, asset_id: String, c
 	if sampling_bake.is_empty() or not _geometry_sampling_bake_is_current(asset_id, component_id, component):
 		return "Blocked"
 	var recipe := GeometrySeedingService.normalize_recipe({"method": method, "parameters": bake.get("parameters", {})})
-	var matches := str(bake.get("sampling_bake_id", "")) == str(sampling_bake.get("bake_id", "")) and str(bake.get("sampling_fingerprint", "")) == GeometrySeedingService.sampling_fingerprint(sampling_bake)
+	var matches := int(bake.get("algorithm_version", 0)) == GeometrySeedingService.ALGORITHM_VERSION \
+		and str(bake.get("sampling_bake_id", "")) == str(sampling_bake.get("bake_id", "")) \
+		and str(bake.get("sampling_fingerprint", "")) == GeometrySeedingService.sampling_fingerprint(sampling_bake)
 	if method == GeometrySeedingService.SPINE_FLOW:
-		var guide := _geometry_seeding_sampler_spine(asset_id, component_id, recipe)
-		matches = matches and not guide.is_empty() and str(bake.get("guide_id", "")) == str(guide.get("id", "")) and str(bake.get("guide_fingerprint", "")) == GeometrySeedingService.guide_fingerprint(guide)
+		var guides := _geometry_seeding_sampler_spines(asset_id, component_id, recipe)
+		var guide_ids: Array[String] = []
+		for guide in guides:
+			guide_ids.append(str(guide.get("id", "")))
+		matches = matches and bake.get("guide_ids", []) == guide_ids and str(bake.get("guides_fingerprint", "")) == GeometrySeedingService.guides_fingerprint(guides)
 	if not matches:
-		return "Ready to Bake"
+		return "Ready to Preview"
 	return "Edited" if bool(bake.get("edited", false)) else "Baked"
 
 
@@ -6518,7 +6641,7 @@ func _geometry_outliner_active_preview(asset_id: String, component_id: String, c
 	if active_geometry_submodule == "Seeding" and geometry_seeding_preview_key == document_key:
 		var method := str(geometry_seeding_preview.get("method", ""))
 		if not method.is_empty():
-			return {"key": method, "label": _geometry_method_number_label(method) + ": " + _geometry_bake_method_label(method), "status": "Preview" if _geometry_seeding_preview_matches(asset_id, component_id, component) else "Invalid"}
+			return {"key": method, "label": _geometry_method_number_label(method) + ": " + _geometry_bake_method_label(method), "status": "Preview Ready" if _geometry_seeding_preview_matches(asset_id, component_id, component) else "Calculating" if geometry_seeding_preview_state == "calculating" else "Invalid"}
 	if active_geometry_submodule == "Meshing" and geometry_meshing_preview_key == document_key:
 		var method := str(geometry_meshing_preview.get("method", ""))
 		if not method.is_empty():
@@ -6551,8 +6674,10 @@ func _geometry_status_rank(status: String) -> int:
 		return 5
 	if status in ["Ready to Bake", "Preview Ready"]:
 		return 4
-	if status == "Blocked":
+	if status in ["Calculating", "Ready to Preview"]:
 		return 3
+	if status in ["Blocked", "Sampling Required"]:
+		return 2
 	if status == "Invalid":
 		return 1
 	return 2
@@ -6565,7 +6690,7 @@ func _geometry_status_color(status: String) -> Color:
 		return Color("#f2c94c")
 	if status in ["Calculating", "Ready to Preview"]:
 		return Color("#8fd8f5")
-	if status == "Blocked":
+	if status in ["Blocked", "Sampling Required"]:
 		return Color("#e56b6f")
 	if status == "Invalid":
 		return Color("#737f91")
@@ -6577,7 +6702,9 @@ func _geometry_status_symbol(status: String) -> String:
 		return "🟢"
 	if status in ["Ready to Bake", "Preview Ready"]:
 		return "🟡"
-	if status == "Blocked":
+	if status in ["Calculating", "Ready to Preview"]:
+		return "🔵"
+	if status in ["Blocked", "Sampling Required"]:
 		return "🔴"
 	if status == "Invalid":
 		return "⚪"
@@ -6587,6 +6714,7 @@ func _geometry_status_symbol(status: String) -> String:
 func _select_geometry_asset(asset_id: String) -> void:
 	geometry_sampling_preview_revision += 1
 	geometry_sampling_input_refresh_pending = false
+	geometry_seeding_preview_revision += 1
 	var was_selected := selected_asset_id == asset_id and selected_component_id.is_empty()
 	selected_asset_id = asset_id
 	selected_component_id = ""
@@ -6604,6 +6732,8 @@ func _select_geometry_asset(asset_id: String) -> void:
 
 
 func _select_geometry_component(asset_id: String, component_id: String) -> void:
+	geometry_sampling_preview_revision += 1
+	geometry_seeding_preview_revision += 1
 	selected_asset_id = asset_id
 	selected_component_id = component_id
 	selected_guide_id = ""
@@ -6623,6 +6753,8 @@ func _select_geometry_component(asset_id: String, component_id: String) -> void:
 			_schedule_geometry_sampling_preview()
 	elif active_geometry_submodule == "Seeding" and is_instance_valid(geometry_seeding_workspace):
 		geometry_seeding_workspace.grab_focus()
+		if _geometry_seeding_status(asset_id, component_id, _get_component(_get_asset(asset_id), component_id)) == "Ready to Preview":
+			_schedule_geometry_seeding_preview()
 	elif active_geometry_submodule == "Meshing" and is_instance_valid(geometry_meshing_workspace):
 		geometry_meshing_workspace.grab_focus()
 	elif active_geometry_submodule == "UV Mapping" and is_instance_valid(geometry_uv_mapping_workspace):
@@ -7949,7 +8081,7 @@ func _render_geometry_sampling_boundary_row(title: String, input_id: String, rol
 	var factor := float(refinement.get("factor", 1.0))
 	var has_adjustment := _geometry_sampling_input_has_override(recipe, input_id)
 	var button := Button.new()
-	button.text = "%s  ·  %s%s" % [title, "Density %.2g×" % factor if has_adjustment else "Inherited", "  ·  %d" % count if count > 0 else ""]
+	button.text = "%s  ·  %s%s" % [title, "Density %s×" % _format_scale_value(factor) if has_adjustment else "Inherited", "  ·  %d" % count if count > 0 else ""]
 	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	button.focus_mode = Control.FOCUS_NONE
 	button.disabled = not select_action.is_valid()
@@ -8082,13 +8214,18 @@ func _clear_geometry_sampling_preview_for_selection() -> void:
 
 
 func _refresh_geometry_after_recipe_change() -> void:
-	_schedule_geometry_sampling_preview()
-	geometry_seeding_preview = {}
-	geometry_seeding_preview_key = ""
-	geometry_meshing_preview = {}
-	geometry_meshing_preview_key = ""
-	if active_geometry_submodule == "Seeding":
-		_refresh_geometry_seeding_workspace()
+	if active_geometry_submodule == "Sampling":
+		_schedule_geometry_sampling_preview()
+		geometry_seeding_preview = {}
+		geometry_seeding_preview_key = ""
+		geometry_seeding_preview_state = "idle"
+		geometry_seeding_preview_revision += 1
+		geometry_meshing_preview = {}
+		geometry_meshing_preview_key = ""
+	elif active_geometry_submodule == "Seeding":
+		_schedule_geometry_seeding_preview()
+		geometry_meshing_preview = {}
+		geometry_meshing_preview_key = ""
 	elif active_geometry_submodule == "Meshing":
 		_refresh_geometry_meshing_workspace()
 
@@ -8228,18 +8365,20 @@ func _geometry_sampling_overlays(asset: Dictionary, component_id: String) -> Dic
 
 
 func _render_geometry_seeding_inspector() -> void:
-	inspector_content.add_child(_create_inspector_section("Seeding"))
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	if component.is_empty():
+		inspector_content.add_child(_create_inspector_section("Seeding"))
 		inspector_content.add_child(_create_inspector_field_label("Select one Component to configure its interior seeding."))
 		return
-	inspector_content.add_child(_create_inspector_field_label(str(component.get("name", "Component"))))
+	inspector_content.add_child(_create_inspector_section("Seeding · %s" % str(component.get("name", "Component"))))
+	inspector_content.add_child(_create_inspector_field_label("One derived Seed set from the accepted Sampling constraints."))
 	var upstream_current := _geometry_sampling_bake_is_current(selected_asset_id, selected_component_id, component)
 	inspector_content.add_child(_create_inspector_section("Input"))
-	var input_label := _create_inspector_field_label("Sampling Bake: %s" % ("Ready" if upstream_current else "Required / Stale"))
+	var input_label := _create_inspector_field_label("Sampling · Adaptive: %s" % ("Baked" if upstream_current else "Required / Stale"))
 	input_label.add_theme_color_override("font_color", Color("#75b88a") if upstream_current else Color("#ef8354"))
 	inspector_content.add_child(input_label)
 	var recipe := _geometry_seeding_recipe(selected_asset_id, selected_component_id)
+	var sampling_bake := _geometry_sampling_bake(selected_asset_id, selected_component_id)
 	inspector_content.add_child(_create_inspector_field_label("Method"))
 	var method_option := OptionButton.new()
 	method_option.add_item("Poisson Fill")
@@ -8250,36 +8389,65 @@ func _render_geometry_seeding_inspector() -> void:
 	method_option.item_selected.connect(func(index: int) -> void: _set_geometry_seeding_method(str(method_option.get_item_metadata(index))))
 	inspector_content.add_child(method_option)
 	inspector_content.add_child(_create_inspector_section("Parameters"))
-	var guide_ready := true
 	if str(recipe.get("method", "")) == GeometrySeedingService.SPINE_FLOW:
 		var sampler_guides := _sampler_spines_for_component(_get_asset(selected_asset_id), selected_component_id)
-		inspector_content.add_child(_create_inspector_field_label("Sample Guide"))
-		var guide_option := OptionButton.new()
+		inspector_content.add_child(_create_inspector_field_label("Active Sampler Spines"))
 		for guide in sampler_guides:
-			guide_option.add_item(_guide_display_name(_get_asset(selected_asset_id), guide))
-			guide_option.set_item_metadata(guide_option.item_count - 1, str(guide.get("id", "")))
-			if str(guide.get("id", "")) == str(recipe.get("parameters", {}).get("guide_id", "")):
-				guide_option.select(guide_option.item_count - 1)
-		guide_ready = not _geometry_seeding_sampler_spine(selected_asset_id, selected_component_id, recipe).is_empty()
-		guide_option.disabled = sampler_guides.is_empty()
-		guide_option.item_selected.connect(_on_geometry_seeding_guide_selected.bind(guide_option))
-		inspector_content.add_child(guide_option)
+			var guide_id := str(guide.get("id", ""))
+			var enabled := _geometry_seeding_spine_enabled(recipe, guide_id)
+			var toggle := CheckBox.new()
+			toggle.text = _guide_display_name(_get_asset(selected_asset_id), guide)
+			toggle.button_pressed = enabled
+			toggle.toggled.connect(_on_geometry_seeding_spine_enabled.bind(guide_id))
+			inspector_content.add_child(toggle)
 		if sampler_guides.is_empty():
-			var missing_guide := _create_inspector_field_label("Create and author a Sample Guide on this Component.")
+			var missing_guide := _create_inspector_field_label("Create and author a Sampler Spine on this Component.")
 			missing_guide.add_theme_color_override("font_color", Color("#ef8354"))
 			inspector_content.add_child(missing_guide)
-		_add_geometry_seeding_float_parameter("Along Spacing", recipe, "along_spacing", GeometrySeedingService.MIN_SPACING, 10000.0)
-		_add_geometry_seeding_float_parameter("Across Spacing", recipe, "across_spacing", GeometrySeedingService.MIN_SPACING, 10000.0)
-		_add_geometry_seeding_float_parameter("Boundary Clearance", recipe, "boundary_clearance", 0.0, 10000.0)
-		_add_geometry_seeding_float_parameter("Stagger", recipe, "stagger", 0.0, 1.0)
+		_add_geometry_seeding_float_parameter("Seed Spacing (Body units)", recipe, "spacing", GeometrySeedingService.MIN_SPACING, 10000.0)
+		_add_geometry_seeding_float_parameter("Flow Stretch", recipe, "flow_stretch", GeometrySeedingService.MIN_FLOW_STRETCH, GeometrySeedingService.MAX_FLOW_STRETCH, "×")
 		var fill_gaps := CheckBox.new()
 		fill_gaps.text = "Fill Gaps"
 		fill_gaps.button_pressed = bool(recipe.get("parameters", {}).get("fill_gaps", GeometrySeedingService.DEFAULT_FILL_GAPS))
 		fill_gaps.toggled.connect(_on_geometry_seeding_fill_gaps_changed)
 		inspector_content.add_child(fill_gaps)
+		var parameters: Dictionary = recipe.get("parameters", {})
+		var boundary_override := bool(parameters.get("boundary_clearance_override", false))
+		var boundary_clearance := float(parameters.get("boundary_clearance", GeometrySeedingService.DEFAULT_BOUNDARY_CLEARANCE))
+		inspector_content.add_child(_create_inspector_field_label("Boundary Margin: %s · %s" % ["Refined" if boundary_override else "Auto", _format_scale_value(boundary_clearance)]))
+		var refine_boundary := CheckBox.new()
+		refine_boundary.text = "Refine Boundary Margin"
+		refine_boundary.button_pressed = boundary_override
+		refine_boundary.toggled.connect(_on_geometry_seeding_boundary_override_changed)
+		inspector_content.add_child(refine_boundary)
+		if boundary_override:
+			_add_geometry_seeding_float_parameter("Boundary Margin Override", recipe, "boundary_clearance", 0.0, 10000.0)
+		var advanced_pattern := Button.new()
+		advanced_pattern.text = "%s Advanced Pattern" % ("▾" if geometry_seeding_advanced_pattern_expanded else "▸")
+		advanced_pattern.toggle_mode = true
+		advanced_pattern.button_pressed = geometry_seeding_advanced_pattern_expanded
+		advanced_pattern.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		advanced_pattern.focus_mode = Control.FOCUS_NONE
+		advanced_pattern.toggled.connect(_on_geometry_seeding_advanced_pattern_toggled)
+		inspector_content.add_child(advanced_pattern)
+		if geometry_seeding_advanced_pattern_expanded:
+			inspector_content.add_child(_create_inspector_field_label("Along Spacing: Derived · %s" % _format_scale_value(float(parameters.get("along_spacing", GeometrySeedingService.DEFAULT_ALONG_SPACING)))))
+			inspector_content.add_child(_create_inspector_field_label("Across Spacing: Derived · %s" % _format_scale_value(float(parameters.get("across_spacing", GeometrySeedingService.DEFAULT_ACROSS_SPACING)))))
+			var stagger_override := bool(parameters.get("stagger_override", false))
+			var stagger := float(parameters.get("stagger", GeometrySeedingService.DEFAULT_ARTISTIC_STAGGER))
+			inspector_content.add_child(_create_inspector_field_label("Stagger: %s · %s" % ["Refined" if stagger_override else "Auto", _format_scale_value(stagger)]))
+			var refine_stagger := CheckBox.new()
+			refine_stagger.text = "Refine Stagger"
+			refine_stagger.button_pressed = stagger_override
+			refine_stagger.toggled.connect(_on_geometry_seeding_stagger_override_changed)
+			inspector_content.add_child(refine_stagger)
+			if stagger_override:
+				_add_geometry_seeding_float_parameter("Stagger Override", recipe, "stagger", 0.0, 1.0)
 	else:
-		_add_geometry_seeding_float_parameter("Spacing (local units)", recipe, "spacing", GeometrySeedingService.MIN_SPACING, 10000.0)
-	if str(recipe.get("method", "")) == GeometrySeedingService.POISSON_FILL or bool(recipe.get("parameters", {}).get("fill_gaps", false)):
+		_add_geometry_seeding_float_parameter("Seed Spacing (Body units)", recipe, "spacing", GeometrySeedingService.MIN_SPACING, 10000.0)
+		var clearance := float(recipe.get("parameters", {}).get("spacing", GeometrySeedingService.DEFAULT_SPACING)) * float(recipe.get("parameters", {}).get("constraint_clearance_factor", GeometrySeedingService.DEFAULT_CONSTRAINT_CLEARANCE_FACTOR))
+		inspector_content.add_child(_create_inspector_field_label("Constraint Clearance: Auto · %.2f" % clearance))
+	if str(recipe.get("method", "")) == GeometrySeedingService.POISSON_FILL or (geometry_seeding_advanced_pattern_expanded and bool(recipe.get("parameters", {}).get("fill_gaps", false))):
 		inspector_content.add_child(_create_inspector_field_label("Random Seed"))
 		var random_seed := SpinBox.new()
 		random_seed.min_value = 0.0
@@ -8288,30 +8456,49 @@ func _render_geometry_seeding_inspector() -> void:
 		random_seed.set_value_no_signal(float(recipe.get("parameters", {}).get("seed", GeometrySeedingService.DEFAULT_SEED)))
 		random_seed.value_changed.connect(_on_geometry_seeding_parameter_changed.bind("seed"))
 		inspector_content.add_child(random_seed)
+	inspector_content.add_child(_create_inspector_section("Constraints"))
+	var outer_count := 0
+	var hole_count := 0
+	var cut_count := 0
+	for stat in sampling_bake.get("boundary_stats", []):
+		var role := str(stat.get("role", ""))
+		if role == "outer":
+			outer_count += int(stat.get("sample_count", 0))
+		elif role == "hole":
+			hole_count += int(stat.get("sample_count", 0))
+		elif role == "cut":
+			cut_count += int(stat.get("sample_count", 0))
+	inspector_content.add_child(_create_inspector_field_label("Outer · inward clearance · %d points" % outer_count))
+	inspector_content.add_child(_create_inspector_field_label("Holes · excluded + clearance · %d points" % hole_count))
+	inspector_content.add_child(_create_inspector_field_label("Cuts · barrier + clearance · %d points" % cut_count))
 	var status := _geometry_seeding_status(selected_asset_id, selected_component_id, component)
 	inspector_content.add_child(_create_inspector_section("Result"))
 	inspector_content.add_child(_create_inspector_field_label("Status: %s" % status))
-	var result := _geometry_seeding_bake(selected_asset_id, selected_component_id)
+	var result := geometry_seeding_preview if _geometry_seeding_preview_matches(selected_asset_id, selected_component_id, component) else _geometry_seeding_bake(selected_asset_id, selected_component_id)
 	if not result.is_empty():
 		inspector_content.add_child(_create_inspector_field_label("Seeds: %d" % int(result.get("seed_count", result.get("seeds", []).size()))))
+		if str(result.get("method", "")) == GeometrySeedingService.SPINE_FLOW:
+			inspector_content.add_child(_create_inspector_field_label("Flow: %d · Gap Fill: %d" % [int(result.get("flow_seed_count", 0)), int(result.get("gap_seed_count", 0))]))
 	var actions := HBoxContainer.new()
 	var bake_button := Button.new()
-	bake_button.text = "Bake"
+	bake_button.text = "Calculating…" if status == "Calculating" else "Baked" if status in ["Baked", "Edited"] else "Bake Preview"
 	bake_button.custom_minimum_size = Vector2(96, 28)
 	bake_button.focus_mode = Control.FOCUS_NONE
-	bake_button.disabled = status != "Ready to Bake"
+	bake_button.disabled = status != "Preview Ready"
 	bake_button.pressed.connect(_bake_geometry_seeding)
+	geometry_seeding_bake_button = bake_button
 	actions.add_child(bake_button)
 	inspector_content.add_child(actions)
 
 
-func _add_geometry_seeding_float_parameter(label_text: String, recipe: Dictionary, parameter_name: String, minimum: float, maximum: float) -> void:
+func _add_geometry_seeding_float_parameter(label_text: String, recipe: Dictionary, parameter_name: String, minimum: float, maximum: float, suffix := "") -> void:
 	inspector_content.add_child(_create_inspector_field_label(label_text))
 	var field := SpinBox.new()
 	field.min_value = minimum
 	field.max_value = maximum
 	field.step = 0.01
 	field.custom_arrow_step = 0.01
+	field.suffix = suffix
 	field.set_value_no_signal(float(recipe.get("parameters", {}).get(parameter_name, minimum)))
 	field.value_changed.connect(_on_geometry_seeding_parameter_changed.bind(parameter_name))
 	field.get_line_edit().text_submitted.connect(_on_geometry_seeding_float_text_submitted.bind(field, parameter_name))
@@ -8319,18 +8506,29 @@ func _add_geometry_seeding_float_parameter(label_text: String, recipe: Dictionar
 	inspector_content.add_child(field)
 
 
-func _on_geometry_seeding_guide_selected(index: int, option: OptionButton) -> void:
-	if index < 0 or index >= option.item_count:
-		return
+func _geometry_seeding_spine_enabled(recipe: Dictionary, guide_id: String) -> bool:
+	for input in recipe.get("parameters", {}).get("spine_inputs", []):
+		if input is Dictionary and str(input.get("guide_id", "")) == guide_id:
+			return bool(input.get("enabled", true))
+	return false
+
+
+func _on_geometry_seeding_spine_enabled(enabled: bool, guide_id: String) -> void:
 	var document := _get_geometry_document(selected_asset_id, selected_component_id, true)
 	var recipe := _geometry_seeding_recipe(selected_asset_id, selected_component_id)
-	var guide_id := str(option.get_item_metadata(index))
-	if str(recipe.get("parameters", {}).get("guide_id", "")) == guide_id:
-		return
 	_record_direct_change()
-	recipe["parameters"]["guide_id"] = guide_id
+	var inputs: Array = recipe.get("parameters", {}).get("spine_inputs", []).duplicate(true)
+	var found := false
+	for input in inputs:
+		if input is Dictionary and str(input.get("guide_id", "")) == guide_id:
+			input["enabled"] = enabled
+			found = true
+			break
+	if not found:
+		inputs.append({"guide_id": guide_id, "enabled": enabled})
+	recipe["parameters"]["spine_inputs"] = inputs
 	document["seeding"]["recipe"] = GeometrySeedingService.normalize_recipe(recipe)
-	call_deferred("_refresh_geometry_after_recipe_change")
+	call_deferred("_schedule_geometry_seeding_preview")
 
 
 func _on_geometry_seeding_fill_gaps_changed(enabled: bool) -> void:
@@ -8344,6 +8542,32 @@ func _on_geometry_seeding_fill_gaps_changed(enabled: bool) -> void:
 	call_deferred("_refresh_geometry_after_recipe_change")
 
 
+func _on_geometry_seeding_boundary_override_changed(enabled: bool) -> void:
+	_on_geometry_seeding_override_changed("boundary_clearance_override", enabled)
+
+
+func _on_geometry_seeding_stagger_override_changed(enabled: bool) -> void:
+	_on_geometry_seeding_override_changed("stagger_override", enabled)
+
+
+func _on_geometry_seeding_override_changed(parameter_name: String, enabled: bool) -> void:
+	if selected_asset_id.is_empty() or selected_component_id.is_empty():
+		return
+	var document := _get_geometry_document(selected_asset_id, selected_component_id, true)
+	var recipe := _geometry_seeding_recipe(selected_asset_id, selected_component_id)
+	if bool(recipe.get("parameters", {}).get(parameter_name, false)) == enabled:
+		return
+	_record_direct_change()
+	recipe["parameters"][parameter_name] = enabled
+	document["seeding"]["recipe"] = GeometrySeedingService.normalize_recipe(recipe)
+	call_deferred("_refresh_geometry_after_recipe_change")
+
+
+func _on_geometry_seeding_advanced_pattern_toggled(expanded: bool) -> void:
+	geometry_seeding_advanced_pattern_expanded = expanded
+	_render_inspector()
+
+
 func _on_geometry_seeding_parameter_changed(value: float, parameter_name: String) -> void:
 	if selected_asset_id.is_empty() or selected_component_id.is_empty():
 		return
@@ -8351,6 +8575,8 @@ func _on_geometry_seeding_parameter_changed(value: float, parameter_name: String
 	var normalized_value: Variant = value
 	if parameter_name in ["spacing", "along_spacing", "across_spacing"]:
 		normalized_value = maxf(value, GeometrySeedingService.MIN_SPACING)
+	elif parameter_name == "flow_stretch":
+		normalized_value = clampf(value, GeometrySeedingService.MIN_FLOW_STRETCH, GeometrySeedingService.MAX_FLOW_STRETCH)
 	elif parameter_name == "boundary_clearance":
 		normalized_value = maxf(value, 0.0)
 	elif parameter_name == "stagger":
@@ -8397,15 +8623,19 @@ func _commit_geometry_seeding_spacing_text(raw_text: String, spacing: SpinBox, p
 func _generate_geometry_seeding_preview() -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	if component.is_empty() or not _geometry_sampling_bake_is_current(selected_asset_id, selected_component_id, component):
+		geometry_seeding_preview_state = "invalid"
 		_show_status_message("Bake current Sampling before generating Seeds.")
 		return
 	var recipe := _geometry_seeding_recipe(selected_asset_id, selected_component_id)
-	var guide := _geometry_seeding_sampler_spine(selected_asset_id, selected_component_id, recipe)
+	var guides := _geometry_seeding_sampler_spines(selected_asset_id, selected_component_id, recipe)
 	geometry_seeding_preview_key = _geometry_document_key(selected_asset_id, selected_component_id)
-	geometry_seeding_preview = GeometrySeedingService.generate(_geometry_sampling_bake(selected_asset_id, selected_component_id), recipe, guide)
+	geometry_seeding_preview_state = "calculating"
+	geometry_seeding_preview = GeometrySeedingService.generate(_geometry_sampling_bake(selected_asset_id, selected_component_id), recipe, guides)
 	if bool(geometry_seeding_preview.get("valid", false)):
+		geometry_seeding_preview_state = "ready"
 		_show_status_message("Generated %d Seeds." % int(geometry_seeding_preview.get("seed_count", 0)))
 	else:
+		geometry_seeding_preview_state = "invalid"
 		var errors: Array = geometry_seeding_preview.get("errors", [])
 		_show_status_message(str(errors[0]) if not errors.is_empty() else "Seeding could not be generated.")
 	_render_outliner()
@@ -8414,8 +8644,38 @@ func _generate_geometry_seeding_preview() -> void:
 
 
 func _bake_geometry_seeding() -> void:
-	_generate_geometry_seeding_preview()
 	_bake_geometry_seeding_preview()
+
+
+func _schedule_geometry_seeding_preview() -> void:
+	if selected_asset_id.is_empty() or selected_component_id.is_empty():
+		return
+	geometry_seeding_preview_revision += 1
+	var revision := geometry_seeding_preview_revision
+	geometry_seeding_preview = {}
+	geometry_seeding_preview_key = _geometry_document_key(selected_asset_id, selected_component_id)
+	geometry_seeding_preview_state = "calculating"
+	_render_outliner()
+	_update_geometry_seeding_bake_button()
+	_refresh_geometry_seeding_workspace()
+	_generate_geometry_seeding_preview_after_delay(revision)
+
+
+func _generate_geometry_seeding_preview_after_delay(revision: int) -> void:
+	if is_inside_tree():
+		await get_tree().create_timer(0.15).timeout
+	if revision != geometry_seeding_preview_revision:
+		return
+	_generate_geometry_seeding_preview()
+
+
+func _update_geometry_seeding_bake_button() -> void:
+	if not is_instance_valid(geometry_seeding_bake_button):
+		return
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	var status := _geometry_seeding_status(selected_asset_id, selected_component_id, component)
+	geometry_seeding_bake_button.text = "Calculating…" if status == "Calculating" else "Baked" if status in ["Baked", "Edited"] else "Bake Preview"
+	geometry_seeding_bake_button.disabled = status != "Preview Ready"
 
 
 func _bake_geometry_seeding_preview(enter_edit_after_bake := false) -> void:
@@ -8444,6 +8704,8 @@ func _confirm_bake_geometry_seeding_preview() -> void:
 	selected_geometry_bake_method = str(bake.get("method", ""))
 	geometry_seeding_preview = {}
 	geometry_seeding_preview_key = ""
+	geometry_seeding_preview_state = "idle"
+	geometry_seeding_preview_revision += 1
 	_set_geometry_command_state("seeding_edit" if geometry_seeding_enter_edit_after_bake else "")
 	geometry_seeding_enter_edit_after_bake = false
 	_show_status_message("Seeding baked for %s." % str(component.get("name", "Component")))
@@ -8468,8 +8730,8 @@ func _refresh_geometry_seeding_workspace() -> void:
 		return
 	var status := _geometry_seeding_status(selected_asset_id, selected_component_id, component)
 	var result := geometry_seeding_preview if _geometry_seeding_preview_matches(selected_asset_id, selected_component_id, component) else _geometry_seeding_bake(selected_asset_id, selected_component_id)
-	var guide := _geometry_seeding_sampler_spine(selected_asset_id, selected_component_id)
-	geometry_seeding_workspace.set_context(_geometry_sampling_bake(selected_asset_id, selected_component_id), result, guide, status, geometry_seeding_edit_active and status in ["Baked", "Edited"], geometry_seeding_edit_tool)
+	var guides := _geometry_seeding_sampler_spines(selected_asset_id, selected_component_id)
+	geometry_seeding_workspace.set_context(_geometry_sampling_bake(selected_asset_id, selected_component_id), result, guides, status, geometry_seeding_edit_active and status in ["Baked", "Edited"], geometry_seeding_edit_tool, selected_sampling_input_id)
 
 
 func _editable_geometry_seeding_bake() -> Dictionary:
@@ -8482,12 +8744,13 @@ func _editable_geometry_seeding_bake() -> Dictionary:
 func _on_geometry_seed_add_requested(position: Vector2) -> void:
 	var bake := _editable_geometry_seeding_bake()
 	var sampling_bake := _geometry_sampling_bake(selected_asset_id, selected_component_id)
-	if bake.is_empty() or not GeometrySeedingService.point_is_valid(sampling_bake, position):
-		_show_status_message("Seeds must remain inside the sampled boundary.")
+	var recipe := _geometry_seeding_recipe(selected_asset_id, selected_component_id)
+	if bake.is_empty() or not GeometrySeedingService.point_is_valid(sampling_bake, position, _geometry_seeding_constraint_clearance(recipe)):
+		_show_status_message("Seeds must respect Outer, Hole, Cut, and constraint clearance.")
 		return
 	for seed_data in bake.get("seeds", []):
-		if position.distance_to(Vector2(seed_data.get("position", Vector2.ZERO))) < GeometrySeedingService.MIN_SPACING:
-			_show_status_message("A Seed already exists at this position.")
+		if position.distance_to(Vector2(seed_data.get("position", Vector2.ZERO))) < _geometry_seeding_manual_minimum_distance(recipe):
+			_show_status_message("Seeds must respect the current minimum spacing.")
 			return
 	_record_direct_change()
 	bake["seeds"].append({"id": "seed:manual:%d" % ResourceUID.create_id(), "position": position, "origin": "manual", "method": "manual", "provenance": {}})
@@ -8501,8 +8764,12 @@ func _on_geometry_seed_move_started(_seed_id: String) -> void:
 
 func _on_geometry_seed_move_requested(seed_id: String, position: Vector2) -> void:
 	var bake := _editable_geometry_seeding_bake()
-	if bake.is_empty() or not GeometrySeedingService.point_is_valid(_geometry_sampling_bake(selected_asset_id, selected_component_id), position):
+	var recipe := _geometry_seeding_recipe(selected_asset_id, selected_component_id)
+	if bake.is_empty() or not GeometrySeedingService.point_is_valid(_geometry_sampling_bake(selected_asset_id, selected_component_id), position, _geometry_seeding_constraint_clearance(recipe)):
 		return
+	for other_seed in bake.get("seeds", []):
+		if str(other_seed.get("id", "")) != seed_id and position.distance_to(Vector2(other_seed.get("position", Vector2.ZERO))) < _geometry_seeding_manual_minimum_distance(recipe):
+			return
 	for seed_data in bake.get("seeds", []):
 		if str(seed_data.get("id", "")) == seed_id:
 			seed_data["position"] = position
@@ -8514,6 +8781,19 @@ func _on_geometry_seed_move_requested(seed_id: String, position: Vector2) -> voi
 				geometry_seeding_workspace.status = "Edited"
 				geometry_seeding_workspace.queue_redraw()
 			return
+
+
+func _geometry_seeding_constraint_clearance(recipe: Dictionary) -> float:
+	if str(recipe.get("method", "")) == GeometrySeedingService.SPINE_FLOW:
+		return maxf(float(recipe.get("parameters", {}).get("boundary_clearance", GeometrySeedingService.DEFAULT_BOUNDARY_CLEARANCE)), 0.0)
+	return maxf(float(recipe.get("parameters", {}).get("spacing", GeometrySeedingService.DEFAULT_SPACING)), GeometrySeedingService.MIN_SPACING) \
+		* maxf(float(recipe.get("parameters", {}).get("constraint_clearance_factor", GeometrySeedingService.DEFAULT_CONSTRAINT_CLEARANCE_FACTOR)), 0.0)
+
+
+func _geometry_seeding_manual_minimum_distance(recipe: Dictionary) -> float:
+	if str(recipe.get("method", "")) == GeometrySeedingService.SPINE_FLOW:
+		return minf(float(recipe.get("parameters", {}).get("along_spacing", GeometrySeedingService.DEFAULT_ALONG_SPACING)), float(recipe.get("parameters", {}).get("across_spacing", GeometrySeedingService.DEFAULT_ACROSS_SPACING)))
+	return float(recipe.get("parameters", {}).get("spacing", GeometrySeedingService.DEFAULT_SPACING))
 
 
 func _on_geometry_seed_move_finished(_seed_id: String) -> void:
@@ -12355,6 +12635,8 @@ func _select_submodule(module_name: String, submodule: String, section: ModuleSe
 	if module_name != "Mesh" or submodule != "Sampling":
 		geometry_sampling_preview_revision += 1
 		geometry_sampling_input_refresh_pending = false
+	if module_name != "Mesh" or submodule != "Seeding":
+		geometry_seeding_preview_revision += 1
 	_set_active_module_visual(module_name, submodule)
 	active_module = module_name
 	if module_name == "Create":

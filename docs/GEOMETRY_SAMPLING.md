@@ -63,7 +63,48 @@ current recipe and source fingerprint; it does not generate again. Recipe or
 topology changes retain the previous Bake as stale and invalidate downstream
 Seeding and Meshing through their existing fingerprint dependencies.
 
+## Constraint-aware Seeding
+
+`Mesh → Seeding` consumes only an accepted current Sampling Bake. It derives
+one constraint domain: the Outer bounds the valid interior, closed Holes remove
+interior regions, and open Cuts act as internal barriers without excluding
+either side. Sampled Outer, Hole, and Cut points remain fixed downstream mesh
+vertices and are never duplicated as interior Seeds.
+
+Poisson Fill uses one minimum Seed Spacing and an automatic constraint
+clearance equal to `Spacing × 0.5`. Candidates must remain inside Outer,
+outside every Hole, and outside the clearance band of Outer, Holes, and Cuts.
+The exact Sampling fingerprint includes sampled Cuts, so any accepted
+constraint change makes Seeding and Meshing stale.
+
+Spine Flow uses the same domain and clips its normal rows at the nearest Outer,
+Hole, or Cut. A recipe may enable multiple Sampler Spines. Their candidates are
+combined deterministically, resolve conflicts through stable Guide order, and
+share one global minimum-distance pass. Optional Gap Fill runs once after all
+Flow candidates and respects both constraints and accepted Flow Seeds.
+
+The primary Spine Flow Inspector is an Artistic control layer. `Seed Spacing`
+defines Across Spacing and Gap Fill density, while `Flow Stretch` derives
+`Along Spacing = Seed Spacing × Flow Stretch`. Boundary Margin defaults to
+`Seed Spacing × 0.5`, and Stagger defaults to `0.1`. Boundary Margin and
+Stagger may be refined explicitly; derived Along/Across values, Stagger, and
+Random Seed live below the collapsed `Advanced Pattern` disclosure. Legacy
+recipes with explicit Along, Across, Boundary Clearance, or Stagger retain the
+same result by loading those technical values as Artistic overrides.
+
+Seeding parameter changes schedule a debounced transient Preview. The states
+are `Sampling Required`, `Ready to Preview`, `Calculating`, `Preview Ready`,
+`Invalid`, `Baked`, and `Edited`. `Bake Preview` copies the exact current
+Preview; replacing a manually edited Bake remains an explicit confirmed action.
+Only accepted current Bakes may enter manual Seed editing, and manual additions
+or moves must satisfy the active constraint clearance and Seed spacing.
+
+Schema 30 migrates the former Spine Flow `guide_id` into an ordered
+`spine_inputs` list. Older Seeding Bakes remain readable but are stale until
+regenerated with the constraint-aware algorithm version.
+
 ## Deferred
 
 Manual sample-point editing, per-boundary Curve Detail, background-threaded
-generation, and export consumption remain deferred.
+generation, per-Spine spacing overrides, blended vector fields at Spine
+intersections, and export consumption remain deferred.

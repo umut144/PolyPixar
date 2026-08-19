@@ -4,26 +4,26 @@ extends RefCounted
 const POISSON_FILL := "poisson_fill"
 const SPINE_FLOW := "spine_flow"
 const VALID_METHODS := [POISSON_FILL, SPINE_FLOW]
+const ALGORITHM_VERSION := 2
 const DEFAULT_SPACING := 2.0
 const DEFAULT_SEED := 1
+const DEFAULT_CONSTRAINT_CLEARANCE_FACTOR := 0.5
 const DEFAULT_ALONG_SPACING := 2.0
 const DEFAULT_ACROSS_SPACING := 2.0
 const DEFAULT_BOUNDARY_CLEARANCE := 0.5
 const DEFAULT_STAGGER := 0.5
+const DEFAULT_FLOW_STRETCH := 1.0
+const DEFAULT_ARTISTIC_STAGGER := 0.1
 const DEFAULT_FILL_GAPS := true
 const MIN_SPACING := 0.01
+const MIN_FLOW_STRETCH := 0.25
+const MAX_FLOW_STRETCH := 16.0
 const MAX_SEEDS := 20000
 const CANDIDATES_PER_ACTIVE_POINT := 30
 
 
 static func default_recipe() -> Dictionary:
-	return {
-		"method": POISSON_FILL,
-		"parameters": {
-			"spacing": DEFAULT_SPACING,
-			"seed": DEFAULT_SEED
-		}
-	}
+	return {"method": POISSON_FILL, "parameters": {"spacing": DEFAULT_SPACING, "constraint_clearance_factor": DEFAULT_CONSTRAINT_CLEARANCE_FACTOR, "seed": DEFAULT_SEED}}
 
 
 static func normalize_recipe(raw_recipe) -> Dictionary:
@@ -33,108 +33,165 @@ static func normalize_recipe(raw_recipe) -> Dictionary:
 	var method := str(raw_recipe.get("method", POISSON_FILL))
 	recipe["method"] = method if method in VALID_METHODS else POISSON_FILL
 	var parameters = raw_recipe.get("parameters", {})
+	if not parameters is Dictionary:
+		parameters = {}
 	if recipe["method"] == SPINE_FLOW:
+		var spine_inputs: Array = []
+		var raw_inputs = parameters.get("spine_inputs", [])
+		if raw_inputs is Array:
+			for raw_input in raw_inputs:
+				if not raw_input is Dictionary:
+					continue
+				var guide_id := str(raw_input.get("guide_id", ""))
+				if guide_id.is_empty() or _spine_input_index(spine_inputs, guide_id) >= 0:
+					continue
+				spine_inputs.append({"guide_id": guide_id, "enabled": bool(raw_input.get("enabled", true))})
+		# Schema-29 migration: one guide_id becomes one enabled spine input.
+		var legacy_guide_id := str(parameters.get("guide_id", ""))
+		if spine_inputs.is_empty() and not legacy_guide_id.is_empty():
+			spine_inputs.append({"guide_id": legacy_guide_id, "enabled": true})
+		# Artistic controls derive the exact lattice values. Recipes written before
+		# these controls preserve their explicit clearance and stagger as overrides.
+		var legacy_across := maxf(float(parameters.get("across_spacing", DEFAULT_ACROSS_SPACING)), MIN_SPACING)
+		var legacy_along := maxf(float(parameters.get("along_spacing", DEFAULT_ALONG_SPACING)), MIN_SPACING)
+		var spacing := maxf(float(parameters.get("spacing", legacy_across)), MIN_SPACING)
+		var flow_stretch := clampf(float(parameters.get("flow_stretch", legacy_along / legacy_across)), MIN_FLOW_STRETCH, MAX_FLOW_STRETCH)
+		var boundary_override := bool(parameters.get("boundary_clearance_override", parameters.has("boundary_clearance")))
+		var stagger_override := bool(parameters.get("stagger_override", parameters.has("stagger")))
+		var boundary_clearance := maxf(float(parameters.get("boundary_clearance", DEFAULT_BOUNDARY_CLEARANCE)), 0.0) if boundary_override else spacing * DEFAULT_CONSTRAINT_CLEARANCE_FACTOR
+		var stagger := clampf(float(parameters.get("stagger", DEFAULT_STAGGER)), 0.0, 1.0) if stagger_override else DEFAULT_ARTISTIC_STAGGER
 		recipe["parameters"] = {
-			"guide_id": str(parameters.get("guide_id", "")) if parameters is Dictionary else "",
-			"along_spacing": maxf(float(parameters.get("along_spacing", DEFAULT_ALONG_SPACING)), MIN_SPACING) if parameters is Dictionary else DEFAULT_ALONG_SPACING,
-			"across_spacing": maxf(float(parameters.get("across_spacing", DEFAULT_ACROSS_SPACING)), MIN_SPACING) if parameters is Dictionary else DEFAULT_ACROSS_SPACING,
-			"boundary_clearance": maxf(float(parameters.get("boundary_clearance", DEFAULT_BOUNDARY_CLEARANCE)), 0.0) if parameters is Dictionary else DEFAULT_BOUNDARY_CLEARANCE,
-			"stagger": clampf(float(parameters.get("stagger", DEFAULT_STAGGER)), 0.0, 1.0) if parameters is Dictionary else DEFAULT_STAGGER,
-			"fill_gaps": bool(parameters.get("fill_gaps", DEFAULT_FILL_GAPS)) if parameters is Dictionary else DEFAULT_FILL_GAPS,
-			"seed": maxi(0, int(parameters.get("seed", DEFAULT_SEED))) if parameters is Dictionary else DEFAULT_SEED
+			"spine_inputs": spine_inputs,
+			"spacing": spacing,
+			"flow_stretch": flow_stretch,
+			"along_spacing": spacing * flow_stretch,
+			"across_spacing": spacing,
+			"boundary_clearance_override": boundary_override,
+			"boundary_clearance": boundary_clearance,
+			"stagger_override": stagger_override,
+			"stagger": stagger,
+			"fill_gaps": bool(parameters.get("fill_gaps", DEFAULT_FILL_GAPS)),
+			"seed": maxi(0, int(parameters.get("seed", DEFAULT_SEED)))
 		}
-	elif parameters is Dictionary:
+	else:
 		recipe["parameters"]["spacing"] = maxf(float(parameters.get("spacing", DEFAULT_SPACING)), MIN_SPACING)
+		recipe["parameters"]["constraint_clearance_factor"] = maxf(float(parameters.get("constraint_clearance_factor", DEFAULT_CONSTRAINT_CLEARANCE_FACTOR)), 0.0)
 		recipe["parameters"]["seed"] = maxi(0, int(parameters.get("seed", DEFAULT_SEED)))
 	return recipe
 
 
-static func generate(sampling_bake: Dictionary, raw_recipe = {}, guide: Dictionary = {}) -> Dictionary:
+static func generate(sampling_bake: Dictionary, raw_recipe = {}, raw_guides = []) -> Dictionary:
 	var recipe := normalize_recipe(raw_recipe)
-	var errors := validation_issues(sampling_bake, recipe, guide)
+	var guides := _guide_array(raw_guides)
+	var errors := validation_issues(sampling_bake, recipe, guides)
 	if not errors.is_empty():
-		return _failed_result(recipe, sampling_bake, guide, errors)
-	var boundaries := boundary_polygons(sampling_bake)
-	var outer: PackedVector2Array = boundaries.get("outer", PackedVector2Array())
-	var holes: Array = boundaries.get("holes", [])
-	var positions: Array[Vector2] = []
+		return _failed_result(recipe, sampling_bake, guides, errors)
+	var domain := constraint_domain(sampling_bake)
+	var placements: Array[Dictionary] = []
+	var guide_stats: Array = []
 	var flow_count := 0
+	var gap_count := 0
 	if str(recipe["method"]) == SPINE_FLOW:
-		positions = _spine_flow_positions(outer, holes, guide, recipe["parameters"])
-		flow_count = positions.size()
+		var flow_result := _combined_spine_flow(domain, guides, recipe["parameters"])
+		placements = flow_result.get("placements", [])
+		guide_stats = flow_result.get("guide_stats", [])
+		flow_count = placements.size()
 		if bool(recipe["parameters"]["fill_gaps"]):
-			var gap_spacing := minf(float(recipe["parameters"]["along_spacing"]), float(recipe["parameters"]["across_spacing"]))
-			positions = _poisson_positions(outer, holes, gap_spacing, float(recipe["parameters"]["boundary_clearance"]), int(recipe["parameters"]["seed"]), positions)
+			var gap_spacing := float(recipe["parameters"]["spacing"])
+			var initial_positions: Array[Vector2] = []
+			for placement in placements:
+				initial_positions.append(Vector2(placement.get("position", Vector2.ZERO)))
+			var filled := _poisson_positions(domain, gap_spacing, float(recipe["parameters"]["boundary_clearance"]), int(recipe["parameters"]["seed"]), initial_positions)
+			for filled_index in range(initial_positions.size(), filled.size()):
+				placements.append({"position": filled[filled_index], "placement": "gap_fill"})
+			gap_count = maxi(placements.size() - flow_count, 0)
 	else:
 		var spacing := float(recipe["parameters"]["spacing"])
-		positions = _poisson_positions(outer, holes, spacing, spacing * 0.5, int(recipe["parameters"]["seed"]))
+		var clearance := spacing * float(recipe["parameters"]["constraint_clearance_factor"])
+		for position in _poisson_positions(domain, spacing, clearance, int(recipe["parameters"]["seed"])):
+			placements.append({"position": position, "placement": "poisson"})
 	var seeds: Array = []
-	for seed_index in range(positions.size()):
-		var placement := "poisson" if str(recipe["method"]) == POISSON_FILL else "flow" if seed_index < flow_count else "gap_fill"
-		seeds.append({
-			"id": "seed:auto:%06d" % (seed_index + 1),
-			"position": positions[seed_index],
-			"origin": "generated",
-			"method": recipe["method"],
-			"provenance": {"generation_index": seed_index, "placement": placement}
-		})
+	for seed_index in range(placements.size()):
+		var placement: Dictionary = placements[seed_index]
+		var provenance := placement.duplicate(true)
+		provenance.erase("position")
+		provenance["generation_index"] = seed_index
+		seeds.append({"id": "seed:auto:%06d" % (seed_index + 1), "position": Vector2(placement.get("position", Vector2.ZERO)), "origin": "generated", "method": recipe["method"], "provenance": provenance})
+	var guide_ids := _active_guide_ids(recipe)
 	return {
-		"valid": true,
-		"errors": [],
-		"method": recipe["method"],
-		"parameters": recipe["parameters"].duplicate(true),
-		"sampling_bake_id": str(sampling_bake.get("bake_id", "")),
-		"sampling_fingerprint": sampling_fingerprint(sampling_bake),
-		"guide_id": str(guide.get("id", "")) if str(recipe["method"]) == SPINE_FLOW else "",
-		"guide_fingerprint": guide_fingerprint(guide) if str(recipe["method"]) == SPINE_FLOW else "",
-		"seeds": seeds,
-		"seed_count": seeds.size(),
-		"edited": false
+		"valid": true, "errors": [], "algorithm_version": ALGORITHM_VERSION,
+		"method": recipe["method"], "parameters": recipe["parameters"].duplicate(true),
+		"sampling_bake_id": str(sampling_bake.get("bake_id", "")), "sampling_fingerprint": sampling_fingerprint(sampling_bake),
+		"guide_ids": guide_ids, "guides_fingerprint": guides_fingerprint(guides),
+		"guide_id": str(guide_ids[0]) if guide_ids.size() == 1 else "", "guide_fingerprint": guide_fingerprint(guides[0]) if guides.size() == 1 else "",
+		"guide_stats": guide_stats, "flow_seed_count": flow_count, "gap_seed_count": gap_count,
+		"seeds": seeds, "seed_count": seeds.size(), "edited": false
 	}
 
 
-static func validation_issues(sampling_bake: Dictionary, recipe: Dictionary = {}, guide: Dictionary = {}) -> Array[String]:
+static func validation_issues(sampling_bake: Dictionary, recipe: Dictionary = {}, raw_guides = []) -> Array[String]:
 	var errors: Array[String] = []
 	if sampling_bake.is_empty() or not bool(sampling_bake.get("valid", false)):
 		errors.append("Seeding requires a valid Sampling Bake.")
 		return errors
 	if str(sampling_bake.get("bake_id", "")).is_empty():
 		errors.append("The Sampling Bake has no stable Bake ID.")
-	var boundaries := boundary_polygons(sampling_bake)
-	var outer: PackedVector2Array = boundaries.get("outer", PackedVector2Array())
-	var holes: Array = boundaries.get("holes", [])
+	var domain := constraint_domain(sampling_bake)
+	var outer: PackedVector2Array = domain.get("outer", PackedVector2Array())
 	if outer.size() < 3:
 		errors.append("Seeding requires one sampled outer boundary with at least three Points.")
-	if str(recipe.get("method", POISSON_FILL)) == SPINE_FLOW:
-		if guide.is_empty() or str(guide.get("guide_type", "")) != AssetGuide.SAMPLER_SPINE:
-			errors.append("Spine Flow requires a Sampler Spine from this Component.")
-		elif str(recipe.get("parameters", {}).get("guide_id", "")) != str(guide.get("id", "")):
-			errors.append("The selected Sampler Spine is unavailable.")
-		elif guide.get("points", []).size() < 2 or guide.get("chains", []).size() != 1:
+	var normalized := normalize_recipe(recipe)
+	if str(normalized.get("method", POISSON_FILL)) != SPINE_FLOW:
+		return errors
+	var guides := _guide_array(raw_guides)
+	var active_ids := _active_guide_ids(normalized)
+	if active_ids.is_empty():
+		errors.append("Spine Flow requires at least one enabled Sampler Spine.")
+		return errors
+	var guides_by_id: Dictionary = {}
+	for guide in guides:
+		guides_by_id[str(guide.get("id", ""))] = guide
+	for guide_id in active_ids:
+		if not guides_by_id.has(guide_id):
+			errors.append("Sampler Spine %s is unavailable." % guide_id)
+			continue
+		var guide: Dictionary = guides_by_id[guide_id]
+		if str(guide.get("guide_type", "")) != AssetGuide.SAMPLER_SPINE:
+			errors.append("Spine Flow inputs must be Sampler Spine Guides.")
+			continue
+		if guide.get("points", []).size() < 2 or guide.get("chains", []).size() != 1:
 			errors.append("Spine Flow requires one authored open Sampler Spine with at least two Points.")
-		else:
-			var guide_polyline := _guide_polyline(guide)
-			var boundary_tolerance := maxf(0.0001, float(sampling_bake.get("parameters", {}).get("spacing", 1.0)) * 0.25)
-			for position in guide_polyline:
-				if not _point_is_inside_or_on_boundary(position, outer, holes, boundary_tolerance):
-					errors.append("The Sampler Spine curve must remain inside the sampled Component boundary.")
-					break
+			continue
+		var boundary_tolerance := maxf(0.0001, float(sampling_bake.get("parameters", {}).get("spacing", 1.0)) * 0.25)
+		for position in _guide_polyline(guide):
+			if not _point_is_inside_or_on_boundary(position, outer, domain.get("holes", []), boundary_tolerance):
+				errors.append("Sampler Spine %s must remain inside the sampled Component boundary." % str(guide.get("name", guide_id)))
+				break
 	return errors
 
 
 static func guide_fingerprint(guide: Dictionary) -> String:
 	if guide.is_empty():
 		return ""
-	var parts := PackedStringArray([str(guide.get("id", "")), str(guide.get("guide_type", "")), str(guide.get("scope", {}).get("component_id", "")), GeometrySamplingService.source_fingerprint(guide)])
-	var context := HashingContext.new()
-	context.start(HashingContext.HASH_SHA256)
-	context.update("\n".join(parts).to_utf8_buffer())
-	return context.finish().hex_encode()
+	return _hash_parts(PackedStringArray([str(guide.get("id", "")), str(guide.get("guide_type", "")), str(guide.get("scope", {}).get("component_id", "")), GeometrySamplingService.source_fingerprint(guide)]))
+
+
+static func guides_fingerprint(raw_guides) -> String:
+	var parts := PackedStringArray()
+	for guide in _guide_array(raw_guides):
+		parts.append("%s|%s" % [str(guide.get("id", "")), guide_fingerprint(guide)])
+	return _hash_parts(parts)
 
 
 static func boundary_polygons(sampling_bake: Dictionary) -> Dictionary:
+	var domain := constraint_domain(sampling_bake)
+	return {"outer": domain.get("outer", PackedVector2Array()), "holes": domain.get("holes", [])}
+
+
+static func constraint_domain(sampling_bake: Dictionary) -> Dictionary:
 	var outer := PackedVector2Array()
 	var holes: Array = []
+	var cuts: Array = []
 	for chain_data in sampling_bake.get("chains", []):
 		if not chain_data is Dictionary or not bool(chain_data.get("closed", false)):
 			continue
@@ -147,19 +204,26 @@ static func boundary_polygons(sampling_bake: Dictionary) -> Dictionary:
 			outer = polygon
 		elif role == "hole" and polygon.size() >= 3:
 			holes.append(polygon)
-	return {"outer": outer, "holes": holes}
+	for cut_data in sampling_bake.get("cuts", []):
+		if not cut_data is Dictionary or not bool(cut_data.get("valid", false)):
+			continue
+		var polyline := PackedVector2Array()
+		for sample in cut_data.get("samples", []):
+			if sample is Dictionary:
+				polyline.append(Vector2(sample.get("position", Vector2.ZERO)))
+		if polyline.size() >= 2:
+			cuts.append({"guide_id": str(cut_data.get("guide_id", "")), "points": polyline})
+	return {"outer": outer, "holes": holes, "cuts": cuts}
 
 
 static func point_is_inside(sampling_bake: Dictionary, position: Vector2) -> bool:
-	var boundaries := boundary_polygons(sampling_bake)
-	return _point_is_inside_polygons(position, boundaries.get("outer", PackedVector2Array()), boundaries.get("holes", []))
+	var domain := constraint_domain(sampling_bake)
+	return _point_is_inside_polygons(position, domain.get("outer", PackedVector2Array()), domain.get("holes", []))
 
 
 static func point_is_valid(sampling_bake: Dictionary, position: Vector2, clearance := 0.0001) -> bool:
-	var boundaries := boundary_polygons(sampling_bake)
-	var outer: PackedVector2Array = boundaries.get("outer", PackedVector2Array())
-	var holes: Array = boundaries.get("holes", [])
-	return _point_is_inside_polygons(position, outer, holes) and _distance_to_boundaries(position, outer, holes) >= maxf(clearance, 0.0)
+	var domain := constraint_domain(sampling_bake)
+	return _point_is_valid_in_domain(position, domain, clearance)
 
 
 static func sampling_fingerprint(sampling_bake: Dictionary) -> String:
@@ -172,21 +236,64 @@ static func sampling_fingerprint(sampling_bake: Dictionary) -> String:
 			if sample is Dictionary:
 				var position: Vector2 = sample.get("position", Vector2.ZERO)
 				parts.append("s|%s|%.9f|%.9f" % [str(sample.get("id", "")), position.x, position.y])
-	var context := HashingContext.new()
-	context.start(HashingContext.HASH_SHA256)
-	var payload := "\n".join(parts)
-	context.update((payload if not payload.is_empty() else "empty").to_utf8_buffer())
-	return context.finish().hex_encode()
+	for cut_data in sampling_bake.get("cuts", []):
+		if not cut_data is Dictionary:
+			continue
+		parts.append("cut|%s|%d" % [str(cut_data.get("guide_id", "")), int(bool(cut_data.get("valid", false)))])
+		for sample in cut_data.get("samples", []):
+			if sample is Dictionary:
+				var position: Vector2 = sample.get("position", Vector2.ZERO)
+				parts.append("cs|%s|%.9f|%.9f" % [str(sample.get("id", "")), position.x, position.y])
+	return _hash_parts(parts)
 
 
-static func _spine_flow_positions(outer: PackedVector2Array, holes: Array, guide: Dictionary, parameters: Dictionary) -> Array[Vector2]:
-	var result: Array[Vector2] = []
-	var polyline := _guide_polyline(guide)
-	var stations := _resample_polyline(polyline, float(parameters["along_spacing"]))
+static func _combined_spine_flow(domain: Dictionary, guides: Array[Dictionary], parameters: Dictionary) -> Dictionary:
+	var candidates: Array[Dictionary] = []
+	for guide_order in range(guides.size()):
+		candidates.append_array(_spine_candidates(domain, guides[guide_order], guide_order, parameters))
+	candidates.sort_custom(func(first: Dictionary, second: Dictionary) -> bool:
+		var first_offset := float(first.get("offset", 0.0))
+		var second_offset := float(second.get("offset", 0.0))
+		if not is_equal_approx(first_offset, second_offset):
+			return first_offset < second_offset
+		var first_order := int(first.get("guide_order", 0))
+		var second_order := int(second.get("guide_order", 0))
+		if first_order != second_order:
+			return first_order < second_order
+		var first_station := int(first.get("station_index", 0))
+		var second_station := int(second.get("station_index", 0))
+		if first_station != second_station:
+			return first_station < second_station
+		return int(first.get("side", 0)) < int(second.get("side", 0))
+	)
+	var minimum_distance := minf(float(parameters["along_spacing"]), float(parameters["across_spacing"]))
+	if not bool(parameters.get("fill_gaps", true)):
+		minimum_distance *= 0.32
+	var placements: Array[Dictionary] = []
+	var positions: Array[Vector2] = []
+	var counts: Dictionary = {}
+	for candidate in candidates:
+		var position := Vector2(candidate.get("position", Vector2.ZERO))
+		if positions.size() >= MAX_SEEDS or not _append_spaced_position(positions, position, minimum_distance):
+			continue
+		var placement := candidate.duplicate(true)
+		placement["placement"] = "flow"
+		placements.append(placement)
+		var guide_id := str(candidate.get("guide_id", ""))
+		counts[guide_id] = int(counts.get(guide_id, 0)) + 1
+	var stats: Array = []
+	for guide in guides:
+		var guide_id := str(guide.get("id", ""))
+		stats.append({"guide_id": guide_id, "seed_count": int(counts.get(guide_id, 0))})
+	return {"placements": placements, "guide_stats": stats}
+
+
+static func _spine_candidates(domain: Dictionary, guide: Dictionary, guide_order: int, parameters: Dictionary) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	var stations := _resample_polyline(_guide_polyline(guide), float(parameters["along_spacing"]))
 	var across_spacing := float(parameters["across_spacing"])
-	var boundary_clearance := float(parameters["boundary_clearance"])
+	var clearance := float(parameters["boundary_clearance"])
 	var stagger := float(parameters["stagger"])
-	var minimum_distance := minf(float(parameters["along_spacing"]), across_spacing) * 0.32
 	for station_index in range(stations.size()):
 		var station: Dictionary = stations[station_index]
 		var position: Vector2 = station["position"]
@@ -195,18 +302,24 @@ static func _spine_flow_positions(outer: PackedVector2Array, holes: Array, guide
 			continue
 		var normal := Vector2(-tangent.y, tangent.x).normalized()
 		var phase := 0.0 if station_index % 2 == 0 else stagger
-		if is_zero_approx(phase) and _distance_to_boundaries(position, outer, holes) >= boundary_clearance:
-			_append_spaced_position(result, position, minimum_distance)
-		for direction_sign: float in [-1.0, 1.0]:
-			var direction: Vector2 = normal * direction_sign
-			var available := _ray_boundary_distance(position, direction, outer, holes) - boundary_clearance
+		if is_zero_approx(phase) and _point_is_valid_in_domain(position, domain, clearance):
+			result.append(_flow_candidate(position, guide, guide_order, station_index, 0, 0.0))
+		for side: int in [-1, 1]:
+			var direction := normal * float(side)
+			var available := _ray_constraint_distance(position, direction, domain) - clearance
 			if available <= 0.0:
 				continue
 			var offset := across_spacing * (phase if phase > 0.0 else 1.0)
 			while offset <= available + 0.000001 and result.size() < MAX_SEEDS:
-				_append_spaced_position(result, position + direction * offset, minimum_distance)
+				var candidate_position := position + direction * offset
+				if _point_is_valid_in_domain(candidate_position, domain, clearance):
+					result.append(_flow_candidate(candidate_position, guide, guide_order, station_index, side, offset))
 				offset += across_spacing
 	return result
+
+
+static func _flow_candidate(position: Vector2, guide: Dictionary, guide_order: int, station_index: int, side: int, offset: float) -> Dictionary:
+	return {"position": position, "guide_id": str(guide.get("id", "")), "guide_order": guide_order, "station_index": station_index, "side": side, "offset": offset}
 
 
 static func _guide_polyline(guide: Dictionary) -> PackedVector2Array:
@@ -242,19 +355,23 @@ static func _resample_polyline(polyline: PackedVector2Array, spacing: float) -> 
 	return result
 
 
-static func _ray_boundary_distance(origin: Vector2, direction: Vector2, outer: PackedVector2Array, holes: Array) -> float:
-	var distance := _ray_polygon_distance(origin, direction, outer)
-	for hole in holes:
+static func _ray_constraint_distance(origin: Vector2, direction: Vector2, domain: Dictionary) -> float:
+	var distance := _ray_polyline_distance(origin, direction, domain.get("outer", PackedVector2Array()), true)
+	for hole in domain.get("holes", []):
 		if hole is PackedVector2Array:
-			distance = minf(distance, _ray_polygon_distance(origin, direction, hole))
+			distance = minf(distance, _ray_polyline_distance(origin, direction, hole, true))
+	for cut in domain.get("cuts", []):
+		if cut is Dictionary:
+			distance = minf(distance, _ray_polyline_distance(origin, direction, cut.get("points", PackedVector2Array()), false))
 	return distance
 
 
-static func _ray_polygon_distance(origin: Vector2, direction: Vector2, polygon: PackedVector2Array) -> float:
+static func _ray_polyline_distance(origin: Vector2, direction: Vector2, polyline: PackedVector2Array, closed: bool) -> float:
 	var nearest := INF
-	for index in range(polygon.size()):
-		var start := polygon[index]
-		var segment := polygon[(index + 1) % polygon.size()] - start
+	var segment_count := polyline.size() if closed else maxi(polyline.size() - 1, 0)
+	for index in range(segment_count):
+		var start := polyline[index]
+		var segment := polyline[(index + 1) % polyline.size()] - start
 		var denominator := direction.cross(segment)
 		if is_zero_approx(denominator):
 			continue
@@ -266,15 +383,9 @@ static func _ray_polygon_distance(origin: Vector2, direction: Vector2, polygon: 
 	return nearest
 
 
-static func _append_spaced_position(positions: Array[Vector2], candidate: Vector2, minimum_distance: float) -> void:
-	for existing in positions:
-		if candidate.distance_squared_to(existing) < minimum_distance * minimum_distance:
-			return
-	positions.append(candidate)
-
-
-static func _poisson_positions(outer: PackedVector2Array, holes: Array, spacing: float, clearance: float, random_seed: int, initial_positions: Array[Vector2] = []) -> Array[Vector2]:
+static func _poisson_positions(domain: Dictionary, spacing: float, clearance: float, random_seed: int, initial_positions: Array[Vector2] = []) -> Array[Vector2]:
 	var result: Array[Vector2] = []
+	var outer: PackedVector2Array = domain.get("outer", PackedVector2Array())
 	if outer.size() < 3:
 		return result
 	var bounds := _polygon_bounds(outer)
@@ -283,14 +394,14 @@ static func _poisson_positions(outer: PackedVector2Array, holes: Array, spacing:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = random_seed
 	for initial_position in initial_positions:
-		if _point_is_inside_polygons(initial_position, outer, holes) and _distance_to_boundaries(initial_position, outer, holes) >= clearance:
+		if _point_is_valid_in_domain(initial_position, domain, clearance):
 			_append_spaced_position(result, initial_position, spacing)
 	var first := bounds.get_center()
-	if result.is_empty() and (not _point_is_inside_polygons(first, outer, holes) or _distance_to_boundaries(first, outer, holes) < clearance):
+	if result.is_empty() and not _point_is_valid_in_domain(first, domain, clearance):
 		var found_first := false
 		for _attempt in range(512):
 			var candidate := Vector2(rng.randf_range(bounds.position.x, bounds.end.x), rng.randf_range(bounds.position.y, bounds.end.y))
-			if _point_is_inside_polygons(candidate, outer, holes) and _distance_to_boundaries(candidate, outer, holes) >= clearance:
+			if _point_is_valid_in_domain(candidate, domain, clearance):
 				first = candidate
 				found_first = true
 				break
@@ -313,9 +424,7 @@ static func _poisson_positions(outer: PackedVector2Array, holes: Array, spacing:
 			var angle := rng.randf_range(0.0, TAU)
 			var distance := spacing * rng.randf_range(1.0, 2.0)
 			var candidate := source + Vector2.from_angle(angle) * distance
-			if not bounds.has_point(candidate):
-				continue
-			if not _point_is_inside_polygons(candidate, outer, holes) or _distance_to_boundaries(candidate, outer, holes) < clearance:
+			if not bounds.has_point(candidate) or not _point_is_valid_in_domain(candidate, domain, clearance):
 				continue
 			if not _has_poisson_clearance(candidate, result, grid, bounds.position, cell_size, spacing):
 				continue
@@ -330,20 +439,30 @@ static func _poisson_positions(outer: PackedVector2Array, holes: Array, spacing:
 	return result
 
 
+static func _append_spaced_position(positions: Array[Vector2], candidate: Vector2, minimum_distance: float) -> bool:
+	for existing in positions:
+		if candidate.distance_squared_to(existing) < minimum_distance * minimum_distance:
+			return false
+	positions.append(candidate)
+	return true
+
+
 static func _has_poisson_clearance(candidate: Vector2, positions: Array[Vector2], grid: Dictionary, origin: Vector2, cell_size: float, spacing: float) -> bool:
 	var key := _grid_key(candidate, origin, cell_size)
 	for y_offset in range(-2, 3):
 		for x_offset in range(-2, 3):
 			var neighbor_key := key + Vector2i(x_offset, y_offset)
-			if not grid.has(neighbor_key):
-				continue
-			if candidate.distance_squared_to(positions[int(grid[neighbor_key])]) < spacing * spacing:
+			if grid.has(neighbor_key) and candidate.distance_squared_to(positions[int(grid[neighbor_key])]) < spacing * spacing:
 				return false
 	return true
 
 
 static func _grid_key(position: Vector2, origin: Vector2, cell_size: float) -> Vector2i:
 	return Vector2i(floori((position.x - origin.x) / cell_size), floori((position.y - origin.y) / cell_size))
+
+
+static func _point_is_valid_in_domain(position: Vector2, domain: Dictionary, clearance: float) -> bool:
+	return _point_is_inside_polygons(position, domain.get("outer", PackedVector2Array()), domain.get("holes", [])) and _distance_to_constraints(position, domain) >= maxf(clearance, 0.0)
 
 
 static func _point_is_inside_polygons(position: Vector2, outer: PackedVector2Array, holes: Array) -> bool:
@@ -356,30 +475,34 @@ static func _point_is_inside_polygons(position: Vector2, outer: PackedVector2Arr
 
 
 static func _point_is_inside_or_on_boundary(position: Vector2, outer: PackedVector2Array, holes: Array, tolerance := 0.0001) -> bool:
-	if _distance_to_polygon(position, outer) <= tolerance:
+	if _distance_to_polyline(position, outer, true) <= tolerance:
 		return true
 	if not _point_is_inside_polygons(position, outer, holes):
 		return false
 	for hole in holes:
-		if hole is PackedVector2Array and _distance_to_polygon(position, hole) <= 0.0001:
+		if hole is PackedVector2Array and _distance_to_polyline(position, hole, true) <= tolerance:
 			return false
 	return true
 
 
-static func _distance_to_boundaries(position: Vector2, outer: PackedVector2Array, holes: Array) -> float:
-	var distance := _distance_to_polygon(position, outer)
-	for hole in holes:
+static func _distance_to_constraints(position: Vector2, domain: Dictionary) -> float:
+	var distance := _distance_to_polyline(position, domain.get("outer", PackedVector2Array()), true)
+	for hole in domain.get("holes", []):
 		if hole is PackedVector2Array:
-			distance = minf(distance, _distance_to_polygon(position, hole))
+			distance = minf(distance, _distance_to_polyline(position, hole, true))
+	for cut in domain.get("cuts", []):
+		if cut is Dictionary:
+			distance = minf(distance, _distance_to_polyline(position, cut.get("points", PackedVector2Array()), false))
 	return distance
 
 
-static func _distance_to_polygon(position: Vector2, polygon: PackedVector2Array) -> float:
-	if polygon.size() < 2:
+static func _distance_to_polyline(position: Vector2, polyline: PackedVector2Array, closed: bool) -> float:
+	if polyline.size() < 2:
 		return INF
 	var distance := INF
-	for point_index in range(polygon.size()):
-		var closest := Geometry2D.get_closest_point_to_segment(position, polygon[point_index], polygon[(point_index + 1) % polygon.size()])
+	var segment_count := polyline.size() if closed else polyline.size() - 1
+	for point_index in range(segment_count):
+		var closest := Geometry2D.get_closest_point_to_segment(position, polyline[point_index], polyline[(point_index + 1) % polyline.size()])
 		distance = minf(distance, position.distance_to(closest))
 	return distance
 
@@ -393,17 +516,49 @@ static func _polygon_bounds(polygon: PackedVector2Array) -> Rect2:
 	return bounds
 
 
-static func _failed_result(recipe: Dictionary, sampling_bake: Dictionary, guide: Dictionary, errors: Array[String]) -> Dictionary:
+static func _active_guide_ids(recipe: Dictionary) -> Array[String]:
+	var result: Array[String] = []
+	if str(recipe.get("method", "")) != SPINE_FLOW:
+		return result
+	for input in recipe.get("parameters", {}).get("spine_inputs", []):
+		if input is Dictionary and bool(input.get("enabled", true)) and not str(input.get("guide_id", "")).is_empty():
+			result.append(str(input.get("guide_id", "")))
+	return result
+
+
+static func _guide_array(raw_guides) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	if raw_guides is Dictionary:
+		if not raw_guides.is_empty():
+			result.append(raw_guides)
+	elif raw_guides is Array:
+		for guide in raw_guides:
+			if guide is Dictionary and not guide.is_empty():
+				result.append(guide)
+	return result
+
+
+static func _spine_input_index(inputs: Array, guide_id: String) -> int:
+	for index in range(inputs.size()):
+		if inputs[index] is Dictionary and str(inputs[index].get("guide_id", "")) == guide_id:
+			return index
+	return -1
+
+
+static func _hash_parts(parts: PackedStringArray) -> String:
+	var context := HashingContext.new()
+	context.start(HashingContext.HASH_SHA256)
+	var payload := "\n".join(parts)
+	context.update((payload if not payload.is_empty() else "empty").to_utf8_buffer())
+	return context.finish().hex_encode()
+
+
+static func _failed_result(recipe: Dictionary, sampling_bake: Dictionary, guides: Array[Dictionary], errors: Array[String]) -> Dictionary:
 	return {
-		"valid": false,
-		"errors": errors,
-		"method": recipe["method"],
-		"parameters": recipe["parameters"].duplicate(true),
-		"sampling_bake_id": str(sampling_bake.get("bake_id", "")),
-		"sampling_fingerprint": sampling_fingerprint(sampling_bake),
-		"guide_id": str(guide.get("id", "")) if str(recipe["method"]) == SPINE_FLOW else "",
-		"guide_fingerprint": guide_fingerprint(guide) if str(recipe["method"]) == SPINE_FLOW else "",
-		"seeds": [],
-		"seed_count": 0,
-		"edited": false
+		"valid": false, "errors": errors, "algorithm_version": ALGORITHM_VERSION,
+		"method": recipe["method"], "parameters": recipe["parameters"].duplicate(true),
+		"sampling_bake_id": str(sampling_bake.get("bake_id", "")), "sampling_fingerprint": sampling_fingerprint(sampling_bake),
+		"guide_ids": _active_guide_ids(recipe), "guides_fingerprint": guides_fingerprint(guides),
+		"guide_stats": [], "flow_seed_count": 0, "gap_seed_count": 0,
+		"seeds": [], "seed_count": 0, "edited": false
 	}

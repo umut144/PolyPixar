@@ -1041,6 +1041,332 @@
 			},
 			"type": "guide",
 			"visibility": true
+		},
+		{
+			"chains": [
+				{
+					"closed": false,
+					"edge_ids": [
+						"edge_6015383857755672634",
+						"edge_2191650122209008369",
+						"edge_8399194335695673690"
+					],
+					"id": "chain_6196425387893471834",
+					"point_ids": [
+						"point_6805433044984501063",
+						"point_2393707710168348403",
+						"point_9157106989813819233",
+						"point_2381282560185367015"
+					],
+					"topology_role": "outer"
+				}
+			],
+			"edges": [
+				{
+					"end_point_id": "point_2393707710168348403",
+					"id": "edge_6015383857755672634",
+					"render_outline": true,
+					"start_point_id": "point_6805433044984501063"
+				},
+				{
+					"end_point_id": "point_9157106989813819233",
+					"id": "edge_2191650122209008369",
+					"render_outline": true,
+					"start_point_id": "point_2393707710168348403"
+				},
+				{
+					"end_point_id": "point_2381282560185367015",
+					"id": "edge_8399194335695673690",
+					"render_outline": true,
+					"start_point_id": "point_9157106989813819233"
+				}
+			],
+			"guide_type": "sample",
+			"id": "guide_2",
+			"name": "Sample 01",
+			"ordinal": 1,
+			"points": [
+				{
+					"handle_in": [
+						0.0,
+						0.0
+					],
+					"handle_out": [
+						-0.800000011920929,
+						1.23333323001862
+					],
+					"handle_source": "auto",
+					"id": "point_6805433044984501063",
+					"mode": "aligned",
+					"position": [
+						0.0,
+						1.95000052452087
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.0,
+						-1.47007167339325
+					],
+					"handle_out": [
+						0.0,
+						1.21666657924652
+					],
+					"handle_source": "auto",
+					"id": "point_2393707710168348403",
+					"mode": "aligned",
+					"position": [
+						-2.40000009536743,
+						5.65000009536743
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.620259523391724,
+						-1.04668784141541
+					],
+					"handle_out": [
+						0.220914408564568,
+						0.372793018817902
+					],
+					"handle_source": "auto",
+					"id": "point_9157106989813819233",
+					"mode": "aligned",
+					"position": [
+						0.0,
+						8.39999961853027
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.0,
+						-0.433333396911621
+					],
+					"handle_out": [
+						0.0,
+						0.0
+					],
+					"handle_source": "auto",
+					"id": "point_2381282560185367015",
+					"mode": "aligned",
+					"position": [
+						0.0,
+						9.69999980926514
+					],
+					"preserve_point": false
+				}
+			],
+			"scope": {
+				"component_id": "component_55",
+				"kind": "component"
+			},
+			"type": "guide",
+			"visibility": true
+		},
+		{
+			"chains": [
+				{
+					"closed": false,
+					"edge_ids": [
+						"edge_5379893511533699925",
+						"edge_8199656032065113094",
+						"edge_4273399729105554193",
+						"edge_1604430252725253047",
+						"edge_3048206734841020633",
+						"edge_3674615792138257744"
+					],
+					"id": "chain_6125463343584420913",
+					"point_ids": [
+						"point_993730163657011734",
+						"point_6927589392155907224",
+						"point_7989737352765933616",
+						"point_2468366704275356027",
+						"point_2910367617094888383",
+						"point_1856203695281321250",
+						"point_2534182280166526457"
+					],
+					"topology_role": "outer"
+				}
+			],
+			"edges": [
+				{
+					"end_point_id": "point_6927589392155907224",
+					"id": "edge_5379893511533699925",
+					"render_outline": true,
+					"start_point_id": "point_993730163657011734"
+				},
+				{
+					"end_point_id": "point_7989737352765933616",
+					"id": "edge_8199656032065113094",
+					"render_outline": true,
+					"start_point_id": "point_6927589392155907224"
+				},
+				{
+					"end_point_id": "point_2468366704275356027",
+					"id": "edge_4273399729105554193",
+					"render_outline": true,
+					"start_point_id": "point_7989737352765933616"
+				},
+				{
+					"end_point_id": "point_2910367617094888383",
+					"id": "edge_1604430252725253047",
+					"render_outline": true,
+					"start_point_id": "point_2468366704275356027"
+				},
+				{
+					"end_point_id": "point_1856203695281321250",
+					"id": "edge_3048206734841020633",
+					"render_outline": true,
+					"start_point_id": "point_2910367617094888383"
+				},
+				{
+					"end_point_id": "point_2534182280166526457",
+					"id": "edge_3674615792138257744",
+					"render_outline": true,
+					"start_point_id": "point_1856203695281321250"
+				}
+			],
+			"guide_type": "sample",
+			"id": "guide_3",
+			"name": "Sample 02",
+			"ordinal": 2,
+			"points": [
+				{
+					"handle_in": [
+						0.0,
+						0.0
+					],
+					"handle_out": [
+						0.483333349227905,
+						0.299999803304672
+					],
+					"handle_source": "auto",
+					"id": "point_993730163657011734",
+					"mode": "aligned",
+					"position": [
+						0.0,
+						1.95000052452087
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.390368968248367,
+						-0.41379103064537
+					],
+					"handle_out": [
+						0.466820538043976,
+						0.494829684495926
+					],
+					"handle_source": "auto",
+					"id": "point_6927589392155907224",
+					"mode": "aligned",
+					"position": [
+						1.45000004768372,
+						2.84999990463257
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.174642652273178,
+						-0.657478332519531
+					],
+					"handle_out": [
+						0.12525737285614,
+						0.471557259559631
+					],
+					"handle_source": "auto",
+					"id": "point_7989737352765933616",
+					"mode": "aligned",
+					"position": [
+						2.5,
+						4.59999990463257
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.171316429972649,
+						-0.456843882799149
+					],
+					"handle_out": [
+						-0.186716362833977,
+						0.497910380363464
+					],
+					"handle_source": "auto",
+					"id": "point_2468366704275356027",
+					"mode": "aligned",
+					"position": [
+						2.29999995231628,
+						6.05000019073486
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.325374364852905,
+						-0.420605808496475
+					],
+					"handle_out": [
+						-0.360837429761887,
+						0.466448307037354
+					],
+					"handle_source": "auto",
+					"id": "point_2910367617094888383",
+					"mode": "aligned",
+					"position": [
+						1.45000004768372,
+						7.40000009536743
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.327121585607529,
+						-0.490682303905487
+					],
+					"handle_out": [
+						-0.152472525835037,
+						0.228708773851395
+					],
+					"handle_source": "auto",
+					"id": "point_1856203695281321250",
+					"mode": "aligned",
+					"position": [
+						0.25,
+						8.69999980926514
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.0666666701436043,
+						-0.266666740179062
+					],
+					"handle_out": [
+						0.0,
+						0.0
+					],
+					"handle_source": "auto",
+					"id": "point_2534182280166526457",
+					"mode": "aligned",
+					"position": [
+						0.0500000007450581,
+						9.5
+					],
+					"preserve_point": false
+				}
+			],
+			"scope": {
+				"component_id": "component_55",
+				"kind": "component"
+			},
+			"type": "guide",
+			"visibility": true
 		}
 	],
 	"id": "asset_9",
@@ -1057,6 +1383,6 @@
 		"target_height_cm": 120.0,
 		"visible": true
 	},
-	"schema_version": 29,
+	"schema_version": 30,
 	"visibility": true
 }

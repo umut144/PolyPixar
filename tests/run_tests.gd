@@ -55,6 +55,15 @@ func _context_menu(application: Control, prefix: String) -> MenuButton:
 	return null
 
 
+func _control_text(root: Node) -> String:
+	var values: Array[String] = []
+	if root is Label or root is Button or root is CheckBox:
+		values.append(str(root.get("text")))
+	for child in root.get_children():
+		values.append(_control_text(child))
+	return "\n".join(values)
+
+
 func _test_add_close_and_validate() -> void:
 	var component := _component()
 	var first_id := BezierTopology.add_point(component, Vector2.ZERO, "corner")
@@ -307,14 +316,14 @@ func _test_geometry_sampling_service() -> void:
 	_expect(not bool(GeometrySamplingService.generate(open_component).get("valid", true)), "An open contour should fail visibly at the mesh-pipeline Sampling boundary.")
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
-	_expect(application._has_supported_schema({"schema_version": 28}) and not application._has_supported_schema({"schema_version": 30}), "Schema 29 should keep older Workspace documents readable and reject unknown future schemas.")
+	_expect(application._has_supported_schema({"schema_version": 29}) and not application._has_supported_schema({"schema_version": 31}), "Schema 30 should keep older Workspace documents readable and reject unknown future schemas.")
 	var geometry_document: Dictionary = application._default_geometry_document("asset_1", "component_1")
 	geometry_document["sampling"]["recipe"] = {"method": GeometrySamplingService.EVEN_SPACING, "parameters": {"spacing": 2.5, "feature_detail": GeometrySamplingService.DEFAULT_FEATURE_DETAIL}}
 	var baked_result := adaptive.duplicate(true)
 	baked_result["bake_id"] = "bake_test"
 	geometry_document["sampling"]["bakes"][GeometrySamplingService.ADAPTIVE] = baked_result
 	var serialized_geometry: Dictionary = application._serialize_geometry_document(geometry_document)
-	_expect(int(serialized_geometry.get("schema_version", 0)) == 29 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-29 JSON arrays.")
+	_expect(int(serialized_geometry.get("schema_version", 0)) == 30 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-30 JSON arrays.")
 	var normalized_geometry: Dictionary = application._normalize_geometry_document(serialized_geometry, "asset_1", "component_1")
 	_expect(normalized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Vector2, "Sampling bake loading should restore local sample positions as Vector2 values.")
 	_expect(normalized_geometry["sampling"]["bakes"].size() == 1, "Sampling should retain one Adaptive Bake.")
@@ -444,7 +453,10 @@ func _test_geometry_seeding_service() -> void:
 	BezierTopology.add_point(component, Vector2(10.0, 10.0), "linear")
 	BezierTopology.add_point(component, Vector2(0.0, 10.0), "linear")
 	BezierTopology.close_active_chain(component)
-	var sampling := GeometrySamplingService.generate(component, {"method": GeometrySamplingService.ADAPTIVE, "parameters": {"spacing": 1.0}})
+	var cut := AssetGuide.create("cut_seed", "Seam", AssetGuide.CUT, "component_1")
+	BezierTopology.add_point(cut, Vector2(7.0, 0.0), "linear")
+	BezierTopology.add_point(cut, Vector2(7.0, 10.0), "linear")
+	var sampling := GeometrySamplingService.generate(component, {"method": GeometrySamplingService.ADAPTIVE, "parameters": {"spacing": 1.0}}, [cut])
 	sampling["bake_id"] = "sampling_bake_test"
 	var first := GeometrySeedingService.generate(sampling, {"method": GeometrySeedingService.POISSON_FILL, "parameters": {"spacing": 2.0, "seed": 17}})
 	var repeated := GeometrySeedingService.generate(sampling, {"method": GeometrySeedingService.POISSON_FILL, "parameters": {"spacing": 2.0, "seed": 17}})
@@ -459,11 +471,38 @@ func _test_geometry_seeding_service() -> void:
 		positions.append(position)
 	_expect(str(first.get("sampling_bake_id", "")) == "sampling_bake_test", "A Seeding result must retain its exact Sampling Bake dependency.")
 	_expect(not bool(GeometrySeedingService.generate({}).get("valid", true)), "Seeding must fail visibly without a valid Sampling Bake.")
+	var hole_component := _component()
+	hole_component["id"] = "hole"
+	hole_component["sampling_input_id"] = "hole_ref"
+	for position in [Vector2(3.0, 3.0), Vector2(3.0, 5.0), Vector2(5.0, 5.0), Vector2(5.0, 3.0)]:
+		BezierTopology.add_point(hole_component, position, "linear")
+	BezierTopology.close_active_chain(hole_component)
+	hole_component["chains"][0]["topology_role"] = "hole"
+	var constrained_sampling := GeometrySamplingService.generate(component, {"parameters": {"spacing": 1.0}}, [cut], [hole_component])
+	constrained_sampling["bake_id"] = "sampling_constraints"
+	var constrained_fill := GeometrySeedingService.generate(constrained_sampling, {"method": GeometrySeedingService.POISSON_FILL, "parameters": {"spacing": 1.0, "constraint_clearance_factor": 0.5, "seed": 23}})
+	var has_left_of_cut := false
+	var has_right_of_cut := false
+	for seed_data in constrained_fill.get("seeds", []):
+		var position := Vector2(seed_data.get("position", Vector2.ZERO))
+		_expect(not Rect2(Vector2(3.0, 3.0), Vector2(2.0, 2.0)).has_point(position), "Poisson Fill must exclude Hole interiors.")
+		_expect(absf(position.x - 7.0) >= 0.499, "Poisson Fill must preserve automatic clearance on both sides of a Cut.")
+		has_left_of_cut = has_left_of_cut or position.x < 6.5
+		has_right_of_cut = has_right_of_cut or position.x > 7.5
+	_expect(has_left_of_cut and has_right_of_cut, "A Cut should remain an internal barrier rather than excluding either side from Seeding.")
+	var original_constraint_fingerprint := GeometrySeedingService.sampling_fingerprint(constrained_sampling)
+	constrained_sampling["cuts"][0]["samples"][0]["position"] += Vector2(0.1, 0.0)
+	_expect(GeometrySeedingService.sampling_fingerprint(constrained_sampling) != original_constraint_fingerprint, "Seeding fingerprints must include sampled Cut geometry.")
 	var sampler_spine := AssetGuide.create("guide_sampler", "Main Flow", AssetGuide.SAMPLER_SPINE, "component_1")
 	BezierTopology.add_point(sampler_spine, Vector2(1.0, 5.0), "aligned")
 	BezierTopology.add_point(sampler_spine, Vector2(5.0, 5.0), "aligned")
 	BezierTopology.add_point(sampler_spine, Vector2(9.0, 5.0), "aligned")
 	var flow_recipe := {"method": GeometrySeedingService.SPINE_FLOW, "parameters": {"guide_id": "guide_sampler", "along_spacing": 2.0, "across_spacing": 2.0, "boundary_clearance": 0.5, "stagger": 0.5, "fill_gaps": false, "seed": 7}}
+	var legacy_flow_recipe := GeometrySeedingService.normalize_recipe(flow_recipe)
+	_expect(is_equal_approx(float(legacy_flow_recipe.get("parameters", {}).get("spacing", 0.0)), 2.0) and is_equal_approx(float(legacy_flow_recipe.get("parameters", {}).get("flow_stretch", 0.0)), 1.0) and bool(legacy_flow_recipe.get("parameters", {}).get("boundary_clearance_override", false)) and bool(legacy_flow_recipe.get("parameters", {}).get("stagger_override", false)), "Legacy Spine Flow recipes should retain their exact technical values as Artistic overrides.")
+	var artistic_flow_recipe := GeometrySeedingService.normalize_recipe({"method": GeometrySeedingService.SPINE_FLOW, "parameters": {"spacing": 0.1, "flow_stretch": 4.0}})
+	_expect(is_equal_approx(float(artistic_flow_recipe.get("parameters", {}).get("across_spacing", 0.0)), 0.1) and is_equal_approx(float(artistic_flow_recipe.get("parameters", {}).get("along_spacing", 0.0)), 0.4), "Artistic Spine Flow controls should derive Across from Seed Spacing and Along from Seed Spacing times Flow Stretch.")
+	_expect(is_equal_approx(float(artistic_flow_recipe.get("parameters", {}).get("boundary_clearance", 0.0)), 0.05) and is_equal_approx(float(artistic_flow_recipe.get("parameters", {}).get("stagger", 0.0)), 0.1) and not bool(artistic_flow_recipe.get("parameters", {}).get("boundary_clearance_override", true)) and not bool(artistic_flow_recipe.get("parameters", {}).get("stagger_override", true)), "New Artistic Spine Flow recipes should derive Boundary Margin and Stagger automatically.")
 	var flow := GeometrySeedingService.generate(sampling, flow_recipe, sampler_spine)
 	var repeated_flow := GeometrySeedingService.generate(sampling, flow_recipe, sampler_spine)
 	_expect(bool(flow.get("valid", false)) and int(flow.get("seed_count", 0)) > 0 and flow == repeated_flow, "Spine Flow should deterministically generate Seeds from a valid Sampler Spine.")
@@ -476,7 +515,22 @@ func _test_geometry_seeding_service() -> void:
 		_expect(GeometrySeedingService.point_is_inside(sampling, position), "Every Spine Flow Seed must remain inside the sampled Component boundary.")
 	_expect(has_left_side and has_right_side, "Spine Flow should seed bidirectionally between the Sampler Spine and Component contour.")
 	_expect(str(flow.get("guide_id", "")) == "guide_sampler" and not str(flow.get("guide_fingerprint", "")).is_empty(), "Spine Flow results must retain their exact Sampler Spine dependency.")
+	_expect(str(GeometrySeedingService.normalize_recipe(flow_recipe).get("parameters", {}).get("spine_inputs", [])[0].get("guide_id", "")) == "guide_sampler", "Schema-29 single-Spine recipes should migrate to one enabled Spine input.")
 	_expect(not bool(GeometrySeedingService.generate(sampling, flow_recipe).get("valid", true)), "Spine Flow should fail visibly when its Sampler Spine dependency is missing.")
+	var crossing_spine := AssetGuide.create("guide_crossing", "Crossing Flow", AssetGuide.SAMPLER_SPINE, "component_1")
+	BezierTopology.add_point(crossing_spine, Vector2(5.0, 1.0), "aligned")
+	BezierTopology.add_point(crossing_spine, Vector2(5.0, 9.0), "aligned")
+	var multi_flow_recipe := {"method": GeometrySeedingService.SPINE_FLOW, "parameters": {"spine_inputs": [{"guide_id": "guide_sampler", "enabled": true}, {"guide_id": "guide_crossing", "enabled": true}], "along_spacing": 2.0, "across_spacing": 2.0, "boundary_clearance": 0.5, "stagger": 0.5, "fill_gaps": false, "seed": 7}}
+	var multi_flow := GeometrySeedingService.generate(sampling, multi_flow_recipe, [sampler_spine, crossing_spine])
+	var multi_positions: Array[Vector2] = []
+	var represented_guides: Dictionary = {}
+	for seed_data in multi_flow.get("seeds", []):
+		var position := Vector2(seed_data.get("position", Vector2.ZERO))
+		for previous in multi_positions:
+			_expect(position.distance_to(previous) >= 0.639, "Combined Spine Flow inputs must enforce one global minimum distance.")
+		multi_positions.append(position)
+		represented_guides[str(seed_data.get("provenance", {}).get("guide_id", ""))] = true
+	_expect(bool(multi_flow.get("valid", false)) and represented_guides.has("guide_sampler") and represented_guides.has("guide_crossing") and multi_flow.get("guide_stats", []).size() == 2, "Multiple enabled Sampler Spines should contribute to one deterministic shared Seed set.")
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
 	var geometry_document: Dictionary = application._default_geometry_document("asset_1", "component_1")
@@ -491,12 +545,12 @@ func _test_geometry_seeding_service() -> void:
 	_expect(serialized.get("seeding", {}).get("bakes", {}).get(GeometrySeedingService.POISSON_FILL, {}).get("seeds", [])[0].get("position", null) is Array, "Seeding method Bake positions should serialize as schema JSON arrays.")
 	var normalized: Dictionary = application._normalize_geometry_document(serialized, "asset_1", "component_1")
 	_expect(normalized.get("seeding", {}).get("bakes", {}).get(GeometrySeedingService.POISSON_FILL, {}).get("seeds", [])[0].get("position", null) is Vector2 and bool(normalized.get("seeding", {}).get("bakes", {}).get(GeometrySeedingService.POISSON_FILL, {}).get("edited", false)), "Seeding method Bake loading should restore editable Seed vectors and edit state.")
-	var test_assets: Array[Dictionary] = [{"id": "asset_1", "name": "Asset", "components": [component], "guides": [sampler_spine]}]
+	var test_assets: Array[Dictionary] = [{"id": "asset_1", "name": "Asset", "components": [component], "guides": [sampler_spine, crossing_spine, cut]}]
 	application.assets = test_assets
 	application.geometry_documents["asset_1/component_1"] = normalized
 	_expect(application._geometry_seeding_status("asset_1", "component_1", component) == "Edited", "A matching manually adjusted Seeding Bake should report Edited.")
 	normalized["seeding"]["recipe"]["parameters"]["seed"] = 18
-	_expect(application._geometry_seeding_status("asset_1", "component_1", component) == "Ready to Bake", "Changing the Seeding recipe should preserve its Bake and leave Seeding ready for a direct rebake.")
+	_expect(application._geometry_seeding_status("asset_1", "component_1", component) == "Ready to Preview", "Changing the Seeding recipe should preserve its Bake and request a new Preview.")
 	normalized["seeding"]["recipe"]["parameters"]["seed"] = 17
 	application._build_ui()
 	application.active_module = "Mesh"
@@ -508,23 +562,39 @@ func _test_geometry_seeding_service() -> void:
 	application._render_inspector()
 	application._render_canvas_context()
 	_expect(application.geometry_seeding_workspace.visible and application.inspector_content.get_child_count() >= 10, "Geometry Seeding should expose its dedicated Workspace and compact Poisson Inspector.")
+	var seeding_outliner_text := _control_text(application.outliner_list)
+	var seeding_inspector_text := _control_text(application.inspector_content)
+	_expect(seeding_outliner_text.contains("Sampling · Adaptive") and seeding_outliner_text.contains("Cut · Body → Cut01") and seeding_outliner_text.contains("Spine · Body → Sample01"), "The Seeding Outliner should nest its Sampling dependency, Cut barriers, and Sampler Spine inputs below the Body.")
+	_expect(seeding_inspector_text.contains("Holes · excluded + clearance") and seeding_inspector_text.contains("Cuts · barrier + clearance") and seeding_inspector_text.contains("Constraint Clearance: Auto"), "The Seeding Inspector should explain automatic Outer, Hole, and Cut constraint treatment.")
 	application._activate_geometry_seeding_method_choice()
 	_expect(application.geometry_seeding_method_choice_active and not application.geometry_seeding_method_menu.get_popup().visible, "Seeding CMD+1 should enter a keyboard Method choice state without opening the mouse dropdown.")
 	var seeding_active_style := application.geometry_seeding_method_menu.get_theme_stylebox("normal") as StyleBoxFlat
 	_expect(seeding_active_style != null and seeding_active_style.bg_color == Color("#8fd8f5") and not application.geometry_seeding_method_menu.flat, "An active Seeding Method MenuButton should render the shared light-blue background in its normal state.")
 	application._set_geometry_seeding_method(GeometrySeedingService.SPINE_FLOW)
 	_expect(application.geometry_seeding_method_choice_active and not application.geometry_seeding_edit_active and str(application._geometry_seeding_recipe("asset_1", "component_1").get("method", "")) == GeometrySeedingService.SPINE_FLOW, "Seeding Method state should remain active and exclude Edit Seeds after its plain-number selection.")
+	var artistic_inspector_text := _control_text(application.inspector_content)
+	_expect(artistic_inspector_text.contains("Seed Spacing (Body units)") and artistic_inspector_text.contains("Flow Stretch") and artistic_inspector_text.contains("Boundary Margin:") and artistic_inspector_text.contains("Advanced Pattern") and not artistic_inspector_text.contains("Along Spacing: Derived"), "The primary Spine Flow Inspector should expose the compact Artistic controls and keep technical lattice values collapsed.")
+	application._on_geometry_seeding_advanced_pattern_toggled(true)
+	artistic_inspector_text = _control_text(application.inspector_content)
+	_expect(artistic_inspector_text.contains("Along Spacing: Derived") and artistic_inspector_text.contains("Across Spacing: Derived") and artistic_inspector_text.contains("Stagger:"), "Advanced Pattern should disclose derived lattice values and optional Stagger refinement.")
+	application._on_geometry_seeding_advanced_pattern_toggled(false)
 	application._set_geometry_seeding_method(GeometrySeedingService.POISSON_FILL)
 	normalized["seeding"]["bakes"][GeometrySeedingService.POISSON_FILL] = {}
+	application.geometry_seeding_preview = GeometrySeedingService.generate(sampling, application._geometry_seeding_recipe("asset_1", "component_1"))
+	application.geometry_seeding_preview["accepted_preview_marker"] = true
+	application.geometry_seeding_preview_key = "asset_1/component_1"
+	application.geometry_seeding_preview_state = "ready"
 	application._bake_geometry_seeding()
-	_expect(application._geometry_seeding_status("asset_1", "component_1", component) == "Baked", "A direct Seeding Bake should persist a valid result without a separate Generate step.")
+	_expect(application._geometry_seeding_status("asset_1", "component_1", component) == "Baked" and bool(application._geometry_seeding_bake("asset_1", "component_1").get("accepted_preview_marker", false)), "Bake Preview should copy the exact current Seeding Preview without regenerating it.")
 	application._toggle_geometry_seeding_edit()
 	_expect(application.geometry_seeding_edit_active and application.geometry_seeding_workspace.editing_enabled and not normalized["seeding"]["bakes"][GeometrySeedingService.POISSON_FILL].is_empty(), "Entering Edit Seeds from a baked result should enable mouse editing immediately.")
 	application._activate_geometry_seeding_method_choice()
 	_expect(application.active_context_command == "geometry.seeding.method" and application.geometry_seeding_method_choice_active and not application.geometry_seeding_edit_active, "Entering Seeding Method must atomically select its central command and deactivate Edit Seeds.")
 	application._toggle_geometry_seeding_edit()
 	_expect(application.active_context_command == "geometry.seeding.edit_seeds" and application.geometry_seeding_edit_active and not application.geometry_seeding_method_choice_active, "Entering Edit Seeds must atomically select its central command and deactivate Seeding Method.")
-	var seed_count_before := int(normalized["seeding"]["bakes"][GeometrySeedingService.POISSON_FILL].get("seed_count", 0))
+	normalized["seeding"]["bakes"][GeometrySeedingService.POISSON_FILL]["seeds"] = []
+	normalized["seeding"]["bakes"][GeometrySeedingService.POISSON_FILL]["seed_count"] = 0
+	var seed_count_before := 0
 	application.geometry_seeding_workspace.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
 	application.geometry_seeding_workspace.size = Vector2(200.0, 200.0)
 	application.geometry_seeding_workspace.camera_position = Vector2(5.0, 5.0)
@@ -560,7 +630,7 @@ func _test_geometry_seeding_service() -> void:
 	application._set_geometry_seeding_method(GeometrySeedingService.SPINE_FLOW)
 	_expect(application.selected_geometry_bake_method == GeometrySeedingService.SPINE_FLOW and not application._geometry_seeding_bake("asset_1", "component_1").is_empty(), "Switching back to Spine Flow should select its existing Bake without replacing Poisson Fill.")
 	sampler_spine["points"][1]["position"] = Vector2(5.0, 5.5)
-	_expect(application._geometry_seeding_status("asset_1", "component_1", component) == "Ready to Bake", "Editing the referenced Sampler Spine should leave Spine Flow ready for a direct rebake.")
+	_expect(application._geometry_seeding_status("asset_1", "component_1", component) == "Ready to Preview", "Editing a referenced Sampler Spine should preserve its Bake and request a new Preview.")
 	spacing_input.free()
 	application.free()
 
@@ -1305,7 +1375,7 @@ func _test_motion_act_evaluator() -> void:
 	var normalized: Dictionary = application._normalize_motion_act({"id": "act_7", "parameters": {"direction": [0.0, 2.0], "distance": 12.0}}, "fallback")
 	_expect(Vector2(normalized.get("parameters", {}).get("direction", Vector2.ZERO)) == Vector2(0.0, 2.0), "Persisted Slide direction arrays should normalize back to Vector2 values.")
 	var serialized: Dictionary = application._serialize_motion_act(normalized)
-	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 29, "Act persistence should serialize vectors as JSON arrays using schema 29.")
+	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 30, "Act persistence should serialize vectors as JSON arrays using schema 30.")
 	var normalized_jump: Dictionary = application._normalize_motion_act({"id": "act_8", "primitive": "jump", "parameters": {"direction": [1.0, 0.0], "distance": 7.0, "height": 2.5, "arc": "snappy"}}, "fallback")
 	var serialized_jump: Dictionary = application._serialize_motion_act(normalized_jump)
 	_expect(str(serialized_jump.get("primitive", "")) == MotionActEvaluator.JUMP and is_equal_approx(float(serialized_jump.get("parameters", {}).get("height", 0.0)), 2.5) and str(serialized_jump.get("parameters", {}).get("arc", "")) == MotionActEvaluator.JUMP_ARC_SNAPPY, "Jump-specific parameters should survive normalization and serialization.")
