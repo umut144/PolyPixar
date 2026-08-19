@@ -7,12 +7,15 @@ const GRID_MAJOR := Color("#303744")
 const CURVE_COLOR := Color("#7b8492")
 const SAMPLE_LINE_COLOR := Color("#f2c94c")
 const SAMPLE_POINT_COLOR := Color("#f6d96b")
+const HOLE_LINE_COLOR := Color("#ef6c78")
+const HOLE_POINT_COLOR := Color("#ff8993")
 const PRESERVE_COLOR := Color("#ef8354")
 
 var component: Dictionary = {}
 var preview: Dictionary = {}
 var overlays: Dictionary = {}
 var status := "Not Generated"
+var selected_input_id := ""
 var camera_position := Vector2.ZERO
 var camera_zoom := 1.0
 var fitted := false
@@ -25,11 +28,12 @@ func _ready() -> void:
 	queue_redraw()
 
 
-func set_context(component_data: Dictionary, preview_data: Dictionary, bake_data: Dictionary, status_value: String, overlay_data: Dictionary = {}) -> void:
+func set_context(component_data: Dictionary, preview_data: Dictionary, bake_data: Dictionary, status_value: String, overlay_data: Dictionary = {}, selected_input := "") -> void:
 	component = component_data.duplicate(true)
 	preview = preview_data.duplicate(true) if not preview_data.is_empty() else bake_data.duplicate(true)
 	overlays = overlay_data.duplicate(true)
 	status = status_value
+	selected_input_id = selected_input
 	BezierGeometry.resolve_auto_handles(component.get("points", []), component.get("chains", []))
 	fitted = false
 	queue_redraw()
@@ -40,6 +44,7 @@ func clear_context() -> void:
 	preview = {}
 	overlays = {}
 	status = "Not Generated"
+	selected_input_id = ""
 	fitted = false
 	queue_redraw()
 
@@ -118,6 +123,12 @@ func _fit_component() -> void:
 	for point_data in component.get("points", []):
 		if point_data is Dictionary:
 			positions.append(Vector2(point_data.get("position", Vector2.ZERO)))
+	for chain_data in preview.get("chains", []):
+		for sample in chain_data.get("samples", []):
+			positions.append(Vector2(sample.get("position", Vector2.ZERO)))
+	for cut in preview.get("cuts", []):
+		for sample in cut.get("samples", []):
+			positions.append(Vector2(sample.get("position", Vector2.ZERO)))
 	if positions.is_empty():
 		camera_position = Vector2.ZERO
 		camera_zoom = 1.0
@@ -160,23 +171,30 @@ func _draw_samples() -> void:
 		var samples: Array = chain_data.get("samples", [])
 		if samples.is_empty():
 			continue
+		var is_hole := str(chain_data.get("topology_role", "outer")) == "hole"
+		var selected := not selected_input_id.is_empty() and str(chain_data.get("input_id", "")) == selected_input_id
+		var line_color := HOLE_LINE_COLOR if is_hole else SAMPLE_LINE_COLOR
+		var point_color := HOLE_POINT_COLOR if is_hole else SAMPLE_POINT_COLOR
 		for sample_index in range(samples.size()):
 			var current := _to_screen(Vector2(samples[sample_index].get("position", Vector2.ZERO)))
 			if sample_index > 0:
 				var previous := _to_screen(Vector2(samples[sample_index - 1].get("position", Vector2.ZERO)))
-				draw_line(previous, current, SAMPLE_LINE_COLOR, 1.5, true)
+				draw_line(previous, current, line_color, 2.5 if selected else 1.5, true)
 			if sample_index == samples.size() - 1 and bool(chain_data.get("closed", false)) and samples.size() > 1:
-				draw_line(current, _to_screen(Vector2(samples[0].get("position", Vector2.ZERO))), SAMPLE_LINE_COLOR, 1.5, true)
+				draw_line(current, _to_screen(Vector2(samples[0].get("position", Vector2.ZERO))), line_color, 2.5 if selected else 1.5, true)
 		for sample in samples:
 			var position := _to_screen(Vector2(sample.get("position", Vector2.ZERO)))
 			var preserved := bool(sample.get("preserved", false))
-			draw_circle(position, 4.5 if preserved else 3.0, PRESERVE_COLOR if preserved else SAMPLE_POINT_COLOR)
+			draw_circle(position, 4.5 if preserved or selected else 3.0, PRESERVE_COLOR if preserved else point_color)
 	for cut in preview.get("cuts", []):
 		if not cut is Dictionary or not bool(cut.get("valid", false)):
 			continue
 		var samples: Array = cut.get("samples", [])
+		var selected := not selected_input_id.is_empty() and str(cut.get("input_id", cut.get("guide_id", ""))) == selected_input_id
 		for sample_index in range(1, samples.size()):
-			draw_dashed_line(_to_screen(Vector2(samples[sample_index - 1].get("position", Vector2.ZERO))), _to_screen(Vector2(samples[sample_index].get("position", Vector2.ZERO))), Color("#ef6c78"), 2.5, 5.0)
+			draw_dashed_line(_to_screen(Vector2(samples[sample_index - 1].get("position", Vector2.ZERO))), _to_screen(Vector2(samples[sample_index].get("position", Vector2.ZERO))), Color("#ef6c78"), 3.5 if selected else 2.5, 5.0)
+		for sample in samples:
+			draw_circle(_to_screen(Vector2(sample.get("position", Vector2.ZERO))), 4.0 if selected else 2.5, HOLE_POINT_COLOR)
 
 
 func _draw_hole_overlays() -> void:

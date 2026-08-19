@@ -49,10 +49,10 @@ before implementing real creation tools.
       Texture initially remained inert until its own phase began.
 - [x] Add the separate `Geometry` category with Sampling, Seeding, Meshing,
       and UV Mapping module entries.
-- [x] Implement Component-local Geometry Sampling with Adaptive and Even
-      Spacing methods, compact artist-facing parameters, immutable Generate
-      preview, explicit Bake, Preserve Point guarantees, derived persistence,
-      and stale-source detection.
+- [x] Implement Body-local adaptive Geometry Sampling with inherited Outer,
+      Hole, and Cut settings, optional boundary-density factors, analytic
+      Primitive curves, a debounced immutable Preview, explicit Preview Bake,
+      Preserve Point guarantees, derived persistence, and stale-source detection.
 - [x] Implement Component-local Geometry Seeding with Poisson Fill and Sampler
       Spine Flow, exact Sampling dependencies, editable accepted Seeds, and one
       persistent Bake per method.

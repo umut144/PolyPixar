@@ -246,18 +246,52 @@ func _test_geometry_sampling_service() -> void:
 	curve_point["handle_source"] = "manual"
 	curve_point["handle_in"] = Vector2(-5.0, 7.0)
 	curve_point["handle_out"] = Vector2(0.0, 5.0)
-	var even := GeometrySamplingService.generate(component, {"method": GeometrySamplingService.EVEN_SPACING, "parameters": {"spacing": 2.5}})
-	_expect(bool(even.get("valid", false)), "Even Spacing should sample a valid closed Component.")
-	_expect(int(even.get("sample_count", 0)) > component["points"].size(), "Even Spacing should add derived Points without replacing authored Points.")
-	var even_samples: Array = even.get("chains", [])[0].get("samples", [])
-	_expect(str(even_samples.front().get("source_point_id", "")) == first_id, "The first authored Point should remain the first ordered sample.")
+	var adaptive := GeometrySamplingService.generate(component, {"method": GeometrySamplingService.ADAPTIVE, "parameters": {"spacing": 2.5}})
+	_expect(bool(adaptive.get("valid", false)), "Adaptive Sampling should sample a valid closed Component.")
+	var hole_component := _component()
+	hole_component["id"] = "hole_component"
+	hole_component["sampling_input_id"] = "ref_orb"
+	for hole_position in [Vector2(2.0, 2.0), Vector2(2.0, 4.0), Vector2(4.0, 4.0), Vector2(4.0, 2.0)]:
+		BezierTopology.add_point(hole_component, hole_position, "linear")
+	BezierTopology.close_active_chain(hole_component)
+	hole_component["chains"][0]["topology_role"] = "hole"
+	var sampled_hole_result := GeometrySamplingService.generate(component, {"parameters": {"spacing": 2.5}}, [], [hole_component])
+	_expect(bool(sampled_hole_result.get("valid", false)) and sampled_hole_result.get("chains", []).size() == 2, "Sampling should include a referenced Hole as a second sampled Chain.")
+	_expect(str(sampled_hole_result["chains"][1].get("topology_role", "")) == "hole" and int(sampled_hole_result.get("hole_count", 0)) == 1, "Referenced Hole sampling must preserve its topology role and count.")
+	_expect(str(sampled_hole_result.get("source_fingerprint", "")) != str(adaptive.get("source_fingerprint", "")), "Sampling fingerprints must include Hole inputs.")
+	var refined_hole_result := GeometrySamplingService.generate(component, {"parameters": {"spacing": 2.5, "boundary_refinements": {"ref_orb": {"factor": 5.0}}}}, [], [hole_component])
+	_expect(bool(refined_hole_result.get("valid", false)) and int(refined_hole_result["chains"][1].get("samples", []).size()) > int(sampled_hole_result["chains"][1].get("samples", []).size()) and int(refined_hole_result["chains"][0].get("samples", []).size()) == int(sampled_hole_result["chains"][0].get("samples", []).size()), "A Hole refinement should increase only that Hole's sample density.")
+	var primitive_hole := {"id": "primitive_hole", "sampling_input_id": "ref_circle", "draw_mode": "primitive", "topology_role": "hole", "primitive": {"type": "circle", "center": Vector2.ZERO, "diameter_cm": 20.0}, "sampling_transform": Transform2D(Vector2(2.0, 0.0), Vector2(0.0, 0.5), Vector2(3.0, 4.0))}
+	var unit_circle_hole := primitive_hole.duplicate(true)
+	unit_circle_hole["sampling_transform"] = Transform2D.IDENTITY
+	var scaled_circle_hole := primitive_hole.duplicate(true)
+	scaled_circle_hole["sampling_transform"] = Transform2D(Vector2(2.0, 0.0), Vector2(0.0, 2.0), Vector2.ZERO)
+	var unit_circle_result := GeometrySamplingService.generate(component, {"parameters": {"spacing": 2.0, "feature_detail": 0.5}}, [], [unit_circle_hole])
+	var scaled_circle_result := GeometrySamplingService.generate(component, {"parameters": {"spacing": 2.0, "feature_detail": 0.5}}, [], [scaled_circle_hole])
+	_expect(int(scaled_circle_result["chains"][1].get("samples", []).size()) > int(unit_circle_result["chains"][1].get("samples", []).size()), "Absolute chord-error sampling should increase a Circle Hole's density when its Body-local scale doubles.")
+	var dense_circle_result := GeometrySamplingService.generate(component, {"parameters": {"spacing": 2.0, "feature_detail": 1.0}}, [], [primitive_hole])
+	var coarse_circle_result := GeometrySamplingService.generate(component, {"parameters": {"spacing": 2.0, "feature_detail": 1.0, "boundary_refinements": {"ref_circle": {"factor": 0.25}}}}, [], [primitive_hole])
+	_expect(int(coarse_circle_result["chains"][1].get("samples", []).size()) < int(dense_circle_result["chains"][1].get("samples", []).size()) and int(coarse_circle_result["chains"][0].get("samples", []).size()) == int(dense_circle_result["chains"][0].get("samples", []).size()), "A Boundary Density below 1x should coarsen all adaptive criteria only for the selected Hole.")
+	var transformed_circle_result := GeometrySamplingService.generate(component, {"parameters": {"spacing": 0.5, "feature_detail": 0.5}}, [], [primitive_hole])
+	var transformed_samples: Array = transformed_circle_result.get("chains", [])[1].get("samples", [])
+	var transformed_bounds := Rect2(Vector2(transformed_samples[0].get("position", Vector2.ZERO)), Vector2.ZERO)
+	for sample in transformed_samples:
+		transformed_bounds = transformed_bounds.expand(Vector2(sample.get("position", Vector2.ZERO)))
+	_expect(bool(transformed_circle_result.get("valid", false)) and transformed_bounds.size.x > transformed_bounds.size.y * 3.5, "Referenced Circle Primitives should remain analytic through non-uniform Body-local transforms.")
+	var migrated_recipe := GeometrySamplingService.normalize_recipe({"method": GeometrySamplingService.EVEN_SPACING, "parameters": {"spacing": 2.5, "boundary_overrides": {"ref_orb": {"spacing": 0.5}}}})
+	_expect(str(migrated_recipe.get("method", "")) == GeometrySamplingService.ADAPTIVE and is_equal_approx(float(migrated_recipe.get("parameters", {}).get("boundary_refinements", {}).get("ref_orb", {}).get("factor", 0.0)), 5.0), "Schema-28 Even Spacing and absolute overrides should migrate to Adaptive refinement factors.")
+	var neutral_adjustment := GeometrySamplingService.normalize_recipe({"parameters": {"boundary_refinements": {"ref_orb": {"factor": 1.0}}}})
+	_expect(neutral_adjustment.get("parameters", {}).get("boundary_refinements", {}).has("ref_orb"), "An active 1x Boundary Density adjustment should remain stable until the user disables it.")
+	_expect(int(adaptive.get("sample_count", 0)) > component["points"].size(), "Adaptive Sampling should add derived Points without replacing authored Points.")
+	var adaptive_samples: Array = adaptive.get("chains", [])[0].get("samples", [])
+	_expect(str(adaptive_samples.front().get("source_point_id", "")) == first_id, "The first authored Point should remain the first ordered sample.")
 	var source_ids: Array[String] = []
-	for sample in even_samples:
+	for sample in adaptive_samples:
 		var source_id := str(sample.get("source_point_id", ""))
 		if not source_id.is_empty():
 			source_ids.append(source_id)
 	_expect(first_id in source_ids and curve_id in source_ids and last_id in source_ids, "Every authored edge endpoint should survive boundary sampling.")
-	_expect(bool(even_samples.front().get("preserved", false)), "A preserve_point source must carry the preserved guarantee into the sample result.")
+	_expect(bool(adaptive_samples.front().get("preserved", false)), "A preserve_point source must carry the preserved guarantee into the sample result.")
 	_expect(source_ids.count(first_id) == 1, "A closed sampled Chain must not duplicate its first Point at the end.")
 	var adaptive_low := GeometrySamplingService.generate(component, {"method": GeometrySamplingService.ADAPTIVE, "parameters": {"spacing": 20.0, "feature_detail": 0.0}})
 	var adaptive_high := GeometrySamplingService.generate(component, {"method": GeometrySamplingService.ADAPTIVE, "parameters": {"spacing": 20.0, "feature_detail": 1.0}})
@@ -273,26 +307,23 @@ func _test_geometry_sampling_service() -> void:
 	_expect(not bool(GeometrySamplingService.generate(open_component).get("valid", true)), "An open contour should fail visibly at the mesh-pipeline Sampling boundary.")
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
-	_expect(application._has_supported_schema({"schema_version": 27}) and not application._has_supported_schema({"schema_version": 29}), "Schema 28 should keep older Workspace documents readable and reject unknown future schemas.")
+	_expect(application._has_supported_schema({"schema_version": 28}) and not application._has_supported_schema({"schema_version": 30}), "Schema 29 should keep older Workspace documents readable and reject unknown future schemas.")
 	var geometry_document: Dictionary = application._default_geometry_document("asset_1", "component_1")
 	geometry_document["sampling"]["recipe"] = {"method": GeometrySamplingService.EVEN_SPACING, "parameters": {"spacing": 2.5, "feature_detail": GeometrySamplingService.DEFAULT_FEATURE_DETAIL}}
-	var baked_result := even.duplicate(true)
+	var baked_result := adaptive.duplicate(true)
 	baked_result["bake_id"] = "bake_test"
-	geometry_document["sampling"]["bakes"][GeometrySamplingService.EVEN_SPACING] = baked_result
+	geometry_document["sampling"]["bakes"][GeometrySamplingService.ADAPTIVE] = baked_result
 	var serialized_geometry: Dictionary = application._serialize_geometry_document(geometry_document)
-	_expect(int(serialized_geometry.get("schema_version", 0)) == 28 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.EVEN_SPACING, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Geometry method bakes should serialize derived positions as schema-28 JSON arrays.")
+	_expect(int(serialized_geometry.get("schema_version", 0)) == 29 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-29 JSON arrays.")
 	var normalized_geometry: Dictionary = application._normalize_geometry_document(serialized_geometry, "asset_1", "component_1")
-	_expect(normalized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.EVEN_SPACING, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Vector2, "Geometry method bake loading should restore local sample positions as Vector2 values.")
-	var adaptive_bake := adaptive_low.duplicate(true)
-	adaptive_bake["bake_id"] = "adaptive_bake_test"
-	normalized_geometry["sampling"]["bakes"][GeometrySamplingService.ADAPTIVE] = adaptive_bake
-	_expect(normalized_geometry["sampling"]["bakes"].size() == 2, "Sampling should retain independently baked results for both methods.")
+	_expect(normalized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Vector2, "Sampling bake loading should restore local sample positions as Vector2 values.")
+	_expect(normalized_geometry["sampling"]["bakes"].size() == 1, "Sampling should retain one Adaptive Bake.")
 	var test_assets: Array[Dictionary] = [{"id": "asset_1", "components": [component]}]
 	application.assets = test_assets
 	application.geometry_documents["asset_1/component_1"] = normalized_geometry
 	_expect(application._geometry_sampling_status("asset_1", "component_1", component) == "Baked", "A bake matching its recipe and source fingerprint should report Baked.")
 	BezierTopology.point_by_id(component["points"], curve_id)["position"] += Vector2.ONE
-	_expect(application._geometry_sampling_status("asset_1", "component_1", component) == "Ready to Bake", "Changing canonical topology should leave Sampling ready for a direct rebake without rewriting its persisted result.")
+	_expect(application._geometry_sampling_status("asset_1", "component_1", component) == "Ready to Preview", "Changing canonical topology should request a new Preview without rewriting its persisted result.")
 	application.free()
 
 
@@ -326,16 +357,11 @@ func _test_geometry_sampling_ui_shell() -> void:
 	application._render_canvas_context()
 	_expect(application.geometry_sampling_workspace.visible, "Geometry Sampling should own a dedicated visible centre workspace.")
 	_expect(application.outliner_list.get_child_count() > 1, "Sampling Outliner should expose the Asset/Component hierarchy.")
-	_expect(application.inspector_content.get_child_count() >= 8, "A selected Component should expose Sampling method, parameters, result, Generate, and Bake controls.")
+	_expect(application.inspector_content.get_child_count() >= 8, "A selected Component should expose Adaptive parameters, boundary inputs, result, and Bake controls.")
 	_expect(application.geometry_sampling_workspace.component.get("points", []).size() == 4, "Sampling Workspace should receive an immutable Component view copy.")
 	application.geometry_sampling_workspace.component["points"][0]["position"] = Vector2(999.0, 999.0)
 	_expect(Vector2(component["points"][0]["position"]) == Vector2.ZERO, "Sampling Workspace presentation copies must not mutate canonical topology.")
-	application._activate_geometry_sampling_method_choice()
-	_expect(application.geometry_sampling_method_choice_active and not application.geometry_method_menu.get_popup().visible, "Sampling CMD+1 should enter a keyboard Method choice state without opening the mouse dropdown.")
-	var sampling_active_style := application.geometry_method_menu.get_theme_stylebox("normal") as StyleBoxFlat
-	_expect(sampling_active_style != null and sampling_active_style.bg_color == Color("#8fd8f5") and not application.geometry_method_menu.flat, "An active Sampling Method MenuButton should render the shared light-blue background in its normal state.")
-	application._set_geometry_sampling_method(GeometrySamplingService.EVEN_SPACING)
-	_expect(application.geometry_sampling_method_choice_active and str(application._geometry_sampling_recipe("asset_1", "component_1").get("method", "")) == GeometrySamplingService.EVEN_SPACING, "Sampling Method state should remain active after its plain-number selection.")
+	_expect(GeometrySamplingService.VALID_METHODS == [GeometrySamplingService.ADAPTIVE] and str(application._geometry_sampling_recipe("asset_1", "component_1").get("method", "")) == GeometrySamplingService.ADAPTIVE, "Sampling should expose one Adaptive method.")
 	var spacing_input := SpinBox.new()
 	spacing_input.min_value = GeometrySamplingService.MIN_SPACING
 	spacing_input.max_value = 10000.0
@@ -343,6 +369,15 @@ func _test_geometry_sampling_ui_shell() -> void:
 	_expect(is_equal_approx(float(application._geometry_sampling_recipe("asset_1", "component_1").get("parameters", {}).get("spacing", 0.0)), 1.25), "Sampling Spacing should accept comma-decimal direct input.")
 	application._commit_geometry_spacing_text("2.50", spacing_input)
 	_expect(is_equal_approx(float(application._geometry_sampling_recipe("asset_1", "component_1").get("parameters", {}).get("spacing", 0.0)), 2.5), "Sampling Spacing should accept dot-decimal direct input.")
+	application._set_geometry_sampling_refinement("hole_test", 0.5)
+	_expect(is_equal_approx(float(application._geometry_sampling_recipe("asset_1", "component_1").get("parameters", {}).get("boundary_refinements", {}).get("hole_test", {}).get("factor", 0.0)), 0.5), "Boundary Density should support coarsening below 1x.")
+	application._set_geometry_sampling_refinement("hole_test", 1.0)
+	_expect(application._geometry_sampling_recipe("asset_1", "component_1").get("parameters", {}).get("boundary_refinements", {}).has("hole_test"), "Stepping through 1x should not collapse an active Boundary Density control.")
+	application._on_geometry_sampling_refinement_toggled(false, "hole_test")
+	_expect(not application._geometry_sampling_recipe("asset_1", "component_1").get("parameters", {}).get("boundary_refinements", {}).has("hole_test"), "Disabling Boundary Density should explicitly restore inheritance.")
+	application.geometry_sampling_preview["accepted_preview_marker"] = true
+	application._bake_geometry_sampling()
+	_expect(bool(application._geometry_sampling_bake("asset_1", "component_1").get("accepted_preview_marker", false)), "Bake Preview should copy the current matching Preview without regenerating it.")
 	spacing_input.free()
 	application.geometry_documents["asset_1/component_1"] = application._default_geometry_document("asset_1", "component_1")
 	var history_snapshot: Dictionary = application._capture_history_snapshot()
@@ -409,7 +444,7 @@ func _test_geometry_seeding_service() -> void:
 	BezierTopology.add_point(component, Vector2(10.0, 10.0), "linear")
 	BezierTopology.add_point(component, Vector2(0.0, 10.0), "linear")
 	BezierTopology.close_active_chain(component)
-	var sampling := GeometrySamplingService.generate(component, {"method": GeometrySamplingService.EVEN_SPACING, "parameters": {"spacing": 1.0}})
+	var sampling := GeometrySamplingService.generate(component, {"method": GeometrySamplingService.ADAPTIVE, "parameters": {"spacing": 1.0}})
 	sampling["bake_id"] = "sampling_bake_test"
 	var first := GeometrySeedingService.generate(sampling, {"method": GeometrySeedingService.POISSON_FILL, "parameters": {"spacing": 2.0, "seed": 17}})
 	var repeated := GeometrySeedingService.generate(sampling, {"method": GeometrySeedingService.POISSON_FILL, "parameters": {"spacing": 2.0, "seed": 17}})
@@ -445,8 +480,8 @@ func _test_geometry_seeding_service() -> void:
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
 	var geometry_document: Dictionary = application._default_geometry_document("asset_1", "component_1")
-	geometry_document["sampling"]["recipe"] = {"method": GeometrySamplingService.EVEN_SPACING, "parameters": {"spacing": 1.0}}
-	geometry_document["sampling"]["bakes"][GeometrySamplingService.EVEN_SPACING] = sampling
+	geometry_document["sampling"]["recipe"] = {"method": GeometrySamplingService.ADAPTIVE, "parameters": {"spacing": 1.0}}
+	geometry_document["sampling"]["bakes"][GeometrySamplingService.ADAPTIVE] = sampling
 	first["bake_id"] = "seeding_bake_test"
 	first["edited"] = true
 	first["seeds"][0]["origin"] = "manual_adjusted"
@@ -538,7 +573,7 @@ func _test_geometry_meshing_service_and_ui() -> void:
 	BezierTopology.add_point(component, Vector2(10.0, 10.0), "linear")
 	BezierTopology.add_point(component, Vector2(0.0, 10.0), "linear")
 	BezierTopology.close_active_chain(component)
-	var sampling := GeometrySamplingService.generate(component, {"method": GeometrySamplingService.EVEN_SPACING, "parameters": {"spacing": 2.0}})
+	var sampling := GeometrySamplingService.generate(component, {"method": GeometrySamplingService.ADAPTIVE, "parameters": {"spacing": 2.0}})
 	sampling["bake_id"] = "sampling_mesh_test"
 	var seeding := GeometrySeedingService.generate(sampling, {"method": GeometrySeedingService.POISSON_FILL, "parameters": {"spacing": 2.5, "seed": 9}})
 	seeding["bake_id"] = "seeding_mesh_test"
@@ -556,7 +591,7 @@ func _test_geometry_meshing_service_and_ui() -> void:
 		BezierTopology.add_point(holed_component, position, "linear")
 	BezierTopology.close_active_chain(holed_component)
 	holed_component["chains"][1]["topology_role"] = "hole"
-	var holed_sampling := GeometrySamplingService.generate(holed_component, {"method": GeometrySamplingService.EVEN_SPACING, "parameters": {"spacing": 2.0}})
+	var holed_sampling := GeometrySamplingService.generate(holed_component, {"method": GeometrySamplingService.ADAPTIVE, "parameters": {"spacing": 2.0}})
 	holed_sampling["bake_id"] = "sampling_hole_test"
 	var holed_seeding := GeometrySeedingService.generate(holed_sampling, {"method": GeometrySeedingService.POISSON_FILL, "parameters": {"spacing": 2.5, "seed": 3}})
 	holed_seeding["bake_id"] = "seeding_hole_test"
@@ -583,8 +618,8 @@ func _test_geometry_meshing_service_and_ui() -> void:
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
 	var document: Dictionary = application._default_geometry_document("asset_1", "component_1")
-	document["sampling"]["recipe"] = {"method": GeometrySamplingService.EVEN_SPACING, "parameters": {"spacing": 2.0}}
-	document["sampling"]["bakes"][GeometrySamplingService.EVEN_SPACING] = sampling
+	document["sampling"]["recipe"] = {"method": GeometrySamplingService.ADAPTIVE, "parameters": {"spacing": 2.0}}
+	document["sampling"]["bakes"][GeometrySamplingService.ADAPTIVE] = sampling
 	document["seeding"]["recipe"] = {"method": GeometrySeedingService.POISSON_FILL, "parameters": {"spacing": 2.5, "seed": 9}}
 	document["seeding"]["bakes"][GeometrySeedingService.POISSON_FILL] = seeding
 	document["meshing"]["recipe"] = cdt_recipe
@@ -633,7 +668,7 @@ func _test_geometry_uv_mapping_service_and_ui() -> void:
 	for position in [Vector2.ZERO, Vector2(12.0, 0.0), Vector2(12.0, 8.0), Vector2(0.0, 8.0)]:
 		BezierTopology.add_point(component, position, "linear")
 	BezierTopology.close_active_chain(component)
-	var sampling := GeometrySamplingService.generate(component, {"method": GeometrySamplingService.EVEN_SPACING, "parameters": {"spacing": 2.0}})
+	var sampling := GeometrySamplingService.generate(component, {"method": GeometrySamplingService.ADAPTIVE, "parameters": {"spacing": 2.0}})
 	sampling["bake_id"] = "sampling_uv_test"
 	var seeding := GeometrySeedingService.generate(sampling, {"method": GeometrySeedingService.POISSON_FILL, "parameters": {"spacing": 2.5, "seed": 4}})
 	seeding["bake_id"] = "seeding_uv_test"
@@ -656,8 +691,8 @@ func _test_geometry_uv_mapping_service_and_ui() -> void:
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
 	var document: Dictionary = application._default_geometry_document("asset_1", "component_1")
-	document["sampling"]["recipe"] = {"method": GeometrySamplingService.EVEN_SPACING, "parameters": {"spacing": 2.0}}
-	document["sampling"]["bakes"][GeometrySamplingService.EVEN_SPACING] = sampling
+	document["sampling"]["recipe"] = {"method": GeometrySamplingService.ADAPTIVE, "parameters": {"spacing": 2.0}}
+	document["sampling"]["bakes"][GeometrySamplingService.ADAPTIVE] = sampling
 	document["seeding"]["recipe"] = {"method": GeometrySeedingService.POISSON_FILL, "parameters": {"spacing": 2.5, "seed": 4}}
 	document["seeding"]["bakes"][GeometrySeedingService.POISSON_FILL] = seeding
 	document["meshing"]["recipe"] = {"method": GeometryMeshingService.CONSTRAINED_DELAUNAY, "parameters": {"seeding_method": GeometrySeedingService.POISSON_FILL}}
@@ -719,7 +754,7 @@ func _test_weighting_service_and_ui() -> void:
 	for position in [Vector2.ZERO, Vector2(10.0, 0.0), Vector2(10.0, 10.0), Vector2(0.0, 10.0)]:
 		BezierTopology.add_point(component, position, "linear")
 	BezierTopology.close_active_chain(component)
-	var sampling := GeometrySamplingService.generate(component, {"method": GeometrySamplingService.EVEN_SPACING, "parameters": {"spacing": 2.0}})
+	var sampling := GeometrySamplingService.generate(component, {"method": GeometrySamplingService.ADAPTIVE, "parameters": {"spacing": 2.0}})
 	sampling["bake_id"] = "sampling_weighting"
 	var seeding := GeometrySeedingService.generate(sampling, {"method": GeometrySeedingService.POISSON_FILL, "parameters": {"spacing": 2.5, "seed": 5}})
 	seeding["bake_id"] = "seeding_weighting"
@@ -737,8 +772,8 @@ func _test_weighting_service_and_ui() -> void:
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
 	var document: Dictionary = application._default_geometry_document("asset_weighting", "component_weighting")
-	document["sampling"]["recipe"] = {"method": GeometrySamplingService.EVEN_SPACING, "parameters": {"spacing": 2.0}}
-	document["sampling"]["bakes"][GeometrySamplingService.EVEN_SPACING] = sampling
+	document["sampling"]["recipe"] = {"method": GeometrySamplingService.ADAPTIVE, "parameters": {"spacing": 2.0}}
+	document["sampling"]["bakes"][GeometrySamplingService.ADAPTIVE] = sampling
 	document["seeding"]["recipe"] = {"method": GeometrySeedingService.POISSON_FILL, "parameters": {"spacing": 2.5, "seed": 5}}
 	document["seeding"]["bakes"][GeometrySeedingService.POISSON_FILL] = seeding
 	document["meshing"]["recipe"] = {"method": GeometryMeshingService.CONSTRAINED_DELAUNAY, "parameters": {"seeding_method": GeometrySeedingService.POISSON_FILL}}
@@ -966,7 +1001,8 @@ func _test_asset_guides() -> void:
 	application._on_primitive_placed(Vector2(0.25, -0.5), 2.5)
 	_expect(PrimitiveGeometryService.has_circle(pupil_component) and is_equal_approx(float(pupil_component.get("primitive", {}).get("diameter_cm", 0.0)), 2.5) and PrimitiveGeometryService.center(pupil_component).is_equal_approx(Vector2(0.25, -0.5)), "Circle placement should persist only its parametric center and diameter.")
 	var primitive_sampling := GeometrySamplingService.generate(pupil_component)
-	_expect(bool(primitive_sampling.get("valid", false)) and int(primitive_sampling.get("sample_count", 0)) == PrimitiveGeometryService.CIRCLE_MESH_SEGMENTS and pupil_component.get("points", []).is_empty(), "Primitive sampling should derive mesh samples without storing them in Component topology.")
+	var refined_primitive_sampling := GeometrySamplingService.generate(pupil_component, {"parameters": {"spacing": 0.01, "feature_detail": 0.5}})
+	_expect(bool(primitive_sampling.get("valid", false)) and int(primitive_sampling.get("sample_count", 0)) >= 4 and int(primitive_sampling.get("sample_count", 0)) != PrimitiveGeometryService.CIRCLE_MESH_SEGMENTS and int(refined_primitive_sampling.get("sample_count", 0)) > int(primitive_sampling.get("sample_count", 0)) and pupil_component.get("points", []).is_empty(), "Primitive sampling should adapt analytically to the recipe without storing Bézier topology or using a fixed mesh segment count.")
 	application._on_primitive_center_changed(Vector2(0.5, -0.25))
 	_expect(PrimitiveGeometryService.center(pupil_component).is_equal_approx(Vector2(0.5, -0.25)), "The Primitive center handle should move the parametric center without changing its Component pivot.")
 	application.free()
@@ -1269,7 +1305,7 @@ func _test_motion_act_evaluator() -> void:
 	var normalized: Dictionary = application._normalize_motion_act({"id": "act_7", "parameters": {"direction": [0.0, 2.0], "distance": 12.0}}, "fallback")
 	_expect(Vector2(normalized.get("parameters", {}).get("direction", Vector2.ZERO)) == Vector2(0.0, 2.0), "Persisted Slide direction arrays should normalize back to Vector2 values.")
 	var serialized: Dictionary = application._serialize_motion_act(normalized)
-	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 28, "Act persistence should serialize vectors as JSON arrays using schema 28.")
+	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 29, "Act persistence should serialize vectors as JSON arrays using schema 29.")
 	var normalized_jump: Dictionary = application._normalize_motion_act({"id": "act_8", "primitive": "jump", "parameters": {"direction": [1.0, 0.0], "distance": 7.0, "height": 2.5, "arc": "snappy"}}, "fallback")
 	var serialized_jump: Dictionary = application._serialize_motion_act(normalized_jump)
 	_expect(str(serialized_jump.get("primitive", "")) == MotionActEvaluator.JUMP and is_equal_approx(float(serialized_jump.get("parameters", {}).get("height", 0.0)), 2.5) and str(serialized_jump.get("parameters", {}).get("arc", "")) == MotionActEvaluator.JUMP_ARC_SNAPPY, "Jump-specific parameters should survive normalization and serialization.")

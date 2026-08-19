@@ -51,8 +51,9 @@ source. A Primitive's center handle moves its `primitive.center`; its Component
 pivot remains an independent transform handle.
 
 Components support `closed_loop`, `open_edge`, `ribbon`, and `primitive` draw
-modes. Primitive sampling is derived at mesh resolution, so it has no user
-editable sample count. Guides remain independent topology records scoped to an Asset or Component. Derived
+modes. Primitive sampling evaluates the analytic Circle at the selected Body's
+adaptive target edge length and scale-aware Curve Detail, so it has no fixed or
+user-editable sample count. Guides remain independent topology records scoped to an Asset or Component. Derived
 Sampling, Seeding, Meshing, UV, and Weighting records are stored separately
 from source topology.
 

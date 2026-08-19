@@ -4,10 +4,10 @@
 
 ## Observable result
 
-In `Geometry → Sampling`, the user selects one Component, chooses Adaptive or
-Even Spacing, adjusts the method's small parameter set, generates a temporary
-boundary preview, and explicitly bakes an accepted result. Every Component owns
-an independent recipe and bake.
+In `Mesh → Sampling`, the user selects one Body Component, adjusts one adaptive
+boundary recipe, inspects an automatically generated point preview, and
+explicitly bakes the accepted result. Outer, referenced Hole, and scoped Cut
+boundaries participate in one shared Bake.
 
 ## Ownership
 
@@ -22,15 +22,28 @@ by stable Asset and Component IDs. A bake records a fingerprint of its source
 topology. A changed fingerprint makes that bake stale; derived data is never
 synchronized back into authored topology.
 
-## Methods
+## Adaptive recipe
 
-- **Adaptive** exposes `Spacing` (default `1.00` local units) and `Feature Detail`. It recursively subdivides
-  cubic edges from chord length, flatness, and tangent turn.
-- **Even Spacing** exposes only `Spacing` and uses an approximate arc-length
-  table per cubic edge.
+Sampling exposes one method. `Target Edge Length` (persisted as `spacing`,
+default `1.00` Body units) is the maximum desired boundary interval, while
+`Curve Detail` (persisted as `feature_detail`) refines curved regions from an
+absolute chord-error tolerance in Body units plus tangent turn. The chord-error
+tolerance is scale-aware: enlarging the same curved input eventually adds
+samples even when its tangent angles are unchanged. Closed Chains omit a
+duplicate copy of their first sample at the end.
 
-Both methods are deterministic. Closed Chains omit a duplicate copy of their
-first sample at the end.
+Outer, Hole, and Cut boundaries inherit the Body recipe. A Hole Reference or
+Cut Guide may optionally store a boundary-density factor from `0.25×` through
+`16×`; its effective target length is `Body spacing / factor`. The factor also
+scales adaptive curve tolerances, so values below `1×` coarsen a boundary and
+values above `1×` refine it. Boundary adjustments never
+select a separate method or Curve Detail value. Schema-28 Even Spacing recipes
+and absolute boundary overrides normalize to the adaptive recipe and factors.
+
+Circle Primitives remain canonical as center plus diameter. Sampling evaluates
+their analytic curve directly, including a Reference transform into Body-local
+space, so their sample count follows Target Edge Length and Curve Detail rather
+than the fixed render-contour segment count.
 
 ## Preserve Point
 
@@ -42,14 +55,15 @@ not permission to erase authored intent.
 
 ## Generate and Bake
 
-Changing a method or parameter automatically runs `Generate` and updates the
-temporary preview; the generated preview does not participate in document
-history. `Bake` accepts only a valid preview matching the current recipe and
-source fingerprint, then persists the derived result and participates in
-Undo/Redo. Recipe or topology changes make the previous bake stale.
+Changing a parameter schedules one debounced Generate and updates the temporary
+point preview; the generated preview does not participate in document history.
+The states are `Ready to Preview`, `Calculating`, `Preview Ready`, `Invalid`,
+and `Baked`. `Bake Preview` only accepts and copies a valid preview matching the
+current recipe and source fingerprint; it does not generate again. Recipe or
+topology changes retain the previous Bake as stale and invalidate downstream
+Seeding and Meshing through their existing fingerprint dependencies.
 
 ## Deferred
 
-`CMD/Ctrl + 0 · Analysis`, `CMD/Ctrl + 2 · Edit Sample Point`, manual sample
-overrides, Seeding, Meshing, UV Mapping, Animation Spines, Inner deformation,
-and export consumption are outside this module MVP.
+Manual sample-point editing, per-boundary Curve Detail, background-threaded
+generation, and export consumption remain deferred.
