@@ -4,6 +4,7 @@ extends RefCounted
 const ADAPTIVE := "adaptive"
 const EVEN_SPACING := "even_spacing"
 const VALID_METHODS := [ADAPTIVE]
+const ALGORITHM_VERSION := 2
 const DEFAULT_SPACING := 1.0
 const DEFAULT_FEATURE_DETAIL := 0.5
 const MIN_SPACING := 0.01
@@ -11,6 +12,7 @@ const MIN_REFINEMENT_FACTOR := 0.25
 const MAX_REFINEMENT_FACTOR := 16.0
 const MAX_SAMPLES_PER_CHAIN := 20000
 const MAX_ADAPTIVE_DEPTH := 18
+const ARRANGEMENT_EPSILON := 0.000001
 
 
 static func default_recipe() -> Dictionary:
@@ -63,6 +65,7 @@ static func generate(component: Dictionary, raw_recipe = {}, cut_guides: Array =
 		var samples: Array = sampled_circle.get("samples", [])
 		var primitive_result := {
 			"valid": true, "errors": [], "method": recipe["method"], "parameters": recipe["parameters"].duplicate(true),
+			"algorithm_version": ALGORITHM_VERSION,
 			"source_fingerprint": source_fingerprint(component, cut_guides, hole_components), "chains": [{"chain_id": "primitive:circle", "input_id": "", "topology_role": "outer", "closed": true, "effective_spacing": sampled_circle["effective_spacing"], "samples": samples}], "cuts": [],
 			"sample_count": samples.size(), "preserve_count": 0
 		}
@@ -78,6 +81,9 @@ static func generate(component: Dictionary, raw_recipe = {}, cut_guides: Array =
 			if not bool(cut.get("valid", false)):
 				return _failed_result(recipe, cut.get("errors", []), source_fingerprint(component, cut_guides, hole_components))
 		primitive_result["cuts"] = primitive_cuts
+		_arrange_cut_constraints(primitive_result)
+		if not bool(primitive_result.get("valid", false)):
+			return primitive_result
 		_finalize_result_stats(primitive_result)
 		return primitive_result
 	var working_component := component.duplicate(true)
@@ -126,6 +132,7 @@ static func generate(component: Dictionary, raw_recipe = {}, cut_guides: Array =
 	var result := {
 		"valid": true,
 		"errors": [],
+		"algorithm_version": ALGORITHM_VERSION,
 		"method": recipe["method"],
 		"parameters": recipe["parameters"].duplicate(true),
 		"source_fingerprint": source_fingerprint(component, cut_guides, hole_components),
@@ -135,6 +142,9 @@ static func generate(component: Dictionary, raw_recipe = {}, cut_guides: Array =
 		"preserve_count": preserved_ids.size(),
 		"hole_count": sampled_holes["chains"].size()
 	}
+	_arrange_cut_constraints(result)
+	if not bool(result.get("valid", false)):
+		return result
 	_finalize_result_stats(result)
 	return result
 
@@ -278,6 +288,209 @@ static func _sample_cut_guides(cut_guides: Array, recipe: Dictionary) -> Array:
 			samples.append(cut_sample)
 		results.append({"valid": true, "errors": [], "guide_id": str(guide.get("id", "")), "input_id": str(guide.get("id", "")), "effective_spacing": float(guide_recipe["parameters"]["spacing"]), "samples": samples})
 	return results
+
+
+static func cut_fragments(cut_data: Dictionary) -> Array:
+	var fragments = cut_data.get("fragments", [])
+	if fragments is Array and not fragments.is_empty():
+		return fragments
+	var samples: Array = cut_data.get("samples", [])
+	return [{"id": "cut:%s:fragment:0" % str(cut_data.get("guide_id", "")), "samples": samples}] if samples.size() >= 2 else []
+
+
+static func _arrange_cut_constraints(result: Dictionary) -> void:
+	var chains: Array = result.get("chains", [])
+	var cuts: Array = result.get("cuts", [])
+	if cuts.is_empty():
+		return
+	var chain_insertions: Array = []
+	for chain_data in chains:
+		chain_insertions.append(_empty_segment_insertions(chain_data.get("samples", []).size()))
+	var cut_insertions: Array = []
+	for cut_data in cuts:
+		cut_insertions.append(_empty_segment_insertions(maxi(cut_data.get("samples", []).size() - 1, 0)))
+
+	for cut_index in range(cuts.size()):
+		var cut_samples: Array = cuts[cut_index].get("samples", [])
+		for cut_segment in range(maxi(cut_samples.size() - 1, 0)):
+			var cut_start := Vector2(cut_samples[cut_segment].get("position", Vector2.ZERO))
+			var cut_end := Vector2(cut_samples[cut_segment + 1].get("position", Vector2.ZERO))
+			for chain_index in range(chains.size()):
+				var chain_samples: Array = chains[chain_index].get("samples", [])
+				var chain_segments := chain_samples.size() if bool(chains[chain_index].get("closed", false)) else maxi(chain_samples.size() - 1, 0)
+				for chain_segment in range(chain_segments):
+					var chain_start := Vector2(chain_samples[chain_segment].get("position", Vector2.ZERO))
+					var chain_end := Vector2(chain_samples[(chain_segment + 1) % chain_samples.size()].get("position", Vector2.ZERO))
+					var intersection := _segment_intersection(cut_start, cut_end, chain_start, chain_end)
+					if intersection.is_empty():
+						continue
+					var junction := _junction_sample(Vector2(intersection["position"]), str(cuts[cut_index].get("guide_id", "")))
+					cut_insertions[cut_index][cut_segment].append({"t": float(intersection["first_t"]), "sample": junction.duplicate(true)})
+					chain_insertions[chain_index][chain_segment].append({"t": float(intersection["second_t"]), "sample": junction.duplicate(true)})
+
+	for first_cut in range(cuts.size()):
+		var first_samples: Array = cuts[first_cut].get("samples", [])
+		for second_cut in range(first_cut + 1, cuts.size()):
+			var second_samples: Array = cuts[second_cut].get("samples", [])
+			for first_segment in range(maxi(first_samples.size() - 1, 0)):
+				for second_segment in range(maxi(second_samples.size() - 1, 0)):
+					var intersection := _segment_intersection(
+						Vector2(first_samples[first_segment].get("position", Vector2.ZERO)),
+						Vector2(first_samples[first_segment + 1].get("position", Vector2.ZERO)),
+						Vector2(second_samples[second_segment].get("position", Vector2.ZERO)),
+						Vector2(second_samples[second_segment + 1].get("position", Vector2.ZERO)))
+					if intersection.is_empty():
+						continue
+					var junction := _junction_sample(Vector2(intersection["position"]), "cut-crossing")
+					cut_insertions[first_cut][first_segment].append({"t": float(intersection["first_t"]), "sample": junction.duplicate(true)})
+					cut_insertions[second_cut][second_segment].append({"t": float(intersection["second_t"]), "sample": junction.duplicate(true)})
+
+	for chain_index in range(chains.size()):
+		chains[chain_index]["samples"] = _rebuild_samples(
+			chains[chain_index].get("samples", []), chain_insertions[chain_index], bool(chains[chain_index].get("closed", false)), "")
+	for cut_index in range(cuts.size()):
+		var guide_id := str(cuts[cut_index].get("guide_id", ""))
+		var arranged := _rebuild_samples(cuts[cut_index].get("samples", []), cut_insertions[cut_index], false, guide_id)
+		var fragments := _clip_cut_fragments(arranged, chains, guide_id)
+		cuts[cut_index]["fragments"] = fragments
+		cuts[cut_index]["samples"] = _flatten_fragment_samples(fragments)
+		if fragments.is_empty():
+			cuts[cut_index]["valid"] = false
+			cuts[cut_index]["errors"] = ["Cut %s does not cross the sampled meshing domain." % guide_id]
+			result["valid"] = false
+			result["errors"].append_array(cuts[cut_index]["errors"])
+	result["chains"] = chains
+	result["cuts"] = cuts
+	result["sample_count"] = _chain_sample_count(chains)
+
+
+static func _empty_segment_insertions(segment_count: int) -> Array:
+	var result: Array = []
+	for _index in range(segment_count):
+		result.append([])
+	return result
+
+
+static func _segment_intersection(first_start: Vector2, first_end: Vector2, second_start: Vector2, second_end: Vector2) -> Dictionary:
+	var first_delta := first_end - first_start
+	var second_delta := second_end - second_start
+	var denominator := first_delta.cross(second_delta)
+	if absf(denominator) <= ARRANGEMENT_EPSILON:
+		return {}
+	var offset := second_start - first_start
+	var first_t := offset.cross(second_delta) / denominator
+	var second_t := offset.cross(first_delta) / denominator
+	if first_t < -ARRANGEMENT_EPSILON or first_t > 1.0 + ARRANGEMENT_EPSILON \
+		or second_t < -ARRANGEMENT_EPSILON or second_t > 1.0 + ARRANGEMENT_EPSILON:
+		return {}
+	first_t = clampf(first_t, 0.0, 1.0)
+	second_t = clampf(second_t, 0.0, 1.0)
+	return {"first_t": first_t, "second_t": second_t, "position": first_start + first_delta * first_t}
+
+
+static func _junction_sample(position: Vector2, guide_id: String) -> Dictionary:
+	var junction_id := "junction:%d:%d" % [roundi(position.x / ARRANGEMENT_EPSILON), roundi(position.y / ARRANGEMENT_EPSILON)]
+	return {
+		"id": junction_id,
+		"position": position,
+		"edge_id": "",
+		"curve_t": 0.0,
+		"source_point_id": "",
+		"preserved": true,
+		"junction": true,
+		"guide_id": guide_id
+	}
+
+
+static func _rebuild_samples(samples: Array, insertions: Array, closed: bool, guide_id: String) -> Array:
+	if samples.size() < 2:
+		return samples.duplicate(true)
+	var working := samples.duplicate(true)
+	for segment_index in range(insertions.size()):
+		for insertion in insertions[segment_index]:
+			var t := float(insertion.get("t", 0.0))
+			var inserted: Dictionary = insertion.get("sample", {})
+			if t <= ARRANGEMENT_EPSILON:
+				working[segment_index]["position"] = inserted.get("position", working[segment_index].get("position", Vector2.ZERO))
+				working[segment_index]["junction"] = true
+			elif t >= 1.0 - ARRANGEMENT_EPSILON:
+				var next_index := (segment_index + 1) % working.size()
+				working[next_index]["position"] = inserted.get("position", working[next_index].get("position", Vector2.ZERO))
+				working[next_index]["junction"] = true
+	var rebuilt: Array = []
+	for segment_index in range(insertions.size()):
+		if rebuilt.is_empty() or not Vector2(rebuilt.back().get("position", Vector2.ZERO)).is_equal_approx(Vector2(working[segment_index].get("position", Vector2.ZERO))):
+			rebuilt.append(working[segment_index].duplicate(true))
+		var ordered: Array = insertions[segment_index].duplicate(true)
+		ordered.sort_custom(func(first: Dictionary, second: Dictionary) -> bool: return float(first.get("t", 0.0)) < float(second.get("t", 0.0)))
+		for insertion in ordered:
+			var t := float(insertion.get("t", 0.0))
+			if t <= ARRANGEMENT_EPSILON or t >= 1.0 - ARRANGEMENT_EPSILON:
+				continue
+			var inserted: Dictionary = insertion.get("sample", {}).duplicate(true)
+			if not guide_id.is_empty():
+				inserted["guide_id"] = guide_id
+			if rebuilt.is_empty() or Vector2(rebuilt.back().get("position", Vector2.ZERO)).distance_squared_to(Vector2(inserted.get("position", Vector2.ZERO))) > ARRANGEMENT_EPSILON * ARRANGEMENT_EPSILON:
+				rebuilt.append(inserted)
+	if not closed:
+		var last: Dictionary = working.back().duplicate(true)
+		if rebuilt.is_empty() or Vector2(rebuilt.back().get("position", Vector2.ZERO)).distance_squared_to(Vector2(last.get("position", Vector2.ZERO))) > ARRANGEMENT_EPSILON * ARRANGEMENT_EPSILON:
+			rebuilt.append(last)
+	for index in range(rebuilt.size()):
+		if not guide_id.is_empty():
+			rebuilt[index]["guide_id"] = guide_id
+			rebuilt[index]["id"] = "cut:%s:%d" % [guide_id, index]
+	return rebuilt
+
+
+static func _clip_cut_fragments(samples: Array, chains: Array, guide_id: String) -> Array:
+	var fragments: Array = []
+	var current: Array = []
+	for segment_index in range(maxi(samples.size() - 1, 0)):
+		var first: Dictionary = samples[segment_index]
+		var second: Dictionary = samples[segment_index + 1]
+		var midpoint := (Vector2(first.get("position", Vector2.ZERO)) + Vector2(second.get("position", Vector2.ZERO))) * 0.5
+		if _point_inside_sampled_domain(midpoint, chains):
+			if current.is_empty():
+				current.append(first.duplicate(true))
+			current.append(second.duplicate(true))
+		elif current.size() >= 2:
+			fragments.append({"id": "cut:%s:fragment:%d" % [guide_id, fragments.size()], "samples": current})
+			current = []
+	if current.size() >= 2:
+		fragments.append({"id": "cut:%s:fragment:%d" % [guide_id, fragments.size()], "samples": current})
+	return fragments
+
+
+static func _point_inside_sampled_domain(position: Vector2, chains: Array) -> bool:
+	var inside_outer := false
+	for chain_data in chains:
+		var polygon := PackedVector2Array()
+		for sample in chain_data.get("samples", []):
+			polygon.append(Vector2(sample.get("position", Vector2.ZERO)))
+		if polygon.size() < 3:
+			continue
+		var inside := Geometry2D.is_point_in_polygon(position, polygon)
+		if str(chain_data.get("topology_role", "outer")) == "outer":
+			inside_outer = inside_outer or inside
+		elif inside:
+			return false
+	return inside_outer
+
+
+static func _flatten_fragment_samples(fragments: Array) -> Array:
+	var flattened: Array = []
+	for fragment in fragments:
+		for sample in fragment.get("samples", []):
+			flattened.append(sample.duplicate(true))
+	return flattened
+
+
+static func _chain_sample_count(chains: Array) -> int:
+	var count := 0
+	for chain_data in chains:
+		count += chain_data.get("samples", []).size()
+	return count
 
 
 static func _recipe_for_input(recipe: Dictionary, input_id: String) -> Dictionary:
@@ -483,6 +696,7 @@ static func _failed_result(recipe: Dictionary, errors: Array[String], fingerprin
 	return {
 		"valid": false,
 		"errors": errors,
+		"algorithm_version": ALGORITHM_VERSION,
 		"method": recipe["method"],
 		"parameters": recipe["parameters"].duplicate(true),
 		"source_fingerprint": fingerprint,

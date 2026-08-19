@@ -9,3 +9,11 @@ exports/
 
 # macOS
 .DS_Store
+
+# Local native-extension toolchain and build products
+native/polytools_cdt/.venv/
+native/polytools_cdt/.sconsign.dblite
+native/polytools_cdt/godot-cpp/bin/
+native/polytools_cdt/godot-cpp/gen/
+native/polytools_cdt/godot-cpp/obj/
+native/polytools_cdt/src/*.os

@@ -6,8 +6,9 @@ const CONSTRAINED_DELAUNAY := "constrained_delaunay" # Legacy schema <= 30.
 const ORGANIC_RELAXED := "organic_relaxed" # Legacy schema <= 30.
 const RIBBON_STRIP := "ribbon_strip"
 const VALID_METHODS := [CONSTRAINED_MESH, RIBBON_STRIP]
-const ALGORITHM_VERSION := 2
-const DEFAULT_MESH_CHARACTER := 0.0
+const ALGORITHM_VERSION := 4
+const DEFAULT_MESH_CHARACTER := 0.64
+const DEFAULT_OPTIMIZE_MESH := true
 const DEFAULT_RELAXATION := 0.35
 const DEFAULT_PASSES := 2
 const MAX_PASSES := 8
@@ -21,6 +22,7 @@ static func default_recipe() -> Dictionary:
 		"parameters": {
 			"seeding_method": GeometrySeedingService.POISSON_FILL,
 			"mesh_character": DEFAULT_MESH_CHARACTER,
+			"optimize_mesh": DEFAULT_OPTIMIZE_MESH,
 			"relaxation_override": false,
 			"relaxation": 0.0,
 			"passes_override": false,
@@ -44,6 +46,7 @@ static func normalize_recipe(raw_recipe) -> Dictionary:
 	if seeding_method not in GeometrySeedingService.VALID_METHODS:
 		seeding_method = GeometrySeedingService.POISSON_FILL
 	var character := clampf(float(parameters.get("mesh_character", DEFAULT_MESH_CHARACTER)), 0.0, 1.0)
+	var optimize_mesh := bool(parameters.get("optimize_mesh", DEFAULT_OPTIMIZE_MESH))
 	var legacy_organic: bool = raw_method == ORGANIC_RELAXED and not parameters.has("mesh_character")
 	if legacy_organic:
 		character = clampf((float(parameters.get("relaxation", DEFAULT_RELAXATION)) - 0.05) / 0.55, 0.0, 1.0)
@@ -54,6 +57,7 @@ static func normalize_recipe(raw_recipe) -> Dictionary:
 	recipe["parameters"] = {
 		"seeding_method": seeding_method,
 		"mesh_character": character,
+		"optimize_mesh": optimize_mesh,
 		"relaxation_override": relaxation_override,
 		"relaxation": relaxation,
 		"passes_override": passes_override,
@@ -83,17 +87,54 @@ static func generate(sampling_bake: Dictionary, seeding_bake: Dictionary, raw_re
 	if not bool(triangulation.get("valid", false)):
 		return _failed_result(sampling_bake, seeding_bake, recipe, triangulation.get("errors", []))
 	var triangles: Array = triangulation.get("triangles", [])
+	var triangulation_diagnostics: Dictionary = triangulation.get("diagnostics", {})
+	var baseline_vertices: Array = vertices.duplicate(true)
+	var baseline_triangles: Array = triangles.duplicate(true)
+	var quality_before := _quality_metrics(baseline_vertices, baseline_triangles)
+	var optimize_mesh := bool(recipe["parameters"].get("optimize_mesh", DEFAULT_OPTIMIZE_MESH))
 	var relaxation := float(recipe["parameters"]["relaxation"])
 	var passes := int(recipe["parameters"]["passes"])
-	if relaxation > 0.0 and passes > 0:
+	var accepted_passes := 0
+	var attempted_passes := 0
+	if optimize_mesh and relaxation > 0.0 and passes > 0:
 		for _pass_index in range(passes):
-			_relax_interior_vertices(vertices, triangles, sampling_bake, relaxation)
-			triangulation = _triangulate(vertices, constraints, sampling_bake)
-			if not bool(triangulation.get("valid", false)):
-				return _failed_result(sampling_bake, seeding_bake, recipe, triangulation.get("errors", []))
-			triangles = triangulation.get("triangles", [])
+			attempted_passes += 1
+			var accepted := false
+			var trial_strength := relaxation
+			for _attempt in range(4):
+				var candidate_vertices: Array = vertices.duplicate(true)
+				_relax_interior_vertices(candidate_vertices, triangles, sampling_bake, trial_strength)
+				var candidate_triangulation := _triangulate(candidate_vertices, constraints, sampling_bake)
+				if bool(candidate_triangulation.get("valid", false)):
+					var candidate_triangles: Array = candidate_triangulation.get("triangles", [])
+					var current_quality := _quality_metrics(vertices, triangles)
+					var candidate_quality := _quality_metrics(candidate_vertices, candidate_triangles)
+					if _quality_is_improved(current_quality, candidate_quality):
+						vertices = candidate_vertices
+						triangles = candidate_triangles
+						triangulation_diagnostics = candidate_triangulation.get("diagnostics", {})
+						accepted_passes += 1
+						accepted = true
+						break
+				trial_strength *= 0.5
+			if not accepted:
+				break
+	var quality_after := _quality_metrics(vertices, triangles)
+	var movements := _optimization_movements(baseline_vertices, vertices)
+	var optimization := {
+		"enabled": optimize_mesh,
+		"applied": not movements.is_empty(),
+		"attempted_passes": attempted_passes,
+		"accepted_passes": accepted_passes,
+		"moved_seed_count": movements.size(),
+		"removed_seed_count": 0,
+		"movements": movements,
+		"baseline_triangles": baseline_triangles,
+		"quality_before": quality_before,
+		"quality_after": quality_after
+	}
 	_duplicate_cut_seam_vertices(vertices, triangles, constraints)
-	var minimum_angle := _minimum_triangle_angle(vertices, triangles)
+	var minimum_angle := float(quality_after.get("minimum_angle", 0.0))
 	var degenerate_count := _degenerate_triangle_count(vertices, triangles)
 	return {
 		"valid": true,
@@ -111,10 +152,15 @@ static func generate(sampling_bake: Dictionary, seeding_bake: Dictionary, raw_re
 		"vertex_count": vertices.size(),
 		"triangle_count": triangles.size(),
 		"minimum_angle": minimum_angle,
+		"worst_aspect_ratio": float(quality_after.get("worst_aspect_ratio", 0.0)),
+		"mean_quality": float(quality_after.get("mean_quality", 0.0)),
+		"optimization": optimization,
 		"constraint_count": constraints.size(),
 		"constraints_valid": true,
 		"cut_seam_vertex_count": vertices.filter(func(vertex: Dictionary) -> bool: return str(vertex.get("origin", "")) == "cut_seam").size(),
-		"degenerate_triangle_count": degenerate_count
+		"degenerate_triangle_count": degenerate_count,
+		"triangulation_backend": "artem-ogre/CDT 1.4.5",
+		"diagnostics": triangulation_diagnostics
 	}
 
 
@@ -186,19 +232,20 @@ static func _source_vertices(sampling_bake: Dictionary, seeding_bake: Dictionary
 	for cut in sampling_bake.get("cuts", []):
 		if not cut is Dictionary or not bool(cut.get("valid", false)):
 			continue
-		for sample in cut.get("samples", []):
-			if not sample is Dictionary:
-				continue
-			var position := Vector2(sample.get("position", Vector2.ZERO))
-			var vertex_id := ""
-			for existing in vertices:
-				if Vector2(existing.get("position", Vector2.ZERO)).distance_squared_to(position) <= EPSILON * EPSILON:
-					vertex_id = str(existing.get("id", ""))
-					break
-			if vertex_id.is_empty():
-				vertex_id = "vertex:cut:%s" % str(sample.get("id", ""))
-				vertices.append({"id": vertex_id, "position": position, "origin": "cut", "source_id": str(sample.get("id", "")), "preserved": true})
-			sample["vertex_id"] = vertex_id
+		for fragment in GeometrySamplingService.cut_fragments(cut):
+			for sample in fragment.get("samples", []):
+				if not sample is Dictionary:
+					continue
+				var position := Vector2(sample.get("position", Vector2.ZERO))
+				var vertex_id := ""
+				for existing in vertices:
+					if Vector2(existing.get("position", Vector2.ZERO)).distance_squared_to(position) <= EPSILON * EPSILON:
+						vertex_id = str(existing.get("id", ""))
+						break
+				if vertex_id.is_empty():
+					vertex_id = "vertex:cut:%s" % str(sample.get("id", ""))
+					vertices.append({"id": vertex_id, "position": position, "origin": "cut", "source_id": str(sample.get("id", "")), "preserved": true})
+				sample["vertex_id"] = vertex_id
 	return vertices
 
 
@@ -212,6 +259,7 @@ static func _boundary_constraints(sampling_bake: Dictionary) -> Array:
 			constraints.append({
 				"chain_id": str(chain_data.get("chain_id", "")),
 				"topology_role": str(chain_data.get("topology_role", "outer")),
+				"segment_index": sample_index,
 				"vertex_ids": [
 					"vertex:boundary:%s" % str(samples[sample_index].get("id", "")),
 					"vertex:boundary:%s" % str(samples[(sample_index + 1) % samples.size()].get("id", ""))
@@ -220,12 +268,15 @@ static func _boundary_constraints(sampling_bake: Dictionary) -> Array:
 	for cut in sampling_bake.get("cuts", []):
 		if not cut is Dictionary or not bool(cut.get("valid", false)):
 			continue
-		var samples: Array = cut.get("samples", [])
-		for sample_index in range(samples.size() - 1):
-			var first_id := str(samples[sample_index].get("vertex_id", ""))
-			var second_id := str(samples[sample_index + 1].get("vertex_id", ""))
-			if not first_id.is_empty() and not second_id.is_empty() and first_id != second_id:
-				constraints.append({"chain_id": "cut:%s" % str(cut.get("guide_id", "")), "topology_role": "cut", "vertex_ids": [first_id, second_id]})
+		var fragment_index := 0
+		for fragment in GeometrySamplingService.cut_fragments(cut):
+			var samples: Array = fragment.get("samples", [])
+			for sample_index in range(samples.size() - 1):
+				var first_id := str(samples[sample_index].get("vertex_id", ""))
+				var second_id := str(samples[sample_index + 1].get("vertex_id", ""))
+				if not first_id.is_empty() and not second_id.is_empty() and first_id != second_id:
+					constraints.append({"chain_id": str(fragment.get("id", "cut:%s" % str(cut.get("guide_id", "")))), "topology_role": "cut", "fragment_index": fragment_index, "segment_index": sample_index, "vertex_ids": [first_id, second_id]})
+			fragment_index += 1
 	return constraints
 
 
@@ -276,21 +327,41 @@ static func _triangulate(vertices: Array, constraints: Array, sampling_bake: Dic
 				return {"valid": false, "errors": ["Meshing inputs contain coincident Vertices."]}
 		positions.append(position)
 		id_to_index[str(vertices[vertex_index].get("id", ""))] = vertex_index
-	var raw_indices := Geometry2D.triangulate_delaunay(positions)
-	if raw_indices.is_empty():
-		return {"valid": false, "errors": ["The selected inputs could not be triangulated."]}
-	var raw_triangles: Array = []
-	for raw_index in range(0, raw_indices.size(), 3):
-		raw_triangles.append([int(raw_indices[raw_index]), int(raw_indices[raw_index + 1]), int(raw_indices[raw_index + 2])])
 	var constraint_indices: Array = []
-	for constraint in constraints:
+	for constraint_index in range(constraints.size()):
+		var constraint: Dictionary = constraints[constraint_index]
 		var ids: Array = constraint.get("vertex_ids", [])
-		if ids.size() == 2 and id_to_index.has(str(ids[0])) and id_to_index.has(str(ids[1])):
-			constraint_indices.append([int(id_to_index[str(ids[0])]), int(id_to_index[str(ids[1])])])
-	var recovery := _recover_constraints(raw_triangles, constraint_indices, positions)
-	if not bool(recovery.get("valid", false)):
-		return recovery
-	raw_triangles = recovery.get("triangles", [])
+		if ids.size() != 2:
+			return {"valid": false, "errors": ["Constraint %d does not contain exactly two endpoint IDs." % (constraint_index + 1)]}
+		if not id_to_index.has(str(ids[0])) or not id_to_index.has(str(ids[1])):
+			return {"valid": false, "errors": ["Constraint %d references a missing sampled junction." % (constraint_index + 1)]}
+		constraint_indices.append([int(id_to_index[str(ids[0])]), int(id_to_index[str(ids[1])])])
+	var pslg_errors := _pslg_validation_issues(positions, constraint_indices, constraints)
+	if not pslg_errors.is_empty():
+		return {"valid": false, "errors": pslg_errors, "diagnostics": {"stage": "pslg_validation"}}
+	if not ClassDB.class_exists(&"PolyToolsCDT"):
+		return {"valid": false, "errors": ["The PolyTools CDT native extension is unavailable. Rebuild native/polytools_cdt for macOS arm64."], "diagnostics": {"stage": "native_load"}}
+	var native_cdt: Object = ClassDB.instantiate(&"PolyToolsCDT")
+	var packed_constraints := PackedInt32Array()
+	for indices in constraint_indices:
+		packed_constraints.append(int(indices[0]))
+		packed_constraints.append(int(indices[1]))
+	var native_result: Dictionary = native_cdt.triangulate(positions, packed_constraints)
+	if not bool(native_result.get("valid", false)):
+		var native_errors: Array = native_result.get("errors", [])
+		return {"valid": false, "errors": native_errors, "diagnostics": {"stage": "native_cdt", "native": native_result.get("diagnostics", {})}}
+	var fixed_edge_keys: Dictionary = {}
+	var native_fixed: PackedInt32Array = native_result.get("fixed_edges", PackedInt32Array())
+	for fixed_index in range(0, native_fixed.size(), 2):
+		fixed_edge_keys[_edge_key(native_fixed[fixed_index], native_fixed[fixed_index + 1])] = true
+	for constraint_index in range(constraint_indices.size()):
+		var indices: Array = constraint_indices[constraint_index]
+		if not fixed_edge_keys.has(_edge_key(int(indices[0]), int(indices[1]))):
+			return {"valid": false, "errors": ["CDT did not preserve %s." % _constraint_label(constraints[constraint_index], constraint_index)], "diagnostics": {"stage": "constraint_verification"}}
+	var raw_triangles: Array = []
+	var native_triangles: PackedInt32Array = native_result.get("triangles", PackedInt32Array())
+	for raw_index in range(0, native_triangles.size(), 3):
+		raw_triangles.append([int(native_triangles[raw_index]), int(native_triangles[raw_index + 1]), int(native_triangles[raw_index + 2])])
 	var triangles: Array = []
 	for raw_triangle in raw_triangles:
 		var indices: Array = raw_triangle.duplicate()
@@ -311,96 +382,73 @@ static func _triangulate(vertices: Array, constraints: Array, sampling_bake: Dic
 		triangles.append({"vertex_ids": [str(vertices[indices[0]].get("id", "")), str(vertices[indices[1]].get("id", "")), str(vertices[indices[2]].get("id", ""))]})
 	if triangles.is_empty():
 		return {"valid": false, "errors": ["No valid Triangles remain inside the sampled boundary."]}
-	return {"valid": true, "errors": [], "triangles": triangles}
+	triangles.sort_custom(func(first: Dictionary, second: Dictionary) -> bool:
+		return ",".join(first.get("vertex_ids", [])) < ",".join(second.get("vertex_ids", []))
+	)
+	return {"valid": true, "errors": [], "triangles": triangles, "diagnostics": {"stage": "complete", "native": native_result.get("diagnostics", {}), "input_constraint_count": constraint_indices.size()}}
 
 
-static func _recover_constraints(raw_triangles: Array, constraints: Array, positions: PackedVector2Array) -> Dictionary:
-	var triangles := raw_triangles.duplicate(true)
-	var fixed_edges: Dictionary = {}
-	for constraint in constraints:
-		var first := int(constraint[0])
-		var second := int(constraint[1])
-		var constraint_key := _edge_key(first, second)
-		var attempts := 0
-		while not _triangles_have_edge(triangles, first, second):
-			attempts += 1
-			if attempts > triangles.size() * 4 + 16:
-				return {"valid": false, "errors": ["A sampled Boundary constraint could not be recovered."]}
-			var edge_map := _triangle_edge_map(triangles)
-			var flipped := false
-			for edge_key in edge_map:
-				if fixed_edges.has(edge_key):
-					continue
-				var edge_data: Dictionary = edge_map[edge_key]
-				var edge_vertices: Array = edge_data.get("vertices", [])
-				var owners: Array = edge_data.get("triangles", [])
-				if edge_vertices.size() != 2 or owners.size() != 2:
-					continue
-				var edge_first := int(edge_vertices[0])
-				var edge_second := int(edge_vertices[1])
-				if edge_first in [first, second] or edge_second in [first, second]:
-					continue
-				if not _segments_properly_intersect(positions[first], positions[second], positions[edge_first], positions[edge_second]):
-					continue
-				var first_owner := int(owners[0])
-				var second_owner := int(owners[1])
-				var opposite_first := _triangle_opposite_vertex(triangles[first_owner], edge_first, edge_second)
-				var opposite_second := _triangle_opposite_vertex(triangles[second_owner], edge_first, edge_second)
-				if opposite_first < 0 or opposite_second < 0 \
-					or not _segments_properly_intersect(positions[edge_first], positions[edge_second], positions[opposite_first], positions[opposite_second]):
-					continue
-				var replacement_key := _edge_key(opposite_first, opposite_second)
-				if fixed_edges.has(replacement_key) or _edge_crosses_fixed_constraints(opposite_first, opposite_second, fixed_edges, positions):
-					continue
-				triangles[first_owner] = [opposite_first, opposite_second, edge_first]
-				triangles[second_owner] = [opposite_second, opposite_first, edge_second]
-				flipped = true
-				break
-			if not flipped:
-				return {"valid": false, "errors": ["A sampled Boundary constraint could not be recovered."]}
-		fixed_edges[constraint_key] = [first, second]
-	return {"valid": true, "errors": [], "triangles": triangles}
-
-
-static func _triangle_edge_map(triangles: Array) -> Dictionary:
-	var edge_map: Dictionary = {}
-	for triangle_index in range(triangles.size()):
-		var triangle: Array = triangles[triangle_index]
-		for slot in range(3):
-			var first := int(triangle[slot])
-			var second := int(triangle[(slot + 1) % 3])
-			var key := _edge_key(first, second)
-			if not edge_map.has(key):
-				edge_map[key] = {"vertices": [first, second], "triangles": []}
-			edge_map[key]["triangles"].append(triangle_index)
-	return edge_map
-
-
-static func _triangles_have_edge(triangles: Array, first: int, second: int) -> bool:
-	var key := _edge_key(first, second)
-	for triangle in triangles:
-		for slot in range(3):
-			if _edge_key(int(triangle[slot]), int(triangle[(slot + 1) % 3])) == key:
-				return true
-	return false
-
-
-static func _triangle_opposite_vertex(triangle: Array, first: int, second: int) -> int:
-	for vertex in triangle:
-		if int(vertex) != first and int(vertex) != second:
-			return int(vertex)
-	return -1
-
-
-static func _edge_crosses_fixed_constraints(first: int, second: int, fixed_edges: Dictionary, positions: PackedVector2Array) -> bool:
-	for constraint in fixed_edges.values():
-		var c_first := int(constraint[0])
-		var c_second := int(constraint[1])
-		if first in [c_first, c_second] or second in [c_first, c_second]:
+static func _pslg_validation_issues(positions: PackedVector2Array, constraint_indices: Array, constraints: Array) -> Array[String]:
+	var errors: Array[String] = []
+	var seen_edges: Dictionary = {}
+	for constraint_index in range(constraint_indices.size()):
+		var edge: Array = constraint_indices[constraint_index]
+		var first := int(edge[0])
+		var second := int(edge[1])
+		var label := _constraint_label(constraints[constraint_index], constraint_index)
+		if first == second or positions[first].distance_squared_to(positions[second]) <= EPSILON * EPSILON:
+			errors.append("%s has zero length." % label)
 			continue
-		if _segments_properly_intersect(positions[first], positions[second], positions[c_first], positions[c_second]):
-			return true
-	return false
+		var key := _edge_key(first, second)
+		if seen_edges.has(key):
+			errors.append("%s duplicates %s." % [label, str(seen_edges[key])])
+		else:
+			seen_edges[key] = label
+		for vertex_index in range(positions.size()):
+			if vertex_index in [first, second]:
+				continue
+			var closest := Geometry2D.get_closest_point_to_segment(positions[vertex_index], positions[first], positions[second])
+			if closest.distance_squared_to(positions[vertex_index]) <= EPSILON * EPSILON:
+				errors.append("%s passes through vertex %d without a shared sampled junction." % [label, vertex_index + 1])
+				break
+	for first_index in range(constraint_indices.size()):
+		var first_edge: Array = constraint_indices[first_index]
+		for second_index in range(first_index + 1, constraint_indices.size()):
+			var second_edge: Array = constraint_indices[second_index]
+			if int(first_edge[0]) in second_edge or int(first_edge[1]) in second_edge:
+				continue
+			if _segments_intersect_including_endpoints(
+				positions[int(first_edge[0])], positions[int(first_edge[1])],
+				positions[int(second_edge[0])], positions[int(second_edge[1])]):
+				errors.append("%s intersects %s without a shared sampled junction." % [
+					_constraint_label(constraints[first_index], first_index),
+					_constraint_label(constraints[second_index], second_index)])
+				return errors
+	return errors
+
+
+static func _constraint_label(constraint: Dictionary, constraint_index: int) -> String:
+	var role := str(constraint.get("topology_role", "boundary")).capitalize()
+	var chain_id := str(constraint.get("chain_id", ""))
+	var segment_number := int(constraint.get("segment_index", constraint_index)) + 1
+	var fragment_suffix := " fragment %d," % (int(constraint.get("fragment_index", 0)) + 1) if constraint.has("fragment_index") else ""
+	return "%s%s segment %d%s" % [role, fragment_suffix, segment_number, " (%s)" % chain_id if not chain_id.is_empty() else ""]
+
+
+static func _segments_intersect_including_endpoints(a: Vector2, b: Vector2, c: Vector2, d: Vector2) -> bool:
+	var ab := b - a
+	var cd := d - c
+	var denominator := ab.cross(cd)
+	if absf(denominator) <= EPSILON:
+		return _point_on_segment(a, c, d) or _point_on_segment(b, c, d) or _point_on_segment(c, a, b) or _point_on_segment(d, a, b)
+	var offset := c - a
+	var first_t := offset.cross(cd) / denominator
+	var second_t := offset.cross(ab) / denominator
+	return first_t >= -EPSILON and first_t <= 1.0 + EPSILON and second_t >= -EPSILON and second_t <= 1.0 + EPSILON
+
+
+static func _point_on_segment(point: Vector2, start: Vector2, end: Vector2) -> bool:
+	return Geometry2D.get_closest_point_to_segment(point, start, end).distance_squared_to(point) <= EPSILON * EPSILON
 
 
 static func _edge_key(first: int, second: int) -> String:
@@ -493,6 +541,82 @@ static func _minimum_triangle_angle(vertices: Array, triangles: Array) -> float:
 	return 0.0 if minimum == 180.0 else minimum
 
 
+static func _quality_metrics(vertices: Array, triangles: Array) -> Dictionary:
+	var by_id: Dictionary = {}
+	for vertex in vertices:
+		by_id[str(vertex.get("id", ""))] = Vector2(vertex.get("position", Vector2.ZERO))
+	var minimum_angle := 180.0
+	var worst_aspect_ratio := 0.0
+	var quality_sum := 0.0
+	var valid_count := 0
+	var degenerate_count := 0
+	for triangle in triangles:
+		var ids: Array = triangle.get("vertex_ids", [])
+		if ids.size() != 3 or not by_id.has(str(ids[0])) or not by_id.has(str(ids[1])) or not by_id.has(str(ids[2])):
+			degenerate_count += 1
+			continue
+		var a: Vector2 = by_id[str(ids[0])]
+		var b: Vector2 = by_id[str(ids[1])]
+		var c: Vector2 = by_id[str(ids[2])]
+		var twice_area := absf((b - a).cross(c - a))
+		var ab2 := a.distance_squared_to(b)
+		var bc2 := b.distance_squared_to(c)
+		var ca2 := c.distance_squared_to(a)
+		if twice_area <= EPSILON or minf(ab2, minf(bc2, ca2)) <= EPSILON * EPSILON:
+			degenerate_count += 1
+			continue
+		minimum_angle = minf(minimum_angle, _angle_degrees(b - a, c - a))
+		minimum_angle = minf(minimum_angle, _angle_degrees(a - b, c - b))
+		minimum_angle = minf(minimum_angle, _angle_degrees(a - c, b - c))
+		var longest_edge_squared := maxf(ab2, maxf(bc2, ca2))
+		worst_aspect_ratio = maxf(worst_aspect_ratio, longest_edge_squared / twice_area)
+		quality_sum += clampf(2.0 * sqrt(3.0) * twice_area / (ab2 + bc2 + ca2), 0.0, 1.0)
+		valid_count += 1
+	return {
+		"minimum_angle": 0.0 if minimum_angle == 180.0 else minimum_angle,
+		"worst_aspect_ratio": worst_aspect_ratio,
+		"mean_quality": quality_sum / float(valid_count) if valid_count > 0 else 0.0,
+		"degenerate_triangle_count": degenerate_count
+	}
+
+
+static func _quality_is_improved(before: Dictionary, after: Dictionary) -> bool:
+	if int(after.get("degenerate_triangle_count", 0)) > int(before.get("degenerate_triangle_count", 0)):
+		return false
+	var before_minimum := float(before.get("minimum_angle", 0.0))
+	var after_minimum := float(after.get("minimum_angle", 0.0))
+	var before_mean := float(before.get("mean_quality", 0.0))
+	var after_mean := float(after.get("mean_quality", 0.0))
+	var before_aspect := float(before.get("worst_aspect_ratio", INF))
+	var after_aspect := float(after.get("worst_aspect_ratio", INF))
+	if after_minimum < before_minimum - 0.05:
+		return false
+	if after_mean > before_mean + 0.000001:
+		return true
+	if after_minimum > before_minimum + 0.01 and after_mean >= before_mean - 0.000001:
+		return true
+	return after_aspect < before_aspect - 0.0001 and after_mean >= before_mean - 0.000001
+
+
+static func _optimization_movements(before_vertices: Array, after_vertices: Array) -> Array:
+	var before_by_id: Dictionary = {}
+	for vertex in before_vertices:
+		if str(vertex.get("origin", "")) == "seed":
+			before_by_id[str(vertex.get("id", ""))] = Vector2(vertex.get("position", Vector2.ZERO))
+	var movements: Array = []
+	for vertex in after_vertices:
+		var vertex_id := str(vertex.get("id", ""))
+		if str(vertex.get("origin", "")) != "seed" or not before_by_id.has(vertex_id):
+			continue
+		var from: Vector2 = before_by_id[vertex_id]
+		var to := Vector2(vertex.get("position", Vector2.ZERO))
+		if from.distance_squared_to(to) <= EPSILON * EPSILON:
+			continue
+		movements.append({"vertex_id": vertex_id, "from": from, "to": to, "distance": from.distance_to(to)})
+	movements.sort_custom(func(first: Dictionary, second: Dictionary) -> bool: return str(first.get("vertex_id", "")) < str(second.get("vertex_id", "")))
+	return movements
+
+
 static func _degenerate_triangle_count(vertices: Array, triangles: Array) -> int:
 	var by_id: Dictionary = {}
 	for vertex in vertices:
@@ -534,6 +658,9 @@ static func _failed_result(sampling_bake: Dictionary, seeding_bake: Dictionary, 
 		"vertex_count": 0,
 		"triangle_count": 0,
 		"minimum_angle": 0.0,
+		"worst_aspect_ratio": 0.0,
+		"mean_quality": 0.0,
+		"optimization": {"enabled": bool(recipe.get("parameters", {}).get("optimize_mesh", DEFAULT_OPTIMIZE_MESH)), "applied": false, "attempted_passes": 0, "accepted_passes": 0, "moved_seed_count": 0, "removed_seed_count": 0, "movements": [], "baseline_triangles": [], "quality_before": {}, "quality_after": {}},
 		"constraint_count": 0,
 		"constraints_valid": false,
 		"cut_seam_vertex_count": 0,

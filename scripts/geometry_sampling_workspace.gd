@@ -127,8 +127,9 @@ func _fit_component() -> void:
 		for sample in chain_data.get("samples", []):
 			positions.append(Vector2(sample.get("position", Vector2.ZERO)))
 	for cut in preview.get("cuts", []):
-		for sample in cut.get("samples", []):
-			positions.append(Vector2(sample.get("position", Vector2.ZERO)))
+		for fragment in GeometrySamplingService.cut_fragments(cut):
+			for sample in fragment.get("samples", []):
+				positions.append(Vector2(sample.get("position", Vector2.ZERO)))
 	if positions.is_empty():
 		camera_position = Vector2.ZERO
 		camera_zoom = 1.0
@@ -189,12 +190,13 @@ func _draw_samples() -> void:
 	for cut in preview.get("cuts", []):
 		if not cut is Dictionary or not bool(cut.get("valid", false)):
 			continue
-		var samples: Array = cut.get("samples", [])
 		var selected := not selected_input_id.is_empty() and str(cut.get("input_id", cut.get("guide_id", ""))) == selected_input_id
-		for sample_index in range(1, samples.size()):
-			draw_dashed_line(_to_screen(Vector2(samples[sample_index - 1].get("position", Vector2.ZERO))), _to_screen(Vector2(samples[sample_index].get("position", Vector2.ZERO))), Color("#ef6c78"), 3.5 if selected else 2.5, 5.0)
-		for sample in samples:
-			draw_circle(_to_screen(Vector2(sample.get("position", Vector2.ZERO))), 4.0 if selected else 2.5, HOLE_POINT_COLOR)
+		for fragment in GeometrySamplingService.cut_fragments(cut):
+			var samples: Array = fragment.get("samples", [])
+			for sample_index in range(1, samples.size()):
+				draw_dashed_line(_to_screen(Vector2(samples[sample_index - 1].get("position", Vector2.ZERO))), _to_screen(Vector2(samples[sample_index].get("position", Vector2.ZERO))), Color("#ef6c78"), 3.5 if selected else 2.5, 5.0)
+			for sample in samples:
+				draw_circle(_to_screen(Vector2(sample.get("position", Vector2.ZERO))), 4.0 if selected else 2.5, HOLE_POINT_COLOR)
 
 
 func _draw_hole_overlays() -> void:

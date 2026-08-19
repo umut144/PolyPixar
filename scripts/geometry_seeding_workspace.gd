@@ -178,9 +178,10 @@ func _fit_boundary() -> void:
 			if sample is Dictionary:
 				positions.append(Vector2(sample.get("position", Vector2.ZERO)))
 	for cut_data in sampling_bake.get("cuts", []):
-		for sample in cut_data.get("samples", []):
-			if sample is Dictionary:
-				positions.append(Vector2(sample.get("position", Vector2.ZERO)))
+		for fragment in GeometrySamplingService.cut_fragments(cut_data):
+			for sample in fragment.get("samples", []):
+				if sample is Dictionary:
+					positions.append(Vector2(sample.get("position", Vector2.ZERO)))
 	if positions.is_empty():
 		camera_position = Vector2.ZERO
 		camera_zoom = 1.0
@@ -217,11 +218,12 @@ func _draw_boundaries() -> void:
 	for cut_data in sampling_bake.get("cuts", []):
 		if not cut_data is Dictionary or not bool(cut_data.get("valid", false)):
 			continue
-		var samples: Array = cut_data.get("samples", [])
 		var guide_id := str(cut_data.get("guide_id", ""))
 		var width := 3.0 if guide_id == selected_input_id else 1.5
-		for sample_index in range(samples.size() - 1):
-			draw_dashed_line(_to_screen(Vector2(samples[sample_index].get("position", Vector2.ZERO))), _to_screen(Vector2(samples[sample_index + 1].get("position", Vector2.ZERO))), CUT_COLOR, width, 6.0, true)
+		for fragment in GeometrySamplingService.cut_fragments(cut_data):
+			var samples: Array = fragment.get("samples", [])
+			for sample_index in range(samples.size() - 1):
+				draw_dashed_line(_to_screen(Vector2(samples[sample_index].get("position", Vector2.ZERO))), _to_screen(Vector2(samples[sample_index + 1].get("position", Vector2.ZERO))), CUT_COLOR, width, 6.0, true)
 
 
 func _draw_sampler_spine() -> void:

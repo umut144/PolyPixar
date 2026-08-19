@@ -7,7 +7,7 @@ const STYLE_SUBMODULES := ["Weighting"]
 const MOTION_SUBMODULES := ["Animation", "Path", "Act", "Sequence"]
 const WORKSPACES_ROOT := "res://workspaces"
 const CONFIG_PATH := "res://configs/app_config.json"
-const SCHEMA_VERSION := 31
+const SCHEMA_VERSION := 33
 const MAX_HISTORY_SIZE := 100
 const PAPER_SIZES_CM := [Vector2(21.0, 29.7), Vector2(29.7, 42.0), Vector2(42.0, 59.4), Vector2(59.4, 84.1), Vector2(84.1, 118.9)]
 const PAPER_LABELS := ["A4", "A3", "A2", "A1", "A0"]
@@ -2961,6 +2961,7 @@ func _normalize_sampling_bake(raw_bake) -> Dictionary:
 				samples.append({"id": str(raw_sample.get("id", "")), "position": _deserialize_vector(raw_sample.get("position", [0.0, 0.0]), Vector2.ZERO), "edge_id": str(raw_sample.get("edge_id", "")), "curve_t": clampf(float(raw_sample.get("curve_t", 0.0)), 0.0, 1.0), "source_point_id": str(raw_sample.get("source_point_id", "")), "preserved": bool(raw_sample.get("preserved", false))})
 		normalized_chains.append({"chain_id": str(raw_chain.get("chain_id", "")), "input_id": str(raw_chain.get("input_id", "")), "topology_role": str(raw_chain.get("topology_role", "outer")), "closed": bool(raw_chain.get("closed", false)), "effective_spacing": maxf(float(raw_chain.get("effective_spacing", raw_bake.get("parameters", {}).get("spacing", GeometrySamplingService.DEFAULT_SPACING))), GeometrySamplingService.MIN_SPACING), "samples": samples})
 	bake["method"] = GeometrySamplingService.ADAPTIVE
+	bake["algorithm_version"] = int(raw_bake.get("algorithm_version", 0))
 	bake["parameters"] = GeometrySamplingService.normalize_recipe({"method": bake["method"], "parameters": raw_bake.get("parameters", {})})["parameters"]
 	bake["chains"] = normalized_chains
 	var normalized_cuts: Array = []
@@ -2971,7 +2972,19 @@ func _normalize_sampling_bake(raw_bake) -> Dictionary:
 		for raw_sample in raw_cut.get("samples", []):
 			if raw_sample is Dictionary:
 				cut_samples.append({"id": str(raw_sample.get("id", "")), "position": _deserialize_vector(raw_sample.get("position", [0.0, 0.0]), Vector2.ZERO), "edge_id": str(raw_sample.get("edge_id", "")), "curve_t": clampf(float(raw_sample.get("curve_t", 0.0)), 0.0, 1.0), "source_point_id": str(raw_sample.get("source_point_id", "")), "preserved": bool(raw_sample.get("preserved", false)), "guide_id": str(raw_sample.get("guide_id", raw_cut.get("guide_id", "")))})
-		normalized_cuts.append({"valid": bool(raw_cut.get("valid", true)), "errors": raw_cut.get("errors", []).duplicate(), "guide_id": str(raw_cut.get("guide_id", "")), "input_id": str(raw_cut.get("input_id", raw_cut.get("guide_id", ""))), "effective_spacing": maxf(float(raw_cut.get("effective_spacing", raw_bake.get("parameters", {}).get("spacing", GeometrySamplingService.DEFAULT_SPACING))), GeometrySamplingService.MIN_SPACING), "samples": cut_samples})
+		var normalized_fragments: Array = []
+		for raw_fragment in raw_cut.get("fragments", []):
+			if not raw_fragment is Dictionary:
+				continue
+			var fragment_samples: Array = []
+			for raw_sample in raw_fragment.get("samples", []):
+				if raw_sample is Dictionary:
+					fragment_samples.append({"id": str(raw_sample.get("id", "")), "position": _deserialize_vector(raw_sample.get("position", [0.0, 0.0]), Vector2.ZERO), "edge_id": str(raw_sample.get("edge_id", "")), "curve_t": clampf(float(raw_sample.get("curve_t", 0.0)), 0.0, 1.0), "source_point_id": str(raw_sample.get("source_point_id", "")), "preserved": bool(raw_sample.get("preserved", false)), "guide_id": str(raw_sample.get("guide_id", raw_cut.get("guide_id", "")))})
+			if fragment_samples.size() >= 2:
+				normalized_fragments.append({"id": str(raw_fragment.get("id", "cut:%s:fragment:%d" % [str(raw_cut.get("guide_id", "")), normalized_fragments.size()])), "samples": fragment_samples})
+		if normalized_fragments.is_empty() and cut_samples.size() >= 2:
+			normalized_fragments.append({"id": "cut:%s:fragment:0" % str(raw_cut.get("guide_id", "")), "samples": cut_samples.duplicate(true)})
+		normalized_cuts.append({"valid": bool(raw_cut.get("valid", true)), "errors": raw_cut.get("errors", []).duplicate(), "guide_id": str(raw_cut.get("guide_id", "")), "input_id": str(raw_cut.get("input_id", raw_cut.get("guide_id", ""))), "effective_spacing": maxf(float(raw_cut.get("effective_spacing", raw_bake.get("parameters", {}).get("spacing", GeometrySamplingService.DEFAULT_SPACING))), GeometrySamplingService.MIN_SPACING), "samples": cut_samples, "fragments": normalized_fragments})
 	bake["cuts"] = normalized_cuts
 	bake["sample_count"] = int(raw_bake.get("sample_count", 0))
 	bake["preserve_count"] = int(raw_bake.get("preserve_count", 0))
@@ -3035,6 +3048,26 @@ func _normalize_meshing_bake(raw_bake) -> Dictionary:
 	bake["vertex_count"] = normalized_vertices.size()
 	bake["triangle_count"] = normalized_triangles.size()
 	bake["minimum_angle"] = maxf(float(raw_bake.get("minimum_angle", 0.0)), 0.0)
+	bake["worst_aspect_ratio"] = maxf(float(raw_bake.get("worst_aspect_ratio", 0.0)), 0.0)
+	bake["mean_quality"] = clampf(float(raw_bake.get("mean_quality", 0.0)), 0.0, 1.0)
+	var raw_optimization = raw_bake.get("optimization", {})
+	var optimization: Dictionary = raw_optimization.duplicate(true) if raw_optimization is Dictionary else {}
+	var normalized_movements: Array = []
+	for raw_movement in optimization.get("movements", []):
+		if raw_movement is Dictionary:
+			normalized_movements.append({
+				"vertex_id": str(raw_movement.get("vertex_id", "")),
+				"from": _deserialize_vector(raw_movement.get("from", [0.0, 0.0]), Vector2.ZERO),
+				"to": _deserialize_vector(raw_movement.get("to", [0.0, 0.0]), Vector2.ZERO),
+				"distance": maxf(float(raw_movement.get("distance", 0.0)), 0.0)
+			})
+	optimization["movements"] = normalized_movements
+	var normalized_baseline_triangles: Array = []
+	for raw_triangle in optimization.get("baseline_triangles", []):
+		if raw_triangle is Dictionary and raw_triangle.get("vertex_ids", []) is Array:
+			normalized_baseline_triangles.append({"vertex_ids": raw_triangle.get("vertex_ids", []).duplicate()})
+	optimization["baseline_triangles"] = normalized_baseline_triangles
+	bake["optimization"] = optimization
 	return bake
 
 
@@ -3072,7 +3105,13 @@ func _serialize_sampling_bake(bake: Dictionary) -> Dictionary:
 		var serialized_samples: Array = []
 		for sample in cut_data.get("samples", []):
 			serialized_samples.append({"id": str(sample.get("id", "")), "position": _serialize_vector(Vector2(sample.get("position", Vector2.ZERO))), "edge_id": str(sample.get("edge_id", "")), "curve_t": float(sample.get("curve_t", 0.0)), "source_point_id": str(sample.get("source_point_id", "")), "preserved": bool(sample.get("preserved", false)), "guide_id": str(sample.get("guide_id", cut_data.get("guide_id", "")))})
-		serialized_cuts.append({"valid": bool(cut_data.get("valid", true)), "errors": cut_data.get("errors", []).duplicate(), "guide_id": str(cut_data.get("guide_id", "")), "input_id": str(cut_data.get("input_id", cut_data.get("guide_id", ""))), "effective_spacing": float(cut_data.get("effective_spacing", GeometrySamplingService.DEFAULT_SPACING)), "samples": serialized_samples})
+		var serialized_fragments: Array = []
+		for fragment in GeometrySamplingService.cut_fragments(cut_data):
+			var fragment_samples: Array = []
+			for sample in fragment.get("samples", []):
+				fragment_samples.append({"id": str(sample.get("id", "")), "position": _serialize_vector(Vector2(sample.get("position", Vector2.ZERO))), "edge_id": str(sample.get("edge_id", "")), "curve_t": float(sample.get("curve_t", 0.0)), "source_point_id": str(sample.get("source_point_id", "")), "preserved": bool(sample.get("preserved", false)), "guide_id": str(sample.get("guide_id", cut_data.get("guide_id", "")))})
+			serialized_fragments.append({"id": str(fragment.get("id", "")), "samples": fragment_samples})
+		serialized_cuts.append({"valid": bool(cut_data.get("valid", true)), "errors": cut_data.get("errors", []).duplicate(), "guide_id": str(cut_data.get("guide_id", "")), "input_id": str(cut_data.get("input_id", cut_data.get("guide_id", ""))), "effective_spacing": float(cut_data.get("effective_spacing", GeometrySamplingService.DEFAULT_SPACING)), "samples": serialized_samples, "fragments": serialized_fragments})
 	serialized_bake["cuts"] = serialized_cuts
 	serialized_bake["hole_count"] = serialized_chains.filter(func(chain: Dictionary) -> bool: return str(chain.get("topology_role", "outer")) == "hole").size()
 	return serialized_bake
@@ -3099,6 +3138,20 @@ func _serialize_meshing_bake(bake: Dictionary) -> Dictionary:
 			"preserved": bool(vertex.get("preserved", false))
 		})
 	serialized_bake["vertices"] = serialized_vertices
+	var raw_optimization = bake.get("optimization", {})
+	if raw_optimization is Dictionary:
+		var optimization: Dictionary = raw_optimization.duplicate(true)
+		var serialized_movements: Array = []
+		for movement in optimization.get("movements", []):
+			if movement is Dictionary:
+				serialized_movements.append({
+					"vertex_id": str(movement.get("vertex_id", "")),
+					"from": _serialize_vector(_deserialize_vector(movement.get("from", Vector2.ZERO), Vector2.ZERO)),
+					"to": _serialize_vector(_deserialize_vector(movement.get("to", Vector2.ZERO), Vector2.ZERO)),
+					"distance": maxf(float(movement.get("distance", 0.0)), 0.0)
+				})
+		optimization["movements"] = serialized_movements
+		serialized_bake["optimization"] = optimization
 	return serialized_bake
 
 
@@ -3181,6 +3234,7 @@ func _geometry_sampling_bake_is_current(asset_id: String, component_id: String, 
 	var cut_guides := _cut_guides_for_component(_get_asset(asset_id), component_id)
 	var hole_components := _geometry_sampling_hole_components(_get_asset(asset_id), component_id)
 	return str(bake.get("source_fingerprint", "")) == GeometrySamplingService.source_fingerprint(component, cut_guides, hole_components) \
+		and int(bake.get("algorithm_version", 0)) == GeometrySamplingService.ALGORITHM_VERSION \
 		and str(bake.get("method", "")) == str(recipe.get("method", "")) \
 		and bake.get("parameters", {}) == recipe.get("parameters", {})
 
@@ -3213,6 +3267,7 @@ func _geometry_sampling_preview_matches(asset_id: String, component_id: String, 
 	var cut_guides := _cut_guides_for_component(asset, component_id)
 	var hole_components := _geometry_sampling_hole_components(asset, component_id)
 	return str(geometry_sampling_preview.get("source_fingerprint", "")) == GeometrySamplingService.source_fingerprint(component, cut_guides, hole_components) \
+		and int(geometry_sampling_preview.get("algorithm_version", 0)) == GeometrySamplingService.ALGORITHM_VERSION \
 		and str(geometry_sampling_preview.get("method", "")) == str(recipe.get("method", "")) \
 		and geometry_sampling_preview.get("parameters", {}) == recipe.get("parameters", {})
 
@@ -3485,7 +3540,8 @@ func _geometry_meshing_input_is_current(asset_id: String, component_id: String, 
 	var asset := _get_asset(asset_id)
 	var cut_guides := _cut_guides_for_component(asset, component_id)
 	var hole_components := _geometry_sampling_hole_components(asset, component_id)
-	if str(sampling_bake.get("source_fingerprint", "")) != GeometrySamplingService.source_fingerprint(component, cut_guides, hole_components):
+	if int(sampling_bake.get("algorithm_version", 0)) != GeometrySamplingService.ALGORITHM_VERSION \
+		or str(sampling_bake.get("source_fingerprint", "")) != GeometrySamplingService.source_fingerprint(component, cut_guides, hole_components):
 		return false
 	if str(seeding_bake.get("sampling_bake_id", "")) != str(sampling_bake.get("bake_id", "")) \
 		or str(seeding_bake.get("sampling_fingerprint", "")) != GeometrySeedingService.sampling_fingerprint(sampling_bake):
@@ -3546,6 +3602,8 @@ func _geometry_meshing_status(asset_id: String, component_id: String, component:
 				return "Preview Ready"
 		var ribbon_bake := _geometry_meshing_bake(asset_id, component_id, RibbonMeshService.METHOD)
 		return "Ready to Preview" if ribbon_bake.is_empty() else "Baked" if RibbonMeshService.matches_source(ribbon_bake, component) else "Ready to Preview"
+	if not _geometry_sampling_bake_is_current(asset_id, component_id, component):
+		return "Sampling Required"
 	if not _geometry_meshing_input_is_current(asset_id, component_id, component):
 		return "Seeding Required"
 	var recipe := _geometry_meshing_recipe(asset_id, component_id)
@@ -8942,8 +9000,15 @@ func _render_geometry_meshing_inspector() -> void:
 	character_row.add_child(_create_inspector_field_label("Organic"))
 	inspector_content.add_child(character_row)
 	inspector_content.add_child(_create_inspector_field_label("Character: %d%%" % roundi(character.value)))
+	inspector_content.add_child(_create_inspector_section("Optimization"))
+	var optimize_mesh := CheckBox.new()
+	optimize_mesh.text = "Optimize Mesh"
+	optimize_mesh.button_pressed = bool(recipe.get("parameters", {}).get("optimize_mesh", GeometryMeshingService.DEFAULT_OPTIMIZE_MESH))
+	optimize_mesh.tooltip_text = "Move only free Interior Seeds and accept a pass only when measured Mesh quality improves."
+	optimize_mesh.toggled.connect(_on_geometry_meshing_override_changed.bind("optimize_mesh"))
+	inspector_content.add_child(optimize_mesh)
 	var advanced := Button.new()
-	advanced.text = "%s Advanced Relaxation" % ("▾" if geometry_meshing_advanced_relaxation_expanded else "▸")
+	advanced.text = "%s Advanced Optimization" % ("▾" if geometry_meshing_advanced_relaxation_expanded else "▸")
 	advanced.toggle_mode = true
 	advanced.button_pressed = geometry_meshing_advanced_relaxation_expanded
 	advanced.alignment = HORIZONTAL_ALIGNMENT_LEFT
@@ -8997,7 +9062,9 @@ func _render_geometry_meshing_inspector() -> void:
 			{"key": "mesh_edges", "label": "Mesh Edges", "value": geometry_meshing_workspace.show_mesh_edges},
 			{"key": "seed_points", "label": "Seed Points", "value": geometry_meshing_workspace.show_seed_points},
 			{"key": "triangle_fill", "label": "Triangle Fill", "value": geometry_meshing_workspace.show_triangle_fill},
-			{"key": "constraints", "label": "Constraints", "value": geometry_meshing_workspace.show_constraints}
+			{"key": "constraints", "label": "Constraints", "value": geometry_meshing_workspace.show_constraints},
+			{"key": "optimization", "label": "Optimization", "value": geometry_meshing_workspace.show_optimization},
+			{"key": "quality", "label": "Quality", "value": geometry_meshing_workspace.show_quality}
 		]:
 			var view_toggle := CheckBox.new()
 			view_toggle.text = str(view_option["label"])
@@ -9011,7 +9078,15 @@ func _render_geometry_meshing_inspector() -> void:
 	if not result.is_empty():
 		inspector_content.add_child(_create_inspector_field_label("Vertices: %d" % int(result.get("vertex_count", 0))))
 		inspector_content.add_child(_create_inspector_field_label("Triangles: %d" % int(result.get("triangle_count", 0))))
-		inspector_content.add_child(_create_inspector_field_label("Minimum Angle: %.1f°" % float(result.get("minimum_angle", 0.0))))
+		var optimization: Dictionary = result.get("optimization", {})
+		var quality_before: Dictionary = optimization.get("quality_before", {})
+		var quality_after: Dictionary = optimization.get("quality_after", {})
+		if not quality_before.is_empty() and not quality_after.is_empty():
+			inspector_content.add_child(_create_inspector_field_label("Minimum Angle: %.1f° → %.1f°" % [float(quality_before.get("minimum_angle", 0.0)), float(quality_after.get("minimum_angle", 0.0))]))
+			inspector_content.add_child(_create_inspector_field_label("Worst Aspect Ratio: %.2f → %.2f" % [float(quality_before.get("worst_aspect_ratio", 0.0)), float(quality_after.get("worst_aspect_ratio", 0.0))]))
+			inspector_content.add_child(_create_inspector_field_label("Moved Seeds: %d · Removed: %d" % [int(optimization.get("moved_seed_count", 0)), int(optimization.get("removed_seed_count", 0))]))
+		else:
+			inspector_content.add_child(_create_inspector_field_label("Minimum Angle: %.1f°" % float(result.get("minimum_angle", 0.0))))
 		inspector_content.add_child(_create_inspector_field_label("Constraints: %s" % ("Valid" if bool(result.get("constraints_valid", false)) else "Invalid")))
 		inspector_content.add_child(_create_inspector_field_label("Cut Seam Vertices: %d" % int(result.get("cut_seam_vertex_count", 0))))
 	var actions := HBoxContainer.new()

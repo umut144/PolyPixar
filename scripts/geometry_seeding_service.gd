@@ -207,12 +207,13 @@ static func constraint_domain(sampling_bake: Dictionary) -> Dictionary:
 	for cut_data in sampling_bake.get("cuts", []):
 		if not cut_data is Dictionary or not bool(cut_data.get("valid", false)):
 			continue
-		var polyline := PackedVector2Array()
-		for sample in cut_data.get("samples", []):
-			if sample is Dictionary:
-				polyline.append(Vector2(sample.get("position", Vector2.ZERO)))
-		if polyline.size() >= 2:
-			cuts.append({"guide_id": str(cut_data.get("guide_id", "")), "points": polyline})
+		for fragment in GeometrySamplingService.cut_fragments(cut_data):
+			var polyline := PackedVector2Array()
+			for sample in fragment.get("samples", []):
+				if sample is Dictionary:
+					polyline.append(Vector2(sample.get("position", Vector2.ZERO)))
+			if polyline.size() >= 2:
+				cuts.append({"guide_id": str(cut_data.get("guide_id", "")), "fragment_id": str(fragment.get("id", "")), "points": polyline})
 	return {"outer": outer, "holes": holes, "cuts": cuts}
 
 
@@ -227,7 +228,7 @@ static func point_is_valid(sampling_bake: Dictionary, position: Vector2, clearan
 
 
 static func sampling_fingerprint(sampling_bake: Dictionary) -> String:
-	var parts: PackedStringArray = [str(sampling_bake.get("bake_id", ""))]
+	var parts: PackedStringArray = [str(sampling_bake.get("bake_id", "")), "algorithm|%d" % int(sampling_bake.get("algorithm_version", 0))]
 	for chain_data in sampling_bake.get("chains", []):
 		if not chain_data is Dictionary:
 			continue
@@ -240,10 +241,18 @@ static func sampling_fingerprint(sampling_bake: Dictionary) -> String:
 		if not cut_data is Dictionary:
 			continue
 		parts.append("cut|%s|%d" % [str(cut_data.get("guide_id", "")), int(bool(cut_data.get("valid", false)))])
+		# Keep the public flattened preview representation in the dependency hash
+		# as well as the connectivity-preserving fragments.
 		for sample in cut_data.get("samples", []):
 			if sample is Dictionary:
-				var position: Vector2 = sample.get("position", Vector2.ZERO)
-				parts.append("cs|%s|%.9f|%.9f" % [str(sample.get("id", "")), position.x, position.y])
+				var flat_position: Vector2 = sample.get("position", Vector2.ZERO)
+				parts.append("flat|%s|%.9f|%.9f" % [str(sample.get("id", "")), flat_position.x, flat_position.y])
+		for fragment in GeometrySamplingService.cut_fragments(cut_data):
+			parts.append("fragment|%s" % str(fragment.get("id", "")))
+			for sample in fragment.get("samples", []):
+				if sample is Dictionary:
+					var position: Vector2 = sample.get("position", Vector2.ZERO)
+					parts.append("cs|%s|%.9f|%.9f" % [str(sample.get("id", "")), position.x, position.y])
 	return _hash_parts(parts)
 
 

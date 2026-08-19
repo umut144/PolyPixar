@@ -67,11 +67,16 @@ refinements remain available under Advanced Pattern.
 
 Meshing consumes one accepted Seeding Bake and exposes one closed-Body method:
 `Constrained Mesh`. Its `Mesh Character` moves continuously from Structured to
-Organic by deriving relaxation strength and passes while keeping every sampled
-Outer, Hole, and Cut constraint fixed. Advanced Relaxation can override those
-derived technical values. A debounced Preview is accepted with `Bake Preview`;
-that exact Bake automatically becomes the Component Mesh. Cut seam vertices
-are duplicated only after the final constrained triangulation and relaxation.
+Organic by deriving optimization strength and passes while keeping every
+sampled Outer, Hole, and Cut constraint fixed. `Optimize Mesh` provides an
+exact raw-CDT versus optimized A/B switch. Only quality-improving relocation
+passes are accepted; Optimization and Quality views expose movement and a
+triangle heatmap. Advanced Optimization can override the derived technical
+values. New recipes start at the accepted 64% Artistic profile, deriving
+Strength 0.40 and three passes without technical overrides. A debounced Preview
+is accepted with `Bake Preview`; that exact Bake
+automatically becomes the Component Mesh. Cut seam vertices are duplicated
+only after the final constrained triangulation and optimization.
 
 ## Workspace and export
 

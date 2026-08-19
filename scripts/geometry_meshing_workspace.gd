@@ -8,6 +8,9 @@ const BOUNDARY_COLOR := Color("#7b8492")
 const HOLE_COLOR := Color("#ef6c78")
 const CUT_COLOR := Color("#ff7f8d")
 const MESH_COLOR := Color("#63b3ed")
+const BASELINE_MESH_COLOR := Color("#f2c94c", 0.28)
+const MOVEMENT_COLOR := Color("#f6ad55", 0.9)
+const OPTIMIZED_POINT_COLOR := Color("#63d5da")
 const FLOW_SEED_COLOR := Color("#f2c94c")
 const GAP_SEED_COLOR := Color("#68d391")
 const FILL_COLOR := Color(0.2, 0.55, 0.75, 0.08)
@@ -23,6 +26,8 @@ var show_mesh_edges := true
 var show_seed_points := false
 var show_triangle_fill := false
 var show_constraints := true
+var show_optimization := false
+var show_quality := false
 
 
 func _ready() -> void:
@@ -58,6 +63,8 @@ func set_view_option(option: String, enabled: bool) -> void:
 		"seed_points": show_seed_points = enabled
 		"triangle_fill": show_triangle_fill = enabled
 		"constraints": show_constraints = enabled
+		"optimization": show_optimization = enabled
+		"quality": show_quality = enabled
 	queue_redraw()
 
 
@@ -100,11 +107,14 @@ func _draw() -> void:
 	if not fitted:
 		_fit_boundary()
 	_draw_mesh()
+	if show_optimization:
+		_draw_optimization()
 	if show_constraints:
 		_draw_boundaries()
 	if show_seed_points:
 		_draw_seeds()
 	draw_string(ThemeDB.fallback_font, Vector2(10.0, 20.0), "Mesh → Meshing · %s" % status, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 12, Color("#9aa3b2"))
+	_draw_view_legend()
 
 
 func _draw_grid() -> void:
@@ -161,11 +171,78 @@ func _draw_mesh() -> void:
 		if ids.size() != 3 or not positions.has(str(ids[0])) or not positions.has(str(ids[1])) or not positions.has(str(ids[2])):
 			continue
 		var polygon := PackedVector2Array([positions[str(ids[0])], positions[str(ids[1])], positions[str(ids[2])]])
-		if show_triangle_fill:
+		if show_quality:
+			draw_colored_polygon(polygon, _triangle_quality_color(polygon))
+		elif show_triangle_fill:
 			draw_colored_polygon(polygon, FILL_COLOR)
 		if show_mesh_edges:
 			for edge_index in range(3):
 				draw_line(polygon[edge_index], polygon[(edge_index + 1) % 3], MESH_COLOR, 1.0, true)
+
+
+func _draw_optimization() -> void:
+	var optimization: Dictionary = mesh_result.get("optimization", {})
+	if optimization.is_empty():
+		return
+	var final_positions: Dictionary = {}
+	for vertex in mesh_result.get("vertices", []):
+		if vertex is Dictionary:
+			final_positions[str(vertex.get("id", ""))] = Vector2(vertex.get("position", Vector2.ZERO))
+	var baseline_positions := final_positions.duplicate()
+	for movement in optimization.get("movements", []):
+		if movement is Dictionary:
+			baseline_positions[str(movement.get("vertex_id", ""))] = _stored_position(movement.get("from", Vector2.ZERO))
+	for triangle in optimization.get("baseline_triangles", []):
+		var ids: Array = triangle.get("vertex_ids", [])
+		if ids.size() != 3 or not baseline_positions.has(str(ids[0])) or not baseline_positions.has(str(ids[1])) or not baseline_positions.has(str(ids[2])):
+			continue
+		var polygon := PackedVector2Array([
+			_to_screen(baseline_positions[str(ids[0])]),
+			_to_screen(baseline_positions[str(ids[1])]),
+			_to_screen(baseline_positions[str(ids[2])])
+		])
+		for edge_index in range(3):
+			draw_line(polygon[edge_index], polygon[(edge_index + 1) % 3], BASELINE_MESH_COLOR, 1.0, true)
+	for movement in optimization.get("movements", []):
+		if not movement is Dictionary:
+			continue
+		var from_screen := _to_screen(_stored_position(movement.get("from", Vector2.ZERO)))
+		var to_screen := _to_screen(_stored_position(movement.get("to", Vector2.ZERO)))
+		draw_line(from_screen, to_screen, MOVEMENT_COLOR, 1.5, true)
+		draw_circle(from_screen, 2.4, BASELINE_MESH_COLOR)
+		draw_circle(to_screen, 2.4, OPTIMIZED_POINT_COLOR)
+
+
+func _triangle_quality_color(polygon: PackedVector2Array) -> Color:
+	var a := polygon[0]
+	var b := polygon[1]
+	var c := polygon[2]
+	var twice_area := absf((b - a).cross(c - a))
+	var edge_sum := a.distance_squared_to(b) + b.distance_squared_to(c) + c.distance_squared_to(a)
+	var quality := clampf(2.0 * sqrt(3.0) * twice_area / edge_sum, 0.0, 1.0) if edge_sum > 0.000001 else 0.0
+	var poor := Color("#ef6c78", 0.48)
+	var medium := Color("#f2c94c", 0.38)
+	var strong := Color("#68d391", 0.30)
+	return poor.lerp(medium, quality * 2.0) if quality < 0.5 else medium.lerp(strong, (quality - 0.5) * 2.0)
+
+
+func _draw_view_legend() -> void:
+	var y := 38.0
+	if show_optimization:
+		var optimization: Dictionary = mesh_result.get("optimization", {})
+		var label := "Optimization · OFF" if not bool(optimization.get("enabled", false)) else "Optimization · %d Seeds moved · %d/%d passes" % [int(optimization.get("moved_seed_count", 0)), int(optimization.get("accepted_passes", 0)), int(optimization.get("attempted_passes", 0))]
+		draw_string(ThemeDB.fallback_font, Vector2(10.0, y), label, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 12, Color("#d5dae3"))
+		y += 18.0
+	if show_quality:
+		draw_string(ThemeDB.fallback_font, Vector2(10.0, y), "Quality · red = poor · yellow = fair · green = strong", HORIZONTAL_ALIGNMENT_LEFT, -1.0, 12, Color("#d5dae3"))
+
+
+func _stored_position(value) -> Vector2:
+	if value is Vector2:
+		return value
+	if value is Array and value.size() >= 2:
+		return Vector2(float(value[0]), float(value[1]))
+	return Vector2.ZERO
 
 
 func _draw_boundaries() -> void:
@@ -178,9 +255,10 @@ func _draw_boundaries() -> void:
 			var next_index := (sample_index + 1) % samples.size()
 			draw_line(_to_screen(Vector2(samples[sample_index].get("position", Vector2.ZERO))), _to_screen(Vector2(samples[next_index].get("position", Vector2.ZERO))), color, 2.0, true)
 	for cut_data in sampling_bake.get("cuts", []):
-		var samples: Array = cut_data.get("samples", [])
-		for sample_index in range(samples.size() - 1):
-			draw_dashed_line(_to_screen(Vector2(samples[sample_index].get("position", Vector2.ZERO))), _to_screen(Vector2(samples[sample_index + 1].get("position", Vector2.ZERO))), CUT_COLOR, 6.0, 2.0, true)
+		for fragment in GeometrySamplingService.cut_fragments(cut_data):
+			var samples: Array = fragment.get("samples", [])
+			for sample_index in range(samples.size() - 1):
+				draw_dashed_line(_to_screen(Vector2(samples[sample_index].get("position", Vector2.ZERO))), _to_screen(Vector2(samples[sample_index + 1].get("position", Vector2.ZERO))), CUT_COLOR, 6.0, 2.0, true)
 
 
 func _draw_seeds() -> void:

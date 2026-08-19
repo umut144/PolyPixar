@@ -1,0 +1,10 @@
+[configuration]
+
+entry_symbol = "polytools_cdt_library_init"
+compatibility_minimum = "4.5"
+reloadable = true
+
+[libraries]
+
+macos.debug.arm64 = "res://native/polytools_cdt/bin/libpolytools_cdt.macos.template_debug.framework"
+macos.release.arm64 = "res://native/polytools_cdt/bin/libpolytools_cdt.macos.template_release.framework"

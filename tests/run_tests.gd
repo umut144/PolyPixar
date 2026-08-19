@@ -256,6 +256,7 @@ func _test_geometry_sampling_service() -> void:
 	curve_point["handle_in"] = Vector2(-5.0, 7.0)
 	curve_point["handle_out"] = Vector2(0.0, 5.0)
 	var adaptive := GeometrySamplingService.generate(component, {"method": GeometrySamplingService.ADAPTIVE, "parameters": {"spacing": 2.5}})
+	_expect(int(adaptive.get("algorithm_version", 0)) == GeometrySamplingService.ALGORITHM_VERSION, "Sampling results should identify the junction-aware algorithm version.")
 	_expect(bool(adaptive.get("valid", false)), "Adaptive Sampling should sample a valid closed Component.")
 	var hole_component := _component()
 	hole_component["id"] = "hole_component"
@@ -268,6 +269,27 @@ func _test_geometry_sampling_service() -> void:
 	_expect(bool(sampled_hole_result.get("valid", false)) and sampled_hole_result.get("chains", []).size() == 2, "Sampling should include a referenced Hole as a second sampled Chain.")
 	_expect(str(sampled_hole_result["chains"][1].get("topology_role", "")) == "hole" and int(sampled_hole_result.get("hole_count", 0)) == 1, "Referenced Hole sampling must preserve its topology role and count.")
 	_expect(str(sampled_hole_result.get("source_fingerprint", "")) != str(adaptive.get("source_fingerprint", "")), "Sampling fingerprints must include Hole inputs.")
+	var arranged_cut := AssetGuide.create("cut_arranged", "Arranged Seam", AssetGuide.CUT, "component_1")
+	BezierTopology.add_point(arranged_cut, Vector2(3.0, -1.0), "linear")
+	BezierTopology.add_point(arranged_cut, Vector2(3.0, 11.0), "linear")
+	var arranged_body := _component()
+	for arranged_position in [Vector2.ZERO, Vector2(10.0, 0.0), Vector2(10.0, 10.0), Vector2(0.0, 10.0)]:
+		BezierTopology.add_point(arranged_body, arranged_position, "linear")
+	BezierTopology.close_active_chain(arranged_body)
+	var arranged_result := GeometrySamplingService.generate(arranged_body, {"parameters": {"spacing": 2.5}}, [arranged_cut], [hole_component])
+	var arranged_fragments: Array = arranged_result.get("cuts", [])[0].get("fragments", [])
+	var cut_has_hole_interior_sample := false
+	for fragment in arranged_fragments:
+		for sample in fragment.get("samples", []):
+			var position := Vector2(sample.get("position", Vector2.ZERO))
+			cut_has_hole_interior_sample = cut_has_hole_interior_sample or (position.y > 2.0 and position.y < 4.0)
+	var boundary_junction_count := 0
+	for chain_data in arranged_result.get("chains", []):
+		for sample in chain_data.get("samples", []):
+			var position := Vector2(sample.get("position", Vector2.ZERO))
+			if is_equal_approx(position.x, 3.0) and (is_equal_approx(position.y, 0.0) or is_equal_approx(position.y, 2.0) or is_equal_approx(position.y, 4.0) or is_equal_approx(position.y, 10.0)):
+				boundary_junction_count += 1
+	_expect(bool(arranged_result.get("valid", false)) and arranged_fragments.size() == 2 and not cut_has_hole_interior_sample and boundary_junction_count == 4, "Sampling should split Cut/Boundary intersections into shared PSLG junctions and remove the Cut span inside a Hole.")
 	var refined_hole_result := GeometrySamplingService.generate(component, {"parameters": {"spacing": 2.5, "boundary_refinements": {"ref_orb": {"factor": 5.0}}}}, [], [hole_component])
 	_expect(bool(refined_hole_result.get("valid", false)) and int(refined_hole_result["chains"][1].get("samples", []).size()) > int(sampled_hole_result["chains"][1].get("samples", []).size()) and int(refined_hole_result["chains"][0].get("samples", []).size()) == int(sampled_hole_result["chains"][0].get("samples", []).size()), "A Hole refinement should increase only that Hole's sample density.")
 	var primitive_hole := {"id": "primitive_hole", "sampling_input_id": "ref_circle", "draw_mode": "primitive", "topology_role": "hole", "primitive": {"type": "circle", "center": Vector2.ZERO, "diameter_cm": 20.0}, "sampling_transform": Transform2D(Vector2(2.0, 0.0), Vector2(0.0, 0.5), Vector2(3.0, 4.0))}
@@ -316,14 +338,16 @@ func _test_geometry_sampling_service() -> void:
 	_expect(not bool(GeometrySamplingService.generate(open_component).get("valid", true)), "An open contour should fail visibly at the mesh-pipeline Sampling boundary.")
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
-	_expect(application._has_supported_schema({"schema_version": 31}) and application._has_supported_schema({"schema_version": 30}) and not application._has_supported_schema({"schema_version": 32}), "Schema 31 should keep current and older Workspace documents readable and reject unknown future schemas.")
+	_expect(application._has_supported_schema({"schema_version": 33}) and application._has_supported_schema({"schema_version": 32}) and not application._has_supported_schema({"schema_version": 34}), "Schema 33 should keep current and older Workspace documents readable and reject unknown future schemas.")
+	var arranged_round_trip: Dictionary = application._normalize_sampling_bake(application._serialize_sampling_bake(arranged_result))
+	_expect(arranged_round_trip.get("cuts", [])[0].get("fragments", []).size() == 2 and arranged_round_trip.get("cuts", [])[0].get("fragments", [])[0].get("samples", [])[0].get("position", null) is Vector2, "Schema 32 should preserve Cut fragment connectivity and restore fragment positions as Vector2 values.")
 	var geometry_document: Dictionary = application._default_geometry_document("asset_1", "component_1")
 	geometry_document["sampling"]["recipe"] = {"method": GeometrySamplingService.EVEN_SPACING, "parameters": {"spacing": 2.5, "feature_detail": GeometrySamplingService.DEFAULT_FEATURE_DETAIL}}
 	var baked_result := adaptive.duplicate(true)
 	baked_result["bake_id"] = "bake_test"
 	geometry_document["sampling"]["bakes"][GeometrySamplingService.ADAPTIVE] = baked_result
 	var serialized_geometry: Dictionary = application._serialize_geometry_document(geometry_document)
-	_expect(int(serialized_geometry.get("schema_version", 0)) == 31 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-31 JSON arrays.")
+	_expect(int(serialized_geometry.get("schema_version", 0)) == 33 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-33 JSON arrays.")
 	var normalized_geometry: Dictionary = application._normalize_geometry_document(serialized_geometry, "asset_1", "component_1")
 	_expect(normalized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Vector2, "Sampling bake loading should restore local sample positions as Vector2 values.")
 	_expect(normalized_geometry["sampling"]["bakes"].size() == 1, "Sampling should retain one Adaptive Bake.")
@@ -636,6 +660,8 @@ func _test_geometry_seeding_service() -> void:
 
 
 func _test_geometry_meshing_service_and_ui() -> void:
+	var default_meshing_recipe := GeometryMeshingService.default_recipe()
+	_expect(is_equal_approx(float(default_meshing_recipe.get("parameters", {}).get("mesh_character", 0.0)), 0.64) and bool(default_meshing_recipe.get("parameters", {}).get("optimize_mesh", false)) and is_equal_approx(GeometryMeshingService.relaxation_for_character(0.64), 0.402) and GeometryMeshingService.passes_for_character(0.64) == 3, "New Meshing recipes should default to the accepted 64% Artistic profile with derived Strength 0.40 and three quality-checked passes.")
 	var component := _component()
 	component.merge({"id": "component_1", "name": "Body", "visibility": true})
 	BezierTopology.add_point(component, Vector2.ZERO, "corner")
@@ -652,6 +678,8 @@ func _test_geometry_meshing_service_and_ui() -> void:
 	var repeated := GeometryMeshingService.generate(sampling, seeding, cdt_recipe)
 	_expect(bool(cdt.get("valid", false)) and int(cdt.get("vertex_count", 0)) > int(seeding.get("seed_count", 0)) and int(cdt.get("triangle_count", 0)) > 0, "Structured Constrained Mesh should generate a derived Mesh from sampled boundaries and Seeds.")
 	_expect(cdt == repeated, "Meshing must be deterministic for identical Sampling, Seeding, and recipe inputs.")
+	var pslg_diagnostics := GeometryMeshingService._pslg_validation_issues(PackedVector2Array([Vector2.ZERO, Vector2(2.0, 0.0), Vector2(1.0, 0.0)]), [[0, 1]], [{"topology_role": "cut", "chain_id": "cut:test", "fragment_index": 0, "segment_index": 10}])
+	_expect(not pslg_diagnostics.is_empty() and str(pslg_diagnostics[0]).contains("Cut fragment 1, segment 11") and str(pslg_diagnostics[0]).contains("shared sampled junction"), "PSLG diagnostics should identify the exact Cut fragment and local segment that passes through an unsplit vertex.")
 	_expect(str(cdt.get("sampling_bake_id", "")) == "sampling_mesh_test" and str(cdt.get("seeding_bake_id", "")) == "seeding_mesh_test", "A Mesh result must retain both exact upstream Bake dependencies.")
 	var holed_component := _component()
 	for position in [Vector2.ZERO, Vector2(12.0, 0.0), Vector2(12.0, 12.0), Vector2(0.0, 12.0)]:
@@ -679,8 +707,16 @@ func _test_geometry_meshing_service_and_ui() -> void:
 		if str(vertex.get("origin", "")) == "boundary":
 			boundary_positions[str(vertex.get("id", ""))] = Vector2(vertex.get("position", Vector2.ZERO))
 	var organic_recipe := {"method": GeometryMeshingService.CONSTRAINED_MESH, "parameters": {"seeding_method": GeometrySeedingService.POISSON_FILL, "mesh_character": 0.55}}
+	var unoptimized_recipe := {"method": GeometryMeshingService.CONSTRAINED_MESH, "parameters": {"seeding_method": GeometrySeedingService.POISSON_FILL, "mesh_character": 0.55, "optimize_mesh": false}}
+	var unoptimized := GeometryMeshingService.generate(sampling, seeding, unoptimized_recipe)
+	_expect(bool(unoptimized.get("valid", false)) and not bool(unoptimized.get("optimization", {}).get("enabled", true)) and int(unoptimized.get("optimization", {}).get("moved_seed_count", -1)) == 0, "Optimize Mesh off should expose the deterministic raw CDT result without moving Seeds.")
+	_expect(unoptimized.get("vertices", []) == cdt.get("vertices", []) and unoptimized.get("triangles", []) == cdt.get("triangles", []), "Disabling optimization must restore the exact raw CDT vertices and triangles regardless of Mesh Character.")
 	var organic := GeometryMeshingService.generate(sampling, seeding, organic_recipe)
-	_expect(bool(organic.get("valid", false)) and int(organic.get("triangle_count", 0)) > 0 and float(organic.get("parameters", {}).get("relaxation", 0.0)) > 0.0, "Organic Mesh Character should produce a valid relaxed constrained Mesh.")
+	var organic_optimization: Dictionary = organic.get("optimization", {})
+	var quality_before: Dictionary = organic_optimization.get("quality_before", {})
+	var quality_after: Dictionary = organic_optimization.get("quality_after", {})
+	_expect(bool(organic.get("valid", false)) and int(organic.get("triangle_count", 0)) > 0 and bool(organic_optimization.get("enabled", false)) and float(organic.get("parameters", {}).get("relaxation", 0.0)) > 0.0, "Organic Mesh Character should produce a valid quality-checked optimized constrained Mesh.")
+	_expect(not quality_before.is_empty() and not quality_after.is_empty() and int(organic_optimization.get("moved_seed_count", 0)) > 0 and float(quality_after.get("minimum_angle", 0.0)) >= float(quality_before.get("minimum_angle", 0.0)) - 0.051 and int(organic.get("vertex_count", 0)) == int(unoptimized.get("vertex_count", -1)), "Existing-point optimization must move free Seeds, report before/after quality, reject material minimum-angle regressions, and keep the Vertex count unchanged.")
 	for vertex in organic.get("vertices", []):
 		if str(vertex.get("origin", "")) == "boundary":
 			_expect(Vector2(vertex.get("position", Vector2.ZERO)).is_equal_approx(boundary_positions.get(str(vertex.get("id", "")), Vector2.INF)), "Organic relaxation must keep every sampled Boundary Vertex fixed.")
@@ -693,9 +729,13 @@ func _test_geometry_meshing_service_and_ui() -> void:
 	cut_seeding["bake_id"] = "seeding_cut_mesh_test"
 	var cut_organic := GeometryMeshingService.generate(cut_sampling, cut_seeding, organic_recipe)
 	_expect(bool(cut_organic.get("valid", false)) and bool(cut_organic.get("constraints_valid", false)) and int(cut_organic.get("cut_seam_vertex_count", 0)) > 0 and int(cut_organic.get("degenerate_triangle_count", -1)) == 0, "Organic Character must relax and retriangulate before duplicating a valid, non-degenerate Cut seam.")
+	_expect(str(cut_organic.get("triangulation_backend", "")).contains("CDT 1.4.5") and str(cut_organic.get("diagnostics", {}).get("stage", "")) == "complete", "Constrained Mesh should report the qualified native CDT backend and successful diagnostic stage.")
 	_expect(not bool(GeometryMeshingService.generate({}, seeding, cdt_recipe).get("valid", true)), "Meshing should fail visibly without its referenced Sampling Bake.")
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
+	var serialized_organic: Dictionary = application._serialize_meshing_bake(organic)
+	var normalized_organic: Dictionary = application._normalize_meshing_bake(serialized_organic)
+	_expect(serialized_organic.get("optimization", {}).get("movements", [])[0].get("from", null) is Array and normalized_organic.get("optimization", {}).get("movements", [])[0].get("from", null) is Vector2, "Meshing persistence should serialize and restore Optimization movement diagnostics for before/after views.")
 	var document: Dictionary = application._default_geometry_document("asset_1", "component_1")
 	document["sampling"]["recipe"] = {"method": GeometrySamplingService.ADAPTIVE, "parameters": {"spacing": 2.0}}
 	document["sampling"]["bakes"][GeometrySamplingService.ADAPTIVE] = sampling
@@ -748,8 +788,13 @@ func _test_geometry_meshing_service_and_ui() -> void:
 	_expect(application.geometry_meshing_workspace.visible and application.inspector_content.get_child_count() >= 10, "Geometry Meshing should expose its dedicated Workspace and compact Inspector.")
 	var meshing_inspector_text := _control_text(application.inspector_content)
 	var meshing_outliner_text := _control_text(application.outliner_list)
-	_expect(meshing_inspector_text.contains("Constrained Mesh · Automatic") and meshing_inspector_text.contains("Mesh Character") and meshing_inspector_text.contains("Advanced Relaxation") and not meshing_inspector_text.contains("Use as Component Mesh"), "Meshing should expose one Artistic Constrained Mesh workflow without a separate Component Mesh action.")
+	_expect(meshing_inspector_text.contains("Constrained Mesh · Automatic") and meshing_inspector_text.contains("Mesh Character") and meshing_inspector_text.contains("Optimize Mesh") and meshing_inspector_text.contains("Advanced Optimization") and meshing_inspector_text.contains("Optimization") and meshing_inspector_text.contains("Quality") and not meshing_inspector_text.contains("Use as Component Mesh"), "Meshing should expose one Artistic Constrained Mesh workflow, explicit optimization control, and both diagnostic views without a separate Component Mesh action.")
 	_expect(meshing_outliner_text.contains("Sampling · Adaptive") and meshing_outliner_text.contains("Seeding · Poisson Fill") and meshing_outliner_text.contains("Constraints · Outer Preserved") and meshing_outliner_text.contains("Mesh · Constrained Mesh"), "Meshing Outliner should expose its complete nested pipeline dependencies.")
+	var current_sampling_bake: Dictionary = normalized["sampling"]["bakes"][GeometrySamplingService.ADAPTIVE]
+	var current_sampling_version := int(current_sampling_bake.get("algorithm_version", 0))
+	current_sampling_bake.erase("algorithm_version")
+	_expect(not application._geometry_sampling_bake_is_current("asset_1", "component_1", component) and application._geometry_meshing_status("asset_1", "component_1", component) == "Sampling Required", "A pre-junction Sampling Bake must become stale upstream instead of surfacing as an invalid Meshing PSLG.")
+	current_sampling_bake["algorithm_version"] = current_sampling_version
 	normalized["meshing"]["bakes"].clear()
 	application.geometry_meshing_preview = cdt.duplicate(true)
 	application.geometry_meshing_preview["accepted_preview_marker"] = true
@@ -1399,7 +1444,7 @@ func _test_motion_act_evaluator() -> void:
 	var normalized: Dictionary = application._normalize_motion_act({"id": "act_7", "parameters": {"direction": [0.0, 2.0], "distance": 12.0}}, "fallback")
 	_expect(Vector2(normalized.get("parameters", {}).get("direction", Vector2.ZERO)) == Vector2(0.0, 2.0), "Persisted Slide direction arrays should normalize back to Vector2 values.")
 	var serialized: Dictionary = application._serialize_motion_act(normalized)
-	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 31, "Act persistence should serialize vectors as JSON arrays using schema 31.")
+	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 33, "Act persistence should serialize vectors as JSON arrays using schema 33.")
 	var normalized_jump: Dictionary = application._normalize_motion_act({"id": "act_8", "primitive": "jump", "parameters": {"direction": [1.0, 0.0], "distance": 7.0, "height": 2.5, "arc": "snappy"}}, "fallback")
 	var serialized_jump: Dictionary = application._serialize_motion_act(normalized_jump)
 	_expect(str(serialized_jump.get("primitive", "")) == MotionActEvaluator.JUMP and is_equal_approx(float(serialized_jump.get("parameters", {}).get("height", 0.0)), 2.5) and str(serialized_jump.get("parameters", {}).get("arc", "")) == MotionActEvaluator.JUMP_ARC_SNAPPY, "Jump-specific parameters should survive normalization and serialization.")

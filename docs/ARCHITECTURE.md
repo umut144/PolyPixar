@@ -86,14 +86,21 @@ editing is available only on a current accepted Bake.
 
 Meshing exposes one constrained recipe for closed Body Components. `Mesh
 Character` derives the relaxation strength and pass count along a Structured to
-Organic continuum; optional Advanced Relaxation overrides preserve exact legacy
-or technical control. The service triangulates Sampling boundaries plus
-Seeding vertices, recovers Outer/Hole/Cut constraints, performs any requested
-interior relaxation and retriangulation, and only then duplicates the Cut seam.
-Boundary vertices never move. Meshing uses the same debounced transient Preview
-and exact Preview Bake contract as Sampling and Seeding. Accepting the Preview
-atomically replaces the single Constrained Mesh Bake and records it as the
-Component Mesh, so no separate `Use as Component Mesh` action exists.
+Organic continuum. `Optimize Mesh` gates existing-point relocation as an exact
+raw-CDT A/B comparison; optional Advanced Optimization overrides preserve exact
+legacy or technical control. The service triangulates Sampling boundaries plus
+Seeding vertices, recovers Outer/Hole/Cut constraints, and accepts a relocation
+pass only when measured quality improves without a material minimum-angle
+regression. It retriangulates after each candidate and only then duplicates the
+Cut seam. Boundary vertices never move and this phase neither adds nor removes
+vertices. Meshing uses the same debounced transient Preview and exact Preview
+Bake contract as Sampling and Seeding. Accepting the Preview atomically replaces
+the single Constrained Mesh Bake and records it as the Component Mesh, so no
+separate `Use as Component Mesh` action exists.
+
+New Constrained Mesh recipes default to `Mesh Character = 0.64`, which derives
+Strength `0.402` and three quality-checked passes. Existing persisted recipes
+retain their exact Character and override values.
 
 ## Persistence
 
@@ -115,6 +122,23 @@ Component Mesh wins, then the active recipe, then a deterministic fallback.
 Legacy Organic parameters load as Artistic Character plus exact Advanced
 Relaxation overrides. Old mesh results remain readable but stale until rebuilt
 with the current constrained-mesh algorithm version.
+
+Schema 32 stores arranged Cut fragments. Sampling owns PSLG junction creation
+and clipping against Outer/Holes; Seeding consumes the resulting fragments as
+independent barriers. Meshing validates the PSLG and delegates only constrained
+triangulation to the pinned macOS-arm64 `artem-ogre/CDT` GDExtension. PolyTools
+continues to own document data, stable IDs, domain filtering, diagnostics,
+relaxation, and Cut-seam duplication.
+
+Schema 33 stores the optimization recipe switch plus compact baseline
+triangles, accepted Seed movements, and before/after quality metrics. These are
+derived diagnostics for the Optimization and Quality views and never become
+Component topology.
+
+Sampling results carry their own algorithm version independently of the
+Workspace schema. The junction-aware version invalidates pre-arrangement flat
+Cut Bakes at Sampling, which in turn makes Seeding stale before Meshing can
+consume an incompatible PSLG.
 
 ## Export contract
 
