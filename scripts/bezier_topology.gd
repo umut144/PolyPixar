@@ -198,11 +198,11 @@ static func mode_validation_issues(component: Dictionary, complete := true) -> A
 				errors.append("Closed Loop chain role must be %s." % topology_role)
 			if not bool(chain.get("closed", false)) or chain.get("point_ids", []).size() < 3:
 				errors.append("Closed Loop requires one closed Chain with at least three Points.")
-	elif draw_mode in ["open_edge", "ribbon"]:
+	elif draw_mode == "ribbon":
 		if chains.size() != 1:
-			errors.append("%s requires one open Chain." % ("Ribbon" if draw_mode == "ribbon" else "Open Edge"))
+			errors.append("Ribbon requires one open Chain.")
 		elif bool(chains[0].get("closed", false)) or chains[0].get("point_ids", []).size() < 2:
-			errors.append("%s requires one open Chain with at least two Points." % ("Ribbon" if draw_mode == "ribbon" else "Open Edge"))
+			errors.append("Ribbon requires one open Chain with at least two Points.")
 	else:
 		errors.append("Unknown Component draw mode.")
 	return errors

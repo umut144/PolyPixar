@@ -14,6 +14,7 @@ func _init() -> void:
 	_test_ribbon_strip_mesh()
 	_test_catch_parent_snapping()
 	_test_geometry_sampling_service()
+	_test_create_outliner_expansion_scope()
 	_test_geometry_sampling_ui_shell()
 	_test_geometry_seeding_service()
 	_test_geometry_meshing_service_and_ui()
@@ -105,7 +106,7 @@ func _test_ids_are_not_reused() -> void:
 	BezierTopology.delete_point(empty_open_component, empty_second_id)
 	_expect(empty_open_component.get("chains", []).is_empty(), "Deleting every Point from an open Chain should remove the empty Chain.")
 	var restarted_id := BezierTopology.add_point(empty_open_component, Vector2(2.0, 2.0), "linear")
-	_expect(not restarted_id.is_empty() and empty_open_component.get("chains", []).size() == 1, "An Open Edge should be drawable again after all of its Points were deleted.")
+	_expect(not restarted_id.is_empty() and empty_open_component.get("chains", []).size() == 1, "An open Bézier chain should be drawable again after all of its Points were deleted.")
 
 
 func _test_delete_multiple_points_and_protect_closed_minimum() -> void:
@@ -155,19 +156,17 @@ func _test_insert_preserves_curve() -> void:
 
 
 func _test_component_draw_modes_and_continuation() -> void:
-	var open_edge := _component()
-	open_edge["draw_mode"] = "open_edge"
-	var first_id := BezierTopology.start_chain(open_edge, Vector2.ZERO, "linear")
-	var second_id := BezierTopology.add_point_from(open_edge, first_id, Vector2(2.0, 0.0), "linear")
-	var prepended_id := BezierTopology.add_point_from(open_edge, first_id, Vector2(-1.0, 0.0), "linear")
-	_expect(not second_id.is_empty() and not prepended_id.is_empty(), "Open drawing should continue from either selected endpoint.")
-	_expect(open_edge.get("chains", []).size() == 1 and BezierTopology.mode_validation_issues(open_edge, true).is_empty(), "Open Edge must validate as exactly one open Chain with at least two Points.")
-	_expect(BezierTopology.start_chain(open_edge, Vector2(20.0, 20.0), "linear").is_empty(), "A Component must reject a second Chain.")
-	var closed := open_edge.duplicate(true)
+	var ribbon := _component()
+	ribbon["draw_mode"] = "ribbon"
+	var first_id := BezierTopology.start_chain(ribbon, Vector2.ZERO, "linear")
+	var second_id := BezierTopology.add_point_from(ribbon, first_id, Vector2(2.0, 0.0), "linear")
+	var prepended_id := BezierTopology.add_point_from(ribbon, first_id, Vector2(-1.0, 0.0), "linear")
+	_expect(not second_id.is_empty() and not prepended_id.is_empty(), "Ribbon drawing should continue from either selected endpoint.")
+	_expect(ribbon.get("chains", []).size() == 1 and BezierTopology.mode_validation_issues(ribbon, true).is_empty(), "Ribbon must validate as exactly one open Chain with at least two Points.")
+	_expect(BezierTopology.start_chain(ribbon, Vector2(20.0, 20.0), "linear").is_empty(), "A Ribbon must reject a second Chain.")
+	var closed := ribbon.duplicate(true)
 	closed["draw_mode"] = "closed_loop"
 	_expect(not BezierTopology.mode_validation_issues(closed, true).is_empty(), "Closed Loop must reject open topology.")
-	var ribbon := open_edge.duplicate(true)
-	ribbon["draw_mode"] = "ribbon"
 	_expect(BezierTopology.mode_validation_issues(ribbon, true).is_empty(), "Ribbon must accept one complete open Chain.")
 
 
@@ -242,6 +241,55 @@ func _test_catch_parent_snapping() -> void:
 	canvas.set_catch_parent_component("parent")
 	_expect(canvas._snap_to_catch_parent(Vector2(5.0, 0.2)).distance_to(Vector2(5.0, 0.0)) < 0.01, "Catch Parent should snap drawing to a referenced Bézier segment.")
 	canvas.free()
+
+
+func _test_create_outliner_expansion_scope() -> void:
+	var application_script = load("res://scripts/main.gd")
+	var application = application_script.new()
+	application._build_ui()
+	application.active_module = "Create"
+	application.active_create_submodule = "Character"
+	var test_assets: Array[Dictionary] = [
+		{"id": "character_a", "name": "Character A", "asset_type": "character", "visibility": true, "components": [], "guides": []},
+		{"id": "character_b", "name": "Character B", "asset_type": "character", "visibility": true, "components": [], "guides": []},
+		{"id": "symbol_a", "name": "Symbol A", "asset_type": "symbols", "visibility": true, "components": [], "guides": []}
+	]
+	application.assets = test_assets
+	application._set_outliner_asset_expanded("character_a", true)
+	application._set_outliner_asset_expanded("character_b", true)
+	_expect(not bool(application.expanded_assets.get("character_a", false)) and bool(application.expanded_assets.get("character_b", false)), "Expanding a Character should collapse only the other Character Assets.")
+	application.active_create_submodule = "Symbols"
+	application._set_outliner_asset_expanded("symbol_a", true)
+	_expect(bool(application.expanded_assets.get("character_b", false)) and bool(application.expanded_assets.get("symbol_a", false)), "Expanding a Symbol should preserve the Character module's expanded Asset.")
+	_expect(application._outliner_focus_asset_id() == "symbol_a" and application._outliner_asset_is_visible(application.assets[2]), "The Symbols Outliner should retain its own visible expanded Asset.")
+	application.active_create_submodule = "Character"
+	_expect(application._outliner_focus_asset_id() == "character_b" and application._outliner_asset_is_visible(application.assets[1]), "Returning to Characters should restore that module's expanded Asset.")
+	application.selected_asset_id = "character_b"
+	application.selected_component_id = "component_stale"
+	application.selected_guide_id = "guide_stale"
+	application.active_create_submodule = "Character"
+	application._set_create_submodule_context("Symbols")
+	_expect(application.selected_asset_id == "symbol_a" and application.selected_component_id.is_empty() and application.selected_guide_id.is_empty(), "Switching Create modules should select the target module's expanded Asset at asset level.")
+	application.canvas_view.set_camera_state(Vector2(12.0, -3.0), 13.0)
+	var camera_before: Dictionary = application.canvas_view.get_camera_state()
+	application._set_create_submodule_context("Character")
+	application._render_canvas_context()
+	_expect(application.canvas_view.get_camera_state() == camera_before, "Restoring a Create module's active Asset must not reset canvas pan or zoom.")
+	application.selected_asset_id = "character_b"
+	application._render_canvas_context()
+	application.canvas_view.set_camera_state(Vector2(42.0, -17.0), 7.0)
+	application.selected_asset_id = "symbol_a"
+	application._render_canvas_context()
+	application.canvas_view.set_camera_state(Vector2(-8.0, 31.0), 3.0)
+	application.selected_asset_id = "character_b"
+	application._render_canvas_context()
+	_expect(application.canvas_view.get_camera_state() == {"position": Vector2(42.0, -17.0), "zoom": 7.0}, "Each Create Asset should restore its own saved canvas pan and zoom.")
+	var saved_editor_state: Dictionary = application._serialize_editor_state()
+	_expect(saved_editor_state.get("asset_cameras", {}).has("character_b") and saved_editor_state.get("asset_cameras", {}).has("symbol_a"), "Per-Asset canvas cameras should be stored in persistent editor state.")
+	application._restore_editor_state(saved_editor_state)
+	application._render_canvas_context()
+	_expect(application.canvas_view.get_camera_state() == {"position": Vector2(42.0, -17.0), "zoom": 7.0}, "Reloading editor state should restore the selected Asset's saved canvas camera.")
+	application.free()
 
 
 func _test_geometry_sampling_service() -> void:
@@ -338,7 +386,7 @@ func _test_geometry_sampling_service() -> void:
 	_expect(not bool(GeometrySamplingService.generate(open_component).get("valid", true)), "An open contour should fail visibly at the mesh-pipeline Sampling boundary.")
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
-	_expect(application._has_supported_schema({"schema_version": 33}) and application._has_supported_schema({"schema_version": 32}) and not application._has_supported_schema({"schema_version": 34}), "Schema 33 should keep current and older Workspace documents readable and reject unknown future schemas.")
+	_expect(application._has_supported_schema({"schema_version": 34}) and application._has_supported_schema({"schema_version": 33}) and not application._has_supported_schema({"schema_version": 35}), "Schema 34 should keep current and older Workspace documents readable and reject unknown future schemas.")
 	var arranged_round_trip: Dictionary = application._normalize_sampling_bake(application._serialize_sampling_bake(arranged_result))
 	_expect(arranged_round_trip.get("cuts", [])[0].get("fragments", []).size() == 2 and arranged_round_trip.get("cuts", [])[0].get("fragments", [])[0].get("samples", [])[0].get("position", null) is Vector2, "Schema 32 should preserve Cut fragment connectivity and restore fragment positions as Vector2 values.")
 	var geometry_document: Dictionary = application._default_geometry_document("asset_1", "component_1")
@@ -347,7 +395,7 @@ func _test_geometry_sampling_service() -> void:
 	baked_result["bake_id"] = "bake_test"
 	geometry_document["sampling"]["bakes"][GeometrySamplingService.ADAPTIVE] = baked_result
 	var serialized_geometry: Dictionary = application._serialize_geometry_document(geometry_document)
-	_expect(int(serialized_geometry.get("schema_version", 0)) == 33 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-33 JSON arrays.")
+	_expect(int(serialized_geometry.get("schema_version", 0)) == 34 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-34 JSON arrays.")
 	var normalized_geometry: Dictionary = application._normalize_geometry_document(serialized_geometry, "asset_1", "component_1")
 	_expect(normalized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Vector2, "Sampling bake loading should restore local sample positions as Vector2 values.")
 	_expect(normalized_geometry["sampling"]["bakes"].size() == 1, "Sampling should retain one Adaptive Bake.")
@@ -1080,7 +1128,7 @@ func _test_asset_guides() -> void:
 	application.component_name_input.text = "Eyes"
 	application.component_dialog.set_meta("asset_id", "asset_1")
 	application.component_dialog.set_meta("parent_component_id", "component_1")
-	application.component_dialog.set_meta("draw_mode", "open_edge")
+	application.component_dialog.set_meta("draw_mode", "ribbon")
 	application._confirm_component_creation()
 	var child_component: Dictionary = application._get_component(application._get_asset("asset_1"), application.selected_component_id)
 	_expect(str(child_component.get("parent_component_id", "")) == "component_1" and Vector2(child_component.get("transform", {}).get("pivot", Vector2.ZERO)).is_equal_approx(Vector2(parent_component.get("transform", {}).get("pivot", Vector2.ZERO))), "Child creation should persist a real Parent relationship and inherit the Parent pivot initially.")
@@ -1097,7 +1145,7 @@ func _test_asset_guides() -> void:
 	application._activate_guide_draw_state()
 	application._on_bezier_point_added(Vector2(15.0, 5.0), "aligned", Vector2.ZERO)
 	_expect(application.active_state == "draw" and Vector2(flow_guide.get("points", [])[0].get("position", Vector2.ZERO)).is_equal_approx(Vector2(10.0, 5.0)), "Flow Guides should catch Draw Guide Points on their parent Component contour just like Sample Guides.")
-	_expect(application.component_add_child_menu.item_count == 4 and application.component_add_guide_menu.item_count == 4, "Every Component add menu should expose all four Child draw modes and all four Guide types.")
+	_expect(application.component_add_child_menu.item_count == 3 and application.component_add_guide_menu.item_count == 4, "Every Component add menu should expose all three Child draw modes and all four Guide types.")
 	parent_component["transform"] = {"position": Vector2(-3.0, 2.0), "rotation": 20.0, "scale": Vector2(1.0, 1.5), "pivot": Vector2.ZERO}
 	parent_component["name"] = "EyeBrowL"
 	child_component["name"] = "EyeL"
@@ -1139,6 +1187,7 @@ func _test_asset_guides() -> void:
 	_expect(str(pupil_component.get("parent_component_id", "")) == "component_1" and str(pupil_component.get("draw_mode", "")) == "primitive" and pupil_component.get("points", []).is_empty() and pupil_component.get("edges", []).is_empty() and pupil_component.get("chains", []).is_empty() and pupil_component.get("primitive", {}).is_empty(), "Primitive Child creation should create an empty Primitive Component without generated Bézier topology.")
 	application._on_primitive_placed(Vector2(0.25, -0.5), 2.5)
 	_expect(PrimitiveGeometryService.has_circle(pupil_component) and is_equal_approx(float(pupil_component.get("primitive", {}).get("diameter_cm", 0.0)), 2.5) and PrimitiveGeometryService.center(pupil_component).is_equal_approx(Vector2(0.25, -0.5)), "Circle placement should persist only its parametric center and diameter.")
+	_expect(application.DRAW_MODES == ["closed_loop", "ribbon", "primitive"], "Components should expose only Closed Loop, Ribbon, and Primitive draw modes.")
 	var primitive_sampling := GeometrySamplingService.generate(pupil_component)
 	var refined_primitive_sampling := GeometrySamplingService.generate(pupil_component, {"parameters": {"spacing": 0.01, "feature_detail": 0.5}})
 	_expect(bool(primitive_sampling.get("valid", false)) and int(primitive_sampling.get("sample_count", 0)) >= 4 and int(primitive_sampling.get("sample_count", 0)) != PrimitiveGeometryService.CIRCLE_MESH_SEGMENTS and int(refined_primitive_sampling.get("sample_count", 0)) > int(primitive_sampling.get("sample_count", 0)) and pupil_component.get("points", []).is_empty(), "Primitive sampling should adapt analytically to the recipe without storing Bézier topology or using a fixed mesh segment count.")
@@ -1444,7 +1493,7 @@ func _test_motion_act_evaluator() -> void:
 	var normalized: Dictionary = application._normalize_motion_act({"id": "act_7", "parameters": {"direction": [0.0, 2.0], "distance": 12.0}}, "fallback")
 	_expect(Vector2(normalized.get("parameters", {}).get("direction", Vector2.ZERO)) == Vector2(0.0, 2.0), "Persisted Slide direction arrays should normalize back to Vector2 values.")
 	var serialized: Dictionary = application._serialize_motion_act(normalized)
-	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 33, "Act persistence should serialize vectors as JSON arrays using schema 33.")
+	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 34, "Act persistence should serialize vectors as JSON arrays using schema 34.")
 	var normalized_jump: Dictionary = application._normalize_motion_act({"id": "act_8", "primitive": "jump", "parameters": {"direction": [1.0, 0.0], "distance": 7.0, "height": 2.5, "arc": "snappy"}}, "fallback")
 	var serialized_jump: Dictionary = application._serialize_motion_act(normalized_jump)
 	_expect(str(serialized_jump.get("primitive", "")) == MotionActEvaluator.JUMP and is_equal_approx(float(serialized_jump.get("parameters", {}).get("height", 0.0)), 2.5) and str(serialized_jump.get("parameters", {}).get("arc", "")) == MotionActEvaluator.JUMP_ARC_SNAPPY, "Jump-specific parameters should survive normalization and serialization.")

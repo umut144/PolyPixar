@@ -7,13 +7,13 @@ const STYLE_SUBMODULES := ["Weighting"]
 const MOTION_SUBMODULES := ["Animation", "Path", "Act", "Sequence"]
 const WORKSPACES_ROOT := "res://workspaces"
 const CONFIG_PATH := "res://configs/app_config.json"
-const SCHEMA_VERSION := 33
+const SCHEMA_VERSION := 34
 const MAX_HISTORY_SIZE := 100
 const PAPER_SIZES_CM := [Vector2(21.0, 29.7), Vector2(29.7, 42.0), Vector2(42.0, 59.4), Vector2(59.4, 84.1), Vector2(84.1, 118.9)]
 const PAPER_LABELS := ["A4", "A3", "A2", "A1", "A0"]
 const PAPER_NONE_LEVEL := -1
 const PAPER_NONE_LABEL := "Kein Rahmen"
-const DRAW_MODES := ["closed_loop", "open_edge", "ribbon", "primitive"]
+const DRAW_MODES := ["closed_loop", "ribbon", "primitive"]
 const DEFAULT_CONTOUR_WIDTH_PX := 8.0
 const DEFAULT_RIBBON_WIDTH_PX := 8.0
 const GRID_BOX_TOOL_UNITS := 0.5
@@ -121,6 +121,10 @@ var bezier_point_move_component_id := ""
 var bezier_point_move_guide_id := ""
 var selected_weighting_style_id := ""
 var expanded_assets: Dictionary = {}
+# Per-asset editor-view state. Geometry remains document-independent; this is
+# only persistent workspace UI state for the Create canvas.
+var asset_camera_states: Dictionary = {}
+var canvas_camera_asset_id := ""
 var next_asset_id := 1
 var next_component_id := 1
 var next_guide_id := 1
@@ -1506,9 +1510,8 @@ func _create_component_dialog() -> void:
 func _create_component_draw_mode_menu() -> void:
 	component_draw_mode_menu = PopupMenu.new()
 	component_draw_mode_menu.add_item("Closed Loop", 0)
-	component_draw_mode_menu.add_item("Open Edge", 1)
-	component_draw_mode_menu.add_item("Ribbon", 2)
-	component_draw_mode_menu.add_item("Primitive", 3)
+	component_draw_mode_menu.add_item("Ribbon", 1)
+	component_draw_mode_menu.add_item("Primitive", 2)
 	_style_popup_menu(component_draw_mode_menu)
 	component_draw_mode_menu.id_pressed.connect(_on_component_draw_mode_selected)
 	add_child(component_draw_mode_menu)
@@ -1520,9 +1523,8 @@ func _create_component_add_menu() -> void:
 	component_add_child_menu = PopupMenu.new()
 	component_add_child_menu.name = "ChildTypes"
 	component_add_child_menu.add_item("Closed Loop", 0)
-	component_add_child_menu.add_item("Open Edge", 1)
-	component_add_child_menu.add_item("Ribbon", 2)
-	component_add_child_menu.add_item("Primitive", 3)
+	component_add_child_menu.add_item("Ribbon", 1)
+	component_add_child_menu.add_item("Primitive", 2)
 	component_add_child_menu.id_pressed.connect(_on_component_add_child_selected)
 	component_add_menu.add_child(component_add_child_menu)
 	component_add_guide_menu = PopupMenu.new()
@@ -1894,7 +1896,7 @@ func _save_workspace() -> void:
 				"draw_mode": str(component.get("draw_mode", "closed_loop")),
 				"topology_role": str(component.get("topology_role", "outer")) if str(component.get("topology_role", "outer")) in ["outer", "hole"] else "outer",
 				"contour_width_px": maxf(DEFAULT_CONTOUR_WIDTH_PX, float(component.get("contour_width_px", DEFAULT_CONTOUR_WIDTH_PX))),
-				"ribbon_width_px": maxf(DEFAULT_RIBBON_WIDTH_PX, float(component.get("ribbon_width_px", DEFAULT_RIBBON_WIDTH_PX))),
+				"ribbon_width_px": maxf(RibbonMeshService.MIN_WIDTH_PX, float(component.get("ribbon_width_px", DEFAULT_RIBBON_WIDTH_PX))),
 				"catch_parent_component_id": str(component.get("catch_parent_component_id", "")),
 				"show_point_numbers": bool(component.get("show_point_numbers", false)),
 				"primitive": _serialize_primitive(component.get("primitive", {}))
@@ -2212,7 +2214,7 @@ func _load_workspace(workspace_entry: String) -> bool:
 				"draw_mode": str(component_data.get("draw_mode", "closed_loop")) if str(component_data.get("draw_mode", "closed_loop")) in DRAW_MODES else "closed_loop",
 				"topology_role": str(component_data.get("topology_role", "outer")) if str(component_data.get("topology_role", "outer")) in ["outer", "hole"] else "outer",
 				"contour_width_px": maxf(DEFAULT_CONTOUR_WIDTH_PX, float(component_data.get("contour_width_px", DEFAULT_CONTOUR_WIDTH_PX))),
-				"ribbon_width_px": maxf(DEFAULT_RIBBON_WIDTH_PX, float(component_data.get("ribbon_width_px", DEFAULT_RIBBON_WIDTH_PX))),
+				"ribbon_width_px": maxf(RibbonMeshService.MIN_WIDTH_PX, float(component_data.get("ribbon_width_px", DEFAULT_RIBBON_WIDTH_PX))),
 				"catch_parent_component_id": str(component_data.get("catch_parent_component_id", "")),
 				"show_point_numbers": bool(component_data.get("show_point_numbers", false)),
 				"primitive": _deserialize_primitive(component_data.get("primitive", {}))
@@ -2295,17 +2297,20 @@ func _load_workspace(workspace_entry: String) -> bool:
 
 
 func _serialize_editor_state() -> Dictionary:
+	_store_camera_for_asset(canvas_camera_asset_id)
 	var expanded_state := {}
 	for asset in assets:
 		var asset_id := str(asset["id"])
 		expanded_state[asset_id] = bool(expanded_assets.get(asset_id, false))
-	var camera_state := {}
-	if is_instance_valid(canvas_view):
-		var current_camera := canvas_view.get_camera_state()
-		camera_state = {
-			"position": _serialize_vector(current_camera.get("position", Vector2.ZERO)),
-			"zoom": float(current_camera.get("zoom", 1.0))
-		}
+	var serialized_asset_cameras := {}
+	for asset in assets:
+		var asset_id := str(asset["id"])
+		var asset_camera = asset_camera_states.get(asset_id, {})
+		if asset_camera is Dictionary and not asset_camera.is_empty():
+			serialized_asset_cameras[asset_id] = {
+				"position": _serialize_vector(asset_camera.get("position", Vector2.ZERO)),
+				"zoom": float(asset_camera.get("zoom", 1.0))
+			}
 	return {
 		"selected_asset_id": selected_asset_id,
 		"selected_component_id": selected_component_id,
@@ -2328,7 +2333,7 @@ func _serialize_editor_state() -> Dictionary:
 		"active_motion_submodule": active_motion_submodule,
 		"outliner_asset_type_filters": outliner_asset_type_filters.duplicate(true),
 		"expanded_assets": expanded_state,
-		"camera": camera_state,
+		"asset_cameras": serialized_asset_cameras,
 		"paper_level": paper_level,
 		"world_scale": {
 			"unit": world_unit,
@@ -2367,6 +2372,8 @@ func _restore_editor_state(state) -> void:
 	outliner_asset_type_filters = {"character": true, "props": true, "terrain": true, "icon": true, "symbols": true}
 	_apply_outliner_asset_type_filter_checkboxes()
 	expanded_assets.clear()
+	asset_camera_states.clear()
+	canvas_camera_asset_id = ""
 	for asset in assets:
 		expanded_assets[str(asset["id"])] = false
 	if not state is Dictionary:
@@ -2393,6 +2400,16 @@ func _restore_editor_state(state) -> void:
 			var asset_id := str(asset["id"])
 			if saved_expanded.has(asset_id):
 				expanded_assets[asset_id] = bool(saved_expanded[asset_id])
+	var saved_asset_cameras = state.get("asset_cameras", {})
+	if saved_asset_cameras is Dictionary:
+		for asset in assets:
+			var asset_id := str(asset["id"])
+			var saved_asset_camera = saved_asset_cameras.get(asset_id, {})
+			if saved_asset_camera is Dictionary and not saved_asset_camera.is_empty():
+				asset_camera_states[asset_id] = {
+					"position": _deserialize_vector(saved_asset_camera.get("position", [0.0, 0.0]), Vector2.ZERO),
+					"zoom": clampf(float(saved_asset_camera.get("zoom", 1.0)), 0.25, 4096.0)
+				}
 	if not selected_component_id.is_empty() or not selected_guide_id.is_empty():
 		_set_outliner_asset_expanded(selected_asset_id, true)
 	active_module = "Create"
@@ -2425,11 +2442,44 @@ func _restore_editor_state(state) -> void:
 	_apply_world_scale_settings(state.get("world_scale", {}))
 	paper_level = clampi(int(state.get("paper_level", 0)), PAPER_NONE_LEVEL, PAPER_SIZES_CM.size() - 1)
 	_apply_snap_settings(state.get("snap", {}))
+	# Workspaces saved before per-asset cameras keep their one legacy view on the
+	# active asset, rather than losing it during the migration.
 	var saved_camera = state.get("camera", {})
-	if saved_camera is Dictionary and not saved_camera.is_empty() and is_instance_valid(canvas_view):
-		var camera_position := _deserialize_vector(saved_camera.get("position", [0.0, 0.0]), Vector2.ZERO)
-		var camera_zoom := clampf(float(saved_camera.get("zoom", 1.0)), 0.25, 4096.0)
-		canvas_view.set_camera_state(camera_position, camera_zoom)
+	if saved_camera is Dictionary and not saved_camera.is_empty() and not selected_asset_id.is_empty() and not asset_camera_states.has(selected_asset_id):
+		asset_camera_states[selected_asset_id] = {
+			"position": _deserialize_vector(saved_camera.get("position", [0.0, 0.0]), Vector2.ZERO),
+			"zoom": clampf(float(saved_camera.get("zoom", 1.0)), 0.25, 4096.0)
+		}
+
+
+func _store_camera_for_asset(asset_id: String) -> void:
+	if asset_id.is_empty() or not is_instance_valid(canvas_view) or _get_asset(asset_id).is_empty():
+		return
+	var camera_state := canvas_view.get_camera_state()
+	asset_camera_states[asset_id] = {
+		"position": camera_state.get("position", Vector2.ZERO),
+		"zoom": clampf(float(camera_state.get("zoom", 1.0)), 0.25, 4096.0)
+	}
+
+
+func _restore_camera_for_asset(asset_id: String) -> void:
+	if asset_id.is_empty() or not is_instance_valid(canvas_view):
+		return
+	var camera_state = asset_camera_states.get(asset_id, {})
+	if not camera_state is Dictionary or camera_state.is_empty():
+		return
+	canvas_view.set_camera_state(
+		camera_state.get("position", Vector2.ZERO),
+		clampf(float(camera_state.get("zoom", 1.0)), 0.25, 4096.0)
+	)
+
+
+func _sync_asset_camera(asset_id: String) -> void:
+	if asset_id == canvas_camera_asset_id:
+		return
+	_store_camera_for_asset(canvas_camera_asset_id)
+	_restore_camera_for_asset(asset_id)
+	canvas_camera_asset_id = asset_id
 
 
 func _apply_world_scale_settings(settings) -> void:
@@ -3589,8 +3639,6 @@ func _geometry_meshing_preview_matches(asset_id: String, component_id: String, c
 func _geometry_meshing_status(asset_id: String, component_id: String, component: Dictionary) -> String:
 	if component.is_empty():
 		return "Invalid"
-	if str(component.get("draw_mode", "")) == "open_edge":
-		return "Open Edge · No Mesh"
 	if str(component.get("draw_mode", "")) == "ribbon":
 		if not RibbonMeshService.validation_issues(component).is_empty():
 			return "Invalid"
@@ -4380,13 +4428,6 @@ func _render_geometry_meshing_context_bar() -> void:
 		ribbon_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		ribbon_label.add_theme_color_override("font_color", Color("#9aa3b2"))
 		context_bar.add_child(ribbon_label)
-		return
-	if str(component.get("draw_mode", "")) == "open_edge":
-		var open_edge_label := Label.new()
-		open_edge_label.text = "Open Edge · No Mesh Output"
-		open_edge_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		open_edge_label.add_theme_color_override("font_color", Color("#9aa3b2"))
-		context_bar.add_child(open_edge_label)
 		return
 	var method_label := Label.new()
 	method_label.text = "Constrained Mesh · Automatic"
@@ -5202,8 +5243,6 @@ func _export_validation_errors(asset: Dictionary) -> Array[String]:
 			continue
 		var component_name := str(component.get("name", "Component"))
 		var draw_mode := str(component.get("draw_mode", ""))
-		if draw_mode == "open_edge":
-			continue
 		if draw_mode == "primitive":
 			var primitive_errors := PrimitiveGeometryService.validation_issues(component)
 			if not primitive_errors.is_empty():
@@ -5301,7 +5340,7 @@ func _build_selected_asset_scene() -> void:
 			progressed = true
 			if _is_reference_component(component):
 				_build_export_reference_geometry(component_node, component)
-			elif str(component.get("draw_mode", "")) != "open_edge":
+			else:
 				_build_export_component_geometry(component_node, asset, component, export_transform)
 		if not progressed:
 			# Documents are normalized on load, but retain a safe export fallback
@@ -5360,7 +5399,7 @@ func _build_export_reference_geometry(reference_node: Node2D, reference: Diction
 	if source_asset.is_empty():
 		return
 	for source_component in source_asset.get("components", []):
-		if _is_reference_component(source_component) or str(source_component.get("draw_mode", "")) == "open_edge":
+		if _is_reference_component(source_component):
 			continue
 		var source_node := Node2D.new()
 		source_node.name = _tscn_name(str(source_component.get("name", "Component")))
@@ -5763,9 +5802,15 @@ func _asset_type_filter_matches(asset: Dictionary) -> bool:
 func _outliner_focus_asset_id() -> String:
 	for asset in assets:
 		var asset_id := str(asset.get("id", ""))
-		if bool(expanded_assets.get(asset_id, false)):
+		if _outliner_expansion_scope_matches(asset) and bool(expanded_assets.get(asset_id, false)):
 			return asset_id
 	return ""
+
+
+func _outliner_expansion_scope_matches(asset: Dictionary) -> bool:
+	if active_module != "Create":
+		return true
+	return _asset_type(asset) == _create_submodule_asset_type(active_create_submodule)
 
 
 func _outliner_asset_is_visible(asset: Dictionary) -> bool:
@@ -5776,7 +5821,8 @@ func _outliner_asset_is_visible(asset: Dictionary) -> bool:
 func _set_outliner_asset_expanded(asset_id: String, expanded: bool) -> void:
 	if expanded:
 		for asset in assets:
-			expanded_assets[str(asset.get("id", ""))] = false
+			if _outliner_expansion_scope_matches(asset):
+				expanded_assets[str(asset.get("id", ""))] = false
 		expanded_assets[asset_id] = true
 	else:
 		expanded_assets[asset_id] = false
@@ -6327,9 +6373,7 @@ func _render_geometry_component_asset_entry(asset: Dictionary, force_expand := f
 		if str(component.get("type", "component")) == "guide":
 			continue
 		var draw_mode := str(component.get("draw_mode", "closed_loop"))
-		if active_geometry_submodule in ["Sampling", "Seeding"] and draw_mode in ["open_edge", "ribbon"]:
-			continue
-		if active_geometry_submodule == "Meshing" and draw_mode == "open_edge":
+		if active_geometry_submodule in ["Sampling", "Seeding"] and draw_mode == "ribbon":
 			continue
 		var component_id := str(component.get("id", ""))
 		var row := HBoxContainer.new()
@@ -7154,8 +7198,6 @@ func _on_component_draw_mode_selected(index: int) -> void:
 
 
 func _draw_mode_display_name(draw_mode: String) -> String:
-	if draw_mode == "open_edge":
-		return "Open Edge"
 	if draw_mode == "ribbon":
 		return "Ribbon"
 	if draw_mode == "primitive":
@@ -7692,6 +7734,9 @@ func _delete_selected_asset() -> void:
 	_record_direct_change()
 	assets.remove_at(asset_index)
 	expanded_assets.erase(selected_asset_id)
+	asset_camera_states.erase(selected_asset_id)
+	if canvas_camera_asset_id == selected_asset_id:
+		canvas_camera_asset_id = ""
 	selected_asset_id = ""
 	selected_component_id = ""
 	active_state = ""
@@ -8952,9 +8997,6 @@ func _render_geometry_meshing_inspector() -> void:
 	if str(component.get("draw_mode", "")) == "ribbon":
 		_render_ribbon_meshing_inspector(component)
 		return
-	if str(component.get("draw_mode", "")) == "open_edge":
-		inspector_content.add_child(_create_inspector_field_label("Open Edge is intentionally unmeshed."))
-		return
 	inspector_content.add_child(_create_inspector_field_label(str(component.get("name", "Component"))))
 	var recipe := _geometry_meshing_recipe(selected_asset_id, selected_component_id)
 	inspector_content.add_child(_create_inspector_section("Input"))
@@ -9797,7 +9839,7 @@ func _render_inspector() -> void:
 	var mode_status := _create_inspector_field_label("Geometry: Valid" if mode_issues.is_empty() else "Geometry: Draft · %s" % mode_issues[0])
 	mode_status.add_theme_color_override("font_color", Color("#75b88a") if mode_issues.is_empty() else Color("#f2c94c"))
 	inspector_content.add_child(mode_status)
-	if draw_mode in ["open_edge", "ribbon"]:
+	if draw_mode == "ribbon":
 		inspector_content.add_child(_create_inspector_section("Drawing Reference"))
 		inspector_content.add_child(_create_inspector_field_label("Catch Parent"))
 		var catch_parent_option := OptionButton.new()
@@ -9821,7 +9863,7 @@ func _render_inspector() -> void:
 		inspector_content.add_child(_create_inspector_section("Ribbon"))
 		inspector_content.add_child(_create_inspector_field_label("Width (px)"))
 		var ribbon_width := SpinBox.new()
-		ribbon_width.min_value = 0.1
+		ribbon_width.min_value = RibbonMeshService.MIN_WIDTH_PX
 		ribbon_width.max_value = 4096.0
 		ribbon_width.step = 0.5
 		ribbon_width.custom_arrow_step = 1.0
@@ -11220,7 +11262,7 @@ func _on_component_ribbon_width_changed(value: float) -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	if component.is_empty() or str(component.get("draw_mode", "")) != "ribbon":
 		return
-	var width := maxf(value, 0.1)
+	var width := maxf(value, RibbonMeshService.MIN_WIDTH_PX)
 	if is_equal_approx(float(component.get("ribbon_width_px", DEFAULT_RIBBON_WIDTH_PX)), width):
 		return
 	_record_coalesced_change()
@@ -11707,6 +11749,7 @@ func _read_import_threshold() -> float:
 
 
 func _render_canvas_context() -> void:
+	_sync_asset_camera(selected_asset_id if active_module == "Create" else "")
 	if active_module == "Motion" and active_motion_submodule == "Animation":
 		_sync_motion_player_document(_get_asset(selected_asset_id))
 	_render_context_bar()
@@ -11858,7 +11901,7 @@ func _render_canvas_context() -> void:
 	canvas_view.set_component_draw_mode(str(component.get("draw_mode", "closed_loop")))
 	canvas_view.set_point_numbers_visible(bool(component.get("show_point_numbers", false)))
 	var catch_parent_id := str(component.get("parent_component_id", ""))
-	if catch_parent_id.is_empty() and str(component.get("draw_mode", "closed_loop")) in ["open_edge", "ribbon"]:
+	if catch_parent_id.is_empty() and str(component.get("draw_mode", "closed_loop")) == "ribbon":
 		catch_parent_id = str(component.get("catch_parent_component_id", ""))
 	canvas_view.set_catch_parent_component(catch_parent_id)
 	BezierGeometry.resolve_auto_handles(component.get("points", []), component.get("chains", []))
@@ -12874,11 +12917,24 @@ func _set_create_submodule_context(submodule: String) -> void:
 	active_state = ""
 	var selected_asset := _get_asset(selected_asset_id)
 	if selected_asset.is_empty() or _asset_type(selected_asset) != _create_submodule_asset_type(active_create_submodule):
-		selected_asset_id = ""
+		selected_asset_id = _create_submodule_active_asset_id()
 		selected_component_id = ""
+		selected_guide_id = ""
 	var create_section := _find_section("Create")
 	if create_section != null:
 		_set_active_module_visual("Create", active_create_submodule)
+
+
+func _create_submodule_active_asset_id() -> String:
+	var expanded_asset_id := _outliner_focus_asset_id()
+	if not expanded_asset_id.is_empty():
+		return expanded_asset_id
+	for asset in assets:
+		if _asset_type(asset) == _create_submodule_asset_type(active_create_submodule):
+			var asset_id := str(asset.get("id", ""))
+			_set_outliner_asset_expanded(asset_id, true)
+			return asset_id
+	return ""
 
 
 func _enter_motion_context(submodule := "Animation") -> void:

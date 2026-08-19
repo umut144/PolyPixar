@@ -1538,7 +1538,7 @@
 				}
 			],
 			"contour_width_px": 8.0,
-			"draw_mode": "open_edge",
+			"draw_mode": "ribbon",
 			"edges": [
 				{
 					"end_point_id": "point_7314826501247709187",
@@ -1590,7 +1590,7 @@
 				}
 			],
 			"primitive": {},
-			"ribbon_width_px": 8.0,
+			"ribbon_width_px": 1.0,
 			"show_point_numbers": false,
 			"source_asset_id": "",
 			"topology_role": "outer",
@@ -1885,7 +1885,7 @@
 				}
 			],
 			"contour_width_px": 8.0,
-			"draw_mode": "open_edge",
+			"draw_mode": "ribbon",
 			"edges": [
 				{
 					"end_point_id": "point_9146606624129526081",
@@ -1937,7 +1937,7 @@
 				}
 			],
 			"primitive": {},
-			"ribbon_width_px": 8.0,
+			"ribbon_width_px": 1.0,
 			"show_point_numbers": false,
 			"source_asset_id": "",
 			"topology_role": "outer",
@@ -2238,7 +2238,7 @@
 				}
 			],
 			"contour_width_px": 8.0,
-			"draw_mode": "open_edge",
+			"draw_mode": "ribbon",
 			"edges": [
 				{
 					"end_point_id": "point_2814076375607499466",
@@ -2362,7 +2362,7 @@
 				}
 			],
 			"primitive": {},
-			"ribbon_width_px": 8.0,
+			"ribbon_width_px": 10.0,
 			"show_point_numbers": false,
 			"source_asset_id": "",
 			"topology_role": "outer",
@@ -2401,6 +2401,6 @@
 		"target_height_cm": 57.0,
 		"visible": true
 	},
-	"schema_version": 31,
+	"schema_version": 34,
 	"visibility": true
 }

@@ -15,15 +15,38 @@
 	"editor_state": {
 		"active_create_submodule": "Character",
 		"active_geometry_submodule": "Meshing",
-		"active_module": "Mesh",
+		"active_module": "Create",
 		"active_motion_submodule": "Animation",
 		"active_style_submodule": "Weighting",
-		"camera": {
-			"position": [
-				-0.138385653495789,
-				5.55549287796021
-			],
-			"zoom": 91.3553524570026
+		"asset_cameras": {
+			"asset_3": {
+				"position": [
+					-0.138385653495789,
+					8.37582206726074
+				],
+				"zoom": 59.3689270716945
+			},
+			"asset_7": {
+				"position": [
+					-0.138385653495789,
+					-0.0823748633265495
+				],
+				"zoom": 185.351866661415
+			},
+			"asset_8": {
+				"position": [
+					-0.138385653495789,
+					-0.0823748633265495
+				],
+				"zoom": 450.662281136575
+			},
+			"asset_9": {
+				"position": [
+					-0.138385653495789,
+					5.55549287796021
+				],
+				"zoom": 91.3553524570026
+			}
 		},
 		"expanded_assets": {
 			"asset_1": false,
@@ -35,7 +58,7 @@
 			"asset_6": false,
 			"asset_7": false,
 			"asset_8": false,
-			"asset_9": true
+			"asset_9": false
 		},
 		"motion_act_preview_asset_id": "",
 		"motion_act_preview_loop": true,
@@ -51,7 +74,7 @@
 		},
 		"paper_level": 0,
 		"selected_asset_id": "asset_9",
-		"selected_component_id": "component_55",
+		"selected_component_id": "",
 		"selected_edge_ids": [],
 		"selected_guide_id": "",
 		"selected_motion_act_id": "",
@@ -74,7 +97,7 @@
 	"paths": [
 		"path_1"
 	],
-	"schema_version": 31,
+	"schema_version": 34,
 	"sequences": [
 		"sequence_1"
 	]

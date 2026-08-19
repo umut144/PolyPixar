@@ -135,6 +135,10 @@ triangles, accepted Seed movements, and before/after quality metrics. These are
 derived diagnostics for the Optimization and Quality views and never become
 Component topology.
 
+Schema 34 removes the editor-only open-curve Component mode. Existing workspace
+assets were converted to Ribbons; Ribbon widths normalize to a practical minimum
+of 1 px.
+
 Sampling results carry their own algorithm version independently of the
 Workspace schema. The junction-aware version invalidates pre-arrangement flat
 Cut Bakes at Sampling, which in turn makes Seeding stale before Meshing can
@@ -151,7 +155,7 @@ number ordering. A successful build creates a Godot scene whose root stores:
 Component hierarchy becomes nested `Node2D` nodes. Closed-loop geometry is
 derived from Bézier topology, while primitive geometry is derived from its
 typed definition. Ribbon geometry uses a matching accepted Ribbon mesh. Open
-edges do not emit fill geometry.
+paths used by simulation or construction are Guides rather than Components.
 Exported Component nodes preserve `topology_role` metadata. For Symbol
 References, the reference node preserves its selected role and expanded source
 Components preserve their own roles independently.

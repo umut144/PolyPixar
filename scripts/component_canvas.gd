@@ -562,7 +562,7 @@ func set_catch_parent_component(component_id: String) -> void:
 
 
 func set_component_draw_mode(draw_mode: String) -> void:
-	component_draw_mode = draw_mode if draw_mode in ["closed_loop", "open_edge", "ribbon", "primitive"] else "closed_loop"
+	component_draw_mode = draw_mode if draw_mode in ["closed_loop", "ribbon", "primitive"] else "closed_loop"
 	queue_redraw()
 
 

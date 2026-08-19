@@ -4,21 +4,22 @@ extends RefCounted
 const METHOD := "ribbon_strip"
 const PIXELS_PER_METER := 128.0
 const DEFAULT_WIDTH_PX := 8.0
+const MIN_WIDTH_PX := 1.0
 const SAMPLE_SPACING_CM := 1.0
 const FEATURE_DETAIL := 0.5
 const EPSILON := 0.000001
 
 
 static func width_cm(component: Dictionary) -> float:
-	return maxf(float(component.get("ribbon_width_px", DEFAULT_WIDTH_PX)) * ToolUnits.TO_CENTIMETERS / PIXELS_PER_METER, EPSILON)
+	return maxf(float(component.get("ribbon_width_px", DEFAULT_WIDTH_PX)), MIN_WIDTH_PX) * ToolUnits.TO_CENTIMETERS / PIXELS_PER_METER
 
 
 static func validation_issues(component: Dictionary) -> Array[String]:
 	var errors := BezierTopology.mode_validation_issues(component, true)
 	if str(component.get("draw_mode", "closed_loop")) != "ribbon":
 		errors.append("Ribbon Strip requires a Ribbon Component.")
-	if float(component.get("ribbon_width_px", DEFAULT_WIDTH_PX)) <= 0.0:
-		errors.append("Ribbon Strip requires a positive width.")
+	if float(component.get("ribbon_width_px", DEFAULT_WIDTH_PX)) < MIN_WIDTH_PX:
+		errors.append("Ribbon Strip requires a width of at least %.0f px." % MIN_WIDTH_PX)
 	return errors
 
 
