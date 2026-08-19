@@ -1,0 +1,208 @@
+{
+	"asset_id": "asset_4",
+	"component_id": "component_29",
+	"component_mesh": {
+		"bake_id": "meshing_bake_7041297319640238274",
+		"build_provenance": {
+			"attempts": 1,
+			"exact_input_hash": "1e3e56d9bf759d6e348c711973169920e8855430af8a876d6b9d58eab058993f",
+			"schema_version": 1,
+			"source_signature": {
+				"geometry_tolerance": 0.00055,
+				"meshing_algorithm": 4,
+				"recipe_hash": "d3c4587eb0ea68f34f2459efe5f2f1a69d91d66710a2c9a634b406f1a22537e7",
+				"recipe_version": 1,
+				"sampling_algorithm": 2,
+				"scalars": [
+					1.0,
+					1.20000004768372,
+					1.20000004768372
+				],
+				"seeding_algorithm": 2,
+				"topology_hash": "798f34d93deb8b69db24542755b15e77f057f96dd85976e2ae6953cfa8cc107d",
+				"vectors": [
+					[
+						-0.850000023841858,
+						4.09999990463257
+					],
+					[
+						0.183333337306976,
+						0.0
+					],
+					[
+						0.0,
+						0.0
+					],
+					[
+						-0.300000011920929,
+						4.09999990463257
+					],
+					[
+						0.0,
+						0.0
+					],
+					[
+						-0.183333337306976,
+						0.0
+					],
+					[
+						1.0,
+						0.0
+					],
+					[
+						0.0,
+						1.0
+					],
+					[
+						0.0,
+						0.0
+					]
+				],
+				"version": 1
+			}
+		},
+		"last_error": "",
+		"last_failure_signature": {},
+		"mesh_fingerprint": "e9ec02c731c8bdacd08397aceb91451ccdf44486525110a85ff0b4707a078bf6",
+		"method": "ribbon_strip"
+	},
+	"meshing": {
+		"bakes": {
+			"ribbon_strip": {
+				"algorithm_version": 0,
+				"bake_id": "meshing_bake_7041297319640238274",
+				"boundary_constraints": [],
+				"errors": [],
+				"mean_quality": 0.0,
+				"method": "ribbon_strip",
+				"minimum_angle": 0.0,
+				"optimization": {
+					"baseline_triangles": [],
+					"movements": []
+				},
+				"parameters": {
+					"cap": "flat",
+					"join": "bevel",
+					"width_cm": 0.078125,
+					"width_px": 1.0
+				},
+				"source_fingerprint": "43bf2fd4c6c3aa21cf9307ef75e5db51d3e1f3050337befe4be454e0fd031b78",
+				"triangle_count": 2,
+				"triangles": [
+					{
+						"vertex_ids": [
+							"vertex:ribbon:sample:edge_8597737370640380639:point_2591498271033969340:left",
+							"vertex:ribbon:sample:edge_8597737370640380639:point_2591498271033969340:right",
+							"vertex:ribbon:sample:edge_8597737370640380639:point_7314826501247709187:left"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:ribbon:sample:edge_8597737370640380639:point_2591498271033969340:right",
+							"vertex:ribbon:sample:edge_8597737370640380639:point_7314826501247709187:right",
+							"vertex:ribbon:sample:edge_8597737370640380639:point_7314826501247709187:left"
+						]
+					}
+				],
+				"valid": true,
+				"vertex_count": 4,
+				"vertices": [
+					{
+						"id": "vertex:ribbon:sample:edge_8597737370640380639:point_2591498271033969340:left",
+						"origin": "ribbon_left",
+						"position": [
+							-0.300000011920929,
+							4.06093740463257
+						],
+						"preserved": false,
+						"source_id": "sample:edge_8597737370640380639:point_2591498271033969340"
+					},
+					{
+						"id": "vertex:ribbon:sample:edge_8597737370640380639:point_2591498271033969340:right",
+						"origin": "ribbon_right",
+						"position": [
+							-0.300000011920929,
+							4.13906240463257
+						],
+						"preserved": false,
+						"source_id": "sample:edge_8597737370640380639:point_2591498271033969340"
+					},
+					{
+						"id": "vertex:ribbon:sample:edge_8597737370640380639:point_7314826501247709187:left",
+						"origin": "ribbon_left",
+						"position": [
+							-0.850000023841858,
+							4.06093740463257
+						],
+						"preserved": false,
+						"source_id": "sample:edge_8597737370640380639:point_7314826501247709187"
+					},
+					{
+						"id": "vertex:ribbon:sample:edge_8597737370640380639:point_7314826501247709187:right",
+						"origin": "ribbon_right",
+						"position": [
+							-0.850000023841858,
+							4.13906240463257
+						],
+						"preserved": false,
+						"source_id": "sample:edge_8597737370640380639:point_7314826501247709187"
+					}
+				],
+				"worst_aspect_ratio": 0.0
+			}
+		},
+		"recipe": {
+			"method": "constrained_mesh",
+			"parameters": {
+				"mesh_character": 0.64,
+				"optimize_mesh": true,
+				"passes": 3,
+				"passes_override": false,
+				"relaxation": 0.402,
+				"relaxation_override": false,
+				"seeding_method": "poisson_fill"
+			}
+		}
+	},
+	"sampling": {
+		"bakes": {},
+		"recipe": {
+			"method": "adaptive",
+			"parameters": {
+				"boundary_refinements": {},
+				"feature_detail": 0.5,
+				"spacing": 1.0
+			}
+		}
+	},
+	"schema_version": 35,
+	"seeding": {
+		"bakes": {},
+		"recipe": {
+			"method": "poisson_fill",
+			"parameters": {
+				"constraint_clearance_factor": 0.5,
+				"seed": 1,
+				"spacing": 2.0
+			}
+		}
+	},
+	"uv_mapping": {
+		"bakes": {},
+		"recipe": {
+			"method": "bounds_planar",
+			"parameters": {
+				"mesh_method": "constrained_mesh",
+				"offset_u": 0.0,
+				"offset_v": 0.0,
+				"preserve_aspect": true,
+				"rotation": 0.0,
+				"scale": 1.0
+			}
+		}
+	},
+	"weighting": {
+		"next_style_index": 1,
+		"styles": []
+	}
+}

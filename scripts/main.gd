@@ -7,7 +7,7 @@ const STYLE_SUBMODULES := ["Weighting"]
 const MOTION_SUBMODULES := ["Animation", "Path", "Act", "Sequence"]
 const WORKSPACES_ROOT := "res://workspaces"
 const CONFIG_PATH := "res://configs/app_config.json"
-const SCHEMA_VERSION := 34
+const SCHEMA_VERSION := 35
 const MAX_HISTORY_SIZE := 100
 const PAPER_SIZES_CM := [Vector2(21.0, 29.7), Vector2(29.7, 42.0), Vector2(42.0, 59.4), Vector2(59.4, 84.1), Vector2(84.1, 118.9)]
 const PAPER_LABELS := ["A4", "A3", "A2", "A1", "A0"]
@@ -231,6 +231,8 @@ var world_scale_popup: PopupPanel
 var world_unit_option: OptionButton
 var world_grid_size_field: SpinBox
 var world_scale_summary_label: Label
+var update_meshes_button: Button
+var mesh_batch_running := false
 var workspace_name := ""
 var workspace_name_dialog: ConfirmationDialog
 var workspace_name_input: LineEdit
@@ -689,6 +691,13 @@ func _build_ui() -> void:
 	workspace_popup.add_item("Load")
 	workspace_popup.id_pressed.connect(_on_workspace_menu_id)
 	_create_world_scale_popup()
+	update_meshes_button = Button.new()
+	update_meshes_button.text = "Update Meshes (0)"
+	update_meshes_button.custom_minimum_size = Vector2(156, 32)
+	update_meshes_button.focus_mode = Control.FOCUS_NONE
+	update_meshes_button.disabled = true
+	update_meshes_button.pressed.connect(_on_update_meshes_pressed)
+	toolbar.add_child(update_meshes_button)
 	toolbar.add_child(world_scale_menu)
 	toolbar.add_child(workspace_menu)
 
@@ -2173,7 +2182,7 @@ func _clear_status_message() -> void:
 		program_status_label.text = ""
 
 
-func _load_workspace(workspace_entry: String) -> bool:
+func _load_workspace(workspace_entry: String, persist_as_last := true) -> bool:
 	var workspace_root := "%s/%s" % [WORKSPACES_ROOT, workspace_entry]
 	var workspace_data = _read_json("%s/workspace.json" % workspace_root)
 	if not _has_supported_schema(workspace_data):
@@ -2292,7 +2301,8 @@ func _load_workspace(workspace_entry: String) -> bool:
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
-	_write_json(CONFIG_PATH, {"schema_version": SCHEMA_VERSION, "last_workspace": workspace_name})
+	if persist_as_last:
+		_write_json(CONFIG_PATH, {"schema_version": SCHEMA_VERSION, "last_workspace": workspace_name})
 	return true
 
 
@@ -2841,7 +2851,10 @@ func _default_geometry_document(asset_id: String, component_id: String) -> Dicti
 		"component_mesh": {
 			"bake_id": "",
 			"method": "",
-			"mesh_fingerprint": ""
+			"mesh_fingerprint": "",
+			"build_provenance": {},
+			"last_error": "",
+			"last_failure_signature": {}
 		},
 		"sampling": {
 			"recipe": GeometrySamplingService.default_recipe(),
@@ -2916,7 +2929,10 @@ func _normalize_geometry_document(raw_document, asset_id: String, component_id: 
 		document["component_mesh"] = {
 			"bake_id": str(component_mesh_source.get("bake_id", "")),
 			"method": str(component_mesh_source.get("method", "")),
-			"mesh_fingerprint": str(component_mesh_source.get("mesh_fingerprint", ""))
+			"mesh_fingerprint": str(component_mesh_source.get("mesh_fingerprint", "")),
+			"build_provenance": component_mesh_source.get("build_provenance", {}).duplicate(true) if component_mesh_source.get("build_provenance", {}) is Dictionary else {},
+			"last_error": str(component_mesh_source.get("last_error", "")),
+			"last_failure_signature": component_mesh_source.get("last_failure_signature", {}).duplicate(true) if component_mesh_source.get("last_failure_signature", {}) is Dictionary else {}
 		}
 	document["sampling"]["recipe"] = GeometrySamplingService.normalize_recipe(sampling_source.get("recipe", {}))
 	var raw_sampling_bakes: Dictionary = sampling_source.get("bakes", {}) if sampling_source.get("bakes", {}) is Dictionary else {}
@@ -3283,6 +3299,10 @@ func _geometry_sampling_bake_is_current(asset_id: String, component_id: String, 
 	var recipe := _geometry_sampling_recipe(asset_id, component_id)
 	var cut_guides := _cut_guides_for_component(_get_asset(asset_id), component_id)
 	var hole_components := _geometry_sampling_hole_components(_get_asset(asset_id), component_id)
+	var semantic_signature = bake.get("semantic_source_signature", {})
+	if semantic_signature is Dictionary and not semantic_signature.is_empty():
+		var current_signature := GeometryAutoBuildService.source_signature(component, cut_guides, hole_components, {"sampling": recipe})
+		return GeometryAutoBuildService.signatures_match(current_signature, semantic_signature)
 	return str(bake.get("source_fingerprint", "")) == GeometrySamplingService.source_fingerprint(component, cut_guides, hole_components) \
 		and int(bake.get("algorithm_version", 0)) == GeometrySamplingService.ALGORITHM_VERSION \
 		and str(bake.get("method", "")) == str(recipe.get("method", "")) \
@@ -3474,6 +3494,324 @@ func _component_mesh_status(asset_id: String, component_id: String, component: D
 	return "Ready" if _geometry_meshing_bake_is_current(asset_id, component_id, component, method) else "Stale"
 
 
+func _geometry_asset_mesh_overview(asset_id: String) -> Dictionary:
+	var asset := _get_asset(asset_id)
+	if asset.is_empty():
+		return {}
+	var vertices: Array = []
+	var triangles: Array = []
+	var visible_component_count := 0
+	var mesh_component_count := 0
+	var asset_is_visible := bool(asset.get("visibility", true))
+	for component in asset.get("components", []):
+		if not component is Dictionary or str(component.get("type", "component")) == "guide" or _is_reference_component(component):
+			continue
+		if not asset_is_visible or not bool(component.get("visibility", true)):
+			continue
+		visible_component_count += 1
+		var component_id := str(component.get("id", ""))
+		if component_id.is_empty() or _component_mesh_status(asset_id, component_id, component) != "Ready":
+			continue
+		var mesh := _component_mesh_bake(asset_id, component_id)
+		if not bool(mesh.get("valid", false)) or mesh.get("vertices", []).is_empty() or mesh.get("triangles", []).is_empty():
+			continue
+		var transform := ComponentHierarchy.world_transform(asset, component_id)
+		var vertex_ids: Dictionary = {}
+		for vertex in mesh.get("vertices", []):
+			if not vertex is Dictionary:
+				continue
+			var local_id := str(vertex.get("id", ""))
+			var overview_id := "%s/%s" % [component_id, local_id]
+			vertex_ids[local_id] = overview_id
+			var overview_vertex: Dictionary = vertex.duplicate(true)
+			overview_vertex["id"] = overview_id
+			overview_vertex["component_id"] = component_id
+			overview_vertex["position"] = transform * Vector2(vertex.get("position", Vector2.ZERO))
+			vertices.append(overview_vertex)
+		for triangle in mesh.get("triangles", []):
+			if not triangle is Dictionary:
+				continue
+			var local_ids: Array = triangle.get("vertex_ids", [])
+			if local_ids.size() != 3 or not vertex_ids.has(str(local_ids[0])) or not vertex_ids.has(str(local_ids[1])) or not vertex_ids.has(str(local_ids[2])):
+				continue
+			var overview_triangle: Dictionary = triangle.duplicate(true)
+			overview_triangle["id"] = "%s/%s" % [component_id, str(triangle.get("id", triangles.size()))]
+			overview_triangle["component_id"] = component_id
+			overview_triangle["vertex_ids"] = [vertex_ids[str(local_ids[0])], vertex_ids[str(local_ids[1])], vertex_ids[str(local_ids[2])]]
+			triangles.append(overview_triangle)
+		mesh_component_count += 1
+	return {
+		"valid": not vertices.is_empty() and not triangles.is_empty(),
+		"method": "asset_mesh_overview",
+		"vertices": vertices,
+		"triangles": triangles,
+		"vertex_count": vertices.size(),
+		"triangle_count": triangles.size(),
+		"mesh_component_count": mesh_component_count,
+		"visible_component_count": visible_component_count
+	}
+
+
+func _geometry_build_recipes(asset_id: String, component_id: String, component: Dictionary, cut_guides: Array, hole_components: Array) -> Dictionary:
+	var key := _geometry_document_key(asset_id, component_id)
+	if not geometry_documents.has(key):
+		return GeometryAutoBuildService.automatic_recipes(component, cut_guides, hole_components)
+	return {
+		"sampling": _geometry_sampling_recipe(asset_id, component_id),
+		"seeding": _geometry_seeding_recipe(asset_id, component_id),
+		"meshing": _geometry_meshing_recipe(asset_id, component_id),
+		"metrics": GeometryAutoBuildService.analyze(component)
+	}
+
+
+func _geometry_build_signature(asset_id: String, component_id: String, component: Dictionary, recipes: Dictionary = {}) -> Dictionary:
+	var asset := _get_asset(asset_id)
+	var cut_guides := _cut_guides_for_component(asset, component_id)
+	var hole_components := _geometry_sampling_hole_components(asset, component_id)
+	var resolved_recipes := recipes if not recipes.is_empty() else _geometry_build_recipes(asset_id, component_id, component, cut_guides, hole_components)
+	if str(component.get("draw_mode", "")) == "ribbon":
+		resolved_recipes = {"ribbon": {"method": RibbonMeshService.METHOD, "width_px": float(component.get("ribbon_width_px", DEFAULT_RIBBON_WIDTH_PX))}}
+	return GeometryAutoBuildService.source_signature(component, cut_guides, hole_components, resolved_recipes)
+
+
+func _component_is_meshable_source(asset: Dictionary, component: Dictionary) -> bool:
+	return _component_mesh_source_validation_issues(asset, component).is_empty()
+
+
+func _component_mesh_source_validation_issues(asset: Dictionary, component: Dictionary) -> Array[String]:
+	if component.is_empty():
+		return ["Component source is missing."]
+	if _is_reference_component(component):
+		return ["Reference Components do not own a Component Mesh."]
+	var draw_mode := str(component.get("draw_mode", "closed_loop"))
+	if draw_mode == "ribbon":
+		var ribbon_issues: Array[String] = []
+		for issue in RibbonMeshService.validation_issues(component):
+			ribbon_issues.append(str(issue))
+		return ribbon_issues
+	if draw_mode not in ["closed_loop", "primitive"]:
+		return ["Draw Mode '%s' cannot be meshed." % draw_mode]
+	var component_id := str(component.get("id", ""))
+	var sampling_issues: Array[String] = []
+	for issue in GeometrySamplingService.validation_issues(
+		component,
+		_cut_guides_for_component(asset, component_id),
+		_geometry_sampling_hole_components(asset, component_id)
+	):
+		sampling_issues.append(str(issue))
+	return sampling_issues
+
+
+func _component_mesh_needs_update(asset_id: String, component: Dictionary) -> bool:
+	var asset := _get_asset(asset_id)
+	if not _component_is_meshable_source(asset, component):
+		return false
+	var component_id := str(component.get("id", ""))
+	var current_signature := _geometry_build_signature(asset_id, component_id, component)
+	var reference := _component_mesh_reference(asset_id, component_id)
+	var failure_signature = reference.get("last_failure_signature", {})
+	if failure_signature is Dictionary and GeometryAutoBuildService.signatures_match(current_signature, failure_signature):
+		return false
+	var provenance = reference.get("build_provenance", {})
+	if not provenance is Dictionary:
+		return true
+	var baked_signature = provenance.get("source_signature", {})
+	if not baked_signature is Dictionary or not GeometryAutoBuildService.signatures_match(current_signature, baked_signature):
+		return true
+	return _component_mesh_status(asset_id, component_id, component) != "Ready"
+
+
+func _mesh_update_candidates(asset_id: String) -> Array[String]:
+	var result: Array[String] = []
+	var asset := _get_asset(asset_id)
+	if asset.is_empty():
+		return result
+	for component in asset.get("components", []):
+		if component is Dictionary and _component_mesh_needs_update(asset_id, component):
+			result.append(str(component.get("id", "")))
+	return result
+
+
+func _all_mesh_update_candidates() -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	for asset in assets:
+		if not asset is Dictionary:
+			continue
+		var asset_id := str(asset.get("id", ""))
+		if asset_id.is_empty():
+			continue
+		for component_id in _mesh_update_candidates(asset_id):
+			result.append({"asset_id": asset_id, "component_id": component_id})
+	return result
+
+
+func _update_meshes_button() -> void:
+	if not is_instance_valid(update_meshes_button):
+		return
+	if mesh_batch_running:
+		return
+	var count := _all_mesh_update_candidates().size()
+	update_meshes_button.text = "Update Meshes (%d)" % count
+	update_meshes_button.disabled = count == 0
+
+
+func _scaled_automatic_recipes(base: Dictionary, factor: float) -> Dictionary:
+	var result := base.duplicate(true)
+	result["sampling"]["parameters"]["spacing"] = float(result["sampling"]["parameters"].get("spacing", GeometrySamplingService.DEFAULT_SPACING)) * factor
+	result["seeding"]["parameters"]["spacing"] = float(result["seeding"]["parameters"].get("spacing", GeometrySeedingService.DEFAULT_SPACING)) * factor
+	result["sampling"] = GeometrySamplingService.normalize_recipe(result["sampling"])
+	result["seeding"] = GeometrySeedingService.normalize_recipe(result["seeding"])
+	result["meshing"] = GeometryMeshingService.normalize_recipe(result["meshing"])
+	return result
+
+
+func _generate_component_mesh_build(asset_id: String, component_id: String) -> Dictionary:
+	var asset := _get_asset(asset_id)
+	var component := _get_component(asset, component_id)
+	if not _component_is_meshable_source(asset, component):
+		return {"valid": false, "errors": ["Component source is not meshable."]}
+	if str(component.get("draw_mode", "")) == "ribbon":
+		var ribbon_mesh := RibbonMeshService.generate(component)
+		if bool(ribbon_mesh.get("valid", false)):
+			ribbon_mesh["bake_id"] = "meshing_bake_%d" % ResourceUID.create_id()
+		return {
+			"valid": bool(ribbon_mesh.get("valid", false)),
+			"errors": ribbon_mesh.get("errors", []).duplicate(),
+			"recipes": {},
+			"meshing": ribbon_mesh,
+			"source_signature": _geometry_build_signature(asset_id, component_id, component),
+			"attempts": 1
+		}
+	var cut_guides := _cut_guides_for_component(asset, component_id)
+	var hole_components := _geometry_sampling_hole_components(asset, component_id)
+	var has_existing_recipe := geometry_documents.has(_geometry_document_key(asset_id, component_id))
+	var base_recipes := _geometry_build_recipes(asset_id, component_id, component, cut_guides, hole_components)
+	var maximum_attempts := 1 if has_existing_recipe else 4
+	var last_errors: Array = []
+	for attempt_index in range(maximum_attempts):
+		var recipes := base_recipes if attempt_index == 0 else _scaled_automatic_recipes(base_recipes, pow(1.25, attempt_index))
+		var sampling := GeometrySamplingService.generate(component, recipes["sampling"], cut_guides, hole_components)
+		if not bool(sampling.get("valid", false)):
+			last_errors = sampling.get("errors", []).duplicate()
+			continue
+		sampling["bake_id"] = "bake_%d" % ResourceUID.create_id()
+		sampling["semantic_source_signature"] = GeometryAutoBuildService.source_signature(component, cut_guides, hole_components, {"sampling": recipes["sampling"]})
+		var seed_guides: Array = []
+		if str(recipes["seeding"].get("method", "")) == GeometrySeedingService.SPINE_FLOW:
+			seed_guides = _geometry_seeding_sampler_spines(asset_id, component_id, recipes["seeding"])
+		var seeding := GeometrySeedingService.generate(sampling, recipes["seeding"], seed_guides)
+		if not bool(seeding.get("valid", false)):
+			last_errors = seeding.get("errors", []).duplicate()
+			continue
+		seeding["bake_id"] = "seeding_bake_%d" % ResourceUID.create_id()
+		seeding["edited"] = false
+		var meshing_recipe: Dictionary = recipes["meshing"].duplicate(true)
+		meshing_recipe["parameters"]["seeding_method"] = str(recipes["seeding"].get("method", GeometrySeedingService.POISSON_FILL))
+		meshing_recipe = GeometryMeshingService.normalize_recipe(meshing_recipe)
+		recipes["meshing"] = meshing_recipe
+		var meshing := GeometryMeshingService.generate(sampling, seeding, meshing_recipe)
+		if not bool(meshing.get("valid", false)) or int(meshing.get("triangle_count", 0)) <= 0 \
+			or int(meshing.get("degenerate_triangle_count", 0)) > 0 or not bool(meshing.get("constraints_valid", false)):
+			last_errors = meshing.get("errors", ["Final Mesh validation failed."]).duplicate()
+			continue
+		meshing["bake_id"] = "meshing_bake_%d" % ResourceUID.create_id()
+		return {
+			"valid": true,
+			"errors": [],
+			"recipes": recipes,
+			"sampling": sampling,
+			"seeding": seeding,
+			"meshing": meshing,
+			"source_signature": GeometryAutoBuildService.source_signature(component, cut_guides, hole_components, recipes),
+			"attempts": attempt_index + 1
+		}
+	return {"valid": false, "errors": last_errors if not last_errors.is_empty() else ["Automatic Mesh generation failed."], "recipes": base_recipes, "source_signature": GeometryAutoBuildService.source_signature(component, cut_guides, hole_components, base_recipes), "attempts": maximum_attempts}
+
+
+func _commit_component_mesh_build(asset_id: String, component_id: String, build: Dictionary) -> void:
+	var document := _get_geometry_document(asset_id, component_id, true)
+	var mesh: Dictionary = build.get("meshing", {})
+	if not build.get("recipes", {}).is_empty():
+		var recipes: Dictionary = build["recipes"]
+		document["sampling"]["recipe"] = recipes["sampling"].duplicate(true)
+		document["seeding"]["recipe"] = recipes["seeding"].duplicate(true)
+		document["meshing"]["recipe"] = recipes["meshing"].duplicate(true)
+		var sampling: Dictionary = build["sampling"]
+		var seeding: Dictionary = build["seeding"]
+		document["sampling"]["bakes"][str(sampling.get("method", ""))] = sampling
+		document["seeding"]["bakes"][str(seeding.get("method", ""))] = seeding
+	document["meshing"]["bakes"][str(mesh.get("method", ""))] = mesh
+	document["component_mesh"] = {
+		"bake_id": str(mesh.get("bake_id", "")),
+		"method": str(mesh.get("method", "")),
+		"mesh_fingerprint": GeometryUVMappingService.mesh_fingerprint(mesh),
+		"build_provenance": {
+			"schema_version": GeometryAutoBuildService.SIGNATURE_VERSION,
+			"source_signature": build.get("source_signature", {}).duplicate(true),
+			"exact_input_hash": GeometryAutoBuildService.exact_signature_hash(build.get("source_signature", {})),
+			"attempts": int(build.get("attempts", 1))
+		},
+		"last_error": "",
+		"last_failure_signature": {}
+	}
+
+
+func _record_component_mesh_failure(asset_id: String, component_id: String, build: Dictionary) -> void:
+	var document := _get_geometry_document(asset_id, component_id, true)
+	var recipes = build.get("recipes", {})
+	if recipes is Dictionary and not recipes.is_empty():
+		document["sampling"]["recipe"] = recipes.get("sampling", document["sampling"]["recipe"]).duplicate(true)
+		document["seeding"]["recipe"] = recipes.get("seeding", document["seeding"]["recipe"]).duplicate(true)
+		document["meshing"]["recipe"] = recipes.get("meshing", document["meshing"]["recipe"]).duplicate(true)
+	var reference: Dictionary = document.get("component_mesh", {}).duplicate(true)
+	var errors: Array = build.get("errors", [])
+	reference["last_error"] = str(errors[0]) if not errors.is_empty() else "Automatic Mesh generation failed."
+	reference["last_failure_signature"] = build.get("source_signature", {}).duplicate(true)
+	document["component_mesh"] = reference
+
+
+func _on_update_meshes_pressed() -> void:
+	if mesh_batch_running:
+		return
+	var candidates := _all_mesh_update_candidates()
+	if candidates.is_empty():
+		_update_meshes_button()
+		return
+	mesh_batch_running = true
+	var succeeded := 0
+	var failed := 0
+	var history_recorded := false
+	for index in range(candidates.size()):
+		update_meshes_button.text = "Updating %d/%d" % [index + 1, candidates.size()]
+		update_meshes_button.disabled = true
+		await get_tree().process_frame
+		var candidate: Dictionary = candidates[index]
+		var asset_id := str(candidate.get("asset_id", ""))
+		var component_id := str(candidate.get("component_id", ""))
+		var build := _generate_component_mesh_build(asset_id, component_id)
+		if not history_recorded:
+			_record_direct_change()
+			history_recorded = true
+		if bool(build.get("valid", false)):
+			var current_component := _get_component(_get_asset(asset_id), component_id)
+			var current_signature := _geometry_build_signature(asset_id, component_id, current_component, build.get("recipes", {}))
+			if GeometryAutoBuildService.signatures_match(current_signature, build.get("source_signature", {})):
+				_commit_component_mesh_build(asset_id, component_id, build)
+				succeeded += 1
+			else:
+				build["errors"] = ["Component changed while its Mesh was being generated."]
+				_record_component_mesh_failure(asset_id, component_id, build)
+				failed += 1
+		else:
+			_record_component_mesh_failure(asset_id, component_id, build)
+			failed += 1
+	mesh_batch_running = false
+	_show_status_message("Updated %d Mesh%s%s" % [succeeded, "" if succeeded == 1 else "es", " · %d need attention" % failed if failed > 0 else ""])
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
 func _weighting_styles(asset_id: String, component_id: String) -> Array:
 	var document := _get_geometry_document(asset_id, component_id)
 	return document.get("weighting", {}).get("styles", []) if not document.is_empty() else []
@@ -3588,10 +3926,7 @@ func _geometry_meshing_input_is_current(asset_id: String, component_id: String, 
 	if component.is_empty() or sampling_bake.is_empty() or seeding_bake.is_empty():
 		return false
 	var asset := _get_asset(asset_id)
-	var cut_guides := _cut_guides_for_component(asset, component_id)
-	var hole_components := _geometry_sampling_hole_components(asset, component_id)
-	if int(sampling_bake.get("algorithm_version", 0)) != GeometrySamplingService.ALGORITHM_VERSION \
-		or str(sampling_bake.get("source_fingerprint", "")) != GeometrySamplingService.source_fingerprint(component, cut_guides, hole_components):
+	if not _geometry_sampling_bake_is_current(asset_id, component_id, component):
 		return false
 	if str(seeding_bake.get("sampling_bake_id", "")) != str(sampling_bake.get("bake_id", "")) \
 		or str(seeding_bake.get("sampling_fingerprint", "")) != GeometrySeedingService.sampling_fingerprint(sampling_bake):
@@ -5738,6 +6073,7 @@ func _has_asset_name(asset_name: String) -> bool:
 func _render_outliner() -> void:
 	_clear(outliner_list)
 	_update_context_action_button()
+	_update_meshes_button()
 	_update_outliner_asset_type_filter_visibility()
 	if active_module == "Motion":
 		_render_motion_outliner()
@@ -8350,6 +8686,10 @@ func _bake_geometry_sampling_preview() -> void:
 	var document := _get_geometry_document(selected_asset_id, selected_component_id, true)
 	var bake := geometry_sampling_preview.duplicate(true)
 	bake["bake_id"] = "bake_%d" % ResourceUID.create_id()
+	var asset := _get_asset(selected_asset_id)
+	var cut_guides := _cut_guides_for_component(asset, selected_component_id)
+	var hole_components := _geometry_sampling_hole_components(asset, selected_component_id)
+	bake["semantic_source_signature"] = GeometryAutoBuildService.source_signature(component, cut_guides, hole_components, {"sampling": _geometry_sampling_recipe(selected_asset_id, selected_component_id)})
 	document["sampling"]["bakes"][str(bake.get("method", ""))] = bake
 	selected_geometry_bake_method = str(bake.get("method", ""))
 	geometry_sampling_preview = {}
@@ -8998,6 +9338,16 @@ func _render_geometry_meshing_inspector() -> void:
 		_render_ribbon_meshing_inspector(component)
 		return
 	inspector_content.add_child(_create_inspector_field_label(str(component.get("name", "Component"))))
+	var source_issues := _component_mesh_source_validation_issues(_get_asset(selected_asset_id), component)
+	if not source_issues.is_empty():
+		inspector_content.add_child(_create_inspector_section("Source Validation"))
+		var source_status := _create_inspector_field_label("Invalid source topology")
+		source_status.add_theme_color_override("font_color", Color("#ef8354"))
+		inspector_content.add_child(source_status)
+		for issue in source_issues:
+			var issue_label := _create_inspector_field_label(str(issue))
+			issue_label.add_theme_color_override("font_color", Color("#ef8354"))
+			inspector_content.add_child(issue_label)
 	var recipe := _geometry_meshing_recipe(selected_asset_id, selected_component_id)
 	inspector_content.add_child(_create_inspector_section("Input"))
 	var sampling_current := _geometry_sampling_bake_is_current(selected_asset_id, selected_component_id, component)
@@ -9116,6 +9466,11 @@ func _render_geometry_meshing_inspector() -> void:
 	var status := _geometry_meshing_status(selected_asset_id, selected_component_id, component)
 	inspector_content.add_child(_create_inspector_section("Result"))
 	inspector_content.add_child(_create_inspector_field_label("Status: %s" % status))
+	var auto_build_error := str(_component_mesh_reference(selected_asset_id, selected_component_id).get("last_error", ""))
+	if not auto_build_error.is_empty():
+		var error_label := _create_inspector_field_label("Update Meshes: %s" % auto_build_error)
+		error_label.add_theme_color_override("font_color", Color("#ef8354"))
+		inspector_content.add_child(error_label)
 	var result := geometry_meshing_preview if _geometry_meshing_preview_matches(selected_asset_id, selected_component_id, component) else _geometry_meshing_bake(selected_asset_id, selected_component_id)
 	if not result.is_empty():
 		inspector_content.add_child(_create_inspector_field_label("Vertices: %d" % int(result.get("vertex_count", 0))))
@@ -9154,6 +9509,11 @@ func _render_ribbon_meshing_inspector(component: Dictionary) -> void:
 	var status := _geometry_meshing_status(selected_asset_id, selected_component_id, component)
 	inspector_content.add_child(_create_inspector_section("Result"))
 	inspector_content.add_child(_create_inspector_field_label("Status: %s" % status))
+	var auto_build_error := str(_component_mesh_reference(selected_asset_id, selected_component_id).get("last_error", ""))
+	if not auto_build_error.is_empty():
+		var error_label := _create_inspector_field_label("Update Meshes: %s" % auto_build_error)
+		error_label.add_theme_color_override("font_color", Color("#ef8354"))
+		inspector_content.add_child(error_label)
 	var result := geometry_meshing_preview if _geometry_meshing_preview_matches(selected_asset_id, selected_component_id, component) else _geometry_meshing_bake(selected_asset_id, selected_component_id, RibbonMeshService.METHOD)
 	if not result.is_empty():
 		inspector_content.add_child(_create_inspector_field_label("Vertices: %d" % int(result.get("vertex_count", 0))))
@@ -9307,10 +9667,27 @@ func _bake_geometry_meshing_preview() -> void:
 	bake["bake_id"] = "meshing_bake_%d" % ResourceUID.create_id()
 	document["meshing"]["bakes"][str(bake.get("method", ""))] = bake
 	selected_geometry_bake_method = str(bake.get("method", ""))
+	var asset := _get_asset(selected_asset_id)
+	var recipes := _geometry_build_recipes(
+		selected_asset_id,
+		selected_component_id,
+		component,
+		_cut_guides_for_component(asset, selected_component_id),
+		_geometry_sampling_hole_components(asset, selected_component_id)
+	)
+	var source_signature := _geometry_build_signature(selected_asset_id, selected_component_id, component, recipes)
 	document["component_mesh"] = {
 		"bake_id": str(bake.get("bake_id", "")),
 		"method": str(bake.get("method", "")),
-		"mesh_fingerprint": GeometryUVMappingService.mesh_fingerprint(bake)
+		"mesh_fingerprint": GeometryUVMappingService.mesh_fingerprint(bake),
+		"build_provenance": {
+			"schema_version": GeometryAutoBuildService.SIGNATURE_VERSION,
+			"source_signature": source_signature,
+			"exact_input_hash": GeometryAutoBuildService.exact_signature_hash(source_signature),
+			"attempts": 1
+		},
+		"last_error": "",
+		"last_failure_signature": {}
 	}
 	geometry_meshing_preview = {}
 	geometry_meshing_preview_key = ""
@@ -9324,7 +9701,17 @@ func _bake_geometry_meshing_preview() -> void:
 func _refresh_geometry_meshing_workspace() -> void:
 	if not is_instance_valid(geometry_meshing_workspace):
 		return
-	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	var asset := _get_asset(selected_asset_id)
+	if selected_component_id.is_empty() and not asset.is_empty():
+		var overview := _geometry_asset_mesh_overview(selected_asset_id)
+		geometry_meshing_workspace.set_context(
+			{},
+			{},
+			overview,
+			"Asset Overview · %d/%d Component Meshes" % [int(overview.get("mesh_component_count", 0)), int(overview.get("visible_component_count", 0))]
+		)
+		return
+	var component := _get_component(asset, selected_component_id)
 	if component.is_empty():
 		geometry_meshing_workspace.clear_context()
 		return

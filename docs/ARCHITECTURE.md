@@ -97,6 +97,9 @@ vertices. Meshing uses the same debounced transient Preview and exact Preview
 Bake contract as Sampling and Seeding. Accepting the Preview atomically replaces
 the single Constrained Mesh Bake and records it as the Component Mesh, so no
 separate `Use as Component Mesh` action exists.
+The Meshing root-Asset view derives a transient display-only aggregate by
+transforming each current visible Component Mesh into Asset space. It never
+persists a merged Mesh, and missing or stale Component Meshes are omitted.
 
 New Constrained Mesh recipes default to `Mesh Character = 0.64`, which derives
 Strength `0.402` and three quality-checked passes. Existing persisted recipes
@@ -138,6 +141,17 @@ Component topology.
 Schema 34 removes the editor-only open-curve Component mode. Existing workspace
 assets were converted to Ribbons; Ribbon widths normalize to a practical minimum
 of 1 px.
+
+Schema 35 stores semantic Component Mesh build provenance in the derived
+Geometry document. The persistent `Update Meshes (N)` action rebuilds only
+meshable Components across all Create Asset types whose effective geometry,
+constraints, or recipes differ meaningfully from their last successful build.
+Numeric geometry is compared
+with a scale-aware tolerance against that accepted snapshot; topology,
+constraints, recipes, and algorithm versions remain exact. Failed Components
+are isolated and retain their previous valid Component Mesh. Components with
+invalid source topology remain outside the actionable count and surface the
+specific validation issue in the Meshing Inspector.
 
 Sampling results carry their own algorithm version independently of the
 Workspace schema. The junction-aware version invalidates pre-arrangement flat

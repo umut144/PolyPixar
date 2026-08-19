@@ -78,6 +78,19 @@ Strength 0.40 and three passes without technical overrides. A debounced Preview
 is accepted with `Bake Preview`; that exact Bake
 automatically becomes the Component Mesh. Cut seam vertices are duplicated
 only after the final constrained triangulation and optimization.
+Selecting the Asset root in Meshing presents all current visible Component
+Meshes in Asset space; missing or stale Component Meshes are simply omitted.
+
+The persistent toolbar action `Update Meshes (N)` runs Adaptive Sampling,
+Poisson Seeding, Constrained Mesh, Optimization, and validation for valid
+out-of-date Components across every Create Asset type. It derives calibrated
+recipes for Components without existing pipeline settings, preserves manual
+recipes, commits successful results atomically per Component, and never lets
+one failure replace an older valid Mesh. Its count comes from semantic build
+provenance rather than a mutable dirty flag, so selection and sub-tolerance
+pointer jitter do not trigger the batch pipeline. Components rejected before
+the batch expose their concrete source-validation issue in the Meshing
+Inspector without inflating the actionable count.
 
 ## Workspace and export
 

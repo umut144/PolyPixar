@@ -14,6 +14,7 @@ func _init() -> void:
 	_test_ribbon_strip_mesh()
 	_test_catch_parent_snapping()
 	_test_geometry_sampling_service()
+	_test_geometry_auto_build_service()
 	_test_create_outliner_expansion_scope()
 	_test_geometry_sampling_ui_shell()
 	_test_geometry_seeding_service()
@@ -386,7 +387,7 @@ func _test_geometry_sampling_service() -> void:
 	_expect(not bool(GeometrySamplingService.generate(open_component).get("valid", true)), "An open contour should fail visibly at the mesh-pipeline Sampling boundary.")
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
-	_expect(application._has_supported_schema({"schema_version": 34}) and application._has_supported_schema({"schema_version": 33}) and not application._has_supported_schema({"schema_version": 35}), "Schema 34 should keep current and older Workspace documents readable and reject unknown future schemas.")
+	_expect(application._has_supported_schema({"schema_version": 35}) and application._has_supported_schema({"schema_version": 34}) and not application._has_supported_schema({"schema_version": 36}), "Schema 35 should keep current and older Workspace documents readable and reject unknown future schemas.")
 	var arranged_round_trip: Dictionary = application._normalize_sampling_bake(application._serialize_sampling_bake(arranged_result))
 	_expect(arranged_round_trip.get("cuts", [])[0].get("fragments", []).size() == 2 and arranged_round_trip.get("cuts", [])[0].get("fragments", [])[0].get("samples", [])[0].get("position", null) is Vector2, "Schema 32 should preserve Cut fragment connectivity and restore fragment positions as Vector2 values.")
 	var geometry_document: Dictionary = application._default_geometry_document("asset_1", "component_1")
@@ -395,7 +396,7 @@ func _test_geometry_sampling_service() -> void:
 	baked_result["bake_id"] = "bake_test"
 	geometry_document["sampling"]["bakes"][GeometrySamplingService.ADAPTIVE] = baked_result
 	var serialized_geometry: Dictionary = application._serialize_geometry_document(geometry_document)
-	_expect(int(serialized_geometry.get("schema_version", 0)) == 34 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-34 JSON arrays.")
+	_expect(int(serialized_geometry.get("schema_version", 0)) == 35 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-35 JSON arrays.")
 	var normalized_geometry: Dictionary = application._normalize_geometry_document(serialized_geometry, "asset_1", "component_1")
 	_expect(normalized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Vector2, "Sampling bake loading should restore local sample positions as Vector2 values.")
 	_expect(normalized_geometry["sampling"]["bakes"].size() == 1, "Sampling should retain one Adaptive Bake.")
@@ -405,6 +406,51 @@ func _test_geometry_sampling_service() -> void:
 	_expect(application._geometry_sampling_status("asset_1", "component_1", component) == "Baked", "A bake matching its recipe and source fingerprint should report Baked.")
 	BezierTopology.point_by_id(component["points"], curve_id)["position"] += Vector2.ONE
 	_expect(application._geometry_sampling_status("asset_1", "component_1", component) == "Ready to Preview", "Changing canonical topology should request a new Preview without rewriting its persisted result.")
+	application.free()
+
+
+func _test_geometry_auto_build_service() -> void:
+	var component := _component()
+	component.merge({"id": "auto_body", "name": "Body", "draw_mode": "closed_loop", "transform": {"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}})
+	for position in [Vector2.ZERO, Vector2(10.0, 0.0), Vector2(10.0, 10.0), Vector2(0.0, 10.0)]:
+		BezierTopology.add_point(component, position, "linear")
+	BezierTopology.close_active_chain(component)
+	var recipes := GeometryAutoBuildService.automatic_recipes(component)
+	_expect(is_equal_approx(float(recipes.get("sampling", {}).get("parameters", {}).get("spacing", 0.0)), 0.55) and is_equal_approx(float(recipes.get("seeding", {}).get("parameters", {}).get("spacing", 0.0)), 0.55), "Automatic Mesh recipes should start from the accepted shared 0.55 density for normal Character contours.")
+	_expect(is_equal_approx(float(recipes.get("meshing", {}).get("parameters", {}).get("mesh_character", 0.0)), 0.64) and int(recipes.get("meshing", {}).get("parameters", {}).get("passes", 0)) == 3, "Automatic Mesh recipes should retain the accepted optimized Artistic profile.")
+	var baked_signature := GeometryAutoBuildService.source_signature(component, [], [], recipes)
+	var jittered := component.duplicate(true)
+	jittered["points"][0]["position"] += Vector2(0.0003, 0.0)
+	_expect(GeometryAutoBuildService.signatures_match(GeometryAutoBuildService.source_signature(jittered, [], [], recipes), baked_signature), "Sub-tolerance point jitter should not request the long Mesh pipeline again.")
+	var moved := component.duplicate(true)
+	moved["points"][0]["position"] += Vector2(0.01, 0.0)
+	_expect(not GeometryAutoBuildService.signatures_match(GeometryAutoBuildService.source_signature(moved, [], [], recipes), baked_signature), "A meaningful point movement should request a Mesh update.")
+	var topology_changed := component.duplicate(true)
+	BezierTopology.insert_point_on_edge(topology_changed, str(topology_changed["edges"][0]["id"]), 0.5)
+	_expect(not GeometryAutoBuildService.signatures_match(GeometryAutoBuildService.source_signature(topology_changed, [], [], recipes), baked_signature), "Topology changes must always request a Mesh update.")
+	var changed_recipes := recipes.duplicate(true)
+	changed_recipes["sampling"]["parameters"]["feature_detail"] = 0.8
+	_expect(not GeometryAutoBuildService.signatures_match(GeometryAutoBuildService.source_signature(component, [], [], changed_recipes), baked_signature), "Pipeline recipe changes must always request a Mesh update.")
+	var application_script = load("res://scripts/main.gd")
+	var application: Control = application_script.new()
+	var other_component: Dictionary = component.duplicate(true)
+	other_component["id"] = "auto_symbol_body"
+	other_component["name"] = "Symbol Body"
+	var test_assets: Array[Dictionary] = [
+		{"id": "auto_asset", "name": "Auto Asset", "asset_type": "character", "visibility": true, "components": [component], "guides": []},
+		{"id": "auto_symbol", "name": "Auto Symbol", "asset_type": "symbols", "visibility": true, "components": [other_component], "guides": []}
+	]
+	application.assets = test_assets
+	application.selected_asset_id = "auto_asset"
+	_expect(application._mesh_update_candidates("auto_asset") == ["auto_body"], "A valid unmeshed Component should appear exactly once in Update Meshes.")
+	_expect(application._all_mesh_update_candidates() == [{"asset_id": "auto_asset", "component_id": "auto_body"}, {"asset_id": "auto_symbol", "component_id": "auto_symbol_body"}], "Update Meshes should collect stable candidates globally across every Create Asset type, independent of the selected Asset.")
+	var build: Dictionary = application._generate_component_mesh_build("auto_asset", "auto_body")
+	_expect(bool(build.get("valid", false)) and int(build.get("meshing", {}).get("triangle_count", 0)) > 0, "The automatic batch runner should complete Sampling, Seeding, CDT, Optimization, and final validation.")
+	application._commit_component_mesh_build("auto_asset", "auto_body", build)
+	_expect(application._mesh_update_candidates("auto_asset").is_empty(), "A successfully committed automatic Mesh should become clean without a mutable dirty flag.")
+	_expect(application._all_mesh_update_candidates() == [{"asset_id": "auto_symbol", "component_id": "auto_symbol_body"}], "A committed Mesh should leave only dirty Components from other Assets in the global batch.")
+	var round_trip: Dictionary = application._normalize_geometry_document(application._serialize_geometry_document(application.geometry_documents["auto_asset/auto_body"]), "auto_asset", "auto_body")
+	_expect(not round_trip.get("component_mesh", {}).get("build_provenance", {}).get("source_signature", {}).is_empty(), "Semantic Mesh build provenance should survive Geometry JSON persistence.")
 	application.free()
 
 
@@ -436,6 +482,7 @@ func _test_geometry_sampling_ui_shell() -> void:
 	application._render_outliner()
 	application._render_inspector()
 	application._render_canvas_context()
+	_expect(is_instance_valid(application.update_meshes_button) and application.update_meshes_button.text == "Update Meshes (1)" and not application.update_meshes_button.disabled, "The persistent toolbar should expose one actionable valid unmeshed Component for the current Asset.")
 	_expect(application.geometry_sampling_workspace.visible, "Geometry Sampling should own a dedicated visible centre workspace.")
 	_expect(application.outliner_list.get_child_count() > 1, "Sampling Outliner should expose the Asset/Component hierarchy.")
 	_expect(application.inspector_content.get_child_count() >= 8, "A selected Component should expose Adaptive parameters, boundary inputs, result, and Bake controls.")
@@ -851,11 +898,28 @@ func _test_geometry_meshing_service_and_ui() -> void:
 	application._bake_geometry_meshing_preview()
 	var accepted_mesh: Dictionary = application._geometry_meshing_bake("asset_1", "component_1")
 	_expect(bool(accepted_mesh.get("accepted_preview_marker", false)) and application._component_mesh_status("asset_1", "component_1", component) == "Ready" and str(application._component_mesh_bake("asset_1", "component_1").get("bake_id", "")) == str(accepted_mesh.get("bake_id", "")), "Bake Preview should copy the exact Preview and automatically make it the Component Mesh.")
+	component["transform"] = application._default_component_transform()
+	component["transform"]["position"] = Vector2(17.0, -6.0)
+	application.selected_component_id = ""
+	application._refresh_geometry_meshing_workspace()
+	var asset_overview: Dictionary = application.geometry_meshing_workspace.mesh_result
+	var local_mesh_position := Vector2(accepted_mesh.get("vertices", [])[0].get("position", Vector2.ZERO))
+	var overview_position := Vector2(asset_overview.get("vertices", [])[0].get("position", Vector2.ZERO))
+	_expect(bool(asset_overview.get("valid", false)) and int(asset_overview.get("mesh_component_count", 0)) == 1 and str(asset_overview.get("vertices", [])[0].get("id", "")).begins_with("component_1/") and overview_position.is_equal_approx(local_mesh_position + Vector2(17.0, -6.0)), "Selecting a Meshing root Asset should compose current Component Meshes in the same transformed Asset coordinate space as Create.")
 	var component_mesh_round_trip: Dictionary = application._normalize_geometry_document(application._serialize_geometry_document(normalized), "asset_1", "component_1")
 	_expect(str(component_mesh_round_trip.get("component_mesh", {}).get("bake_id", "")) == str(accepted_mesh.get("bake_id", "")), "Automatic Component Mesh selection should survive Geometry document persistence.")
 	normalized["seeding"]["bakes"][GeometrySeedingService.POISSON_FILL]["seeds"][0]["position"] += Vector2(0.1, 0.0)
 	_expect(application._geometry_meshing_status("asset_1", "component_1", component) == "Ready to Preview", "Editing an upstream Seeding Bake should request a new Mesh Preview without reverse synchronization.")
 	_expect(application._component_mesh_status("asset_1", "component_1", component) == "Stale", "A selected Component Mesh should become stale without losing its persistent Bake reference when upstream inputs change.")
+	var stale_overview: Dictionary = application._geometry_asset_mesh_overview("asset_1")
+	_expect(int(stale_overview.get("mesh_component_count", -1)) == 0 and stale_overview.get("vertices", []).is_empty(), "Asset Meshing overview should omit stale or missing Component Meshes without invalidating the remaining Asset view.")
+	component["points"][1]["position"] = component["points"][0]["position"]
+	component["points"][0]["preserve_point"] = true
+	component["points"][1]["preserve_point"] = true
+	application.selected_component_id = "component_1"
+	application._render_inspector()
+	var invalid_inspector_text := _control_text(application.inspector_content)
+	_expect(invalid_inspector_text.contains("Source Validation") and invalid_inspector_text.contains("Consecutive Preserve Points may not occupy the same position."), "Meshing Inspector should expose the concrete source-topology reason for an invalid Component that the global batch skips.")
 	application.free()
 
 
@@ -1493,7 +1557,7 @@ func _test_motion_act_evaluator() -> void:
 	var normalized: Dictionary = application._normalize_motion_act({"id": "act_7", "parameters": {"direction": [0.0, 2.0], "distance": 12.0}}, "fallback")
 	_expect(Vector2(normalized.get("parameters", {}).get("direction", Vector2.ZERO)) == Vector2(0.0, 2.0), "Persisted Slide direction arrays should normalize back to Vector2 values.")
 	var serialized: Dictionary = application._serialize_motion_act(normalized)
-	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 34, "Act persistence should serialize vectors as JSON arrays using schema 34.")
+	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 35, "Act persistence should serialize vectors as JSON arrays using schema 35.")
 	var normalized_jump: Dictionary = application._normalize_motion_act({"id": "act_8", "primitive": "jump", "parameters": {"direction": [1.0, 0.0], "distance": 7.0, "height": 2.5, "arc": "snappy"}}, "fallback")
 	var serialized_jump: Dictionary = application._serialize_motion_act(normalized_jump)
 	_expect(str(serialized_jump.get("primitive", "")) == MotionActEvaluator.JUMP and is_equal_approx(float(serialized_jump.get("parameters", {}).get("height", 0.0)), 2.5) and str(serialized_jump.get("parameters", {}).get("arc", "")) == MotionActEvaluator.JUMP_ARC_SNAPPY, "Jump-specific parameters should survive normalization and serialization.")

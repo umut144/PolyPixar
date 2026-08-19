@@ -38,12 +38,12 @@ func _ready() -> void:
 
 
 func set_context(sampling_data: Dictionary, seeding_data: Dictionary, mesh_data: Dictionary, status_value: String) -> void:
-	var boundary_changed := sampling_bake != sampling_data
+	var geometry_changed := sampling_bake != sampling_data or mesh_result != mesh_data
 	sampling_bake = sampling_data.duplicate(true)
 	seeding_bake = seeding_data.duplicate(true)
 	mesh_result = mesh_data.duplicate(true)
 	status = status_value
-	if boundary_changed:
+	if geometry_changed:
 		fitted = false
 	queue_redraw()
 

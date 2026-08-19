@@ -1,0 +1,608 @@
+{
+	"asset_id": "asset_1",
+	"component_id": "component_9",
+	"component_mesh": {
+		"bake_id": "meshing_bake_6297554276889312499",
+		"build_provenance": {
+			"attempts": 1,
+			"exact_input_hash": "4aa070af8c59453ea120641e3e3bb359a5d4fa912bf989d37302ce2248e7b633",
+			"schema_version": 1,
+			"source_signature": {
+				"geometry_tolerance": 0.00055,
+				"meshing_algorithm": 4,
+				"recipe_hash": "d6dd2a50e13d8d1de67bfb819014fcf4b7811f37072298b4aa69a4d00cca4c02",
+				"recipe_version": 1,
+				"sampling_algorithm": 2,
+				"scalars": [
+					10.0,
+					1.0,
+					1.0
+				],
+				"seeding_algorithm": 2,
+				"topology_hash": "e63a37651362745fdcef1796ba815f89f189f219898ed3ff0577a740b0fe4696",
+				"vectors": [
+					[
+						-1.25,
+						4.34999990463257
+					],
+					[
+						-0.0833333358168602,
+						-0.149999931454659
+					],
+					[
+						0.0,
+						0.0
+					],
+					[
+						-1.5,
+						3.90000009536743
+					],
+					[
+						-0.0675239041447639,
+						-0.160369247198105
+					],
+					[
+						0.0665881708264351,
+						0.158146888017654
+					],
+					[
+						-1.64999997615814,
+						3.40000009536743
+					],
+					[
+						-0.0384575091302395,
+						-0.230745002627373
+					],
+					[
+						0.0286062695086002,
+						0.17163759469986
+					],
+					[
+						-1.70000004768372,
+						2.70000004768372
+					],
+					[
+						-0.0348358415067196,
+						-0.252559810876846
+					],
+					[
+						0.0319632962346077,
+						0.231733843684196
+					],
+					[
+						-1.85000002384186,
+						1.95000004768372
+					],
+					[
+						-0.051337469369173,
+						-0.195868462324142
+					],
+					[
+						0.0553187131881714,
+						0.211058139801025
+					],
+					[
+						-2.04999995231628,
+						1.37999999523163
+					],
+					[
+						-0.0778914913535118,
+						-0.176224634051323
+					],
+					[
+						0.0778383016586304,
+						0.176104307174683
+					],
+					[
+						-2.34999990463257,
+						0.879999995231628
+					],
+					[
+						-0.108766384422779,
+						-0.154200166463852
+					],
+					[
+						0.12052321434021,
+						0.170868039131165
+					],
+					[
+						1.0,
+						0.0
+					],
+					[
+						0.0,
+						1.0
+					],
+					[
+						0.0,
+						0.0
+					]
+				],
+				"version": 1
+			}
+		},
+		"last_error": "",
+		"last_failure_signature": {},
+		"mesh_fingerprint": "b0f685a6aa8da72a75e80d02ae57d553fbddbe743eb909be2d81b75d8bf07356",
+		"method": "ribbon_strip"
+	},
+	"meshing": {
+		"bakes": {
+			"ribbon_strip": {
+				"algorithm_version": 0,
+				"bake_id": "meshing_bake_6297554276889312499",
+				"boundary_constraints": [],
+				"errors": [],
+				"mean_quality": 0.0,
+				"method": "ribbon_strip",
+				"minimum_angle": 0.0,
+				"optimization": {
+					"baseline_triangles": [],
+					"movements": []
+				},
+				"parameters": {
+					"cap": "flat",
+					"join": "bevel",
+					"width_cm": 0.78125,
+					"width_px": 10.0
+				},
+				"source_fingerprint": "ece7054b7319f28dbe988a717936327835018c3d9cc23eeee298cb147d2d9da6",
+				"triangle_count": 22,
+				"triangles": [
+					{
+						"vertex_ids": [
+							"vertex:ribbon:sample:edge_2866698869981252977:point_8914413935351456588:left",
+							"vertex:ribbon:sample:edge_2866698869981252977:point_8914413935351456588:right",
+							"vertex:ribbon:sample:edge_2866698869981252977:0.500000000:left"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:ribbon:sample:edge_2866698869981252977:point_8914413935351456588:right",
+							"vertex:ribbon:sample:edge_2866698869981252977:0.500000000:right",
+							"vertex:ribbon:sample:edge_2866698869981252977:0.500000000:left"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:ribbon:sample:edge_2866698869981252977:0.500000000:left",
+							"vertex:ribbon:sample:edge_2866698869981252977:0.500000000:right",
+							"vertex:ribbon:sample:edge_2866698869981252977:point_177561313565669657:left"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:ribbon:sample:edge_2866698869981252977:0.500000000:right",
+							"vertex:ribbon:sample:edge_2866698869981252977:point_177561313565669657:right",
+							"vertex:ribbon:sample:edge_2866698869981252977:point_177561313565669657:left"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:ribbon:sample:edge_2866698869981252977:point_177561313565669657:left",
+							"vertex:ribbon:sample:edge_2866698869981252977:point_177561313565669657:right",
+							"vertex:ribbon:sample:edge_7644913508814218965:0.500000000:left"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:ribbon:sample:edge_2866698869981252977:point_177561313565669657:right",
+							"vertex:ribbon:sample:edge_7644913508814218965:0.500000000:right",
+							"vertex:ribbon:sample:edge_7644913508814218965:0.500000000:left"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:ribbon:sample:edge_7644913508814218965:0.500000000:left",
+							"vertex:ribbon:sample:edge_7644913508814218965:0.500000000:right",
+							"vertex:ribbon:sample:edge_7644913508814218965:point_6152523104464576149:left"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:ribbon:sample:edge_7644913508814218965:0.500000000:right",
+							"vertex:ribbon:sample:edge_7644913508814218965:point_6152523104464576149:right",
+							"vertex:ribbon:sample:edge_7644913508814218965:point_6152523104464576149:left"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:ribbon:sample:edge_7644913508814218965:point_6152523104464576149:left",
+							"vertex:ribbon:sample:edge_7644913508814218965:point_6152523104464576149:right",
+							"vertex:ribbon:sample:edge_8426776026384790134:point_6047059166541793598:left"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:ribbon:sample:edge_7644913508814218965:point_6152523104464576149:right",
+							"vertex:ribbon:sample:edge_8426776026384790134:point_6047059166541793598:right",
+							"vertex:ribbon:sample:edge_8426776026384790134:point_6047059166541793598:left"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:ribbon:sample:edge_8426776026384790134:point_6047059166541793598:left",
+							"vertex:ribbon:sample:edge_8426776026384790134:point_6047059166541793598:right",
+							"vertex:ribbon:sample:edge_3350010594639193684:0.500000000:left"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:ribbon:sample:edge_8426776026384790134:point_6047059166541793598:right",
+							"vertex:ribbon:sample:edge_3350010594639193684:0.500000000:right",
+							"vertex:ribbon:sample:edge_3350010594639193684:0.500000000:left"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:ribbon:sample:edge_3350010594639193684:0.500000000:left",
+							"vertex:ribbon:sample:edge_3350010594639193684:0.500000000:right",
+							"vertex:ribbon:sample:edge_3350010594639193684:point_6806131744902765576:left"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:ribbon:sample:edge_3350010594639193684:0.500000000:right",
+							"vertex:ribbon:sample:edge_3350010594639193684:point_6806131744902765576:right",
+							"vertex:ribbon:sample:edge_3350010594639193684:point_6806131744902765576:left"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:ribbon:sample:edge_3350010594639193684:point_6806131744902765576:left",
+							"vertex:ribbon:sample:edge_3350010594639193684:point_6806131744902765576:right",
+							"vertex:ribbon:sample:edge_4905662449486481279:0.500000000:left"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:ribbon:sample:edge_3350010594639193684:point_6806131744902765576:right",
+							"vertex:ribbon:sample:edge_4905662449486481279:0.500000000:right",
+							"vertex:ribbon:sample:edge_4905662449486481279:0.500000000:left"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:ribbon:sample:edge_4905662449486481279:0.500000000:left",
+							"vertex:ribbon:sample:edge_4905662449486481279:0.500000000:right",
+							"vertex:ribbon:sample:edge_4905662449486481279:point_6321395448616486472:left"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:ribbon:sample:edge_4905662449486481279:0.500000000:right",
+							"vertex:ribbon:sample:edge_4905662449486481279:point_6321395448616486472:right",
+							"vertex:ribbon:sample:edge_4905662449486481279:point_6321395448616486472:left"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:ribbon:sample:edge_4905662449486481279:point_6321395448616486472:left",
+							"vertex:ribbon:sample:edge_4905662449486481279:point_6321395448616486472:right",
+							"vertex:ribbon:sample:edge_6624821550033142108:0.500000000:left"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:ribbon:sample:edge_4905662449486481279:point_6321395448616486472:right",
+							"vertex:ribbon:sample:edge_6624821550033142108:0.500000000:right",
+							"vertex:ribbon:sample:edge_6624821550033142108:0.500000000:left"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:ribbon:sample:edge_6624821550033142108:0.500000000:left",
+							"vertex:ribbon:sample:edge_6624821550033142108:0.500000000:right",
+							"vertex:ribbon:sample:edge_6624821550033142108:point_569884312625214603:left"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:ribbon:sample:edge_6624821550033142108:0.500000000:right",
+							"vertex:ribbon:sample:edge_6624821550033142108:point_569884312625214603:right",
+							"vertex:ribbon:sample:edge_6624821550033142108:point_569884312625214603:left"
+						]
+					}
+				],
+				"valid": true,
+				"vertex_count": 24,
+				"vertices": [
+					{
+						"id": "vertex:ribbon:sample:edge_2866698869981252977:point_8914413935351456588:left",
+						"origin": "ribbon_left",
+						"position": [
+							-2.67462062835693,
+							1.09727680683136
+						],
+						"preserved": false,
+						"source_id": "sample:edge_2866698869981252977:point_8914413935351456588"
+					},
+					{
+						"id": "vertex:ribbon:sample:edge_2866698869981252977:point_8914413935351456588:right",
+						"origin": "ribbon_right",
+						"position": [
+							-2.0253791809082,
+							0.662723183631897
+						],
+						"preserved": false,
+						"source_id": "sample:edge_2866698869981252977:point_8914413935351456588"
+					},
+					{
+						"id": "vertex:ribbon:sample:edge_2866698869981252977:0.500000000:left",
+						"origin": "ribbon_left",
+						"position": [
+							-2.51897120475769,
+							1.32896614074707
+						],
+						"preserved": false,
+						"source_id": "sample:edge_2866698869981252977:0.500000000"
+					},
+					{
+						"id": "vertex:ribbon:sample:edge_2866698869981252977:0.500000000:right",
+						"origin": "ribbon_right",
+						"position": [
+							-1.8490549325943,
+							0.92701643705368
+						],
+						"preserved": false,
+						"source_id": "sample:edge_2866698869981252977:0.500000000"
+					},
+					{
+						"id": "vertex:ribbon:sample:edge_2866698869981252977:point_177561313565669657:left",
+						"origin": "ribbon_left",
+						"position": [
+							-2.40479350090027,
+							1.54343032836914
+						],
+						"preserved": false,
+						"source_id": "sample:edge_2866698869981252977:point_177561313565669657"
+					},
+					{
+						"id": "vertex:ribbon:sample:edge_2866698869981252977:point_177561313565669657:right",
+						"origin": "ribbon_right",
+						"position": [
+							-1.6952064037323,
+							1.21656966209412
+						],
+						"preserved": false,
+						"source_id": "sample:edge_2866698869981252977:point_177561313565669657"
+					},
+					{
+						"id": "vertex:ribbon:sample:edge_7644913508814218965:0.500000000:left",
+						"origin": "ribbon_left",
+						"position": [
+							-2.30865597724915,
+							1.78691959381104
+						],
+						"preserved": false,
+						"source_id": "sample:edge_7644913508814218965:0.500000000"
+					},
+					{
+						"id": "vertex:ribbon:sample:edge_7644913508814218965:0.500000000:right",
+						"origin": "ribbon_right",
+						"position": [
+							-1.57146835327148,
+							1.52825736999512
+						],
+						"preserved": false,
+						"source_id": "sample:edge_7644913508814218965:0.500000000"
+					},
+					{
+						"id": "vertex:ribbon:sample:edge_7644913508814218965:point_6152523104464576149:left",
+						"origin": "ribbon_left",
+						"position": [
+							-2.23066115379333,
+							2.03766441345215
+						],
+						"preserved": false,
+						"source_id": "sample:edge_7644913508814218965:point_6152523104464576149"
+					},
+					{
+						"id": "vertex:ribbon:sample:edge_7644913508814218965:point_6152523104464576149:right",
+						"origin": "ribbon_right",
+						"position": [
+							-1.46933889389038,
+							1.86233568191528
+						],
+						"preserved": false,
+						"source_id": "sample:edge_7644913508814218965:point_6152523104464576149"
+					},
+					{
+						"id": "vertex:ribbon:sample:edge_8426776026384790134:point_6047059166541793598:left",
+						"origin": "ribbon_left",
+						"position": [
+							-2.08590841293335,
+							2.7605197429657
+						],
+						"preserved": false,
+						"source_id": "sample:edge_8426776026384790134:point_6047059166541793598"
+					},
+					{
+						"id": "vertex:ribbon:sample:edge_8426776026384790134:point_6047059166541793598:right",
+						"origin": "ribbon_right",
+						"position": [
+							-1.31409168243408,
+							2.63948035240173
+						],
+						"preserved": false,
+						"source_id": "sample:edge_8426776026384790134:point_6047059166541793598"
+					},
+					{
+						"id": "vertex:ribbon:sample:edge_3350010594639193684:0.500000000:left",
+						"origin": "ribbon_left",
+						"position": [
+							-2.06706762313843,
+							3.07820177078247
+						],
+						"preserved": false,
+						"source_id": "sample:edge_3350010594639193684:0.500000000"
+					},
+					{
+						"id": "vertex:ribbon:sample:edge_3350010594639193684:0.500000000:right",
+						"origin": "ribbon_right",
+						"position": [
+							-1.2878030538559,
+							3.02254009246826
+						],
+						"preserved": false,
+						"source_id": "sample:edge_3350010594639193684:0.500000000"
+					},
+					{
+						"id": "vertex:ribbon:sample:edge_3350010594639193684:point_6806131744902765576:left",
+						"origin": "ribbon_left",
+						"position": [
+							-2.03655648231506,
+							3.45623159408569
+						],
+						"preserved": false,
+						"source_id": "sample:edge_3350010594639193684:point_6806131744902765576"
+					},
+					{
+						"id": "vertex:ribbon:sample:edge_3350010594639193684:point_6806131744902765576:right",
+						"origin": "ribbon_right",
+						"position": [
+							-1.26344347000122,
+							3.34376859664917
+						],
+						"preserved": false,
+						"source_id": "sample:edge_3350010594639193684:point_6806131744902765576"
+					},
+					{
+						"id": "vertex:ribbon:sample:edge_4905662449486481279:0.500000000:left",
+						"origin": "ribbon_left",
+						"position": [
+							-1.96374499797821,
+							3.76647114753723
+						],
+						"preserved": false,
+						"source_id": "sample:edge_4905662449486481279:0.500000000"
+					},
+					{
+						"id": "vertex:ribbon:sample:edge_4905662449486481279:0.500000000:right",
+						"origin": "ribbon_right",
+						"position": [
+							-1.21544325351715,
+							3.54198050498962
+						],
+						"preserved": false,
+						"source_id": "sample:edge_4905662449486481279:0.500000000"
+					},
+					{
+						"id": "vertex:ribbon:sample:edge_4905662449486481279:point_6321395448616486472:left",
+						"origin": "ribbon_left",
+						"position": [
+							-1.85759222507477,
+							4.05721235275269
+						],
+						"preserved": false,
+						"source_id": "sample:edge_4905662449486481279:point_6321395448616486472"
+					},
+					{
+						"id": "vertex:ribbon:sample:edge_4905662449486481279:point_6321395448616486472:right",
+						"origin": "ribbon_right",
+						"position": [
+							-1.14240777492523,
+							3.74278783798218
+						],
+						"preserved": false,
+						"source_id": "sample:edge_4905662449486481279:point_6321395448616486472"
+					},
+					{
+						"id": "vertex:ribbon:sample:edge_6624821550033142108:0.500000000:left",
+						"origin": "ribbon_left",
+						"position": [
+							-1.72274708747864,
+							4.31775903701782
+						],
+						"preserved": false,
+						"source_id": "sample:edge_6624821550033142108:0.500000000"
+					},
+					{
+						"id": "vertex:ribbon:sample:edge_6624821550033142108:0.500000000:right",
+						"origin": "ribbon_right",
+						"position": [
+							-1.03981184959412,
+							3.93835020065308
+						],
+						"preserved": false,
+						"source_id": "sample:edge_6624821550033142108:0.500000000"
+					},
+					{
+						"id": "vertex:ribbon:sample:edge_6624821550033142108:point_569884312625214603:left",
+						"origin": "ribbon_left",
+						"position": [
+							-1.58621311187744,
+							4.54886817932129
+						],
+						"preserved": false,
+						"source_id": "sample:edge_6624821550033142108:point_569884312625214603"
+					},
+					{
+						"id": "vertex:ribbon:sample:edge_6624821550033142108:point_569884312625214603:right",
+						"origin": "ribbon_right",
+						"position": [
+							-0.913786888122559,
+							4.15113162994385
+						],
+						"preserved": false,
+						"source_id": "sample:edge_6624821550033142108:point_569884312625214603"
+					}
+				],
+				"worst_aspect_ratio": 0.0
+			}
+		},
+		"recipe": {
+			"method": "constrained_mesh",
+			"parameters": {
+				"mesh_character": 0.64,
+				"optimize_mesh": true,
+				"passes": 3,
+				"passes_override": false,
+				"relaxation": 0.402,
+				"relaxation_override": false,
+				"seeding_method": "poisson_fill"
+			}
+		}
+	},
+	"sampling": {
+		"bakes": {},
+		"recipe": {
+			"method": "adaptive",
+			"parameters": {
+				"boundary_refinements": {},
+				"feature_detail": 0.5,
+				"spacing": 1.0
+			}
+		}
+	},
+	"schema_version": 35,
+	"seeding": {
+		"bakes": {},
+		"recipe": {
+			"method": "poisson_fill",
+			"parameters": {
+				"constraint_clearance_factor": 0.5,
+				"seed": 1,
+				"spacing": 2.0
+			}
+		}
+	},
+	"uv_mapping": {
+		"bakes": {},
+		"recipe": {
+			"method": "bounds_planar",
+			"parameters": {
+				"mesh_method": "constrained_mesh",
+				"offset_u": 0.0,
+				"offset_v": 0.0,
+				"preserve_aspect": true,
+				"rotation": 0.0,
+				"scale": 1.0
+			}
+		}
+	},
+	"weighting": {
+		"next_style_index": 1,
+		"styles": []
+	}
+}
