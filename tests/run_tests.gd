@@ -316,14 +316,14 @@ func _test_geometry_sampling_service() -> void:
 	_expect(not bool(GeometrySamplingService.generate(open_component).get("valid", true)), "An open contour should fail visibly at the mesh-pipeline Sampling boundary.")
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
-	_expect(application._has_supported_schema({"schema_version": 29}) and not application._has_supported_schema({"schema_version": 31}), "Schema 30 should keep older Workspace documents readable and reject unknown future schemas.")
+	_expect(application._has_supported_schema({"schema_version": 31}) and application._has_supported_schema({"schema_version": 30}) and not application._has_supported_schema({"schema_version": 32}), "Schema 31 should keep current and older Workspace documents readable and reject unknown future schemas.")
 	var geometry_document: Dictionary = application._default_geometry_document("asset_1", "component_1")
 	geometry_document["sampling"]["recipe"] = {"method": GeometrySamplingService.EVEN_SPACING, "parameters": {"spacing": 2.5, "feature_detail": GeometrySamplingService.DEFAULT_FEATURE_DETAIL}}
 	var baked_result := adaptive.duplicate(true)
 	baked_result["bake_id"] = "bake_test"
 	geometry_document["sampling"]["bakes"][GeometrySamplingService.ADAPTIVE] = baked_result
 	var serialized_geometry: Dictionary = application._serialize_geometry_document(geometry_document)
-	_expect(int(serialized_geometry.get("schema_version", 0)) == 30 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-30 JSON arrays.")
+	_expect(int(serialized_geometry.get("schema_version", 0)) == 31 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-31 JSON arrays.")
 	var normalized_geometry: Dictionary = application._normalize_geometry_document(serialized_geometry, "asset_1", "component_1")
 	_expect(normalized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Vector2, "Sampling bake loading should restore local sample positions as Vector2 values.")
 	_expect(normalized_geometry["sampling"]["bakes"].size() == 1, "Sampling should retain one Adaptive Bake.")
@@ -647,10 +647,10 @@ func _test_geometry_meshing_service_and_ui() -> void:
 	sampling["bake_id"] = "sampling_mesh_test"
 	var seeding := GeometrySeedingService.generate(sampling, {"method": GeometrySeedingService.POISSON_FILL, "parameters": {"spacing": 2.5, "seed": 9}})
 	seeding["bake_id"] = "seeding_mesh_test"
-	var cdt_recipe := {"method": GeometryMeshingService.CONSTRAINED_DELAUNAY, "parameters": {"seeding_method": GeometrySeedingService.POISSON_FILL}}
+	var cdt_recipe := {"method": GeometryMeshingService.CONSTRAINED_MESH, "parameters": {"seeding_method": GeometrySeedingService.POISSON_FILL, "mesh_character": 0.0}}
 	var cdt := GeometryMeshingService.generate(sampling, seeding, cdt_recipe)
 	var repeated := GeometryMeshingService.generate(sampling, seeding, cdt_recipe)
-	_expect(bool(cdt.get("valid", false)) and int(cdt.get("vertex_count", 0)) > int(seeding.get("seed_count", 0)) and int(cdt.get("triangle_count", 0)) > 0, "Constrained Delaunay should generate a derived Mesh from sampled boundaries and Seeds.")
+	_expect(bool(cdt.get("valid", false)) and int(cdt.get("vertex_count", 0)) > int(seeding.get("seed_count", 0)) and int(cdt.get("triangle_count", 0)) > 0, "Structured Constrained Mesh should generate a derived Mesh from sampled boundaries and Seeds.")
 	_expect(cdt == repeated, "Meshing must be deterministic for identical Sampling, Seeding, and recipe inputs.")
 	_expect(str(cdt.get("sampling_bake_id", "")) == "sampling_mesh_test" and str(cdt.get("seeding_bake_id", "")) == "seeding_mesh_test", "A Mesh result must retain both exact upstream Bake dependencies.")
 	var holed_component := _component()
@@ -678,12 +678,21 @@ func _test_geometry_meshing_service_and_ui() -> void:
 	for vertex in cdt.get("vertices", []):
 		if str(vertex.get("origin", "")) == "boundary":
 			boundary_positions[str(vertex.get("id", ""))] = Vector2(vertex.get("position", Vector2.ZERO))
-	var organic_recipe := {"method": GeometryMeshingService.ORGANIC_RELAXED, "parameters": {"seeding_method": GeometrySeedingService.POISSON_FILL, "relaxation": 0.35, "passes": 2}}
+	var organic_recipe := {"method": GeometryMeshingService.CONSTRAINED_MESH, "parameters": {"seeding_method": GeometrySeedingService.POISSON_FILL, "mesh_character": 0.55}}
 	var organic := GeometryMeshingService.generate(sampling, seeding, organic_recipe)
-	_expect(bool(organic.get("valid", false)) and int(organic.get("triangle_count", 0)) > 0, "Organic Relaxed should produce a valid constrained Mesh.")
+	_expect(bool(organic.get("valid", false)) and int(organic.get("triangle_count", 0)) > 0 and float(organic.get("parameters", {}).get("relaxation", 0.0)) > 0.0, "Organic Mesh Character should produce a valid relaxed constrained Mesh.")
 	for vertex in organic.get("vertices", []):
 		if str(vertex.get("origin", "")) == "boundary":
 			_expect(Vector2(vertex.get("position", Vector2.ZERO)).is_equal_approx(boundary_positions.get(str(vertex.get("id", "")), Vector2.INF)), "Organic relaxation must keep every sampled Boundary Vertex fixed.")
+	var cut := AssetGuide.create("cut_mesh", "Seam", AssetGuide.CUT, "component_1")
+	BezierTopology.add_point(cut, Vector2(5.0, 0.0), "linear")
+	BezierTopology.add_point(cut, Vector2(5.0, 10.0), "linear")
+	var cut_sampling := GeometrySamplingService.generate(component, {"method": GeometrySamplingService.ADAPTIVE, "parameters": {"spacing": 1.0}}, [cut])
+	cut_sampling["bake_id"] = "sampling_cut_mesh_test"
+	var cut_seeding := GeometrySeedingService.generate(cut_sampling, {"method": GeometrySeedingService.POISSON_FILL, "parameters": {"spacing": 1.5, "seed": 31}})
+	cut_seeding["bake_id"] = "seeding_cut_mesh_test"
+	var cut_organic := GeometryMeshingService.generate(cut_sampling, cut_seeding, organic_recipe)
+	_expect(bool(cut_organic.get("valid", false)) and bool(cut_organic.get("constraints_valid", false)) and int(cut_organic.get("cut_seam_vertex_count", 0)) > 0 and int(cut_organic.get("degenerate_triangle_count", -1)) == 0, "Organic Character must relax and retriangulate before duplicating a valid, non-degenerate Cut seam.")
 	_expect(not bool(GeometryMeshingService.generate({}, seeding, cdt_recipe).get("valid", true)), "Meshing should fail visibly without its referenced Sampling Bake.")
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
@@ -694,13 +703,36 @@ func _test_geometry_meshing_service_and_ui() -> void:
 	document["seeding"]["bakes"][GeometrySeedingService.POISSON_FILL] = seeding
 	document["meshing"]["recipe"] = cdt_recipe
 	cdt["bake_id"] = "mesh_cdt_test"
-	organic["bake_id"] = "mesh_organic_test"
-	document["meshing"]["bakes"][GeometryMeshingService.CONSTRAINED_DELAUNAY] = cdt
-	document["meshing"]["bakes"][GeometryMeshingService.ORGANIC_RELAXED] = organic
+	document["meshing"]["bakes"][GeometryMeshingService.CONSTRAINED_MESH] = cdt
 	var serialized: Dictionary = application._serialize_geometry_document(document)
-	_expect(serialized.get("meshing", {}).get("bakes", {}).get(GeometryMeshingService.CONSTRAINED_DELAUNAY, {}).get("vertices", [])[0].get("position", null) is Array, "Mesh Bake positions should serialize as JSON arrays.")
+	_expect(serialized.get("meshing", {}).get("bakes", {}).get(GeometryMeshingService.CONSTRAINED_MESH, {}).get("vertices", [])[0].get("position", null) is Array, "Mesh Bake positions should serialize as JSON arrays.")
 	var normalized: Dictionary = application._normalize_geometry_document(serialized, "asset_1", "component_1")
-	_expect(normalized.get("meshing", {}).get("bakes", {}).get(GeometryMeshingService.CONSTRAINED_DELAUNAY, {}).get("vertices", [])[0].get("position", null) is Vector2, "Mesh Bake loading should restore Component-local Vertex positions.")
+	_expect(normalized.get("meshing", {}).get("bakes", {}).get(GeometryMeshingService.CONSTRAINED_MESH, {}).get("vertices", [])[0].get("position", null) is Vector2, "Mesh Bake loading should restore Component-local Vertex positions.")
+	var legacy_cdt := cdt.duplicate(true)
+	legacy_cdt["method"] = GeometryMeshingService.CONSTRAINED_DELAUNAY
+	legacy_cdt["bake_id"] = "legacy_cdt"
+	legacy_cdt.erase("algorithm_version")
+	var legacy_organic := organic.duplicate(true)
+	legacy_organic["method"] = GeometryMeshingService.ORGANIC_RELAXED
+	legacy_organic["bake_id"] = "legacy_organic"
+	legacy_organic["parameters"].erase("mesh_character")
+	legacy_organic["parameters"].erase("relaxation_override")
+	legacy_organic["parameters"].erase("passes_override")
+	legacy_organic.erase("algorithm_version")
+	var legacy_document := serialized.duplicate(true)
+	legacy_document["schema_version"] = 30
+	legacy_document["meshing"]["recipe"] = {"method": GeometryMeshingService.ORGANIC_RELAXED, "parameters": legacy_organic["parameters"].duplicate(true)}
+	legacy_document["meshing"]["bakes"] = {GeometryMeshingService.CONSTRAINED_DELAUNAY: legacy_cdt, GeometryMeshingService.ORGANIC_RELAXED: legacy_organic}
+	legacy_document["component_mesh"] = {"bake_id": "legacy_organic", "method": GeometryMeshingService.ORGANIC_RELAXED, "mesh_fingerprint": "legacy"}
+	legacy_document["uv_mapping"]["bakes"] = {
+		"legacy_cdt_uv": {"valid": true, "method": GeometryUVMappingService.BOUNDS_PLANAR, "mesh_method": GeometryMeshingService.CONSTRAINED_DELAUNAY, "mesh_bake_id": "legacy_cdt", "uvs": [{"vertex_id": "cdt", "uv": [0.0, 0.0]}]},
+		"legacy_organic_uv": {"valid": true, "method": GeometryUVMappingService.BOUNDS_PLANAR, "mesh_method": GeometryMeshingService.ORGANIC_RELAXED, "mesh_bake_id": "legacy_organic", "uvs": [{"vertex_id": "organic", "uv": [1.0, 1.0]}]}
+	}
+	var migrated_legacy: Dictionary = application._normalize_geometry_document(legacy_document, "asset_1", "component_1")
+	_expect(migrated_legacy["meshing"]["bakes"].size() == 1 and migrated_legacy["meshing"]["bakes"].has(GeometryMeshingService.CONSTRAINED_MESH) and str(migrated_legacy["meshing"]["bakes"][GeometryMeshingService.CONSTRAINED_MESH].get("bake_id", "")) == "legacy_organic", "Schema-30 dual Meshing bakes should deterministically migrate the accepted Component Mesh into one Constrained Mesh bake.")
+	_expect(str(migrated_legacy["component_mesh"].get("method", "")) == GeometryMeshingService.CONSTRAINED_MESH and float(migrated_legacy["meshing"]["recipe"]["parameters"].get("mesh_character", 0.0)) > 0.0, "Legacy Organic Relaxed selection should migrate to Constrained Mesh with an Organic Character and keep its Component Mesh reference.")
+	var migrated_uv: Dictionary = migrated_legacy["uv_mapping"]["bakes"].values()[0]
+	_expect(migrated_legacy["uv_mapping"]["bakes"].size() == 1 and str(migrated_uv.get("mesh_bake_id", "")) == "legacy_organic", "Legacy UV variants should retain the UV Bake belonging to the deterministically accepted Mesh.")
 	var test_assets: Array[Dictionary] = [{"id": "asset_1", "name": "Asset", "visibility": true, "components": [component], "guides": []}]
 	application.assets = test_assets
 	application.geometry_documents["asset_1/component_1"] = normalized
@@ -714,20 +746,22 @@ func _test_geometry_meshing_service_and_ui() -> void:
 	application._render_inspector()
 	application._render_canvas_context()
 	_expect(application.geometry_meshing_workspace.visible and application.inspector_content.get_child_count() >= 10, "Geometry Meshing should expose its dedicated Workspace and compact Inspector.")
-	_expect(application._component_mesh_status("asset_1", "component_1", component) == "Missing", "A Component should not infer its output Mesh from the current Meshing method.")
-	application._use_current_bake_as_component_mesh()
-	_expect(application._component_mesh_status("asset_1", "component_1", component) == "Ready" and str(application._component_mesh_bake("asset_1", "component_1").get("bake_id", "")) == "mesh_cdt_test", "Use as Component Mesh should persist the exact current Mesh Bake as the downstream output.")
+	var meshing_inspector_text := _control_text(application.inspector_content)
+	var meshing_outliner_text := _control_text(application.outliner_list)
+	_expect(meshing_inspector_text.contains("Constrained Mesh · Automatic") and meshing_inspector_text.contains("Mesh Character") and meshing_inspector_text.contains("Advanced Relaxation") and not meshing_inspector_text.contains("Use as Component Mesh"), "Meshing should expose one Artistic Constrained Mesh workflow without a separate Component Mesh action.")
+	_expect(meshing_outliner_text.contains("Sampling · Adaptive") and meshing_outliner_text.contains("Seeding · Poisson Fill") and meshing_outliner_text.contains("Constraints · Outer Preserved") and meshing_outliner_text.contains("Mesh · Constrained Mesh"), "Meshing Outliner should expose its complete nested pipeline dependencies.")
+	normalized["meshing"]["bakes"].clear()
+	application.geometry_meshing_preview = cdt.duplicate(true)
+	application.geometry_meshing_preview["accepted_preview_marker"] = true
+	application.geometry_meshing_preview_key = "asset_1/component_1"
+	application.geometry_meshing_preview_state = "ready"
+	application._bake_geometry_meshing_preview()
+	var accepted_mesh: Dictionary = application._geometry_meshing_bake("asset_1", "component_1")
+	_expect(bool(accepted_mesh.get("accepted_preview_marker", false)) and application._component_mesh_status("asset_1", "component_1", component) == "Ready" and str(application._component_mesh_bake("asset_1", "component_1").get("bake_id", "")) == str(accepted_mesh.get("bake_id", "")), "Bake Preview should copy the exact Preview and automatically make it the Component Mesh.")
 	var component_mesh_round_trip: Dictionary = application._normalize_geometry_document(application._serialize_geometry_document(normalized), "asset_1", "component_1")
-	_expect(str(component_mesh_round_trip.get("component_mesh", {}).get("bake_id", "")) == "mesh_cdt_test", "Component Mesh selection should survive Geometry document persistence.")
-	application._activate_geometry_meshing_method_choice()
-	var active_style := application.geometry_meshing_method_menu.get_theme_stylebox("normal") as StyleBoxFlat
-	_expect(application.active_context_command == "geometry.meshing.method" and application.geometry_meshing_method_choice_active and active_style != null and active_style.bg_color == Color("#8fd8f5"), "Meshing CMD+1 should use the shared exclusive Method command state and highlight.")
-	application._set_geometry_meshing_method(GeometryMeshingService.ORGANIC_RELAXED)
-	_expect(application.selected_geometry_bake_method == GeometryMeshingService.ORGANIC_RELAXED and application._geometry_meshing_status("asset_1", "component_1", component) == "Baked", "Selecting Organic Relaxed should select its matching persistent Bake.")
-	application._set_geometry_meshing_method(GeometryMeshingService.CONSTRAINED_DELAUNAY)
-	_expect(application.selected_geometry_bake_method == GeometryMeshingService.CONSTRAINED_DELAUNAY and application._geometry_meshing_bakes("asset_1", "component_1").size() == 2, "Meshing methods should retain and select two independent Bakes without replacement.")
+	_expect(str(component_mesh_round_trip.get("component_mesh", {}).get("bake_id", "")) == str(accepted_mesh.get("bake_id", "")), "Automatic Component Mesh selection should survive Geometry document persistence.")
 	normalized["seeding"]["bakes"][GeometrySeedingService.POISSON_FILL]["seeds"][0]["position"] += Vector2(0.1, 0.0)
-	_expect(application._geometry_meshing_status("asset_1", "component_1", component) == "Ready to Bake", "Editing an upstream Seeding Bake should leave Mesh ready for a direct rebake without reverse synchronization.")
+	_expect(application._geometry_meshing_status("asset_1", "component_1", component) == "Ready to Preview", "Editing an upstream Seeding Bake should request a new Mesh Preview without reverse synchronization.")
 	_expect(application._component_mesh_status("asset_1", "component_1", component) == "Stale", "A selected Component Mesh should become stale without losing its persistent Bake reference when upstream inputs change.")
 	application.free()
 
@@ -742,10 +776,8 @@ func _test_geometry_uv_mapping_service_and_ui() -> void:
 	sampling["bake_id"] = "sampling_uv_test"
 	var seeding := GeometrySeedingService.generate(sampling, {"method": GeometrySeedingService.POISSON_FILL, "parameters": {"spacing": 2.5, "seed": 4}})
 	seeding["bake_id"] = "seeding_uv_test"
-	var mesh := GeometryMeshingService.generate(sampling, seeding, {"method": GeometryMeshingService.CONSTRAINED_DELAUNAY, "parameters": {"seeding_method": GeometrySeedingService.POISSON_FILL}})
+	var mesh := GeometryMeshingService.generate(sampling, seeding, {"method": GeometryMeshingService.CONSTRAINED_MESH, "parameters": {"seeding_method": GeometrySeedingService.POISSON_FILL}})
 	mesh["bake_id"] = "mesh_uv_test"
-	var organic_mesh := GeometryMeshingService.generate(sampling, seeding, {"method": GeometryMeshingService.ORGANIC_RELAXED, "parameters": {"seeding_method": GeometrySeedingService.POISSON_FILL, "relaxation": 0.35, "passes": 2}})
-	organic_mesh["bake_id"] = "mesh_uv_organic_test"
 	var recipe := GeometryUVMappingService.default_recipe()
 	var uv_result := GeometryUVMappingService.generate(mesh, recipe)
 	var repeated := GeometryUVMappingService.generate(mesh, recipe)
@@ -754,7 +786,7 @@ func _test_geometry_uv_mapping_service_and_ui() -> void:
 	for entry in uv_result.get("uvs", []):
 		var uv := Vector2(entry.get("uv", Vector2.ZERO))
 		_expect(uv.x >= -0.0001 and uv.x <= 1.0001 and uv.y >= -0.0001 and uv.y <= 1.0001, "Default Bounds / Planar UVs should fit into normalized UV space.")
-	var transformed_recipe := {"method": GeometryUVMappingService.BOUNDS_PLANAR, "parameters": {"mesh_method": GeometryMeshingService.CONSTRAINED_DELAUNAY, "scale": 0.75, "rotation": 15.0, "offset_u": 0.1, "offset_v": -0.05, "preserve_aspect": false}}
+	var transformed_recipe := {"method": GeometryUVMappingService.BOUNDS_PLANAR, "parameters": {"mesh_method": GeometryMeshingService.CONSTRAINED_MESH, "scale": 0.75, "rotation": 15.0, "offset_u": 0.1, "offset_v": -0.05, "preserve_aspect": false}}
 	var transformed := GeometryUVMappingService.generate(mesh, transformed_recipe)
 	_expect(bool(transformed.get("valid", false)) and transformed.get("uvs", []) != uv_result.get("uvs", []), "UV Scale, Rotation, Offset, and Preserve Aspect should affect only the derived UV result.")
 	_expect(not bool(GeometryUVMappingService.generate({}, recipe).get("valid", true)), "UV Mapping should fail visibly without a valid Mesh Bake.")
@@ -765,18 +797,12 @@ func _test_geometry_uv_mapping_service_and_ui() -> void:
 	document["sampling"]["bakes"][GeometrySamplingService.ADAPTIVE] = sampling
 	document["seeding"]["recipe"] = {"method": GeometrySeedingService.POISSON_FILL, "parameters": {"spacing": 2.5, "seed": 4}}
 	document["seeding"]["bakes"][GeometrySeedingService.POISSON_FILL] = seeding
-	document["meshing"]["recipe"] = {"method": GeometryMeshingService.CONSTRAINED_DELAUNAY, "parameters": {"seeding_method": GeometrySeedingService.POISSON_FILL}}
-	document["meshing"]["bakes"][GeometryMeshingService.CONSTRAINED_DELAUNAY] = mesh
-	document["meshing"]["bakes"][GeometryMeshingService.ORGANIC_RELAXED] = organic_mesh
+	document["meshing"]["recipe"] = {"method": GeometryMeshingService.CONSTRAINED_MESH, "parameters": {"seeding_method": GeometrySeedingService.POISSON_FILL}}
+	document["meshing"]["bakes"][GeometryMeshingService.CONSTRAINED_MESH] = mesh
 	uv_result["bake_id"] = "uv_bounds_test"
-	var uv_key := GeometryUVMappingService.bake_key(GeometryMeshingService.CONSTRAINED_DELAUNAY, GeometryUVMappingService.BOUNDS_PLANAR)
-	var organic_uv_recipe := GeometryUVMappingService.normalize_recipe({"method": GeometryUVMappingService.BOUNDS_PLANAR, "parameters": {"mesh_method": GeometryMeshingService.ORGANIC_RELAXED}})
-	var organic_uv := GeometryUVMappingService.generate(organic_mesh, organic_uv_recipe)
-	organic_uv["bake_id"] = "uv_bounds_organic_test"
-	var organic_uv_key := GeometryUVMappingService.bake_key(GeometryMeshingService.ORGANIC_RELAXED, GeometryUVMappingService.BOUNDS_PLANAR)
+	var uv_key := GeometryUVMappingService.bake_key(GeometryMeshingService.CONSTRAINED_MESH, GeometryUVMappingService.BOUNDS_PLANAR)
 	document["uv_mapping"]["recipe"] = recipe
 	document["uv_mapping"]["bakes"][uv_key] = uv_result
-	document["uv_mapping"]["bakes"][organic_uv_key] = organic_uv
 	var serialized: Dictionary = application._serialize_geometry_document(document)
 	_expect(serialized.get("uv_mapping", {}).get("bakes", {}).get(uv_key, {}).get("uvs", [])[0].get("uv", null) is Array, "UV Bake coordinates should serialize as JSON arrays.")
 	var normalized: Dictionary = application._normalize_geometry_document(serialized, "asset_1", "component_1")
@@ -803,16 +829,14 @@ func _test_geometry_uv_mapping_service_and_ui() -> void:
 	_expect(not application.geometry_uv_mapping_checker_overlay and not application.geometry_uv_mapping_workspace.checker_overlay_enabled, "UV Checker Overlay should be a live editor-only preview toggle without changing the UV Bake.")
 	application._on_geometry_uv_mapping_checker_overlay_changed(true)
 	_expect(application.geometry_uv_mapping_checker_overlay and application.geometry_uv_mapping_workspace.checker_overlay_enabled, "UV Checker Overlay should default back to the active mapped-Mesh debug preview.")
-	application._set_geometry_uv_mapping_mesh_source(GeometryMeshingService.ORGANIC_RELAXED)
-	_expect(application.selected_geometry_bake_method == organic_uv_key and application._geometry_uv_mapping_bakes("asset_1", "component_1").size() == 2, "CDT and Organic Relaxed should retain independently selectable Bounds / Planar UV Bakes.")
-	application._set_geometry_uv_mapping_mesh_source(GeometryMeshingService.CONSTRAINED_DELAUNAY)
+	application._set_geometry_uv_mapping_mesh_source(GeometryMeshingService.CONSTRAINED_MESH)
 	var scale_input := SpinBox.new()
 	scale_input.min_value = GeometryUVMappingService.MIN_SCALE
 	scale_input.max_value = 100.0
 	application._commit_geometry_uv_mapping_float_text("1,25", scale_input, "scale")
 	_expect(is_equal_approx(float(application._geometry_uv_mapping_recipe("asset_1", "component_1").get("parameters", {}).get("scale", 0.0)), 1.25), "UV numeric fields should accept comma-decimal direct input and update the Recipe.")
 	normalized["uv_mapping"]["recipe"] = GeometryUVMappingService.normalize_recipe(recipe)
-	normalized["meshing"]["bakes"][GeometryMeshingService.CONSTRAINED_DELAUNAY]["vertices"][0]["position"] += Vector2(0.1, 0.0)
+	normalized["meshing"]["bakes"][GeometryMeshingService.CONSTRAINED_MESH]["vertices"][0]["position"] += Vector2(0.1, 0.0)
 	_expect(application._geometry_uv_mapping_status("asset_1", "component_1", component) == "Stale", "Changing the referenced Mesh Bake should make its UV Bake stale without changing Mesh or Component topology.")
 	scale_input.free()
 	application.free()
@@ -828,7 +852,7 @@ func _test_weighting_service_and_ui() -> void:
 	sampling["bake_id"] = "sampling_weighting"
 	var seeding := GeometrySeedingService.generate(sampling, {"method": GeometrySeedingService.POISSON_FILL, "parameters": {"spacing": 2.5, "seed": 5}})
 	seeding["bake_id"] = "seeding_weighting"
-	var mesh := GeometryMeshingService.generate(sampling, seeding, {"method": GeometryMeshingService.CONSTRAINED_DELAUNAY, "parameters": {"seeding_method": GeometrySeedingService.POISSON_FILL}})
+	var mesh := GeometryMeshingService.generate(sampling, seeding, {"method": GeometryMeshingService.CONSTRAINED_MESH, "parameters": {"seeding_method": GeometrySeedingService.POISSON_FILL}})
 	mesh["bake_id"] = "mesh_weighting"
 	var uniform_style := WeightingService.default_style("weight_uniform", "Uniform", "component_weighting")
 	uniform_style["parameters"]["strength"] = 0.6
@@ -846,9 +870,9 @@ func _test_weighting_service_and_ui() -> void:
 	document["sampling"]["bakes"][GeometrySamplingService.ADAPTIVE] = sampling
 	document["seeding"]["recipe"] = {"method": GeometrySeedingService.POISSON_FILL, "parameters": {"spacing": 2.5, "seed": 5}}
 	document["seeding"]["bakes"][GeometrySeedingService.POISSON_FILL] = seeding
-	document["meshing"]["recipe"] = {"method": GeometryMeshingService.CONSTRAINED_DELAUNAY, "parameters": {"seeding_method": GeometrySeedingService.POISSON_FILL}}
-	document["meshing"]["bakes"][GeometryMeshingService.CONSTRAINED_DELAUNAY] = mesh
-	document["component_mesh"] = {"bake_id": "mesh_weighting", "method": GeometryMeshingService.CONSTRAINED_DELAUNAY, "mesh_fingerprint": GeometryUVMappingService.mesh_fingerprint(mesh)}
+	document["meshing"]["recipe"] = {"method": GeometryMeshingService.CONSTRAINED_MESH, "parameters": {"seeding_method": GeometrySeedingService.POISSON_FILL}}
+	document["meshing"]["bakes"][GeometryMeshingService.CONSTRAINED_MESH] = mesh
+	document["component_mesh"] = {"bake_id": "mesh_weighting", "method": GeometryMeshingService.CONSTRAINED_MESH, "mesh_fingerprint": GeometryUVMappingService.mesh_fingerprint(mesh)}
 	document["weighting"]["styles"].append(gradient_style)
 	var weighting_assets: Array[Dictionary] = [{"id": "asset_weighting", "name": "Asset", "visibility": true, "components": [component], "guides": []}]
 	application.assets = weighting_assets
@@ -1375,7 +1399,7 @@ func _test_motion_act_evaluator() -> void:
 	var normalized: Dictionary = application._normalize_motion_act({"id": "act_7", "parameters": {"direction": [0.0, 2.0], "distance": 12.0}}, "fallback")
 	_expect(Vector2(normalized.get("parameters", {}).get("direction", Vector2.ZERO)) == Vector2(0.0, 2.0), "Persisted Slide direction arrays should normalize back to Vector2 values.")
 	var serialized: Dictionary = application._serialize_motion_act(normalized)
-	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 30, "Act persistence should serialize vectors as JSON arrays using schema 30.")
+	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 31, "Act persistence should serialize vectors as JSON arrays using schema 31.")
 	var normalized_jump: Dictionary = application._normalize_motion_act({"id": "act_8", "primitive": "jump", "parameters": {"direction": [1.0, 0.0], "distance": 7.0, "height": 2.5, "arc": "snappy"}}, "fallback")
 	var serialized_jump: Dictionary = application._serialize_motion_act(normalized_jump)
 	_expect(str(serialized_jump.get("primitive", "")) == MotionActEvaluator.JUMP and is_equal_approx(float(serialized_jump.get("parameters", {}).get("height", 0.0)), 2.5) and str(serialized_jump.get("parameters", {}).get("arc", "")) == MotionActEvaluator.JUMP_ARC_SNAPPY, "Jump-specific parameters should survive normalization and serialization.")

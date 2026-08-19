@@ -9,8 +9,13 @@
 	"meshing": {
 		"bakes": {},
 		"recipe": {
-			"method": "constrained_delaunay",
+			"method": "constrained_mesh",
 			"parameters": {
+				"mesh_character": 0.07,
+				"passes": 1,
+				"passes_override": false,
+				"relaxation": 0.0885,
+				"relaxation_override": false,
 				"seeding_method": "poisson_fill"
 			}
 		}
@@ -1336,7 +1341,7 @@
 								"edge_id": "primitive:circle",
 								"id": "sample:circle:component_58:24",
 								"position": [
-									-0.000000000000000179999993770806,
+									-0.000000000000000170000002204861,
 									4.55000019073486
 								],
 								"preserved": false,
@@ -1868,7 +1873,7 @@
 			}
 		}
 	},
-	"schema_version": 30,
+	"schema_version": 31,
 	"seeding": {
 		"bakes": {
 			"poisson_fill": {
@@ -3078,31 +3083,1583 @@
 					}
 				],
 				"valid": true
+			},
+			"spine_flow": {
+				"algorithm_version": 2,
+				"bake_id": "seeding_bake_8899598128859316792",
+				"edited": false,
+				"errors": [],
+				"flow_seed_count": 69,
+				"gap_seed_count": 21,
+				"guide_fingerprint": "",
+				"guide_id": "",
+				"guide_ids": [
+					"guide_2",
+					"guide_3"
+				],
+				"guide_stats": [
+					{
+						"guide_id": "guide_2",
+						"seed_count": 36
+					},
+					{
+						"guide_id": "guide_3",
+						"seed_count": 33
+					}
+				],
+				"guides_fingerprint": "4ea7dd0c9ae7ed61dc89431fdf262b90885e4e5a8f55b709af48fe9f85bfed65",
+				"method": "spine_flow",
+				"parameters": {
+					"across_spacing": 0.6,
+					"along_spacing": 0.6,
+					"boundary_clearance": 0.26,
+					"boundary_clearance_override": true,
+					"fill_gaps": true,
+					"flow_stretch": 1.0,
+					"seed": 1,
+					"spacing": 0.6,
+					"spine_inputs": [
+						{
+							"enabled": true,
+							"guide_id": "guide_2"
+						},
+						{
+							"enabled": true,
+							"guide_id": "guide_3"
+						}
+					],
+					"stagger": 0.5,
+					"stagger_override": true
+				},
+				"sampling_bake_id": "bake_2322324291614209131",
+				"sampling_fingerprint": "aa865cada476bb0f0bd1ccdda71cb92374fb610be99969953695980b10350775",
+				"seed_count": 90,
+				"seeds": [
+					{
+						"id": "seed:auto:000001",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							-0.751160323619843,
+							2.88411498069763
+						],
+						"provenance": {
+							"generation_index": 0,
+							"guide_id": "guide_2",
+							"guide_order": 0,
+							"offset": 0.0,
+							"placement": "flow",
+							"side": 0,
+							"station_index": 2
+						}
+					},
+					{
+						"id": "seed:auto:000002",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							-1.55406141281128,
+							3.77576923370361
+						],
+						"provenance": {
+							"generation_index": 1,
+							"guide_id": "guide_2",
+							"guide_order": 0,
+							"offset": 0.0,
+							"placement": "flow",
+							"side": 0,
+							"station_index": 4
+						}
+					},
+					{
+						"id": "seed:auto:000003",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							-2.2084538936615,
+							4.77669763565063
+						],
+						"provenance": {
+							"generation_index": 2,
+							"guide_id": "guide_2",
+							"guide_order": 0,
+							"offset": 0.0,
+							"placement": "flow",
+							"side": 0,
+							"station_index": 6
+						}
+					},
+					{
+						"id": "seed:auto:000004",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							-2.36198711395264,
+							5.94626140594482
+						],
+						"provenance": {
+							"generation_index": 3,
+							"guide_id": "guide_2",
+							"guide_order": 0,
+							"offset": 0.0,
+							"placement": "flow",
+							"side": 0,
+							"station_index": 8
+						}
+					},
+					{
+						"id": "seed:auto:000005",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							-1.66634964942932,
+							6.89990997314453
+						],
+						"provenance": {
+							"generation_index": 4,
+							"guide_id": "guide_2",
+							"guide_order": 0,
+							"offset": 0.0,
+							"placement": "flow",
+							"side": 0,
+							"station_index": 10
+						}
+					},
+					{
+						"id": "seed:auto:000006",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							-0.717276334762573,
+							7.63398790359497
+						],
+						"provenance": {
+							"generation_index": 5,
+							"guide_id": "guide_2",
+							"guide_order": 0,
+							"offset": 0.0,
+							"placement": "flow",
+							"side": 0,
+							"station_index": 12
+						}
+					},
+					{
+						"id": "seed:auto:000007",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							1.05159091949463,
+							2.52709603309631
+						],
+						"provenance": {
+							"generation_index": 6,
+							"guide_id": "guide_3",
+							"guide_order": 1,
+							"offset": 0.0,
+							"placement": "flow",
+							"side": 0,
+							"station_index": 2
+						}
+					},
+					{
+						"id": "seed:auto:000008",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							1.88959741592407,
+							3.37592458724976
+						],
+						"provenance": {
+							"generation_index": 7,
+							"guide_id": "guide_3",
+							"guide_order": 1,
+							"offset": 0.0,
+							"placement": "flow",
+							"side": 0,
+							"station_index": 4
+						}
+					},
+					{
+						"id": "seed:auto:000009",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							2.44970965385437,
+							4.4316520690918
+						],
+						"provenance": {
+							"generation_index": 8,
+							"guide_id": "guide_3",
+							"guide_order": 1,
+							"offset": 0.0,
+							"placement": "flow",
+							"side": 0,
+							"station_index": 6
+						}
+					},
+					{
+						"id": "seed:auto:000010",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							2.44624090194702,
+							5.61077070236206
+						],
+						"provenance": {
+							"generation_index": 9,
+							"guide_id": "guide_3",
+							"guide_order": 1,
+							"offset": 0.0,
+							"placement": "flow",
+							"side": 0,
+							"station_index": 8
+						}
+					},
+					{
+						"id": "seed:auto:000011",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							1.96080219745636,
+							6.70256614685059
+						],
+						"provenance": {
+							"generation_index": 10,
+							"guide_id": "guide_3",
+							"guide_order": 1,
+							"offset": 0.0,
+							"placement": "flow",
+							"side": 0,
+							"station_index": 10
+						}
+					},
+					{
+						"id": "seed:auto:000012",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							1.23093605041504,
+							7.65360498428345
+						],
+						"provenance": {
+							"generation_index": 11,
+							"guide_id": "guide_3",
+							"guide_order": 1,
+							"offset": 0.0,
+							"placement": "flow",
+							"side": 0,
+							"station_index": 12
+						}
+					},
+					{
+						"id": "seed:auto:000013",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							0.391033887863159,
+							8.50976085662842
+						],
+						"provenance": {
+							"generation_index": 12,
+							"guide_id": "guide_3",
+							"guide_order": 1,
+							"offset": 0.0,
+							"placement": "flow",
+							"side": 0,
+							"station_index": 14
+						}
+					},
+					{
+						"id": "seed:auto:000014",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							-0.588027238845825,
+							2.24063396453857
+						],
+						"provenance": {
+							"generation_index": 13,
+							"guide_id": "guide_2",
+							"guide_order": 0,
+							"offset": 0.3,
+							"placement": "flow",
+							"side": 1,
+							"station_index": 1
+						}
+					},
+					{
+						"id": "seed:auto:000015",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							-0.935988485813141,
+							3.52828001976013
+						],
+						"provenance": {
+							"generation_index": 14,
+							"guide_id": "guide_2",
+							"guide_order": 0,
+							"offset": 0.3,
+							"placement": "flow",
+							"side": -1,
+							"station_index": 3
+						}
+					},
+					{
+						"id": "seed:auto:000016",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							-1.37862658500671,
+							3.1232225894928
+						],
+						"provenance": {
+							"generation_index": 15,
+							"guide_id": "guide_2",
+							"guide_order": 0,
+							"offset": 0.3,
+							"placement": "flow",
+							"side": 1,
+							"station_index": 3
+						}
+					},
+					{
+						"id": "seed:auto:000017",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							-1.66958820819855,
+							4.42331171035767
+						],
+						"provenance": {
+							"generation_index": 16,
+							"guide_id": "guide_2",
+							"guide_order": 0,
+							"offset": 0.3,
+							"placement": "flow",
+							"side": -1,
+							"station_index": 5
+						}
+					},
+					{
+						"id": "seed:auto:000018",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							-2.16400718688965,
+							4.08338499069214
+						],
+						"provenance": {
+							"generation_index": 17,
+							"guide_id": "guide_2",
+							"guide_order": 0,
+							"offset": 0.3,
+							"placement": "flow",
+							"side": 1,
+							"station_index": 5
+						}
+					},
+					{
+						"id": "seed:auto:000019",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							-2.08109378814697,
+							5.40032863616943
+						],
+						"provenance": {
+							"generation_index": 18,
+							"guide_id": "guide_2",
+							"guide_order": 0,
+							"offset": 0.3,
+							"placement": "flow",
+							"side": -1,
+							"station_index": 7
+						}
+					},
+					{
+						"id": "seed:auto:000020",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							-2.67281055450439,
+							5.30097389221191
+						],
+						"provenance": {
+							"generation_index": 19,
+							"guide_id": "guide_2",
+							"guide_order": 0,
+							"offset": 0.3,
+							"placement": "flow",
+							"side": 1,
+							"station_index": 7
+						}
+					},
+					{
+						"id": "seed:auto:000021",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							-1.85461413860321,
+							6.2874813079834
+						],
+						"provenance": {
+							"generation_index": 20,
+							"guide_id": "guide_2",
+							"guide_order": 0,
+							"offset": 0.3,
+							"placement": "flow",
+							"side": -1,
+							"station_index": 9
+						}
+					},
+					{
+						"id": "seed:auto:000022",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							-1.01425492763519,
+							7.02930927276611
+						],
+						"provenance": {
+							"generation_index": 21,
+							"guide_id": "guide_2",
+							"guide_order": 0,
+							"offset": 0.3,
+							"placement": "flow",
+							"side": -1,
+							"station_index": 11
+						}
+					},
+					{
+						"id": "seed:auto:000023",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							-1.37352740764618,
+							7.50985431671143
+						],
+						"provenance": {
+							"generation_index": 22,
+							"guide_id": "guide_2",
+							"guide_order": 0,
+							"offset": 0.3,
+							"placement": "flow",
+							"side": 1,
+							"station_index": 11
+						}
+					},
+					{
+						"id": "seed:auto:000024",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							-0.498631596565247,
+							8.23815250396729
+						],
+						"provenance": {
+							"generation_index": 23,
+							"guide_id": "guide_2",
+							"guide_order": 0,
+							"offset": 0.3,
+							"placement": "flow",
+							"side": 1,
+							"station_index": 13
+						}
+					},
+					{
+						"id": "seed:auto:000025",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							0.390645146369934,
+							2.50366401672363
+						],
+						"provenance": {
+							"generation_index": 24,
+							"guide_id": "guide_3",
+							"guide_order": 1,
+							"offset": 0.3,
+							"placement": "flow",
+							"side": 1,
+							"station_index": 1
+						}
+					},
+					{
+						"id": "seed:auto:000026",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							1.72989332675934,
+							2.71055865287781
+						],
+						"provenance": {
+							"generation_index": 25,
+							"guide_id": "guide_3",
+							"guide_order": 1,
+							"offset": 0.3,
+							"placement": "flow",
+							"side": -1,
+							"station_index": 3
+						}
+					},
+					{
+						"id": "seed:auto:000027",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							1.28699433803558,
+							3.11533093452454
+						],
+						"provenance": {
+							"generation_index": 26,
+							"guide_id": "guide_3",
+							"guide_order": 1,
+							"offset": 0.3,
+							"placement": "flow",
+							"side": 1,
+							"station_index": 3
+						}
+					},
+					{
+						"id": "seed:auto:000028",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							2.47413420677185,
+							3.73805475234985
+						],
+						"provenance": {
+							"generation_index": 27,
+							"guide_id": "guide_3",
+							"guide_order": 1,
+							"offset": 0.3,
+							"placement": "flow",
+							"side": -1,
+							"station_index": 5
+						}
+					},
+					{
+						"id": "seed:auto:000029",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							1.94776463508606,
+							4.02603960037231
+						],
+						"provenance": {
+							"generation_index": 28,
+							"guide_id": "guide_3",
+							"guide_order": 1,
+							"offset": 0.3,
+							"placement": "flow",
+							"side": 1,
+							"station_index": 5
+						}
+					},
+					{
+						"id": "seed:auto:000030",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							2.8445987701416,
+							5.03104066848755
+						],
+						"provenance": {
+							"generation_index": 29,
+							"guide_id": "guide_3",
+							"guide_order": 1,
+							"offset": 0.3,
+							"placement": "flow",
+							"side": -1,
+							"station_index": 7
+						}
+					},
+					{
+						"id": "seed:auto:000031",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							2.52424645423889,
+							6.2951602935791
+						],
+						"provenance": {
+							"generation_index": 30,
+							"guide_id": "guide_3",
+							"guide_order": 1,
+							"offset": 0.3,
+							"placement": "flow",
+							"side": -1,
+							"station_index": 9
+						}
+					},
+					{
+						"id": "seed:auto:000032",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							1.85016393661499,
+							7.37220811843872
+						],
+						"provenance": {
+							"generation_index": 31,
+							"guide_id": "guide_3",
+							"guide_order": 1,
+							"offset": 0.3,
+							"placement": "flow",
+							"side": -1,
+							"station_index": 11
+						}
+					},
+					{
+						"id": "seed:auto:000033",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							1.37304878234863,
+							7.00839281082153
+						],
+						"provenance": {
+							"generation_index": 32,
+							"guide_id": "guide_3",
+							"guide_order": 1,
+							"offset": 0.3,
+							"placement": "flow",
+							"side": 1,
+							"station_index": 11
+						}
+					},
+					{
+						"id": "seed:auto:000034",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							1.01094675064087,
+							8.29020404815674
+						],
+						"provenance": {
+							"generation_index": 33,
+							"guide_id": "guide_3",
+							"guide_order": 1,
+							"offset": 0.3,
+							"placement": "flow",
+							"side": -1,
+							"station_index": 13
+						}
+					},
+					{
+						"id": "seed:auto:000035",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							-1.09408724308014,
+							4.16102743148804
+						],
+						"provenance": {
+							"generation_index": 34,
+							"guide_id": "guide_2",
+							"guide_order": 0,
+							"offset": 0.6,
+							"placement": "flow",
+							"side": -1,
+							"station_index": 4
+						}
+					},
+					{
+						"id": "seed:auto:000036",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							-2.01403546333313,
+							3.39051103591919
+						],
+						"provenance": {
+							"generation_index": 35,
+							"guide_id": "guide_2",
+							"guide_order": 0,
+							"offset": 0.6,
+							"placement": "flow",
+							"side": 1,
+							"station_index": 4
+						}
+					},
+					{
+						"id": "seed:auto:000037",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							-2.94620203971863,
+							6.08298349380493
+						],
+						"provenance": {
+							"generation_index": 36,
+							"guide_id": "guide_2",
+							"guide_order": 0,
+							"offset": 0.6,
+							"placement": "flow",
+							"side": 1,
+							"station_index": 8
+						}
+					},
+					{
+						"id": "seed:auto:000038",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							-0.337687313556671,
+							7.16932439804077
+						],
+						"provenance": {
+							"generation_index": 37,
+							"guide_id": "guide_2",
+							"guide_order": 0,
+							"offset": 0.6,
+							"placement": "flow",
+							"side": -1,
+							"station_index": 12
+						}
+					},
+					{
+						"id": "seed:auto:000039",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							-1.09686541557312,
+							8.09865188598633
+						],
+						"provenance": {
+							"generation_index": 38,
+							"guide_id": "guide_2",
+							"guide_order": 0,
+							"offset": 0.6,
+							"placement": "flow",
+							"side": 1,
+							"station_index": 12
+						}
+					},
+					{
+						"id": "seed:auto:000040",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							2.37316179275513,
+							3.02072668075562
+						],
+						"provenance": {
+							"generation_index": 39,
+							"guide_id": "guide_3",
+							"guide_order": 1,
+							"offset": 0.6,
+							"placement": "flow",
+							"side": -1,
+							"station_index": 4
+						}
+					},
+					{
+						"id": "seed:auto:000041",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							1.40603303909302,
+							3.7311224937439
+						],
+						"provenance": {
+							"generation_index": 40,
+							"guide_id": "guide_3",
+							"guide_order": 1,
+							"offset": 0.6,
+							"placement": "flow",
+							"side": 1,
+							"station_index": 4
+						}
+					},
+					{
+						"id": "seed:auto:000042",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							3.02044868469238,
+							4.24656534194946
+						],
+						"provenance": {
+							"generation_index": 41,
+							"guide_id": "guide_3",
+							"guide_order": 1,
+							"offset": 0.6,
+							"placement": "flow",
+							"side": -1,
+							"station_index": 6
+						}
+					},
+					{
+						"id": "seed:auto:000043",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							3.02337884902954,
+							5.77481937408447
+						],
+						"provenance": {
+							"generation_index": 42,
+							"guide_id": "guide_3",
+							"guide_order": 1,
+							"offset": 0.6,
+							"placement": "flow",
+							"side": -1,
+							"station_index": 8
+						}
+					},
+					{
+						"id": "seed:auto:000044",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							1.8691029548645,
+							5.44672203063965
+						],
+						"provenance": {
+							"generation_index": 43,
+							"guide_id": "guide_3",
+							"guide_order": 1,
+							"offset": 0.6,
+							"placement": "flow",
+							"side": 1,
+							"station_index": 8
+						}
+					},
+					{
+						"id": "seed:auto:000045",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							2.46480178833008,
+							7.02811861038208
+						],
+						"provenance": {
+							"generation_index": 44,
+							"guide_id": "guide_3",
+							"guide_order": 1,
+							"offset": 0.6,
+							"placement": "flow",
+							"side": -1,
+							"station_index": 10
+						}
+					},
+					{
+						"id": "seed:auto:000046",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							1.45680260658264,
+							6.37701368331909
+						],
+						"provenance": {
+							"generation_index": 45,
+							"guide_id": "guide_3",
+							"guide_order": 1,
+							"offset": 0.6,
+							"placement": "flow",
+							"side": 1,
+							"station_index": 10
+						}
+					},
+					{
+						"id": "seed:auto:000047",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							0.797097563743591,
+							7.23913621902466
+						],
+						"provenance": {
+							"generation_index": 46,
+							"guide_id": "guide_3",
+							"guide_order": 1,
+							"offset": 0.6,
+							"placement": "flow",
+							"side": 1,
+							"station_index": 12
+						}
+					},
+					{
+						"id": "seed:auto:000048",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							0.855106890201569,
+							8.89007186889648
+						],
+						"provenance": {
+							"generation_index": 47,
+							"guide_id": "guide_3",
+							"guide_order": 1,
+							"offset": 0.6,
+							"placement": "flow",
+							"side": -1,
+							"station_index": 14
+						}
+					},
+					{
+						"id": "seed:auto:000049",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							-0.493350505828857,
+							3.93333768844604
+						],
+						"provenance": {
+							"generation_index": 48,
+							"guide_id": "guide_2",
+							"guide_order": 0,
+							"offset": 0.9,
+							"placement": "flow",
+							"side": -1,
+							"station_index": 3
+						}
+					},
+					{
+						"id": "seed:auto:000050",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							-1.82126450538635,
+							2.71816492080688
+						],
+						"provenance": {
+							"generation_index": 49,
+							"guide_id": "guide_2",
+							"guide_order": 0,
+							"offset": 0.9,
+							"placement": "flow",
+							"side": 1,
+							"station_index": 3
+						}
+					},
+					{
+						"id": "seed:auto:000051",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							-1.48937702178955,
+							5.49968290328979
+						],
+						"provenance": {
+							"generation_index": 50,
+							"guide_id": "guide_2",
+							"guide_order": 0,
+							"offset": 0.9,
+							"placement": "flow",
+							"side": -1,
+							"station_index": 7
+						}
+					},
+					{
+						"id": "seed:auto:000052",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							-3.26452732086182,
+							5.20161962509155
+						],
+						"provenance": {
+							"generation_index": 51,
+							"guide_id": "guide_2",
+							"guide_order": 0,
+							"offset": 0.9,
+							"placement": "flow",
+							"side": 1,
+							"station_index": 7
+						}
+					},
+					{
+						"id": "seed:auto:000053",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							-2.79071664810181,
+							7.03828859329224
+						],
+						"provenance": {
+							"generation_index": 52,
+							"guide_id": "guide_2",
+							"guide_order": 0,
+							"offset": 0.9,
+							"placement": "flow",
+							"side": 1,
+							"station_index": 9
+						}
+					},
+					{
+						"id": "seed:auto:000054",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							3.44422173500061,
+							5.05230903625488
+						],
+						"provenance": {
+							"generation_index": 53,
+							"guide_id": "guide_3",
+							"guide_order": 1,
+							"offset": 0.9,
+							"placement": "flow",
+							"side": -1,
+							"station_index": 7
+						}
+					},
+					{
+						"id": "seed:auto:000055",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							-2.47400975227356,
+							3.00525283813477
+						],
+						"provenance": {
+							"generation_index": 54,
+							"guide_id": "guide_2",
+							"guide_order": 0,
+							"offset": 1.2,
+							"placement": "flow",
+							"side": 1,
+							"station_index": 4
+						}
+					},
+					{
+						"id": "seed:auto:000056",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							-3.31428670883179,
+							4.3107213973999
+						],
+						"provenance": {
+							"generation_index": 55,
+							"guide_id": "guide_2",
+							"guide_order": 0,
+							"offset": 1.2,
+							"placement": "flow",
+							"side": 1,
+							"station_index": 6
+						}
+					},
+					{
+						"id": "seed:auto:000057",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							-2.44291496276855,
+							7.81475782394409
+						],
+						"provenance": {
+							"generation_index": 56,
+							"guide_id": "guide_2",
+							"guide_order": 0,
+							"offset": 1.2,
+							"placement": "flow",
+							"side": 1,
+							"station_index": 10
+						}
+					},
+					{
+						"id": "seed:auto:000058",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							0.398682951927185,
+							3.53392839431763
+						],
+						"provenance": {
+							"generation_index": 57,
+							"guide_id": "guide_3",
+							"guide_order": 1,
+							"offset": 1.2,
+							"placement": "flow",
+							"side": 1,
+							"station_index": 2
+						}
+					},
+					{
+						"id": "seed:auto:000059",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							2.85672616958618,
+							2.66552877426147
+						],
+						"provenance": {
+							"generation_index": 58,
+							"guide_id": "guide_3",
+							"guide_order": 1,
+							"offset": 1.2,
+							"placement": "flow",
+							"side": -1,
+							"station_index": 4
+						}
+					},
+					{
+						"id": "seed:auto:000060",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							1.30823171138763,
+							4.80182552337646
+						],
+						"provenance": {
+							"generation_index": 59,
+							"guide_id": "guide_3",
+							"guide_order": 1,
+							"offset": 1.2,
+							"placement": "flow",
+							"side": 1,
+							"station_index": 6
+						}
+					},
+					{
+						"id": "seed:auto:000061",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							2.09861302375793,
+							8.48254203796387
+						],
+						"provenance": {
+							"generation_index": 60,
+							"guide_id": "guide_3",
+							"guide_order": 1,
+							"offset": 1.2,
+							"placement": "flow",
+							"side": -1,
+							"station_index": 12
+						}
+					},
+					{
+						"id": "seed:auto:000062",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							1.31917989253998,
+							9.27038288116455
+						],
+						"provenance": {
+							"generation_index": 61,
+							"guide_id": "guide_3",
+							"guide_order": 1,
+							"offset": 1.2,
+							"placement": "flow",
+							"side": -1,
+							"station_index": 14
+						}
+					},
+					{
+						"id": "seed:auto:000063",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							-2.26390266418457,
+							2.31310749053955
+						],
+						"provenance": {
+							"generation_index": 62,
+							"guide_id": "guide_2",
+							"guide_order": 0,
+							"offset": 1.5,
+							"placement": "flow",
+							"side": 1,
+							"station_index": 3
+						}
+					},
+					{
+						"id": "seed:auto:000064",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							-3.15284490585327,
+							3.40353202819824
+						],
+						"provenance": {
+							"generation_index": 63,
+							"guide_id": "guide_2",
+							"guide_order": 0,
+							"offset": 1.5,
+							"placement": "flow",
+							"side": 1,
+							"station_index": 5
+						}
+					},
+					{
+						"id": "seed:auto:000065",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							-2.09207224845886,
+							8.47094345092773
+						],
+						"provenance": {
+							"generation_index": 64,
+							"guide_id": "guide_2",
+							"guide_order": 0,
+							"offset": 1.5,
+							"placement": "flow",
+							"side": 1,
+							"station_index": 11
+						}
+					},
+					{
+						"id": "seed:auto:000066",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							-1.39401161670685,
+							9.03708553314209
+						],
+						"provenance": {
+							"generation_index": 65,
+							"guide_id": "guide_2",
+							"guide_order": 0,
+							"offset": 1.5,
+							"placement": "flow",
+							"side": 1,
+							"station_index": 13
+						}
+					},
+					{
+						"id": "seed:auto:000067",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							3.52687311172485,
+							3.16208553314209
+						],
+						"provenance": {
+							"generation_index": 66,
+							"guide_id": "guide_3",
+							"guide_order": 1,
+							"offset": 1.5,
+							"placement": "flow",
+							"side": -1,
+							"station_index": 5
+						}
+					},
+					{
+						"id": "seed:auto:000068",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							-3.39395809173584,
+							2.2347366809845
+						],
+						"provenance": {
+							"generation_index": 67,
+							"guide_id": "guide_2",
+							"guide_order": 0,
+							"offset": 2.4,
+							"placement": "flow",
+							"side": 1,
+							"station_index": 4
+						}
+					},
+					{
+						"id": "seed:auto:000069",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							2.33613538742065,
+							7.77376699447632
+						],
+						"provenance": {
+							"generation_index": 68,
+							"guide_id": "guide_2",
+							"guide_order": 0,
+							"offset": 2.4,
+							"placement": "flow",
+							"side": -1,
+							"station_index": 14
+						}
+					},
+					{
+						"id": "seed:auto:000070",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							0.266071915626526,
+							7.65800476074219
+						],
+						"provenance": {
+							"generation_index": 69,
+							"placement": "gap_fill"
+						}
+					},
+					{
+						"id": "seed:auto:000071",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							-0.806073606014252,
+							8.75652599334717
+						],
+						"provenance": {
+							"generation_index": 70,
+							"placement": "gap_fill"
+						}
+					},
+					{
+						"id": "seed:auto:000072",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							3.11186623573303,
+							6.77870845794678
+						],
+						"provenance": {
+							"generation_index": 71,
+							"placement": "gap_fill"
+						}
+					},
+					{
+						"id": "seed:auto:000073",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							3.73065638542175,
+							4.06855249404907
+						],
+						"provenance": {
+							"generation_index": 72,
+							"placement": "gap_fill"
+						}
+					},
+					{
+						"id": "seed:auto:000074",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							0.869269013404846,
+							4.32532167434692
+						],
+						"provenance": {
+							"generation_index": 73,
+							"placement": "gap_fill"
+						}
+					},
+					{
+						"id": "seed:auto:000075",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							-0.268889307975769,
+							3.27085375785828
+						],
+						"provenance": {
+							"generation_index": 74,
+							"placement": "gap_fill"
+						}
+					},
+					{
+						"id": "seed:auto:000076",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							-3.67077684402466,
+							2.86726045608521
+						],
+						"provenance": {
+							"generation_index": 75,
+							"placement": "gap_fill"
+						}
+					},
+					{
+						"id": "seed:auto:000077",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							-1.24270534515381,
+							2.41924643516541
+						],
+						"provenance": {
+							"generation_index": 76,
+							"placement": "gap_fill"
+						}
+					},
+					{
+						"id": "seed:auto:000078",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							1.90251219272614,
+							4.71201848983765
+						],
+						"provenance": {
+							"generation_index": 77,
+							"placement": "gap_fill"
+						}
+					},
+					{
+						"id": "seed:auto:000079",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							1.24690580368042,
+							5.80157899856567
+						],
+						"provenance": {
+							"generation_index": 78,
+							"placement": "gap_fill"
+						}
+					},
+					{
+						"id": "seed:auto:000080",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							0.319920837879181,
+							9.17520427703857
+						],
+						"provenance": {
+							"generation_index": 79,
+							"placement": "gap_fill"
+						}
+					},
+					{
+						"id": "seed:auto:000081",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							-0.485012620687485,
+							9.29409599304199
+						],
+						"provenance": {
+							"generation_index": 80,
+							"placement": "gap_fill"
+						}
+					},
+					{
+						"id": "seed:auto:000082",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							-2.68786978721619,
+							4.37739610671997
+						],
+						"provenance": {
+							"generation_index": 81,
+							"placement": "gap_fill"
+						}
+					},
+					{
+						"id": "seed:auto:000083",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							-3.81337356567383,
+							3.47660279273987
+						],
+						"provenance": {
+							"generation_index": 82,
+							"placement": "gap_fill"
+						}
+					},
+					{
+						"id": "seed:auto:000084",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							-1.20896518230438,
+							6.38115262985229
+						],
+						"provenance": {
+							"generation_index": 83,
+							"placement": "gap_fill"
+						}
+					},
+					{
+						"id": "seed:auto:000085",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							0.299199908971786,
+							6.89493656158447
+						],
+						"provenance": {
+							"generation_index": 84,
+							"placement": "gap_fill"
+						}
+					},
+					{
+						"id": "seed:auto:000086",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							-1.12131237983704,
+							4.77454662322998
+						],
+						"provenance": {
+							"generation_index": 85,
+							"placement": "gap_fill"
+						}
+					},
+					{
+						"id": "seed:auto:000087",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							2.08053255081177,
+							2.22357797622681
+						],
+						"provenance": {
+							"generation_index": 86,
+							"placement": "gap_fill"
+						}
+					},
+					{
+						"id": "seed:auto:000088",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							3.68013525009155,
+							2.25676679611206
+						],
+						"provenance": {
+							"generation_index": 87,
+							"placement": "gap_fill"
+						}
+					},
+					{
+						"id": "seed:auto:000089",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							0.851656794548035,
+							6.51881837844849
+						],
+						"provenance": {
+							"generation_index": 88,
+							"placement": "gap_fill"
+						}
+					},
+					{
+						"id": "seed:auto:000090",
+						"method": "spine_flow",
+						"origin": "generated",
+						"position": [
+							-2.27670764923096,
+							6.71628379821777
+						],
+						"provenance": {
+							"generation_index": 89,
+							"placement": "gap_fill"
+						}
+					}
+				],
+				"valid": true
 			}
 		},
 		"recipe": {
-			"method": "spine_flow",
+			"method": "poisson_fill",
 			"parameters": {
-				"across_spacing": 0.5,
-				"along_spacing": 0.2,
-				"boundary_clearance": 0.25,
-				"boundary_clearance_override": true,
-				"fill_gaps": false,
-				"flow_stretch": 0.4,
+				"constraint_clearance_factor": 0.5,
 				"seed": 1,
-				"spacing": 0.5,
-				"spine_inputs": [
-					{
-						"enabled": true,
-						"guide_id": "guide_2"
-					},
-					{
-						"enabled": true,
-						"guide_id": "guide_3"
-					}
-				],
-				"stagger": 0.5,
-				"stagger_override": true
+				"spacing": 0.55
 			}
 		}
 	},
@@ -3111,7 +4668,7 @@
 		"recipe": {
 			"method": "bounds_planar",
 			"parameters": {
-				"mesh_method": "constrained_delaunay",
+				"mesh_method": "constrained_mesh",
 				"offset_u": 0.0,
 				"offset_v": 0.0,
 				"preserve_aspect": true,

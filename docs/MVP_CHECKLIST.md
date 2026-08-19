@@ -57,9 +57,10 @@ before implementing real creation tools.
       Fill, combined multi-Spine Flow, Outer/Hole/Cut clearance, debounced
       Preview, exact Preview Bake, compact Artistic Spine Flow controls,
       editable accepted Seeds, and one persistent Bake per method.
-- [x] Implement Component-local Geometry Meshing with Constrained Delaunay and
-      Organic Relaxed, exact Seeding/Sampling dependencies, stable derived
-      Vertex IDs, immutable preview, and one persistent Bake per method.
+- [x] Implement Component-local Geometry Meshing as one Constrained Mesh with
+      Structured-to-Organic Artistic Character, exact Seeding/Sampling and
+      Outer/Hole/Cut constraints, stable derived Vertex IDs, debounced exact
+      Preview Bake, and automatic Component Mesh acceptance.
 - [x] Implement Component-local UV Mapping with Bounds / Planar, exact Mesh
       dependencies, stable Vertex-ID-to-UV assignments, split preview, and one
       persistent Bake per Mesh-method/UV-method combination.

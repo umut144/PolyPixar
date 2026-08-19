@@ -5,8 +5,11 @@ const BACKGROUND := Color("#1b1e24")
 const GRID_MINOR := Color("#252a33")
 const GRID_MAJOR := Color("#303744")
 const BOUNDARY_COLOR := Color("#7b8492")
+const HOLE_COLOR := Color("#ef6c78")
+const CUT_COLOR := Color("#ff7f8d")
 const MESH_COLOR := Color("#63b3ed")
-const SEED_COLOR := Color("#68d391")
+const FLOW_SEED_COLOR := Color("#f2c94c")
+const GAP_SEED_COLOR := Color("#68d391")
 const FILL_COLOR := Color(0.2, 0.55, 0.75, 0.08)
 
 var sampling_bake: Dictionary = {}
@@ -16,6 +19,10 @@ var status := "Seeding Required"
 var camera_position := Vector2.ZERO
 var camera_zoom := 1.0
 var fitted := false
+var show_mesh_edges := true
+var show_seed_points := false
+var show_triangle_fill := false
+var show_constraints := true
 
 
 func _ready() -> void:
@@ -42,6 +49,15 @@ func clear_context() -> void:
 	mesh_result = {}
 	status = "Seeding Required"
 	fitted = false
+	queue_redraw()
+
+
+func set_view_option(option: String, enabled: bool) -> void:
+	match option:
+		"mesh_edges": show_mesh_edges = enabled
+		"seed_points": show_seed_points = enabled
+		"triangle_fill": show_triangle_fill = enabled
+		"constraints": show_constraints = enabled
 	queue_redraw()
 
 
@@ -84,8 +100,10 @@ func _draw() -> void:
 	if not fitted:
 		_fit_boundary()
 	_draw_mesh()
-	_draw_boundaries()
-	_draw_seeds()
+	if show_constraints:
+		_draw_boundaries()
+	if show_seed_points:
+		_draw_seeds()
 	draw_string(ThemeDB.fallback_font, Vector2(10.0, 20.0), "Mesh → Meshing · %s" % status, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 12, Color("#9aa3b2"))
 
 
@@ -143,25 +161,34 @@ func _draw_mesh() -> void:
 		if ids.size() != 3 or not positions.has(str(ids[0])) or not positions.has(str(ids[1])) or not positions.has(str(ids[2])):
 			continue
 		var polygon := PackedVector2Array([positions[str(ids[0])], positions[str(ids[1])], positions[str(ids[2])]])
-		draw_colored_polygon(polygon, FILL_COLOR)
-		for edge_index in range(3):
-			draw_line(polygon[edge_index], polygon[(edge_index + 1) % 3], MESH_COLOR, 1.0, true)
+		if show_triangle_fill:
+			draw_colored_polygon(polygon, FILL_COLOR)
+		if show_mesh_edges:
+			for edge_index in range(3):
+				draw_line(polygon[edge_index], polygon[(edge_index + 1) % 3], MESH_COLOR, 1.0, true)
 
 
 func _draw_boundaries() -> void:
 	for chain_data in sampling_bake.get("chains", []):
 		var samples: Array = chain_data.get("samples", [])
+		var color := HOLE_COLOR if str(chain_data.get("topology_role", "outer")) == "hole" else BOUNDARY_COLOR
 		for sample_index in range(samples.size()):
 			if sample_index == samples.size() - 1 and not bool(chain_data.get("closed", false)):
 				continue
 			var next_index := (sample_index + 1) % samples.size()
-			draw_line(_to_screen(Vector2(samples[sample_index].get("position", Vector2.ZERO))), _to_screen(Vector2(samples[next_index].get("position", Vector2.ZERO))), BOUNDARY_COLOR, 2.0, true)
+			draw_line(_to_screen(Vector2(samples[sample_index].get("position", Vector2.ZERO))), _to_screen(Vector2(samples[next_index].get("position", Vector2.ZERO))), color, 2.0, true)
+	for cut_data in sampling_bake.get("cuts", []):
+		var samples: Array = cut_data.get("samples", [])
+		for sample_index in range(samples.size() - 1):
+			draw_dashed_line(_to_screen(Vector2(samples[sample_index].get("position", Vector2.ZERO))), _to_screen(Vector2(samples[sample_index + 1].get("position", Vector2.ZERO))), CUT_COLOR, 6.0, 2.0, true)
 
 
 func _draw_seeds() -> void:
 	for seed_data in seeding_bake.get("seeds", []):
 		if seed_data is Dictionary:
-			draw_circle(_to_screen(Vector2(seed_data.get("position", Vector2.ZERO))), 2.4, SEED_COLOR)
+			var placement := str(seed_data.get("provenance", {}).get("placement", ""))
+			var color := FLOW_SEED_COLOR if placement == "flow" else GAP_SEED_COLOR
+			draw_circle(_to_screen(Vector2(seed_data.get("position", Vector2.ZERO))), 2.4, color)
 
 
 func _to_screen(local_position: Vector2) -> Vector2:

@@ -15,7 +15,7 @@ static func default_recipe() -> Dictionary:
 	return {
 		"method": BOUNDS_PLANAR,
 		"parameters": {
-			"mesh_method": GeometryMeshingService.CONSTRAINED_DELAUNAY,
+			"mesh_method": GeometryMeshingService.CONSTRAINED_MESH,
 			"scale": DEFAULT_SCALE,
 			"rotation": DEFAULT_ROTATION,
 			"offset_u": DEFAULT_OFFSET_U,
@@ -34,8 +34,9 @@ static func normalize_recipe(raw_recipe) -> Dictionary:
 	var parameters = raw_recipe.get("parameters", {})
 	if not parameters is Dictionary:
 		return recipe
-	var mesh_method := str(parameters.get("mesh_method", GeometryMeshingService.CONSTRAINED_DELAUNAY))
-	recipe["parameters"]["mesh_method"] = mesh_method if mesh_method in GeometryMeshingService.VALID_METHODS else GeometryMeshingService.CONSTRAINED_DELAUNAY
+	var raw_mesh_method := str(parameters.get("mesh_method", GeometryMeshingService.CONSTRAINED_MESH))
+	var mesh_method := GeometryMeshingService.CONSTRAINED_MESH if raw_mesh_method in [GeometryMeshingService.CONSTRAINED_DELAUNAY, GeometryMeshingService.ORGANIC_RELAXED] else raw_mesh_method
+	recipe["parameters"]["mesh_method"] = mesh_method if mesh_method in GeometryMeshingService.VALID_METHODS else GeometryMeshingService.CONSTRAINED_MESH
 	recipe["parameters"]["scale"] = maxf(float(parameters.get("scale", DEFAULT_SCALE)), MIN_SCALE)
 	recipe["parameters"]["rotation"] = wrapf(float(parameters.get("rotation", DEFAULT_ROTATION)), -180.0, 180.0)
 	recipe["parameters"]["offset_u"] = float(parameters.get("offset_u", DEFAULT_OFFSET_U))

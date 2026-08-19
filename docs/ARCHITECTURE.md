@@ -84,6 +84,17 @@ recipe derives Across from Seed Spacing and Along from Spacing times Flow
 Stretch while retaining explicit technical overrides for compatibility. Manual
 editing is available only on a current accepted Bake.
 
+Meshing exposes one constrained recipe for closed Body Components. `Mesh
+Character` derives the relaxation strength and pass count along a Structured to
+Organic continuum; optional Advanced Relaxation overrides preserve exact legacy
+or technical control. The service triangulates Sampling boundaries plus
+Seeding vertices, recovers Outer/Hole/Cut constraints, performs any requested
+interior relaxation and retriangulation, and only then duplicates the Cut seam.
+Boundary vertices never move. Meshing uses the same debounced transient Preview
+and exact Preview Bake contract as Sampling and Seeding. Accepting the Preview
+atomically replaces the single Constrained Mesh Bake and records it as the
+Component Mesh, so no separate `Use as Component Mesh` action exists.
+
 ## Persistence
 
 `workspace.json` indexes Assets by stable ID plus retained motion/derived
@@ -97,6 +108,13 @@ does not restore disabled Motion as the active category.
 
 Undo/Redo snapshots copy canonical documents and stable selections. Derived
 previews are transient and are recomputed after restoration.
+
+Schema 31 consolidates legacy `constrained_delaunay` and `organic_relaxed`
+recipes/bakes into `constrained_mesh`. If both legacy Bakes exist, the accepted
+Component Mesh wins, then the active recipe, then a deterministic fallback.
+Legacy Organic parameters load as Artistic Character plus exact Advanced
+Relaxation overrides. Old mesh results remain readable but stale until rebuilt
+with the current constrained-mesh algorithm version.
 
 ## Export contract
 

@@ -7,7 +7,7 @@ const STYLE_SUBMODULES := ["Weighting"]
 const MOTION_SUBMODULES := ["Animation", "Path", "Act", "Sequence"]
 const WORKSPACES_ROOT := "res://workspaces"
 const CONFIG_PATH := "res://configs/app_config.json"
-const SCHEMA_VERSION := 30
+const SCHEMA_VERSION := 31
 const MAX_HISTORY_SIZE := 100
 const PAPER_SIZES_CM := [Vector2(21.0, 29.7), Vector2(29.7, 42.0), Vector2(42.0, 59.4), Vector2(59.4, 84.1), Vector2(84.1, 118.9)]
 const PAPER_LABELS := ["A4", "A3", "A2", "A1", "A0"]
@@ -59,6 +59,10 @@ var geometry_seeding_bake_button: Button
 var geometry_seeding_advanced_pattern_expanded := false
 var geometry_meshing_preview: Dictionary = {}
 var geometry_meshing_preview_key := ""
+var geometry_meshing_preview_state := "idle"
+var geometry_meshing_preview_revision := 0
+var geometry_meshing_bake_button: Button
+var geometry_meshing_advanced_relaxation_expanded := false
 var geometry_uv_mapping_preview: Dictionary = {}
 var geometry_uv_mapping_preview_key := ""
 var geometry_uv_mapping_checker_overlay := true
@@ -404,21 +408,6 @@ func _unhandled_key_input(event: InputEvent) -> void:
 					geometry_seeding_workspace.delete_selected_seed()
 				get_viewport().set_input_as_handled()
 				return
-	if active_module == "Mesh" and active_geometry_submodule == "Meshing" and event.keycode in [KEY_1, KEY_2]:
-		var meshing_focus_owner := get_viewport().gui_get_focus_owner()
-		if meshing_focus_owner is LineEdit or meshing_focus_owner is TextEdit or meshing_focus_owner is SpinBox:
-			return
-		var meshing_component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-		if str(meshing_component.get("draw_mode", "")) in ["ribbon", "open_edge"]:
-			return
-		if has_command_modifier and event.keycode == KEY_1:
-			_activate_geometry_meshing_method_choice()
-			get_viewport().set_input_as_handled()
-			return
-		if not has_command_modifier and geometry_meshing_method_choice_active:
-			_set_geometry_meshing_method(GeometryMeshingService.CONSTRAINED_DELAUNAY if event.keycode == KEY_1 else GeometryMeshingService.ORGANIC_RELAXED)
-			get_viewport().set_input_as_handled()
-			return
 	if active_module == "Mesh" and active_geometry_submodule == "UV Mapping" and event.keycode == KEY_1:
 		var uv_focus_owner := get_viewport().gui_get_focus_owner()
 		if uv_focus_owner is LineEdit or uv_focus_owner is TextEdit or uv_focus_owner is SpinBox:
@@ -1711,6 +1700,10 @@ func _confirm_new_workspace() -> void:
 	geometry_seeding_preview_key = ""
 	geometry_seeding_preview_state = "idle"
 	geometry_seeding_preview_revision += 1
+	geometry_meshing_preview = {}
+	geometry_meshing_preview_key = ""
+	geometry_meshing_preview_state = "idle"
+	geometry_meshing_preview_revision += 1
 	_set_geometry_command_state("")
 	geometry_seeding_enter_edit_after_bake = false
 	_stop_guide_draw_state()
@@ -2042,6 +2035,10 @@ func _restore_history_snapshot(snapshot: Dictionary) -> void:
 	geometry_seeding_preview_key = ""
 	geometry_seeding_preview_state = "idle"
 	geometry_seeding_preview_revision += 1
+	geometry_meshing_preview = {}
+	geometry_meshing_preview_key = ""
+	geometry_meshing_preview_state = "idle"
+	geometry_meshing_preview_revision += 1
 	weighting_preview = {}
 	weighting_preview_key = ""
 	_set_geometry_command_state("")
@@ -2276,6 +2273,10 @@ func _load_workspace(workspace_entry: String) -> bool:
 	geometry_seeding_preview_key = ""
 	geometry_seeding_preview_state = "idle"
 	geometry_seeding_preview_revision += 1
+	geometry_meshing_preview = {}
+	geometry_meshing_preview_key = ""
+	geometry_meshing_preview_state = "idle"
+	geometry_meshing_preview_revision += 1
 	_set_geometry_command_state("")
 	geometry_seeding_enter_edit_after_bake = false
 	_stop_guide_draw_state()
@@ -2896,22 +2897,46 @@ func _normalize_geometry_document(raw_document, asset_id: String, component_id: 
 	var meshing_source = source.get("meshing", {})
 	if not meshing_source is Dictionary:
 		meshing_source = {}
-	document["meshing"]["recipe"] = GeometryMeshingService.normalize_recipe(meshing_source.get("recipe", {}))
+	var raw_meshing_recipe: Dictionary = meshing_source.get("recipe", {}) if meshing_source.get("recipe", {}) is Dictionary else {}
+	document["meshing"]["recipe"] = GeometryMeshingService.normalize_recipe(raw_meshing_recipe)
 	var raw_meshing_bakes: Dictionary = meshing_source.get("bakes", {}) if meshing_source.get("bakes", {}) is Dictionary else {}
-	for raw_method in raw_meshing_bakes:
-		var meshing_bake := _normalize_meshing_bake(raw_meshing_bakes[raw_method])
+	var preferred_mesh_method := str(component_mesh_source.get("method", raw_meshing_recipe.get("method", GeometryMeshingService.CONSTRAINED_MESH))) if component_mesh_source is Dictionary else str(raw_meshing_recipe.get("method", GeometryMeshingService.CONSTRAINED_MESH))
+	var chosen_raw_bake: Dictionary = {}
+	if raw_meshing_bakes.get(preferred_mesh_method, {}) is Dictionary:
+		chosen_raw_bake = raw_meshing_bakes.get(preferred_mesh_method, {})
+	if chosen_raw_bake.is_empty():
+		for fallback_method in [GeometryMeshingService.CONSTRAINED_MESH, GeometryMeshingService.ORGANIC_RELAXED, GeometryMeshingService.CONSTRAINED_DELAUNAY, RibbonMeshService.METHOD]:
+			if raw_meshing_bakes.get(fallback_method, {}) is Dictionary and not raw_meshing_bakes.get(fallback_method, {}).is_empty():
+				chosen_raw_bake = raw_meshing_bakes[fallback_method]
+				break
+	if not chosen_raw_bake.is_empty():
+		var meshing_bake := _normalize_meshing_bake(chosen_raw_bake)
 		if not meshing_bake.is_empty():
-			document["meshing"]["bakes"][str(meshing_bake.get("method", raw_method))] = meshing_bake
+			document["meshing"]["bakes"][str(meshing_bake.get("method", GeometryMeshingService.CONSTRAINED_MESH))] = meshing_bake
+			if preferred_mesh_method in [GeometryMeshingService.CONSTRAINED_DELAUNAY, GeometryMeshingService.ORGANIC_RELAXED]:
+				document["meshing"]["recipe"] = GeometryMeshingService.normalize_recipe({"method": preferred_mesh_method, "parameters": chosen_raw_bake.get("parameters", {})})
+			if str(document["component_mesh"].get("bake_id", "")) == str(meshing_bake.get("bake_id", "")):
+				document["component_mesh"]["method"] = str(meshing_bake.get("method", GeometryMeshingService.CONSTRAINED_MESH))
 	var uv_mapping_source = source.get("uv_mapping", {})
 	if not uv_mapping_source is Dictionary:
 		uv_mapping_source = {}
 	document["uv_mapping"]["recipe"] = GeometryUVMappingService.normalize_recipe(uv_mapping_source.get("recipe", {}))
 	var raw_uv_bakes: Dictionary = uv_mapping_source.get("bakes", {}) if uv_mapping_source.get("bakes", {}) is Dictionary else {}
+	var uv_bake_scores: Dictionary = {}
+	var chosen_mesh_bake_id := str(chosen_raw_bake.get("bake_id", ""))
 	for raw_key in raw_uv_bakes:
 		var uv_bake := _normalize_uv_mapping_bake(raw_uv_bakes[raw_key])
 		if not uv_bake.is_empty():
 			var bake_key := GeometryUVMappingService.bake_key(str(uv_bake.get("mesh_method", "")), str(uv_bake.get("method", "")))
-			document["uv_mapping"]["bakes"][bake_key] = uv_bake
+			var raw_uv_bake: Dictionary = raw_uv_bakes[raw_key]
+			var score := 0
+			if not chosen_mesh_bake_id.is_empty() and str(raw_uv_bake.get("mesh_bake_id", "")) == chosen_mesh_bake_id:
+				score = 2
+			elif str(raw_uv_bake.get("mesh_method", "")) == preferred_mesh_method:
+				score = 1
+			if not document["uv_mapping"]["bakes"].has(bake_key) or score > int(uv_bake_scores.get(bake_key, -1)):
+				document["uv_mapping"]["bakes"][bake_key] = uv_bake
+				uv_bake_scores[bake_key] = score
 	var weighting_source = source.get("weighting", {})
 	if weighting_source is Dictionary:
 		document["weighting"]["next_style_index"] = maxi(1, int(weighting_source.get("next_style_index", 1)))
@@ -3000,8 +3025,10 @@ func _normalize_meshing_bake(raw_bake) -> Dictionary:
 	for raw_triangle in raw_bake.get("triangles", []):
 		if raw_triangle is Dictionary and raw_triangle.get("vertex_ids", []) is Array:
 			normalized_triangles.append({"vertex_ids": raw_triangle.get("vertex_ids", []).duplicate()})
-	bake["method"] = str(raw_bake.get("method", GeometryMeshingService.CONSTRAINED_DELAUNAY))
-	bake["parameters"] = GeometryMeshingService.normalize_recipe({"method": bake["method"], "parameters": raw_bake.get("parameters", {})})["parameters"]
+	var normalized_recipe := GeometryMeshingService.normalize_recipe({"method": str(raw_bake.get("method", GeometryMeshingService.CONSTRAINED_MESH)), "parameters": raw_bake.get("parameters", {})})
+	bake["method"] = str(normalized_recipe.get("method", GeometryMeshingService.CONSTRAINED_MESH))
+	bake["parameters"] = normalized_recipe["parameters"]
+	bake["algorithm_version"] = int(raw_bake.get("algorithm_version", 0))
 	bake["vertices"] = normalized_vertices
 	bake["triangles"] = normalized_triangles
 	bake["boundary_constraints"] = raw_bake.get("boundary_constraints", []).duplicate(true)
@@ -3023,7 +3050,8 @@ func _normalize_uv_mapping_bake(raw_bake) -> Dictionary:
 				"uv": _deserialize_vector(raw_entry.get("uv", [0.0, 0.0]), Vector2.ZERO)
 			})
 	bake["method"] = str(raw_bake.get("method", GeometryUVMappingService.BOUNDS_PLANAR))
-	bake["mesh_method"] = str(raw_bake.get("mesh_method", GeometryMeshingService.CONSTRAINED_DELAUNAY))
+	var raw_mesh_method := str(raw_bake.get("mesh_method", GeometryMeshingService.CONSTRAINED_MESH))
+	bake["mesh_method"] = GeometryMeshingService.CONSTRAINED_MESH if raw_mesh_method in [GeometryMeshingService.CONSTRAINED_DELAUNAY, GeometryMeshingService.ORGANIC_RELAXED] else raw_mesh_method
 	bake["parameters"] = GeometryUVMappingService.normalize_recipe({"method": bake["method"], "parameters": raw_bake.get("parameters", {})})["parameters"]
 	bake["uvs"] = normalized_uvs
 	bake["uv_count"] = normalized_uvs.size()
@@ -3489,6 +3517,7 @@ func _geometry_meshing_result_matches(result: Dictionary, asset_id: String, comp
 	var sampling_bake: Dictionary = input.get("sampling", {})
 	var seeding_bake: Dictionary = input.get("seeding", {})
 	return str(result.get("method", "")) == str(recipe.get("method", "")) \
+		and int(result.get("algorithm_version", 0)) == GeometryMeshingService.ALGORITHM_VERSION \
 		and result.get("parameters", {}) == recipe.get("parameters", {}) \
 		and str(result.get("sampling_bake_id", "")) == str(sampling_bake.get("bake_id", "")) \
 		and str(result.get("sampling_fingerprint", "")) == GeometrySeedingService.sampling_fingerprint(sampling_bake) \
@@ -3509,19 +3538,33 @@ func _geometry_meshing_status(asset_id: String, component_id: String, component:
 	if str(component.get("draw_mode", "")) == "ribbon":
 		if not RibbonMeshService.validation_issues(component).is_empty():
 			return "Invalid"
+		var ribbon_key := _geometry_document_key(asset_id, component_id)
+		if geometry_meshing_preview_key == ribbon_key:
+			if geometry_meshing_preview_state == "calculating":
+				return "Calculating"
+			if geometry_meshing_preview_state == "ready" and _geometry_meshing_preview_matches(asset_id, component_id, component):
+				return "Preview Ready"
 		var ribbon_bake := _geometry_meshing_bake(asset_id, component_id, RibbonMeshService.METHOD)
-		return "Ready to Bake" if ribbon_bake.is_empty() else "Baked" if RibbonMeshService.matches_source(ribbon_bake, component) else "Ready to Bake"
+		return "Ready to Preview" if ribbon_bake.is_empty() else "Baked" if RibbonMeshService.matches_source(ribbon_bake, component) else "Ready to Preview"
 	if not _geometry_meshing_input_is_current(asset_id, component_id, component):
-		return "Blocked"
+		return "Seeding Required"
 	var recipe := _geometry_meshing_recipe(asset_id, component_id)
 	var input := _geometry_meshing_input(asset_id, component_id, recipe)
 	if not GeometryMeshingService.validation_issues(input.get("sampling", {}), input.get("seeding", {}), recipe).is_empty():
 		return "Invalid"
+	var document_key := _geometry_document_key(asset_id, component_id)
+	if geometry_meshing_preview_key == document_key:
+		if geometry_meshing_preview_state == "calculating":
+			return "Calculating"
+		if geometry_meshing_preview_state == "invalid":
+			return "Invalid"
+		if geometry_meshing_preview_state == "ready" and _geometry_meshing_preview_matches(asset_id, component_id, component):
+			return "Preview Ready"
 	var bake := _geometry_meshing_bake(asset_id, component_id)
 	if bake.is_empty():
-		return "Ready to Bake"
+		return "Ready to Preview"
 	if not _geometry_meshing_result_matches(bake, asset_id, component_id, component):
-		return "Ready to Bake"
+		return "Ready to Preview"
 	return "Baked"
 
 
@@ -3531,6 +3574,8 @@ func _geometry_meshing_bake_is_current(asset_id: String, component_id: String, c
 		return false
 	if method == RibbonMeshService.METHOD:
 		return RibbonMeshService.matches_source(bake, component)
+	if method != GeometryMeshingService.CONSTRAINED_MESH or int(bake.get("algorithm_version", 0)) != GeometryMeshingService.ALGORITHM_VERSION:
+		return false
 	var recipe := GeometryMeshingService.normalize_recipe({"method": method, "parameters": bake.get("parameters", {})})
 	if not _geometry_meshing_input_is_current(asset_id, component_id, component, recipe):
 		return false
@@ -4285,63 +4330,48 @@ func _render_geometry_meshing_context_bar() -> void:
 		open_edge_label.add_theme_color_override("font_color", Color("#9aa3b2"))
 		context_bar.add_child(open_edge_label)
 		return
-	geometry_meshing_method_menu = MenuButton.new()
-	geometry_meshing_method_menu.text = "⌘1  Method"
-	geometry_meshing_method_menu.custom_minimum_size = Vector2(118, 32)
-	geometry_meshing_method_menu.focus_mode = Control.FOCUS_NONE
-	_style_context_command_button(geometry_meshing_method_menu, _context_command_is("geometry.meshing.method"))
-	var popup := geometry_meshing_method_menu.get_popup()
-	_style_popup_menu(popup)
-	popup.add_item("1  Constrained Delaunay", 0)
-	popup.set_item_metadata(0, GeometryMeshingService.CONSTRAINED_DELAUNAY)
-	popup.add_item("2  Organic Relaxed", 1)
-	popup.set_item_metadata(1, GeometryMeshingService.ORGANIC_RELAXED)
-	_connect_context_method_menu(popup, "geometry.meshing.method", _set_geometry_meshing_method)
-	context_bar.add_child(geometry_meshing_method_menu)
-	var recipe := _geometry_meshing_recipe(selected_asset_id, selected_component_id)
 	var method_label := Label.new()
-	method_label.text = "Constrained Delaunay" if str(recipe.get("method", "")) == GeometryMeshingService.CONSTRAINED_DELAUNAY else "Organic Relaxed"
+	method_label.text = "Constrained Mesh · Automatic"
 	method_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	method_label.add_theme_color_override("font_color", Color("#9aa3b2"))
 	context_bar.add_child(method_label)
 
 
-func _set_geometry_meshing_method(method: String) -> void:
-	if selected_asset_id.is_empty() or selected_component_id.is_empty() or method not in GeometryMeshingService.VALID_METHODS:
+func _set_geometry_meshing_method(_method: String = GeometryMeshingService.CONSTRAINED_MESH) -> void:
+	if selected_asset_id.is_empty() or selected_component_id.is_empty():
 		return
-	_set_geometry_command_state("meshing_method")
-	selected_geometry_bake_method = method
+	_set_geometry_command_state("")
+	selected_geometry_bake_method = GeometryMeshingService.CONSTRAINED_MESH
 	var current := _geometry_meshing_recipe(selected_asset_id, selected_component_id)
-	if str(current.get("method", "")) == method:
+	if str(current.get("method", "")) == GeometryMeshingService.CONSTRAINED_MESH:
 		_render_outliner()
 		_render_inspector()
 		_render_context_bar()
 		_refresh_geometry_meshing_workspace()
+		if _geometry_meshing_status(selected_asset_id, selected_component_id, _get_component(_get_asset(selected_asset_id), selected_component_id)) == "Ready to Preview":
+			_schedule_geometry_meshing_preview()
 		return
 	_record_direct_change()
 	var document := _get_geometry_document(selected_asset_id, selected_component_id, true)
-	var next_recipe := GeometryMeshingService.normalize_recipe({"method": method, "parameters": current.get("parameters", {})})
-	var matching_bake := _geometry_meshing_bake(selected_asset_id, selected_component_id, method)
+	var next_recipe := GeometryMeshingService.normalize_recipe({"method": GeometryMeshingService.CONSTRAINED_MESH, "parameters": current.get("parameters", {})})
+	var matching_bake := _geometry_meshing_bake(selected_asset_id, selected_component_id, GeometryMeshingService.CONSTRAINED_MESH)
 	if not matching_bake.is_empty():
 		next_recipe["parameters"] = matching_bake.get("parameters", {}).duplicate(true)
 	document["meshing"]["recipe"] = next_recipe
 	geometry_meshing_preview = {}
 	geometry_meshing_preview_key = ""
+	geometry_meshing_preview_state = "idle"
+	geometry_meshing_preview_revision += 1
 	_render_outliner()
 	_render_inspector()
 	_render_context_bar()
 	_refresh_geometry_meshing_workspace()
-	if matching_bake.is_empty():
-		call_deferred("_refresh_geometry_after_recipe_change")
+	if matching_bake.is_empty() or not _geometry_meshing_result_matches(matching_bake, selected_asset_id, selected_component_id, _get_component(_get_asset(selected_asset_id), selected_component_id)):
+		call_deferred("_schedule_geometry_meshing_preview")
 
 
 func _activate_geometry_meshing_method_choice() -> void:
-	if selected_asset_id.is_empty() or selected_component_id.is_empty():
-		return
-	_set_geometry_command_state("meshing_method")
-	_render_context_bar()
-	_render_info_bar()
-	_show_status_message("Meshing Method: 1 Constrained Delaunay · 2 Organic Relaxed")
+	_set_geometry_meshing_method(GeometryMeshingService.CONSTRAINED_MESH)
 
 
 func _render_geometry_uv_mapping_context_bar() -> void:
@@ -4968,13 +4998,6 @@ func _render_info_bar() -> void:
 				{"label": "3: Remove", "id": "remove"}
 			], geometry_seeding_edit_tool)
 			_add_info_option("Delete: Remove selected")
-		elif active_geometry_submodule == "Meshing" and geometry_meshing_method_choice_active:
-			geometry_state_label.text = "State: Meshing Method"
-			info_bar.add_child(geometry_state_label)
-			_add_info_mode_group([
-				{"label": "1: Constrained Delaunay", "id": GeometryMeshingService.CONSTRAINED_DELAUNAY},
-				{"label": "2: Organic Relaxed", "id": GeometryMeshingService.ORGANIC_RELAXED}
-			], str(_geometry_meshing_recipe(selected_asset_id, selected_component_id).get("method", GeometryMeshingService.CONSTRAINED_DELAUNAY)))
 		elif active_geometry_submodule == "UV Mapping" and geometry_uv_mapping_method_choice_active:
 			geometry_state_label.text = "State: UV Mapping Method"
 			info_bar.add_child(geometry_state_label)
@@ -6229,8 +6252,8 @@ func _render_geometry_component_asset_entry(asset: Dictionary, force_expand := f
 	container.add_child(_create_outliner_child_group_label("Components"))
 	var components: Array = asset.get("components", []).duplicate()
 	var references: Array = []
-	var guides: Array = asset.get("guides", []).duplicate(true) if active_geometry_submodule in ["Sampling", "Seeding"] else []
-	if active_geometry_submodule in ["Sampling", "Seeding"]:
+	var guides: Array = asset.get("guides", []).duplicate(true) if active_geometry_submodule in ["Sampling", "Seeding", "Meshing"] else []
+	if active_geometry_submodule in ["Sampling", "Seeding", "Meshing"]:
 		components.clear()
 		for component in asset.get("components", []):
 			if str(component.get("type", "component")) == "guide":
@@ -6309,6 +6332,8 @@ func _render_geometry_component_asset_entry(asset: Dictionary, force_expand := f
 				elif guide_type == AssetGuide.SAMPLER_SPINE:
 					var enabled := _geometry_seeding_spine_enabled(_geometry_seeding_recipe(asset_id, component_id), str(guide.get("id", "")))
 					_render_geometry_seeding_input_row(container, asset_id, component_id, str(guide.get("id", "")), "spine", "Spine · %s" % _guide_display_name(asset, guide), "Enabled" if enabled else "Disabled", "Spine")
+		elif active_geometry_submodule == "Meshing":
+			_render_geometry_meshing_pipeline_rows(container, asset, component)
 	if active_geometry_submodule != "Sampling":
 		return
 
@@ -6382,6 +6407,46 @@ func _open_sampling_dependency(asset_id: String, component_id: String) -> void:
 	active_geometry_submodule = "Sampling"
 	_set_active_module_visual("Mesh", "Sampling")
 	_select_geometry_component(asset_id, component_id)
+
+
+func _open_seeding_dependency(asset_id: String, component_id: String) -> void:
+	active_geometry_submodule = "Seeding"
+	_set_active_module_visual("Mesh", "Seeding")
+	_select_geometry_component(asset_id, component_id)
+
+
+func _render_geometry_meshing_pipeline_rows(container: VBoxContainer, asset: Dictionary, component: Dictionary) -> void:
+	var asset_id := str(asset.get("id", ""))
+	var component_id := str(component.get("id", ""))
+	var sampling := _geometry_sampling_bake(asset_id, component_id)
+	var sampling_ready := _geometry_sampling_bake_is_current(asset_id, component_id, component)
+	_render_geometry_meshing_pipeline_row(container, "Sampling · Adaptive · %s · %d Points" % ["Baked" if sampling_ready else "Required", int(sampling.get("constraint_sample_count", sampling.get("sample_count", 0)))], _open_sampling_dependency.bind(asset_id, component_id))
+	var recipe := _geometry_meshing_recipe(asset_id, component_id)
+	var seed_method := str(recipe.get("parameters", {}).get("seeding_method", GeometrySeedingService.POISSON_FILL))
+	var seeding := _geometry_seeding_bake(asset_id, component_id, seed_method)
+	var seeding_ready := _geometry_meshing_input_is_current(asset_id, component_id, component, recipe)
+	_render_geometry_meshing_pipeline_row(container, "Seeding · %s · %s · %d Seeds" % [_geometry_bake_method_label(seed_method), "Baked" if seeding_ready else "Required", int(seeding.get("seed_count", 0))], _open_seeding_dependency.bind(asset_id, component_id))
+	_render_geometry_meshing_pipeline_row(container, "Constraints · Outer Preserved · %d Hole%s · %d Cut%s" % [int(sampling.get("hole_count", 0)), "" if int(sampling.get("hole_count", 0)) == 1 else "s", sampling.get("cuts", []).size(), "" if sampling.get("cuts", []).size() == 1 else "s"], _open_sampling_dependency.bind(asset_id, component_id))
+	var result := geometry_meshing_preview if _geometry_meshing_preview_matches(asset_id, component_id, component) else _geometry_meshing_bake(asset_id, component_id)
+	_render_geometry_meshing_pipeline_row(container, "Mesh · Constrained Mesh · %s%s" % [_geometry_meshing_status(asset_id, component_id, component), " · %d Triangles" % int(result.get("triangle_count", 0)) if not result.is_empty() else ""], Callable())
+
+
+func _render_geometry_meshing_pipeline_row(container: VBoxContainer, title: String, action: Callable) -> void:
+	var row := HBoxContainer.new()
+	var indent := Control.new()
+	indent.custom_minimum_size = Vector2(34, 0)
+	row.add_child(indent)
+	var button := Button.new()
+	button.text = title
+	button.custom_minimum_size = Vector2(0, 26)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	button.focus_mode = Control.FOCUS_NONE
+	button.disabled = not action.is_valid()
+	if action.is_valid():
+		button.pressed.connect(action)
+	row.add_child(button)
+	container.add_child(row)
 
 
 func _render_geometry_seeding_input_row(container: VBoxContainer, asset_id: String, component_id: String, input_id: String, role: String, title: String, treatment: String, badge: String) -> void:
@@ -6508,8 +6573,7 @@ func _geometry_bake_methods_for_active_module(bakes: Dictionary) -> Array[String
 		order.append(GeometrySeedingService.POISSON_FILL)
 		order.append(GeometrySeedingService.SPINE_FLOW)
 	else:
-		order.append(GeometryMeshingService.CONSTRAINED_DELAUNAY)
-		order.append(GeometryMeshingService.ORGANIC_RELAXED)
+		order.append(GeometryMeshingService.CONSTRAINED_MESH)
 		order.append(RibbonMeshService.METHOD)
 	var methods: Array[String] = []
 	for method in order:
@@ -6525,10 +6589,8 @@ func _geometry_bake_method_label(method: String) -> String:
 		return "Even Spacing"
 	if method == GeometrySeedingService.SPINE_FLOW:
 		return "Spine Flow"
-	if method == GeometryMeshingService.CONSTRAINED_DELAUNAY:
-		return "Constrained Delaunay"
-	if method == GeometryMeshingService.ORGANIC_RELAXED:
-		return "Organic Relaxed"
+	if method in [GeometryMeshingService.CONSTRAINED_MESH, GeometryMeshingService.CONSTRAINED_DELAUNAY, GeometryMeshingService.ORGANIC_RELAXED]:
+		return "Constrained Mesh"
 	if method == RibbonMeshService.METHOD:
 		return "Ribbon Strip"
 	return "Poisson Fill"
@@ -6540,17 +6602,7 @@ func _geometry_bake_status(method: String, bake: Dictionary, asset_id: String, c
 	if active_geometry_submodule == "Meshing":
 		if method == RibbonMeshService.METHOD:
 			return "Baked" if RibbonMeshService.matches_source(bake, component) else "Ready to Bake"
-		var mesh_recipe := GeometryMeshingService.normalize_recipe({"method": method, "parameters": bake.get("parameters", {})})
-		if not _geometry_meshing_input_is_current(asset_id, component_id, component, mesh_recipe):
-			return "Blocked"
-		var mesh_input := _geometry_meshing_input(asset_id, component_id, mesh_recipe)
-		var mesh_sampling: Dictionary = mesh_input.get("sampling", {})
-		var mesh_seeding: Dictionary = mesh_input.get("seeding", {})
-		var mesh_matches := str(bake.get("sampling_bake_id", "")) == str(mesh_sampling.get("bake_id", "")) \
-			and str(bake.get("sampling_fingerprint", "")) == GeometrySeedingService.sampling_fingerprint(mesh_sampling) \
-			and str(bake.get("seeding_bake_id", "")) == str(mesh_seeding.get("bake_id", "")) \
-			and str(bake.get("seeding_fingerprint", "")) == GeometryMeshingService.seeding_fingerprint(mesh_seeding)
-		return "Baked" if mesh_matches else "Ready to Bake"
+		return _geometry_meshing_status(asset_id, component_id, component)
 	var sampling_bake := _geometry_sampling_bake(asset_id, component_id)
 	if sampling_bake.is_empty() or not _geometry_sampling_bake_is_current(asset_id, component_id, component):
 		return "Blocked"
@@ -6644,8 +6696,8 @@ func _geometry_outliner_active_preview(asset_id: String, component_id: String, c
 			return {"key": method, "label": _geometry_method_number_label(method) + ": " + _geometry_bake_method_label(method), "status": "Preview Ready" if _geometry_seeding_preview_matches(asset_id, component_id, component) else "Calculating" if geometry_seeding_preview_state == "calculating" else "Invalid"}
 	if active_geometry_submodule == "Meshing" and geometry_meshing_preview_key == document_key:
 		var method := str(geometry_meshing_preview.get("method", ""))
-		if not method.is_empty():
-			return {"key": method, "label": _geometry_method_number_label(method) + ": " + _geometry_bake_method_label(method), "status": "Preview" if _geometry_meshing_preview_matches(asset_id, component_id, component) else "Invalid"}
+		if not method.is_empty() or geometry_meshing_preview_state == "calculating":
+			return {"key": GeometryMeshingService.CONSTRAINED_MESH, "label": "Constrained Mesh", "status": "Preview Ready" if _geometry_meshing_preview_matches(asset_id, component_id, component) else "Calculating" if geometry_meshing_preview_state == "calculating" else "Invalid"}
 	if active_geometry_submodule == "UV Mapping" and geometry_uv_mapping_preview_key == document_key:
 		var method := str(geometry_uv_mapping_preview.get("method", ""))
 		var mesh_method := str(geometry_uv_mapping_preview.get("mesh_method", ""))
@@ -6662,7 +6714,7 @@ func _geometry_method_number_label(method: String) -> String:
 	elif active_geometry_submodule == "Seeding":
 		methods = [GeometrySeedingService.POISSON_FILL, GeometrySeedingService.SPINE_FLOW]
 	elif active_geometry_submodule == "Meshing":
-		methods = [GeometryMeshingService.CONSTRAINED_DELAUNAY, GeometryMeshingService.ORGANIC_RELAXED]
+		methods = [GeometryMeshingService.CONSTRAINED_MESH]
 	else:
 		methods = [GeometryUVMappingService.BOUNDS_PLANAR]
 	var index := methods.find(method)
@@ -8222,12 +8274,16 @@ func _refresh_geometry_after_recipe_change() -> void:
 		geometry_seeding_preview_revision += 1
 		geometry_meshing_preview = {}
 		geometry_meshing_preview_key = ""
+		geometry_meshing_preview_state = "idle"
+		geometry_meshing_preview_revision += 1
 	elif active_geometry_submodule == "Seeding":
 		_schedule_geometry_seeding_preview()
 		geometry_meshing_preview = {}
 		geometry_meshing_preview_key = ""
+		geometry_meshing_preview_state = "idle"
+		geometry_meshing_preview_revision += 1
 	elif active_geometry_submodule == "Meshing":
-		_refresh_geometry_meshing_workspace()
+		_schedule_geometry_meshing_preview()
 
 
 func _schedule_geometry_sampling_input_refresh() -> void:
@@ -8843,17 +8899,12 @@ func _render_geometry_meshing_inspector() -> void:
 		return
 	inspector_content.add_child(_create_inspector_field_label(str(component.get("name", "Component"))))
 	var recipe := _geometry_meshing_recipe(selected_asset_id, selected_component_id)
-	inspector_content.add_child(_create_inspector_field_label("Method"))
-	var method_option := OptionButton.new()
-	method_option.add_item("Constrained Delaunay")
-	method_option.set_item_metadata(0, GeometryMeshingService.CONSTRAINED_DELAUNAY)
-	method_option.add_item("Organic Relaxed")
-	method_option.set_item_metadata(1, GeometryMeshingService.ORGANIC_RELAXED)
-	method_option.select(0 if str(recipe.get("method", "")) == GeometryMeshingService.CONSTRAINED_DELAUNAY else 1)
-	method_option.item_selected.connect(func(index: int) -> void: _set_geometry_meshing_method(str(method_option.get_item_metadata(index))))
-	inspector_content.add_child(method_option)
 	inspector_content.add_child(_create_inspector_section("Input"))
-	inspector_content.add_child(_create_inspector_field_label("Seed Source"))
+	var sampling_current := _geometry_sampling_bake_is_current(selected_asset_id, selected_component_id, component)
+	var sampling_label := _create_inspector_field_label("Sampling · Adaptive: %s" % ("Baked" if sampling_current else "Required / Stale"))
+	sampling_label.add_theme_color_override("font_color", Color("#75b88a") if sampling_current else Color("#ef8354"))
+	inspector_content.add_child(sampling_label)
+	inspector_content.add_child(_create_inspector_field_label("Seeding Source"))
 	var seed_option := OptionButton.new()
 	var seeding_bakes := _geometry_seeding_bakes(selected_asset_id, selected_component_id)
 	for method in GeometrySeedingService.VALID_METHODS:
@@ -8874,61 +8925,103 @@ func _render_geometry_meshing_inspector() -> void:
 	var input_label := _create_inspector_field_label("Input Status: %s" % ("Ready" if input_current else "Required / Stale"))
 	input_label.add_theme_color_override("font_color", Color("#75b88a") if input_current else Color("#ef8354"))
 	inspector_content.add_child(input_label)
-	if str(recipe.get("method", "")) == GeometryMeshingService.ORGANIC_RELAXED:
-		inspector_content.add_child(_create_inspector_section("Parameters"))
-		inspector_content.add_child(_create_inspector_field_label("Relaxation"))
-		var relaxation := SpinBox.new()
-		relaxation.min_value = 0.0
-		relaxation.max_value = 1.0
-		relaxation.step = 0.01
-		relaxation.custom_arrow_step = 0.01
-		relaxation.set_value_no_signal(float(recipe.get("parameters", {}).get("relaxation", GeometryMeshingService.DEFAULT_RELAXATION)))
-		relaxation.value_changed.connect(_on_geometry_meshing_parameter_changed.bind("relaxation"))
-		relaxation.get_line_edit().text_submitted.connect(_on_geometry_meshing_float_text_submitted.bind(relaxation, "relaxation"))
-		relaxation.get_line_edit().focus_exited.connect(_on_geometry_meshing_float_focus_exited.bind(relaxation, "relaxation"))
-		inspector_content.add_child(relaxation)
-		inspector_content.add_child(_create_inspector_field_label("Passes"))
-		var passes := SpinBox.new()
-		passes.min_value = 1.0
-		passes.max_value = GeometryMeshingService.MAX_PASSES
-		passes.step = 1.0
-		passes.set_value_no_signal(float(recipe.get("parameters", {}).get("passes", GeometryMeshingService.DEFAULT_PASSES)))
-		passes.value_changed.connect(_on_geometry_meshing_parameter_changed.bind("passes"))
-		inspector_content.add_child(passes)
+	inspector_content.add_child(_create_inspector_section("Method"))
+	inspector_content.add_child(_create_inspector_field_label("Constrained Mesh · Automatic"))
+	inspector_content.add_child(_create_inspector_section("Parameters"))
+	inspector_content.add_child(_create_inspector_field_label("Mesh Character"))
+	var character_row := HBoxContainer.new()
+	character_row.add_child(_create_inspector_field_label("Structured"))
+	var character := HSlider.new()
+	character.min_value = 0.0
+	character.max_value = 100.0
+	character.step = 1.0
+	character.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	character.set_value_no_signal(float(recipe.get("parameters", {}).get("mesh_character", GeometryMeshingService.DEFAULT_MESH_CHARACTER)) * 100.0)
+	character.value_changed.connect(func(value: float) -> void: _on_geometry_meshing_parameter_changed(value / 100.0, "mesh_character"))
+	character_row.add_child(character)
+	character_row.add_child(_create_inspector_field_label("Organic"))
+	inspector_content.add_child(character_row)
+	inspector_content.add_child(_create_inspector_field_label("Character: %d%%" % roundi(character.value)))
+	var advanced := Button.new()
+	advanced.text = "%s Advanced Relaxation" % ("▾" if geometry_meshing_advanced_relaxation_expanded else "▸")
+	advanced.toggle_mode = true
+	advanced.button_pressed = geometry_meshing_advanced_relaxation_expanded
+	advanced.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	advanced.focus_mode = Control.FOCUS_NONE
+	advanced.toggled.connect(_on_geometry_meshing_advanced_relaxation_toggled)
+	inspector_content.add_child(advanced)
+	if geometry_meshing_advanced_relaxation_expanded:
+		var parameters: Dictionary = recipe.get("parameters", {})
+		var relaxation_override := bool(parameters.get("relaxation_override", false))
+		inspector_content.add_child(_create_inspector_field_label("Relaxation Strength: %s · %s" % ["Refined" if relaxation_override else "Derived", _format_scale_value(float(parameters.get("relaxation", 0.0)))]))
+		var refine_relaxation := CheckBox.new()
+		refine_relaxation.text = "Refine Relaxation Strength"
+		refine_relaxation.button_pressed = relaxation_override
+		refine_relaxation.toggled.connect(_on_geometry_meshing_override_changed.bind("relaxation_override"))
+		inspector_content.add_child(refine_relaxation)
+		if relaxation_override:
+			var relaxation := SpinBox.new()
+			relaxation.min_value = 0.0
+			relaxation.max_value = 1.0
+			relaxation.step = 0.01
+			relaxation.custom_arrow_step = 0.01
+			relaxation.set_value_no_signal(float(parameters.get("relaxation", GeometryMeshingService.DEFAULT_RELAXATION)))
+			relaxation.value_changed.connect(_on_geometry_meshing_parameter_changed.bind("relaxation"))
+			relaxation.get_line_edit().text_submitted.connect(_on_geometry_meshing_float_text_submitted.bind(relaxation, "relaxation"))
+			relaxation.get_line_edit().focus_exited.connect(_on_geometry_meshing_float_focus_exited.bind(relaxation, "relaxation"))
+			inspector_content.add_child(relaxation)
+		var passes_override := bool(parameters.get("passes_override", false))
+		inspector_content.add_child(_create_inspector_field_label("Relaxation Passes: %s · %d" % ["Refined" if passes_override else "Derived", int(parameters.get("passes", 0))]))
+		var refine_passes := CheckBox.new()
+		refine_passes.text = "Refine Relaxation Passes"
+		refine_passes.button_pressed = passes_override
+		refine_passes.toggled.connect(_on_geometry_meshing_override_changed.bind("passes_override"))
+		inspector_content.add_child(refine_passes)
+		if passes_override:
+			var passes := SpinBox.new()
+			passes.min_value = 1.0
+			passes.max_value = GeometryMeshingService.MAX_PASSES
+			passes.step = 1.0
+			passes.set_value_no_signal(float(parameters.get("passes", GeometryMeshingService.DEFAULT_PASSES)))
+			passes.value_changed.connect(_on_geometry_meshing_parameter_changed.bind("passes"))
+			inspector_content.add_child(passes)
+	inspector_content.add_child(_create_inspector_section("Constraints"))
+	var input := _geometry_meshing_input(selected_asset_id, selected_component_id, recipe)
+	var sampling_bake: Dictionary = input.get("sampling", {})
+	inspector_content.add_child(_create_inspector_field_label("Outer · Preserved"))
+	inspector_content.add_child(_create_inspector_field_label("Holes · Preserved · %d" % int(sampling_bake.get("hole_count", 0))))
+	inspector_content.add_child(_create_inspector_field_label("Cuts · Seam · %d" % sampling_bake.get("cuts", []).size()))
+	inspector_content.add_child(_create_inspector_section("View"))
+	if is_instance_valid(geometry_meshing_workspace):
+		for view_option in [
+			{"key": "mesh_edges", "label": "Mesh Edges", "value": geometry_meshing_workspace.show_mesh_edges},
+			{"key": "seed_points", "label": "Seed Points", "value": geometry_meshing_workspace.show_seed_points},
+			{"key": "triangle_fill", "label": "Triangle Fill", "value": geometry_meshing_workspace.show_triangle_fill},
+			{"key": "constraints", "label": "Constraints", "value": geometry_meshing_workspace.show_constraints}
+		]:
+			var view_toggle := CheckBox.new()
+			view_toggle.text = str(view_option["label"])
+			view_toggle.button_pressed = bool(view_option["value"])
+			view_toggle.toggled.connect(_on_geometry_meshing_view_option_changed.bind(str(view_option["key"])))
+			inspector_content.add_child(view_toggle)
 	var status := _geometry_meshing_status(selected_asset_id, selected_component_id, component)
 	inspector_content.add_child(_create_inspector_section("Result"))
 	inspector_content.add_child(_create_inspector_field_label("Status: %s" % status))
-	var result := _geometry_meshing_bake(selected_asset_id, selected_component_id)
+	var result := geometry_meshing_preview if _geometry_meshing_preview_matches(selected_asset_id, selected_component_id, component) else _geometry_meshing_bake(selected_asset_id, selected_component_id)
 	if not result.is_empty():
 		inspector_content.add_child(_create_inspector_field_label("Vertices: %d" % int(result.get("vertex_count", 0))))
 		inspector_content.add_child(_create_inspector_field_label("Triangles: %d" % int(result.get("triangle_count", 0))))
 		inspector_content.add_child(_create_inspector_field_label("Minimum Angle: %.1f°" % float(result.get("minimum_angle", 0.0))))
-	inspector_content.add_child(_create_inspector_section("Component Mesh"))
-	var component_mesh_status := _component_mesh_status(selected_asset_id, selected_component_id, component)
-	var component_mesh_reference := _component_mesh_reference(selected_asset_id, selected_component_id)
-	var component_mesh_label := _create_inspector_field_label("Status: %s" % component_mesh_status)
-	component_mesh_label.add_theme_color_override("font_color", Color("#75b88a") if component_mesh_status == "Ready" else Color("#ef8354"))
-	inspector_content.add_child(component_mesh_label)
-	if not str(component_mesh_reference.get("bake_id", "")).is_empty():
-		inspector_content.add_child(_create_inspector_field_label("Selected: %s" % _geometry_bake_method_label(str(component_mesh_reference.get("method", "")))))
-	var mesh_method := str(recipe.get("method", ""))
-	var mesh_bake := _geometry_meshing_bake(selected_asset_id, selected_component_id, mesh_method)
-	var mesh_bake_current := not mesh_bake.is_empty() and _geometry_meshing_bake_is_current(selected_asset_id, selected_component_id, component, mesh_method)
-	var mesh_is_selected := mesh_bake_current and str(component_mesh_reference.get("bake_id", "")) == str(mesh_bake.get("bake_id", ""))
-	var use_mesh_button := Button.new()
-	use_mesh_button.text = "Component Mesh Selected" if mesh_is_selected else "Use as Component Mesh"
-	use_mesh_button.custom_minimum_size = Vector2(0, 28)
-	use_mesh_button.focus_mode = Control.FOCUS_NONE
-	use_mesh_button.disabled = not mesh_bake_current or mesh_is_selected
-	use_mesh_button.pressed.connect(_use_current_bake_as_component_mesh)
-	inspector_content.add_child(use_mesh_button)
+		inspector_content.add_child(_create_inspector_field_label("Constraints: %s" % ("Valid" if bool(result.get("constraints_valid", false)) else "Invalid")))
+		inspector_content.add_child(_create_inspector_field_label("Cut Seam Vertices: %d" % int(result.get("cut_seam_vertex_count", 0))))
 	var actions := HBoxContainer.new()
 	var bake_button := Button.new()
-	bake_button.text = "Bake"
+	bake_button.text = "Calculating…" if status == "Calculating" else "Baked · Component Mesh" if status == "Baked" else "Bake Preview"
 	bake_button.custom_minimum_size = Vector2(96, 28)
 	bake_button.focus_mode = Control.FOCUS_NONE
-	bake_button.disabled = status != "Ready to Bake"
+	bake_button.disabled = status != "Preview Ready"
 	bake_button.pressed.connect(_bake_geometry_meshing)
+	geometry_meshing_bake_button = bake_button
 	actions.add_child(bake_button)
 	inspector_content.add_child(actions)
 
@@ -8944,47 +9037,18 @@ func _render_ribbon_meshing_inspector(component: Dictionary) -> void:
 	var status := _geometry_meshing_status(selected_asset_id, selected_component_id, component)
 	inspector_content.add_child(_create_inspector_section("Result"))
 	inspector_content.add_child(_create_inspector_field_label("Status: %s" % status))
-	var result := _geometry_meshing_bake(selected_asset_id, selected_component_id, RibbonMeshService.METHOD)
+	var result := geometry_meshing_preview if _geometry_meshing_preview_matches(selected_asset_id, selected_component_id, component) else _geometry_meshing_bake(selected_asset_id, selected_component_id, RibbonMeshService.METHOD)
 	if not result.is_empty():
 		inspector_content.add_child(_create_inspector_field_label("Vertices: %d" % int(result.get("vertex_count", 0))))
 		inspector_content.add_child(_create_inspector_field_label("Triangles: %d" % int(result.get("triangle_count", 0))))
-	inspector_content.add_child(_create_inspector_section("Component Mesh"))
-	var component_mesh_status := _component_mesh_status(selected_asset_id, selected_component_id, component)
-	inspector_content.add_child(_create_inspector_field_label("Status: %s" % component_mesh_status))
-	var mesh_bake := _geometry_meshing_bake(selected_asset_id, selected_component_id, RibbonMeshService.METHOD)
-	var mesh_current := not mesh_bake.is_empty() and _geometry_meshing_bake_is_current(selected_asset_id, selected_component_id, component, RibbonMeshService.METHOD)
-	var mesh_selected := mesh_current and str(_component_mesh_reference(selected_asset_id, selected_component_id).get("bake_id", "")) == str(mesh_bake.get("bake_id", ""))
-	var use_mesh_button := Button.new()
-	use_mesh_button.text = "Component Mesh Selected" if mesh_selected else "Use as Component Mesh"
-	use_mesh_button.disabled = not mesh_current or mesh_selected
-	use_mesh_button.pressed.connect(_use_current_bake_as_component_mesh)
-	inspector_content.add_child(use_mesh_button)
 	var actions := HBoxContainer.new()
 	var bake_button := Button.new()
-	bake_button.text = "Bake"
-	bake_button.disabled = status != "Ready to Bake"
+	bake_button.text = "Calculating…" if status == "Calculating" else "Baked · Component Mesh" if status == "Baked" else "Bake Preview"
+	bake_button.disabled = status != "Preview Ready"
 	bake_button.pressed.connect(_bake_geometry_meshing)
+	geometry_meshing_bake_button = bake_button
 	actions.add_child(bake_button)
 	inspector_content.add_child(actions)
-
-
-func _use_current_bake_as_component_mesh() -> void:
-	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	var method := RibbonMeshService.METHOD if str(component.get("draw_mode", "")) == "ribbon" else str(_geometry_meshing_recipe(selected_asset_id, selected_component_id).get("method", ""))
-	var bake := _geometry_meshing_bake(selected_asset_id, selected_component_id, method)
-	if component.is_empty() or bake.is_empty() or not _geometry_meshing_bake_is_current(selected_asset_id, selected_component_id, component, method):
-		_show_status_message("Bake a current Mesh before selecting the Component Mesh.")
-		return
-	_record_direct_change()
-	var document := _get_geometry_document(selected_asset_id, selected_component_id, true)
-	document["component_mesh"] = {
-		"bake_id": str(bake.get("bake_id", "")),
-		"method": method,
-		"mesh_fingerprint": GeometryUVMappingService.mesh_fingerprint(bake)
-	}
-	_show_status_message("%s is now the Component Mesh." % _geometry_bake_method_label(method))
-	_render_outliner()
-	_render_inspector()
 
 
 func _on_geometry_meshing_seed_source_selected(index: int, option: OptionButton) -> void:
@@ -9003,7 +9067,11 @@ func _on_geometry_meshing_seed_source_selected(index: int, option: OptionButton)
 
 func _on_geometry_meshing_parameter_changed(value: float, parameter_name: String) -> void:
 	var current := _geometry_meshing_recipe(selected_asset_id, selected_component_id)
-	var normalized: Variant = clampf(value, 0.0, 1.0) if parameter_name == "relaxation" else clampi(int(round(value)), 1, GeometryMeshingService.MAX_PASSES)
+	var normalized: Variant = value
+	if parameter_name in ["mesh_character", "relaxation"]:
+		normalized = clampf(value, 0.0, 1.0)
+	elif parameter_name == "passes":
+		normalized = clampi(int(round(value)), 1, GeometryMeshingService.MAX_PASSES)
 	if current.get("parameters", {}).get(parameter_name) == normalized:
 		return
 	_record_coalesced_change()
@@ -9011,6 +9079,27 @@ func _on_geometry_meshing_parameter_changed(value: float, parameter_name: String
 	current["parameters"][parameter_name] = normalized
 	document["meshing"]["recipe"] = GeometryMeshingService.normalize_recipe(current)
 	call_deferred("_refresh_geometry_after_recipe_change")
+
+
+func _on_geometry_meshing_override_changed(enabled: bool, parameter_name: String) -> void:
+	var current := _geometry_meshing_recipe(selected_asset_id, selected_component_id)
+	if bool(current.get("parameters", {}).get(parameter_name, false)) == enabled:
+		return
+	_record_direct_change()
+	var document := _get_geometry_document(selected_asset_id, selected_component_id, true)
+	current["parameters"][parameter_name] = enabled
+	document["meshing"]["recipe"] = GeometryMeshingService.normalize_recipe(current)
+	call_deferred("_refresh_geometry_after_recipe_change")
+
+
+func _on_geometry_meshing_advanced_relaxation_toggled(expanded: bool) -> void:
+	geometry_meshing_advanced_relaxation_expanded = expanded
+	_render_inspector()
+
+
+func _on_geometry_meshing_view_option_changed(enabled: bool, option: String) -> void:
+	if is_instance_valid(geometry_meshing_workspace):
+		geometry_meshing_workspace.set_view_option(option, enabled)
 
 
 func _on_geometry_meshing_float_text_submitted(text: String, field: SpinBox, parameter_name: String) -> void:
@@ -9032,11 +9121,34 @@ func _commit_geometry_meshing_float_text(raw_text: String, field: SpinBox, param
 	_on_geometry_meshing_parameter_changed(value, parameter_name)
 
 
+func _schedule_geometry_meshing_preview() -> void:
+	if selected_asset_id.is_empty() or selected_component_id.is_empty():
+		return
+	geometry_meshing_preview_revision += 1
+	var revision := geometry_meshing_preview_revision
+	geometry_meshing_preview = {}
+	geometry_meshing_preview_key = _geometry_document_key(selected_asset_id, selected_component_id)
+	geometry_meshing_preview_state = "calculating"
+	_render_outliner()
+	_render_inspector()
+	_refresh_geometry_meshing_workspace()
+	_generate_geometry_meshing_preview_after_delay(revision)
+
+
+func _generate_geometry_meshing_preview_after_delay(revision: int) -> void:
+	if is_inside_tree():
+		await get_tree().create_timer(0.15).timeout
+	if revision != geometry_meshing_preview_revision:
+		return
+	_generate_geometry_meshing_preview()
+
+
 func _generate_geometry_meshing_preview() -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	if str(component.get("draw_mode", "")) == "ribbon":
 		geometry_meshing_preview_key = _geometry_document_key(selected_asset_id, selected_component_id)
 		geometry_meshing_preview = RibbonMeshService.generate(component)
+		geometry_meshing_preview_state = "ready" if bool(geometry_meshing_preview.get("valid", false)) else "invalid"
 		_show_status_message("Generated %d Ribbon Triangles." % int(geometry_meshing_preview.get("triangle_count", 0)) if bool(geometry_meshing_preview.get("valid", false)) else str(geometry_meshing_preview.get("errors", ["Ribbon Mesh could not be generated."])[0]))
 		_render_outliner()
 		_render_inspector()
@@ -9046,14 +9158,17 @@ func _generate_geometry_meshing_preview() -> void:
 	if not _geometry_meshing_input_is_current(selected_asset_id, selected_component_id, component, recipe):
 		geometry_meshing_preview_key = _geometry_document_key(selected_asset_id, selected_component_id)
 		geometry_meshing_preview = GeometryMeshingService.generate({}, {}, recipe)
+		geometry_meshing_preview_state = "invalid"
 		_show_status_message("Bake a current Seeding input before generating a Mesh.")
 	else:
 		var input := _geometry_meshing_input(selected_asset_id, selected_component_id, recipe)
 		geometry_meshing_preview_key = _geometry_document_key(selected_asset_id, selected_component_id)
 		geometry_meshing_preview = GeometryMeshingService.generate(input.get("sampling", {}), input.get("seeding", {}), recipe)
 		if bool(geometry_meshing_preview.get("valid", false)):
+			geometry_meshing_preview_state = "ready"
 			_show_status_message("Generated %d Triangles." % int(geometry_meshing_preview.get("triangle_count", 0)))
 		else:
+			geometry_meshing_preview_state = "invalid"
 			var errors: Array = geometry_meshing_preview.get("errors", [])
 			_show_status_message(str(errors[0]) if not errors.is_empty() else "Meshing could not be generated.")
 	_render_outliner()
@@ -9062,7 +9177,6 @@ func _generate_geometry_meshing_preview() -> void:
 
 
 func _bake_geometry_meshing() -> void:
-	_generate_geometry_meshing_preview()
 	_bake_geometry_meshing_preview()
 
 
@@ -9076,8 +9190,14 @@ func _bake_geometry_meshing_preview() -> void:
 	bake["bake_id"] = "meshing_bake_%d" % ResourceUID.create_id()
 	document["meshing"]["bakes"][str(bake.get("method", ""))] = bake
 	selected_geometry_bake_method = str(bake.get("method", ""))
+	document["component_mesh"] = {
+		"bake_id": str(bake.get("bake_id", "")),
+		"method": str(bake.get("method", "")),
+		"mesh_fingerprint": GeometryUVMappingService.mesh_fingerprint(bake)
+	}
 	geometry_meshing_preview = {}
 	geometry_meshing_preview_key = ""
+	geometry_meshing_preview_state = "idle"
 	_show_status_message("Mesh baked for %s." % str(component.get("name", "Component")))
 	_render_outliner()
 	_render_inspector()
@@ -12637,6 +12757,8 @@ func _select_submodule(module_name: String, submodule: String, section: ModuleSe
 		geometry_sampling_input_refresh_pending = false
 	if module_name != "Mesh" or submodule != "Seeding":
 		geometry_seeding_preview_revision += 1
+	if module_name != "Mesh" or submodule != "Meshing":
+		geometry_meshing_preview_revision += 1
 	_set_active_module_visual(module_name, submodule)
 	active_module = module_name
 	if module_name == "Create":
@@ -12658,6 +12780,14 @@ func _select_submodule(module_name: String, submodule: String, section: ModuleSe
 			var selected_component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 			if not _geometry_sampling_bake_is_current(selected_asset_id, selected_component_id, selected_component):
 				_schedule_geometry_sampling_preview()
+		elif submodule == "Seeding" and not selected_component_id.is_empty():
+			var selected_component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+			if _geometry_seeding_status(selected_asset_id, selected_component_id, selected_component) == "Ready to Preview":
+				_schedule_geometry_seeding_preview()
+		elif submodule == "Meshing" and not selected_component_id.is_empty():
+			var selected_component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+			if _geometry_meshing_status(selected_asset_id, selected_component_id, selected_component) == "Ready to Preview":
+				_schedule_geometry_meshing_preview()
 	elif module_name == "Style" and submodule in STYLE_SUBMODULES:
 		active_style_submodule = submodule
 		_enter_weighting_context()

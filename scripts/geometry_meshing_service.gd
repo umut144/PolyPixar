@@ -1,10 +1,13 @@
 class_name GeometryMeshingService
 extends RefCounted
 
-const CONSTRAINED_DELAUNAY := "constrained_delaunay"
-const ORGANIC_RELAXED := "organic_relaxed"
+const CONSTRAINED_MESH := "constrained_mesh"
+const CONSTRAINED_DELAUNAY := "constrained_delaunay" # Legacy schema <= 30.
+const ORGANIC_RELAXED := "organic_relaxed" # Legacy schema <= 30.
 const RIBBON_STRIP := "ribbon_strip"
-const VALID_METHODS := [CONSTRAINED_DELAUNAY, ORGANIC_RELAXED, RIBBON_STRIP]
+const VALID_METHODS := [CONSTRAINED_MESH, RIBBON_STRIP]
+const ALGORITHM_VERSION := 2
+const DEFAULT_MESH_CHARACTER := 0.0
 const DEFAULT_RELAXATION := 0.35
 const DEFAULT_PASSES := 2
 const MAX_PASSES := 8
@@ -14,9 +17,14 @@ const EPSILON := 0.000001
 
 static func default_recipe() -> Dictionary:
 	return {
-		"method": CONSTRAINED_DELAUNAY,
+		"method": CONSTRAINED_MESH,
 		"parameters": {
-			"seeding_method": GeometrySeedingService.POISSON_FILL
+			"seeding_method": GeometrySeedingService.POISSON_FILL,
+			"mesh_character": DEFAULT_MESH_CHARACTER,
+			"relaxation_override": false,
+			"relaxation": 0.0,
+			"passes_override": false,
+			"passes": 0
 		}
 	}
 
@@ -25,8 +33,9 @@ static func normalize_recipe(raw_recipe) -> Dictionary:
 	var recipe := default_recipe()
 	if not raw_recipe is Dictionary:
 		return recipe
-	var method := str(raw_recipe.get("method", CONSTRAINED_DELAUNAY))
-	recipe["method"] = method if method in VALID_METHODS else CONSTRAINED_DELAUNAY
+	var raw_method := str(raw_recipe.get("method", CONSTRAINED_MESH))
+	var method := CONSTRAINED_MESH if raw_method in [CONSTRAINED_MESH, CONSTRAINED_DELAUNAY, ORGANIC_RELAXED] else raw_method
+	recipe["method"] = method if method in VALID_METHODS else CONSTRAINED_MESH
 	if recipe["method"] == RIBBON_STRIP:
 		recipe["parameters"] = raw_recipe.get("parameters", {}).duplicate(true) if raw_recipe.get("parameters", {}) is Dictionary else {}
 		return recipe
@@ -34,11 +43,33 @@ static func normalize_recipe(raw_recipe) -> Dictionary:
 	var seeding_method := str(parameters.get("seeding_method", GeometrySeedingService.POISSON_FILL)) if parameters is Dictionary else GeometrySeedingService.POISSON_FILL
 	if seeding_method not in GeometrySeedingService.VALID_METHODS:
 		seeding_method = GeometrySeedingService.POISSON_FILL
-	recipe["parameters"] = {"seeding_method": seeding_method}
-	if recipe["method"] == ORGANIC_RELAXED:
-		recipe["parameters"]["relaxation"] = clampf(float(parameters.get("relaxation", DEFAULT_RELAXATION)), 0.0, 1.0) if parameters is Dictionary else DEFAULT_RELAXATION
-		recipe["parameters"]["passes"] = clampi(int(parameters.get("passes", DEFAULT_PASSES)), 1, MAX_PASSES) if parameters is Dictionary else DEFAULT_PASSES
+	var character := clampf(float(parameters.get("mesh_character", DEFAULT_MESH_CHARACTER)), 0.0, 1.0)
+	var legacy_organic: bool = raw_method == ORGANIC_RELAXED and not parameters.has("mesh_character")
+	if legacy_organic:
+		character = clampf((float(parameters.get("relaxation", DEFAULT_RELAXATION)) - 0.05) / 0.55, 0.0, 1.0)
+	var relaxation_override := bool(parameters.get("relaxation_override", legacy_organic))
+	var passes_override := bool(parameters.get("passes_override", legacy_organic))
+	var relaxation := clampf(float(parameters.get("relaxation", DEFAULT_RELAXATION)), 0.0, 1.0) if relaxation_override else relaxation_for_character(character)
+	var passes := clampi(int(parameters.get("passes", DEFAULT_PASSES)), 1, MAX_PASSES) if passes_override else passes_for_character(character)
+	recipe["parameters"] = {
+		"seeding_method": seeding_method,
+		"mesh_character": character,
+		"relaxation_override": relaxation_override,
+		"relaxation": relaxation,
+		"passes_override": passes_override,
+		"passes": passes
+	}
 	return recipe
+
+
+static func relaxation_for_character(character: float) -> float:
+	var normalized := clampf(character, 0.0, 1.0)
+	return 0.0 if is_zero_approx(normalized) else 0.05 + 0.55 * normalized
+
+
+static func passes_for_character(character: float) -> int:
+	var normalized := clampf(character, 0.0, 1.0)
+	return 0 if is_zero_approx(normalized) else 1 + roundi(normalized * 3.0)
 
 
 static func generate(sampling_bake: Dictionary, seeding_bake: Dictionary, raw_recipe = {}) -> Dictionary:
@@ -52,18 +83,22 @@ static func generate(sampling_bake: Dictionary, seeding_bake: Dictionary, raw_re
 	if not bool(triangulation.get("valid", false)):
 		return _failed_result(sampling_bake, seeding_bake, recipe, triangulation.get("errors", []))
 	var triangles: Array = triangulation.get("triangles", [])
-	_duplicate_cut_seam_vertices(vertices, triangles, constraints)
-	if str(recipe["method"]) == ORGANIC_RELAXED:
-		for _pass_index in range(int(recipe["parameters"]["passes"])):
-			_relax_interior_vertices(vertices, triangles, sampling_bake, float(recipe["parameters"]["relaxation"]))
+	var relaxation := float(recipe["parameters"]["relaxation"])
+	var passes := int(recipe["parameters"]["passes"])
+	if relaxation > 0.0 and passes > 0:
+		for _pass_index in range(passes):
+			_relax_interior_vertices(vertices, triangles, sampling_bake, relaxation)
 			triangulation = _triangulate(vertices, constraints, sampling_bake)
 			if not bool(triangulation.get("valid", false)):
 				return _failed_result(sampling_bake, seeding_bake, recipe, triangulation.get("errors", []))
 			triangles = triangulation.get("triangles", [])
+	_duplicate_cut_seam_vertices(vertices, triangles, constraints)
 	var minimum_angle := _minimum_triangle_angle(vertices, triangles)
+	var degenerate_count := _degenerate_triangle_count(vertices, triangles)
 	return {
 		"valid": true,
 		"errors": [],
+		"algorithm_version": ALGORITHM_VERSION,
 		"method": recipe["method"],
 		"parameters": recipe["parameters"].duplicate(true),
 		"sampling_bake_id": str(sampling_bake.get("bake_id", "")),
@@ -75,7 +110,11 @@ static func generate(sampling_bake: Dictionary, seeding_bake: Dictionary, raw_re
 		"boundary_constraints": constraints,
 		"vertex_count": vertices.size(),
 		"triangle_count": triangles.size(),
-		"minimum_angle": minimum_angle
+		"minimum_angle": minimum_angle,
+		"constraint_count": constraints.size(),
+		"constraints_valid": true,
+		"cut_seam_vertex_count": vertices.filter(func(vertex: Dictionary) -> bool: return str(vertex.get("origin", "")) == "cut_seam").size(),
+		"degenerate_triangle_count": degenerate_count
 	}
 
 
@@ -454,6 +493,24 @@ static func _minimum_triangle_angle(vertices: Array, triangles: Array) -> float:
 	return 0.0 if minimum == 180.0 else minimum
 
 
+static func _degenerate_triangle_count(vertices: Array, triangles: Array) -> int:
+	var by_id: Dictionary = {}
+	for vertex in vertices:
+		by_id[str(vertex.get("id", ""))] = Vector2(vertex.get("position", Vector2.ZERO))
+	var count := 0
+	for triangle in triangles:
+		var ids: Array = triangle.get("vertex_ids", [])
+		if ids.size() != 3:
+			count += 1
+			continue
+		var a: Vector2 = by_id.get(str(ids[0]), Vector2.ZERO)
+		var b: Vector2 = by_id.get(str(ids[1]), Vector2.ZERO)
+		var c: Vector2 = by_id.get(str(ids[2]), Vector2.ZERO)
+		if absf((b - a).cross(c - a)) <= EPSILON:
+			count += 1
+	return count
+
+
 static func _angle_degrees(first: Vector2, second: Vector2) -> float:
 	if first.length_squared() <= EPSILON or second.length_squared() <= EPSILON:
 		return 0.0
@@ -464,6 +521,7 @@ static func _failed_result(sampling_bake: Dictionary, seeding_bake: Dictionary, 
 	return {
 		"valid": false,
 		"errors": errors,
+		"algorithm_version": ALGORITHM_VERSION,
 		"method": recipe["method"],
 		"parameters": recipe["parameters"].duplicate(true),
 		"sampling_bake_id": str(sampling_bake.get("bake_id", "")),
@@ -475,5 +533,9 @@ static func _failed_result(sampling_bake: Dictionary, seeding_bake: Dictionary, 
 		"boundary_constraints": [],
 		"vertex_count": 0,
 		"triangle_count": 0,
-		"minimum_angle": 0.0
+		"minimum_angle": 0.0,
+		"constraint_count": 0,
+		"constraints_valid": false,
+		"cut_seam_vertex_count": 0,
+		"degenerate_triangle_count": 0
 	}

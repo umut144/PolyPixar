@@ -1,14 +1,18 @@
 # PolyTools – Geometry Meshing
 
-**Status:** Meshing MVP contract.
+**Status:** Constrained Meshing MVP contract.
 
 ## Observable result
 
-In `Geometry → Meshing`, the user selects one Component, chooses Constrained
-Delaunay or Organic Relaxed through `CMD/Ctrl + 1 · Method`, selects one of the
-Component's persisted Seeding Bakes, previews the generated triangles, and
-explicitly bakes the accepted Mesh. Each Component retains one Mesh Bake per
-Meshing method for direct comparison in the Outliner.
+In `Mesh → Meshing`, the user selects one closed Body Component, selects its
+accepted Seeding source, adjusts `Mesh Character` between Structured and
+Organic, inspects an automatically generated Preview, and explicitly accepts
+that exact result with `Bake Preview`. The accepted Bake automatically becomes
+the Component Mesh.
+
+The Outliner presents the active dependency chain as Sampling → Seeding →
+Constraints → Mesh. The Inspector exposes one method, `Constrained Mesh`, plus
+view-only toggles for mesh edges, Seed points, triangle fill, and constraints.
 
 ## Ownership and dependency
 
@@ -18,56 +22,55 @@ back into Component topology. The selected Seeding Bake identifies its exact
 Sampling Bake, so Meshing never combines unrelated upstream results.
 
 ```text
-canonical Bézier topology → Sampling Bake → Seeding Bake → Meshing Bake
+canonical Bézier topology → Sampling Bake → Seeding Bake → Constrained Mesh Bake
 ```
 
-Each Mesh Bake stores both upstream Bake IDs and fingerprints. Canonical
-topology changes, Sampling changes, Guide changes, or manual Seed edits make a
-dependent Mesh Bake stale without deleting or rewriting it.
+The Mesh Bake stores both upstream Bake IDs and fingerprints. Canonical
+topology, Sampling, Guide, or accepted Seed changes retain the previous result
+as stale and request a new Preview.
 
-## Methods
+## Artistic Constrained Mesh
 
-- **Constrained Delaunay** uses all sampled boundary vertices as fixed
-  constraints and all selected Seeds as interior vertices. It has no artistic
-  tuning parameter beyond `Seed Source`.
-- **Organic Relaxed** starts from the same constrained result and exposes only
-  `Relaxation` and `Passes`. It moves interior derived vertices toward their
-  local neighbourhood and retriangulates after each pass. Boundary vertices,
-  holes, and Preserve Points remain fixed.
+All closed Bodies use one constrained triangulation method. Sampled Outer,
+Hole, and Cut vertices are fixed constraints; accepted Seeds are interior
+vertices. Hole interiors remain empty and Cuts remain recoverable two-sided
+seams.
 
-Both methods are deterministic for identical inputs and recipes.
+`Mesh Character` is the primary control. Structured uses the direct constrained
+triangulation. Moving toward Organic derives increasing relaxation strength and
+one to four relaxation/retriangulation passes. Only interior Seed vertices can
+move. `Advanced Relaxation` may override strength or pass count independently
+when exact technical control is required.
 
-## Generate, Bake, and comparison
+Relaxation and constrained retriangulation complete before Cut vertices are
+duplicated into seam sides. The result reports vertex and triangle counts,
+minimum angle, recovered constraints, Cut seam vertices, and degenerate
+triangles. Identical inputs and recipes produce identical output.
 
-Method, Seed Source, Relaxation, and Pass changes automatically run Generate.
-Generate produces a temporary preview that does not participate in history.
-Bake accepts only a valid preview matching the current recipe and upstream
-fingerprints; the accepted derived result participates in Undo/Redo and
-Workspace persistence.
+## Preview, Bake, and Component Mesh
 
-The Geometry Outliner displays available Mesh Bakes beneath their Component.
-Switching Method selects its matching Bake and restores its recipe parameters.
-One Bake is retained per method; multiple input variants of the same method
-are deferred.
+Parameter changes schedule one debounced transient Preview. Preview generation
+does not participate in history. `Bake Preview` is enabled only for a valid
+Preview matching the current recipe and upstream fingerprints; it copies that
+result without regenerating it.
 
-Mesh vertices carry stable IDs. Triangles refer to those IDs instead of owning
-copies of positions, establishing the downstream identity required by UV
-Mapping and later Inner Animation without making the Mesh canonical geometry.
+Accepting replaces the Component's single Constrained Mesh Bake and atomically
+records its Bake ID, method, and fingerprint as `component_mesh`. Downstream UV
+Mapping and Weighting consume that accepted output. There is no separate `Use
+as Component Mesh` action. The output is `Ready` while the exact dependency
+chain matches and `Stale` when a source or accepted Bake changes.
 
-## Component Mesh output
+Mesh vertices carry stable IDs, and triangles refer to those IDs instead of
+owning position copies. Cut seam duplicates keep their source identity while
+remaining independent downstream vertices.
 
-A Component explicitly selects one current Mesh Bake through `Use as Component
-Mesh`. This persistent reference stores the Bake ID, method, and fingerprint;
-it is never inferred from the currently viewed or most recently generated
-method. Downstream Weighting and later export consume only this selected output.
+## Migration and deferred work
 
-The output status is `Missing` until selected, `Ready` while its exact Bake and
-upstream chain are current, and `Stale` when that Bake is replaced or any input
-fingerprint changes. Existing Mesh Bakes and the selected reference are retained
-for inspection instead of being silently rewritten.
+Schema 31 consolidates legacy Constrained Delaunay and Organic Relaxed recipes
+and Bakes into one Constrained Mesh. The accepted Component Mesh wins when both
+legacy Bakes exist; legacy Organic controls load as Mesh Character plus exact
+Advanced Relaxation overrides. Old results remain readable but stale until
+regenerated with the current algorithm version.
 
-## Deferred
-
-Manual Mesh editing, quality heatmaps, multiple variants per method, automatic
-refinement controls, UV coordinates, export consumption, Animation weights,
-and reverse synchronization are outside this MVP.
+Manual Mesh editing, quality heatmaps, local refinement painting,
+background-threaded generation, and reverse synchronization remain deferred.

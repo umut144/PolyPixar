@@ -22,9 +22,9 @@ A UV Bake never changes Mesh vertices, Triangles, or Component
 and stores one UV coordinate for each stable Mesh Vertex ID. A changed or stale
 Mesh makes the UV Bake stale without reverse synchronization.
 
-UV Bakes are retained by the combination of Mesh method and UV method. This
-allows CDT and Organic Relaxed Meshes to keep independent Bounds / Planar UV
-results beneath the same Component.
+UV Bakes are retained by the combination of Mesh method and UV method. Closed
+Bodies now contribute one accepted Constrained Mesh source; Ribbon Components
+retain their automatic Ribbon Strip source.
 
 ## Bounds / Planar
 
