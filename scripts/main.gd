@@ -9,10 +9,6 @@ const WORLDS_ROOT := "res://worlds"
 const CONFIG_PATH := "res://configs/app_config.json"
 const SCHEMA_VERSION := 39
 const MAX_HISTORY_SIZE := 100
-const PAPER_SIZES_CM := [Vector2(21.0, 29.7), Vector2(29.7, 42.0), Vector2(42.0, 59.4), Vector2(59.4, 84.1), Vector2(84.1, 118.9)]
-const PAPER_LABELS := ["A4", "A3", "A2", "A1", "A0"]
-const PAPER_NONE_LEVEL := -1
-const PAPER_NONE_LABEL := "Kein Rahmen"
 const DRAW_MODES := ["closed_loop", "ribbon", "primitive"]
 const DEFAULT_CONTOUR_WIDTH_PX := 8.0
 const DEFAULT_RIBBON_WIDTH_PX := 8.0
@@ -231,8 +227,6 @@ var snap_mode_buttons: Array[CheckBox] = []
 var snap_grid_info_label: Label
 var snap_rotation_slider: HSlider
 var snap_rotation_value_label: Label
-var paper_menu: MenuButton
-var paper_level := 0
 var world_scale_menu: Button
 var world_scale_popup: PopupPanel
 var world_unit_option: OptionButton
@@ -701,7 +695,6 @@ func _build_ui() -> void:
 	snap_button.focus_mode = Control.FOCUS_NONE
 	snap_button.pressed.connect(_toggle_snap_popup)
 	toolbar.add_child(snap_button)
-	toolbar.add_child(_create_paper_menu())
 	var toolbar_spacer := Control.new()
 	toolbar_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	toolbar.add_child(toolbar_spacer)
@@ -1696,8 +1689,6 @@ func _update_context_action_button() -> void:
 	var show_asset_create_controls := active_module == "Create" and active_create_submodule in CREATE_SUBMODULES
 	if is_instance_valid(snap_button):
 		snap_button.visible = show_asset_create_controls
-	if is_instance_valid(paper_menu):
-		paper_menu.visible = show_asset_create_controls
 	if not show_asset_create_controls and is_instance_valid(snap_popup):
 		snap_popup.hide()
 	if active_module == "Create" and active_create_submodule in CREATE_SUBMODULES:
@@ -2492,7 +2483,6 @@ func _serialize_editor_state() -> Dictionary:
 		"outliner_asset_type_filters": outliner_asset_type_filters.duplicate(true),
 		"expanded_assets": expanded_state,
 		"asset_cameras": serialized_asset_cameras,
-		"paper_level": paper_level,
 		"world_scale": {
 			"unit": world_unit,
 			"grid_size": world_grid_size
@@ -2598,7 +2588,6 @@ func _restore_editor_state(state) -> void:
 		if geometry_section != null:
 			_set_active_module_visual("Mesh", active_geometry_submodule)
 	_apply_world_scale_settings(state.get("world_scale", {}))
-	paper_level = clampi(int(state.get("paper_level", 0)), PAPER_NONE_LEVEL, PAPER_SIZES_CM.size() - 1)
 	_apply_snap_settings(state.get("snap", {}))
 	# Worlds saved before per-asset cameras keep their one legacy view on the
 	# active asset, rather than losing it during the migration.
@@ -5086,43 +5075,6 @@ func _update_next_ids() -> void:
 func _id_suffix_number(identifier: String) -> int:
 	var suffix := identifier.get_slice("_", identifier.get_slice_count("_") - 1)
 	return suffix.to_int()
-
-
-func _create_paper_menu() -> MenuButton:
-	paper_menu = MenuButton.new()
-	paper_menu.text = "Paper: %s  ▼" % _paper_label()
-	paper_menu.custom_minimum_size = Vector2(118, 32)
-	paper_menu.focus_mode = Control.FOCUS_NONE
-	var paper_popup := paper_menu.get_popup()
-	_style_popup_menu(paper_popup)
-	paper_popup.add_item(PAPER_NONE_LABEL, PAPER_NONE_LEVEL)
-	for paper_index in range(PAPER_LABELS.size()):
-		paper_popup.add_item(PAPER_LABELS[paper_index], paper_index)
-	paper_popup.id_pressed.connect(_on_paper_size_id)
-	return paper_menu
-
-
-func _on_paper_size_id(id: int) -> void:
-	if id == PAPER_NONE_LEVEL:
-		paper_level = PAPER_NONE_LEVEL
-		_render_context_bar()
-		_render_canvas_context()
-		return
-	if id < 0 or id >= PAPER_SIZES_CM.size():
-		return
-	paper_level = id
-	_render_context_bar()
-	_render_canvas_context()
-
-
-func _paper_label() -> String:
-	return PAPER_NONE_LABEL if paper_level == PAPER_NONE_LEVEL else PAPER_LABELS[paper_level]
-
-
-func _paper_frame_size(level: int) -> Vector2:
-	var din_size: Vector2 = PAPER_SIZES_CM[level]
-	var doubled_short_side := minf(din_size.x, din_size.y) * 2.0
-	return Vector2(doubled_short_side, doubled_short_side)
 
 
 func _render_context_bar() -> void:
@@ -12859,7 +12811,6 @@ func _render_canvas_context() -> void:
 	if not is_instance_valid(canvas_context_label):
 		return
 	canvas_view.set_reference_image(null)
-	canvas_view.set_paper_frame(Vector2.ZERO, false)
 	canvas_view.set_guide_style(false)
 	canvas_view.set_point_numbers_visible(false)
 	canvas_view.set_catch_parent_component("")
@@ -12939,7 +12890,6 @@ func _render_canvas_context() -> void:
 		canvas_view.set_context(str(asset["name"]))
 		canvas_view.set_interaction_state("asset")
 		canvas_view.set_asset_pivot(_asset_pivot(asset))
-		canvas_view.set_paper_frame(_paper_frame_size(paper_level) if paper_level >= 0 else Vector2.ZERO, paper_level >= 0)
 		canvas_view.set_tool_mode("")
 		canvas_view.set_component_transform({})
 		canvas_view.set_reference_shapes(_build_reference_shapes(asset, "", selected_component_id))
@@ -12952,7 +12902,6 @@ func _render_canvas_context() -> void:
 		canvas_context_label.text = "Asset: %s" % str(asset["name"])
 		canvas_view.set_context(str(asset["name"]))
 		canvas_view.set_interaction_state("asset")
-		canvas_view.set_paper_frame(Vector2.ZERO, false)
 		canvas_view.set_tool_mode("")
 		canvas_view.set_component_transform({})
 		canvas_view.set_reference_shapes(_build_reference_shapes(asset, "", selected_component_id))
@@ -12985,7 +12934,6 @@ func _render_canvas_context() -> void:
 		canvas_view.set_draw_point_mode(active_draw_point_mode)
 	else:
 		canvas_view.set_tool_mode("")
-	canvas_view.set_paper_frame(Vector2.ZERO, false)
 	var component_transform := ComponentHierarchy.world_transform_record(asset, selected_component_id)
 	component_transform["visibility"] = bool(asset.get("visibility", true)) and bool(component.get("visibility", true))
 	component_transform["z_index"] = int(component.get("z_index", 0))
@@ -13011,7 +12959,6 @@ func _render_spine_canvas(asset: Dictionary, guide: Dictionary, drawing: bool) -
 	var guide_name := _guide_display_name(asset, guide)
 	canvas_context_label.text = "%s: %s%s" % [type_name, guide_name, " · Draft" if drawing else ""]
 	canvas_view.set_context(guide_name)
-	canvas_view.set_paper_frame(Vector2.ZERO, false)
 	canvas_view.set_guide_style(true)
 	canvas_view.set_guide_color(AssetGuide.color(str(guide.get("guide_type", AssetGuide.SAMPLER_SPINE))))
 	canvas_view.set_reference_shapes(_build_reference_shapes(asset, "", target_component_id))

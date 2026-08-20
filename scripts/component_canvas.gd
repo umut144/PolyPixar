@@ -32,8 +32,6 @@ const MIN_ZOOM := 0.25
 # progression and grid package logic unchanged.
 const MAX_ZOOM := 4096.0
 const DEFAULT_ZOOM := 1.0
-const DEFAULT_PAPER_SIZE_CM := Vector2(14.8, 21.0) # DIN A5, portrait
-const DEFAULT_PAPER_MARGIN := 0.9
 const ZOOM_RATE := 1.8
 const CLOSE_DISTANCE_PIXELS := 14.0
 const GIZMO_AXIS_LENGTH := 42.0
@@ -116,8 +114,6 @@ var reference_image_visible := true
 var reference_image_opacity := 0.5
 var reference_image_position := Vector2.ZERO
 var reference_image_scale := 1.0
-var paper_frame_visible := false
-var paper_frame_size := Vector2.ZERO
 var navigation_locked := false
 var command_shortcut_active := false
 var pivot_dragging := false
@@ -139,18 +135,6 @@ func _ready() -> void:
 	focus_mode = Control.FOCUS_ALL
 	mouse_entered.connect(_on_mouse_entered)
 	mouse_exited.connect(_on_mouse_exited)
-	call_deferred("_apply_default_zoom")
-	queue_redraw()
-
-
-func _apply_default_zoom() -> void:
-	if camera_state_restored or size.x <= 0.0 or size.y <= 0.0:
-		return
-	var fit_zoom := minf(
-		size.x / DEFAULT_PAPER_SIZE_CM.x,
-		size.y / DEFAULT_PAPER_SIZE_CM.y
-	) * DEFAULT_PAPER_MARGIN
-	zoom = clampf(fit_zoom, MIN_ZOOM, MAX_ZOOM)
 	queue_redraw()
 
 
@@ -721,12 +705,6 @@ func set_reference_image(texture: Texture2D, image_visible := true, image_opacit
 	queue_redraw()
 
 
-func set_paper_frame(frame_size: Vector2, frame_visible: bool) -> void:
-	paper_frame_size = frame_size
-	paper_frame_visible = frame_visible and frame_size.x > 0.0 and frame_size.y > 0.0
-	queue_redraw()
-
-
 func set_navigation_locked(locked: bool) -> void:
 	navigation_locked = locked
 
@@ -907,7 +885,6 @@ func _draw() -> void:
 	var half_view := size / (2.0 * zoom)
 	var min_world := view_center - half_view
 	var max_world := view_center + half_view
-	_draw_paper_frame()
 	var x_axis_color := Color("#6a4d58")
 	var y_axis_color := Color("#4c6a5b")
 	draw_line(_world_to_screen(Vector2(min_world.x, 0.0)), _world_to_screen(Vector2(max_world.x, 0.0)), x_axis_color, 2.0)
@@ -989,22 +966,6 @@ func _draw_grid_lines(step: float, line_color: Color, line_width: float) -> void
 	for grid_index in range(first_y, last_y + 1):
 		var world_y := grid_index * step
 		draw_line(_world_to_screen(Vector2(min_world.x, world_y)), _world_to_screen(Vector2(max_world.x, world_y)), line_color, line_width)
-
-
-func _draw_paper_frame() -> void:
-	if not paper_frame_visible:
-		return
-	var half_width := paper_frame_size.x * 0.5
-	var half_height := paper_frame_size.y * 0.5
-	var bottom_left := _world_to_screen(Vector2(-half_width, -half_height))
-	var bottom_right := _world_to_screen(Vector2(half_width, -half_height))
-	var top_right := _world_to_screen(Vector2(half_width, half_height))
-	var top_left := _world_to_screen(Vector2(-half_width, half_height))
-	var frame_color := Color("#f2c94caa")
-	draw_line(bottom_left, bottom_right, frame_color, 2.0)
-	draw_line(bottom_right, top_right, frame_color, 2.0)
-	draw_line(top_right, top_left, frame_color, 2.0)
-	draw_line(top_left, bottom_left, frame_color, 2.0)
 
 
 func _draw_measurement_guides() -> void:
