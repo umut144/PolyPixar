@@ -377,8 +377,7 @@
 				}
 			],
 			"id": "component_55",
-			"name": "Body",
-			"name_mode": "manual",
+			"missing_semantic_source": "",
 			"parent_component_id": "",
 			"points": [
 				{
@@ -708,6 +707,7 @@
 			],
 			"primitive": {},
 			"ribbon_width_px": 8.0,
+			"semantic_key": "body",
 			"show_point_numbers": false,
 			"source_asset_id": "",
 			"topology_role": "outer",
@@ -796,8 +796,7 @@
 				}
 			],
 			"id": "component_56",
-			"name": "Trapez",
-			"name_mode": "manual",
+			"missing_semantic_source": "",
 			"parent_component_id": "",
 			"points": [
 				{
@@ -911,6 +910,7 @@
 			],
 			"primitive": {},
 			"ribbon_width_px": 8.0,
+			"semantic_key": "feet",
 			"show_point_numbers": false,
 			"source_asset_id": "",
 			"topology_role": "outer",
@@ -940,12 +940,12 @@
 			"draw_mode": "closed_loop",
 			"edges": [],
 			"id": "component_58",
-			"name": "Orb",
-			"name_mode": "auto",
+			"missing_semantic_source": "",
 			"parent_component_id": "component_55",
 			"points": [],
 			"primitive": {},
 			"ribbon_width_px": 8.0,
+			"semantic_key": "belly",
 			"show_point_numbers": false,
 			"source_asset_id": "asset_7",
 			"topology_role": "hole",
@@ -1383,6 +1383,6 @@
 		"target_height_cm": 120.0,
 		"visible": true
 	},
-	"schema_version": 37,
+	"schema_version": 39,
 	"visibility": true
 }

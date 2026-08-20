@@ -13,7 +13,7 @@
 		"asset_10"
 	],
 	"editor_state": {
-		"active_create_submodule": "Character",
+		"active_create_submodule": "Props",
 		"active_geometry_submodule": "Sampling",
 		"active_module": "Create",
 		"active_motion_submodule": "Animation",
@@ -25,6 +25,13 @@
 					5.92938566207886
 				],
 				"zoom": 125.505121256916
+			},
+			"asset_10": {
+				"position": [
+					-0.138385653495789,
+					19.9986572265625
+				],
+				"zoom": 11.9465613388049
 			},
 			"asset_2": {
 				"position": [
@@ -84,8 +91,8 @@
 			}
 		},
 		"expanded_assets": {
-			"asset_1": true,
-			"asset_10": false,
+			"asset_1": false,
+			"asset_10": true,
 			"asset_2": false,
 			"asset_3": false,
 			"asset_4": false,
@@ -108,8 +115,8 @@
 			"terrain": true
 		},
 		"paper_level": 0,
-		"selected_asset_id": "asset_1",
-		"selected_component_id": "component_7",
+		"selected_asset_id": "asset_10",
+		"selected_component_id": "component_57",
 		"selected_edge_ids": [],
 		"selected_guide_id": "",
 		"selected_motion_act_id": "",
@@ -119,8 +126,8 @@
 		"selected_weighting_style_id": "",
 		"snap": {
 			"enabled": true,
-			"grid_step": 0.05,
-			"mode": "finer",
+			"grid_step": 0.5,
+			"mode": "coarse",
 			"rotation_step": 15.0
 		},
 		"world_scale": {
@@ -132,7 +139,7 @@
 	"paths": [
 		"path_1"
 	],
-	"schema_version": 37,
+	"schema_version": 39,
 	"sequences": [
 		"sequence_1"
 	]

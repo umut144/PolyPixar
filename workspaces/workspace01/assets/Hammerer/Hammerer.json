@@ -345,8 +345,7 @@
 				}
 			],
 			"id": "component_46",
-			"name": "Body",
-			"name_mode": "manual",
+			"missing_semantic_source": "",
 			"parent_component_id": "",
 			"points": [
 				{
@@ -604,6 +603,7 @@
 			],
 			"primitive": {},
 			"ribbon_width_px": 8.0,
+			"semantic_key": "body",
 			"show_point_numbers": false,
 			"source_asset_id": "",
 			"topology_role": "outer",
@@ -724,8 +724,7 @@
 				}
 			],
 			"id": "component_47",
-			"name": "Trapez",
-			"name_mode": "manual",
+			"missing_semantic_source": "",
 			"parent_component_id": "",
 			"points": [
 				{
@@ -911,6 +910,7 @@
 			],
 			"primitive": {},
 			"ribbon_width_px": 8.0,
+			"semantic_key": "feet",
 			"show_point_numbers": false,
 			"source_asset_id": "",
 			"topology_role": "outer",
@@ -1143,8 +1143,7 @@
 				}
 			],
 			"id": "component_48",
-			"name": "Cloak",
-			"name_mode": "manual",
+			"missing_semantic_source": "",
 			"parent_component_id": "component_46",
 			"points": [
 				{
@@ -1582,6 +1581,7 @@
 			],
 			"primitive": {},
 			"ribbon_width_px": 8.0,
+			"semantic_key": "cloak",
 			"show_point_numbers": false,
 			"source_asset_id": "",
 			"topology_role": "outer",
@@ -1734,8 +1734,7 @@
 				}
 			],
 			"id": "component_49",
-			"name": "Head",
-			"name_mode": "manual",
+			"missing_semantic_source": "",
 			"parent_component_id": "",
 			"points": [
 				{
@@ -1993,6 +1992,7 @@
 			],
 			"primitive": {},
 			"ribbon_width_px": 8.0,
+			"semantic_key": "head",
 			"show_point_numbers": false,
 			"source_asset_id": "",
 			"topology_role": "outer",
@@ -2065,8 +2065,7 @@
 				}
 			],
 			"id": "component_50",
-			"name": "EyeL",
-			"name_mode": "manual",
+			"missing_semantic_source": "",
 			"parent_component_id": "component_49",
 			"points": [
 				{
@@ -2144,6 +2143,7 @@
 			],
 			"primitive": {},
 			"ribbon_width_px": 8.0,
+			"semantic_key": "eye_left",
 			"show_point_numbers": false,
 			"source_asset_id": "",
 			"topology_role": "outer",
@@ -2216,8 +2216,7 @@
 				}
 			],
 			"id": "component_51",
-			"name": "EyeR",
-			"name_mode": "manual",
+			"missing_semantic_source": "",
 			"parent_component_id": "component_49",
 			"points": [
 				{
@@ -2295,6 +2294,7 @@
 			],
 			"primitive": {},
 			"ribbon_width_px": 8.0,
+			"semantic_key": "eye_right",
 			"show_point_numbers": false,
 			"source_asset_id": "",
 			"topology_role": "outer",
@@ -2415,8 +2415,7 @@
 				}
 			],
 			"id": "component_52",
-			"name": "Hat",
-			"name_mode": "manual",
+			"missing_semantic_source": "",
 			"parent_component_id": "",
 			"points": [
 				{
@@ -2602,6 +2601,7 @@
 			],
 			"primitive": {},
 			"ribbon_width_px": 8.0,
+			"semantic_key": "hat",
 			"show_point_numbers": false,
 			"source_asset_id": "",
 			"topology_role": "outer",
@@ -2640,6 +2640,6 @@
 		"target_height_cm": 179.0,
 		"visible": true
 	},
-	"schema_version": 37,
+	"schema_version": 39,
 	"visibility": true
 }

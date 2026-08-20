@@ -21,6 +21,7 @@ func _init() -> void:
 	_test_geometry_meshing_service_and_ui()
 	_test_geometry_uv_mapping_service_and_ui()
 	_test_geometry_sdf_service_and_batch()
+	_test_semantic_registry_and_picker()
 	_test_runtime_export_service()
 	_test_weighting_service_and_ui()
 	_test_component_hierarchy_model()
@@ -389,7 +390,7 @@ func _test_geometry_sampling_service() -> void:
 	_expect(not bool(GeometrySamplingService.generate(open_component).get("valid", true)), "An open contour should fail visibly at the mesh-pipeline Sampling boundary.")
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
-	_expect(application._has_supported_schema({"schema_version": 38}) and application._has_supported_schema({"schema_version": 37}) and not application._has_supported_schema({"schema_version": 39}), "Schema 38 should keep current and older Workspace documents readable and reject unknown future schemas.")
+	_expect(application._has_supported_schema({"schema_version": 39}) and application._has_supported_schema({"schema_version": 38}) and not application._has_supported_schema({"schema_version": 40}), "Schema 39 should keep current and older Workspace documents readable and reject unknown future schemas.")
 	var arranged_round_trip: Dictionary = application._normalize_sampling_bake(application._serialize_sampling_bake(arranged_result))
 	_expect(arranged_round_trip.get("cuts", [])[0].get("fragments", []).size() == 2 and arranged_round_trip.get("cuts", [])[0].get("fragments", [])[0].get("samples", [])[0].get("position", null) is Vector2, "Schema 32 should preserve Cut fragment connectivity and restore fragment positions as Vector2 values.")
 	var geometry_document: Dictionary = application._default_geometry_document("asset_1", "component_1")
@@ -398,7 +399,7 @@ func _test_geometry_sampling_service() -> void:
 	baked_result["bake_id"] = "bake_test"
 	geometry_document["sampling"]["bakes"][GeometrySamplingService.ADAPTIVE] = baked_result
 	var serialized_geometry: Dictionary = application._serialize_geometry_document(geometry_document)
-	_expect(int(serialized_geometry.get("schema_version", 0)) == 38 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-38 JSON arrays.")
+	_expect(int(serialized_geometry.get("schema_version", 0)) == 39 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-39 JSON arrays.")
 	var normalized_geometry: Dictionary = application._normalize_geometry_document(serialized_geometry, "asset_1", "component_1")
 	_expect(normalized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Vector2, "Sampling bake loading should restore local sample positions as Vector2 values.")
 	_expect(normalized_geometry["sampling"]["bakes"].size() == 1, "Sampling should retain one Adaptive Bake.")
@@ -420,6 +421,11 @@ func _test_geometry_auto_build_service() -> void:
 	var recipes := GeometryAutoBuildService.automatic_recipes(component)
 	_expect(is_equal_approx(float(recipes.get("sampling", {}).get("parameters", {}).get("spacing", 0.0)), 0.55) and is_equal_approx(float(recipes.get("seeding", {}).get("parameters", {}).get("spacing", 0.0)), 0.55), "Automatic Mesh recipes should start from the accepted shared 0.55 density for normal Character contours.")
 	_expect(is_equal_approx(float(recipes.get("meshing", {}).get("parameters", {}).get("mesh_character", 0.0)), 0.64) and int(recipes.get("meshing", {}).get("parameters", {}).get("passes", 0)) == 3, "Automatic Mesh recipes should retain the accepted optimized Artistic profile.")
+	var large_component := component.duplicate(true)
+	for point in large_component.get("points", []):
+		point["position"] = Vector2(point.get("position", Vector2.ZERO)) * Vector2(2.0, 5.0)
+	var large_recipes := GeometryAutoBuildService.automatic_recipes(large_component)
+	_expect(is_equal_approx(float(large_recipes.get("sampling", {}).get("parameters", {}).get("spacing", 0.0)), 1.0) and is_equal_approx(float(large_recipes.get("seeding", {}).get("parameters", {}).get("spacing", 0.0)), 1.0), "Automatic Mesh recipes should bound interior density for a 20x50 Component instead of generating thousands of avoidable Seeds.")
 	var baked_signature := GeometryAutoBuildService.source_signature(component, [], [], recipes)
 	var jittered := component.duplicate(true)
 	jittered["points"][0]["position"] += Vector2(0.0003, 0.0)
@@ -1061,6 +1067,19 @@ func _test_geometry_sdf_service_and_batch() -> void:
 	var invalid_uv := uv.duplicate(true)
 	invalid_uv["uvs"][0]["uv"] = Vector2(-0.1, 0.0)
 	_expect(not bool(GeometrySDFService.generate(mesh, invalid_uv).get("valid", true)), "SDF generation should reject UV geometry outside normalized texture space instead of clipping it.")
+	var single_triangle_mesh := mesh.duplicate(true)
+	single_triangle_mesh["vertices"] = single_triangle_mesh["vertices"].slice(0, 3)
+	single_triangle_mesh["triangles"] = [single_triangle_mesh["triangles"][0]]
+	single_triangle_mesh["bake_id"] = "mesh_sdf_tiny_triangle"
+	var tiny_uv := GeometryUVMappingService.generate(single_triangle_mesh, uv_recipe)
+	tiny_uv["bake_id"] = "uv_sdf_tiny_triangle"
+	tiny_uv["uvs"][0]["uv"] = Vector2(0.5, 0.5)
+	tiny_uv["uvs"][1]["uv"] = Vector2(0.50001, 0.5)
+	tiny_uv["uvs"][2]["uv"] = Vector2(0.5, 0.50001)
+	_expect(GeometrySDFService.validation_issues(single_triangle_mesh, tiny_uv).is_empty(), "SDF validation should retain a tiny but well-shaped UV Triangle independently of its absolute normalized area.")
+	var collapsed_uv := tiny_uv.duplicate(true)
+	collapsed_uv["uvs"][2]["uv"] = Vector2(0.50002, 0.5)
+	_expect(not GeometrySDFService.validation_issues(single_triangle_mesh, collapsed_uv).is_empty(), "SDF validation should still reject a truly collinear UV Triangle through its scale-relative orientation test.")
 	var ribbon := _component()
 	ribbon.merge({"id": "component_sdf", "name": "ArmLine", "draw_mode": "ribbon", "ribbon_width_px": 8.0, "visibility": true})
 	BezierTopology.add_point(ribbon, Vector2.ZERO, "linear")
@@ -1078,10 +1097,12 @@ func _test_geometry_sdf_service_and_batch() -> void:
 	document["component_mesh"] = {"bake_id": "mesh_ribbon_sdf_test", "method": RibbonMeshService.METHOD, "mesh_fingerprint": GeometryUVMappingService.mesh_fingerprint(ribbon_mesh)}
 	document["uv_mapping"]["recipe"] = ribbon_uv_recipe
 	document["uv_mapping"]["bakes"][GeometryUVMappingService.bake_key(RibbonMeshService.METHOD, GeometryUVMappingService.BOUNDS_PLANAR)] = ribbon_uv
+	document["sdf"]["last_error"] = "Legacy validation failure"
+	document["sdf"]["last_failure_fingerprint"] = GeometrySDFService.source_fingerprint(ribbon_mesh, ribbon_uv, document["sdf"]["recipe"])
 	var assets: Array[Dictionary] = [{"id": "asset_sdf", "name": "Wizard", "visibility": true, "components": [ribbon], "guides": []}]
 	application.assets = assets
 	application.geometry_documents["asset_sdf/component_sdf"] = document
-	_expect(application._all_sdf_update_candidates() == [{"asset_id": "asset_sdf", "component_id": "component_sdf"}], "The SDF batch should include a visible Ribbon with current accepted Mesh and UV Bakes.")
+	_expect(application._all_sdf_update_candidates() == [{"asset_id": "asset_sdf", "component_id": "component_sdf"}] and application._sdf_batch_summary(application._all_sdf_update_candidates()).get("attention", []).is_empty(), "A superseded validation failure should become actionable again without leaving a stale attention warning.")
 	var build: Dictionary = application._generate_component_sdf_build("asset_sdf", "component_sdf")
 	_expect(bool(build.get("valid", false)) and application._commit_component_sdf_build("asset_sdf", "component_sdf", build), "The SDF batch should generate and atomically accept a Ribbon contour image.")
 	_expect(application._sdf_status("asset_sdf", "component_sdf", ribbon) == "Baked" and application._all_sdf_update_candidates().is_empty(), "A current accepted SDF resource should clear the actionable batch state.")
@@ -1089,6 +1110,54 @@ func _test_geometry_sdf_service_and_batch() -> void:
 	_expect(str(round_trip.get("sdf", {}).get("bake", {}).get("pixel_hash", "")) == str(document.get("sdf", {}).get("bake", {}).get("pixel_hash", "")) and not round_trip.get("sdf", {}).get("bake", {}).has("image"), "SDF metadata should survive Geometry persistence without embedding image pixels into JSON.")
 	document["uv_mapping"]["bakes"][GeometryUVMappingService.bake_key(RibbonMeshService.METHOD, GeometryUVMappingService.BOUNDS_PLANAR)]["uvs"][0]["uv"] += Vector2(0.001, 0.0)
 	_expect(application._sdf_status("asset_sdf", "component_sdf", ribbon) == "Stale" and application._all_sdf_update_candidates().size() == 1, "Changing accepted UV coordinates should make the dependent SDF stale without mutating Mesh or Component topology.")
+	application.free()
+
+
+func _test_semantic_registry_and_picker() -> void:
+	var registry := SemanticRegistry.load_registry()
+	_expect(bool(registry.get("valid", false)) and int(registry.get("schema_version", SemanticRegistry.REGISTRY_SCHEMA_VERSION)) == SemanticRegistry.REGISTRY_SCHEMA_VERSION, "The read-only Semantic Registry should load its independently versioned contract.")
+	_expect(registry.get("semantics", []) == ["arm_line", "belly", "body", "cloak", "eye_left", "eye_right", "eyebrow_left", "eyebrow_right", "feet", "hat", "hat_back", "hat_tip", "head", "head_tip"], "Semantic Keys should remain canonical, unique, and alphabetically sorted.")
+	_expect(SemanticRegistry.migrate_legacy_key("Barde", {"name": "Orb"}, registry) == "belly" and SemanticRegistry.migrate_legacy_key("Orb", {"name": "orb"}, registry) == "body" and SemanticRegistry.migrate_legacy_key("Tree", {"name": "Trunk"}, registry) == "body" and SemanticRegistry.migrate_legacy_key("Hammerer", {"name": "Trapez"}, registry) == "feet", "Legacy migration should apply the explicitly approved asset-specific semantic mappings.")
+	_expect(SemanticRegistry.migrate_legacy_key("Glavier", {"name": "HeadTip"}, registry) == "head_tip" and SemanticRegistry.migrate_legacy_key("Mage", {"name": "HatTip"}, registry) == "hat_tip" and SemanticRegistry.migrate_legacy_key("Glavier", {"name": "Belly"}, registry) == "belly", "Legacy migration should preserve Head Tip, Hat Tip, and Belly as distinct approved meanings.")
+	_expect(SemanticRegistry.mirror_key("eye_left") == "eye_right" and SemanticRegistry.mirror_key("eyebrow_right") == "eyebrow_left", "Known left/right Semantic pairs should expose deterministic duplicate mappings.")
+	_expect(SemanticRegistry.component_display_name({"semantic_key": "removed_key"}, registry) == "missing_semantic (removed_key)", "A missing Registry link should remain visible without inventing a replacement Semantic Key.")
+	var picker := SemanticPicker.new()
+	picker.configure(registry.get("semantics", []), "body", ["hat"])
+	_expect(picker.list.item_count == registry.get("semantics", []).size() - 1 and picker.selected_key == "body", "The Semantic Picker should list available keys alphabetically, exclude already-used keys, and retain its current selection.")
+	picker.search_input.text = "eye"
+	picker._render_items("eye")
+	_expect(picker.list.item_count == 4 and str(picker.list.get_item_metadata(0)).begins_with("eye"), "The Semantic Picker should filter keys immediately through its integrated search field.")
+	picker.free()
+	var dropdown := SemanticDropdown.new()
+	dropdown.configure(registry.get("semantics", []), "body", ["hat"])
+	_expect(dropdown.selected_key == "body" and dropdown.text.begins_with("body") and dropdown.list.item_count == registry.get("semantics", []).size() - 1, "The Inspector Semantic control should stay compact while its dropdown retains the searchable filtered list.")
+	dropdown.search_input.text = "tip"
+	dropdown._render_items("tip")
+	_expect(dropdown.list.item_count == 2, "The Semantic dropdown should provide its search field inside the opened menu.")
+	dropdown.free()
+	var application_script = load("res://scripts/main.gd")
+	var application: Control = application_script.new()
+	var source_component := _component()
+	source_component.merge({"id": "component_1", "name": "body", "semantic_key": "body", "visibility": true})
+	var semantic_asset := {"id": "character", "name": "Character", "asset_type": "character", "visibility": true, "components": [source_component], "guides": []}
+	var symbol_asset := {"id": "orb", "name": "Orb", "asset_type": "symbols", "visibility": true, "components": [], "guides": []}
+	var semantic_assets: Array[Dictionary] = [semantic_asset, symbol_asset]
+	application.assets = semantic_assets
+	application._build_ui()
+	_expect(application.component_dialog.dialog_text.is_empty() and application.duplicate_semantic_dialog.dialog_text.is_empty(), "Semantic dialogs should keep AcceptDialog's built-in text empty so it cannot overlap the custom search field.")
+	application._duplicate_component("character", "component_1")
+	_expect(semantic_asset.get("components", []).size() == 1 and application.pending_component_duplicate.get("unresolved", []).size() == 1, "Duplicating a Component without a known mirror pair should pause before mutation and require an explicit Semantic Key.")
+	application.duplicate_semantic_picker.configure(registry.get("semantics", []), "belly", ["body"])
+	application._confirm_duplicate_semantic()
+	_expect(semantic_asset.get("components", []).size() == 2 and str(semantic_asset.get("components", [])[1].get("semantic_key", "")) == "belly", "Choosing an available Semantic Key should commit the previously unresolved duplicate.")
+	application.component_dialog.set_meta("asset_id", "character")
+	application.component_dialog.set_meta("parent_component_id", "")
+	application.component_dialog.set_meta("draw_mode", "reference")
+	application.component_dialog.set_meta("source_asset_id", "orb")
+	application.component_semantic_picker.configure(registry.get("semantics", []), "feet", ["body", "belly"])
+	application._confirm_component_creation()
+	var created_reference: Dictionary = semantic_asset.get("components", [])[2]
+	_expect(str(created_reference.get("type", "")) == "reference" and str(created_reference.get("semantic_key", "")) == "feet" and str(created_reference.get("source_asset_id", "")) == "orb", "Reference creation should require a local Semantic Key while retaining the actual source Asset ID.")
 	application.free()
 
 
@@ -1108,8 +1177,8 @@ func _test_runtime_export_service() -> void:
 		{"vertex_id": "v1", "uv": Vector2(1.0, 0.0)}
 	]}
 	var sdf := {"valid": true, "resolution": [256, 256], "spread_px": 16.0, "boundary_value": 0.5, "inside_is_greater": true, "pixel_hash": "stable_pixels"}
-	var body := {"id": "component_b", "name": "Body", "semantic_role": "body", "visibility": true, "z_index": 2, "parent_component_id": "", "transform": {"position": Vector2(10.0, 20.0), "pivot": Vector2(2.0, 3.0), "rotation": 90.0, "scale": Vector2(2.0, 1.0)}}
-	var eye := {"id": "component_a", "name": "EyeL", "semantic_role": "eye_left", "visibility": true, "z_index": 2, "parent_component_id": "component_b", "transform": {"position": Vector2.ZERO, "pivot": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE}}
+	var body := {"id": "component_b", "name": "body", "semantic_key": "body", "visibility": true, "z_index": 2, "parent_component_id": "", "transform": {"position": Vector2(10.0, 20.0), "pivot": Vector2(2.0, 3.0), "rotation": 90.0, "scale": Vector2(2.0, 1.0)}}
+	var eye := {"id": "component_a", "name": "eye_left", "semantic_key": "eye_left", "visibility": true, "z_index": 2, "parent_component_id": "component_b", "transform": {"position": Vector2.ZERO, "pivot": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE}}
 	var asset := {"id": "wizard", "name": "Wizard", "asset_type": "character", "visibility": true, "asset_pivot": Vector2(5.0, 6.0), "components": [body, eye]}
 	var source := {"mesh": mesh, "uv": uv, "sdf": sdf, "sdf_resource_valid": true, "sdf_source_path": "/tmp/contour_sdf.png"}
 	var result := RuntimeExportService.build_manifest(asset, {"component_a": source, "component_b": source})
@@ -1120,9 +1189,20 @@ func _test_runtime_export_service() -> void:
 	_expect(components[1].get("mesh", {}).get("vertices", []) == [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]] and components[1].get("mesh", {}).get("indices", []) == [0, 1, 2], "Runtime Meshes should preserve accepted Vertex order, convert Tool units to meters, and compact Triangle IDs.")
 	_expect(components[1].get("mesh", {}).get("uvs", []) == [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]], "Runtime UVs should be reordered only through stable Vertex IDs.")
 	_expect(components[1].get("local_transform", {}).get("position", []) == [1.0, 2.0] and is_equal_approx(float(components[1].get("local_transform", {}).get("rotation_radians", 0.0)), PI / 2.0), "Runtime transforms should preserve Y-up coordinates and publish positions in meters and CCW radians.")
+	_expect(not components[1].has("display_name") and str(components[1].get("semantic_key", "")) == "body", "Runtime Components should expose their Semantic Key as the sole authored designation without a redundant display label.")
+	var reference := {"id": "component_orb", "type": "reference", "semantic_key": "belly", "source_asset_id": "orb", "visibility": true, "z_index": 3, "parent_component_id": "component_b", "transform": {"position": Vector2(3.0, 4.0), "pivot": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE}}
+	var referenced_asset: Dictionary = asset.duplicate(true)
+	referenced_asset["components"].append(reference)
+	var reference_source := {"owner_asset_id": "wizard", "source_asset_exists": true}
+	var referenced_result := RuntimeExportService.build_manifest(referenced_asset, {"component_a": source, "component_b": source, "component_orb": reference_source})
+	var referenced_components: Array = referenced_result.get("manifest", {}).get("components", [])
+	var exported_reference: Dictionary = referenced_components[2] if referenced_components.size() == 3 else {}
+	_expect(bool(referenced_result.get("valid", false)) and str(exported_reference.get("kind", "")) == "asset_reference" and str(exported_reference.get("source_asset_id", "")) == "orb" and str(exported_reference.get("semantic_key", "")) == "belly" and not exported_reference.has("mesh"), "A local Semantic Key should classify a Reference while its source_asset_id preserves the actual referenced Asset geometry.")
+	reference_source["source_asset_exists"] = false
+	_expect(not bool(RuntimeExportService.build_manifest(referenced_asset, {"component_a": source, "component_b": source, "component_orb": reference_source}).get("valid", true)), "Runtime export should reject a Reference whose actual source Asset cannot be resolved.")
 	var duplicate_role_asset: Dictionary = asset.duplicate(true)
-	duplicate_role_asset["components"][1]["semantic_role"] = "body"
-	_expect(not bool(RuntimeExportService.build_manifest(duplicate_role_asset, {"component_a": source, "component_b": source}).get("valid", true)), "Runtime export should reject duplicate semantic roles.")
+	duplicate_role_asset["components"][1]["semantic_key"] = "body"
+	_expect(not bool(RuntimeExportService.build_manifest(duplicate_role_asset, {"component_a": source, "component_b": source}).get("valid", true)), "Runtime export should reject duplicate Semantic Keys.")
 	var missing_resource: Dictionary = source.duplicate(true)
 	missing_resource["sdf_resource_valid"] = false
 	_expect(not bool(RuntimeExportService.build_manifest(asset, {"component_a": missing_resource, "component_b": source}).get("valid", true)), "Runtime export should reject a missing or corrupt SDF resource without fallback.")
@@ -1226,7 +1306,7 @@ func _test_component_hierarchy_model() -> void:
 
 func _test_asset_guides() -> void:
 	var component := _component()
-	component.merge({"id": "component_1", "name": "Body", "visibility": true, "transform": {"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}})
+	component.merge({"id": "component_1", "name": "body", "semantic_key": "body", "visibility": true, "transform": {"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}})
 	BezierTopology.add_point(component, Vector2.ZERO, "linear")
 	BezierTopology.add_point(component, Vector2(10.0, 0.0), "linear")
 	BezierTopology.add_point(component, Vector2(10.0, 10.0), "linear")
@@ -1318,10 +1398,11 @@ func _test_asset_guides() -> void:
 	_expect(is_equal_approx(point_after_nudge.x, point_before_nudge.x + 0.5) and is_equal_approx(point_after_nudge.y, point_before_nudge.y), "Arrow keys in Edit Point Select mode should move the selected point by the configured Snap step.")
 	application._nudge_selected_point(Vector2.LEFT)
 	application.next_component_id = 2
-	application.component_name_input.text = "Eyes"
 	application.component_dialog.set_meta("asset_id", "asset_1")
 	application.component_dialog.set_meta("parent_component_id", "component_1")
 	application.component_dialog.set_meta("draw_mode", "ribbon")
+	application.component_dialog.set_meta("source_asset_id", "")
+	application.component_semantic_picker.configure(application.semantic_registry.get("semantics", []), "arm_line", ["body"])
 	application._confirm_component_creation()
 	var child_component: Dictionary = application._get_component(application._get_asset("asset_1"), application.selected_component_id)
 	_expect(str(child_component.get("parent_component_id", "")) == "component_1" and Vector2(child_component.get("transform", {}).get("pivot", Vector2.ZERO)).is_equal_approx(Vector2(parent_component.get("transform", {}).get("pivot", Vector2.ZERO))), "Child creation should persist a real Parent relationship and inherit the Parent pivot initially.")
@@ -1340,8 +1421,10 @@ func _test_asset_guides() -> void:
 	_expect(application.active_state == "draw" and Vector2(flow_guide.get("points", [])[0].get("position", Vector2.ZERO)).is_equal_approx(Vector2(10.0, 5.0)), "Flow Guides should catch Draw Guide Points on their parent Component contour just like Sample Guides.")
 	_expect(application.component_add_child_menu.item_count == 3 and application.component_add_guide_menu.item_count == 4, "Every Component add menu should expose all three Child draw modes and all four Guide types.")
 	parent_component["transform"] = {"position": Vector2(-3.0, 2.0), "rotation": 20.0, "scale": Vector2(1.0, 1.5), "pivot": Vector2.ZERO}
-	parent_component["name"] = "EyeBrowL"
-	child_component["name"] = "EyeL"
+	parent_component["name"] = "eyebrow_left"
+	parent_component["semantic_key"] = "eyebrow_left"
+	child_component["name"] = "eye_left"
+	child_component["semantic_key"] = "eye_left"
 	var duplicate_asset: Dictionary = application._get_asset("asset_1")
 	var component_count_before_duplicate: int = duplicate_asset.get("components", []).size()
 	var guide_count_before_duplicate: int = duplicate_asset.get("guides", []).size()
@@ -1349,8 +1432,11 @@ func _test_asset_guides() -> void:
 	application._duplicate_component("asset_1", "component_1")
 	var plain_duplicate: Dictionary = application._get_component(application._get_asset("asset_1"), application.selected_component_id)
 	var plain_duplicate_children := ComponentHierarchy.children(application._get_asset("asset_1"), str(plain_duplicate.get("id", "")))
-	_expect(application._get_asset("asset_1").get("components", []).size() == component_count_before_duplicate + 1 + descendant_count_before_duplicate and application._get_asset("asset_1").get("guides", []).size() == guide_count_before_duplicate and str(plain_duplicate.get("parent_component_id", "")) == str(parent_component.get("parent_component_id", "")) and str(plain_duplicate.get("name", "")) == "EyeBrowR" and plain_duplicate_children.size() == descendant_count_before_duplicate and str(plain_duplicate_children[0].get("name", "")) == "EyeR", "Component Duplicate should copy the complete Component subtree and swap terminal L/R names.")
+	_expect(application._get_asset("asset_1").get("components", []).size() == component_count_before_duplicate + 1 + descendant_count_before_duplicate and application._get_asset("asset_1").get("guides", []).size() == guide_count_before_duplicate and str(plain_duplicate.get("parent_component_id", "")) == str(parent_component.get("parent_component_id", "")) and str(plain_duplicate.get("semantic_key", "")) == "eyebrow_right" and plain_duplicate_children.size() == descendant_count_before_duplicate and str(plain_duplicate_children[0].get("semantic_key", "")) == "eye_right", "Component Duplicate should copy the complete Component subtree and map known left/right Semantic Keys automatically.")
 	_expect(str(plain_duplicate.get("id", "")) != "component_1" and str(plain_duplicate.get("points", [])[0].get("id", "")) != str(parent_component.get("points", [])[0].get("id", "")), "Component Duplicate should remap the Component and topology IDs independently.")
+	for duplicate_child in plain_duplicate_children:
+		application._get_asset("asset_1")["components"].erase(duplicate_child)
+	application._get_asset("asset_1")["components"].erase(plain_duplicate)
 	application._duplicate_component("asset_1", "component_1", "keep_orientation")
 	var kept_duplicate: Dictionary = application._get_component(application._get_asset("asset_1"), application.selected_component_id)
 	var kept_children := ComponentHierarchy.children(application._get_asset("asset_1"), str(kept_duplicate.get("id", "")))
@@ -1358,6 +1444,9 @@ func _test_asset_guides() -> void:
 	var source_visual_center: Vector2 = application._component_visual_center_in_parent_space(parent_component)
 	var kept_visual_center: Vector2 = application._component_visual_center_in_parent_space(kept_duplicate)
 	_expect(is_equal_approx(kept_visual_center.x, -source_visual_center.x) and is_equal_approx(kept_visual_center.y, source_visual_center.y) and is_equal_approx(float(kept_duplicate.get("transform", {}).get("rotation", 0.0)), 20.0), "Keep Orientation should mirror the visible Component placement across the Parent Y axis without rotating it.")
+	for duplicate_child in kept_children:
+		application._get_asset("asset_1")["components"].erase(duplicate_child)
+	application._get_asset("asset_1")["components"].erase(kept_duplicate)
 	application._duplicate_component("asset_1", "component_1", "flip_orientation")
 	var flipped_duplicate: Dictionary = application._get_component(application._get_asset("asset_1"), application.selected_component_id)
 	_expect(is_equal_approx(float(flipped_duplicate.get("transform", {}).get("rotation", 0.0)), -20.0) and is_equal_approx(Vector2(flipped_duplicate.get("transform", {}).get("scale", Vector2.ONE)).x, -1.0), "Flip Orientation should mirror the Component geometry orientation as well as its Y-axis position.")
@@ -1371,10 +1460,11 @@ func _test_asset_guides() -> void:
 	var detached_child: Dictionary = application._get_component(application._get_asset("asset_1"), str(child_component.get("id", "")))
 	var child_world_after_detach := ComponentHierarchy.world_transform_record(application._get_asset("asset_1"), str(child_component.get("id", "")))
 	_expect(str(detached_child.get("parent_component_id", "")).is_empty() and child_world_before_detach["position"].is_equal_approx(child_world_after_detach["position"]) and is_equal_approx(float(child_world_before_detach["rotation"]), float(child_world_after_detach["rotation"])), "Detach from Parent should promote a Child to the Parent's level without changing its world transform.")
-	application.component_name_input.text = "Pupil"
 	application.component_dialog.set_meta("asset_id", "asset_1")
 	application.component_dialog.set_meta("parent_component_id", "component_1")
 	application.component_dialog.set_meta("draw_mode", "primitive")
+	application.component_dialog.set_meta("source_asset_id", "")
+	application.component_semantic_picker.configure(application.semantic_registry.get("semantics", []), "cloak", ["eyebrow_left", "eye_left", "eyebrow_right", "eye_right"])
 	application._confirm_component_creation()
 	var pupil_component: Dictionary = application._get_component(application._get_asset("asset_1"), application.selected_component_id)
 	_expect(str(pupil_component.get("parent_component_id", "")) == "component_1" and str(pupil_component.get("draw_mode", "")) == "primitive" and pupil_component.get("points", []).is_empty() and pupil_component.get("edges", []).is_empty() and pupil_component.get("chains", []).is_empty() and pupil_component.get("primitive", {}).is_empty(), "Primitive Child creation should create an empty Primitive Component without generated Bézier topology.")
@@ -1686,7 +1776,7 @@ func _test_motion_act_evaluator() -> void:
 	var normalized: Dictionary = application._normalize_motion_act({"id": "act_7", "parameters": {"direction": [0.0, 2.0], "distance": 12.0}}, "fallback")
 	_expect(Vector2(normalized.get("parameters", {}).get("direction", Vector2.ZERO)) == Vector2(0.0, 2.0), "Persisted Slide direction arrays should normalize back to Vector2 values.")
 	var serialized: Dictionary = application._serialize_motion_act(normalized)
-	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 38, "Act persistence should serialize vectors as JSON arrays using schema 38.")
+	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 39, "Act persistence should serialize vectors as JSON arrays using schema 39.")
 	var normalized_jump: Dictionary = application._normalize_motion_act({"id": "act_8", "primitive": "jump", "parameters": {"direction": [1.0, 0.0], "distance": 7.0, "height": 2.5, "arc": "snappy"}}, "fallback")
 	var serialized_jump: Dictionary = application._serialize_motion_act(normalized_jump)
 	_expect(str(serialized_jump.get("primitive", "")) == MotionActEvaluator.JUMP and is_equal_approx(float(serialized_jump.get("parameters", {}).get("height", 0.0)), 2.5) and str(serialized_jump.get("parameters", {}).get("arc", "")) == MotionActEvaluator.JUMP_ARC_SNAPPY, "Jump-specific parameters should survive normalization and serialization.")

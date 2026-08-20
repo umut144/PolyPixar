@@ -297,8 +297,7 @@
 				}
 			],
 			"id": "component_18",
-			"name": "Head",
-			"name_mode": "manual",
+			"missing_semantic_source": "",
 			"parent_component_id": "",
 			"points": [
 				{
@@ -448,6 +447,7 @@
 			],
 			"primitive": {},
 			"ribbon_width_px": 8.0,
+			"semantic_key": "head",
 			"show_point_numbers": true,
 			"source_asset_id": "",
 			"topology_role": "outer",
@@ -512,8 +512,7 @@
 				}
 			],
 			"id": "component_19",
-			"name": "HeadTip",
-			"name_mode": "manual",
+			"missing_semantic_source": "",
 			"parent_component_id": "",
 			"points": [
 				{
@@ -573,6 +572,7 @@
 			],
 			"primitive": {},
 			"ribbon_width_px": 8.0,
+			"semantic_key": "head_tip",
 			"show_point_numbers": false,
 			"source_asset_id": "",
 			"topology_role": "outer",
@@ -637,8 +637,7 @@
 				}
 			],
 			"id": "component_20",
-			"name": "EyeR",
-			"name_mode": "manual",
+			"missing_semantic_source": "",
 			"parent_component_id": "component_18",
 			"points": [
 				{
@@ -698,6 +697,7 @@
 			],
 			"primitive": {},
 			"ribbon_width_px": 8.0,
+			"semantic_key": "eye_right",
 			"show_point_numbers": false,
 			"source_asset_id": "",
 			"topology_role": "outer",
@@ -762,8 +762,7 @@
 				}
 			],
 			"id": "component_21",
-			"name": "EyeL",
-			"name_mode": "manual",
+			"missing_semantic_source": "",
 			"parent_component_id": "component_18",
 			"points": [
 				{
@@ -823,6 +822,7 @@
 			],
 			"primitive": {},
 			"ribbon_width_px": 8.0,
+			"semantic_key": "eye_left",
 			"show_point_numbers": false,
 			"source_asset_id": "",
 			"topology_role": "outer",
@@ -927,8 +927,7 @@
 				}
 			],
 			"id": "component_22",
-			"name": "Body",
-			"name_mode": "manual",
+			"missing_semantic_source": "",
 			"parent_component_id": "",
 			"points": [
 				{
@@ -1078,6 +1077,7 @@
 			],
 			"primitive": {},
 			"ribbon_width_px": 8.0,
+			"semantic_key": "body",
 			"show_point_numbers": false,
 			"source_asset_id": "",
 			"topology_role": "outer",
@@ -1182,8 +1182,7 @@
 				}
 			],
 			"id": "component_23",
-			"name": "Belly",
-			"name_mode": "manual",
+			"missing_semantic_source": "",
 			"parent_component_id": "component_22",
 			"points": [
 				{
@@ -1333,6 +1332,7 @@
 			],
 			"primitive": {},
 			"ribbon_width_px": 8.0,
+			"semantic_key": "belly",
 			"show_point_numbers": false,
 			"source_asset_id": "",
 			"topology_role": "outer",
@@ -1371,6 +1371,6 @@
 		"target_height_cm": 16.0,
 		"visible": false
 	},
-	"schema_version": 37,
+	"schema_version": 39,
 	"visibility": true
 }

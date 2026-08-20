@@ -58,8 +58,9 @@ An Asset contains:
 
 A Component contains its geometry source, hierarchy reference, local transform,
 visibility/layer settings, draw mode, widths, catch-parent reference, and point
-number display setting. It may carry one runtime `semantic_role`; roles must be
-unique within an exported Asset. It has no Material assignment.
+number display setting. It carries one required `semantic_key`, which is both
+its registry identity and its only authored name. Keys must be registered and
+unique within an Asset. It has no Material assignment.
 
 Derived mesh documents are keyed by Asset and Component IDs. Sampling feeds
 Seeding, Seeding feeds Meshing, and accepted Bakes remain separate from source
@@ -147,6 +148,10 @@ Schema 35 stores semantic Component Mesh build provenance in the derived
 Geometry document. The persistent `Update Meshes (N)` action rebuilds only
 meshable Components across all Create Asset types whose effective geometry,
 constraints, or recipes differ meaningfully from their last successful build.
+New automatic recipes retain the calibrated `0.55` spacing for normal contours
+but scale it upward when Component area would exceed the automatic interior
+density budget. This keeps large simple Assets responsive without rewriting an
+existing manual recipe.
 Numeric geometry is compared
 with a scale-aware tolerance against that accepted snapshot; topology,
 constraints, recipes, and algorithm versions remain exact. Failed Components
@@ -168,6 +173,11 @@ linear L8 PNG beside the Component Geometry document. The JSON Bake contains
 only compact interpretation metadata, source fingerprints, pixel hash, and the
 relative `contour_sdf.png` reference. Missing files and changed Mesh, UV, recipe,
 or algorithm inputs make the Bake stale; no image data becomes Component topology.
+SDF validation measures UV collapse relative to each Triangle's own longest-edge
+scale. It rejects truly collinear mappings without misclassifying small,
+well-shaped normalized UV Triangles as degenerate. Its failure-retry signature
+is versioned independently from the pixel algorithm, allowing repaired
+validation failures to retry without invalidating every accepted SDF image.
 
 Schema 38 adds the Component-level `semantic_role` field. It retires the
 standalone Godot-scene Export workspace in favor of the persistent
@@ -178,6 +188,18 @@ treated as executable derived-build candidates. `BatchStatusButton` consumes
 the same summary and draws a per-Button attention point independently of the
 Button's enabled state; it never maintains a separate warning flag.
 
+Schema 39 replaces the provisional free-form `name` / `semantic_role` pair with
+one required `semantic_key`. `configs/semantic_keys.json` owns the independent
+Semantic Registry schema 1. The registry is read-only in the application;
+creation uses a searchable alphabetical picker, while Inspector reassignment
+places that searchable list in a compact dropdown. Unknown links display as
+`missing_semantic (<key/source>)`. Pre-schema-39 data
+migrates through the explicitly reviewed legacy mapping. Known left/right pairs
+are mirrored automatically during duplication; all other copied Components
+must receive an explicit available key before the duplicate is committed.
+Asset References use the same local Semantic picker but retain the borrowed
+Asset in `source_asset_id`, so local classification never erases geometry origin.
+
 Sampling results carry their own algorithm version independently of the
 Workspace schema. The junction-aware version invalidates pre-arrangement flat
 Cut Bakes at Sampling, which in turn makes Seeding stale before Meshing can
@@ -187,9 +209,11 @@ consume an incompatible PSLG.
 
 `RuntimeExportService` builds manifest schema 1 exclusively from current
 accepted Component Mesh, UV, and SDF Bakes. It rejects missing or stale inputs,
-missing/corrupt mask resources, invalid or duplicate semantic roles, references,
-and incomplete or cyclic visible hierarchies. It never derives replacement
-geometry during export.
+missing/corrupt mask resources, invalid or duplicate Semantic Keys, unresolved
+Asset References, and incomplete or cyclic visible hierarchies. Ordinary
+Components never derive replacement geometry during export. References emit an
+`asset_reference` record containing the local `semantic_key` and actual
+`source_asset_id`, without copying a second Mesh or contour mask into the owner.
 
 The contract is engine-neutral: X points right, Y points up, lengths are meters,
 positive rotations are counter-clockwise radians, and one Tool unit equals

@@ -8,6 +8,7 @@ const MIN_BOUNDARY_SAMPLES := 8
 const MAX_BOUNDARY_SAMPLES := 512
 const CALIBRATED_SPACING := 0.55
 const CALIBRATED_FEATURE_DETAIL := 0.55
+const MAX_AUTOMATIC_AREA_CELLS := 1000.0
 const HOLE_DENSITY_FACTOR := 0.75
 const CUT_DENSITY_FACTOR := 1.25
 
@@ -15,10 +16,15 @@ const CUT_DENSITY_FACTOR := 1.25
 static func automatic_recipes(component: Dictionary, cut_guides: Array = [], hole_components: Array = []) -> Dictionary:
 	var metrics := analyze(component)
 	var perimeter := float(metrics.get("perimeter", 0.0))
+	var area := float(metrics.get("area", 0.0))
 	var spacing := CALIBRATED_SPACING
 	if perimeter > 0.0:
 		spacing = minf(spacing, perimeter / float(MIN_BOUNDARY_SAMPLES))
 		spacing = maxf(spacing, perimeter / float(MAX_BOUNDARY_SAMPLES))
+	if area > 0.0:
+		# Keep automatic interior density bounded for physically large Components.
+		# Manual recipes remain exact and are never rewritten by this calibration.
+		spacing = maxf(spacing, sqrt(area / MAX_AUTOMATIC_AREA_CELLS))
 	spacing = maxf(spacing, GeometrySamplingService.MIN_SPACING)
 	var refinements: Dictionary = {}
 	for hole in hole_components:

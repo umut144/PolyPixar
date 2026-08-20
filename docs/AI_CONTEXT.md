@@ -106,7 +106,9 @@ or missing-resource changes make the SDF stale without changing source topology.
 
 The persistent `Export Runtime (N)` action automatically considers every visible
 Asset. Every visible Component must have one unique
-lower-snake-case semantic role and current accepted Mesh, UV, and SDF resources.
+registered `semantic_key`. Ordinary Components require current accepted Mesh,
+UV, and SDF resources. Asset References instead export their local Semantic Key
+plus the actual `source_asset_id`; they do not duplicate the referenced geometry.
 The batch writes a versioned engine-neutral manifest plus copied SDF masks to
 the project-sibling `PolyToolsRuntimeExports/<asset_id>/` directory. Packages are
 staged, verified, and replaced atomically per Asset; an invalid Asset retains
@@ -125,10 +127,36 @@ disabled.
 
 A Workspace persists Assets plus the currently retained motion and derived
 mesh records. Assets own Components, Guides, reference-image settings, their
-Asset pivot and `asset_type`. Components own an optional
-runtime semantic role. New persistence must not add display polygons or reverse
+Asset pivot and `asset_type`. Workspace schema 39 makes `semantic_key` the
+required, sole authored Component designation. The key is its registry identity,
+visible name, search term, and runtime target; no independent Component label or
+free-form runtime role is persisted. New persistence must not add display polygons or reverse
 synchronization into Component topology. The former Godot-scene Export module
 is retired; runtime export is a batch operation over accepted derived data.
+
+## Semantic Registry workflow
+
+`configs/semantic_keys.json` is the independently versioned, read-only Semantic
+Registry. Its schema version is currently `1`; keys are unique, stable,
+alphabetically sorted `lower_snake_case` values. The editor provides no inline
+add, rename, or delete action. Component and Asset-Reference creation require a
+choice from the searchable registry picker, and the Inspector uses the same
+searchable list inside a compact dropdown. A key may occur only once inside an
+Asset.
+
+References classify the borrowed geometry locally: for example, Barde may use
+the Orb Asset through `source_asset_id = "orb"` while assigning the local
+`semantic_key = "belly"`. Duplicate maps the known pairs `eye_left` /
+`eye_right` and `eyebrow_left` / `eyebrow_right` automatically. Every other
+copied Component requires an explicit picker choice before the duplicate is
+committed.
+
+Registry changes are a Mensch-AI maintenance operation. Before adding or
+replacing a key, inspect all Workspace, Motion, export, test, and documentation
+uses; then update the registry and every affected reference atomically. Do not
+silently repurpose an existing key. A removed or unknown link must remain
+visible as `missing_semantic (<key/source>)` and block runtime export until a
+valid replacement is chosen.
 
 ## Verification
 

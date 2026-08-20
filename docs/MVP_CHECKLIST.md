@@ -70,10 +70,12 @@ before implementing real creation tools.
       empty.
 - [x] List created Assets in the Outliner and select them there.
 - [x] Show the selected Asset's name in the Inspector and allow renaming.
-- [x] Show `Add Component` below an Asset and create named Components.
-- [x] Use `component01`, `component02`, and so on when a Component name is
-      confirmed empty.
-- [x] Select Components in the Outliner and edit their `Name` in the Inspector.
+- [x] Show `Add Component` below an Asset and create Components through the
+      required searchable Semantic Key picker (Schema 39 supersedes free names).
+- [x] Keep the Semantic Registry application-read-only; do not invent fallback
+      `component01` names or allow an empty Semantic Key.
+- [x] Select Components in the Outliner and reassign their unique registered
+      Semantic Key through the Inspector picker.
 - [x] Delete the selected Component with `Backspace` when no editing state is
       active; keep point deletion available inside Edit state.
 - [x] Add the initial Texture document model with independent `elements`,

@@ -2,11 +2,11 @@ class_name RuntimeExportService
 extends RefCounted
 
 const MANIFEST_SCHEMA_VERSION := 1
-const ROLE_PATTERN := "^[a-z][a-z0-9_]*$"
-
-
 static func build_manifest(asset: Dictionary, sources: Dictionary) -> Dictionary:
 	var errors: Array[String] = []
+	var registry := SemanticRegistry.load_registry()
+	if not bool(registry.get("valid", false)):
+		errors.append_array(registry.get("errors", []))
 	var asset_id := str(asset.get("id", ""))
 	if asset_id.is_empty():
 		errors.append("Asset ID is missing.")
@@ -21,21 +21,19 @@ static func build_manifest(asset: Dictionary, sources: Dictionary) -> Dictionary
 			continue
 		var component: Dictionary = raw_component
 		var component_id := str(component.get("id", ""))
-		var role := str(component.get("semantic_role", "")).strip_edges()
+		var role := str(component.get("semantic_key", "")).strip_edges()
 		if component_id.is_empty():
 			errors.append("A visible Component has no stable ID.")
 		elif ids.has(component_id):
 			errors.append("Component ID '%s' is duplicated." % component_id)
 		else:
 			ids[component_id] = true
-		if not role_is_valid(role):
-			errors.append("%s: semantic role must be a non-empty lower_snake_case identifier." % _component_label(component))
+		if not SemanticRegistry.contains(registry, role):
+			errors.append("%s: Semantic Key is missing from the registry." % _component_label(component))
 		elif roles.has(role):
-			errors.append("Semantic role '%s' is duplicated." % role)
+			errors.append("Semantic Key '%s' is duplicated." % role)
 		else:
 			roles[role] = true
-		if str(component.get("type", "component")) != "component":
-			errors.append("%s: referenced Components are not supported by runtime export." % _component_label(component))
 		visible_components.append(component)
 	visible_components.sort_custom(_component_less)
 	for component in visible_components:
@@ -48,11 +46,12 @@ static func build_manifest(asset: Dictionary, sources: Dictionary) -> Dictionary
 	for component in visible_components:
 		var component_id := str(component.get("id", ""))
 		var source: Dictionary = sources.get(component_id, {})
-		var built := _build_component(component, source)
+		var built := _build_reference_component(component, source) if str(component.get("type", "component")) == "reference" else _build_component(component, source)
 		errors.append_array(built.get("errors", []))
 		if bool(built.get("valid", false)):
 			manifest_components.append(built["component"])
-			masks.append(built["mask"])
+			if built.has("mask"):
+				masks.append(built["mask"])
 	if visible_components.is_empty():
 		errors.append("The Asset has no visible Components to export.")
 	if not bool(asset.get("visibility", true)):
@@ -83,11 +82,6 @@ static func build_manifest(asset: Dictionary, sources: Dictionary) -> Dictionary
 		"components": manifest_components
 	}
 	return {"valid": true, "errors": [], "manifest": manifest, "masks": masks}
-
-
-static func role_is_valid(role: String) -> bool:
-	var regex := RegEx.new()
-	return regex.compile(ROLE_PATTERN) == OK and regex.search(role) != null
 
 
 static func _build_component(component: Dictionary, source: Dictionary) -> Dictionary:
@@ -189,8 +183,7 @@ static func _build_component(component: Dictionary, source: Dictionary) -> Dicti
 		"errors": [],
 		"component": {
 			"component_id": component_id,
-			"display_name": str(component.get("name", component_id)),
-			"semantic_role": str(component.get("semantic_role", "")).strip_edges(),
+			"semantic_key": str(component.get("semantic_key", "")).strip_edges(),
 			"parent_component_id": null if str(component.get("parent_component_id", "")).is_empty() else str(component.get("parent_component_id", "")),
 			"z_index": int(component.get("z_index", 0)),
 			"local_pivot": _meters(pivot),
@@ -219,6 +212,45 @@ static func _build_component(component: Dictionary, source: Dictionary) -> Dicti
 	}
 
 
+static func _build_reference_component(component: Dictionary, source: Dictionary) -> Dictionary:
+	var errors: Array[String] = []
+	var label := _component_label(component)
+	var source_asset_id := str(component.get("source_asset_id", ""))
+	if source_asset_id.is_empty() or not bool(source.get("source_asset_exists", false)):
+		errors.append("%s: referenced source Asset is missing." % label)
+	if source_asset_id == str(source.get("owner_asset_id", "")):
+		errors.append("%s: an Asset cannot reference itself." % label)
+	var transform = component.get("transform", {})
+	if not transform is Dictionary:
+		transform = {}
+	var position := Vector2(transform.get("position", Vector2.ZERO))
+	var pivot := Vector2(transform.get("pivot", Vector2.ZERO))
+	var scale := Vector2(transform.get("scale", Vector2.ONE))
+	var rotation := float(transform.get("rotation", 0.0))
+	if not position.is_finite() or not pivot.is_finite() or not scale.is_finite() or not is_finite(rotation):
+		errors.append("%s: Component transform is not finite." % label)
+	if not errors.is_empty():
+		return {"valid": false, "errors": errors}
+	return {
+		"valid": true,
+		"errors": [],
+		"component": {
+			"component_id": str(component.get("id", "")),
+			"semantic_key": str(component.get("semantic_key", "")),
+			"kind": "asset_reference",
+			"source_asset_id": source_asset_id,
+			"parent_component_id": null if str(component.get("parent_component_id", "")).is_empty() else str(component.get("parent_component_id", "")),
+			"z_index": int(component.get("z_index", 0)),
+			"local_pivot": _meters(pivot),
+			"local_transform": {
+				"position": _meters(position),
+				"rotation_radians": deg_to_rad(rotation),
+				"scale": [scale.x, scale.y]
+			}
+		}
+	}
+
+
 static func _hierarchy_errors(components: Array[Dictionary]) -> Array[String]:
 	var errors: Array[String] = []
 	var parent_by_id: Dictionary = {}
@@ -243,7 +275,7 @@ static func _component_less(a: Dictionary, b: Dictionary) -> bool:
 
 
 static func _component_label(component: Dictionary) -> String:
-	return "%s (%s)" % [str(component.get("name", "Component")), str(component.get("id", "missing-id"))]
+	return "%s (%s)" % [str(component.get("semantic_key", "missing_semantic")), str(component.get("id", "missing-id"))]
 
 
 static func _meters(value: Vector2) -> Array:

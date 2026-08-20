@@ -23140,11 +23140,41 @@
 			}
 		}
 	},
-	"schema_version": 37,
+	"schema_version": 39,
 	"sdf": {
-		"bake": {},
-		"last_error": "The UV Bake contains a degenerate Triangle.",
-		"last_failure_fingerprint": "9de6203394a690a45ca5c1d1f90b0cf768e9f8c8a647d689f426ac34c8ff59fe",
+		"bake": {
+			"algorithm_version": 1,
+			"bake_id": "sdf_bake_3101505712279467166",
+			"boundary_value": 0.5,
+			"channel": "r",
+			"color_space": "linear",
+			"errors": [],
+			"image_origin": "top_left",
+			"image_path": "contour_sdf.png",
+			"inside_is_greater": true,
+			"mesh_bake_id": "meshing_bake_8071226602867358685",
+			"mesh_fingerprint": "c5259f477a7dc0f0ae29b00aabb77274f9f8e759481a9a532232b8c4f76c6f9e",
+			"mesh_method": "constrained_mesh",
+			"method": "single_channel_sdf",
+			"parameters": {
+				"resolution": 256,
+				"spread_px": 16.0
+			},
+			"pixel_hash": "df749ed4dec1a8c9841dc60d56bfa2c61b25e4c8bc64e15f2146020af984bd89",
+			"resolution": [
+				256,
+				256
+			],
+			"source_fingerprint": "9de6203394a690a45ca5c1d1f90b0cf768e9f8c8a647d689f426ac34c8ff59fe",
+			"spread_px": 16.0,
+			"uv_bake_id": "uv_bake_6278557469859532061",
+			"uv_fingerprint": "7363b60243a66d8b399615798efa00e4d8e41adebca5365243562c34d636f045",
+			"uv_origin": "bottom_left",
+			"uv_to_pixel": "x=u*width, y=(1-v)*height",
+			"valid": true
+		},
+		"last_error": "",
+		"last_failure_fingerprint": "",
 		"recipe": {
 			"method": "single_channel_sdf",
 			"parameters": {

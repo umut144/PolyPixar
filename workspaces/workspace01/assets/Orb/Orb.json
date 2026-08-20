@@ -222,8 +222,7 @@
 			"draw_mode": "primitive",
 			"edges": [],
 			"id": "component_53",
-			"name": "orb",
-			"name_mode": "manual",
+			"missing_semantic_source": "",
 			"parent_component_id": "",
 			"points": [],
 			"primitive": {
@@ -235,6 +234,7 @@
 				"type": "circle"
 			},
 			"ribbon_width_px": 8.0,
+			"semantic_key": "body",
 			"show_point_numbers": false,
 			"source_asset_id": "",
 			"topology_role": "outer",
@@ -273,6 +273,6 @@
 		"target_height_cm": 13.0,
 		"visible": true
 	},
-	"schema_version": 37,
+	"schema_version": 39,
 	"visibility": true
 }

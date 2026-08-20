@@ -3,12 +3,14 @@ extends RefCounted
 
 const SINGLE_CHANNEL_SDF := "single_channel_sdf"
 const ALGORITHM_VERSION := 1
+const VALIDATION_VERSION := 2
 const DEFAULT_RESOLUTION := 256
 const DEFAULT_SPREAD_PX := 16.0
 const MIN_RESOLUTION := 16
 const MAX_RESOLUTION := 2048
 const MIN_SPREAD_PX := 1.0
 const EPSILON := 0.000001
+const UV_RELATIVE_AREA_EPSILON := 0.0000001
 
 
 static func default_recipe() -> Dictionary:
@@ -134,8 +136,11 @@ static func validation_issues(mesh_bake: Dictionary, uv_bake: Dictionary, raw_re
 		if not uv_by_id.has(str(ids[0])) or not uv_by_id.has(str(ids[1])) or not uv_by_id.has(str(ids[2])):
 			errors.append("A Component Mesh Triangle references a Vertex without accepted UVs.")
 			continue
-		if absf(_cross(uv_by_id[str(ids[1])] - uv_by_id[str(ids[0])], uv_by_id[str(ids[2])] - uv_by_id[str(ids[0])])) <= EPSILON:
-			errors.append("The UV Bake contains a degenerate Triangle.")
+		var uv_a: Vector2 = uv_by_id[str(ids[0])]
+		var uv_b: Vector2 = uv_by_id[str(ids[1])]
+		var uv_c: Vector2 = uv_by_id[str(ids[2])]
+		if _uv_triangle_is_collapsed(uv_a, uv_b, uv_c):
+			errors.append("The UV Bake contains a numerically collapsed Triangle.")
 	var recipe := normalize_recipe(raw_recipe)
 	if float(recipe["parameters"]["spread_px"]) * 2.0 >= float(recipe["parameters"]["resolution"]):
 		errors.append("SDF Spread must be smaller than half the image resolution.")
@@ -163,6 +168,13 @@ static func source_fingerprint(mesh_bake: Dictionary, uv_bake: Dictionary, raw_r
 		uv_fingerprint(uv_bake),
 		str(ALGORITHM_VERSION),
 		JSON.stringify(recipe, "", true, true)
+	]))
+
+
+static func failure_fingerprint(mesh_bake: Dictionary, uv_bake: Dictionary, raw_recipe = {}) -> String:
+	return _strings_hash(PackedStringArray([
+		source_fingerprint(mesh_bake, uv_bake, raw_recipe),
+		"validation:%d" % VALIDATION_VERSION
 	]))
 
 
@@ -222,6 +234,19 @@ static func _point_in_triangle(point: Vector2, a: Vector2, b: Vector2, c: Vector
 
 static func _cross(a: Vector2, b: Vector2) -> float:
 	return a.x * b.y - a.y * b.x
+
+
+static func _uv_triangle_is_collapsed(a: Vector2, b: Vector2, c: Vector2) -> bool:
+	var ab := b - a
+	var bc := c - b
+	var ca := a - c
+	var edge_scale_squared := maxf(ab.length_squared(), maxf(bc.length_squared(), ca.length_squared()))
+	if edge_scale_squared <= 0.0:
+		return true
+	# UVs are normalized, so a fixed absolute area threshold rejects small but
+	# well-shaped triangles. Compare orientation against the triangle's own edge
+	# scale instead; this remains stable across Component and UV-island sizes.
+	return absf(_cross(ab, c - a)) <= edge_scale_squared * UV_RELATIVE_AREA_EPSILON
 
 
 static func _uv_to_pixel(uv: Vector2, resolution: int) -> Vector2:
