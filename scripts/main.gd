@@ -68,6 +68,11 @@ var geometry_uv_mapping_preview_key := ""
 var geometry_uv_mapping_checker_overlay := true
 var sdf_images: Dictionary = {}
 var sdf_resource_validation_cache: Dictionary = {}
+var batch_status_snapshot: Dictionary = {}
+var batch_status_revision := 0
+var batch_status_snapshot_revision := -1
+var batch_status_snapshot_build_count := 0
+var batch_status_refresh_timer: Timer
 var weighting_preview: Dictionary = {}
 var weighting_preview_key := ""
 var geometry_seeding_edit_active := false
@@ -271,6 +276,11 @@ func _ready() -> void:
 	history_coalesce_timer.wait_time = 0.25
 	history_coalesce_timer.timeout.connect(_finish_history_coalescing)
 	add_child(history_coalesce_timer)
+	batch_status_refresh_timer = Timer.new()
+	batch_status_refresh_timer.one_shot = true
+	batch_status_refresh_timer.wait_time = 0.15
+	batch_status_refresh_timer.timeout.connect(_refresh_batch_status_snapshot)
+	add_child(batch_status_refresh_timer)
 	_apply_world_scale()
 	_render_outliner()
 	_render_inspector()
@@ -298,6 +308,10 @@ func _disable_quit_shortcut() -> void:
 
 
 func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_FOCUS_IN:
+		sdf_resource_validation_cache.clear()
+		_invalidate_batch_status()
+		return
 	if what != NOTIFICATION_WM_CLOSE_REQUEST:
 		return
 	if Input.is_key_pressed(KEY_META) or Input.is_key_pressed(KEY_CTRL):
@@ -2029,6 +2043,7 @@ func _push_undo_snapshot() -> void:
 
 
 func _record_direct_change() -> void:
+	_invalidate_batch_status()
 	history_coalescing = false
 	if is_instance_valid(history_coalesce_timer):
 		history_coalesce_timer.stop()
@@ -2036,6 +2051,7 @@ func _record_direct_change() -> void:
 
 
 func _record_coalesced_change() -> void:
+	_invalidate_batch_status()
 	if not history_coalescing:
 		_push_undo_snapshot()
 		history_coalescing = true
@@ -2048,6 +2064,7 @@ func _finish_history_coalescing() -> void:
 
 
 func _restore_history_snapshot(snapshot: Dictionary) -> void:
+	_invalidate_batch_status()
 	# Undo/redo restores document data, not the user's currently selected tool.
 	# Keep the interaction state when the same component remains selected.
 	var retained_module := active_module
@@ -2314,6 +2331,7 @@ func _load_workspace(workspace_entry: String, persist_as_last := true) -> bool:
 	geometry_documents = loaded_geometry_documents
 	sdf_images.clear()
 	sdf_resource_validation_cache.clear()
+	_invalidate_batch_status()
 	geometry_sampling_preview = {}
 	geometry_sampling_preview_key = ""
 	geometry_sampling_preview_state = "idle"
@@ -3780,13 +3798,57 @@ func _all_mesh_update_candidates() -> Array[Dictionary]:
 	return result
 
 
+func _invalidate_batch_status() -> void:
+	batch_status_revision += 1
+	if is_instance_valid(batch_status_refresh_timer) and batch_status_refresh_timer.is_inside_tree():
+		batch_status_refresh_timer.start()
+
+
+func _batch_status_snapshot() -> Dictionary:
+	if batch_status_snapshot_revision == batch_status_revision and not batch_status_snapshot.is_empty():
+		return batch_status_snapshot
+	# Keep the prior UI-only snapshot during a short edit burst. Batch commands
+	# never consume this cache and always rebuild their authoritative candidates.
+	if not batch_status_snapshot.is_empty() and is_instance_valid(batch_status_refresh_timer) and not batch_status_refresh_timer.is_stopped():
+		return batch_status_snapshot
+	return _rebuild_batch_status_snapshot()
+
+
+func _rebuild_batch_status_snapshot() -> Dictionary:
+	var mesh_candidates := _all_mesh_update_candidates()
+	var uv_candidates := _all_uv_update_candidates()
+	var sdf_candidates := _all_sdf_update_candidates()
+	var runtime_candidates := _all_runtime_export_candidates()
+	batch_status_snapshot = {
+		"mesh": {"candidates": mesh_candidates, "summary": _mesh_batch_summary(mesh_candidates)},
+		"uv": {"candidates": uv_candidates, "summary": _uv_batch_summary(uv_candidates)},
+		"sdf": {"candidates": sdf_candidates, "summary": _sdf_batch_summary(sdf_candidates)},
+		"runtime": {"candidates": runtime_candidates, "summary": _runtime_export_batch_summary(runtime_candidates)}
+	}
+	batch_status_snapshot_revision = batch_status_revision
+	batch_status_snapshot_build_count += 1
+	return batch_status_snapshot
+
+
+func _refresh_batch_status_snapshot() -> void:
+	if mesh_batch_running or uv_batch_running or sdf_batch_running or runtime_export_batch_running:
+		batch_status_refresh_timer.start()
+		return
+	_rebuild_batch_status_snapshot()
+	_update_meshes_button()
+	_update_uvs_button()
+	_update_sdfs_button()
+	_update_runtime_export_button()
+
+
 func _update_meshes_button() -> void:
 	if not is_instance_valid(update_meshes_button):
 		return
 	if mesh_batch_running or uv_batch_running or sdf_batch_running or runtime_export_batch_running:
 		return
-	var candidates := _all_mesh_update_candidates()
-	var summary := _mesh_batch_summary(candidates)
+	var status: Dictionary = _batch_status_snapshot().get("mesh", {})
+	var candidates: Array = status.get("candidates", [])
+	var summary: Dictionary = status.get("summary", {})
 	var count := candidates.size()
 	update_meshes_button.text = "Update Meshes (%d)" % count
 	update_meshes_button.tooltip_text = _batch_summary_tooltip(summary, "All Meshes current")
@@ -3825,8 +3887,9 @@ func _all_uv_update_candidates() -> Array[Dictionary]:
 func _update_uvs_button() -> void:
 	if not is_instance_valid(update_uvs_button) or mesh_batch_running or uv_batch_running or sdf_batch_running or runtime_export_batch_running:
 		return
-	var candidates := _all_uv_update_candidates()
-	var summary := _uv_batch_summary(candidates)
+	var status: Dictionary = _batch_status_snapshot().get("uv", {})
+	var candidates: Array = status.get("candidates", [])
+	var summary: Dictionary = status.get("summary", {})
 	update_uvs_button.text = "Update UVs (%d)" % candidates.size()
 	update_uvs_button.tooltip_text = _batch_summary_tooltip(summary, "All UVs current")
 	update_uvs_button.set_attention_count(summary.get("attention", PackedStringArray()).size())
@@ -3900,8 +3963,9 @@ func _all_sdf_update_candidates() -> Array[Dictionary]:
 func _update_sdfs_button() -> void:
 	if not is_instance_valid(update_sdfs_button) or mesh_batch_running or uv_batch_running or sdf_batch_running or runtime_export_batch_running:
 		return
-	var candidates := _all_sdf_update_candidates()
-	var summary := _sdf_batch_summary(candidates)
+	var status: Dictionary = _batch_status_snapshot().get("sdf", {})
+	var candidates: Array = status.get("candidates", [])
+	var summary: Dictionary = status.get("summary", {})
 	update_sdfs_button.text = "Update SDFs (%d)" % candidates.size()
 	update_sdfs_button.tooltip_text = _batch_summary_tooltip(summary, "All SDFs current")
 	update_sdfs_button.set_attention_count(summary.get("attention", PackedStringArray()).size())
@@ -4350,7 +4414,7 @@ func _on_update_sdfs_pressed() -> void:
 
 
 func _runtime_export_root() -> String:
-	return ProjectSettings.globalize_path("res://").get_base_dir().path_join("PolyToolsRuntimeExports")
+	return ProjectSettings.globalize_path("res://PolyToolsRuntimeExports")
 
 
 func _runtime_export_build(asset: Dictionary) -> Dictionary:
@@ -4430,8 +4494,9 @@ func _runtime_export_batch_summary(candidates: Array[Dictionary]) -> Dictionary:
 func _update_runtime_export_button() -> void:
 	if not is_instance_valid(runtime_export_button) or mesh_batch_running or uv_batch_running or sdf_batch_running or runtime_export_batch_running:
 		return
-	var candidates := _all_runtime_export_candidates()
-	var summary := _runtime_export_batch_summary(candidates)
+	var status: Dictionary = _batch_status_snapshot().get("runtime", {})
+	var candidates: Array = status.get("candidates", [])
+	var summary: Dictionary = status.get("summary", {})
 	runtime_export_button.text = "Export Runtime (%d)" % candidates.size()
 	runtime_export_button.disabled = candidates.is_empty()
 	runtime_export_button.tooltip_text = _batch_summary_tooltip(summary, "All runtime packages current")
@@ -4481,11 +4546,12 @@ func _write_runtime_export_package(asset: Dictionary, build: Dictionary) -> bool
 	_remove_runtime_export_tree(backup)
 	if DirAccess.make_dir_recursive_absolute(staging.path_join("masks")) != OK:
 		return false
+	var manifest_text := JSON.stringify(build.get("manifest", {}), "\t")
 	var manifest_file := FileAccess.open(staging.path_join("manifest.json"), FileAccess.WRITE)
 	if manifest_file == null:
 		_remove_runtime_export_tree(staging)
 		return false
-	manifest_file.store_string(JSON.stringify(build.get("manifest", {}), "\t"))
+	manifest_file.store_string(manifest_text)
 	manifest_file.close()
 	for mask in build.get("masks", []):
 		var source_path := str(mask.get("source_path", ""))
@@ -4493,8 +4559,7 @@ func _write_runtime_export_package(asset: Dictionary, build: Dictionary) -> bool
 		if not FileAccess.file_exists(source_path) or DirAccess.copy_absolute(source_path, destination) != OK:
 			_remove_runtime_export_tree(staging)
 			return false
-	var staged_manifest = _read_json(staging.path_join("manifest.json"))
-	if staged_manifest != build.get("manifest", {}):
+	if not _runtime_manifest_text_matches(manifest_text, FileAccess.get_file_as_string(staging.path_join("manifest.json"))):
 		_remove_runtime_export_tree(staging)
 		return false
 	for mask in build.get("masks", []):
@@ -4512,6 +4577,10 @@ func _write_runtime_export_package(asset: Dictionary, build: Dictionary) -> bool
 		return false
 	_remove_runtime_export_tree(backup)
 	return true
+
+
+func _runtime_manifest_text_matches(expected_text: String, staged_text: String) -> bool:
+	return not staged_text.is_empty() and JSON.parse_string(staged_text) is Dictionary and staged_text == expected_text
 
 
 func _remove_runtime_export_tree(path: String) -> void:

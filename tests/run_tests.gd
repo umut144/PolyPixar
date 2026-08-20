@@ -497,6 +497,12 @@ func _test_geometry_sampling_ui_shell() -> void:
 	_expect(application.runtime_export_button.text == "Export Runtime (1)" and application.runtime_export_button.tooltip_text.contains("Needs attention (1):"), "Every visible Asset should enter Runtime Export automatically and expose invalid contract data in the tooltip without an opt-in flag.")
 	_expect(application.update_meshes_button is BatchStatusButton and application.update_meshes_button.attention_count == 0, "An actionable Mesh alone should not illuminate the Mesh attention indicator.")
 	_expect(application.update_uvs_button.attention_count == 1 and application.update_sdfs_button.attention_count == 1 and application.runtime_export_button.attention_count == 1, "Each affected Batch button should own an independent attention indicator derived from its own summary.")
+	var batch_snapshot_builds: int = application.batch_status_snapshot_build_count
+	application._render_outliner()
+	_expect(application.batch_status_snapshot_build_count == batch_snapshot_builds, "Selection-only Outliner rendering should reuse one shared Batch-status snapshot across all four toolbar buttons.")
+	application._record_direct_change()
+	application._render_outliner()
+	_expect(application.batch_status_snapshot_build_count == batch_snapshot_builds + 1, "A document mutation should invalidate the shared Batch-status snapshot exactly once.")
 	_expect(application.geometry_sampling_workspace.visible, "Geometry Sampling should own a dedicated visible centre workspace.")
 	_expect(application.outliner_list.get_child_count() > 1, "Sampling Outliner should expose the Asset/Component hierarchy.")
 	_expect(application.inspector_content.get_child_count() >= 8, "A selected Component should expose Adaptive parameters, boundary inputs, result, and Bake controls.")
@@ -1162,6 +1168,13 @@ func _test_semantic_registry_and_picker() -> void:
 
 
 func _test_runtime_export_service() -> void:
+	var application = load("res://scripts/main.gd").new()
+	_expect(application._runtime_export_root() == ProjectSettings.globalize_path("res://PolyToolsRuntimeExports"), "Runtime packages should be written to the ignored PolyToolsRuntimeExports directory inside the PolyTools project.")
+	var numeric_manifest := {"schema_version": 1, "values": [0, 1.0, 0.25]}
+	var numeric_manifest_text := JSON.stringify(numeric_manifest, "\t")
+	_expect(application._runtime_manifest_text_matches(numeric_manifest_text, numeric_manifest_text), "Runtime staging should verify the exact valid JSON bytes without rejecting Godot's numeric JSON round-trip types.")
+	_expect(not application._runtime_manifest_text_matches(numeric_manifest_text, numeric_manifest_text + " "), "Runtime staging should reject Manifest bytes that differ from the expected package.")
+	application.free()
 	var mesh := {
 		"valid": true,
 		"vertices": [

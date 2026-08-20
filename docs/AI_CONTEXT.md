@@ -110,7 +110,7 @@ registered `semantic_key`. Ordinary Components require current accepted Mesh,
 UV, and SDF resources. Asset References instead export their local Semantic Key
 plus the actual `source_asset_id`; they do not duplicate the referenced geometry.
 The batch writes a versioned engine-neutral manifest plus copied SDF masks to
-the project-sibling `PolyToolsRuntimeExports/<asset_id>/` directory. Packages are
+the project-local `res://PolyToolsRuntimeExports/<asset_id>/` directory. Packages are
 staged, verified, and replaced atomically per Asset; an invalid Asset retains
 its older package and no fallback geometry is generated.
 

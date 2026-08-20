@@ -187,6 +187,10 @@ The Mesh, UV, SDF, and Runtime Export batch tooltips share compact `Pending` and
 treated as executable derived-build candidates. `BatchStatusButton` consumes
 the same summary and draws a per-Button attention point independently of the
 Button's enabled state; it never maintains a separate warning flag.
+All four Buttons consume one UI-only Batch-status snapshot. Selection and
+render-only changes reuse it; document mutations invalidate it and coalesced
+edits refresh it after a short debounce. Batch execution never trusts the UI
+cache and recomputes authoritative candidates before mutating derived data.
 
 Schema 39 replaces the provisional free-form `name` / `semantic_role` pair with
 one required `semantic_key`. `configs/semantic_keys.json` owns the independent
@@ -223,8 +227,8 @@ global ascending `(z_index, component_id)` order from back to front. Accepted
 Mesh Vertex order is retained, Triangle Vertex IDs become compact indices, and
 UVs are aligned to that same order through stable Vertex IDs.
 
-Each visible Asset is exported to the project-sibling
-`PolyToolsRuntimeExports/<asset_id>/` directory as `manifest.json` plus relative
+Each visible Asset is exported to the project-local
+`res://PolyToolsRuntimeExports/<asset_id>/` directory as `manifest.json` plus relative
 `masks/<component_id>.sdf.png` resources. The batch verifies a staging package
 before atomically replacing the prior package; validation or I/O failure leaves
 the prior package intact. Package freshness is derived by comparing the expected
