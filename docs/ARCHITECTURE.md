@@ -153,6 +153,13 @@ are isolated and retain their previous valid Component Mesh. Components with
 invalid source topology remain outside the actionable count and surface the
 specific validation issue in the Meshing Inspector.
 
+Schema 36 makes the accepted Component Mesh the sole UV Mapping input. It adds
+deterministic UV Padding, exact Vertex-ID mapping validation, Ribbon Strip UV
+support, and the persistent `Update UVs (N)` batch. Existing manual recipes are
+preserved, pre-schema-36 unpadded Bakes retain Padding `0` and therefore become
+stale against the new padded default, and a failed batch attempt never replaces
+an older valid UV Bake.
+
 Sampling results carry their own algorithm version independently of the
 Workspace schema. The junction-aware version invalidates pre-arrangement flat
 Cut Bakes at Sampling, which in turn makes Seeding stale before Meshing can

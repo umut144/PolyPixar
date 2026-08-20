@@ -387,7 +387,7 @@ func _test_geometry_sampling_service() -> void:
 	_expect(not bool(GeometrySamplingService.generate(open_component).get("valid", true)), "An open contour should fail visibly at the mesh-pipeline Sampling boundary.")
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
-	_expect(application._has_supported_schema({"schema_version": 35}) and application._has_supported_schema({"schema_version": 34}) and not application._has_supported_schema({"schema_version": 36}), "Schema 35 should keep current and older Workspace documents readable and reject unknown future schemas.")
+	_expect(application._has_supported_schema({"schema_version": 36}) and application._has_supported_schema({"schema_version": 35}) and not application._has_supported_schema({"schema_version": 37}), "Schema 36 should keep current and older Workspace documents readable and reject unknown future schemas.")
 	var arranged_round_trip: Dictionary = application._normalize_sampling_bake(application._serialize_sampling_bake(arranged_result))
 	_expect(arranged_round_trip.get("cuts", [])[0].get("fragments", []).size() == 2 and arranged_round_trip.get("cuts", [])[0].get("fragments", [])[0].get("samples", [])[0].get("position", null) is Vector2, "Schema 32 should preserve Cut fragment connectivity and restore fragment positions as Vector2 values.")
 	var geometry_document: Dictionary = application._default_geometry_document("asset_1", "component_1")
@@ -396,7 +396,7 @@ func _test_geometry_sampling_service() -> void:
 	baked_result["bake_id"] = "bake_test"
 	geometry_document["sampling"]["bakes"][GeometrySamplingService.ADAPTIVE] = baked_result
 	var serialized_geometry: Dictionary = application._serialize_geometry_document(geometry_document)
-	_expect(int(serialized_geometry.get("schema_version", 0)) == 35 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-35 JSON arrays.")
+	_expect(int(serialized_geometry.get("schema_version", 0)) == 36 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-36 JSON arrays.")
 	var normalized_geometry: Dictionary = application._normalize_geometry_document(serialized_geometry, "asset_1", "component_1")
 	_expect(normalized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Vector2, "Sampling bake loading should restore local sample positions as Vector2 values.")
 	_expect(normalized_geometry["sampling"]["bakes"].size() == 1, "Sampling should retain one Adaptive Bake.")
@@ -482,7 +482,8 @@ func _test_geometry_sampling_ui_shell() -> void:
 	application._render_outliner()
 	application._render_inspector()
 	application._render_canvas_context()
-	_expect(is_instance_valid(application.update_meshes_button) and application.update_meshes_button.text == "Update Meshes (1)" and not application.update_meshes_button.disabled, "The persistent toolbar should expose one actionable valid unmeshed Component for the current Asset.")
+	_expect(is_instance_valid(application.update_meshes_button) and application.update_meshes_button.text == "Update Meshes (1)" and not application.update_meshes_button.disabled, "The persistent toolbar should expose one actionable valid unmeshed Component across all Create Assets.")
+	_expect(application.update_meshes_button.tooltip_text == "Wizard / Body", "Update Meshes hover text should contain only the compact Asset / Component list of affected Meshes.")
 	_expect(application.geometry_sampling_workspace.visible, "Geometry Sampling should own a dedicated visible centre workspace.")
 	_expect(application.outliner_list.get_child_count() > 1, "Sampling Outliner should expose the Asset/Component hierarchy.")
 	_expect(application.inspector_content.get_child_count() >= 8, "A selected Component should expose Adaptive parameters, boundary inputs, result, and Bake controls.")
@@ -942,7 +943,7 @@ func _test_geometry_uv_mapping_service_and_ui() -> void:
 	_expect(uv_result == repeated, "UV Mapping must be deterministic for an identical Mesh Bake and recipe.")
 	for entry in uv_result.get("uvs", []):
 		var uv := Vector2(entry.get("uv", Vector2.ZERO))
-		_expect(uv.x >= -0.0001 and uv.x <= 1.0001 and uv.y >= -0.0001 and uv.y <= 1.0001, "Default Bounds / Planar UVs should fit into normalized UV space.")
+		_expect(uv.x >= GeometryUVMappingService.DEFAULT_PADDING - 0.0001 and uv.x <= 1.0 - GeometryUVMappingService.DEFAULT_PADDING + 0.0001 and uv.y >= GeometryUVMappingService.DEFAULT_PADDING - 0.0001 and uv.y <= 1.0 - GeometryUVMappingService.DEFAULT_PADDING + 0.0001, "Default Bounds / Planar UVs should preserve the calibrated contour-mask padding inside normalized UV space.")
 	var transformed_recipe := {"method": GeometryUVMappingService.BOUNDS_PLANAR, "parameters": {"mesh_method": GeometryMeshingService.CONSTRAINED_MESH, "scale": 0.75, "rotation": 15.0, "offset_u": 0.1, "offset_v": -0.05, "preserve_aspect": false}}
 	var transformed := GeometryUVMappingService.generate(mesh, transformed_recipe)
 	_expect(bool(transformed.get("valid", false)) and transformed.get("uvs", []) != uv_result.get("uvs", []), "UV Scale, Rotation, Offset, and Preserve Aspect should affect only the derived UV result.")
@@ -956,6 +957,7 @@ func _test_geometry_uv_mapping_service_and_ui() -> void:
 	document["seeding"]["bakes"][GeometrySeedingService.POISSON_FILL] = seeding
 	document["meshing"]["recipe"] = {"method": GeometryMeshingService.CONSTRAINED_MESH, "parameters": {"seeding_method": GeometrySeedingService.POISSON_FILL}}
 	document["meshing"]["bakes"][GeometryMeshingService.CONSTRAINED_MESH] = mesh
+	document["component_mesh"] = {"bake_id": "mesh_uv_test", "method": GeometryMeshingService.CONSTRAINED_MESH, "mesh_fingerprint": GeometryUVMappingService.mesh_fingerprint(mesh)}
 	uv_result["bake_id"] = "uv_bounds_test"
 	var uv_key := GeometryUVMappingService.bake_key(GeometryMeshingService.CONSTRAINED_MESH, GeometryUVMappingService.BOUNDS_PLANAR)
 	document["uv_mapping"]["recipe"] = recipe
@@ -977,6 +979,7 @@ func _test_geometry_uv_mapping_service_and_ui() -> void:
 	application._render_inspector()
 	application._render_canvas_context()
 	_expect(application.geometry_uv_mapping_workspace.visible and application.inspector_content.get_child_count() >= 14, "UV Mapping should expose its dedicated split Workspace and compact Bounds / Planar Inspector.")
+	_expect(application.update_uvs_button.text == "Update UVs (0)" and application.update_uvs_button.disabled, "A current accepted UV Bake should leave the global UV batch empty.")
 	application._activate_geometry_uv_mapping_method_choice()
 	var active_style := application.geometry_uv_mapping_method_menu.get_theme_stylebox("normal") as StyleBoxFlat
 	_expect(application.active_context_command == "geometry.uv_mapping.method" and application.geometry_uv_mapping_method_choice_active and active_style != null and active_style.bg_color == Color("#8fd8f5"), "UV Mapping CMD+1 should use the shared exclusive Method state and highlight.")
@@ -992,11 +995,34 @@ func _test_geometry_uv_mapping_service_and_ui() -> void:
 	scale_input.max_value = 100.0
 	application._commit_geometry_uv_mapping_float_text("1,25", scale_input, "scale")
 	_expect(is_equal_approx(float(application._geometry_uv_mapping_recipe("asset_1", "component_1").get("parameters", {}).get("scale", 0.0)), 1.25), "UV numeric fields should accept comma-decimal direct input and update the Recipe.")
+	_expect(application._geometry_uv_mapping_status("asset_1", "component_1", component) == "Stale" and application._all_uv_update_candidates().size() == 1, "Changing a UV recipe should make its accepted Bake stale and actionable without changing the Component Mesh.")
 	normalized["uv_mapping"]["recipe"] = GeometryUVMappingService.normalize_recipe(recipe)
 	normalized["meshing"]["bakes"][GeometryMeshingService.CONSTRAINED_MESH]["vertices"][0]["position"] += Vector2(0.1, 0.0)
-	_expect(application._geometry_uv_mapping_status("asset_1", "component_1", component) == "Stale", "Changing the referenced Mesh Bake should make its UV Bake stale without changing Mesh or Component topology.")
+	_expect(application._geometry_uv_mapping_status("asset_1", "component_1", component) == "Mesh Required / Stale", "Changing the accepted Component Mesh should block UV use without changing Component topology.")
 	scale_input.free()
 	application.free()
+	var ribbon := _component()
+	ribbon.merge({"id": "component_ribbon", "name": "ArmLine", "draw_mode": "ribbon", "ribbon_width_px": 8.0, "visibility": true})
+	BezierTopology.add_point(ribbon, Vector2.ZERO, "linear")
+	BezierTopology.add_point(ribbon, Vector2(0.0, 8.0), "linear")
+	var ribbon_mesh := RibbonMeshService.generate(ribbon)
+	ribbon_mesh["bake_id"] = "mesh_ribbon_uv_test"
+	var ribbon_application: Control = application_script.new()
+	var ribbon_document: Dictionary = ribbon_application._default_geometry_document("asset_ribbon", "component_ribbon")
+	ribbon_document["meshing"]["bakes"][RibbonMeshService.METHOD] = ribbon_mesh
+	ribbon_document["component_mesh"] = {"bake_id": "mesh_ribbon_uv_test", "method": RibbonMeshService.METHOD, "mesh_fingerprint": GeometryUVMappingService.mesh_fingerprint(ribbon_mesh)}
+	var ribbon_assets: Array[Dictionary] = [{"id": "asset_ribbon", "name": "Wizard", "visibility": true, "components": [ribbon], "guides": []}]
+	ribbon_application.assets = ribbon_assets
+	ribbon_application.geometry_documents["asset_ribbon/component_ribbon"] = ribbon_document
+	_expect(ribbon_application._all_uv_update_candidates() == [{"asset_id": "asset_ribbon", "component_id": "component_ribbon"}], "The UV batch should include a visible Ribbon with a current accepted Component Mesh.")
+	var ribbon_build: Dictionary = ribbon_application._generate_component_uv_build("asset_ribbon", "component_ribbon")
+	_expect(bool(ribbon_build.get("valid", false)) and str(ribbon_build.get("result", {}).get("mesh_method", "")) == RibbonMeshService.METHOD, "Automatic UV generation should consume the accepted Ribbon Strip Component Mesh without a manual source choice.")
+	ribbon_application._commit_component_uv_build("asset_ribbon", "component_ribbon", ribbon_build)
+	_expect(ribbon_application._all_uv_update_candidates().is_empty() and ribbon_application._geometry_uv_mapping_status("asset_ribbon", "component_ribbon", ribbon) == "Baked", "Committing an automatic Ribbon UV Bake should clear its actionable batch state.")
+	ribbon["visibility"] = false
+	ribbon_document["uv_mapping"]["bakes"].clear()
+	_expect(ribbon_application._all_uv_update_candidates().is_empty(), "The UV batch should not mutate hidden Components.")
+	ribbon_application.free()
 
 
 func _test_weighting_service_and_ui() -> void:
@@ -1557,7 +1583,7 @@ func _test_motion_act_evaluator() -> void:
 	var normalized: Dictionary = application._normalize_motion_act({"id": "act_7", "parameters": {"direction": [0.0, 2.0], "distance": 12.0}}, "fallback")
 	_expect(Vector2(normalized.get("parameters", {}).get("direction", Vector2.ZERO)) == Vector2(0.0, 2.0), "Persisted Slide direction arrays should normalize back to Vector2 values.")
 	var serialized: Dictionary = application._serialize_motion_act(normalized)
-	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 35, "Act persistence should serialize vectors as JSON arrays using schema 35.")
+	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 36, "Act persistence should serialize vectors as JSON arrays using schema 36.")
 	var normalized_jump: Dictionary = application._normalize_motion_act({"id": "act_8", "primitive": "jump", "parameters": {"direction": [1.0, 0.0], "distance": 7.0, "height": 2.5, "arc": "snappy"}}, "fallback")
 	var serialized_jump: Dictionary = application._serialize_motion_act(normalized_jump)
 	_expect(str(serialized_jump.get("primitive", "")) == MotionActEvaluator.JUMP and is_equal_approx(float(serialized_jump.get("parameters", {}).get("height", 0.0)), 2.5) and str(serialized_jump.get("parameters", {}).get("arc", "")) == MotionActEvaluator.JUMP_ARC_SNAPPY, "Jump-specific parameters should survive normalization and serialization.")

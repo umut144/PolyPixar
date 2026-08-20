@@ -4,21 +4,21 @@
 	"component_mesh": {
 		"bake_id": "meshing_bake_1200537350300454419",
 		"build_provenance": {
-			"attempts": 1,
+			"attempts": 1.0,
 			"exact_input_hash": "b8e37fedb6b89a42da06f13ddf235d342be4def0f62b1481a1f95a3b90310cbb",
-			"schema_version": 1,
+			"schema_version": 1.0,
 			"source_signature": {
 				"geometry_tolerance": 0.00055,
-				"meshing_algorithm": 4,
+				"meshing_algorithm": 4.0,
 				"recipe_hash": "d6dd2a50e13d8d1de67bfb819014fcf4b7811f37072298b4aa69a4d00cca4c02",
-				"recipe_version": 1,
-				"sampling_algorithm": 2,
+				"recipe_version": 1.0,
+				"sampling_algorithm": 2.0,
 				"scalars": [
 					10.0,
 					1.0,
 					1.0
 				],
-				"seeding_algorithm": 2,
+				"seeding_algorithm": 2.0,
 				"topology_hash": "7375a6268d49939cff86da433fb90c16b6ec0234f3d7488babccb98c8e42c8b8",
 				"vectors": [
 					[
@@ -94,7 +94,7 @@
 						0.0
 					]
 				],
-				"version": 1
+				"version": 1.0
 			}
 		},
 		"last_error": "",
@@ -449,7 +449,7 @@
 			}
 		}
 	},
-	"schema_version": 35,
+	"schema_version": 36,
 	"seeding": {
 		"bakes": {},
 		"recipe": {
@@ -462,13 +462,164 @@
 		}
 	},
 	"uv_mapping": {
-		"bakes": {},
+		"bakes": {
+			"ribbon_strip/bounds_planar": {
+				"bake_id": "uv_bake_8460461809288693461",
+				"errors": [],
+				"mesh_bake_id": "meshing_bake_1200537350300454419",
+				"mesh_fingerprint": "b2e3ac866dfbb00418835e824413a035584081381543dd8f8a2f96b687c66995",
+				"mesh_method": "ribbon_strip",
+				"method": "bounds_planar",
+				"parameters": {
+					"mesh_method": "ribbon_strip",
+					"offset_u": 0.0,
+					"offset_v": 0.0,
+					"padding": 0.0625,
+					"preserve_aspect": true,
+					"rotation": 0.0,
+					"scale": 1.0
+				},
+				"uv_count": 18,
+				"uvs": [
+					{
+						"uv": [
+							0.344826966524124,
+							0.136314392089844
+						],
+						"vertex_id": "vertex:ribbon:sample:edge_5388871856880730213:point_398128553650719182:left"
+					},
+					{
+						"uv": [
+							0.54321300983429,
+							0.0625
+						],
+						"vertex_id": "vertex:ribbon:sample:edge_5388871856880730213:point_398128553650719182:right"
+					},
+					{
+						"uv": [
+							0.373581945896149,
+							0.213417172431946
+						],
+						"vertex_id": "vertex:ribbon:sample:edge_5388871856880730213:0.500000000:left"
+					},
+					{
+						"uv": [
+							0.574392855167389,
+							0.146480202674866
+						],
+						"vertex_id": "vertex:ribbon:sample:edge_5388871856880730213:0.500000000:right"
+					},
+					{
+						"uv": [
+							0.394239276647568,
+							0.281766891479492
+						],
+						"vertex_id": "vertex:ribbon:sample:edge_5388871856880730213:point_8512581185672902537:left"
+					},
+					{
+						"uv": [
+							0.602177500724792,
+							0.242177724838257
+						],
+						"vertex_id": "vertex:ribbon:sample:edge_5388871856880730213:point_8512581185672902537:right"
+					},
+					{
+						"uv": [
+							0.403266787528992,
+							0.370201051235199
+						],
+						"vertex_id": "vertex:ribbon:sample:edge_8210193442183297111:0.500000000:left"
+					},
+					{
+						"uv": [
+							0.614471256732941,
+							0.356120705604553
+						],
+						"vertex_id": "vertex:ribbon:sample:edge_8210193442183297111:0.500000000:right"
+					},
+					{
+						"uv": [
+							0.405919641256332,
+							0.465600281953812
+						],
+						"vertex_id": "vertex:ribbon:sample:edge_8210193442183297111:point_2281041257631603604:left"
+					},
+					{
+						"uv": [
+							0.617591321468353,
+							0.464757144451141
+						],
+						"vertex_id": "vertex:ribbon:sample:edge_8210193442183297111:point_2281041257631603604:right"
+					},
+					{
+						"uv": [
+							0.403951793909073,
+							0.593994319438934
+						],
+						"vertex_id": "vertex:ribbon:sample:edge_8787393026889438680:0.500000000:left"
+					},
+					{
+						"uv": [
+							0.615625023841858,
+							0.593994319438934
+						],
+						"vertex_id": "vertex:ribbon:sample:edge_8787393026889438680:0.500000000:right"
+					},
+					{
+						"uv": [
+							0.406314194202423,
+							0.731712818145752
+						],
+						"vertex_id": "vertex:ribbon:sample:edge_8787393026889438680:point_7325148836305487783:left"
+					},
+					{
+						"uv": [
+							0.617196679115295,
+							0.713434040546417
+						],
+						"vertex_id": "vertex:ribbon:sample:edge_8787393026889438680:point_7325148836305487783:right"
+					},
+					{
+						"uv": [
+							0.425703704357147,
+							0.84001761674881
+						],
+						"vertex_id": "vertex:ribbon:sample:edge_8635145364214427743:0.500000000:left"
+					},
+					{
+						"uv": [
+							0.632678389549255,
+							0.795665979385376
+						],
+						"vertex_id": "vertex:ribbon:sample:edge_8635145364214427743:0.500000000:right"
+					},
+					{
+						"uv": [
+							0.449620455503464,
+							0.9375
+						],
+						"vertex_id": "vertex:ribbon:sample:edge_8635145364214427743:point_5802121301551870848:left"
+					},
+					{
+						"uv": [
+							0.655173003673553,
+							0.886965572834015
+						],
+						"vertex_id": "vertex:ribbon:sample:edge_8635145364214427743:point_5802121301551870848:right"
+					}
+				],
+				"valid": true
+			}
+		},
+		"last_error": "",
+		"last_failure_fingerprint": "",
 		"recipe": {
 			"method": "bounds_planar",
 			"parameters": {
-				"mesh_method": "constrained_mesh",
+				"mesh_method": "ribbon_strip",
 				"offset_u": 0.0,
 				"offset_v": 0.0,
+				"padding": 0.0625,
 				"preserve_aspect": true,
 				"rotation": 0.0,
 				"scale": 1.0

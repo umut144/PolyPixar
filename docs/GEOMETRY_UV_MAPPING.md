@@ -5,9 +5,9 @@
 ## Observable result
 
 In `Geometry → UV Mapping`, the user selects one Component, chooses
-`CMD/Ctrl + 1 · Method → 1 · Bounds / Planar`, selects one current Mesh Bake,
-adjusts a compact mapping recipe, previews the source Mesh beside normalized UV
-space, and explicitly bakes the accepted UV result.
+`CMD/Ctrl + 1 · Method → 1 · Bounds / Planar`, adjusts a compact mapping recipe,
+previews the accepted Component Mesh beside normalized UV space, and explicitly
+bakes the accepted UV result.
 
 ## Ownership and dependency
 
@@ -22,25 +22,42 @@ A UV Bake never changes Mesh vertices, Triangles, or Component
 and stores one UV coordinate for each stable Mesh Vertex ID. A changed or stale
 Mesh makes the UV Bake stale without reverse synchronization.
 
-UV Bakes are retained by the combination of Mesh method and UV method. Closed
-Bodies now contribute one accepted Constrained Mesh source; Ribbon Components
-retain their automatic Ribbon Strip source.
+The accepted Component Mesh is the only UV input. There is no independent Mesh
+source selection: closed Bodies contribute their accepted Constrained Mesh and
+Ribbon Components contribute their accepted Ribbon Strip. UV Bakes are retained
+by the combination of Component Mesh method and UV method.
 
 ## Bounds / Planar
 
 Bounds / Planar maps Component-local Mesh positions into normalized UV space.
-It exposes only `Mesh Source`, `Scale`, `Rotation`, `Offset U`, `Offset V`, and
-`Preserve Aspect`.
+It exposes the accepted `Component Mesh` plus `Scale`, `Rotation`, `Offset U`,
+`Offset V`, `Padding`, and `Preserve Aspect`.
 
 Preserve Aspect uses one uniform Component bound and centres unused space.
-Disabling it fills U and V independently. Scale and rotation operate around the
-centre of UV space; offsets are applied afterward. Identical Mesh and recipe
-inputs produce identical UV coordinates.
+Disabling it fills U and V independently. New recipes inset the mapped bounds by
+`0.0625` on every UV edge. This deterministic Padding reserves exterior texels
+for later contour-mask derivation. Scale and rotation operate around the centre
+of UV space; offsets are applied afterward. Identical Mesh and recipe inputs
+produce identical UV coordinates.
+
+## Update UVs
+
+The persistent `Update UVs (N)` action accepts deterministic Bounds / Planar UVs
+for every visible Component whose accepted Component Mesh is current and whose
+UV Bake is missing or stale. Existing recipes are preserved; Components without
+an authored recipe use the calibrated padded default. Each Component is committed
+atomically, one failure cannot replace an older valid UV Bake, and a repeated
+failure is not actionable again until its Mesh or recipe changes.
+
+Every accepted result is validated as an exact one-to-one mapping from stable
+Component Mesh Vertex IDs to finite UV coordinates. Hidden Components and
+Components without a current accepted Component Mesh are not batch candidates.
 
 ## Generate, Bake, and Outliner
 
-Input or parameter changes automatically Generate a temporary preview. Bake is
-explicit and participates in Undo/Redo and Workspace persistence. The UV
+Input or parameter changes automatically Generate a temporary preview. Manual
+Bake remains explicit and participates in Undo/Redo and Workspace persistence;
+the global batch provides the deterministic default acceptance path. The UV
 Outliner nests accepted results beneath their source Mesh method so the exact
 dependency remains visible and directly selectable.
 
@@ -54,4 +71,4 @@ or Bakes.
 
 `CMD/Ctrl + 2 · Edit UV`, manual UV overrides, Seams, texture assignment,
 Sampler-Spine or Shader-Flow mapping, packing, atlases, distortion analysis,
-and export consumption are outside this MVP.
+SDF generation, and export consumption are outside this Slice.

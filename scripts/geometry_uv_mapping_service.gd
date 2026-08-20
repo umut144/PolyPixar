@@ -8,7 +8,9 @@ const DEFAULT_ROTATION := 0.0
 const DEFAULT_OFFSET_U := 0.0
 const DEFAULT_OFFSET_V := 0.0
 const DEFAULT_PRESERVE_ASPECT := true
+const DEFAULT_PADDING := 0.0625
 const MIN_SCALE := 0.01
+const MAX_PADDING := 0.49
 
 
 static func default_recipe() -> Dictionary:
@@ -20,7 +22,8 @@ static func default_recipe() -> Dictionary:
 			"rotation": DEFAULT_ROTATION,
 			"offset_u": DEFAULT_OFFSET_U,
 			"offset_v": DEFAULT_OFFSET_V,
-			"preserve_aspect": DEFAULT_PRESERVE_ASPECT
+			"preserve_aspect": DEFAULT_PRESERVE_ASPECT,
+			"padding": DEFAULT_PADDING
 		}
 	}
 
@@ -42,6 +45,7 @@ static func normalize_recipe(raw_recipe) -> Dictionary:
 	recipe["parameters"]["offset_u"] = float(parameters.get("offset_u", DEFAULT_OFFSET_U))
 	recipe["parameters"]["offset_v"] = float(parameters.get("offset_v", DEFAULT_OFFSET_V))
 	recipe["parameters"]["preserve_aspect"] = bool(parameters.get("preserve_aspect", DEFAULT_PRESERVE_ASPECT))
+	recipe["parameters"]["padding"] = clampf(float(parameters.get("padding", DEFAULT_PADDING)), 0.0, MAX_PADDING)
 	return recipe
 
 
@@ -61,6 +65,7 @@ static func generate(mesh_bake: Dictionary, raw_recipe = {}) -> Dictionary:
 	var radians := deg_to_rad(float(recipe["parameters"]["rotation"]))
 	var scale := float(recipe["parameters"]["scale"])
 	var offset := Vector2(float(recipe["parameters"]["offset_u"]), float(recipe["parameters"]["offset_v"]))
+	var padding := float(recipe["parameters"]["padding"])
 	var uv_entries: Array = []
 	for vertex in vertices:
 		var position := Vector2(vertex.get("position", Vector2.ZERO))
@@ -70,6 +75,7 @@ static func generate(mesh_bake: Dictionary, raw_recipe = {}) -> Dictionary:
 			uv = (position - bounds.position + padded) / uniform_extent
 		else:
 			uv = (position - bounds.position) / extent
+		uv = Vector2(padding, padding) + uv * (1.0 - padding * 2.0)
 		uv = Vector2(0.5, 0.5) + (uv - Vector2(0.5, 0.5)).rotated(radians) * scale + offset
 		uv_entries.append({"vertex_id": str(vertex.get("id", "")), "uv": uv})
 	return {
@@ -94,10 +100,73 @@ static func validation_issues(mesh_bake: Dictionary, recipe: Dictionary = {}) ->
 		errors.append("The Mesh Bake has no stable Bake ID.")
 	if mesh_bake.get("vertices", []).is_empty() or mesh_bake.get("triangles", []).is_empty():
 		errors.append("UV Mapping requires Mesh Vertices and Triangles.")
+	var vertex_ids: Dictionary = {}
+	for vertex in mesh_bake.get("vertices", []):
+		if not vertex is Dictionary:
+			errors.append("The Component Mesh contains an invalid Vertex record.")
+			continue
+		var vertex_id := str(vertex.get("id", ""))
+		var position := Vector2(vertex.get("position", Vector2.INF))
+		if vertex_id.is_empty():
+			errors.append("Every Component Mesh Vertex needs a stable ID.")
+		elif vertex_ids.has(vertex_id):
+			errors.append("Component Mesh Vertex ID '%s' is duplicated." % vertex_id)
+		else:
+			vertex_ids[vertex_id] = true
+		if not position.is_finite():
+			errors.append("Component Mesh Vertex '%s' has a non-finite position." % vertex_id)
 	var normalized := normalize_recipe(recipe)
 	if str(mesh_bake.get("method", "")) != str(normalized.get("parameters", {}).get("mesh_method", "")):
-		errors.append("The selected Mesh source is unavailable.")
+		errors.append("The UV recipe does not reference the accepted Component Mesh method.")
 	return errors
+
+
+static func source_fingerprint(mesh_bake: Dictionary, raw_recipe = {}) -> String:
+	var recipe := normalize_recipe(raw_recipe)
+	var parts := PackedStringArray([
+		mesh_fingerprint(mesh_bake),
+		str(recipe.get("method", "")),
+		JSON.stringify(recipe.get("parameters", {}), "", true, true)
+	])
+	var context := HashingContext.new()
+	context.start(HashingContext.HASH_SHA256)
+	context.update("\n".join(parts).to_utf8_buffer())
+	return context.finish().hex_encode()
+
+
+static func result_matches(result: Dictionary, mesh_bake: Dictionary, raw_recipe = {}) -> bool:
+	if result.is_empty() or not bool(result.get("valid", false)):
+		return false
+	var recipe := normalize_recipe(raw_recipe)
+	return str(result.get("method", "")) == str(recipe.get("method", "")) \
+		and result.get("parameters", {}) == recipe.get("parameters", {}) \
+		and str(result.get("mesh_bake_id", "")) == str(mesh_bake.get("bake_id", "")) \
+		and str(result.get("mesh_method", "")) == str(mesh_bake.get("method", "")) \
+		and str(result.get("mesh_fingerprint", "")) == mesh_fingerprint(mesh_bake) \
+		and _has_exact_vertex_mapping(result.get("uvs", []), mesh_bake.get("vertices", []))
+
+
+static func _has_exact_vertex_mapping(uv_entries: Array, vertices: Array) -> bool:
+	if uv_entries.size() != vertices.size():
+		return false
+	var expected: Dictionary = {}
+	for vertex in vertices:
+		if not vertex is Dictionary:
+			return false
+		var vertex_id := str(vertex.get("id", ""))
+		if vertex_id.is_empty() or expected.has(vertex_id):
+			return false
+		expected[vertex_id] = true
+	var actual: Dictionary = {}
+	for entry in uv_entries:
+		if not entry is Dictionary:
+			return false
+		var vertex_id := str(entry.get("vertex_id", ""))
+		var uv := Vector2(entry.get("uv", Vector2.INF))
+		if not expected.has(vertex_id) or actual.has(vertex_id) or not uv.is_finite():
+			return false
+		actual[vertex_id] = true
+	return actual.size() == expected.size()
 
 
 static func mesh_fingerprint(mesh_bake: Dictionary) -> String:

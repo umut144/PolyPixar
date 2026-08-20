@@ -92,6 +92,12 @@ pointer jitter do not trigger the batch pipeline. Components rejected before
 the batch expose their concrete source-validation issue in the Meshing
 Inspector without inflating the actionable count.
 
+The persistent `Update UVs (N)` action consumes only current accepted Component
+Meshes, including Ribbon Strips, and accepts deterministic Bounds / Planar UVs
+for visible Components with missing or stale mappings. New recipes reserve a
+calibrated UV border for later contour-mask derivation. UV results remain keyed
+one-to-one by stable Mesh Vertex ID and never alter Component topology or Meshes.
+
 ## Workspace and export
 
 A Workspace persists Assets plus the currently retained motion and derived
