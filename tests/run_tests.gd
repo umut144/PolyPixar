@@ -22,6 +22,7 @@ func _init() -> void:
 	_test_geometry_uv_mapping_service_and_ui()
 	_test_geometry_sdf_service_and_batch()
 	_test_semantic_registry_and_picker()
+	_test_asset_catalog_service()
 	_test_runtime_export_service()
 	_test_weighting_service_and_ui()
 	_test_component_hierarchy_model()
@@ -1168,9 +1169,33 @@ func _test_semantic_registry_and_picker() -> void:
 	application.free()
 
 
+func _test_asset_catalog_service() -> void:
+	_expect(AssetCatalogService.asset_key("Magic Orb") == "magic_orb" and AssetCatalogService.asset_key("Ancient Orb") == "ancient_orb" and AssetCatalogService.asset_key("Orb") == "orb", "Asset Keys should derive deterministically from the complete display name.")
+	_expect(AssetCatalogService.asset_key("  Mage's Hat-Tip  ") == "mage_s_hat_tip", "Asset Key derivation should collapse punctuation and whitespace into lower_snake_case separators.")
+	var assets: Array[Dictionary] = [
+		{"id": "internal_3", "name": "Orb", "asset_type": "symbols", "visibility": true},
+		{"id": "internal_1", "name": "Magic Orb", "asset_type": "props", "visibility": true},
+		{"id": "internal_2", "name": "Ancient Orb", "asset_type": "props", "visibility": true}
+	]
+	var build := AssetCatalogService.build_catalog("world01", "Secrets, Room's & Travels'", assets)
+	var catalog: Dictionary = build.get("catalog", {})
+	var entries: Array = catalog.get("assets", [])
+	_expect(bool(build.get("valid", false)) and int(catalog.get("schema_version", 0)) == 1 and str(catalog.get("world_key", "")) == "world01", "Every World should derive an independently versioned Asset Catalog.")
+	_expect(entries.size() == 3 and str(entries[0].get("asset_key", "")) == "ancient_orb" and str(entries[2].get("asset_key", "")) == "orb", "Catalog entries should be sorted alphabetically by Asset Key.")
+	_expect(not JSON.stringify(catalog).contains("asset_id") and str(entries[1].get("runtime_package", "")) == "PolyToolsRuntimeExports/magic_orb/manifest.json", "The public Asset Catalog should expose key-based package paths without internal Asset IDs.")
+	var collision_assets: Array[Dictionary] = assets.duplicate(true)
+	collision_assets.append({"id": "internal_4", "name": "Magic-Orb", "asset_type": "props", "visibility": false})
+	_expect(not bool(AssetCatalogService.build_catalog("world01", "World", collision_assets).get("valid", true)), "Asset Key collisions should be rejected even when one conflicting Asset is hidden.")
+	var application = load("res://scripts/main.gd").new()
+	application.assets = assets
+	_expect(application._asset_name_validation_error("Magic-Orb") == "Asset Key 'magic_orb' is already used by 'Magic Orb'.", "Asset creation and rename validation should explain the exact derived-key collision.")
+	application.free()
+
+
 func _test_runtime_export_service() -> void:
 	var application = load("res://scripts/main.gd").new()
 	application.world_name = "world01"
+	application.world_title = "Secrets, Room's & Travels'"
 	_expect(application._runtime_export_root() == ProjectSettings.globalize_path("res://worlds/world01/PolyToolsRuntimeExports"), "Runtime packages should be written to the ignored PolyToolsRuntimeExports directory owned by the active World.")
 	var numeric_manifest := {"schema_version": 1, "values": [0, 1.0, 0.25]}
 	var numeric_manifest_text := JSON.stringify(numeric_manifest, "\t")
@@ -1199,7 +1224,7 @@ func _test_runtime_export_service() -> void:
 	var result := RuntimeExportService.build_manifest(asset, {"component_a": source, "component_b": source})
 	var manifest: Dictionary = result.get("manifest", {})
 	var components: Array = manifest.get("components", [])
-	_expect(bool(result.get("valid", false)) and int(manifest.get("schema_version", 0)) == 1, "Runtime export should build a versioned engine-neutral manifest from accepted derived data.")
+	_expect(bool(result.get("valid", false)) and int(manifest.get("schema_version", 0)) == 2 and str(manifest.get("asset_key", "")) == "wizard" and not manifest.has("asset_id"), "Runtime export schema 2 should identify packages only by the Asset Key derived from their display name.")
 	_expect(components.size() == 2 and str(components[0].get("component_id", "")) == "component_a" and str(components[1].get("component_id", "")) == "component_b", "Runtime Components should sort globally by ascending z_index and lexicographic Component ID.")
 	_expect(components[1].get("mesh", {}).get("vertices", []) == [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]] and components[1].get("mesh", {}).get("indices", []) == [0, 1, 2], "Runtime Meshes should preserve accepted Vertex order, convert Tool units to meters, and compact Triangle IDs.")
 	_expect(components[1].get("mesh", {}).get("uvs", []) == [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]], "Runtime UVs should be reordered only through stable Vertex IDs.")
@@ -1208,11 +1233,11 @@ func _test_runtime_export_service() -> void:
 	var reference := {"id": "component_orb", "type": "reference", "semantic_key": "belly", "source_asset_id": "orb", "visibility": true, "z_index": 3, "parent_component_id": "component_b", "transform": {"position": Vector2(3.0, 4.0), "pivot": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE}}
 	var referenced_asset: Dictionary = asset.duplicate(true)
 	referenced_asset["components"].append(reference)
-	var reference_source := {"owner_asset_id": "wizard", "source_asset_exists": true}
+	var reference_source := {"owner_asset_id": "wizard", "source_asset_exists": true, "source_asset_key": "orb"}
 	var referenced_result := RuntimeExportService.build_manifest(referenced_asset, {"component_a": source, "component_b": source, "component_orb": reference_source})
 	var referenced_components: Array = referenced_result.get("manifest", {}).get("components", [])
 	var exported_reference: Dictionary = referenced_components[2] if referenced_components.size() == 3 else {}
-	_expect(bool(referenced_result.get("valid", false)) and str(exported_reference.get("kind", "")) == "asset_reference" and str(exported_reference.get("source_asset_id", "")) == "orb" and str(exported_reference.get("semantic_key", "")) == "belly" and not exported_reference.has("mesh"), "A local Semantic Key should classify a Reference while its source_asset_id preserves the actual referenced Asset geometry.")
+	_expect(bool(referenced_result.get("valid", false)) and str(exported_reference.get("kind", "")) == "asset_reference" and str(exported_reference.get("source_asset_key", "")) == "orb" and not exported_reference.has("source_asset_id") and str(exported_reference.get("semantic_key", "")) == "belly" and not exported_reference.has("mesh"), "A local Semantic Key should classify a Reference while source_asset_key preserves the referenced runtime Asset identity.")
 	reference_source["source_asset_exists"] = false
 	_expect(not bool(RuntimeExportService.build_manifest(referenced_asset, {"component_a": source, "component_b": source, "component_orb": reference_source}).get("valid", true)), "Runtime export should reject a Reference whose actual source Asset cannot be resolved.")
 	var duplicate_role_asset: Dictionary = asset.duplicate(true)

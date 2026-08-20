@@ -1,6 +1,7 @@
 # PolyTools Runtime Export Contract
 
-**Status:** Normative consumer contract for runtime manifest schema `1`.
+**Status:** Normative consumer contract for Asset Catalog schema `1` and
+runtime manifest schema `2`.
 
 This document is the single source of truth for consuming PolyTools Runtime
 packages. `AI_CONTEXT.md`, `ARCHITECTURE.md`, and the geometry documents explain
@@ -13,16 +14,31 @@ the exported package.
 Asset:
 
 ```text
-res://worlds/<world_name>/PolyToolsRuntimeExports/<asset_id>/
-├── manifest.json
-└── masks/
-    └── <component_id>.sdf.png
+res://worlds/<world_key>/
+├── catalog.json
+└── PolyToolsRuntimeExports/
+    └── <asset_key>/
+        ├── manifest.json
+        └── masks/
+            └── <component_id>.sdf.png
 ```
 
-`<asset_id>` is the stable authored Asset identity. `display_name` is
-presentation metadata and must not be used as an identity or path key. All paths
-inside a Manifest use `/`, are relative to the package directory, and must remain
-inside that directory after normalization.
+`<world_key>` is the technical World directory name. `<asset_key>` is derived
+mechanically from the complete Asset display name by lowercasing ASCII letters,
+retaining digits, replacing each run of other characters with `_`, and removing
+leading or trailing separators. `Magic Orb`, `Ancient Orb`, and `Orb` therefore
+derive `magic_orb`, `ancient_orb`, and `orb`. PolyTools rejects creation or
+rename when two Assets in one World would derive the same key.
+
+Renaming an Asset therefore intentionally changes its runtime identity. Internal
+PolyTools References are resolved to the newly derived key on the next export,
+but an external consumer must treat the new key as an addition and the old key
+as removed from the Catalog; no rename alias is serialized.
+
+`display_name` remains presentation metadata and must not be used as identity.
+Internal editor Asset IDs are deliberately absent from the Catalog and runtime
+package contract. All serialized paths use `/` and must remain inside the World
+after normalization.
 
 The exporter stages and verifies a complete package before replacing the prior
 package directory. A validation or I/O failure preserves the prior package. The
@@ -30,14 +46,33 @@ root is a generated cache and may contain editor-owned sidecar files such as
 `.import`; only `manifest.json` and resources referenced by that Manifest belong
 to this contract.
 
-There is no schema-1 root catalog. Removing or hiding an Asset does not assert
-that an older package directory has been removed. A consumer that needs a closed
-Asset set must maintain an explicit allow-list; directory discovery alone may
-also discover older independently valid packages.
+`catalog.json` is the closed, authoritative set of visible exported Assets.
+Consumers must not discover packages by enumerating `PolyToolsRuntimeExports`:
+older generated directories may remain after hiding, deleting, or renaming an
+Asset until the next fully successful Runtime Export. That export prunes
+uncataloged generated package directories only after writing the new Catalog.
+Only Catalog entries are eligible for loading at every point in this process.
+
+## Asset Catalog
+
+Catalog schema 1 requires:
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `schema_version` | integer | Exactly `1`. |
+| `world_key` | non-empty string | Technical World directory and JSON identity. |
+| `world_name` | string | Human-facing World title. |
+| `assets` | array | Visible exported Assets, sorted by `asset_key`. |
+
+Every Catalog Asset requires `asset_key`, `display_name`, `asset_type`, and
+`runtime_package`. `runtime_package` is a World-relative Manifest path with the
+exact form `PolyToolsRuntimeExports/<asset_key>/manifest.json`. Asset Keys are
+unique in the Catalog. A consumer must verify that the loaded Manifest's
+`asset_key` equals its Catalog entry before publishing the package.
 
 ## Compatibility and failure policy
 
-Every Manifest has an integer `schema_version`. A schema-1 consumer must reject
+Every Catalog and Manifest has an integer `schema_version`. A schema-2 Manifest consumer must reject
 an absent, non-integer, or unsupported version. It must not guess the meaning of
 unknown fields in place of missing required fields.
 
@@ -53,12 +88,12 @@ must be finite.
 
 ## Top-level Manifest
 
-Schema 1 requires:
+Schema 2 requires:
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `schema_version` | integer | Exactly `1` for this contract. |
-| `asset_id` | non-empty string | Stable Asset identity and package directory name. |
+| `schema_version` | integer | Exactly `2` for this contract. |
+| `asset_key` | non-empty lower-snake-case string | Runtime identity and package directory name. |
 | `display_name` | string | Informational authored name. |
 | `asset_type` | string | `character`, `props`, `terrain`, `icon`, or `symbols`. |
 | `coordinate_system` | object | Self-describing coordinate and transform convention. |
@@ -138,8 +173,8 @@ IDs must resolve inside the same Manifest, and the parent graph must be acyclic.
 
 `semantic_key` is the sole authored runtime designation. Consumers use it for
 gameplay, motion, and simulation lookup. They must not derive a role from
-`display_name`, `component_id`, array position, or `source_asset_id`.
-Keys are registered lower-snake-case strings, but schema 1 does not embed the
+`display_name`, `component_id`, array position, or `source_asset_key`.
+Keys are registered lower-snake-case strings, but schema 2 does not embed the
 Semantic Registry or its version. Consumers should retain the key as a string
 and coordinate any stricter engine-side registry update explicitly.
 
@@ -160,7 +195,7 @@ For every index `i`, `vertices[i]` and `uvs[i]` describe the same stable Mesh
 Vertex. The index count is a positive multiple of three. Every index is in
 range, and the three indices of one Triangle are distinct.
 
-Schema 1 does not guarantee one Triangle winding across every Mesh method.
+Schema 2 does not guarantee one Triangle winding across every Mesh method.
 Transforms with a negative determinant may also reverse the final winding. A
 consumer using face culling must calculate and normalize winding explicitly; a
 2D consumer may instead use a non-culling material.
@@ -194,7 +229,7 @@ from Mesh bounds.
 
 `contour_mask` requires:
 
-| Field | Schema-1 value or type |
+| Field | Schema-2 value or type |
 | --- | --- |
 | `path` | Relative package path to the PNG. |
 | `type` | `signed_distance_field` |
@@ -213,7 +248,7 @@ The resource is a deterministic single-channel L8 PNG. It is data, not color:
 the texture must be sampled without sRGB decoding, and the red channel is the
 normative channel even if an image loader expands L8 to RGB or RGBA.
 
-For a normalized sample `s`, schema 1 encodes signed distance as:
+For a normalized sample `s`, schema 2 encodes signed distance as:
 
 ```text
 signed_distance_px = (s - boundary_value) * 2 * spread_px
@@ -234,20 +269,20 @@ An Asset Reference is identified by:
 {
   "kind": "asset_reference",
   "semantic_key": "belly",
-  "source_asset_id": "asset_7"
+  "source_asset_key": "orb"
 }
 ```
 
-In addition to the common Component fields, `source_asset_id` is required and
+In addition to the common Component fields, `source_asset_key` is required and
 identifies the actual borrowed Asset package. A Reference contains no `mesh` or
 `contour_mask`; geometry is not duplicated into its owner package.
 
 The Reference's `semantic_key` is its local classification in the owner Asset.
 It does not rename the referenced Asset and must not replace
-`source_asset_id`. For example, Barde may classify an Orb Reference as `belly`
-while the referenced geometry retains the Orb Asset's stable ID.
+`source_asset_key`. For example, Barde may classify an Orb Reference as `belly`
+while the referenced geometry retains the runtime Asset Key `orb`.
 
-Consumers resolve References after registering packages by `asset_id`. Import
+Consumers resolve References after registering packages by `asset_key`. Import
 order is not significant. A missing source package rejects that Reference at
 runtime. Consumers must also guard against transitive cross-Asset Reference
 cycles. Instantiating referenced geometry uses the Reference's Component
@@ -299,7 +334,7 @@ A Reference uses the common transform fields plus:
   "component_id": "component_58",
   "semantic_key": "belly",
   "kind": "asset_reference",
-  "source_asset_id": "asset_7",
+  "source_asset_key": "orb",
   "parent_component_id": null,
   "z_index": 2,
   "local_pivot": [0.0, 0.0],
@@ -311,8 +346,8 @@ A Reference uses the common transform fields plus:
 }
 ```
 
-The example IDs illustrate the current World and are not reserved schema
-constants.
+The example Component IDs illustrate the current World and are not reserved
+schema constants.
 
 ## Consumer implementation notes
 
@@ -321,13 +356,14 @@ fields:
 
 - Keep the Runtime root configurable instead of hard-coding an absolute
   development path.
-- Parse and validate every package before publishing it to a live Asset
-  registry.
-- Register manifests by `asset_id`, then resolve References in a second pass.
+- Parse `catalog.json` first, then load only the Manifest paths it lists.
+- Validate every package and its Catalog-key match before publishing it to a
+  live Asset registry.
+- Register manifests by `asset_key`, then resolve References in a second pass.
 - Convert UV origin in one centralized layer.
 - Disable face culling for 2D, or normalize Triangle winding explicitly.
 - Load SDF masks as linear data textures and sample the red channel.
-- Keep both `semantic_key` and `source_asset_id` on a resolved Reference.
+- Keep both `semantic_key` and `source_asset_key` on a resolved Reference.
 - Use `pixel_hash` and Manifest bytes for cache invalidation rather than file
   modification times.
 - Ignore unreferenced files and editor sidecars inside the generated root.

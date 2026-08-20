@@ -1882,6 +1882,82 @@ func _asset_storage_root(world_root: String, asset: Dictionary) -> String:
 	return "%s/assets/%s" % [world_root, _asset_storage_name(asset)]
 
 
+func _asset_key(asset: Dictionary) -> String:
+	return AssetCatalogService.asset_key(str(asset.get("name", "")))
+
+
+func _asset_name_validation_error(proposed_name: String, excluded_asset_id := "") -> String:
+	var key := AssetCatalogService.asset_key(proposed_name)
+	if key.is_empty():
+		return "The Asset name must contain at least one ASCII letter or number."
+	for other_asset in assets:
+		if str(other_asset.get("id", "")) == excluded_asset_id:
+			continue
+		if _asset_key(other_asset) == key:
+			return "Asset Key '%s' is already used by '%s'." % [key, str(other_asset.get("name", "Asset"))]
+	return ""
+
+
+func _asset_catalog_build() -> Dictionary:
+	return AssetCatalogService.build_catalog(world_name, world_title, assets)
+
+
+func _asset_catalog_path() -> String:
+	if world_name.is_empty():
+		return ""
+	return "%s/%s/catalog.json" % [WORLDS_ROOT, world_name]
+
+
+func _asset_catalog_is_stale(build: Dictionary = {}) -> bool:
+	var expected := build if not build.is_empty() else _asset_catalog_build()
+	if not bool(expected.get("valid", false)):
+		return true
+	var path := _asset_catalog_path()
+	if path.is_empty() or not FileAccess.file_exists(path):
+		return true
+	return FileAccess.get_file_as_string(path) != JSON.stringify(expected.get("catalog", {}), "\t")
+
+
+func _write_asset_catalog(build: Dictionary = {}) -> bool:
+	var expected := build if not build.is_empty() else _asset_catalog_build()
+	if not bool(expected.get("valid", false)):
+		return false
+	var resource_path := _asset_catalog_path()
+	if resource_path.is_empty():
+		return false
+	var target := ProjectSettings.globalize_path(resource_path)
+	DirAccess.make_dir_recursive_absolute(target.get_base_dir())
+	var staging := target + ".staging"
+	var backup := target + ".backup"
+	if FileAccess.file_exists(staging):
+		DirAccess.remove_absolute(staging)
+	if FileAccess.file_exists(backup):
+		if FileAccess.file_exists(target):
+			DirAccess.remove_absolute(backup)
+		else:
+			DirAccess.rename_absolute(backup, target)
+	var catalog_text := JSON.stringify(expected.get("catalog", {}), "\t")
+	var file := FileAccess.open(staging, FileAccess.WRITE)
+	if file == null:
+		return false
+	file.store_string(catalog_text)
+	file.close()
+	if FileAccess.get_file_as_string(staging) != catalog_text:
+		DirAccess.remove_absolute(staging)
+		return false
+	if FileAccess.file_exists(target) and DirAccess.rename_absolute(target, backup) != OK:
+		DirAccess.remove_absolute(staging)
+		return false
+	if DirAccess.rename_absolute(staging, target) != OK:
+		if FileAccess.file_exists(backup):
+			DirAccess.rename_absolute(backup, target)
+		DirAccess.remove_absolute(staging)
+		return false
+	if FileAccess.file_exists(backup):
+		DirAccess.remove_absolute(backup)
+	return true
+
+
 func _read_asset_data(world_root: String, asset_id: String):
 	var legacy_data = _read_json("%s/assets/%s/asset.json" % [world_root, asset_id])
 	var directory := DirAccess.open("%s/assets" % world_root)
@@ -1902,6 +1978,11 @@ func _read_asset_data(world_root: String, asset_id: String):
 func _save_world() -> void:
 	if world_name.is_empty():
 		_open_new_world_dialog(true)
+		return
+	var catalog_build := _asset_catalog_build()
+	if not bool(catalog_build.get("valid", false)):
+		var catalog_errors: Array = catalog_build.get("errors", [])
+		_show_status_message("World not saved · %s" % (str(catalog_errors[0]) if not catalog_errors.is_empty() else "Asset Catalog is invalid."))
 		return
 	var world_root := "%s/%s" % [WORLDS_ROOT, world_name]
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("%s/assets" % world_root))
@@ -2000,6 +2081,12 @@ func _save_world() -> void:
 		"editor_state": _serialize_editor_state()
 	})
 	_write_json(CONFIG_PATH, {"schema_version": SCHEMA_VERSION, "last_world": world_name})
+	if not _write_asset_catalog(catalog_build):
+		_show_status_message("World saved, but catalog.json could not be updated.")
+		return
+	_invalidate_batch_status()
+	batch_status_snapshot = {}
+	_update_runtime_export_button()
 	_show_status_message("Saved World: %s!" % world_name)
 
 
@@ -4433,9 +4520,11 @@ func _runtime_export_build(asset: Dictionary) -> Dictionary:
 		var component_id := str(component.get("id", ""))
 		if _is_reference_component(component):
 			var source_asset_id := str(component.get("source_asset_id", ""))
+			var source_asset := _get_asset(source_asset_id)
 			sources[component_id] = {
 				"owner_asset_id": asset_id,
-				"source_asset_exists": not _get_asset(source_asset_id).is_empty()
+				"source_asset_exists": not source_asset.is_empty(),
+				"source_asset_key": _asset_key(source_asset) if not source_asset.is_empty() else ""
 			}
 			continue
 		var mesh := _component_mesh_bake(asset_id, component_id)
@@ -4452,7 +4541,16 @@ func _runtime_export_build(asset: Dictionary) -> Dictionary:
 			"sdf_resource_valid": sdf_current and _sdf_resource_available(asset_id, component_id) and not sdf_path.is_empty() and FileAccess.file_exists(sdf_path),
 			"sdf_source_path": ProjectSettings.globalize_path(sdf_path) if not sdf_path.is_empty() else ""
 		}
-	return RuntimeExportService.build_manifest(asset, sources)
+	var result := RuntimeExportService.build_manifest(asset, sources)
+	var catalog_errors := AssetCatalogService.validation_errors(assets)
+	if not catalog_errors.is_empty():
+		var errors: Array = result.get("errors", [])
+		errors.append_array(catalog_errors)
+		result["valid"] = false
+		result["errors"] = errors
+		result["manifest"] = {}
+		result["masks"] = []
+	return result
 
 
 func _runtime_export_is_stale(asset: Dictionary, build: Dictionary = {}) -> bool:
@@ -4462,7 +4560,7 @@ func _runtime_export_is_stale(asset: Dictionary, build: Dictionary = {}) -> bool
 	var export_root := _runtime_export_root()
 	if export_root.is_empty():
 		return true
-	var target := export_root.path_join(str(asset.get("id", "")))
+	var target := export_root.path_join(_asset_key(asset))
 	var manifest_path := target.path_join("manifest.json")
 	var expected_manifest_text := JSON.stringify(expected.get("manifest", {}), "\t")
 	if not FileAccess.file_exists(manifest_path) or not _runtime_manifest_text_matches(expected_manifest_text, FileAccess.get_file_as_string(manifest_path)):
@@ -4477,14 +4575,24 @@ func _runtime_export_is_stale(asset: Dictionary, build: Dictionary = {}) -> bool
 	return false
 
 
-func _all_runtime_export_candidates() -> Array[Dictionary]:
+func _all_runtime_package_candidates() -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	for asset in assets:
 		if not asset is Dictionary or not bool(asset.get("visibility", true)):
 			continue
 		var build := _runtime_export_build(asset)
 		if not bool(build.get("valid", false)) or _runtime_export_is_stale(asset, build):
-			result.append({"asset_id": str(asset.get("id", "")), "build": build})
+			result.append({"kind": "package", "asset_id": str(asset.get("id", "")), "build": build})
+	return result
+
+
+func _all_runtime_export_candidates() -> Array[Dictionary]:
+	var result := _all_runtime_package_candidates()
+	if world_name.is_empty():
+		return result
+	var catalog_build := _asset_catalog_build()
+	if not bool(catalog_build.get("valid", false)) or _asset_catalog_is_stale(catalog_build):
+		result.append({"kind": "catalog", "asset_id": "", "build": catalog_build})
 	return result
 
 
@@ -4492,8 +4600,15 @@ func _runtime_export_batch_summary(candidates: Array[Dictionary]) -> Dictionary:
 	var pending := PackedStringArray()
 	var attention := PackedStringArray()
 	for candidate in candidates:
-		var asset := _get_asset(str(candidate.get("asset_id", "")))
 		var build: Dictionary = candidate.get("build", {})
+		if str(candidate.get("kind", "package")) == "catalog":
+			if bool(build.get("valid", false)):
+				pending.append("World Catalog — catalog.json missing or stale")
+			else:
+				var catalog_errors: Array = build.get("errors", [])
+				attention.append("World Catalog — %s" % (str(catalog_errors[0]) if not catalog_errors.is_empty() else "invalid"))
+			continue
+		var asset := _get_asset(str(candidate.get("asset_id", "")))
 		if bool(build.get("valid", false)):
 			pending.append("%s — package missing or stale" % str(asset.get("name", "Asset")))
 		else:
@@ -4527,18 +4642,31 @@ func _on_runtime_export_pressed() -> void:
 	update_sdfs_button.disabled = true
 	var succeeded := 0
 	var failed := 0
+	var catalog_requested := false
 	for index in range(candidates.size()):
 		runtime_export_button.text = "Exporting %d/%d" % [index + 1, candidates.size()]
 		runtime_export_button.disabled = true
 		await get_tree().process_frame
+		if str(candidates[index].get("kind", "package")) == "catalog":
+			catalog_requested = true
+			continue
 		var asset := _get_asset(str(candidates[index].get("asset_id", "")))
 		var build := _runtime_export_build(asset)
 		if bool(build.get("valid", false)) and _write_runtime_export_package(asset, build):
 			succeeded += 1
 		else:
 			failed += 1
+	var catalog_updated := false
+	if catalog_requested or succeeded > 0:
+		if _all_runtime_package_candidates().is_empty() and _write_asset_catalog():
+			catalog_updated = true
+			_prune_uncataloged_runtime_packages()
+		elif catalog_requested:
+			failed += 1
 	runtime_export_batch_running = false
-	_show_status_message("Exported %d Runtime package%s%s · %s" % [succeeded, "" if succeeded == 1 else "s", " · %d need attention" % failed if failed > 0 else "", _runtime_export_root()])
+	_invalidate_batch_status()
+	batch_status_snapshot = {}
+	_show_status_message("Exported %d Runtime package%s%s%s · %s" % [succeeded, "" if succeeded == 1 else "s", " · catalog updated" if catalog_updated else "", " · %d need attention" % failed if failed > 0 else "", _runtime_export_root()])
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
@@ -4547,12 +4675,13 @@ func _on_runtime_export_pressed() -> void:
 func _write_runtime_export_package(asset: Dictionary, build: Dictionary) -> bool:
 	var export_root := _runtime_export_root()
 	var asset_id := str(asset.get("id", ""))
-	if export_root.is_empty() or asset_id.is_empty():
+	var asset_key := _asset_key(asset)
+	if export_root.is_empty() or asset_id.is_empty() or asset_key.is_empty():
 		return false
 	DirAccess.make_dir_recursive_absolute(export_root)
-	var target := export_root.path_join(asset_id)
-	var staging := export_root.path_join(".%s.staging" % asset_id)
-	var backup := export_root.path_join(".%s.backup" % asset_id)
+	var target := export_root.path_join(asset_key)
+	var staging := export_root.path_join(".%s.staging" % asset_key)
+	var backup := export_root.path_join(".%s.backup" % asset_key)
 	_remove_runtime_export_tree(staging)
 	_remove_runtime_export_tree(backup)
 	if DirAccess.make_dir_recursive_absolute(staging.path_join("masks")) != OK:
@@ -4592,6 +4721,24 @@ func _write_runtime_export_package(asset: Dictionary, build: Dictionary) -> bool
 
 func _runtime_manifest_text_matches(expected_text: String, staged_text: String) -> bool:
 	return not staged_text.is_empty() and JSON.parse_string(staged_text) is Dictionary and staged_text == expected_text
+
+
+func _prune_uncataloged_runtime_packages() -> void:
+	var export_root := _runtime_export_root()
+	var catalog_build := _asset_catalog_build()
+	if export_root.is_empty() or not bool(catalog_build.get("valid", false)) or not DirAccess.dir_exists_absolute(export_root):
+		return
+	var allowed_keys: Dictionary = {}
+	for entry in catalog_build.get("catalog", {}).get("assets", []):
+		if entry is Dictionary:
+			allowed_keys[str(entry.get("asset_key", ""))] = true
+	var directory := DirAccess.open(export_root)
+	if directory == null:
+		return
+	for directory_name in directory.get_directories():
+		if str(directory_name).begins_with(".") or allowed_keys.has(str(directory_name)):
+			continue
+		_remove_runtime_export_tree(export_root.path_join(str(directory_name)))
 
 
 func _remove_runtime_export_tree(path: String) -> void:
@@ -6366,6 +6513,7 @@ func _add_info_mode_option(text: String, active: bool) -> void:
 
 func _open_new_asset_dialog() -> void:
 	asset_name_input.text = ""
+	asset_dialog.dialog_text = "Enter an asset name"
 	asset_dialog.popup_centered()
 	asset_name_input.grab_focus()
 
@@ -6375,10 +6523,17 @@ func _submit_asset_name(_submitted_text: String) -> void:
 
 
 func _confirm_asset_creation() -> void:
-	_record_direct_change()
 	var asset_name := asset_name_input.text.strip_edges()
 	if asset_name.is_empty():
 		asset_name = _next_default_asset_name()
+	var validation_error := _asset_name_validation_error(asset_name)
+	if not validation_error.is_empty():
+		asset_dialog.dialog_text = validation_error
+		asset_name_input.grab_focus()
+		asset_name_input.select_all()
+		_show_status_message(validation_error)
+		return
+	_record_direct_change()
 	var asset_id := "asset_%d" % next_asset_id
 	next_asset_id += 1
 	assets.append({"id": asset_id, "name": asset_name, "asset_type": _create_submodule_asset_type(active_create_submodule), "visibility": true, "asset_pivot": Vector2.ZERO, "reference_image": _default_reference_image(), "animation": MotionWorkspace.create_default_animation_document(), "components": [], "guides": []})
@@ -6618,16 +6773,9 @@ func _update_reference_image_property(property_name: String, value) -> void:
 
 func _next_default_asset_name() -> String:
 	var index := 1
-	while _has_asset_name("asset%02d" % index):
+	while not _asset_name_validation_error("asset%02d" % index).is_empty():
 		index += 1
 	return "asset%02d" % index
-
-
-func _has_asset_name(asset_name: String) -> bool:
-	for asset in assets:
-		if str(asset["name"]).to_lower() == asset_name.to_lower():
-			return true
-	return false
 
 
 func _render_outliner() -> void:
@@ -12655,6 +12803,12 @@ func _rename_selected_asset(new_name: String) -> void:
 		asset_name_editor.text = str(asset["name"])
 		return
 	if asset_name == str(asset["name"]):
+		return
+	var validation_error := _asset_name_validation_error(asset_name, selected_asset_id)
+	if not validation_error.is_empty():
+		if is_instance_valid(asset_name_editor):
+			asset_name_editor.text = str(asset["name"])
+		_show_status_message(validation_error)
 		return
 	_record_direct_change()
 	asset["name"] = asset_name

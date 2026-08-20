@@ -108,10 +108,13 @@ The persistent `Export Runtime (N)` action automatically considers every visible
 Asset. Every visible Component must have one unique
 registered `semantic_key`. Ordinary Components require current accepted Mesh,
 UV, and SDF resources. Asset References instead export their local Semantic Key
-plus the actual `source_asset_id`; they do not duplicate the referenced geometry.
+plus the referenced Asset's derived `source_asset_key`; they do not duplicate
+the referenced geometry. The editor retains `source_asset_id` only as its
+internal link to the actual authored source Asset.
 The batch writes a versioned engine-neutral manifest plus copied SDF masks to
 the active World-local
-`res://worlds/<world_name>/PolyToolsRuntimeExports/<asset_id>/` directory. Packages are
+`res://worlds/<world_key>/PolyToolsRuntimeExports/<asset_key>/` directory and
+updates the World-root `catalog.json`. Packages are
 staged, verified, and replaced atomically per Asset; an invalid Asset retains
 its older package and no fallback geometry is generated.
 The normative field-level package and consumer rules live in
@@ -140,6 +143,13 @@ the current UI. New persistence must not add display polygons or reverse
 synchronization into Component topology. The former Godot-scene Export module
 is retired; runtime export is a batch operation over accepted derived data.
 
+`catalog.json` has its own schema version and is derived automatically from
+visible Assets. Each `asset_key` is the lower-snake-case derivation of the full
+Asset display name and is never authored independently. Creation and rename
+reject collisions across all Assets, including hidden Assets. The Catalog and
+runtime contract expose no internal Asset IDs; the Catalog is the authoritative
+closed export set, so consumers do not discover packages by directory listing.
+
 ## Semantic Registry workflow
 
 `configs/semantic_keys.json` is the independently versioned, read-only Semantic
@@ -152,7 +162,8 @@ Asset.
 
 References classify the borrowed geometry locally: for example, Barde may use
 the Orb Asset through its stable Asset ID in `source_asset_id` while assigning the local
-`semantic_key = "belly"`. Duplicate maps the known pairs `eye_left` /
+`semantic_key = "belly"`. Runtime export resolves that internal link to
+`source_asset_key = "orb"`. Duplicate maps the known pairs `eye_left` /
 `eye_right` and `eyebrow_left` / `eyebrow_right` automatically. Every other
 copied Component requires an explicit picker choice before the duplicate is
 committed.

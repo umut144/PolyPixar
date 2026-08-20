@@ -120,6 +120,13 @@ older Assets without `asset_type` load as `character`. Editor
 state persists the active Create/Mesh/Style module and valid selection, but it
 does not restore disabled Motion as the active category.
 
+The World-root `catalog.json` is an independently versioned derived index, not
+an authored identity store. It lists visible Assets by the `asset_key`
+mechanically derived from each complete display name. The derivation cannot be
+overridden, and creation or rename rejects collisions across visible and hidden
+Assets. Internal stable Asset IDs remain in editor persistence only; neither the
+Catalog nor runtime manifests expose them.
+
 Undo/Redo snapshots copy canonical documents and stable selections. Derived
 previews are transient and are recomputed after restoration.
 
@@ -204,7 +211,8 @@ migrates through the explicitly reviewed legacy mapping. Known left/right pairs
 are mirrored automatically during duplication; all other copied Components
 must receive an explicit available key before the duplicate is committed.
 Asset References use the same local Semantic picker but retain the borrowed
-Asset in `source_asset_id`, so local classification never erases geometry origin.
+Asset in internal `source_asset_id`, so local classification never erases
+geometry origin. Runtime export resolves that editor link to `source_asset_key`.
 
 Sampling results carry their own algorithm version independently of the
 World schema. The junction-aware version invalidates pre-arrangement flat
@@ -217,13 +225,13 @@ The normative serialized package and consumer contract is
 [`RUNTIME_EXPORT_CONTRACT.md`](RUNTIME_EXPORT_CONTRACT.md). The summary below
 describes how the editor produces that contract.
 
-`RuntimeExportService` builds manifest schema 1 exclusively from current
+`RuntimeExportService` builds manifest schema 2 exclusively from current
 accepted Component Mesh, UV, and SDF Bakes. It rejects missing or stale inputs,
 missing/corrupt mask resources, invalid or duplicate Semantic Keys, unresolved
 Asset References, and incomplete or cyclic visible hierarchies. Ordinary
 Components never derive replacement geometry during export. References emit an
 `asset_reference` record containing the local `semantic_key` and actual
-`source_asset_id`, without copying a second Mesh or contour mask into the owner.
+`source_asset_key`, without copying a second Mesh or contour mask into the owner.
 
 The contract is engine-neutral: X points right, Y points up, lengths are meters,
 positive rotations are counter-clockwise radians, and one Tool unit equals
@@ -234,10 +242,13 @@ Mesh Vertex order is retained, Triangle Vertex IDs become compact indices, and
 UVs are aligned to that same order through stable Vertex IDs.
 
 Each visible Asset is exported to the active World-local
-`res://worlds/<world_name>/PolyToolsRuntimeExports/<asset_id>/` directory as `manifest.json` plus relative
+`res://worlds/<world_key>/PolyToolsRuntimeExports/<asset_key>/` directory as `manifest.json` plus relative
 `masks/<component_id>.sdf.png` resources. The batch verifies a staging package
 before atomically replacing the prior package; validation or I/O failure leaves
-the prior package intact. Package freshness is derived by comparing the expected
+the prior package intact. Once all required packages are current, the same batch
+atomically updates World-root Asset Catalog schema 1. The Catalog is the closed
+consumer set; generated directories absent from it are ignored and pruned only
+after every listed package is current and the new Catalog has been committed. Package freshness is derived by comparing the expected
 manifest and mask hashes, not by persisting export diagnostics in the Asset.
 
 ## Testing

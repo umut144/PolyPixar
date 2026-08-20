@@ -1,7 +1,7 @@
 class_name RuntimeExportService
 extends RefCounted
 
-const MANIFEST_SCHEMA_VERSION := 1
+const MANIFEST_SCHEMA_VERSION := 2
 static func build_manifest(asset: Dictionary, sources: Dictionary) -> Dictionary:
 	var errors: Array[String] = []
 	var registry := SemanticRegistry.load_registry()
@@ -10,6 +10,9 @@ static func build_manifest(asset: Dictionary, sources: Dictionary) -> Dictionary
 	var asset_id := str(asset.get("id", ""))
 	if asset_id.is_empty():
 		errors.append("Asset ID is missing.")
+	var asset_key := AssetCatalogService.asset_key(str(asset.get("name", "")))
+	if asset_key.is_empty():
+		errors.append("Asset name does not derive a usable lower_snake_case Asset Key.")
 	var asset_pivot := Vector2(asset.get("asset_pivot", Vector2.ZERO))
 	if not asset_pivot.is_finite():
 		errors.append("Asset pivot is not finite.")
@@ -60,7 +63,7 @@ static func build_manifest(asset: Dictionary, sources: Dictionary) -> Dictionary
 		return {"valid": false, "errors": errors, "manifest": {}, "masks": []}
 	var manifest := {
 		"schema_version": MANIFEST_SCHEMA_VERSION,
-		"asset_id": asset_id,
+		"asset_key": asset_key,
 		"display_name": str(asset.get("name", asset_id)),
 		"asset_type": str(asset.get("asset_type", "character")),
 		"coordinate_system": {
@@ -218,6 +221,9 @@ static func _build_reference_component(component: Dictionary, source: Dictionary
 	var source_asset_id := str(component.get("source_asset_id", ""))
 	if source_asset_id.is_empty() or not bool(source.get("source_asset_exists", false)):
 		errors.append("%s: referenced source Asset is missing." % label)
+	var source_asset_key := str(source.get("source_asset_key", ""))
+	if source_asset_key.is_empty():
+		errors.append("%s: referenced source Asset has no usable Asset Key." % label)
 	if source_asset_id == str(source.get("owner_asset_id", "")):
 		errors.append("%s: an Asset cannot reference itself." % label)
 	var transform = component.get("transform", {})
@@ -238,7 +244,7 @@ static func _build_reference_component(component: Dictionary, source: Dictionary
 			"component_id": str(component.get("id", "")),
 			"semantic_key": str(component.get("semantic_key", "")),
 			"kind": "asset_reference",
-			"source_asset_id": source_asset_id,
+			"source_asset_key": source_asset_key,
 			"parent_component_id": null if str(component.get("parent_component_id", "")).is_empty() else str(component.get("parent_component_id", "")),
 			"z_index": int(component.get("z_index", 0)),
 			"local_pivot": _meters(pivot),
