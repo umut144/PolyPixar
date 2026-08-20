@@ -160,6 +160,14 @@ preserved, pre-schema-36 unpadded Bakes retain Padding `0` and therefore become
 stale against the new padded default, and a failed batch attempt never replaces
 an older valid UV Bake.
 
+Schema 37 adds a derived single-channel SDF stage after accepted UV Mapping.
+`Update SDFs (N)` rasterizes the accepted Mesh triangles in their exact UV space,
+derives signed distance from the resulting silhouette boundary, and stores a
+linear L8 PNG beside the Component Geometry document. The JSON Bake contains
+only compact interpretation metadata, source fingerprints, pixel hash, and the
+relative `contour_sdf.png` reference. Missing files and changed Mesh, UV, recipe,
+or algorithm inputs make the Bake stale; no image data becomes Component topology.
+
 Sampling results carry their own algorithm version independently of the
 Workspace schema. The junction-aware version invalidates pre-arrangement flat
 Cut Bakes at Sampling, which in turn makes Seeding stale before Meshing can

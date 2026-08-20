@@ -7,7 +7,7 @@ const STYLE_SUBMODULES := ["Weighting"]
 const MOTION_SUBMODULES := ["Animation", "Path", "Act", "Sequence"]
 const WORKSPACES_ROOT := "res://workspaces"
 const CONFIG_PATH := "res://configs/app_config.json"
-const SCHEMA_VERSION := 36
+const SCHEMA_VERSION := 37
 const MAX_HISTORY_SIZE := 100
 const PAPER_SIZES_CM := [Vector2(21.0, 29.7), Vector2(29.7, 42.0), Vector2(42.0, 59.4), Vector2(59.4, 84.1), Vector2(84.1, 118.9)]
 const PAPER_LABELS := ["A4", "A3", "A2", "A1", "A0"]
@@ -66,6 +66,8 @@ var geometry_meshing_advanced_relaxation_expanded := false
 var geometry_uv_mapping_preview: Dictionary = {}
 var geometry_uv_mapping_preview_key := ""
 var geometry_uv_mapping_checker_overlay := true
+var sdf_images: Dictionary = {}
+var sdf_resource_validation_cache: Dictionary = {}
 var weighting_preview: Dictionary = {}
 var weighting_preview_key := ""
 var geometry_seeding_edit_active := false
@@ -235,6 +237,8 @@ var update_meshes_button: Button
 var mesh_batch_running := false
 var update_uvs_button: Button
 var uv_batch_running := false
+var update_sdfs_button: Button
+var sdf_batch_running := false
 var workspace_name := ""
 var workspace_name_dialog: ConfirmationDialog
 var workspace_name_input: LineEdit
@@ -709,6 +713,14 @@ func _build_ui() -> void:
 	update_uvs_button.disabled = true
 	update_uvs_button.pressed.connect(_on_update_uvs_pressed)
 	toolbar.add_child(update_uvs_button)
+	update_sdfs_button = Button.new()
+	update_sdfs_button.text = "Update SDFs (0)"
+	update_sdfs_button.tooltip_text = "No pending SDFs"
+	update_sdfs_button.custom_minimum_size = Vector2(140, 32)
+	update_sdfs_button.focus_mode = Control.FOCUS_NONE
+	update_sdfs_button.disabled = true
+	update_sdfs_button.pressed.connect(_on_update_sdfs_pressed)
+	toolbar.add_child(update_sdfs_button)
 	toolbar.add_child(world_scale_menu)
 	toolbar.add_child(workspace_menu)
 
@@ -1714,6 +1726,8 @@ func _confirm_new_workspace() -> void:
 	motion_acts.clear()
 	motion_sequences.clear()
 	geometry_documents.clear()
+	sdf_images.clear()
+	sdf_resource_validation_cache.clear()
 	geometry_sampling_preview = {}
 	geometry_sampling_preview_key = ""
 	geometry_sampling_preview_state = "idle"
@@ -1930,6 +1944,7 @@ func _save_workspace() -> void:
 				continue
 			var geometry_path := "%s/geometry/%s/%s/geometry.json" % [workspace_root, asset_storage_name, str(component.get("id", ""))]
 			_write_json(geometry_path, _serialize_geometry_document(geometry_documents[geometry_key]))
+			_save_sdf_image(asset, str(component.get("id", "")))
 	for path_document in motion_paths:
 		var path_id := str(path_document.get("id", ""))
 		motion_path_ids.append(path_id)
@@ -2287,6 +2302,8 @@ func _load_workspace(workspace_entry: String, persist_as_last := true) -> bool:
 	motion_acts = loaded_motion_acts
 	motion_sequences = loaded_motion_sequences
 	geometry_documents = loaded_geometry_documents
+	sdf_images.clear()
+	sdf_resource_validation_cache.clear()
 	geometry_sampling_preview = {}
 	geometry_sampling_preview_key = ""
 	geometry_sampling_preview_state = "idle"
@@ -2855,6 +2872,52 @@ func _geometry_document_key(asset_id: String, component_id: String) -> String:
 	return "%s/%s" % [asset_id, component_id]
 
 
+func _sdf_image_path(asset: Dictionary, component_id: String) -> String:
+	if workspace_name.is_empty() or asset.is_empty() or component_id.is_empty():
+		return ""
+	return "%s/%s/geometry/%s/%s/contour_sdf.png" % [WORKSPACES_ROOT, workspace_name, _asset_storage_name(asset), component_id]
+
+
+func _sdf_resource_available(asset_id: String, component_id: String) -> bool:
+	var key := _geometry_document_key(asset_id, component_id)
+	var bake := _sdf_bake(asset_id, component_id)
+	var resolution: Array = bake.get("resolution", [])
+	var expected_width := int(resolution[0]) if resolution.size() == 2 else 0
+	var expected_height := int(resolution[1]) if resolution.size() == 2 else 0
+	var expected_hash := str(bake.get("pixel_hash", ""))
+	if sdf_images.has(key) and sdf_images[key] is Image:
+		var transient_image: Image = sdf_images[key]
+		return not transient_image.is_empty() and transient_image.get_format() == Image.FORMAT_L8 \
+			and transient_image.get_width() == expected_width and transient_image.get_height() == expected_height \
+			and GeometrySDFService.image_pixel_hash(transient_image) == expected_hash
+	var path := _sdf_image_path(_get_asset(asset_id), component_id)
+	if path.is_empty() or not FileAccess.file_exists(path):
+		return false
+	var modified_time := FileAccess.get_modified_time(path)
+	var cache_key := "%s|%d|%d|%d|%s" % [path, modified_time, expected_width, expected_height, expected_hash]
+	if sdf_resource_validation_cache.has(cache_key):
+		return bool(sdf_resource_validation_cache[cache_key])
+	var image := Image.load_from_file(path)
+	var valid := image != null and not image.is_empty() and image.get_format() == Image.FORMAT_L8 \
+		and image.get_width() == expected_width and image.get_height() == expected_height \
+		and GeometrySDFService.image_pixel_hash(image) == expected_hash
+	sdf_resource_validation_cache[cache_key] = valid
+	return valid
+
+
+func _save_sdf_image(asset: Dictionary, component_id: String) -> Error:
+	var key := _geometry_document_key(str(asset.get("id", "")), component_id)
+	if not sdf_images.has(key) or not sdf_images[key] is Image:
+		return OK
+	var path := _sdf_image_path(asset, component_id)
+	if path.is_empty():
+		return ERR_UNCONFIGURED
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(path.get_base_dir()))
+	var result := (sdf_images[key] as Image).save_png(path)
+	sdf_resource_validation_cache.clear()
+	return result
+
+
 func _default_geometry_document(asset_id: String, component_id: String) -> Dictionary:
 	return {
 		"asset_id": asset_id,
@@ -2882,6 +2945,12 @@ func _default_geometry_document(asset_id: String, component_id: String) -> Dicti
 		"uv_mapping": {
 			"recipe": GeometryUVMappingService.default_recipe(),
 			"bakes": {},
+			"last_error": "",
+			"last_failure_fingerprint": ""
+		},
+		"sdf": {
+			"recipe": GeometrySDFService.default_recipe(),
+			"bake": {},
 			"last_error": "",
 			"last_failure_fingerprint": ""
 		},
@@ -3018,6 +3087,12 @@ func _normalize_geometry_document(raw_document, asset_id: String, component_id: 
 			if not document["uv_mapping"]["bakes"].has(bake_key) or score > int(uv_bake_scores.get(bake_key, -1)):
 				document["uv_mapping"]["bakes"][bake_key] = uv_bake
 				uv_bake_scores[bake_key] = score
+	var sdf_source = source.get("sdf", {})
+	if sdf_source is Dictionary:
+		document["sdf"]["recipe"] = GeometrySDFService.normalize_recipe(sdf_source.get("recipe", {}))
+		document["sdf"]["bake"] = _normalize_sdf_bake(sdf_source.get("bake", {}))
+		document["sdf"]["last_error"] = str(sdf_source.get("last_error", ""))
+		document["sdf"]["last_failure_fingerprint"] = str(sdf_source.get("last_failure_fingerprint", ""))
 	var weighting_source = source.get("weighting", {})
 	if weighting_source is Dictionary:
 		document["weighting"]["next_style_index"] = maxi(1, int(weighting_source.get("next_style_index", 1)))
@@ -3254,6 +3329,25 @@ func _serialize_uv_mapping_bake(bake: Dictionary) -> Dictionary:
 	return serialized_bake
 
 
+func _normalize_sdf_bake(raw_bake) -> Dictionary:
+	if not raw_bake is Dictionary or not bool(raw_bake.get("valid", false)):
+		return {}
+	var bake: Dictionary = raw_bake.duplicate(true)
+	bake.erase("image")
+	bake["method"] = str(raw_bake.get("method", GeometrySDFService.SINGLE_CHANNEL_SDF))
+	bake["algorithm_version"] = int(raw_bake.get("algorithm_version", 0))
+	bake["parameters"] = GeometrySDFService.normalize_recipe({"method": bake["method"], "parameters": raw_bake.get("parameters", {})})["parameters"]
+	bake["resolution"] = raw_bake.get("resolution", [GeometrySDFService.DEFAULT_RESOLUTION, GeometrySDFService.DEFAULT_RESOLUTION]).duplicate()
+	bake["image_path"] = str(raw_bake.get("image_path", "contour_sdf.png"))
+	return bake
+
+
+func _serialize_sdf_bake(bake: Dictionary) -> Dictionary:
+	var serialized := bake.duplicate(true)
+	serialized.erase("image")
+	return serialized
+
+
 func _serialize_geometry_document(document: Dictionary) -> Dictionary:
 	var normalized := _normalize_geometry_document(document, str(document.get("asset_id", "")), str(document.get("component_id", "")))
 	var serialized_sampling_bakes: Dictionary = {}
@@ -3290,6 +3384,12 @@ func _serialize_geometry_document(document: Dictionary) -> Dictionary:
 			"bakes": serialized_uv_mapping_bakes,
 			"last_error": str(normalized.get("uv_mapping", {}).get("last_error", "")),
 			"last_failure_fingerprint": str(normalized.get("uv_mapping", {}).get("last_failure_fingerprint", ""))
+		},
+		"sdf": {
+			"recipe": normalized.get("sdf", {}).get("recipe", {}).duplicate(true),
+			"bake": _serialize_sdf_bake(normalized.get("sdf", {}).get("bake", {})),
+			"last_error": str(normalized.get("sdf", {}).get("last_error", "")),
+			"last_failure_fingerprint": str(normalized.get("sdf", {}).get("last_failure_fingerprint", ""))
 		},
 		"weighting": {
 			"next_style_index": int(normalized.get("weighting", {}).get("next_style_index", 1)),
@@ -3671,7 +3771,7 @@ func _all_mesh_update_candidates() -> Array[Dictionary]:
 func _update_meshes_button() -> void:
 	if not is_instance_valid(update_meshes_button):
 		return
-	if mesh_batch_running or uv_batch_running:
+	if mesh_batch_running or uv_batch_running or sdf_batch_running:
 		return
 	var candidates := _all_mesh_update_candidates()
 	var count := candidates.size()
@@ -3709,12 +3809,108 @@ func _all_uv_update_candidates() -> Array[Dictionary]:
 
 
 func _update_uvs_button() -> void:
-	if not is_instance_valid(update_uvs_button) or mesh_batch_running or uv_batch_running:
+	if not is_instance_valid(update_uvs_button) or mesh_batch_running or uv_batch_running or sdf_batch_running:
 		return
 	var candidates := _all_uv_update_candidates()
 	update_uvs_button.text = "Update UVs (%d)" % candidates.size()
 	update_uvs_button.tooltip_text = _uv_update_candidates_tooltip(candidates)
 	update_uvs_button.disabled = candidates.is_empty()
+
+
+func _sdf_recipe(asset_id: String, component_id: String) -> Dictionary:
+	var document := _get_geometry_document(asset_id, component_id)
+	return GeometrySDFService.normalize_recipe(document.get("sdf", {}).get("recipe", {})) if not document.is_empty() else GeometrySDFService.default_recipe()
+
+
+func _sdf_bake(asset_id: String, component_id: String) -> Dictionary:
+	var document := _get_geometry_document(asset_id, component_id)
+	return document.get("sdf", {}).get("bake", {}) if not document.is_empty() else {}
+
+
+func _sdf_inputs(asset_id: String, component_id: String) -> Dictionary:
+	return {
+		"mesh": _component_mesh_bake(asset_id, component_id),
+		"uv": _geometry_uv_mapping_bake(asset_id, component_id)
+	}
+
+
+func _sdf_status(asset_id: String, component_id: String, component: Dictionary) -> String:
+	if component.is_empty() or _component_mesh_status(asset_id, component_id, component) != "Ready":
+		return "Component Mesh Required / Stale"
+	var uv := _geometry_uv_mapping_bake(asset_id, component_id)
+	if not _geometry_uv_mapping_bake_is_current(asset_id, component_id, component, uv):
+		return "UV Bake Required / Stale"
+	var inputs := _sdf_inputs(asset_id, component_id)
+	var bake := _sdf_bake(asset_id, component_id)
+	if bake.is_empty():
+		return "Not Generated"
+	if not GeometrySDFService.result_matches(bake, inputs["mesh"], inputs["uv"], _sdf_recipe(asset_id, component_id)):
+		return "Stale"
+	return "Baked" if _sdf_resource_available(asset_id, component_id) else "Resource Missing"
+
+
+func _component_sdf_needs_update(asset_id: String, component: Dictionary) -> bool:
+	var asset := _get_asset(asset_id)
+	if asset.is_empty() or not bool(asset.get("visibility", true)) or not bool(component.get("visibility", true)):
+		return false
+	var component_id := str(component.get("id", ""))
+	if component_id.is_empty() or _component_mesh_status(asset_id, component_id, component) != "Ready":
+		return false
+	var uv := _geometry_uv_mapping_bake(asset_id, component_id)
+	if not _geometry_uv_mapping_bake_is_current(asset_id, component_id, component, uv):
+		return false
+	var mesh := _component_mesh_bake(asset_id, component_id)
+	var recipe := _sdf_recipe(asset_id, component_id)
+	var fingerprint := GeometrySDFService.source_fingerprint(mesh, uv, recipe)
+	var document := _get_geometry_document(asset_id, component_id)
+	if str(document.get("sdf", {}).get("last_failure_fingerprint", "")) == fingerprint:
+		return false
+	return not GeometrySDFService.result_matches(_sdf_bake(asset_id, component_id), mesh, uv, recipe) \
+		or not _sdf_resource_available(asset_id, component_id)
+
+
+func _all_sdf_update_candidates() -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	for asset in assets:
+		if not asset is Dictionary:
+			continue
+		var asset_id := str(asset.get("id", ""))
+		for component in asset.get("components", []):
+			if component is Dictionary and _component_sdf_needs_update(asset_id, component):
+				result.append({"asset_id": asset_id, "component_id": str(component.get("id", ""))})
+	return result
+
+
+func _update_sdfs_button() -> void:
+	if not is_instance_valid(update_sdfs_button) or mesh_batch_running or uv_batch_running or sdf_batch_running:
+		return
+	var candidates := _all_sdf_update_candidates()
+	update_sdfs_button.text = "Update SDFs (%d)" % candidates.size()
+	update_sdfs_button.tooltip_text = _sdf_update_candidates_tooltip(candidates)
+	update_sdfs_button.disabled = candidates.is_empty()
+
+
+func _sdf_update_candidates_tooltip(candidates: Array[Dictionary]) -> String:
+	var lines := PackedStringArray()
+	for candidate in candidates:
+		var asset := _get_asset(str(candidate.get("asset_id", "")))
+		var component := _get_component(asset, str(candidate.get("component_id", "")))
+		lines.append("%s / %s" % [str(asset.get("name", "Asset")), str(component.get("name", "Component"))])
+	if not lines.is_empty():
+		return "\n".join(lines)
+	var failures := PackedStringArray()
+	for asset in assets:
+		if not asset is Dictionary:
+			continue
+		var asset_id := str(asset.get("id", ""))
+		for component in asset.get("components", []):
+			if not component is Dictionary:
+				continue
+			var document := _get_geometry_document(asset_id, str(component.get("id", "")))
+			var error_message := str(document.get("sdf", {}).get("last_error", ""))
+			if not error_message.is_empty():
+				failures.append("%s / %s — %s" % [str(asset.get("name", "Asset")), str(component.get("name", "Component")), error_message])
+	return "Needs attention:\n%s" % "\n".join(failures) if not failures.is_empty() else "No pending SDFs"
 
 
 func _uv_update_candidates_tooltip(candidates: Array[Dictionary]) -> String:
@@ -3855,7 +4051,7 @@ func _record_component_mesh_failure(asset_id: String, component_id: String, buil
 
 
 func _on_update_meshes_pressed() -> void:
-	if mesh_batch_running or uv_batch_running:
+	if mesh_batch_running or uv_batch_running or sdf_batch_running:
 		return
 	var candidates := _all_mesh_update_candidates()
 	if candidates.is_empty():
@@ -3863,6 +4059,8 @@ func _on_update_meshes_pressed() -> void:
 		return
 	mesh_batch_running = true
 	update_meshes_button.tooltip_text = _mesh_update_candidates_tooltip(candidates)
+	update_uvs_button.disabled = true
+	update_sdfs_button.disabled = true
 	var succeeded := 0
 	var failed := 0
 	var history_recorded := false
@@ -3933,7 +4131,7 @@ func _record_component_uv_failure(asset_id: String, component_id: String, build:
 
 
 func _on_update_uvs_pressed() -> void:
-	if uv_batch_running or mesh_batch_running:
+	if uv_batch_running or mesh_batch_running or sdf_batch_running:
 		return
 	var candidates := _all_uv_update_candidates()
 	if candidates.is_empty():
@@ -3942,6 +4140,7 @@ func _on_update_uvs_pressed() -> void:
 	uv_batch_running = true
 	update_uvs_button.tooltip_text = _uv_update_candidates_tooltip(candidates)
 	update_meshes_button.disabled = true
+	update_sdfs_button.disabled = true
 	var succeeded := 0
 	var failed := 0
 	var history_recorded := false
@@ -3973,6 +4172,97 @@ func _on_update_uvs_pressed() -> void:
 			failed += 1
 	uv_batch_running = false
 	_show_status_message("Updated %d UV Bake%s%s" % [succeeded, "" if succeeded == 1 else "s", " · %d need attention" % failed if failed > 0 else ""])
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _generate_component_sdf_build(asset_id: String, component_id: String) -> Dictionary:
+	var component := _get_component(_get_asset(asset_id), component_id)
+	var status := _sdf_status(asset_id, component_id, component)
+	if status in ["Component Mesh Required / Stale", "UV Bake Required / Stale"]:
+		return {"valid": false, "errors": [status]}
+	var inputs := _sdf_inputs(asset_id, component_id)
+	var recipe := _sdf_recipe(asset_id, component_id)
+	var result := GeometrySDFService.generate(inputs["mesh"], inputs["uv"], recipe)
+	return {
+		"valid": bool(result.get("valid", false)),
+		"errors": result.get("errors", []).duplicate(),
+		"recipe": recipe,
+		"result": result,
+		"source_fingerprint": GeometrySDFService.source_fingerprint(inputs["mesh"], inputs["uv"], recipe)
+	}
+
+
+func _commit_component_sdf_build(asset_id: String, component_id: String, build: Dictionary) -> bool:
+	var result: Dictionary = build.get("result", {})
+	var image = result.get("image", null)
+	if not image is Image or image.is_empty():
+		return false
+	var key := _geometry_document_key(asset_id, component_id)
+	sdf_images[key] = image
+	var asset := _get_asset(asset_id)
+	if not workspace_name.is_empty() and _save_sdf_image(asset, component_id) != OK:
+		sdf_images.erase(key)
+		return false
+	var bake := result.duplicate(true)
+	bake.erase("image")
+	bake["bake_id"] = "sdf_bake_%d" % ResourceUID.create_id()
+	var document := _get_geometry_document(asset_id, component_id, true)
+	document["sdf"]["recipe"] = GeometrySDFService.normalize_recipe(build.get("recipe", {}))
+	document["sdf"]["bake"] = bake
+	document["sdf"]["last_error"] = ""
+	document["sdf"]["last_failure_fingerprint"] = ""
+	return true
+
+
+func _record_component_sdf_failure(asset_id: String, component_id: String, build: Dictionary) -> void:
+	var document := _get_geometry_document(asset_id, component_id, true)
+	var errors: Array = build.get("errors", [])
+	document["sdf"]["last_error"] = str(errors[0]) if not errors.is_empty() else "Automatic SDF generation failed."
+	document["sdf"]["last_failure_fingerprint"] = str(build.get("source_fingerprint", ""))
+
+
+func _on_update_sdfs_pressed() -> void:
+	if sdf_batch_running or mesh_batch_running or uv_batch_running:
+		return
+	var candidates := _all_sdf_update_candidates()
+	if candidates.is_empty():
+		_update_sdfs_button()
+		return
+	sdf_batch_running = true
+	update_sdfs_button.tooltip_text = _sdf_update_candidates_tooltip(candidates)
+	update_meshes_button.disabled = true
+	update_uvs_button.disabled = true
+	var succeeded := 0
+	var failed := 0
+	var history_recorded := false
+	for index in range(candidates.size()):
+		update_sdfs_button.text = "Updating %d/%d" % [index + 1, candidates.size()]
+		update_sdfs_button.disabled = true
+		await get_tree().process_frame
+		var candidate: Dictionary = candidates[index]
+		var asset_id := str(candidate.get("asset_id", ""))
+		var component_id := str(candidate.get("component_id", ""))
+		var build := _generate_component_sdf_build(asset_id, component_id)
+		if not history_recorded:
+			_record_direct_change()
+			history_recorded = true
+		if bool(build.get("valid", false)):
+			var inputs := _sdf_inputs(asset_id, component_id)
+			var recipe := _sdf_recipe(asset_id, component_id)
+			if GeometrySDFService.source_fingerprint(inputs["mesh"], inputs["uv"], recipe) == str(build.get("source_fingerprint", "")) \
+				and _commit_component_sdf_build(asset_id, component_id, build):
+				succeeded += 1
+			else:
+				build["errors"] = ["SDF inputs changed or the contour image could not be written."]
+				_record_component_sdf_failure(asset_id, component_id, build)
+				failed += 1
+		else:
+			_record_component_sdf_failure(asset_id, component_id, build)
+			failed += 1
+	sdf_batch_running = false
+	_show_status_message("Updated %d SDF Bake%s%s" % [succeeded, "" if succeeded == 1 else "s", " · %d need attention" % failed if failed > 0 else ""])
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
@@ -6242,6 +6532,7 @@ func _render_outliner() -> void:
 	_update_context_action_button()
 	_update_meshes_button()
 	_update_uvs_button()
+	_update_sdfs_button()
 	_update_outliner_asset_type_filter_visibility()
 	if active_module == "Motion":
 		_render_motion_outliner()

@@ -711,7 +711,49 @@
 			}
 		}
 	},
-	"schema_version": 36,
+	"schema_version": 37,
+	"sdf": {
+		"bake": {
+			"algorithm_version": 1,
+			"bake_id": "sdf_bake_3179392190043240752",
+			"boundary_value": 0.5,
+			"channel": "r",
+			"color_space": "linear",
+			"errors": [],
+			"image_origin": "top_left",
+			"image_path": "contour_sdf.png",
+			"inside_is_greater": true,
+			"mesh_bake_id": "meshing_bake_1547345827967331228",
+			"mesh_fingerprint": "f42906329d99a72a88489da0a769f4493ef981e25ca0d70ee23384847ef29af7",
+			"mesh_method": "constrained_mesh",
+			"method": "single_channel_sdf",
+			"parameters": {
+				"resolution": 256,
+				"spread_px": 16.0
+			},
+			"pixel_hash": "a4b06c8fea1b222f5cc7bf079026455aa70ebcb98177fb8e4ec955198fb7c5f2",
+			"resolution": [
+				256,
+				256
+			],
+			"source_fingerprint": "08a2af9436fc90e2253b6b133196e60f9db57834b1c49d26e6228b59e191cca5",
+			"spread_px": 16.0,
+			"uv_bake_id": "uv_bake_4175132970861746411",
+			"uv_fingerprint": "f19691f2f5d897da5891405e32e644db57174cbd1c3fa61fb0121875ac7a3f1f",
+			"uv_origin": "bottom_left",
+			"uv_to_pixel": "x=u*width, y=(1-v)*height",
+			"valid": true
+		},
+		"last_error": "",
+		"last_failure_fingerprint": "",
+		"recipe": {
+			"method": "single_channel_sdf",
+			"parameters": {
+				"resolution": 256,
+				"spread_px": 16.0
+			}
+		}
+	},
 	"seeding": {
 		"bakes": {
 			"poisson_fill": {

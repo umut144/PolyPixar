@@ -98,6 +98,13 @@ for visible Components with missing or stale mappings. New recipes reserve a
 calibrated UV border for later contour-mask derivation. UV results remain keyed
 one-to-one by stable Mesh Vertex ID and never alter Component topology or Meshes.
 
+The persistent `Update SDFs (N)` action consumes only current accepted Component
+Meshes and UV Bakes. It derives a deterministic 256×256 single-channel signed
+distance image for each visible Component, with a 16 px spread and values above
+0.5 inside the triangulated silhouette. Bake metadata remains in the Geometry
+document while `contour_sdf.png` is stored beside it. Mesh, UV, recipe, algorithm,
+or missing-resource changes make the SDF stale without changing source topology.
+
 ## Workspace and export
 
 A Workspace persists Assets plus the currently retained motion and derived

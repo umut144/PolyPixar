@@ -71,4 +71,24 @@ or Bakes.
 
 `CMD/Ctrl + 2 · Edit UV`, manual UV overrides, Seams, texture assignment,
 Sampler-Spine or Shader-Flow mapping, packing, atlases, distortion analysis,
-SDF generation, and export consumption are outside this Slice.
+manual SDF editing, and export consumption are outside this Slice.
+
+## Contour SDF
+
+The downstream contour stage consumes the exact accepted Component Mesh and UV
+Bake. `Update SDFs (N)` creates one deterministic `256×256` single-channel PNG
+per visible Component. The channel is interpreted linearly: `0.5` is the contour,
+greater values are inside, lower values are outside, and the signed-distance
+spread is `16 px`.
+
+Mesh triangles define the filled silhouette, including Ribbon Strips and holes;
+Bézier control polygons are not consulted. UV uses `u` right and `v` up, while
+PNG rows use a top-left image origin, so rasterization applies `y = (1-v) ×
+height`. Bake metadata records the channel, color-space interpretation,
+resolution, spread, origins, source Bake IDs and fingerprints, algorithm version,
+and pixel hash. The relative resource name is `contour_sdf.png` beside
+`geometry.json`.
+
+Changing Mesh, UV coordinates, SDF recipe, or algorithm makes the SDF stale.
+A missing PNG is also actionable. Batch commits are atomic per Component and a
+failure cannot replace an older valid Bake or image.

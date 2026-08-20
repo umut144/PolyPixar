@@ -20,6 +20,7 @@ func _init() -> void:
 	_test_geometry_seeding_service()
 	_test_geometry_meshing_service_and_ui()
 	_test_geometry_uv_mapping_service_and_ui()
+	_test_geometry_sdf_service_and_batch()
 	_test_weighting_service_and_ui()
 	_test_component_hierarchy_model()
 	_test_asset_guides()
@@ -387,7 +388,7 @@ func _test_geometry_sampling_service() -> void:
 	_expect(not bool(GeometrySamplingService.generate(open_component).get("valid", true)), "An open contour should fail visibly at the mesh-pipeline Sampling boundary.")
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
-	_expect(application._has_supported_schema({"schema_version": 36}) and application._has_supported_schema({"schema_version": 35}) and not application._has_supported_schema({"schema_version": 37}), "Schema 36 should keep current and older Workspace documents readable and reject unknown future schemas.")
+	_expect(application._has_supported_schema({"schema_version": 37}) and application._has_supported_schema({"schema_version": 36}) and not application._has_supported_schema({"schema_version": 38}), "Schema 37 should keep current and older Workspace documents readable and reject unknown future schemas.")
 	var arranged_round_trip: Dictionary = application._normalize_sampling_bake(application._serialize_sampling_bake(arranged_result))
 	_expect(arranged_round_trip.get("cuts", [])[0].get("fragments", []).size() == 2 and arranged_round_trip.get("cuts", [])[0].get("fragments", [])[0].get("samples", [])[0].get("position", null) is Vector2, "Schema 32 should preserve Cut fragment connectivity and restore fragment positions as Vector2 values.")
 	var geometry_document: Dictionary = application._default_geometry_document("asset_1", "component_1")
@@ -396,7 +397,7 @@ func _test_geometry_sampling_service() -> void:
 	baked_result["bake_id"] = "bake_test"
 	geometry_document["sampling"]["bakes"][GeometrySamplingService.ADAPTIVE] = baked_result
 	var serialized_geometry: Dictionary = application._serialize_geometry_document(geometry_document)
-	_expect(int(serialized_geometry.get("schema_version", 0)) == 36 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-36 JSON arrays.")
+	_expect(int(serialized_geometry.get("schema_version", 0)) == 37 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-37 JSON arrays.")
 	var normalized_geometry: Dictionary = application._normalize_geometry_document(serialized_geometry, "asset_1", "component_1")
 	_expect(normalized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Vector2, "Sampling bake loading should restore local sample positions as Vector2 values.")
 	_expect(normalized_geometry["sampling"]["bakes"].size() == 1, "Sampling should retain one Adaptive Bake.")
@@ -980,6 +981,7 @@ func _test_geometry_uv_mapping_service_and_ui() -> void:
 	application._render_canvas_context()
 	_expect(application.geometry_uv_mapping_workspace.visible and application.inspector_content.get_child_count() >= 14, "UV Mapping should expose its dedicated split Workspace and compact Bounds / Planar Inspector.")
 	_expect(application.update_uvs_button.text == "Update UVs (0)" and application.update_uvs_button.disabled, "A current accepted UV Bake should leave the global UV batch empty.")
+	_expect(application.update_sdfs_button.text == "Update SDFs (1)" and not application.update_sdfs_button.disabled, "A visible Component with current Mesh and UV Bakes should become an actionable SDF batch candidate.")
 	application._activate_geometry_uv_mapping_method_choice()
 	var active_style := application.geometry_uv_mapping_method_menu.get_theme_stylebox("normal") as StyleBoxFlat
 	_expect(application.active_context_command == "geometry.uv_mapping.method" and application.geometry_uv_mapping_method_choice_active and active_style != null and active_style.bg_color == Color("#8fd8f5"), "UV Mapping CMD+1 should use the shared exclusive Method state and highlight.")
@@ -1023,6 +1025,65 @@ func _test_geometry_uv_mapping_service_and_ui() -> void:
 	ribbon_document["uv_mapping"]["bakes"].clear()
 	_expect(ribbon_application._all_uv_update_candidates().is_empty(), "The UV batch should not mutate hidden Components.")
 	ribbon_application.free()
+
+
+func _test_geometry_sdf_service_and_batch() -> void:
+	var mesh := {
+		"valid": true,
+		"bake_id": "mesh_sdf_test",
+		"method": GeometryMeshingService.CONSTRAINED_MESH,
+		"vertices": [
+			{"id": "v0", "position": Vector2.ZERO},
+			{"id": "v1", "position": Vector2(10.0, 0.0)},
+			{"id": "v2", "position": Vector2(10.0, 10.0)},
+			{"id": "v3", "position": Vector2(0.0, 10.0)}
+		],
+		"triangles": [
+			{"vertex_ids": ["v0", "v1", "v2"]},
+			{"vertex_ids": ["v0", "v2", "v3"]}
+		]
+	}
+	var uv_recipe := GeometryUVMappingService.default_recipe()
+	var uv := GeometryUVMappingService.generate(mesh, uv_recipe)
+	uv["bake_id"] = "uv_sdf_test"
+	var sdf := GeometrySDFService.generate(mesh, uv)
+	var repeated := GeometrySDFService.generate(mesh, uv)
+	var sdf_image: Image = sdf.get("image", null)
+	_expect(bool(sdf.get("valid", false)) and sdf_image != null and sdf_image.get_format() == Image.FORMAT_L8 and sdf_image.get_width() == 256 and sdf_image.get_height() == 256, "SDF generation should produce the accepted 256x256 single-channel linear image.")
+	_expect(str(sdf.get("pixel_hash", "")) == str(repeated.get("pixel_hash", "")) and str(sdf.get("source_fingerprint", "")) == str(repeated.get("source_fingerprint", "")), "Identical Mesh, UV, and SDF recipes should produce deterministic semantic content and pixels.")
+	_expect(sdf_image.get_pixel(128, 128).r > 0.5 and sdf_image.get_pixel(0, 0).r < 0.5 and is_equal_approx(float(sdf.get("boundary_value", 0.0)), 0.5) and bool(sdf.get("inside_is_greater", false)), "The SDF should encode the filled silhouette above 0.5 and exterior texels below 0.5.")
+	var invalid_uv := uv.duplicate(true)
+	invalid_uv["uvs"][0]["uv"] = Vector2(-0.1, 0.0)
+	_expect(not bool(GeometrySDFService.generate(mesh, invalid_uv).get("valid", true)), "SDF generation should reject UV geometry outside normalized texture space instead of clipping it.")
+	var ribbon := _component()
+	ribbon.merge({"id": "component_sdf", "name": "ArmLine", "draw_mode": "ribbon", "ribbon_width_px": 8.0, "visibility": true})
+	BezierTopology.add_point(ribbon, Vector2.ZERO, "linear")
+	BezierTopology.add_point(ribbon, Vector2(0.0, 8.0), "linear")
+	var ribbon_mesh := RibbonMeshService.generate(ribbon)
+	ribbon_mesh["bake_id"] = "mesh_ribbon_sdf_test"
+	var ribbon_uv_recipe := GeometryUVMappingService.default_recipe()
+	ribbon_uv_recipe["parameters"]["mesh_method"] = RibbonMeshService.METHOD
+	var ribbon_uv := GeometryUVMappingService.generate(ribbon_mesh, ribbon_uv_recipe)
+	ribbon_uv["bake_id"] = "uv_ribbon_sdf_test"
+	var application_script = load("res://scripts/main.gd")
+	var application: Control = application_script.new()
+	var document: Dictionary = application._default_geometry_document("asset_sdf", "component_sdf")
+	document["meshing"]["bakes"][RibbonMeshService.METHOD] = ribbon_mesh
+	document["component_mesh"] = {"bake_id": "mesh_ribbon_sdf_test", "method": RibbonMeshService.METHOD, "mesh_fingerprint": GeometryUVMappingService.mesh_fingerprint(ribbon_mesh)}
+	document["uv_mapping"]["recipe"] = ribbon_uv_recipe
+	document["uv_mapping"]["bakes"][GeometryUVMappingService.bake_key(RibbonMeshService.METHOD, GeometryUVMappingService.BOUNDS_PLANAR)] = ribbon_uv
+	var assets: Array[Dictionary] = [{"id": "asset_sdf", "name": "Wizard", "visibility": true, "components": [ribbon], "guides": []}]
+	application.assets = assets
+	application.geometry_documents["asset_sdf/component_sdf"] = document
+	_expect(application._all_sdf_update_candidates() == [{"asset_id": "asset_sdf", "component_id": "component_sdf"}], "The SDF batch should include a visible Ribbon with current accepted Mesh and UV Bakes.")
+	var build: Dictionary = application._generate_component_sdf_build("asset_sdf", "component_sdf")
+	_expect(bool(build.get("valid", false)) and application._commit_component_sdf_build("asset_sdf", "component_sdf", build), "The SDF batch should generate and atomically accept a Ribbon contour image.")
+	_expect(application._sdf_status("asset_sdf", "component_sdf", ribbon) == "Baked" and application._all_sdf_update_candidates().is_empty(), "A current accepted SDF resource should clear the actionable batch state.")
+	var round_trip: Dictionary = application._normalize_geometry_document(application._serialize_geometry_document(document), "asset_sdf", "component_sdf")
+	_expect(str(round_trip.get("sdf", {}).get("bake", {}).get("pixel_hash", "")) == str(document.get("sdf", {}).get("bake", {}).get("pixel_hash", "")) and not round_trip.get("sdf", {}).get("bake", {}).has("image"), "SDF metadata should survive Geometry persistence without embedding image pixels into JSON.")
+	document["uv_mapping"]["bakes"][GeometryUVMappingService.bake_key(RibbonMeshService.METHOD, GeometryUVMappingService.BOUNDS_PLANAR)]["uvs"][0]["uv"] += Vector2(0.001, 0.0)
+	_expect(application._sdf_status("asset_sdf", "component_sdf", ribbon) == "Stale" and application._all_sdf_update_candidates().size() == 1, "Changing accepted UV coordinates should make the dependent SDF stale without mutating Mesh or Component topology.")
+	application.free()
 
 
 func _test_weighting_service_and_ui() -> void:
@@ -1583,7 +1644,7 @@ func _test_motion_act_evaluator() -> void:
 	var normalized: Dictionary = application._normalize_motion_act({"id": "act_7", "parameters": {"direction": [0.0, 2.0], "distance": 12.0}}, "fallback")
 	_expect(Vector2(normalized.get("parameters", {}).get("direction", Vector2.ZERO)) == Vector2(0.0, 2.0), "Persisted Slide direction arrays should normalize back to Vector2 values.")
 	var serialized: Dictionary = application._serialize_motion_act(normalized)
-	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 36, "Act persistence should serialize vectors as JSON arrays using schema 36.")
+	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 37, "Act persistence should serialize vectors as JSON arrays using schema 37.")
 	var normalized_jump: Dictionary = application._normalize_motion_act({"id": "act_8", "primitive": "jump", "parameters": {"direction": [1.0, 0.0], "distance": 7.0, "height": 2.5, "arc": "snappy"}}, "fallback")
 	var serialized_jump: Dictionary = application._serialize_motion_act(normalized_jump)
 	_expect(str(serialized_jump.get("primitive", "")) == MotionActEvaluator.JUMP and is_equal_approx(float(serialized_jump.get("parameters", {}).get("height", 0.0)), 2.5) and str(serialized_jump.get("parameters", {}).get("arc", "")) == MotionActEvaluator.JUMP_ARC_SNAPPY, "Jump-specific parameters should survive normalization and serialization.")
