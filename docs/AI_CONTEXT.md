@@ -11,7 +11,6 @@ The left rail is always expanded and exposes exactly these categories:
 - `Create`: `Character`, `Props`, `Terrain`, `Icon`, `Symbols`
 - `Mesh`: `Sampling`, `Seeding`, `Meshing`
 - `Style`: `Weighting`
-- `Export`
 
 Only one module is active at a time, even though all categories remain open.
 Motion authoring is retained internally for future work but is not selectable
@@ -30,10 +29,10 @@ search field. Character, Props, Terrain, Icon, and Symbols are checked by defaul
 search text and checked types are combined. The filter is an editor-state
 preference, not a document mutation.
 
-The field is written to `asset.json` and to the exported Godot scene root as
-the `asset_type` metadata value. This is the current export contract for
-distinguishing product modules; module-specific behavior can be layered on top
-later without changing Asset topology.
+The field is written to `asset.json` and to the engine-neutral runtime manifest.
+This is the current export contract for distinguishing product modules;
+module-specific behavior can be layered on top later without changing Asset
+topology.
 
 ## Geometry model
 
@@ -105,17 +104,31 @@ distance image for each visible Component, with a 16 px spread and values above
 document while `contour_sdf.png` is stored beside it. Mesh, UV, recipe, algorithm,
 or missing-resource changes make the SDF stale without changing source topology.
 
+The persistent `Export Runtime (N)` action automatically considers every visible
+Asset. Every visible Component must have one unique
+lower-snake-case semantic role and current accepted Mesh, UV, and SDF resources.
+The batch writes a versioned engine-neutral manifest plus copied SDF masks to
+the project-sibling `PolyToolsRuntimeExports/<asset_id>/` directory. Packages are
+staged, verified, and replaced atomically per Asset; an invalid Asset retains
+its older package and no fallback geometry is generated.
+
+All four persistent batch buttons use the same compact tooltip summary. A
+`Pending` section lists actionable work, while `Needs attention` lists visible
+Components or Assets blocked by invalid source data, missing/stale upstream
+resources, or the last failed batch attempt. Attention entries remain outside
+the actionable Mesh, UV, and SDF button counts. Each Batch button draws its own
+orange attention point whenever that same summary contains at least one
+`Needs attention` entry; the point remains visible even if the Button itself is
+disabled.
+
 ## Workspace and export
 
 A Workspace persists Assets plus the currently retained motion and derived
 mesh records. Assets own Components, Guides, reference-image settings, their
-Asset pivot, and their `asset_type`. New persistence must not add display
-polygons or reverse synchronization into Component topology.
-
-Export validates topology before building a Godot scene. The scene root owns
-the exported Asset pivot and `asset_type`; child `Node2D` records preserve the
-Component hierarchy and `Polygon2D` geometry is derived from Bézier topology,
-a primitive definition, or an accepted Ribbon mesh.
+Asset pivot and `asset_type`. Components own an optional
+runtime semantic role. New persistence must not add display polygons or reverse
+synchronization into Component topology. The former Godot-scene Export module
+is retired; runtime export is a batch operation over accepted derived data.
 
 ## Verification
 

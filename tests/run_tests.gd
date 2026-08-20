@@ -21,6 +21,7 @@ func _init() -> void:
 	_test_geometry_meshing_service_and_ui()
 	_test_geometry_uv_mapping_service_and_ui()
 	_test_geometry_sdf_service_and_batch()
+	_test_runtime_export_service()
 	_test_weighting_service_and_ui()
 	_test_component_hierarchy_model()
 	_test_asset_guides()
@@ -388,7 +389,7 @@ func _test_geometry_sampling_service() -> void:
 	_expect(not bool(GeometrySamplingService.generate(open_component).get("valid", true)), "An open contour should fail visibly at the mesh-pipeline Sampling boundary.")
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
-	_expect(application._has_supported_schema({"schema_version": 37}) and application._has_supported_schema({"schema_version": 36}) and not application._has_supported_schema({"schema_version": 38}), "Schema 37 should keep current and older Workspace documents readable and reject unknown future schemas.")
+	_expect(application._has_supported_schema({"schema_version": 38}) and application._has_supported_schema({"schema_version": 37}) and not application._has_supported_schema({"schema_version": 39}), "Schema 38 should keep current and older Workspace documents readable and reject unknown future schemas.")
 	var arranged_round_trip: Dictionary = application._normalize_sampling_bake(application._serialize_sampling_bake(arranged_result))
 	_expect(arranged_round_trip.get("cuts", [])[0].get("fragments", []).size() == 2 and arranged_round_trip.get("cuts", [])[0].get("fragments", [])[0].get("samples", [])[0].get("position", null) is Vector2, "Schema 32 should preserve Cut fragment connectivity and restore fragment positions as Vector2 values.")
 	var geometry_document: Dictionary = application._default_geometry_document("asset_1", "component_1")
@@ -397,7 +398,7 @@ func _test_geometry_sampling_service() -> void:
 	baked_result["bake_id"] = "bake_test"
 	geometry_document["sampling"]["bakes"][GeometrySamplingService.ADAPTIVE] = baked_result
 	var serialized_geometry: Dictionary = application._serialize_geometry_document(geometry_document)
-	_expect(int(serialized_geometry.get("schema_version", 0)) == 37 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-37 JSON arrays.")
+	_expect(int(serialized_geometry.get("schema_version", 0)) == 38 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-38 JSON arrays.")
 	var normalized_geometry: Dictionary = application._normalize_geometry_document(serialized_geometry, "asset_1", "component_1")
 	_expect(normalized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Vector2, "Sampling bake loading should restore local sample positions as Vector2 values.")
 	_expect(normalized_geometry["sampling"]["bakes"].size() == 1, "Sampling should retain one Adaptive Bake.")
@@ -471,7 +472,7 @@ func _test_geometry_sampling_ui_shell() -> void:
 	for module_section in application.module_sections:
 		visible_categories.append(module_section.module_name)
 		every_category_expanded = every_category_expanded and module_section.expanded
-	_expect(visible_categories == ["Create", "Mesh", "Style", "Export"], "The module rail should omit Texture, Material, Motion, Transform, and Effects categories.")
+	_expect(visible_categories == ["Create", "Mesh", "Style"], "The module rail should omit the retired Export workspace and the deferred Texture, Material, Motion, Transform, and Effects categories.")
 	_expect(every_category_expanded, "Every visible category should remain expanded.")
 	var test_assets: Array[Dictionary] = [{"id": "asset_1", "name": "Wizard", "visibility": true, "components": [component]}]
 	application.assets = test_assets
@@ -484,7 +485,12 @@ func _test_geometry_sampling_ui_shell() -> void:
 	application._render_inspector()
 	application._render_canvas_context()
 	_expect(is_instance_valid(application.update_meshes_button) and application.update_meshes_button.text == "Update Meshes (1)" and not application.update_meshes_button.disabled, "The persistent toolbar should expose one actionable valid unmeshed Component across all Create Assets.")
-	_expect(application.update_meshes_button.tooltip_text == "Wizard / Body", "Update Meshes hover text should contain only the compact Asset / Component list of affected Meshes.")
+	_expect(application.update_meshes_button.tooltip_text == "Pending (1):\nWizard / Body", "Update Meshes hover text should summarize the actionable Asset / Component list.")
+	_expect(application.update_uvs_button.tooltip_text.contains("Needs attention (1):") and application.update_uvs_button.tooltip_text.contains("Current Component Mesh required"), "Update UVs hover text should summarize Components blocked by missing or stale Meshes.")
+	_expect(application.update_sdfs_button.tooltip_text.contains("Needs attention (1):") and application.update_sdfs_button.tooltip_text.contains("Current Component Mesh required"), "Update SDFs hover text should summarize Components blocked by missing or stale upstream data.")
+	_expect(application.runtime_export_button.text == "Export Runtime (1)" and application.runtime_export_button.tooltip_text.contains("Needs attention (1):"), "Every visible Asset should enter Runtime Export automatically and expose invalid contract data in the tooltip without an opt-in flag.")
+	_expect(application.update_meshes_button is BatchStatusButton and application.update_meshes_button.attention_count == 0, "An actionable Mesh alone should not illuminate the Mesh attention indicator.")
+	_expect(application.update_uvs_button.attention_count == 1 and application.update_sdfs_button.attention_count == 1 and application.runtime_export_button.attention_count == 1, "Each affected Batch button should own an independent attention indicator derived from its own summary.")
 	_expect(application.geometry_sampling_workspace.visible, "Geometry Sampling should own a dedicated visible centre workspace.")
 	_expect(application.outliner_list.get_child_count() > 1, "Sampling Outliner should expose the Asset/Component hierarchy.")
 	_expect(application.inspector_content.get_child_count() >= 8, "A selected Component should expose Adaptive parameters, boundary inputs, result, and Bake controls.")
@@ -1086,6 +1092,42 @@ func _test_geometry_sdf_service_and_batch() -> void:
 	application.free()
 
 
+func _test_runtime_export_service() -> void:
+	var mesh := {
+		"valid": true,
+		"vertices": [
+			{"id": "v0", "position": Vector2(0.0, 0.0)},
+			{"id": "v1", "position": Vector2(10.0, 0.0)},
+			{"id": "v2", "position": Vector2(0.0, 10.0)}
+		],
+		"triangles": [{"vertex_ids": ["v0", "v1", "v2"]}]
+	}
+	var uv := {"valid": true, "uvs": [
+		{"vertex_id": "v2", "uv": Vector2(0.0, 1.0)},
+		{"vertex_id": "v0", "uv": Vector2(0.0, 0.0)},
+		{"vertex_id": "v1", "uv": Vector2(1.0, 0.0)}
+	]}
+	var sdf := {"valid": true, "resolution": [256, 256], "spread_px": 16.0, "boundary_value": 0.5, "inside_is_greater": true, "pixel_hash": "stable_pixels"}
+	var body := {"id": "component_b", "name": "Body", "semantic_role": "body", "visibility": true, "z_index": 2, "parent_component_id": "", "transform": {"position": Vector2(10.0, 20.0), "pivot": Vector2(2.0, 3.0), "rotation": 90.0, "scale": Vector2(2.0, 1.0)}}
+	var eye := {"id": "component_a", "name": "EyeL", "semantic_role": "eye_left", "visibility": true, "z_index": 2, "parent_component_id": "component_b", "transform": {"position": Vector2.ZERO, "pivot": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE}}
+	var asset := {"id": "wizard", "name": "Wizard", "asset_type": "character", "visibility": true, "asset_pivot": Vector2(5.0, 6.0), "components": [body, eye]}
+	var source := {"mesh": mesh, "uv": uv, "sdf": sdf, "sdf_resource_valid": true, "sdf_source_path": "/tmp/contour_sdf.png"}
+	var result := RuntimeExportService.build_manifest(asset, {"component_a": source, "component_b": source})
+	var manifest: Dictionary = result.get("manifest", {})
+	var components: Array = manifest.get("components", [])
+	_expect(bool(result.get("valid", false)) and int(manifest.get("schema_version", 0)) == 1, "Runtime export should build a versioned engine-neutral manifest from accepted derived data.")
+	_expect(components.size() == 2 and str(components[0].get("component_id", "")) == "component_a" and str(components[1].get("component_id", "")) == "component_b", "Runtime Components should sort globally by ascending z_index and lexicographic Component ID.")
+	_expect(components[1].get("mesh", {}).get("vertices", []) == [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]] and components[1].get("mesh", {}).get("indices", []) == [0, 1, 2], "Runtime Meshes should preserve accepted Vertex order, convert Tool units to meters, and compact Triangle IDs.")
+	_expect(components[1].get("mesh", {}).get("uvs", []) == [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]], "Runtime UVs should be reordered only through stable Vertex IDs.")
+	_expect(components[1].get("local_transform", {}).get("position", []) == [1.0, 2.0] and is_equal_approx(float(components[1].get("local_transform", {}).get("rotation_radians", 0.0)), PI / 2.0), "Runtime transforms should preserve Y-up coordinates and publish positions in meters and CCW radians.")
+	var duplicate_role_asset: Dictionary = asset.duplicate(true)
+	duplicate_role_asset["components"][1]["semantic_role"] = "body"
+	_expect(not bool(RuntimeExportService.build_manifest(duplicate_role_asset, {"component_a": source, "component_b": source}).get("valid", true)), "Runtime export should reject duplicate semantic roles.")
+	var missing_resource: Dictionary = source.duplicate(true)
+	missing_resource["sdf_resource_valid"] = false
+	_expect(not bool(RuntimeExportService.build_manifest(asset, {"component_a": missing_resource, "component_b": source}).get("valid", true)), "Runtime export should reject a missing or corrupt SDF resource without fallback.")
+
+
 func _test_weighting_service_and_ui() -> void:
 	var component := _component()
 	component.merge({"id": "component_weighting", "name": "Body", "visibility": true})
@@ -1644,7 +1686,7 @@ func _test_motion_act_evaluator() -> void:
 	var normalized: Dictionary = application._normalize_motion_act({"id": "act_7", "parameters": {"direction": [0.0, 2.0], "distance": 12.0}}, "fallback")
 	_expect(Vector2(normalized.get("parameters", {}).get("direction", Vector2.ZERO)) == Vector2(0.0, 2.0), "Persisted Slide direction arrays should normalize back to Vector2 values.")
 	var serialized: Dictionary = application._serialize_motion_act(normalized)
-	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 37, "Act persistence should serialize vectors as JSON arrays using schema 37.")
+	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 38, "Act persistence should serialize vectors as JSON arrays using schema 38.")
 	var normalized_jump: Dictionary = application._normalize_motion_act({"id": "act_8", "primitive": "jump", "parameters": {"direction": [1.0, 0.0], "distance": 7.0, "height": 2.5, "arc": "snappy"}}, "fallback")
 	var serialized_jump: Dictionary = application._serialize_motion_act(normalized_jump)
 	_expect(str(serialized_jump.get("primitive", "")) == MotionActEvaluator.JUMP and is_equal_approx(float(serialized_jump.get("parameters", {}).get("height", 0.0)), 2.5) and str(serialized_jump.get("parameters", {}).get("arc", "")) == MotionActEvaluator.JUMP_ARC_SNAPPY, "Jump-specific parameters should survive normalization and serialization.")

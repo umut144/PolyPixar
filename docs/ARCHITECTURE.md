@@ -4,7 +4,7 @@
 
 `scripts/main.gd` composes the editor shell and routes user intent between the
 Outliner, canvas/workspaces, Inspector, persistence, and export. The left rail
-contains always-expanded Create, Mesh, Style, and Export categories. A single
+contains always-expanded Create, Mesh, and Style categories. A single
 `active_module` plus its category-specific submodule identifies the one active
 workspace.
 
@@ -58,7 +58,8 @@ An Asset contains:
 
 A Component contains its geometry source, hierarchy reference, local transform,
 visibility/layer settings, draw mode, widths, catch-parent reference, and point
-number display setting. It has no Material assignment.
+number display setting. It may carry one runtime `semantic_role`; roles must be
+unique within an exported Asset. It has no Material assignment.
 
 Derived mesh documents are keyed by Asset and Component IDs. Sampling feeds
 Seeding, Seeding feeds Meshing, and accepted Bakes remain separate from source
@@ -168,6 +169,15 @@ only compact interpretation metadata, source fingerprints, pixel hash, and the
 relative `contour_sdf.png` reference. Missing files and changed Mesh, UV, recipe,
 or algorithm inputs make the Bake stale; no image data becomes Component topology.
 
+Schema 38 adds the Component-level `semantic_role` field. It retires the
+standalone Godot-scene Export workspace in favor of the persistent
+`Export Runtime (N)` batch, which automatically considers every visible Asset.
+The Mesh, UV, SDF, and Runtime Export batch tooltips share compact `Pending` and
+`Needs attention` sections so blocked records remain discoverable without being
+treated as executable derived-build candidates. `BatchStatusButton` consumes
+the same summary and draws a per-Button attention point independently of the
+Button's enabled state; it never maintains a separate warning flag.
+
 Sampling results carry their own algorithm version independently of the
 Workspace schema. The junction-aware version invalidates pre-arrangement flat
 Cut Bakes at Sampling, which in turn makes Seeding stale before Meshing can
@@ -175,19 +185,26 @@ consume an incompatible PSLG.
 
 ## Export contract
 
-Export first runs topology validation, including chain continuity and point
-number ordering. A successful build creates a Godot scene whose root stores:
+`RuntimeExportService` builds manifest schema 1 exclusively from current
+accepted Component Mesh, UV, and SDF Bakes. It rejects missing or stale inputs,
+missing/corrupt mask resources, invalid or duplicate semantic roles, references,
+and incomplete or cyclic visible hierarchies. It never derives replacement
+geometry during export.
 
-- `asset_pivot`: the exported pivot in Godot coordinates;
-- `asset_type`: `character`, `props`, `terrain`, `icon`, or `symbols`.
+The contract is engine-neutral: X points right, Y points up, lengths are meters,
+positive rotations are counter-clockwise radians, and one Tool unit equals
+0.1 m. Component local transforms mean
+`T(position) * R(rotation) * S(scale) * T(-pivot)`. Components are listed in
+global ascending `(z_index, component_id)` order from back to front. Accepted
+Mesh Vertex order is retained, Triangle Vertex IDs become compact indices, and
+UVs are aligned to that same order through stable Vertex IDs.
 
-Component hierarchy becomes nested `Node2D` nodes. Closed-loop geometry is
-derived from Bézier topology, while primitive geometry is derived from its
-typed definition. Ribbon geometry uses a matching accepted Ribbon mesh. Open
-paths used by simulation or construction are Guides rather than Components.
-Exported Component nodes preserve `topology_role` metadata. For Symbol
-References, the reference node preserves its selected role and expanded source
-Components preserve their own roles independently.
+Each visible Asset is exported to the project-sibling
+`PolyToolsRuntimeExports/<asset_id>/` directory as `manifest.json` plus relative
+`masks/<component_id>.sdf.png` resources. The batch verifies a staging package
+before atomically replacing the prior package; validation or I/O failure leaves
+the prior package intact. Package freshness is derived by comparing the expected
+manifest and mask hashes, not by persisting export diagnostics in the Asset.
 
 ## Testing
 

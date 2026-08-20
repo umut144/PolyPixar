@@ -7,7 +7,7 @@ const STYLE_SUBMODULES := ["Weighting"]
 const MOTION_SUBMODULES := ["Animation", "Path", "Act", "Sequence"]
 const WORKSPACES_ROOT := "res://workspaces"
 const CONFIG_PATH := "res://configs/app_config.json"
-const SCHEMA_VERSION := 37
+const SCHEMA_VERSION := 38
 const MAX_HISTORY_SIZE := 100
 const PAPER_SIZES_CM := [Vector2(21.0, 29.7), Vector2(29.7, 42.0), Vector2(42.0, 59.4), Vector2(59.4, 84.1), Vector2(84.1, 118.9)]
 const PAPER_LABELS := ["A4", "A3", "A2", "A1", "A0"]
@@ -151,7 +151,6 @@ var component_name_editor: LineEdit
 var transform_fields: Dictionary = {}
 var canvas_context_label: Label
 var canvas_view: ComponentCanvas
-var export_workspace: VBoxContainer
 var motion_workspace: MotionWorkspace
 var motion_path_workspace: MotionPathWorkspace
 var motion_act_workspace: MotionActWorkspace
@@ -199,8 +198,6 @@ var motion_path_dialog: ConfirmationDialog
 var motion_path_name_input: LineEdit
 var motion_sequence_dialog: ConfirmationDialog
 var motion_sequence_name_input: LineEdit
-var export_summary_label: Label
-var export_validation_label: Label
 var context_bar: HBoxContainer
 var create_action_button: Button
 var info_bar: HBoxContainer
@@ -233,12 +230,14 @@ var world_scale_popup: PopupPanel
 var world_unit_option: OptionButton
 var world_grid_size_field: SpinBox
 var world_scale_summary_label: Label
-var update_meshes_button: Button
+var update_meshes_button: BatchStatusButton
 var mesh_batch_running := false
-var update_uvs_button: Button
+var update_uvs_button: BatchStatusButton
 var uv_batch_running := false
-var update_sdfs_button: Button
+var update_sdfs_button: BatchStatusButton
 var sdf_batch_running := false
+var runtime_export_button: BatchStatusButton
+var runtime_export_batch_running := false
 var workspace_name := ""
 var workspace_name_dialog: ConfirmationDialog
 var workspace_name_input: LineEdit
@@ -697,30 +696,38 @@ func _build_ui() -> void:
 	workspace_popup.add_item("Load")
 	workspace_popup.id_pressed.connect(_on_workspace_menu_id)
 	_create_world_scale_popup()
-	update_meshes_button = Button.new()
+	update_meshes_button = BatchStatusButton.new()
 	update_meshes_button.text = "Update Meshes (0)"
-	update_meshes_button.tooltip_text = "No pending meshes"
+	update_meshes_button.tooltip_text = "All Meshes current"
 	update_meshes_button.custom_minimum_size = Vector2(156, 32)
 	update_meshes_button.focus_mode = Control.FOCUS_NONE
 	update_meshes_button.disabled = true
 	update_meshes_button.pressed.connect(_on_update_meshes_pressed)
 	toolbar.add_child(update_meshes_button)
-	update_uvs_button = Button.new()
+	update_uvs_button = BatchStatusButton.new()
 	update_uvs_button.text = "Update UVs (0)"
-	update_uvs_button.tooltip_text = "No pending UVs"
+	update_uvs_button.tooltip_text = "All UVs current"
 	update_uvs_button.custom_minimum_size = Vector2(132, 32)
 	update_uvs_button.focus_mode = Control.FOCUS_NONE
 	update_uvs_button.disabled = true
 	update_uvs_button.pressed.connect(_on_update_uvs_pressed)
 	toolbar.add_child(update_uvs_button)
-	update_sdfs_button = Button.new()
+	update_sdfs_button = BatchStatusButton.new()
 	update_sdfs_button.text = "Update SDFs (0)"
-	update_sdfs_button.tooltip_text = "No pending SDFs"
+	update_sdfs_button.tooltip_text = "All SDFs current"
 	update_sdfs_button.custom_minimum_size = Vector2(140, 32)
 	update_sdfs_button.focus_mode = Control.FOCUS_NONE
 	update_sdfs_button.disabled = true
 	update_sdfs_button.pressed.connect(_on_update_sdfs_pressed)
 	toolbar.add_child(update_sdfs_button)
+	runtime_export_button = BatchStatusButton.new()
+	runtime_export_button.text = "Export Runtime (0)"
+	runtime_export_button.tooltip_text = "No pending runtime exports"
+	runtime_export_button.custom_minimum_size = Vector2(164, 32)
+	runtime_export_button.focus_mode = Control.FOCUS_NONE
+	runtime_export_button.disabled = true
+	runtime_export_button.pressed.connect(_on_runtime_export_pressed)
+	toolbar.add_child(runtime_export_button)
 	toolbar.add_child(world_scale_menu)
 	toolbar.add_child(workspace_menu)
 
@@ -738,7 +745,6 @@ func _build_ui() -> void:
 	_add_module_section(module_rail, "Create", CREATE_SUBMODULES, true)
 	_add_module_section(module_rail, "Mesh", GEOMETRY_SUBMODULES, true, false, -1)
 	_add_module_section(module_rail, "Style", STYLE_SUBMODULES, true)
-	_add_module_section(module_rail, "Export", [], true)
 	_set_active_module_visual("Create", active_create_submodule)
 
 	var workspace_split := HSplitContainer.new()
@@ -863,7 +869,6 @@ func _build_ui() -> void:
 	canvas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	canvas_panel.add_child(canvas)
-	_create_export_workspace(canvas_panel)
 	_create_motion_workspace(canvas_panel)
 	_create_motion_path_workspace(canvas_panel)
 	_create_motion_act_workspace(canvas_panel)
@@ -937,29 +942,6 @@ func _build_ui() -> void:
 	_create_geometry_seeding_dialogs()
 	_create_guide_dialogs()
 	_create_component_remove_dialog()
-
-
-func _create_export_workspace(parent: Control) -> void:
-	export_workspace = VBoxContainer.new()
-	export_workspace.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	export_workspace.add_theme_constant_override("separation", 8)
-	export_workspace.visible = false
-	parent.add_child(export_workspace)
-	var title := Label.new()
-	title.text = "Build"
-	title.add_theme_font_size_override("font_size", 16)
-	export_workspace.add_child(title)
-	export_summary_label = Label.new()
-	export_summary_label.add_theme_font_size_override("font_size", 12)
-	export_workspace.add_child(export_summary_label)
-	var pipeline := Label.new()
-	pipeline.text = "Source Asset  →  Validate  →  Godot Scene"
-	pipeline.add_theme_color_override("font_color", Color("#9aa3b2"))
-	export_workspace.add_child(pipeline)
-	export_validation_label = Label.new()
-	export_validation_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	export_validation_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	export_workspace.add_child(export_validation_label)
 
 
 func _create_motion_workspace(parent: Control) -> void:
@@ -1918,6 +1900,7 @@ func _save_workspace() -> void:
 				"id": str(component["id"]),
 				"type": str(component.get("type", "component")),
 				"name": str(component["name"]),
+				"semantic_role": str(component.get("semantic_role", "")),
 				"name_mode": str(component.get("name_mode", "manual")),
 				"source_asset_id": str(component.get("source_asset_id", "")),
 				"parent_component_id": str(component.get("parent_component_id", "")),
@@ -2237,6 +2220,7 @@ func _load_workspace(workspace_entry: String, persist_as_last := true) -> bool:
 				"id": str(component_data.get("id", "")),
 				"type": component_type,
 				"name": _normalized_component_name(component_data),
+				"semantic_role": str(component_data.get("semantic_role", "")).strip_edges(),
 				"name_mode": str(component_data.get("name_mode", "manual")),
 				"source_asset_id": str(component_data.get("source_asset_id", "")),
 				"parent_component_id": str(component_data.get("parent_component_id", "")),
@@ -3727,6 +3711,8 @@ func _component_mesh_source_validation_issues(asset: Dictionary, component: Dict
 
 func _component_mesh_needs_update(asset_id: String, component: Dictionary) -> bool:
 	var asset := _get_asset(asset_id)
+	if asset.is_empty() or not bool(asset.get("visibility", true)) or not bool(component.get("visibility", true)):
+		return false
 	if not _component_is_meshable_source(asset, component):
 		return false
 	var component_id := str(component.get("id", ""))
@@ -3771,12 +3757,14 @@ func _all_mesh_update_candidates() -> Array[Dictionary]:
 func _update_meshes_button() -> void:
 	if not is_instance_valid(update_meshes_button):
 		return
-	if mesh_batch_running or uv_batch_running or sdf_batch_running:
+	if mesh_batch_running or uv_batch_running or sdf_batch_running or runtime_export_batch_running:
 		return
 	var candidates := _all_mesh_update_candidates()
+	var summary := _mesh_batch_summary(candidates)
 	var count := candidates.size()
 	update_meshes_button.text = "Update Meshes (%d)" % count
-	update_meshes_button.tooltip_text = _mesh_update_candidates_tooltip(candidates)
+	update_meshes_button.tooltip_text = _batch_summary_tooltip(summary, "All Meshes current")
+	update_meshes_button.set_attention_count(summary.get("attention", PackedStringArray()).size())
 	update_meshes_button.disabled = count == 0
 
 
@@ -3809,11 +3797,13 @@ func _all_uv_update_candidates() -> Array[Dictionary]:
 
 
 func _update_uvs_button() -> void:
-	if not is_instance_valid(update_uvs_button) or mesh_batch_running or uv_batch_running or sdf_batch_running:
+	if not is_instance_valid(update_uvs_button) or mesh_batch_running or uv_batch_running or sdf_batch_running or runtime_export_batch_running:
 		return
 	var candidates := _all_uv_update_candidates()
+	var summary := _uv_batch_summary(candidates)
 	update_uvs_button.text = "Update UVs (%d)" % candidates.size()
-	update_uvs_button.tooltip_text = _uv_update_candidates_tooltip(candidates)
+	update_uvs_button.tooltip_text = _batch_summary_tooltip(summary, "All UVs current")
+	update_uvs_button.set_attention_count(summary.get("attention", PackedStringArray()).size())
 	update_uvs_button.disabled = candidates.is_empty()
 
 
@@ -3882,57 +3872,118 @@ func _all_sdf_update_candidates() -> Array[Dictionary]:
 
 
 func _update_sdfs_button() -> void:
-	if not is_instance_valid(update_sdfs_button) or mesh_batch_running or uv_batch_running or sdf_batch_running:
+	if not is_instance_valid(update_sdfs_button) or mesh_batch_running or uv_batch_running or sdf_batch_running or runtime_export_batch_running:
 		return
 	var candidates := _all_sdf_update_candidates()
+	var summary := _sdf_batch_summary(candidates)
 	update_sdfs_button.text = "Update SDFs (%d)" % candidates.size()
-	update_sdfs_button.tooltip_text = _sdf_update_candidates_tooltip(candidates)
+	update_sdfs_button.tooltip_text = _batch_summary_tooltip(summary, "All SDFs current")
+	update_sdfs_button.set_attention_count(summary.get("attention", PackedStringArray()).size())
 	update_sdfs_button.disabled = candidates.is_empty()
 
 
-func _sdf_update_candidates_tooltip(candidates: Array[Dictionary]) -> String:
+
+
+func _batch_tooltip(pending: PackedStringArray, attention: PackedStringArray, current_message: String) -> String:
+	var sections := PackedStringArray()
+	if not pending.is_empty():
+		sections.append("Pending (%d):\n%s" % [pending.size(), _summarize_tooltip_lines(pending)])
+	if not attention.is_empty():
+		sections.append("Needs attention (%d):\n%s" % [attention.size(), _summarize_tooltip_lines(attention)])
+	return "\n\n".join(sections) if not sections.is_empty() else current_message
+
+
+func _batch_summary_tooltip(summary: Dictionary, current_message: String) -> String:
+	return _batch_tooltip(summary.get("pending", PackedStringArray()), summary.get("attention", PackedStringArray()), current_message)
+
+
+func _summarize_tooltip_lines(lines: PackedStringArray, maximum := 6) -> String:
+	var visible := PackedStringArray()
+	for index in range(mini(lines.size(), maximum)):
+		visible.append(lines[index])
+	if lines.size() > maximum:
+		visible.append("… and %d more" % (lines.size() - maximum))
+	return "\n".join(visible)
+
+
+func _candidate_tooltip_lines(candidates: Array[Dictionary]) -> PackedStringArray:
 	var lines := PackedStringArray()
 	for candidate in candidates:
 		var asset := _get_asset(str(candidate.get("asset_id", "")))
 		var component := _get_component(asset, str(candidate.get("component_id", "")))
 		lines.append("%s / %s" % [str(asset.get("name", "Asset")), str(component.get("name", "Component"))])
-	if not lines.is_empty():
-		return "\n".join(lines)
-	var failures := PackedStringArray()
+	return lines
+
+
+func _mesh_batch_summary(candidates: Array[Dictionary]) -> Dictionary:
+	var attention := PackedStringArray()
 	for asset in assets:
-		if not asset is Dictionary:
+		if not asset is Dictionary or not bool(asset.get("visibility", true)):
 			continue
 		var asset_id := str(asset.get("id", ""))
 		for component in asset.get("components", []):
-			if not component is Dictionary:
+			if not component is Dictionary or not bool(component.get("visibility", true)) or _is_reference_component(component):
 				continue
-			var document := _get_geometry_document(asset_id, str(component.get("id", "")))
-			var error_message := str(document.get("sdf", {}).get("last_error", ""))
-			if not error_message.is_empty():
-				failures.append("%s / %s — %s" % [str(asset.get("name", "Asset")), str(component.get("name", "Component")), error_message])
-	return "Needs attention:\n%s" % "\n".join(failures) if not failures.is_empty() else "No pending SDFs"
-
-
-func _uv_update_candidates_tooltip(candidates: Array[Dictionary]) -> String:
-	if candidates.is_empty():
-		return "No pending UVs"
-	var lines := PackedStringArray()
-	for candidate in candidates:
-		var asset := _get_asset(str(candidate.get("asset_id", "")))
-		var component := _get_component(asset, str(candidate.get("component_id", "")))
-		lines.append("%s / %s" % [str(asset.get("name", "Asset")), str(component.get("name", "Component"))])
-	return "\n".join(lines)
+			var issues := _component_mesh_source_validation_issues(asset, component)
+			var error_message := str(_component_mesh_reference(asset_id, str(component.get("id", ""))).get("last_error", ""))
+			var reason := str(issues[0]) if not issues.is_empty() else error_message
+			if not reason.is_empty():
+				attention.append("%s / %s — %s" % [str(asset.get("name", "Asset")), str(component.get("name", "Component")), reason])
+	return {"pending": _candidate_tooltip_lines(candidates), "attention": attention}
 
 
 func _mesh_update_candidates_tooltip(candidates: Array[Dictionary]) -> String:
-	if candidates.is_empty():
-		return "No pending meshes"
-	var lines := PackedStringArray()
-	for candidate in candidates:
-		var asset := _get_asset(str(candidate.get("asset_id", "")))
-		var component := _get_component(asset, str(candidate.get("component_id", "")))
-		lines.append("%s / %s" % [str(asset.get("name", "Asset")), str(component.get("name", "Component"))])
-	return "\n".join(lines)
+	return _batch_summary_tooltip(_mesh_batch_summary(candidates), "All Meshes current")
+
+
+func _uv_batch_summary(candidates: Array[Dictionary]) -> Dictionary:
+	var attention := PackedStringArray()
+	for asset in assets:
+		if not asset is Dictionary or not bool(asset.get("visibility", true)):
+			continue
+		var asset_id := str(asset.get("id", ""))
+		for component in asset.get("components", []):
+			if not component is Dictionary or not bool(component.get("visibility", true)) or _is_reference_component(component):
+				continue
+			var component_id := str(component.get("id", ""))
+			var reason := ""
+			if _component_mesh_status(asset_id, component_id, component) != "Ready":
+				reason = "Current Component Mesh required"
+			else:
+				reason = str(_get_geometry_document(asset_id, component_id).get("uv_mapping", {}).get("last_error", ""))
+			if not reason.is_empty():
+				attention.append("%s / %s — %s" % [str(asset.get("name", "Asset")), str(component.get("name", "Component")), reason])
+	return {"pending": _candidate_tooltip_lines(candidates), "attention": attention}
+
+
+func _uv_update_candidates_tooltip(candidates: Array[Dictionary]) -> String:
+	return _batch_summary_tooltip(_uv_batch_summary(candidates), "All UVs current")
+
+
+func _sdf_batch_summary(candidates: Array[Dictionary]) -> Dictionary:
+	var attention := PackedStringArray()
+	for asset in assets:
+		if not asset is Dictionary or not bool(asset.get("visibility", true)):
+			continue
+		var asset_id := str(asset.get("id", ""))
+		for component in asset.get("components", []):
+			if not component is Dictionary or not bool(component.get("visibility", true)) or _is_reference_component(component):
+				continue
+			var component_id := str(component.get("id", ""))
+			var reason := ""
+			if _component_mesh_status(asset_id, component_id, component) != "Ready":
+				reason = "Current Component Mesh required"
+			elif not _geometry_uv_mapping_bake_is_current(asset_id, component_id, component, _geometry_uv_mapping_bake(asset_id, component_id)):
+				reason = "Current UV Bake required"
+			else:
+				reason = str(_get_geometry_document(asset_id, component_id).get("sdf", {}).get("last_error", ""))
+			if not reason.is_empty():
+				attention.append("%s / %s — %s" % [str(asset.get("name", "Asset")), str(component.get("name", "Component")), reason])
+	return {"pending": _candidate_tooltip_lines(candidates), "attention": attention}
+
+
+func _sdf_update_candidates_tooltip(candidates: Array[Dictionary]) -> String:
+	return _batch_summary_tooltip(_sdf_batch_summary(candidates), "All SDFs current")
 
 
 func _scaled_automatic_recipes(base: Dictionary, factor: float) -> Dictionary:
@@ -4051,7 +4102,7 @@ func _record_component_mesh_failure(asset_id: String, component_id: String, buil
 
 
 func _on_update_meshes_pressed() -> void:
-	if mesh_batch_running or uv_batch_running or sdf_batch_running:
+	if mesh_batch_running or uv_batch_running or sdf_batch_running or runtime_export_batch_running:
 		return
 	var candidates := _all_mesh_update_candidates()
 	if candidates.is_empty():
@@ -4131,7 +4182,7 @@ func _record_component_uv_failure(asset_id: String, component_id: String, build:
 
 
 func _on_update_uvs_pressed() -> void:
-	if uv_batch_running or mesh_batch_running or sdf_batch_running:
+	if uv_batch_running or mesh_batch_running or sdf_batch_running or runtime_export_batch_running:
 		return
 	var candidates := _all_uv_update_candidates()
 	if candidates.is_empty():
@@ -4224,7 +4275,7 @@ func _record_component_sdf_failure(asset_id: String, component_id: String, build
 
 
 func _on_update_sdfs_pressed() -> void:
-	if sdf_batch_running or mesh_batch_running or uv_batch_running:
+	if sdf_batch_running or mesh_batch_running or uv_batch_running or runtime_export_batch_running:
 		return
 	var candidates := _all_sdf_update_candidates()
 	if candidates.is_empty():
@@ -4266,6 +4317,178 @@ func _on_update_sdfs_pressed() -> void:
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
+
+
+func _runtime_export_root() -> String:
+	return ProjectSettings.globalize_path("res://").get_base_dir().path_join("PolyToolsRuntimeExports")
+
+
+func _runtime_export_build(asset: Dictionary) -> Dictionary:
+	var sources: Dictionary = {}
+	var asset_id := str(asset.get("id", ""))
+	for component in asset.get("components", []):
+		if not component is Dictionary or not bool(component.get("visibility", true)):
+			continue
+		var component_id := str(component.get("id", ""))
+		var mesh := _component_mesh_bake(asset_id, component_id)
+		var uv := _geometry_uv_mapping_bake(asset_id, component_id)
+		var sdf := _sdf_bake(asset_id, component_id)
+		var mesh_current := _component_mesh_status(asset_id, component_id, component) == "Ready"
+		var uv_current := mesh_current and _geometry_uv_mapping_bake_is_current(asset_id, component_id, component, uv)
+		var sdf_current := uv_current and GeometrySDFService.result_matches(sdf, mesh, uv, _sdf_recipe(asset_id, component_id))
+		var sdf_path := _sdf_image_path(asset, component_id)
+		sources[component_id] = {
+			"mesh": mesh if mesh_current else {},
+			"uv": uv if uv_current else {},
+			"sdf": sdf if sdf_current else {},
+			"sdf_resource_valid": sdf_current and _sdf_resource_available(asset_id, component_id) and not sdf_path.is_empty() and FileAccess.file_exists(sdf_path),
+			"sdf_source_path": ProjectSettings.globalize_path(sdf_path) if not sdf_path.is_empty() else ""
+		}
+	return RuntimeExportService.build_manifest(asset, sources)
+
+
+func _runtime_export_is_stale(asset: Dictionary, build: Dictionary = {}) -> bool:
+	var expected := build if not build.is_empty() else _runtime_export_build(asset)
+	if not bool(expected.get("valid", false)):
+		return true
+	var target := _runtime_export_root().path_join(str(asset.get("id", "")))
+	var manifest = _read_json(target.path_join("manifest.json"))
+	if not manifest is Dictionary or manifest != expected.get("manifest", {}):
+		return true
+	for mask in expected.get("masks", []):
+		var mask_path := target.path_join(str(mask.get("relative_path", "")))
+		if not FileAccess.file_exists(mask_path):
+			return true
+		var image := Image.load_from_file(mask_path)
+		if image == null or image.is_empty() or GeometrySDFService.image_pixel_hash(image) != str(mask.get("pixel_hash", "")):
+			return true
+	return false
+
+
+func _all_runtime_export_candidates() -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	for asset in assets:
+		if not asset is Dictionary or not bool(asset.get("visibility", true)):
+			continue
+		var build := _runtime_export_build(asset)
+		if not bool(build.get("valid", false)) or _runtime_export_is_stale(asset, build):
+			result.append({"asset_id": str(asset.get("id", "")), "build": build})
+	return result
+
+
+func _runtime_export_batch_summary(candidates: Array[Dictionary]) -> Dictionary:
+	var pending := PackedStringArray()
+	var attention := PackedStringArray()
+	for candidate in candidates:
+		var asset := _get_asset(str(candidate.get("asset_id", "")))
+		var build: Dictionary = candidate.get("build", {})
+		if bool(build.get("valid", false)):
+			pending.append("%s — package missing or stale" % str(asset.get("name", "Asset")))
+		else:
+			var errors: Array = build.get("errors", [])
+			attention.append("%s — %s" % [str(asset.get("name", "Asset")), str(errors[0]) if not errors.is_empty() else "invalid"])
+	return {"pending": pending, "attention": attention}
+
+
+func _update_runtime_export_button() -> void:
+	if not is_instance_valid(runtime_export_button) or mesh_batch_running or uv_batch_running or sdf_batch_running or runtime_export_batch_running:
+		return
+	var candidates := _all_runtime_export_candidates()
+	var summary := _runtime_export_batch_summary(candidates)
+	runtime_export_button.text = "Export Runtime (%d)" % candidates.size()
+	runtime_export_button.disabled = candidates.is_empty()
+	runtime_export_button.tooltip_text = _batch_summary_tooltip(summary, "All runtime packages current")
+	runtime_export_button.set_attention_count(summary.get("attention", PackedStringArray()).size())
+
+
+func _on_runtime_export_pressed() -> void:
+	if runtime_export_batch_running or mesh_batch_running or uv_batch_running or sdf_batch_running:
+		return
+	var candidates := _all_runtime_export_candidates()
+	if candidates.is_empty():
+		_update_runtime_export_button()
+		return
+	runtime_export_batch_running = true
+	update_meshes_button.disabled = true
+	update_uvs_button.disabled = true
+	update_sdfs_button.disabled = true
+	var succeeded := 0
+	var failed := 0
+	for index in range(candidates.size()):
+		runtime_export_button.text = "Exporting %d/%d" % [index + 1, candidates.size()]
+		runtime_export_button.disabled = true
+		await get_tree().process_frame
+		var asset := _get_asset(str(candidates[index].get("asset_id", "")))
+		var build := _runtime_export_build(asset)
+		if bool(build.get("valid", false)) and _write_runtime_export_package(asset, build):
+			succeeded += 1
+		else:
+			failed += 1
+	runtime_export_batch_running = false
+	_show_status_message("Exported %d Runtime package%s%s · %s" % [succeeded, "" if succeeded == 1 else "s", " · %d need attention" % failed if failed > 0 else "", _runtime_export_root()])
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _write_runtime_export_package(asset: Dictionary, build: Dictionary) -> bool:
+	var export_root := _runtime_export_root()
+	var asset_id := str(asset.get("id", ""))
+	if asset_id.is_empty():
+		return false
+	DirAccess.make_dir_recursive_absolute(export_root)
+	var target := export_root.path_join(asset_id)
+	var staging := export_root.path_join(".%s.staging" % asset_id)
+	var backup := export_root.path_join(".%s.backup" % asset_id)
+	_remove_runtime_export_tree(staging)
+	_remove_runtime_export_tree(backup)
+	if DirAccess.make_dir_recursive_absolute(staging.path_join("masks")) != OK:
+		return false
+	var manifest_file := FileAccess.open(staging.path_join("manifest.json"), FileAccess.WRITE)
+	if manifest_file == null:
+		_remove_runtime_export_tree(staging)
+		return false
+	manifest_file.store_string(JSON.stringify(build.get("manifest", {}), "\t"))
+	manifest_file.close()
+	for mask in build.get("masks", []):
+		var source_path := str(mask.get("source_path", ""))
+		var destination := staging.path_join(str(mask.get("relative_path", "")))
+		if not FileAccess.file_exists(source_path) or DirAccess.copy_absolute(source_path, destination) != OK:
+			_remove_runtime_export_tree(staging)
+			return false
+	var staged_manifest = _read_json(staging.path_join("manifest.json"))
+	if staged_manifest != build.get("manifest", {}):
+		_remove_runtime_export_tree(staging)
+		return false
+	for mask in build.get("masks", []):
+		var staged_image := Image.load_from_file(staging.path_join(str(mask.get("relative_path", ""))))
+		if staged_image == null or staged_image.is_empty() or GeometrySDFService.image_pixel_hash(staged_image) != str(mask.get("pixel_hash", "")):
+			_remove_runtime_export_tree(staging)
+			return false
+	if DirAccess.dir_exists_absolute(target) and DirAccess.rename_absolute(target, backup) != OK:
+		_remove_runtime_export_tree(staging)
+		return false
+	if DirAccess.rename_absolute(staging, target) != OK:
+		if DirAccess.dir_exists_absolute(backup):
+			DirAccess.rename_absolute(backup, target)
+		_remove_runtime_export_tree(staging)
+		return false
+	_remove_runtime_export_tree(backup)
+	return true
+
+
+func _remove_runtime_export_tree(path: String) -> void:
+	var export_root := _runtime_export_root().trim_suffix("/")
+	if path.is_empty() or not path.begins_with(export_root + "/") or not DirAccess.dir_exists_absolute(path):
+		return
+	var directory := DirAccess.open(path)
+	if directory == null:
+		return
+	for file_name in directory.get_files():
+		DirAccess.remove_absolute(path.path_join(file_name))
+	for directory_name in directory.get_directories():
+		_remove_runtime_export_tree(path.path_join(directory_name))
+	DirAccess.remove_absolute(path)
 
 
 func _weighting_styles(asset_id: String, component_id: String) -> Array:
@@ -4647,22 +4870,6 @@ func _render_context_bar() -> void:
 		draw_mode_status.text = "Draw Mode: %s" % _draw_mode_display_name(str(selected_component.get("draw_mode", "closed_loop"))) if not selected_component.is_empty() else "Draw Mode: —"
 	_update_context_action_button()
 	_clear_context_bar()
-	if active_module == "Export":
-		var validate_button := Button.new()
-		validate_button.text = "Validate"
-		validate_button.custom_minimum_size = Vector2(92, 32)
-		validate_button.focus_mode = Control.FOCUS_NONE
-		validate_button.pressed.connect(_validate_selected_export_asset)
-		context_bar.add_child(validate_button)
-		var build_button := Button.new()
-		build_button.text = "Build Godot Scene"
-		build_button.custom_minimum_size = Vector2(144, 32)
-		build_button.focus_mode = Control.FOCUS_NONE
-		build_button.disabled = not _export_validation_errors(_get_asset(selected_asset_id)).is_empty()
-		build_button.pressed.connect(_build_selected_asset_scene)
-		context_bar.add_child(build_button)
-		_render_info_bar()
-		return
 	if active_module == "Motion":
 		if active_motion_submodule == "Animation":
 			_render_motion_context_bar()
@@ -5920,13 +6127,6 @@ func _render_info_bar() -> void:
 			if not style.is_empty():
 				_add_info_option(str(style.get("name", "Weighting Style")))
 		return
-	if active_module == "Export":
-		var build_state := Label.new()
-		build_state.text = "Build: %s" % (str(_get_asset(selected_asset_id).get("name", "None")))
-		info_bar.add_child(build_state)
-		_add_info_option("Validate")
-		_add_info_option("Build")
-		return
 	if not selected_guide_id.is_empty():
 		var selected_guide := _get_guide(_get_asset(selected_asset_id), selected_guide_id)
 		var guide_state_label := Label.new()
@@ -6014,220 +6214,6 @@ func _draw_point_mode_label(mode: String) -> String:
 			return "Corner"
 		_:
 			return "Linear"
-
-
-func _validate_selected_export_asset() -> void:
-	_render_export_workspace()
-
-
-func _export_validation_errors(asset: Dictionary) -> Array[String]:
-	var errors: Array[String] = []
-	if asset.is_empty():
-		errors.append("Select an Asset source.")
-		return errors
-	for component in asset.get("components", []):
-		if _is_reference_component(component):
-			var source_asset := _get_asset(str(component.get("source_asset_id", "")))
-			if source_asset.is_empty() or source_asset == asset:
-				errors.append("%s: source Symbol is missing or cyclic." % str(component.get("name", "Reference")))
-			if str(component.get("topology_role", "outer")) not in ["outer", "hole"]:
-				errors.append("%s: topology role must be Outer or Hole." % str(component.get("name", "Reference")))
-			continue
-		var component_name := str(component.get("name", "Component"))
-		var draw_mode := str(component.get("draw_mode", ""))
-		if draw_mode == "primitive":
-			var primitive_errors := PrimitiveGeometryService.validation_issues(component)
-			if not primitive_errors.is_empty():
-				for primitive_error in primitive_errors:
-					errors.append("%s: %s" % [component_name, primitive_error])
-			continue
-		var topology_errors := BezierTopology.mode_validation_issues(component, true)
-		if not topology_errors.is_empty():
-			for topology_error in topology_errors:
-				errors.append("%s: %s" % [component_name, topology_error])
-			continue
-		if draw_mode == "ribbon":
-			var ribbon_mesh := _component_mesh_bake(str(asset.get("id", "")), str(component.get("id", "")))
-			if not RibbonMeshService.matches_source(ribbon_mesh, component):
-				errors.append("%s: current Ribbon Strip Mesh is required." % component_name)
-			continue
-		var points: Array = BezierTopology.outer_control_polygon(component)
-		if not BezierTopology.outer_chain_closed(component):
-			errors.append("%s: contour is not closed." % component_name)
-			continue
-		if points.size() < 3:
-			errors.append("%s: contour needs at least 3 points." % component_name)
-			continue
-		var packed_points := PackedVector2Array()
-		for point in points:
-			if point is Vector2:
-				packed_points.append(point)
-		if packed_points.size() != points.size() or Geometry2D.triangulate_polygon(packed_points).is_empty():
-			errors.append("%s: contour cannot be triangulated." % component_name)
-	return errors
-
-
-func _render_export_workspace() -> void:
-	if not is_instance_valid(export_workspace):
-		return
-	var asset := _get_asset(selected_asset_id)
-	if asset.is_empty():
-		export_summary_label.text = "No Source Asset selected"
-		export_validation_label.text = "Select an Asset in the Outliner, then validate it before building."
-		export_validation_label.add_theme_color_override("font_color", Color("#9aa3b2"))
-		return
-	export_summary_label.text = "Source Asset: %s" % str(asset.get("name", "Asset"))
-	var errors := _export_validation_errors(asset)
-	if errors.is_empty():
-		export_validation_label.text = "Validation passed. Ready to build Godot Scene."
-		export_validation_label.add_theme_color_override("font_color", Color("#75b88a"))
-	else:
-		export_validation_label.text = "Validation\n• %s" % "\n• ".join(errors)
-		export_validation_label.add_theme_color_override("font_color", Color("#e56b6f"))
-
-
-func _build_selected_asset_scene() -> void:
-	var asset := _get_asset(selected_asset_id)
-	var errors := _export_validation_errors(asset)
-	if not errors.is_empty():
-		_show_status_message("Build blocked: validation failed.")
-		_render_export_workspace()
-		return
-	var root := Node2D.new()
-	root.name = _tscn_name(str(asset.get("name", "Asset")))
-	var export_asset_pivot := _godot_export_points([_asset_pivot(asset)])[0]
-	root.set_meta("asset_pivot", export_asset_pivot)
-	root.set_meta("asset_type", _asset_type(asset))
-	var component_nodes: Dictionary = {}
-	var pending_components: Array = asset.get("components", []).duplicate()
-	while not pending_components.is_empty():
-		var progressed := false
-		for pending_index in range(pending_components.size() - 1, -1, -1):
-			var component: Dictionary = pending_components[pending_index]
-			var component_id := str(component.get("id", ""))
-			var parent_component_id := str(component.get("parent_component_id", ""))
-			if not parent_component_id.is_empty() and not component_nodes.has(parent_component_id):
-				continue
-			var component_node := Node2D.new()
-			component_node.name = _tscn_name(str(component.get("name", "Component")))
-			component_node.set_meta("component_id", component_id)
-			component_node.set_meta("draw_mode", str(component.get("draw_mode", "closed_loop")))
-			component_node.set_meta("topology_role", str(component.get("topology_role", "outer")))
-			var export_transform := _godot_export_transform(component.get("transform", _default_component_transform()))
-			component_node.position = export_transform["position"]
-			if parent_component_id.is_empty():
-				# The asset anchor lives at the exported scene root; root Components
-				# remain in their established editor positions relative to it.
-				component_node.position -= export_asset_pivot
-			component_node.rotation = deg_to_rad(float(export_transform["rotation"]))
-			component_node.scale = export_transform["scale"]
-			component_node.visible = bool(asset.get("visibility", true)) and bool(component.get("visibility", true))
-			component_node.z_index = int(component.get("z_index", 0))
-			component_node.z_as_relative = false
-			var parent_node: Node2D = component_nodes[parent_component_id] if component_nodes.has(parent_component_id) else root
-			parent_node.add_child(component_node)
-			component_node.owner = root
-			component_nodes[component_id] = component_node
-			pending_components.remove_at(pending_index)
-			progressed = true
-			if _is_reference_component(component):
-				_build_export_reference_geometry(component_node, component)
-			else:
-				_build_export_component_geometry(component_node, asset, component, export_transform)
-		if not progressed:
-			# Documents are normalized on load, but retain a safe export fallback
-			# if malformed in-memory parent references ever slip through.
-			for orphan_component in pending_components:
-				orphan_component["parent_component_id"] = ""
-			continue
-	var scene := PackedScene.new()
-	var pack_error := scene.pack(root)
-	if pack_error != OK:
-		root.free()
-		_show_status_message("Build failed: could not pack scene.")
-		return
-	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://exports"))
-	var safe_name := _tscn_name(str(asset.get("name", "Asset")).to_lower().replace(" ", "_"))
-	var scene_path := "res://exports/%s.tscn" % safe_name
-	var save_error := ResourceSaver.save(scene, scene_path)
-	root.free()
-	if save_error != OK:
-		_show_status_message("Build failed: could not save scene.")
-		return
-	_show_status_message("Built Godot Scene: %s" % scene_path)
-	_render_export_workspace()
-
-
-func _build_export_component_geometry(component_node: Node2D, asset: Dictionary, component: Dictionary, export_transform: Dictionary) -> void:
-	var polygon := Polygon2D.new()
-	polygon.name = "Geometry"
-	var export_points: Array[Vector2] = []
-	if str(component.get("draw_mode", "")) == "ribbon":
-		var ribbon_mesh := _component_mesh_bake(str(asset.get("id", "")), str(component.get("id", "")))
-		var vertex_indices: Dictionary = {}
-		for vertex in ribbon_mesh.get("vertices", []):
-			var vertex_id := str(vertex.get("id", ""))
-			vertex_indices[vertex_id] = export_points.size()
-			export_points.append(_godot_export_points([Vector2(vertex.get("position", Vector2.ZERO))])[0])
-		var ribbon_polygons: Array[PackedInt32Array] = []
-		for triangle in ribbon_mesh.get("triangles", []):
-			var ids: Array = triangle.get("vertex_ids", [])
-			if ids.size() == 3 and vertex_indices.has(str(ids[0])) and vertex_indices.has(str(ids[1])) and vertex_indices.has(str(ids[2])):
-				ribbon_polygons.append(PackedInt32Array([int(vertex_indices[str(ids[0])]), int(vertex_indices[str(ids[1])]), int(vertex_indices[str(ids[2])])]))
-		polygon.polygons = ribbon_polygons
-	else:
-		var contour := PrimitiveGeometryService.contour(component, PrimitiveGeometryService.CIRCLE_MESH_SEGMENTS) if PrimitiveGeometryService.has_circle(component) else BezierTopology.outer_control_polygon(component)
-		export_points = _godot_export_points(contour)
-	polygon.polygon = PackedVector2Array(export_points)
-	# Geometry is stored in Component-local coordinates; offsetting it by the
-	# pivot lets its Node2D parent own the component transform exactly once.
-	polygon.position = -Vector2(export_transform.get("pivot", Vector2.ZERO))
-	component_node.add_child(polygon)
-	polygon.owner = component_node.owner
-
-
-func _build_export_reference_geometry(reference_node: Node2D, reference: Dictionary) -> void:
-	var source_asset := _get_asset(str(reference.get("source_asset_id", "")))
-	if source_asset.is_empty():
-		return
-	for source_component in source_asset.get("components", []):
-		if _is_reference_component(source_component):
-			continue
-		var source_node := Node2D.new()
-		source_node.name = _tscn_name(str(source_component.get("name", "Component")))
-		source_node.set_meta("topology_role", str(source_component.get("topology_role", "outer")))
-		var source_transform := _godot_export_transform(ComponentHierarchy.world_transform_record(source_asset, str(source_component.get("id", ""))))
-		source_node.position = source_transform["position"]
-		source_node.rotation = deg_to_rad(float(source_transform["rotation"]))
-		source_node.scale = source_transform["scale"]
-		source_node.visible = bool(source_component.get("visibility", true))
-		reference_node.add_child(source_node)
-		source_node.owner = reference_node.owner
-		_build_export_component_geometry(source_node, source_asset, source_component, source_transform)
-
-
-func _tscn_name(value: String) -> String:
-	return value.replace("\"", "'") if not value.is_empty() else "Component"
-
-
-func _godot_export_points(points: Array) -> Array[Vector2]:
-	var converted: Array[Vector2] = []
-	for point in points:
-		if point is Vector2:
-			converted.append(Vector2(point.x * ToolUnits.TO_METERS, -point.y * ToolUnits.TO_METERS))
-	return converted
-
-
-func _godot_export_transform(transform: Dictionary) -> Dictionary:
-	var normalized := _deserialize_transform(transform)
-	var export_position_value: Vector2 = normalized["position"]
-	var export_pivot_value: Vector2 = normalized["pivot"]
-	return {
-		"position": Vector2(export_position_value.x * ToolUnits.TO_METERS, -export_position_value.y * ToolUnits.TO_METERS),
-		"rotation": -float(normalized["rotation"]),
-		"scale": normalized["scale"],
-		"pivot": Vector2(export_pivot_value.x * ToolUnits.TO_METERS, -export_pivot_value.y * ToolUnits.TO_METERS)
-	}
 
 
 func _add_info_option(text: String) -> void:
@@ -6533,15 +6519,13 @@ func _render_outliner() -> void:
 	_update_meshes_button()
 	_update_uvs_button()
 	_update_sdfs_button()
+	_update_runtime_export_button()
 	_update_outliner_asset_type_filter_visibility()
 	if active_module == "Motion":
 		_render_motion_outliner()
 		return
 	if active_module == "Style":
 		_render_weighting_outliner()
-		return
-	if active_module == "Export":
-		_render_export_outliner()
 		return
 	if active_module == "Mesh":
 		if active_geometry_submodule in GEOMETRY_SUBMODULES:
@@ -7030,42 +7014,6 @@ func _render_weighting_outliner() -> void:
 				outliner_list.add_child(style_row)
 	if visible_asset_count == 0:
 		outliner_list.add_child(_create_inspector_field_label("No Assets match the selected types."))
-
-
-func _render_export_outliner() -> void:
-	var search_text := outliner_search_input.text.strip_edges().to_lower() if is_instance_valid(outliner_search_input) else ""
-	var source_assets: Array[Dictionary] = []
-	for asset in assets:
-		if search_text.is_empty() or str(asset.get("name", "")).to_lower().contains(search_text):
-			source_assets.append(asset)
-	source_assets.sort_custom(_sort_named_documents)
-	outliner_list.add_child(_create_outliner_group_label("Source Assets"))
-	for asset in source_assets:
-		var asset_id := str(asset.get("id", ""))
-		var source_row := HBoxContainer.new()
-		source_row.add_theme_constant_override("separation", 2)
-		outliner_list.add_child(source_row)
-		source_row.add_child(_create_visibility_checkbox(bool(asset.get("visibility", true)), _on_asset_visibility_changed.bind(asset_id)))
-		var source_button := Button.new()
-		source_button.text = str(asset.get("name", "Asset"))
-		source_button.custom_minimum_size = Vector2(0, 30)
-		source_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		source_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		source_button.focus_mode = Control.FOCUS_NONE
-		_style_outliner_button(source_button, asset_id == selected_asset_id)
-		source_button.pressed.connect(_select_export_source_asset.bind(asset_id))
-		source_row.add_child(source_button)
-
-
-func _select_export_source_asset(asset_id: String) -> void:
-	if _get_asset(asset_id).is_empty():
-		return
-	selected_asset_id = asset_id
-	selected_component_id = ""
-	active_state = ""
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
 
 
 func _asset_matches_search(asset: Dictionary, search_text: String) -> bool:
@@ -7967,7 +7915,7 @@ func _on_component_add_reference_selected(index: int) -> void:
 	_record_direct_change()
 	var reference_id := "component_%d" % next_component_id
 	next_component_id += 1
-	asset["components"].append({"id": reference_id, "type": "reference", "name": str(source_asset.get("name", "Symbol")), "name_mode": "auto", "source_asset_id": str(source_asset.get("id", "")), "parent_component_id": str(component_add_menu.get_meta("parent_component_id", "")), "transform": _default_component_transform(), "visibility": true, "z_index": 0, "draw_mode": "closed_loop", "topology_role": "outer", "points": [], "edges": [], "chains": []})
+	asset["components"].append({"id": reference_id, "type": "reference", "name": str(source_asset.get("name", "Symbol")), "semantic_role": "", "name_mode": "auto", "source_asset_id": str(source_asset.get("id", "")), "parent_component_id": str(component_add_menu.get_meta("parent_component_id", "")), "transform": _default_component_transform(), "visibility": true, "z_index": 0, "draw_mode": "closed_loop", "topology_role": "outer", "points": [], "edges": [], "chains": []})
 	selected_asset_id = str(asset.get("id", ""))
 	selected_component_id = reference_id
 	selected_guide_id = ""
@@ -8162,6 +8110,7 @@ func _duplicate_component_record(source: Dictionary, asset: Dictionary, forced_i
 	if forced_id.is_empty():
 		next_component_id += 1
 	duplicate["name"] = str(source.get("name", "Component"))
+	duplicate["semantic_role"] = ""
 	# The duplicated Component stays beside its source: same Parent, no copied
 	# descendants, and no copied Guides.
 	duplicate["parent_component_id"] = str(source.get("parent_component_id", ""))
@@ -8334,6 +8283,7 @@ func _confirm_component_creation() -> void:
 	asset["components"].append({
 		"id": component_id,
 		"name": component_name,
+		"semantic_role": "",
 		"parent_component_id": parent_component_id,
 		"points": [],
 		"edges": [],
@@ -10418,15 +10368,6 @@ func _render_inspector() -> void:
 		else:
 			_render_motion_inspector()
 		return
-	if active_module == "Export":
-		inspector_content.add_child(_create_inspector_section("Build"))
-		inspector_content.add_child(_create_inspector_field_label("Source Asset"))
-		inspector_content.add_child(_create_inspector_field_label(str(_get_asset(selected_asset_id).get("name", "None"))))
-		inspector_content.add_child(_create_inspector_field_label("Output Path"))
-		inspector_content.add_child(_create_inspector_field_label("res://exports/"))
-		inspector_content.add_child(_create_inspector_field_label("Format"))
-		inspector_content.add_child(_create_inspector_field_label("Godot Scene (.tscn)"))
-		return
 	if active_module == "Style":
 		_render_weighting_inspector()
 		return
@@ -10628,6 +10569,17 @@ func _render_inspector() -> void:
 		_rename_selected_component(component_name_editor.text)
 	)
 	inspector_content.add_child(component_name_editor)
+	inspector_content.add_child(_create_inspector_section("Runtime Export"))
+	inspector_content.add_child(_create_inspector_field_label("Semantic Role"))
+	var semantic_role_editor := LineEdit.new()
+	semantic_role_editor.placeholder_text = "lower_snake_case"
+	semantic_role_editor.text = str(component.get("semantic_role", ""))
+	semantic_role_editor.custom_minimum_size = Vector2(0, 26)
+	semantic_role_editor.text_submitted.connect(_set_selected_component_semantic_role)
+	semantic_role_editor.focus_exited.connect(func() -> void:
+		_set_selected_component_semantic_role(semantic_role_editor.text)
+	)
+	inspector_content.add_child(semantic_role_editor)
 	inspector_content.add_child(_create_inspector_section("Hierarchy"))
 	inspector_content.add_child(_create_inspector_field_label("Parent Component"))
 	var hierarchy_parent_option := OptionButton.new()
@@ -12576,6 +12528,18 @@ func _rename_selected_component(new_name: String) -> void:
 	_render_canvas_context()
 
 
+func _set_selected_component_semantic_role(value: String) -> void:
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if component.is_empty():
+		return
+	var role := value.strip_edges().to_lower()
+	if role == str(component.get("semantic_role", "")):
+		return
+	_record_direct_change()
+	component["semantic_role"] = role
+	_update_runtime_export_button()
+
+
 func _on_import_threshold_changed(value: float) -> void:
 	pending_import_threshold = clampf(value, 0.0, 1.0)
 
@@ -12615,7 +12579,6 @@ func _render_canvas_context() -> void:
 	weighting_workspace.visible = false
 	if active_module == "Motion":
 		canvas_view.visible = false
-		export_workspace.visible = false
 		motion_workspace.visible = active_motion_submodule == "Animation"
 		motion_path_workspace.visible = active_motion_submodule == "Path"
 		motion_act_workspace.visible = active_motion_submodule == "Act"
@@ -12635,14 +12598,6 @@ func _render_canvas_context() -> void:
 	motion_path_workspace.visible = false
 	motion_act_workspace.visible = false
 	motion_sequence_workspace.visible = false
-	if active_module == "Export":
-		motion_workspace.visible = false
-		canvas_view.visible = false
-		export_workspace.visible = true
-		_render_export_workspace()
-		canvas_context_label.text = ""
-		return
-	export_workspace.visible = false
 	if active_module == "Mesh":
 		motion_workspace.visible = false
 		canvas_view.visible = false
@@ -13671,9 +13626,6 @@ func _on_category_pressed(_module_name: String) -> void:
 	if active_module == "Mesh":
 		active_state = ""
 		active_geometry_submodule = active_geometry_submodule if active_geometry_submodule in GEOMETRY_SUBMODULES else "Sampling"
-	if active_module == "Export":
-		selected_component_id = ""
-		active_state = ""
 	var pressed_section := _find_section(_module_name)
 	for section in module_sections:
 		section.set_expanded(true)
