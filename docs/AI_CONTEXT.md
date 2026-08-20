@@ -113,6 +113,8 @@ The batch writes a versioned engine-neutral manifest plus copied SDF masks to
 the project-local `res://PolyToolsRuntimeExports/<asset_id>/` directory. Packages are
 staged, verified, and replaced atomically per Asset; an invalid Asset retains
 its older package and no fallback geometry is generated.
+The normative field-level package and consumer rules live in
+`docs/RUNTIME_EXPORT_CONTRACT.md`; other documents must not redefine them.
 
 All four persistent batch buttons use the same compact tooltip summary. A
 `Pending` section lists actionable work, while `Needs attention` lists visible
@@ -145,7 +147,7 @@ searchable list inside a compact dropdown. A key may occur only once inside an
 Asset.
 
 References classify the borrowed geometry locally: for example, Barde may use
-the Orb Asset through `source_asset_id = "orb"` while assigning the local
+the Orb Asset through its stable Asset ID in `source_asset_id` while assigning the local
 `semantic_key = "belly"`. Duplicate maps the known pairs `eye_left` /
 `eye_right` and `eyebrow_left` / `eyebrow_right` automatically. Every other
 copied Component requires an explicit picker choice before the duplicate is

@@ -75,6 +75,10 @@ manual SDF editing, and export consumption are outside this Slice.
 
 ## Contour SDF
 
+The normative exported UV and SDF interpretation is defined in
+[`RUNTIME_EXPORT_CONTRACT.md`](RUNTIME_EXPORT_CONTRACT.md). This section
+describes how the editor derives those resources.
+
 The downstream contour stage consumes the exact accepted Component Mesh and UV
 Bake. `Update SDFs (N)` creates one deterministic `256×256` single-channel PNG
 per visible Component. The channel is interpreted linearly: `0.5` is the contour,

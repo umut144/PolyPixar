@@ -4453,8 +4453,9 @@ func _runtime_export_is_stale(asset: Dictionary, build: Dictionary = {}) -> bool
 	if not bool(expected.get("valid", false)):
 		return true
 	var target := _runtime_export_root().path_join(str(asset.get("id", "")))
-	var manifest = _read_json(target.path_join("manifest.json"))
-	if not manifest is Dictionary or manifest != expected.get("manifest", {}):
+	var manifest_path := target.path_join("manifest.json")
+	var expected_manifest_text := JSON.stringify(expected.get("manifest", {}), "\t")
+	if not FileAccess.file_exists(manifest_path) or not _runtime_manifest_text_matches(expected_manifest_text, FileAccess.get_file_as_string(manifest_path)):
 		return true
 	for mask in expected.get("masks", []):
 		var mask_path := target.path_join(str(mask.get("relative_path", "")))

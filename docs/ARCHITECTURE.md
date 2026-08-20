@@ -211,6 +211,10 @@ consume an incompatible PSLG.
 
 ## Export contract
 
+The normative serialized package and consumer contract is
+[`RUNTIME_EXPORT_CONTRACT.md`](RUNTIME_EXPORT_CONTRACT.md). The summary below
+describes how the editor produces that contract.
+
 `RuntimeExportService` builds manifest schema 1 exclusively from current
 accepted Component Mesh, UV, and SDF Bakes. It rejects missing or stale inputs,
 missing/corrupt mask resources, invalid or duplicate Semantic Keys, unresolved
