@@ -70,7 +70,7 @@ Motion displays its future Animation Guide dependency and remains `Not
 Previewable` until mesh and Spine foundations exist.
 
 States, Motions, Transitions, and Markers belong to the Asset's persisted
-`animation` document and participate in Workspace Save/Load and Undo/Redo.
+`animation` document and participate in World Save/Load and Undo/Redo.
 
 ## State authoring
 
@@ -144,7 +144,7 @@ camera remains based on rest geometry. Sampling details are documented in
 The Motion category is a vertical module rail with three independent contexts:
 
 - `Animation` owns asset-local States, Motions, Transitions, and Markers.
-- `Path` owns reusable Workspace-level travel geometry and playback settings.
+- `Path` owns reusable World-level travel geometry and playback settings.
 - `Sequence` will compose stable Asset, Animation State, and Path references.
 
 Path and Sequence have separate Outliners, Inspectors, centre workspaces,

@@ -9,7 +9,7 @@ Read `docs/AI_CONTEXT.md`, `docs/ARCHITECTURE.md`, and
 - `BezierTopology` owns structural operations and topology validation.
 - `BezierGeometry` owns cubic Bézier mathematics and handle resolution.
 - `ComponentCanvas` renders immutable view copies and emits user intent. It
-  must not mutate Workspace document topology.
+  must not mutate World document topology.
 - Polygon arrays used by fill, hit testing, or the current export are derived
   on demand and are never stored in a Component.
 
@@ -25,5 +25,5 @@ Run both commands after geometry changes:
 /Applications/Godot_mono.app/Contents/MacOS/Godot --headless --path . --editor --quit
 ```
 
-Also run `git diff --check`. Files below `workspaces/` are user data and must
+Also run `git diff --check`. Files below `worlds/` are user data and must
 not be rewritten as test fixtures.

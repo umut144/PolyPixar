@@ -56,7 +56,7 @@ Components without a current accepted Component Mesh are not batch candidates.
 ## Generate, Bake, and Outliner
 
 Input or parameter changes automatically Generate a temporary preview. Manual
-Bake remains explicit and participates in Undo/Redo and Workspace persistence;
+Bake remains explicit and participates in Undo/Redo and World persistence;
 the global batch provides the deterministic default acceptance path. The UV
 Outliner nests accepted results beneath their source Mesh method so the exact
 dependency remains visible and directly selectable.

@@ -44,7 +44,7 @@ never store generated Bézier points, edges, chains, or samples. The currently
 supported primitive is `{ type: "circle", center, diameter_cm }`.
 
 `ComponentCanvas` receives immutable view copies, renders them, and emits user
-intent; it never mutates Workspace geometry directly. Polygon arrays for fill,
+intent; it never mutates World geometry directly. Polygon arrays for fill,
 hit testing, sampling, meshing, and export are derived on demand from either
 source. A Primitive's center handle moves its `primitive.center`; its Component
 pivot remains an independent transform handle.
@@ -110,7 +110,8 @@ registered `semantic_key`. Ordinary Components require current accepted Mesh,
 UV, and SDF resources. Asset References instead export their local Semantic Key
 plus the actual `source_asset_id`; they do not duplicate the referenced geometry.
 The batch writes a versioned engine-neutral manifest plus copied SDF masks to
-the project-local `res://PolyToolsRuntimeExports/<asset_id>/` directory. Packages are
+the active World-local
+`res://worlds/<world_name>/PolyToolsRuntimeExports/<asset_id>/` directory. Packages are
 staged, verified, and replaced atomically per Asset; an invalid Asset retains
 its older package and no fallback geometry is generated.
 The normative field-level package and consumer rules live in
@@ -125,14 +126,17 @@ orange attention point whenever that same summary contains at least one
 `Needs attention` entry; the point remains visible even if the Button itself is
 disabled.
 
-## Workspace and export
+## World and export
 
-A Workspace persists Assets plus the currently retained motion and derived
+A World persists Assets plus the currently retained motion and derived
 mesh records. Assets own Components, Guides, reference-image settings, their
-Asset pivot and `asset_type`. Workspace schema 39 makes `semantic_key` the
+Asset pivot and `asset_type`. World schema 39 makes `semantic_key` the
 required, sole authored Component designation. The key is its registry identity,
 visible name, search term, and runtime target; no independent Component label or
-free-form runtime role is persisted. New persistence must not add display polygons or reverse
+free-form runtime role is persisted. The World `name` is its stable technical
+key and owns its directory and main JSON filename. A separate persisted
+`world_name` stores the human-facing title and does not need to be visible in
+the current UI. New persistence must not add display polygons or reverse
 synchronization into Component topology. The former Godot-scene Export module
 is retired; runtime export is a batch operation over accepted derived data.
 
@@ -154,7 +158,7 @@ copied Component requires an explicit picker choice before the duplicate is
 committed.
 
 Registry changes are a Mensch-AI maintenance operation. Before adding or
-replacing a key, inspect all Workspace, Motion, export, test, and documentation
+replacing a key, inspect all World, Motion, export, test, and documentation
 uses; then update the registry and every affected reference atomically. Do not
 silently repurpose an existing key. A removed or unknown link must remain
 visible as `missing_semantic (<key/source>)` and block runtime export until a
@@ -170,4 +174,4 @@ After geometry changes run:
 git diff --check
 ```
 
-Files below `workspaces/` are user data and must not be rewritten as fixtures.
+Files below `worlds/` are user data and must not be rewritten as fixtures.

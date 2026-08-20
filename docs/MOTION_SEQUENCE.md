@@ -19,7 +19,7 @@ with the complete Path and moving Asset. The Inspector becomes a read-only
 resolved-reference and runtime report. Missing references remain visible as
 blocking messages instead of being silently replaced.
 
-The active view and `Preview Loop` are Workspace editor state. They are not
+The active view and `Preview Loop` are World editor state. They are not
 Sequence runtime data. Shortcuts are ignored while editing text.
 
 ## Entry contract

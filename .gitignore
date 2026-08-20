@@ -3,10 +3,12 @@
 .mono/
 .export/
 exports/
-PolyToolsRuntimeExports/
+worlds/*/PolyToolsRuntimeExports/
 *.import
 *.jpg
 *.jpeg
+!worlds/**/*.jpg
+!worlds/**/*.jpeg
 
 # macOS
 .DS_Store

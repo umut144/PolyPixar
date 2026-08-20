@@ -4,15 +4,15 @@
 
 ## Ownership
 
-An Act is a Workspace-level resource. It does not belong to an Animation State,
+An Act is a World-level resource. It does not belong to an Animation State,
 does not contain Path geometry, and is not implicitly part of a Sequence. The
 selected Preview Asset is editor state only and is never persisted in the Act.
 
-Act order in the workspace list is presentational. It has no runtime priority
+Act order in the World list is presentational. It has no runtime priority
 or playback meaning. A later Act Group may own an explicit ordered list of Act
 references, but grouping is outside this phase.
 
-## Workspace contract
+## World ownership contract
 
 `Motion → Act` divides the centre workspace into a vertical Act list on the
 left (one quarter) and a stable, centered Preview on the right (three quarters).

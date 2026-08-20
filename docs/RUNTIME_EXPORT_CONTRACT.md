@@ -13,7 +13,7 @@ the exported package.
 Asset:
 
 ```text
-res://PolyToolsRuntimeExports/<asset_id>/
+res://worlds/<world_name>/PolyToolsRuntimeExports/<asset_id>/
 ├── manifest.json
 └── masks/
     └── <component_id>.sdf.png
@@ -311,7 +311,7 @@ A Reference uses the common transform fields plus:
 }
 ```
 
-The example IDs illustrate the current Workspace and are not reserved schema
+The example IDs illustrate the current World and are not reserved schema
 constants.
 
 ## Consumer implementation notes

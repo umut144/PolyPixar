@@ -32,7 +32,7 @@ category is disabled. Transform and Effects categories do not exist.
 - `ComponentHierarchy` owns parent/child normalization and world/local
   transform conversion.
 - `ComponentCanvas` renders immutable copies and emits user intent.
-- `main.gd` applies intent to the selected Workspace document and records
+- `main.gd` applies intent to the selected World document and records
   history.
 
 Each Component declares a geometry source. Bézier sources contain only
@@ -109,10 +109,12 @@ retain their exact Character and override values.
 
 ## Persistence
 
-`workspace.json` indexes Assets by stable ID plus retained motion/derived
-resources. Each Asset is stored below a sanitized visible-name directory with
+`worlds/<world_name>/<world_name>.json` indexes Assets by stable ID plus retained motion/derived
+resources. Its canonical technical `name` owns the directory and filename,
+while the separate persisted `world_name` is the human-facing World title and
+need not be shown by the current UI. Each Asset is stored below a sanitized visible-name directory with
 a matching JSON filename, for example `assets/Wizard/Wizard.json`. The stable
-ID remains inside the JSON and in the workspace index. Older ID-based paths
+ID remains inside the JSON and in the World index. Older ID-based paths
 such as `assets/asset_1/asset.json` remain readable as a migration fallback;
 older Assets without `asset_type` load as `character`. Editor
 state persists the active Create/Mesh/Style module and valid selection, but it
@@ -140,7 +142,7 @@ triangles, accepted Seed movements, and before/after quality metrics. These are
 derived diagnostics for the Optimization and Quality views and never become
 Component topology.
 
-Schema 34 removes the editor-only open-curve Component mode. Existing workspace
+Schema 34 removes the editor-only open-curve Component mode. Existing World
 assets were converted to Ribbons; Ribbon widths normalize to a practical minimum
 of 1 px.
 
@@ -205,7 +207,7 @@ Asset References use the same local Semantic picker but retain the borrowed
 Asset in `source_asset_id`, so local classification never erases geometry origin.
 
 Sampling results carry their own algorithm version independently of the
-Workspace schema. The junction-aware version invalidates pre-arrangement flat
+World schema. The junction-aware version invalidates pre-arrangement flat
 Cut Bakes at Sampling, which in turn makes Seeding stale before Meshing can
 consume an incompatible PSLG.
 
@@ -231,8 +233,8 @@ global ascending `(z_index, component_id)` order from back to front. Accepted
 Mesh Vertex order is retained, Triangle Vertex IDs become compact indices, and
 UVs are aligned to that same order through stable Vertex IDs.
 
-Each visible Asset is exported to the project-local
-`res://PolyToolsRuntimeExports/<asset_id>/` directory as `manifest.json` plus relative
+Each visible Asset is exported to the active World-local
+`res://worlds/<world_name>/PolyToolsRuntimeExports/<asset_id>/` directory as `manifest.json` plus relative
 `masks/<component_id>.sdf.png` resources. The batch verifies a staging package
 before atomically replacing the prior package; validation or I/O failure leaves
 the prior package intact. Package freshness is derived by comparing the expected
@@ -242,4 +244,4 @@ manifest and mask hashes, not by persisting export diagnostics in the Asset.
 
 The headless suite covers topology, derived geometry, navigation state, and UI
 contracts. Geometry changes require the test runner, a headless editor parse,
-and `git diff --check`. Workspace data is never used as a mutable test fixture.
+and `git diff --check`. World data is never used as a mutable test fixture.

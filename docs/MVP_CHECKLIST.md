@@ -5,7 +5,7 @@ The current editor has superseded that implementation with the canonical
 Point/Edge/Chain Bézier model documented in `BEZIER_MODEL.md`; those entries
 must not be used as current implementation instructions.
 
-**Status:** Asset, Component, Transform, Workspace, and UV-Texture foundations
+**Status:** Asset, Component, Transform, World, and UV-Texture foundations
 are functional. The next implementation target is Slice 4: Stone Floor Bloom.
 **Rule:** A box is checked only after the result can be demonstrated in the
 editor. Writing code alone is not completion.
@@ -128,12 +128,12 @@ before implementing real creation tools.
       other components as transparent references.
 - [x] Highlight selected Outliner entries yellow with black text.
 - [x] Require a second click on the selected Asset to toggle its component list.
-- [x] Provide an in-app Workspace menu with New, Save, and Load.
+- [x] Provide an in-app World menu with New, Save, and Load.
 - [x] Serialize workspaces and their Assets/Components as versioned JSON files.
-- [x] Include `schema_version` in Workspace, Asset, and app-config JSON files.
+- [x] Include `schema_version` in World, Asset, and app-config JSON files.
 - [x] Store and automatically restore the last workspace through app config.
 - [x] Split the bottom status bar into 17% / 64% / 17% regions.
-- [x] Save the active Workspace with `CMD/Ctrl + S` and show a temporary yellow
+- [x] Save the active World with `CMD/Ctrl + S` and show a temporary yellow
       confirmation in the program-status region.
 - [x] Persist and restore Outliner selection and Asset expansion state.
 - [x] Add hidden snapshot-based Undo/Redo with `CMD/Ctrl + Z` and
@@ -142,7 +142,7 @@ before implementing real creation tools.
 - [x] Transform & Snap Foundation: mark the world origin and full canvas axes.
 - [x] Add a persistent Snap popover with On/Off, Grid Step, and Rotation Step.
 - [x] Store Component position, rotation, scale, pivot, visibility, and z-index
-      in schema-versioned Workspace JSON.
+      in schema-versioned World JSON.
 - [x] Expose Component transform, visibility, and z-index fields in the
       Inspector.
 - [x] Display and drag the selected Component's local Pivot with Snap support.
@@ -229,8 +229,8 @@ system, particle system, or universal animation graph.
 
 - [x] Add `Import Texture` to the Texture Context Bar; importing a raster image
       must not require creating Texture Elements.
-- [x] Preserve an imported texture as a named Workspace Texture and restore it
-      when the Workspace is loaded.
+- [x] Preserve an imported texture as a named World Texture and restore it
+      when the World is loaded.
 - [x] Display the composed final UV output when the Texture parent is selected;
       only output-valid Elements may contribute to it.
 - [x] Provide a first background treatment that can isolate the dark ink from a
@@ -254,7 +254,7 @@ system, particle system, or universal animation graph.
       white-background removal or ink-mask extraction.
 - [x] Provide a minimal `White to Alpha` processing action with a persisted
       threshold parameter.
-- [x] Write the processed output into the Workspace and transition the Element
+- [x] Write the processed output into the World and transition the Element
       state from `not_ready` to `ready` only after processing succeeds.
 - [x] Feed the processed Import Element output into the Texture parent's final
       UV composition only after that output is valid.
@@ -262,7 +262,7 @@ system, particle system, or universal animation graph.
 ### D. Style → Material
 
 - [x] Add the initial independent Material data resource with a Texture
-      reference, tint, and opacity; persist it in Workspace JSON and history.
+      reference, tint, and opacity; persist it in World JSON and history.
 - [x] Add Material creation and the Style Material Outliner.
 - [x] Add the initial Material Graph state as a fixed GraphEdit skeleton with
       `Texture Source → Material Output`.
@@ -281,7 +281,7 @@ system, particle system, or universal animation graph.
       Texture paths, plus initial bounding-box UVs.
 
 - [x] Add the first `Material` module under Style.
-- [x] Bind a Workspace Texture to the Stone Floor Component without embedding
+- [x] Bind a World Texture to the Stone Floor Component without embedding
       or copying the Texture into the Asset.
 - [x] Provide the smallest useful texture mapping controls: scale and offset.
 - [x] Replace the Repeat intent with concrete `Fit`, `Clamp`, and `Repeat`
@@ -293,7 +293,7 @@ system, particle system, or universal animation graph.
 ### E. Motion → Path
 
 - [x] Add `Animation`, `Path`, `Act`, and `Sequence` as separate Motion modules with
-      independent ownership and stable Workspace resources.
+      independent ownership and stable World resources.
 - [x] Author one open ordered Point/Segment Path with Draw and Edit tools.
 - [x] Move Path Points, edit free Bézier handles, and delete Points without
       mutating Asset Component topology.
@@ -338,7 +338,7 @@ system, particle system, or universal animation graph.
       using its pivot and uniform scale.
 - [ ] Preview the intended order: floor is normal → local guide area glows →
       flower grows from that area.
-- [ ] Save and reload the Workspace; the imported Texture, Material binding,
+- [ ] Save and reload the World; the imported Texture, Material binding,
       Guide reference, and Sequence must restore correctly.
 
 ## Explicitly deferred

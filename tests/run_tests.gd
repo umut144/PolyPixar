@@ -390,7 +390,7 @@ func _test_geometry_sampling_service() -> void:
 	_expect(not bool(GeometrySamplingService.generate(open_component).get("valid", true)), "An open contour should fail visibly at the mesh-pipeline Sampling boundary.")
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
-	_expect(application._has_supported_schema({"schema_version": 39}) and application._has_supported_schema({"schema_version": 38}) and not application._has_supported_schema({"schema_version": 40}), "Schema 39 should keep current and older Workspace documents readable and reject unknown future schemas.")
+	_expect(application._has_supported_schema({"schema_version": 39}) and application._has_supported_schema({"schema_version": 38}) and not application._has_supported_schema({"schema_version": 40}), "Schema 39 should keep current and older World documents readable and reject unknown future schemas.")
 	var arranged_round_trip: Dictionary = application._normalize_sampling_bake(application._serialize_sampling_bake(arranged_result))
 	_expect(arranged_round_trip.get("cuts", [])[0].get("fragments", []).size() == 2 and arranged_round_trip.get("cuts", [])[0].get("fragments", [])[0].get("samples", [])[0].get("position", null) is Vector2, "Schema 32 should preserve Cut fragment connectivity and restore fragment positions as Vector2 values.")
 	var geometry_document: Dictionary = application._default_geometry_document("asset_1", "component_1")
@@ -473,6 +473,7 @@ func _test_geometry_sampling_ui_shell() -> void:
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
 	application._build_ui()
+	_expect(application.world_menu.text == "World  ▼" and application.world_name_dialog.title == "New World" and application.load_world_dialog.title == "Load World", "The persisted top-level document should be presented consistently as a World in the toolbar and dialogs.")
 	var visible_categories: Array[String] = []
 	var every_category_expanded := true
 	for module_section in application.module_sections:
@@ -531,7 +532,7 @@ func _test_geometry_sampling_ui_shell() -> void:
 	var history_snapshot: Dictionary = application._capture_history_snapshot()
 	application.geometry_documents["asset_1/component_1"]["sampling"]["recipe"]["parameters"]["spacing"] = 42.0
 	application._restore_history_snapshot(history_snapshot)
-	_expect(is_equal_approx(float(application.geometry_documents["asset_1/component_1"]["sampling"]["recipe"]["parameters"]["spacing"]), GeometrySamplingService.DEFAULT_SPACING), "Geometry recipes and bakes should participate in Workspace Undo/Redo snapshots.")
+	_expect(is_equal_approx(float(application.geometry_documents["asset_1/component_1"]["sampling"]["recipe"]["parameters"]["spacing"]), GeometrySamplingService.DEFAULT_SPACING), "Geometry recipes and bakes should participate in World Undo/Redo snapshots.")
 	var create_section: ModuleSection = application._find_section("Create")
 	application._select_submodule("Create", "Props", create_section)
 	_expect(application.active_module == "Create" and application.active_create_submodule == "Props" and application.canvas_view.visible and not application.geometry_sampling_workspace.visible, "Selecting Create Props should immediately render the shared asset workspace.")
@@ -1169,7 +1170,8 @@ func _test_semantic_registry_and_picker() -> void:
 
 func _test_runtime_export_service() -> void:
 	var application = load("res://scripts/main.gd").new()
-	_expect(application._runtime_export_root() == ProjectSettings.globalize_path("res://PolyToolsRuntimeExports"), "Runtime packages should be written to the ignored PolyToolsRuntimeExports directory inside the PolyTools project.")
+	application.world_name = "world01"
+	_expect(application._runtime_export_root() == ProjectSettings.globalize_path("res://worlds/world01/PolyToolsRuntimeExports"), "Runtime packages should be written to the ignored PolyToolsRuntimeExports directory owned by the active World.")
 	var numeric_manifest := {"schema_version": 1, "values": [0, 1.0, 0.25]}
 	var numeric_manifest_text := JSON.stringify(numeric_manifest, "\t")
 	_expect(application._runtime_manifest_text_matches(numeric_manifest_text, numeric_manifest_text), "Runtime staging should verify the exact valid JSON bytes without rejecting Godot's numeric JSON round-trip types.")
@@ -1730,7 +1732,7 @@ func _test_motion_path_topology_and_sampler() -> void:
 	var canvas := MotionPathWorkspace.new()
 	canvas.set_document(path_document)
 	canvas.path_document["topology"]["points"][0]["position"] = Vector2(99.0, 99.0)
-	_expect(Vector2(path_document["topology"]["points"][0]["position"]) != Vector2(99.0, 99.0), "MotionPathWorkspace must render an immutable document copy rather than mutating Workspace topology.")
+	_expect(Vector2(path_document["topology"]["points"][0]["position"]) != Vector2(99.0, 99.0), "MotionPathWorkspace must render an immutable document copy rather than mutating World topology.")
 	canvas.free()
 
 
@@ -1802,7 +1804,7 @@ func _test_motion_act_evaluator() -> void:
 	var workspace := MotionActWorkspace.new()
 	workspace.set_context([act], "act_1", {})
 	workspace.acts[0]["name"] = "Mutated"
-	_expect(str(act.get("name", "")) == "Slide Right", "MotionActWorkspace must render immutable Act copies and never mutate Workspace documents.")
+	_expect(str(act.get("name", "")) == "Slide Right", "MotionActWorkspace must render immutable Act copies and never mutate World documents.")
 	workspace.free()
 
 

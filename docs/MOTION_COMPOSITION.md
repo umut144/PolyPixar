@@ -10,9 +10,9 @@ answer different questions:
 
 - **Animation:** How does one Asset move locally? It is persisted inside the
   Asset and owns States, primitive Motions, Transitions, and Markers.
-- **Path:** Where does something travel? It is an independent Workspace
+- **Path:** Where does something travel? It is an independent World
   resource and owns path topology plus playback defaults. It has no Asset ID.
-- **Sequence:** What is combined and when? It is an independent Workspace
+- **Sequence:** What is combined and when? It is an independent World
   resource and owns stable references to an Asset, one Animation State, and an
   optional Path.
 

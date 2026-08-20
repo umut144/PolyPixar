@@ -34,7 +34,7 @@ Bake.
 
 `CMD/Ctrl + 1 · Method` selects the current method. Parameter changes generate
 an immutable preview automatically; Bake is explicit and participates in
-Undo/Redo and Workspace persistence.
+Undo/Redo and World persistence.
 
 ## Preview
 

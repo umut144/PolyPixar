@@ -5,7 +5,7 @@ const CREATE_SUBMODULES := ["Character", "Props", "Terrain", "Icon", "Symbols"]
 const GEOMETRY_SUBMODULES := ["Sampling", "Seeding", "Meshing"]
 const STYLE_SUBMODULES := ["Weighting"]
 const MOTION_SUBMODULES := ["Animation", "Path", "Act", "Sequence"]
-const WORKSPACES_ROOT := "res://workspaces"
+const WORLDS_ROOT := "res://worlds"
 const CONFIG_PATH := "res://configs/app_config.json"
 const SCHEMA_VERSION := 39
 const MAX_HISTORY_SIZE := 100
@@ -246,11 +246,13 @@ var update_sdfs_button: BatchStatusButton
 var sdf_batch_running := false
 var runtime_export_button: BatchStatusButton
 var runtime_export_batch_running := false
-var workspace_name := ""
-var workspace_name_dialog: ConfirmationDialog
-var workspace_name_input: LineEdit
-var load_workspace_dialog: ConfirmationDialog
-var workspace_list: ItemList
+var world_name := ""
+var world_title := ""
+var world_menu: MenuButton
+var world_name_dialog: ConfirmationDialog
+var world_name_input: LineEdit
+var load_world_dialog: ConfirmationDialog
+var world_list: ItemList
 var pending_save_after_new := false
 var undo_history: Array[Dictionary] = []
 var redo_history: Array[Dictionary] = []
@@ -285,7 +287,7 @@ func _ready() -> void:
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
-	_load_last_workspace()
+	_load_last_world()
 	call_deferred("_disable_quit_shortcut")
 	call_deferred("_focus_active_canvas_after_startup")
 
@@ -318,16 +320,16 @@ func _notification(what: int) -> void:
 		_show_status_message("Cmd+Q is disabled.")
 		return
 	get_tree().quit()
-func _load_last_workspace() -> void:
+func _load_last_world() -> void:
 	var config_data = _read_json(CONFIG_PATH)
 	if _has_supported_schema(config_data):
-		var last_workspace := str(config_data.get("last_workspace", ""))
-		if not last_workspace.is_empty():
-			_load_workspace(last_workspace)
+		var last_world := str(config_data.get("last_world", ""))
+		if not last_world.is_empty():
+			_load_world(last_world)
 
 
 func _focus_active_canvas_after_startup() -> void:
-	# Let the workspace restore finish creating/focusing its controls first.
+	# Let the World restore finish creating/focusing its controls first.
 	await get_tree().process_frame
 	await get_tree().process_frame
 	if is_instance_valid(canvas_view) and canvas_view.visible:
@@ -386,7 +388,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 		return
 	if has_command_modifier and event.keycode == KEY_S:
-		_save_workspace()
+		_save_world()
 		get_viewport().set_input_as_handled()
 		return
 	if has_command_modifier and event.keycode == KEY_Z:
@@ -703,16 +705,16 @@ func _build_ui() -> void:
 	var toolbar_spacer := Control.new()
 	toolbar_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	toolbar.add_child(toolbar_spacer)
-	var workspace_menu := MenuButton.new()
-	workspace_menu.text = "Workspace  ▼"
-	workspace_menu.custom_minimum_size = Vector2(132, 32)
-	workspace_menu.focus_mode = Control.FOCUS_NONE
-	var workspace_popup := workspace_menu.get_popup()
-	_style_popup_menu(workspace_popup)
-	workspace_popup.add_item("New")
-	workspace_popup.add_item("Save")
-	workspace_popup.add_item("Load")
-	workspace_popup.id_pressed.connect(_on_workspace_menu_id)
+	world_menu = MenuButton.new()
+	world_menu.text = "World  ▼"
+	world_menu.custom_minimum_size = Vector2(132, 32)
+	world_menu.focus_mode = Control.FOCUS_NONE
+	var world_popup := world_menu.get_popup()
+	_style_popup_menu(world_popup)
+	world_popup.add_item("New")
+	world_popup.add_item("Save")
+	world_popup.add_item("Load")
+	world_popup.id_pressed.connect(_on_world_menu_id)
 	_create_world_scale_popup()
 	update_meshes_button = BatchStatusButton.new()
 	update_meshes_button.text = "Update Meshes (0)"
@@ -747,7 +749,7 @@ func _build_ui() -> void:
 	runtime_export_button.pressed.connect(_on_runtime_export_pressed)
 	toolbar.add_child(runtime_export_button)
 	toolbar.add_child(world_scale_menu)
-	toolbar.add_child(workspace_menu)
+	toolbar.add_child(world_menu)
 
 	var workspace_row := HBoxContainer.new()
 	workspace_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -955,7 +957,7 @@ func _build_ui() -> void:
 	reference_image_crop_dialog.image_accepted.connect(_save_reference_image_result)
 	reference_image_crop_dialog.image_cropped.connect(_save_reference_image_result)
 	add_child(reference_image_crop_dialog)
-	_create_workspace_dialogs()
+	_create_world_dialogs()
 	_create_motion_state_dialogs()
 	_create_motion_resource_dialogs()
 	_create_geometry_seeding_dialogs()
@@ -1640,33 +1642,33 @@ func _create_reference_image_dialog() -> void:
 	add_child(reference_image_dialog)
 
 
-func _create_workspace_dialogs() -> void:
-	workspace_name_dialog = ConfirmationDialog.new()
-	workspace_name_dialog.title = "New Workspace"
-	workspace_name_dialog.dialog_text = "Enter a workspace name"
-	workspace_name_dialog.ok_button_text = "Create"
-	workspace_name_dialog.size = Vector2i(360, 160)
-	workspace_name_dialog.confirmed.connect(_confirm_new_workspace)
-	workspace_name_input = LineEdit.new()
-	workspace_name_input.placeholder_text = "Workspace name"
-	workspace_name_input.custom_minimum_size = Vector2(320, 32)
-	workspace_name_input.focus_mode = Control.FOCUS_ALL
-	workspace_name_input.text_submitted.connect(_submit_workspace_name)
-	workspace_name_dialog.add_child(workspace_name_input)
-	add_child(workspace_name_dialog)
+func _create_world_dialogs() -> void:
+	world_name_dialog = ConfirmationDialog.new()
+	world_name_dialog.title = "New World"
+	world_name_dialog.dialog_text = "Enter a World name"
+	world_name_dialog.ok_button_text = "Create"
+	world_name_dialog.size = Vector2i(360, 160)
+	world_name_dialog.confirmed.connect(_confirm_new_world)
+	world_name_input = LineEdit.new()
+	world_name_input.placeholder_text = "World name"
+	world_name_input.custom_minimum_size = Vector2(320, 32)
+	world_name_input.focus_mode = Control.FOCUS_ALL
+	world_name_input.text_submitted.connect(_submit_world_name)
+	world_name_dialog.add_child(world_name_input)
+	add_child(world_name_dialog)
 
-	load_workspace_dialog = ConfirmationDialog.new()
-	load_workspace_dialog.title = "Load Workspace"
-	load_workspace_dialog.dialog_text = ""
-	load_workspace_dialog.ok_button_text = "Load"
-	load_workspace_dialog.size = Vector2i(420, 320)
-	load_workspace_dialog.confirmed.connect(_load_selected_workspace)
-	workspace_list = ItemList.new()
-	workspace_list.custom_minimum_size = Vector2(380, 220)
-	workspace_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	workspace_list.item_activated.connect(_load_selected_workspace)
-	load_workspace_dialog.add_child(workspace_list)
-	add_child(load_workspace_dialog)
+	load_world_dialog = ConfirmationDialog.new()
+	load_world_dialog.title = "Load World"
+	load_world_dialog.dialog_text = ""
+	load_world_dialog.ok_button_text = "Load"
+	load_world_dialog.size = Vector2i(420, 320)
+	load_world_dialog.confirmed.connect(_load_selected_world)
+	world_list = ItemList.new()
+	world_list.custom_minimum_size = Vector2(380, 220)
+	world_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	world_list.item_activated.connect(_load_selected_world)
+	load_world_dialog.add_child(world_list)
+	add_child(load_world_dialog)
 
 
 func _on_create_action_pressed() -> void:
@@ -1708,34 +1710,35 @@ func _update_context_action_button() -> void:
 		create_action_button.text = "Create Sequence"
 
 
-func _on_workspace_menu_id(id: int) -> void:
+func _on_world_menu_id(id: int) -> void:
 	if id == 0:
-		_open_new_workspace_dialog(false)
+		_open_new_world_dialog(false)
 	elif id == 1:
-		_save_workspace()
+		_save_world()
 	elif id == 2:
-		_open_load_workspace_dialog()
+		_open_load_world_dialog()
 
 
-func _open_new_workspace_dialog(save_after_creation: bool) -> void:
+func _open_new_world_dialog(save_after_creation: bool) -> void:
 	pending_save_after_new = save_after_creation
-	workspace_name_input.text = ""
-	workspace_name_dialog.dialog_text = "Enter a workspace name"
-	workspace_name_dialog.popup_centered()
-	workspace_name_input.grab_focus()
+	world_name_input.text = ""
+	world_name_dialog.dialog_text = "Enter a World name"
+	world_name_dialog.popup_centered()
+	world_name_input.grab_focus()
 
 
-func _submit_workspace_name(_submitted_text: String) -> void:
-	_confirm_new_workspace()
+func _submit_world_name(_submitted_text: String) -> void:
+	_confirm_new_world()
 
 
-func _confirm_new_workspace() -> void:
+func _confirm_new_world() -> void:
 	var should_save := pending_save_after_new
-	var new_name := workspace_name_input.text.strip_edges()
+	var new_name := world_name_input.text.strip_edges()
 	if new_name.is_empty():
-		new_name = _next_default_workspace_name()
-	new_name = _sanitize_workspace_name(new_name)
-	workspace_name = new_name
+		new_name = _next_default_world_name()
+	new_name = _sanitize_world_name(new_name)
+	world_name = new_name
+	world_title = new_name
 	assets.clear()
 	motion_paths.clear()
 	motion_acts.clear()
@@ -1787,45 +1790,45 @@ func _confirm_new_workspace() -> void:
 	active_state = ""
 	_apply_snap_settings({})
 	pending_save_after_new = false
-	workspace_name_dialog.hide()
+	world_name_dialog.hide()
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
 	if should_save:
-		_save_workspace()
+		_save_world()
 
 
-func _open_load_workspace_dialog() -> void:
-	workspace_list.clear()
-	var names := _list_workspace_names()
-	for workspace_entry in names:
-		workspace_list.add_item(workspace_entry)
-		workspace_list.set_item_metadata(workspace_list.item_count - 1, workspace_entry)
-	if workspace_list.item_count > 0:
-		workspace_list.select(0)
-	load_workspace_dialog.popup_centered()
-	workspace_list.grab_focus()
+func _open_load_world_dialog() -> void:
+	world_list.clear()
+	var names := _list_world_names()
+	for world_entry in names:
+		world_list.add_item(world_entry)
+		world_list.set_item_metadata(world_list.item_count - 1, world_entry)
+	if world_list.item_count > 0:
+		world_list.select(0)
+	load_world_dialog.popup_centered()
+	world_list.grab_focus()
 
 
-func _load_selected_workspace(_index := -1) -> void:
-	var selected_indices := workspace_list.get_selected_items()
+func _load_selected_world(_index := -1) -> void:
+	var selected_indices := world_list.get_selected_items()
 	if selected_indices.is_empty():
 		return
 	var index := selected_indices[0]
-	var workspace_entry := str(workspace_list.get_item_metadata(index))
-	if _load_workspace(workspace_entry):
-		load_workspace_dialog.hide()
+	var world_entry := str(world_list.get_item_metadata(index))
+	if _load_world(world_entry):
+		load_world_dialog.hide()
 
 
-func _list_workspace_names() -> Array[String]:
+func _list_world_names() -> Array[String]:
 	var names: Array[String] = []
-	var directory := DirAccess.open(WORKSPACES_ROOT)
+	var directory := DirAccess.open(WORLDS_ROOT)
 	if directory == null:
 		return names
 	directory.list_dir_begin()
 	var entry := directory.get_next()
 	while not entry.is_empty():
-		if directory.current_is_dir() and not entry.begins_with(".") and FileAccess.file_exists("%s/%s/workspace.json" % [WORKSPACES_ROOT, entry]):
+		if directory.current_is_dir() and not entry.begins_with(".") and FileAccess.file_exists("%s/%s/%s.json" % [WORLDS_ROOT, entry, entry]):
 			names.append(entry)
 		entry = directory.get_next()
 	directory.list_dir_end()
@@ -1833,20 +1836,20 @@ func _list_workspace_names() -> Array[String]:
 	return names
 
 
-func _next_default_workspace_name() -> String:
-	var existing := _list_workspace_names()
+func _next_default_world_name() -> String:
+	var existing := _list_world_names()
 	var index := 1
-	while existing.has("workspace%02d" % index):
+	while existing.has("world%02d" % index):
 		index += 1
-	return "workspace%02d" % index
+	return "world%02d" % index
 
 
-func _sanitize_workspace_name(value: String) -> String:
+func _sanitize_world_name(value: String) -> String:
 	var sanitized := value.strip_edges()
 	for character in ["/", "\\", ":"]:
 		sanitized = sanitized.replace(character, "_")
 	if sanitized == "." or sanitized == ".." or sanitized.is_empty():
-		return _next_default_workspace_name()
+		return _next_default_world_name()
 	return sanitized
 
 
@@ -1875,17 +1878,17 @@ func _asset_storage_name(asset: Dictionary) -> String:
 	return "%s__%s" % [base, str(asset.get("id", "asset"))] if duplicate else base
 
 
-func _asset_storage_root(workspace_root: String, asset: Dictionary) -> String:
-	return "%s/assets/%s" % [workspace_root, _asset_storage_name(asset)]
+func _asset_storage_root(world_root: String, asset: Dictionary) -> String:
+	return "%s/assets/%s" % [world_root, _asset_storage_name(asset)]
 
 
-func _read_asset_data(workspace_root: String, asset_id: String):
-	var legacy_data = _read_json("%s/assets/%s/asset.json" % [workspace_root, asset_id])
-	var directory := DirAccess.open("%s/assets" % workspace_root)
+func _read_asset_data(world_root: String, asset_id: String):
+	var legacy_data = _read_json("%s/assets/%s/asset.json" % [world_root, asset_id])
+	var directory := DirAccess.open("%s/assets" % world_root)
 	if directory == null:
 		return legacy_data if legacy_data is Dictionary else {}
 	for entry in directory.get_directories():
-		var asset_directory := "%s/assets/%s" % [workspace_root, entry]
+		var asset_directory := "%s/assets/%s" % [world_root, entry]
 		for file_name in DirAccess.get_files_at(ProjectSettings.globalize_path(asset_directory)):
 			if not str(file_name).to_lower().ends_with(".json"):
 				continue
@@ -1896,16 +1899,16 @@ func _read_asset_data(workspace_root: String, asset_id: String):
 	return legacy_data if legacy_data is Dictionary else {}
 
 
-func _save_workspace() -> void:
-	if workspace_name.is_empty():
-		_open_new_workspace_dialog(true)
+func _save_world() -> void:
+	if world_name.is_empty():
+		_open_new_world_dialog(true)
 		return
-	var workspace_root := "%s/%s" % [WORKSPACES_ROOT, workspace_name]
-	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("%s/assets" % workspace_root))
-	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("%s/paths" % workspace_root))
-	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("%s/acts" % workspace_root))
-	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("%s/sequences" % workspace_root))
-	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("%s/geometry" % workspace_root))
+	var world_root := "%s/%s" % [WORLDS_ROOT, world_name]
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("%s/assets" % world_root))
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("%s/paths" % world_root))
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("%s/acts" % world_root))
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("%s/sequences" % world_root))
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("%s/geometry" % world_root))
 	var asset_ids: Array[String] = []
 	var motion_path_ids: Array[String] = []
 	var motion_act_ids: Array[String] = []
@@ -1914,7 +1917,7 @@ func _save_workspace() -> void:
 		var asset_id := str(asset["id"])
 		asset_ids.append(asset_id)
 		var asset_storage_name := _asset_storage_name(asset)
-		var asset_root := _asset_storage_root(workspace_root, asset)
+		var asset_root := _asset_storage_root(world_root, asset)
 		DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(asset_root))
 		var asset_data := {
 			"schema_version": SCHEMA_VERSION,
@@ -1957,13 +1960,13 @@ func _save_workspace() -> void:
 			var geometry_key := _geometry_document_key(asset_id, str(component.get("id", "")))
 			if not geometry_documents.has(geometry_key):
 				continue
-			var geometry_path := "%s/geometry/%s/%s/geometry.json" % [workspace_root, asset_storage_name, str(component.get("id", ""))]
+			var geometry_path := "%s/geometry/%s/%s/geometry.json" % [world_root, asset_storage_name, str(component.get("id", ""))]
 			_write_json(geometry_path, _serialize_geometry_document(geometry_documents[geometry_key]))
 			_save_sdf_image(asset, str(component.get("id", "")))
 	for path_document in motion_paths:
 		var path_id := str(path_document.get("id", ""))
 		motion_path_ids.append(path_id)
-		_write_json("%s/paths/%s/path.json" % [workspace_root, path_id], {
+		_write_json("%s/paths/%s/path.json" % [world_root, path_id], {
 			"schema_version": SCHEMA_VERSION,
 			"id": path_id,
 			"name": str(path_document.get("name", path_id)),
@@ -1974,7 +1977,7 @@ func _save_workspace() -> void:
 	for sequence_document in motion_sequences:
 		var sequence_id := str(sequence_document.get("id", ""))
 		motion_sequence_ids.append(sequence_id)
-		_write_json("%s/sequences/%s/sequence.json" % [workspace_root, sequence_id], {
+		_write_json("%s/sequences/%s/sequence.json" % [world_root, sequence_id], {
 			"schema_version": SCHEMA_VERSION,
 			"id": sequence_id,
 			"name": str(sequence_document.get("name", sequence_id)),
@@ -1985,18 +1988,19 @@ func _save_workspace() -> void:
 	for act_document in motion_acts:
 		var act_id := str(act_document.get("id", ""))
 		motion_act_ids.append(act_id)
-		_write_json("%s/acts/%s/act.json" % [workspace_root, act_id], _serialize_motion_act(act_document))
-	_write_json("%s/workspace.json" % workspace_root, {
+		_write_json("%s/acts/%s/act.json" % [world_root, act_id], _serialize_motion_act(act_document))
+	_write_json("%s/%s.json" % [world_root, world_name], {
 		"schema_version": SCHEMA_VERSION,
-		"name": workspace_name,
+		"name": world_name,
+		"world_name": world_title if not world_title.is_empty() else world_name,
 		"assets": asset_ids,
 		"paths": motion_path_ids,
 		"acts": motion_act_ids,
 		"sequences": motion_sequence_ids,
 		"editor_state": _serialize_editor_state()
 	})
-	_write_json(CONFIG_PATH, {"schema_version": SCHEMA_VERSION, "last_workspace": workspace_name})
-	_show_status_message("Saved Workspace: %s!" % workspace_name)
+	_write_json(CONFIG_PATH, {"schema_version": SCHEMA_VERSION, "last_world": world_name})
+	_show_status_message("Saved World: %s!" % world_name)
 
 
 func _capture_history_snapshot() -> Dictionary:
@@ -2226,15 +2230,15 @@ func _clear_status_message() -> void:
 		program_status_label.text = ""
 
 
-func _load_workspace(workspace_entry: String, persist_as_last := true) -> bool:
-	var workspace_root := "%s/%s" % [WORKSPACES_ROOT, workspace_entry]
-	var workspace_data = _read_json("%s/workspace.json" % workspace_root)
-	if not _has_supported_schema(workspace_data):
+func _load_world(world_entry: String, persist_as_last := true) -> bool:
+	var world_root := "%s/%s" % [WORLDS_ROOT, world_entry]
+	var world_data = _read_json("%s/%s.json" % [world_root, world_entry])
+	if not _has_supported_schema(world_data):
 		return false
 	var loaded_assets: Array[Dictionary] = []
-	for asset_id_variant in workspace_data.get("assets", []):
+	for asset_id_variant in world_data.get("assets", []):
 		var asset_id := str(asset_id_variant)
-		var asset_data = _read_asset_data(workspace_root, asset_id)
+		var asset_data = _read_asset_data(world_root, asset_id)
 		if not _has_supported_schema(asset_data):
 			continue
 		var components: Array[Dictionary] = []
@@ -2304,25 +2308,25 @@ func _load_workspace(workspace_entry: String, persist_as_last := true) -> bool:
 		var loaded_asset_id := str(loaded_asset.get("id", ""))
 		for loaded_component in loaded_asset.get("components", []):
 			var loaded_component_id := str(loaded_component.get("id", ""))
-			var geometry_data = _read_json("%s/geometry/%s/%s/geometry.json" % [workspace_root, _asset_storage_name(loaded_asset), loaded_component_id])
+			var geometry_data = _read_json("%s/geometry/%s/%s/geometry.json" % [world_root, _asset_storage_name(loaded_asset), loaded_component_id])
 			if _has_supported_schema(geometry_data):
 				loaded_geometry_documents[_geometry_document_key(loaded_asset_id, loaded_component_id)] = _normalize_geometry_document(geometry_data, loaded_asset_id, loaded_component_id)
 	var loaded_motion_paths: Array[Dictionary] = []
-	for path_id_variant in workspace_data.get("paths", []):
+	for path_id_variant in world_data.get("paths", []):
 		var path_id := str(path_id_variant)
-		var path_data = _read_json("%s/paths/%s/path.json" % [workspace_root, path_id])
+		var path_data = _read_json("%s/paths/%s/path.json" % [world_root, path_id])
 		if _has_supported_schema(path_data):
 			loaded_motion_paths.append(_normalize_motion_path(path_data, path_id))
 	var loaded_motion_sequences: Array[Dictionary] = []
-	for sequence_id_variant in workspace_data.get("sequences", []):
+	for sequence_id_variant in world_data.get("sequences", []):
 		var sequence_id := str(sequence_id_variant)
-		var sequence_data = _read_json("%s/sequences/%s/sequence.json" % [workspace_root, sequence_id])
+		var sequence_data = _read_json("%s/sequences/%s/sequence.json" % [world_root, sequence_id])
 		if _has_supported_schema(sequence_data):
 			loaded_motion_sequences.append(_normalize_motion_sequence(sequence_data, sequence_id))
 	var loaded_motion_acts: Array[Dictionary] = []
-	for act_id_variant in workspace_data.get("acts", []):
+	for act_id_variant in world_data.get("acts", []):
 		var act_id := str(act_id_variant)
-		var act_data = _read_json("%s/acts/%s/act.json" % [workspace_root, act_id])
+		var act_data = _read_json("%s/acts/%s/act.json" % [world_root, act_id])
 		if _has_supported_schema(act_data):
 			loaded_motion_acts.append(_normalize_motion_act(act_data, act_id))
 	motion_paths = loaded_motion_paths
@@ -2347,18 +2351,19 @@ func _load_workspace(workspace_entry: String, persist_as_last := true) -> bool:
 	_set_geometry_command_state("")
 	geometry_seeding_enter_edit_after_bake = false
 	_stop_guide_draw_state()
-	var saved_editor_state = workspace_data.get("editor_state", {})
+	var saved_editor_state = world_data.get("editor_state", {})
 	if saved_editor_state is Dictionary and str(saved_editor_state.get("world_scale", {}).get("unit", "")) == "m":
 		_convert_asset_units(assets, 100.0)
-	workspace_name = str(workspace_data.get("name", workspace_entry))
-	_restore_editor_state(workspace_data.get("editor_state", {}))
+	world_name = str(world_data.get("name", world_entry))
+	world_title = str(world_data.get("world_name", world_name))
+	_restore_editor_state(world_data.get("editor_state", {}))
 	_update_next_ids()
 	active_state = ""
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
 	if persist_as_last:
-		_write_json(CONFIG_PATH, {"schema_version": SCHEMA_VERSION, "last_workspace": workspace_name})
+		_write_json(CONFIG_PATH, {"schema_version": SCHEMA_VERSION, "last_world": world_name})
 	return true
 
 
@@ -2508,7 +2513,7 @@ func _restore_editor_state(state) -> void:
 	_apply_world_scale_settings(state.get("world_scale", {}))
 	paper_level = clampi(int(state.get("paper_level", 0)), PAPER_NONE_LEVEL, PAPER_SIZES_CM.size() - 1)
 	_apply_snap_settings(state.get("snap", {}))
-	# Workspaces saved before per-asset cameras keep their one legacy view on the
+	# Worlds saved before per-asset cameras keep their one legacy view on the
 	# active asset, rather than losing it during the migration.
 	var saved_camera = state.get("camera", {})
 	if saved_camera is Dictionary and not saved_camera.is_empty() and not selected_asset_id.is_empty() and not asset_camera_states.has(selected_asset_id):
@@ -2801,9 +2806,9 @@ func _serialize_reference_image(raw_reference) -> Dictionary:
 func _reference_image_path(asset: Dictionary) -> String:
 	var reference_image := _normalize_reference_image(asset.get("reference_image", {}))
 	var reference_file := str(reference_image.get("file", ""))
-	if workspace_name.is_empty() or reference_file.is_empty():
+	if world_name.is_empty() or reference_file.is_empty():
 		return ""
-	return "%s/%s" % [_asset_storage_root("%s/%s" % [WORKSPACES_ROOT, workspace_name], asset), reference_file]
+	return "%s/%s" % [_asset_storage_root("%s/%s" % [WORLDS_ROOT, world_name], asset), reference_file]
 
 
 func _reference_image_filename(asset: Dictionary) -> String:
@@ -2901,9 +2906,9 @@ func _geometry_document_key(asset_id: String, component_id: String) -> String:
 
 
 func _sdf_image_path(asset: Dictionary, component_id: String) -> String:
-	if workspace_name.is_empty() or asset.is_empty() or component_id.is_empty():
+	if world_name.is_empty() or asset.is_empty() or component_id.is_empty():
 		return ""
-	return "%s/%s/geometry/%s/%s/contour_sdf.png" % [WORKSPACES_ROOT, workspace_name, _asset_storage_name(asset), component_id]
+	return "%s/%s/geometry/%s/%s/contour_sdf.png" % [WORLDS_ROOT, world_name, _asset_storage_name(asset), component_id]
 
 
 func _sdf_resource_available(asset_id: String, component_id: String) -> bool:
@@ -4347,7 +4352,7 @@ func _commit_component_sdf_build(asset_id: String, component_id: String, build: 
 	var key := _geometry_document_key(asset_id, component_id)
 	sdf_images[key] = image
 	var asset := _get_asset(asset_id)
-	if not workspace_name.is_empty() and _save_sdf_image(asset, component_id) != OK:
+	if not world_name.is_empty() and _save_sdf_image(asset, component_id) != OK:
 		sdf_images.erase(key)
 		return false
 	var bake := result.duplicate(true)
@@ -4414,7 +4419,9 @@ func _on_update_sdfs_pressed() -> void:
 
 
 func _runtime_export_root() -> String:
-	return ProjectSettings.globalize_path("res://PolyToolsRuntimeExports")
+	if world_name.is_empty():
+		return ""
+	return ProjectSettings.globalize_path("%s/%s/PolyToolsRuntimeExports" % [WORLDS_ROOT, world_name])
 
 
 func _runtime_export_build(asset: Dictionary) -> Dictionary:
@@ -4452,7 +4459,10 @@ func _runtime_export_is_stale(asset: Dictionary, build: Dictionary = {}) -> bool
 	var expected := build if not build.is_empty() else _runtime_export_build(asset)
 	if not bool(expected.get("valid", false)):
 		return true
-	var target := _runtime_export_root().path_join(str(asset.get("id", "")))
+	var export_root := _runtime_export_root()
+	if export_root.is_empty():
+		return true
+	var target := export_root.path_join(str(asset.get("id", "")))
 	var manifest_path := target.path_join("manifest.json")
 	var expected_manifest_text := JSON.stringify(expected.get("manifest", {}), "\t")
 	if not FileAccess.file_exists(manifest_path) or not _runtime_manifest_text_matches(expected_manifest_text, FileAccess.get_file_as_string(manifest_path)):
@@ -4537,7 +4547,7 @@ func _on_runtime_export_pressed() -> void:
 func _write_runtime_export_package(asset: Dictionary, build: Dictionary) -> bool:
 	var export_root := _runtime_export_root()
 	var asset_id := str(asset.get("id", ""))
-	if asset_id.is_empty():
+	if export_root.is_empty() or asset_id.is_empty():
 		return false
 	DirAccess.make_dir_recursive_absolute(export_root)
 	var target := export_root.path_join(asset_id)
@@ -4586,7 +4596,7 @@ func _runtime_manifest_text_matches(expected_text: String, staged_text: String) 
 
 func _remove_runtime_export_tree(path: String) -> void:
 	var export_root := _runtime_export_root().trim_suffix("/")
-	if path.is_empty() or not path.begins_with(export_root + "/") or not DirAccess.dir_exists_absolute(path):
+	if export_root.is_empty() or path.is_empty() or not path.begins_with(export_root + "/") or not DirAccess.dir_exists_absolute(path):
 		return
 	var directory := DirAccess.open(path)
 	if directory == null:
@@ -6386,8 +6396,8 @@ func _confirm_asset_creation() -> void:
 func _open_reference_image_dialog() -> void:
 	if _get_asset(selected_asset_id).is_empty():
 		return
-	if workspace_name.is_empty():
-		_show_status_message("Create or load a Workspace before loading a Reference Image.")
+	if world_name.is_empty():
+		_show_status_message("Create or load a World before loading a Reference Image.")
 		return
 	reference_image_dialog.current_dir = _reference_art_directory()
 	reference_image_dialog.popup_centered_ratio()
@@ -6404,7 +6414,7 @@ func _reference_art_directory() -> String:
 
 func _on_reference_image_file_selected(source_path: String) -> void:
 	var asset := _get_asset(selected_asset_id)
-	if asset.is_empty() or workspace_name.is_empty():
+	if asset.is_empty() or world_name.is_empty():
 		return
 	var source_image := Image.new()
 	if source_image.load(source_path) != OK or source_image.is_empty():
@@ -6416,10 +6426,10 @@ func _on_reference_image_file_selected(source_path: String) -> void:
 
 func _save_reference_image_result(reference_image_result: Image) -> void:
 	var asset := _get_asset(selected_asset_id)
-	if asset.is_empty() or workspace_name.is_empty() or reference_image_result == null or reference_image_result.is_empty():
+	if asset.is_empty() or world_name.is_empty() or reference_image_result == null or reference_image_result.is_empty():
 		return
 	var reference_filename := _reference_image_filename(asset)
-	var asset_root := _asset_storage_root("%s/%s" % [WORKSPACES_ROOT, workspace_name], asset)
+	var asset_root := _asset_storage_root("%s/%s" % [WORLDS_ROOT, world_name], asset)
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(asset_root))
 	var destination_path := "%s/%s" % [asset_root, reference_filename]
 	if reference_image_result.save_png(ProjectSettings.globalize_path(destination_path)) != OK:
@@ -11184,7 +11194,7 @@ func _render_motion_path_inspector() -> void:
 	var topology: Dictionary = path_document.get("topology", {})
 	inspector_content.add_child(_create_motion_inspector_value("Points", str(topology.get("points", []).size())))
 	inspector_content.add_child(_create_motion_inspector_value("Segments", str(topology.get("segments", []).size())))
-	inspector_content.add_child(_create_motion_inspector_value("Ownership", "Independent Workspace resource · no Asset reference"))
+	inspector_content.add_child(_create_motion_inspector_value("Ownership", "Independent World resource · no Asset reference"))
 	var validation := MotionPathTopology.validate(topology)
 	var sample := MotionPathSampler.sample(topology, 0.5)
 	var validation_text := "Ready for Preview · %.2f cm" % float(sample.get("length", 0.0))
