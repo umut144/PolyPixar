@@ -235,12 +235,14 @@ Contour Mesh fingerprints and build signatures, so downstream Bakes become
 stale without changing Component topology.
 
 Schema 42 adds atomic Asset-level Component Scale Rebase and analytic Ellipses.
-The service bakes positive Scale into owned Bézier geometry, resolved handles,
-Component-scoped Guides, or primitive axes around the unchanged Pivot before
-setting local Scale to `(1, 1)`. Position, Rotation, hierarchy, and animation
-data remain untouched. Scaled References, non-positive Scale, and scaled
-Components with Children block the whole operation rather than triggering a
-partial or compensating transform fallback. See
+The service bakes finite, non-zero signed Scale into owned Bézier geometry,
+resolved handles, Component-scoped Guides, or primitive axes around the
+unchanged Pivot before setting local Scale to `(1, 1)`. Negative axes preserve
+Mirror reflections in source geometry; analytic primitive diameters remain
+positive. Position, Rotation, hierarchy, and animation data remain untouched.
+Scaled References, zero/non-finite Scale, and scaled Components with Children
+block the whole operation rather than triggering a partial or compensating
+transform fallback. See
 [`SCALE_REBASE.md`](SCALE_REBASE.md).
 
 Sampling results carry their own algorithm version independently of the

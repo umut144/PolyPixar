@@ -1,10 +1,10 @@
 class_name ComponentScaleRebaseService
 extends RefCounted
 
-## Explicitly bakes positive local Component scale into owned source geometry.
+## Explicitly bakes finite, non-zero signed local Component scale into owned source geometry.
 ## Position, rotation, pivot, hierarchy, and animation data remain unchanged.
 
-const ALGORITHM_VERSION := 1
+const ALGORITHM_VERSION := 2
 const SCALE_EPSILON := 0.000001
 
 
@@ -69,8 +69,8 @@ static func rebase_asset(asset: Dictionary) -> Dictionary:
 
 
 static func _blocking_reason(asset: Dictionary, component: Dictionary, scale: Vector2) -> String:
-	if not scale.is_finite() or scale.x <= 0.0 or scale.y <= 0.0:
-		return "Scale must be finite and strictly positive."
+	if not scale.is_finite() or absf(scale.x) <= SCALE_EPSILON or absf(scale.y) <= SCALE_EPSILON:
+		return "Scale axes must be finite and non-zero."
 	if str(component.get("type", "component")) == "reference":
 		return "Reference Components do not own geometry that can absorb Scale."
 	if not ComponentHierarchy.children(asset, str(component.get("id", ""))).is_empty():
@@ -101,9 +101,9 @@ static func _bake_component_geometry(component: Dictionary, pivot: Vector2, scal
 	var diameters_cm: Vector2
 	if PrimitiveGeometryService.has_circle(component):
 		var diameter := float(primitive.get("diameter_cm", 1.0))
-		diameters_cm = Vector2(diameter * scale.x, diameter * scale.y)
+		diameters_cm = Vector2(diameter * absf(scale.x), diameter * absf(scale.y))
 	else:
-		diameters_cm = Vector2(float(primitive.get("diameter_x_cm", 1.0)) * scale.x, float(primitive.get("diameter_y_cm", 1.0)) * scale.y)
+		diameters_cm = Vector2(float(primitive.get("diameter_x_cm", 1.0)) * absf(scale.x), float(primitive.get("diameter_y_cm", 1.0)) * absf(scale.y))
 	if is_equal_approx(diameters_cm.x, diameters_cm.y):
 		component["primitive"] = {"type": "circle", "center": primitive["center"], "diameter_cm": diameters_cm.x}
 	else:
@@ -127,7 +127,7 @@ static func _bake_component_guides(asset: Dictionary, component_id: String, pivo
 static func _result_primitive_type(component: Dictionary, scale: Vector2) -> String:
 	if not PrimitiveGeometryService.has_analytic_shape(component):
 		return ""
-	var diameters := PrimitiveGeometryService.diameters_tool_units(component) * scale
+	var diameters := PrimitiveGeometryService.diameters_tool_units(component) * Vector2(absf(scale.x), absf(scale.y))
 	return "circle" if is_equal_approx(diameters.x, diameters.y) else PrimitiveGeometryService.ELLIPSE
 
 

@@ -29,7 +29,11 @@ topology.
 
 The Asset Inspector lists every candidate and blocker. Its Rebase button is
 enabled only when at least one candidate exists and the complete operation is
-safe. Negative, zero, or non-finite Scale is unsupported. Scaled Asset
+safe. Finite, non-zero signed Scale is accepted for owned leaf Components.
+Negative axes are a transient Mirror/authoring representation: their reflection
+is baked into the owned geometry before Scale becomes `(1, 1)`. Primitive
+centers receive the signed affine transform while their analytic axis diameters
+use the absolute axis factors. Zero or non-finite Scale is blocked. Scaled Asset
 References are blocked because they do not own their source geometry. A scaled
 Component with Child Components is also blocked: preserving those Children
 while forbidding Position/Rotation compensation is not generally possible,
@@ -37,7 +41,8 @@ especially under anisotropic Scale. There is no partial or silent fallback.
 
 Runtime Export rejects every visible Component whose authored Scale is not
 `(1, 1)` and directs the author to Rebase. It never bakes Scale implicitly and
-does not silently preserve the old scaled export behavior. Later simulation
+never exports a negative Mirror scale. It does not silently preserve the old
+scaled export behavior. Later simulation
 Scale remains relative to the normalized reference drawing and transforms the
 complete drawing, including its eventual contour stroke geometry.
 

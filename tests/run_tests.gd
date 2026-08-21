@@ -633,6 +633,46 @@ func _test_component_scale_rebase() -> void:
 	_expect(bool(ellipse_sampling.get("valid", false)) and str(ellipse_sampling.get("chains", [])[0].get("chain_id", "")) == "primitive:ellipse" and float(ellipse_metrics.get("area", 0.0)) > 0.0, "The sampling and automatic geometry analyzers must consume rebased Ellipses analytically.")
 	_expect(asset.get("animation", {}) == animation_before, "Scale Rebase must leave authored animation data unchanged so later simulation Scale remains relative to the normalized reference drawing.")
 
+	var mirrored_eye := curved_source.duplicate(true)
+	mirrored_eye["id"] = "mirrored_eye"
+	mirrored_eye["name"] = "Mirrored Eye"
+	mirrored_eye["parent_component_id"] = ""
+	mirrored_eye["transform"] = {"position": Vector2(-0.75, 11.4), "rotation": 180.0, "scale": Vector2(1.0, -1.0), "pivot": Vector2(0.75, 11.4)}
+	var mirrored_asset := {"id": "mirrored_rebase", "name": "Mirrored Rebase", "components": [mirrored_eye], "guides": []}
+	var mirrored_transform_before: Dictionary = mirrored_eye["transform"].duplicate(true)
+	var mirrored_edge: Dictionary = mirrored_eye.get("edges", [])[0]
+	var mirrored_start := BezierTopology.point_by_id(mirrored_eye["points"], str(mirrored_edge.get("start_point_id", "")))
+	var mirrored_end := BezierTopology.point_by_id(mirrored_eye["points"], str(mirrored_edge.get("end_point_id", "")))
+	var mirrored_controls := BezierGeometry.cubic_controls(mirrored_start, mirrored_end)
+	var mirrored_world_transform_before := ComponentHierarchy.world_transform(mirrored_asset, "mirrored_eye")
+	var mirrored_world_before: Array[Vector2] = []
+	for sample_index in range(17):
+		mirrored_world_before.append(mirrored_world_transform_before * BezierGeometry.cubic_position(mirrored_controls, float(sample_index) / 16.0))
+	var mirrored_analysis := ComponentScaleRebaseService.analyze_asset(mirrored_asset)
+	var mirrored_result := ComponentScaleRebaseService.rebase_asset(mirrored_asset)
+	var rebased_mirrored_eye := ComponentHierarchy.component_by_id(mirrored_asset, "mirrored_eye")
+	var rebased_mirrored_edge: Dictionary = rebased_mirrored_eye.get("edges", [])[0]
+	var rebased_mirrored_start := BezierTopology.point_by_id(rebased_mirrored_eye["points"], str(rebased_mirrored_edge.get("start_point_id", "")))
+	var rebased_mirrored_end := BezierTopology.point_by_id(rebased_mirrored_eye["points"], str(rebased_mirrored_edge.get("end_point_id", "")))
+	var rebased_mirrored_controls := BezierGeometry.cubic_controls(rebased_mirrored_start, rebased_mirrored_end)
+	var rebased_mirrored_world_transform := ComponentHierarchy.world_transform(mirrored_asset, "mirrored_eye")
+	var mirrored_curve_preserved := true
+	var mirrored_max_error := 0.0
+	for sample_index in range(17):
+		var after := rebased_mirrored_world_transform * BezierGeometry.cubic_position(rebased_mirrored_controls, float(sample_index) / 16.0)
+		mirrored_max_error = maxf(mirrored_max_error, after.distance_to(mirrored_world_before[sample_index]))
+		mirrored_curve_preserved = mirrored_curve_preserved and mirrored_max_error <= 0.000005
+	_expect(bool(mirrored_analysis.get("can_rebase", false)) and bool(mirrored_result.get("valid", false)), "A finite negative axis created by Mirror must be an explicit signed Rebase candidate, not a blocker.")
+	_expect(Vector2(rebased_mirrored_eye.get("transform", {}).get("scale", Vector2.ZERO)) == Vector2.ONE and rebased_mirrored_eye.get("transform", {}).get("position") == mirrored_transform_before["position"] and rebased_mirrored_eye.get("transform", {}).get("rotation") == mirrored_transform_before["rotation"] and rebased_mirrored_eye.get("transform", {}).get("pivot") == mirrored_transform_before["pivot"], "Signed Rebase must normalize mirrored Scale without changing Position, Rotation, or Pivot.")
+	_expect(mirrored_curve_preserved and str(rebased_mirrored_start.get("handle_source", "")) == "manual", "Signed Rebase must preserve the exact reflected Bézier boundary represented by a 180-degree Rotation and negative Y Scale (max error: %s)." % mirrored_max_error)
+	var mirrored_circle := circle.duplicate(true)
+	mirrored_circle["id"] = "mirrored_circle"
+	mirrored_circle["transform"] = {"position": Vector2.ZERO, "rotation": 180.0, "scale": Vector2(-2.0, 0.5), "pivot": Vector2(1.0, 1.0)}
+	var mirrored_primitive_asset := {"id": "mirrored_primitive_rebase", "name": "Mirrored Primitive Rebase", "components": [mirrored_circle], "guides": []}
+	var mirrored_primitive_result := ComponentScaleRebaseService.rebase_asset(mirrored_primitive_asset)
+	var rebased_mirrored_circle := ComponentHierarchy.component_by_id(mirrored_primitive_asset, "mirrored_circle")
+	_expect(bool(mirrored_primitive_result.get("valid", false)) and PrimitiveGeometryService.has_ellipse(rebased_mirrored_circle) and PrimitiveGeometryService.center(rebased_mirrored_circle).is_equal_approx(Vector2(-1.0, 2.0)) and is_equal_approx(float(rebased_mirrored_circle.get("primitive", {}).get("diameter_x_cm", 0.0)), 20.0) and is_equal_approx(float(rebased_mirrored_circle.get("primitive", {}).get("diameter_y_cm", 0.0)), 5.0), "Signed primitive Rebase must reflect the center while keeping analytic Circle/Ellipse diameters positive.")
+
 	var blocked_parent := curved_source.duplicate(true)
 	blocked_parent["id"] = "parent"
 	blocked_parent["name"] = "Parent"
@@ -647,11 +687,16 @@ func _test_component_scale_rebase() -> void:
 	negative["name"] = "Negative"
 	negative["parent_component_id"] = ""
 	negative["transform"] = {"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2(-1.0, 1.0), "pivot": Vector2.ZERO}
+	var zero_axis := curved_source.duplicate(true)
+	zero_axis["id"] = "zero_axis"
+	zero_axis["name"] = "Zero Axis"
+	zero_axis["parent_component_id"] = ""
+	zero_axis["transform"] = {"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2(0.0, 1.0), "pivot": Vector2.ZERO}
 	var scaled_reference := {"id": "reference", "name": "Reference", "type": "reference", "source_asset_id": "other", "parent_component_id": "", "draw_mode": "closed_loop", "points": [], "edges": [], "chains": [], "transform": {"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2(2.0, 1.0), "pivot": Vector2.ZERO}}
-	var blocked_asset := {"id": "blocked", "name": "Blocked", "components": [blocked_parent, child, negative, scaled_reference], "guides": []}
+	var blocked_asset := {"id": "blocked", "name": "Blocked", "components": [blocked_parent, child, negative, zero_axis, scaled_reference], "guides": []}
 	var blocked_snapshot := blocked_asset.duplicate(true)
 	var blocked_analysis := ComponentScaleRebaseService.analyze_asset(blocked_asset)
-	_expect(not bool(blocked_analysis.get("can_rebase", true)) and blocked_analysis.get("blockers", []).size() == 3, "Negative Scale, scaled References, and a scaled Parent with Children must be explicit atomic Rebase blockers.")
+	_expect(not bool(blocked_analysis.get("can_rebase", true)) and blocked_analysis.get("candidates", []).size() == 1 and blocked_analysis.get("blockers", []).size() == 3, "Signed leaf Scale must remain a candidate while zero Scale, scaled References, and a scaled Parent with Children block the atomic Rebase.")
 	_expect(not bool(ComponentScaleRebaseService.rebase_asset(blocked_asset).get("valid", true)) and blocked_asset == blocked_snapshot, "A blocked Asset Rebase must not partially mutate any Component.")
 
 	var ui_asset := {"id": "ui_rebase", "name": "UI Rebase", "asset_type": "character", "visibility": true, "asset_pivot": Vector2.ZERO, "components": [curved_source.duplicate(true)], "guides": [], "animation": MotionWorkspace.create_default_animation_document()}

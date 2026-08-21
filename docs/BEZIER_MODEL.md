@@ -94,10 +94,11 @@ deterministically from those parameters. The primitive center handle moves
 `center`; the Component pivot remains independent. Primitive Components cannot
 be edited with Bézier point, edge, or face tools.
 
-Scale Rebase is the sole normalization path for positive non-unit Component
-Scale. It affinely bakes Points, resolved handles, analytic primitive axes, and
-Component-scoped Guides around the unchanged Pivot, then sets Scale to
-`(1, 1)`. Position and Rotation never change. See
+Scale Rebase is the sole normalization path for finite, non-zero signed
+non-unit Component Scale. It affinely bakes Points, resolved handles, analytic
+primitive axes, and Component-scoped Guides around the unchanged Pivot, then
+sets Scale to `(1, 1)`. Negative axes preserve transient Mirror reflections in
+the owned geometry. Position and Rotation never change. See
 [`SCALE_REBASE.md`](SCALE_REBASE.md).
 
 The current fill and Godot export derive a control polygon from the outer

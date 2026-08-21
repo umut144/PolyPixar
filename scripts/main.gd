@@ -12873,7 +12873,7 @@ func _render_asset_scale_rebase_inspector(asset: Dictionary) -> void:
 	asset_scale_rebase_button.custom_minimum_size = Vector2(0, 28)
 	asset_scale_rebase_button.focus_mode = Control.FOCUS_NONE
 	asset_scale_rebase_button.disabled = not bool(analysis.get("can_rebase", false))
-	asset_scale_rebase_button.tooltip_text = "Bake positive Component Scale into owned geometry without changing Position or Rotation." if blockers.is_empty() else "Resolve every listed blocker before rebasing this Asset atomically."
+	asset_scale_rebase_button.tooltip_text = "Bake finite, non-zero Component Scale, including Mirror signs, into owned geometry without changing Position or Rotation." if blockers.is_empty() else "Resolve every listed blocker before rebasing this Asset atomically."
 	asset_scale_rebase_button.pressed.connect(_on_rebase_asset_scales_pressed)
 	inspector_content.add_child(asset_scale_rebase_button)
 

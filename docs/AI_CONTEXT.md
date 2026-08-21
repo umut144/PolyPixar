@@ -64,11 +64,12 @@ typed `world_settings` record. It defaults to `4 px` at the fixed `128 px/m`
 reference density, has no Component override, and invalidates derived Contour
 Meshes when changed. Schema 40 and older Worlds migrate explicitly to 4 px.
 
-World schema 42 adds the Asset Inspector's atomic Scale Rebase. Positive local
-Scale is baked around the unchanged Pivot into owned Points, resolved handles,
-Component Guides, or analytic primitive axes; local Scale becomes `(1, 1)` and
-Position/Rotation remain unchanged. Non-uniform Circles become analytic
-Ellipses. Negative Scale, scaled References, and scaled Components with Children
+World schema 42 adds the Asset Inspector's atomic Scale Rebase. Finite, non-zero
+signed local Scale is baked around the unchanged Pivot into owned Points,
+resolved handles, Component Guides, or analytic primitive axes; local Scale
+becomes `(1, 1)` and Position/Rotation remain unchanged. Negative axes encode a
+transient Mirror reflection. Non-uniform Circles become analytic Ellipses.
+Zero/non-finite Scale, scaled References, and scaled Components with Children
 are explicit blockers with no partial fallback.
 
 Seeding consumes the complete accepted Sampling constraint set. Outer bounds
