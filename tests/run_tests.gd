@@ -11,7 +11,7 @@ func _init() -> void:
 	_test_insert_preserves_curve()
 	_test_component_draw_modes_and_continuation()
 	_test_closed_loop_selection_mirror()
-	_test_ribbon_strip_mesh()
+	_test_contour_stroke_mesh()
 	_test_catch_parent_snapping()
 	_test_contour_stroke_service()
 	_test_geometry_sampling_service()
@@ -158,11 +158,11 @@ func _test_delete_multiple_points_and_protect_closed_minimum() -> void:
 	BezierTopology.add_point(mirrored_reset, Vector2(11.0, 0.0), "linear")
 	var mirrored_reset_deleted := BezierTopology.delete_points(mirrored_reset, mirrored_ids)
 	_expect(mirrored_reset_deleted.size() == 6 and mirrored_reset.get("points", []).is_empty() and mirrored_reset.get("chains", []).is_empty(), "Resetting a mirrored Closed Loop should also remove stale mirror chains.")
-	var ribbon_reset := _component()
-	ribbon_reset["draw_mode"] = "ribbon"
-	var ribbon_ids: Array[String] = [BezierTopology.add_point(ribbon_reset, Vector2.ZERO, "linear"), BezierTopology.add_point(ribbon_reset, Vector2.ONE, "linear")]
-	BezierTopology.delete_points(ribbon_reset, ribbon_ids)
-	_expect(ribbon_reset.get("chains", []).is_empty() and not BezierTopology.add_point(ribbon_reset, Vector2(2.0, 0.0), "linear").is_empty(), "A Ribbon should be drawable again after its full open Chain was deleted.")
+	var contour_reset := _component()
+	contour_reset["draw_mode"] = "contour"
+	var contour_ids: Array[String] = [BezierTopology.add_point(contour_reset, Vector2.ZERO, "linear"), BezierTopology.add_point(contour_reset, Vector2.ONE, "linear")]
+	BezierTopology.delete_points(contour_reset, contour_ids)
+	_expect(contour_reset.get("chains", []).is_empty() and not BezierTopology.add_point(contour_reset, Vector2(2.0, 0.0), "linear").is_empty(), "A Contour should be drawable again after its full open Chain was deleted.")
 
 
 func _test_insert_preserves_curve() -> void:
@@ -178,17 +178,17 @@ func _test_insert_preserves_curve() -> void:
 
 func _test_component_draw_modes_and_continuation() -> void:
 	var ribbon := _component()
-	ribbon["draw_mode"] = "ribbon"
+	ribbon["draw_mode"] = "contour"
 	var first_id := BezierTopology.start_chain(ribbon, Vector2.ZERO, "linear")
 	var second_id := BezierTopology.add_point_from(ribbon, first_id, Vector2(2.0, 0.0), "linear")
 	var prepended_id := BezierTopology.add_point_from(ribbon, first_id, Vector2(-1.0, 0.0), "linear")
-	_expect(not second_id.is_empty() and not prepended_id.is_empty(), "Ribbon drawing should continue from either selected endpoint.")
-	_expect(ribbon.get("chains", []).size() == 1 and BezierTopology.mode_validation_issues(ribbon, true).is_empty(), "Ribbon must validate as exactly one open Chain with at least two Points.")
-	_expect(BezierTopology.start_chain(ribbon, Vector2(20.0, 20.0), "linear").is_empty(), "A Ribbon must reject a second Chain.")
+	_expect(not second_id.is_empty() and not prepended_id.is_empty(), "Contour drawing should continue from either selected endpoint.")
+	_expect(ribbon.get("chains", []).size() == 1 and BezierTopology.mode_validation_issues(ribbon, true).is_empty(), "Contour must validate as exactly one open Chain with at least two Points.")
+	_expect(BezierTopology.start_chain(ribbon, Vector2(20.0, 20.0), "linear").is_empty(), "A Contour must reject a second Chain.")
 	var closed := ribbon.duplicate(true)
 	closed["draw_mode"] = "closed_loop"
 	_expect(not BezierTopology.mode_validation_issues(closed, true).is_empty(), "Closed Loop must reject open topology.")
-	_expect(BezierTopology.mode_validation_issues(ribbon, true).is_empty(), "Ribbon must accept one complete open Chain.")
+	_expect(BezierTopology.mode_validation_issues(ribbon, true).is_empty(), "Contour must accept one complete open Chain.")
 
 
 func _test_closed_loop_selection_mirror() -> void:
@@ -228,22 +228,52 @@ func _test_closed_loop_selection_mirror() -> void:
 	_expect(multi_mirror.get("chains", []).size() == 1 and bool(multi_mirror["chains"][0].get("closed", false)) and BezierTopology.mode_validation_issues(multi_mirror, true).is_empty(), "Multiple coincident axis endpoints should produce one valid closed Mirror Chain.")
 
 
-func _test_ribbon_strip_mesh() -> void:
-	var ribbon := _component()
-	ribbon["draw_mode"] = "ribbon"
-	ribbon["ribbon_width_px"] = 8.0
-	_expect(is_equal_approx(RibbonMeshService.width_cm(ribbon), 0.625), "At 128 px/m and 10 Tool-cm/m, an 8 px Ribbon must be 0.625 Tool-cm wide.")
-	BezierTopology.add_point(ribbon, Vector2.ZERO, "linear")
-	BezierTopology.add_point(ribbon, Vector2(4.0, 0.0), "linear")
-	BezierTopology.add_point(ribbon, Vector2(8.0, 3.0), "linear")
-	var first := RibbonMeshService.generate(ribbon)
-	var second := RibbonMeshService.generate(ribbon)
-	_expect(bool(first.get("valid", false)), "A complete Ribbon Component should generate a Ribbon Strip Mesh.")
-	_expect(int(first.get("vertex_count", 0)) >= 6 and int(first.get("triangle_count", 0)) >= 4, "Ribbon Strip should create paired vertices and triangle quads.")
-	_expect(str(first.get("method", "")) == RibbonMeshService.METHOD and JSON.stringify(first) == JSON.stringify(second), "Ribbon Strip output must be deterministic.")
-	_expect(RibbonMeshService.matches_source(first, ribbon), "Ribbon Strip Mesh should match its source Component.")
-	ribbon["ribbon_width_px"] = 12.0
-	_expect(not RibbonMeshService.matches_source(first, ribbon), "Changing Ribbon width must make the previous Mesh stale.")
+func _test_contour_stroke_mesh() -> void:
+	var contour := _component()
+	contour["draw_mode"] = "contour"
+	BezierTopology.add_point(contour, Vector2.ZERO, "linear")
+	BezierTopology.add_point(contour, Vector2(4.0, 0.0), "linear")
+	BezierTopology.add_point(contour, Vector2(8.0, 3.0), "linear")
+	BezierTopology.add_point(contour, Vector2(11.0, 5.0), "linear")
+	var first := ContourMeshService.generate(contour)
+	var second := ContourMeshService.generate(contour)
+	_expect(bool(first.get("valid", false)), "A complete Contour Component should generate a Contour Stroke Mesh.")
+	_expect(int(first.get("vertex_count", 0)) >= 8 and int(first.get("triangle_count", 0)) >= 4, "Contour Stroke should create centered segment quads and explicit joins.")
+	_expect(str(first.get("method", "")) == ContourMeshService.METHOD and JSON.stringify(first) == JSON.stringify(second), "Contour Stroke output must be deterministic.")
+	_expect(ContourMeshService.matches_source(first, contour), "Contour Stroke Mesh should match its source Component.")
+	_expect(is_equal_approx(float(first.get("parameters", {}).get("stroke_width_px", 0.0)), 4.0) and is_equal_approx(float(first.get("parameters", {}).get("stroke_width_meters", 0.0)), 0.03125), "Open Contours should use the fixed 4 px World default without a Component-local width.")
+	_expect(str(first.get("parameters", {}).get("join", "")) == "miter" and str(first.get("parameters", {}).get("cap", "")) == "butt", "Open Contours should use the same Miter/Butt art-stroke semantics as closed contours.")
+	var interrupted_contour := contour.duplicate(true)
+	interrupted_contour["edges"][1]["render_outline"] = false
+	var interrupted_stroke := ContourStrokeService.generate(interrupted_contour)
+	_expect(bool(interrupted_stroke.get("valid", false)) and int(interrupted_stroke.get("outline_run_count", 0)) == 2 and interrupted_stroke.get("runs", [])[0].get("edge_ids", []).size() == 1 and interrupted_stroke.get("runs", [])[1].get("edge_ids", []).size() == 1, "A hidden middle Edge must split an open Contour into two ordered Butt-capped runs without wrapping its endpoints.")
+	contour["points"][1]["position"] += Vector2(0.25, 0.0)
+	_expect(not ContourMeshService.matches_source(first, contour), "Changing the authored Contour centerline must make the previous Mesh stale.")
+	var hidden_contour := contour.duplicate(true)
+	for edge in hidden_contour["edges"]:
+		edge["render_outline"] = false
+	var hidden_result := ContourMeshService.generate(hidden_contour)
+	_expect(not bool(hidden_result.get("valid", true)) and "An open Contour with no visible outline Edges has no renderable geometry." in hidden_result.get("errors", []), "A fill-less Contour with every Edge hidden must fail explicitly instead of producing fallback geometry.")
+	_expect(not ContourMeshService.matches_source(first, hidden_contour), "Changing Render Outline flags must invalidate an accepted Contour Stroke Mesh.")
+	var application = load("res://scripts/main.gd").new()
+	var legacy_document: Dictionary = application._default_geometry_document("asset_legacy", "component_legacy")
+	var legacy_bake: Dictionary = first.duplicate(true)
+	legacy_bake["method"] = GeometryMeshingService.RIBBON_STRIP
+	legacy_bake["algorithm_version"] = 0
+	legacy_bake["bake_id"] = "legacy_ribbon_bake"
+	legacy_document["component_mesh"] = {"bake_id": "legacy_ribbon_bake", "method": GeometryMeshingService.RIBBON_STRIP, "mesh_fingerprint": "legacy"}
+	legacy_document["meshing"]["bakes"] = {GeometryMeshingService.RIBBON_STRIP: legacy_bake}
+	var normalized_legacy: Dictionary = application._normalize_geometry_document(legacy_document, "asset_legacy", "component_legacy")
+	_expect(normalized_legacy.get("meshing", {}).get("bakes", {}).has(GeometryMeshingService.RIBBON_STRIP) and str(normalized_legacy.get("component_mesh", {}).get("method", "")) == GeometryMeshingService.RIBBON_STRIP, "Legacy Ribbon Strip Bakes should remain readable records without being relabeled as current Contour Stroke Bakes.")
+	var contour_document: Dictionary = application._default_geometry_document("asset_contour", "component_contour")
+	var persisted_contour: Dictionary = first.duplicate(true)
+	persisted_contour["bake_id"] = "contour_bake"
+	contour_document["component_mesh"] = {"bake_id": "contour_bake", "method": ContourMeshService.METHOD, "mesh_fingerprint": GeometryUVMappingService.mesh_fingerprint(persisted_contour)}
+	contour_document["meshing"]["bakes"] = {ContourMeshService.METHOD: persisted_contour}
+	var contour_round_trip: Dictionary = application._normalize_geometry_document(application._serialize_geometry_document(contour_document), "asset_contour", "component_contour")
+	var restored_contour: Dictionary = contour_round_trip.get("meshing", {}).get("bakes", {}).get(ContourMeshService.METHOD, {})
+	_expect(restored_contour.get("vertices", [])[0].has("edge_id") and restored_contour.get("runs", [])[0].get("centerline", [])[0].get("position", null) is Vector2, "Contour Mesh JSON persistence must retain typed Edge/curve provenance and restore Run centerlines as vectors.")
+	application.free()
 
 
 func _test_catch_parent_snapping() -> void:
@@ -514,7 +544,9 @@ func _test_geometry_sampling_service() -> void:
 	_expect(not bool(GeometrySamplingService.generate(open_component).get("valid", true)), "An open contour should fail visibly at the mesh-pipeline Sampling boundary.")
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
-	_expect(application._has_supported_schema({"schema_version": 39}) and application._has_supported_schema({"schema_version": 38}) and not application._has_supported_schema({"schema_version": 40}), "Schema 39 should keep current and older World documents readable and reject unknown future schemas.")
+	_expect(application._has_supported_schema({"schema_version": 40}) and application._has_supported_schema({"schema_version": 39}) and not application._has_supported_schema({"schema_version": 41}), "Schema 40 should keep current and older World documents readable and reject unknown future schemas.")
+	_expect(application._normalize_component_draw_mode("ribbon", 39) == "contour" and application._normalize_component_draw_mode("contour", 40) == "contour", "Schema-40 loading must explicitly migrate legacy Ribbon Components to open Contours.")
+	_expect(application._normalize_component_draw_mode("ribbon", 40) == "ribbon", "Current-schema Ribbon data must remain visibly invalid instead of receiving a silent backward fallback.")
 	var arranged_round_trip: Dictionary = application._normalize_sampling_bake(application._serialize_sampling_bake(arranged_result))
 	_expect(arranged_round_trip.get("cuts", [])[0].get("fragments", []).size() == 2 and arranged_round_trip.get("cuts", [])[0].get("fragments", [])[0].get("samples", [])[0].get("position", null) is Vector2, "Schema 32 should preserve Cut fragment connectivity and restore fragment positions as Vector2 values.")
 	var geometry_document: Dictionary = application._default_geometry_document("asset_1", "component_1")
@@ -523,7 +555,7 @@ func _test_geometry_sampling_service() -> void:
 	baked_result["bake_id"] = "bake_test"
 	geometry_document["sampling"]["bakes"][GeometrySamplingService.ADAPTIVE] = baked_result
 	var serialized_geometry: Dictionary = application._serialize_geometry_document(geometry_document)
-	_expect(int(serialized_geometry.get("schema_version", 0)) == 39 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-39 JSON arrays.")
+	_expect(int(serialized_geometry.get("schema_version", 0)) == 40 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-40 JSON arrays.")
 	var normalized_geometry: Dictionary = application._normalize_geometry_document(serialized_geometry, "asset_1", "component_1")
 	_expect(normalized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Vector2, "Sampling bake loading should restore local sample positions as Vector2 values.")
 	_expect(normalized_geometry["sampling"]["bakes"].size() == 1, "Sampling should retain one Adaptive Bake.")
@@ -584,6 +616,21 @@ func _test_geometry_auto_build_service() -> void:
 	var round_trip: Dictionary = application._normalize_geometry_document(application._serialize_geometry_document(application.geometry_documents["auto_asset/auto_body"]), "auto_asset", "auto_body")
 	_expect(not round_trip.get("component_mesh", {}).get("build_provenance", {}).get("source_signature", {}).is_empty(), "Semantic Mesh build provenance should survive Geometry JSON persistence.")
 	application.free()
+	var contour_component := _component()
+	contour_component.merge({"id": "auto_arm_line", "name": "Arm Line", "draw_mode": "contour", "visibility": true, "transform": {"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}})
+	for contour_position in [Vector2.ZERO, Vector2(3.0, 1.0), Vector2(6.0, 0.0)]:
+		BezierTopology.add_point(contour_component, contour_position, "linear")
+	var contour_application: Control = application_script.new()
+	var contour_assets: Array[Dictionary] = [{"id": "contour_asset", "name": "Contour Asset", "asset_type": "character", "visibility": true, "components": [contour_component], "guides": []}]
+	contour_application.assets = contour_assets
+	_expect(contour_application._mesh_update_candidates("contour_asset") == ["auto_arm_line"], "A valid open Contour should enter Update Meshes without Sampling or Seeding prerequisites.")
+	var contour_build: Dictionary = contour_application._generate_component_mesh_build("contour_asset", "auto_arm_line")
+	_expect(bool(contour_build.get("valid", false)) and str(contour_build.get("meshing", {}).get("method", "")) == ContourMeshService.METHOD, "Update Meshes should build the authored Contour Stroke directly instead of a legacy strip or Fill Mesh.")
+	contour_application._commit_component_mesh_build("contour_asset", "auto_arm_line", contour_build)
+	_expect(contour_application._mesh_update_candidates("contour_asset").is_empty(), "A committed current Contour Stroke Mesh should clear its batch candidate.")
+	contour_component["edges"][0]["render_outline"] = false
+	_expect(contour_application._mesh_update_candidates("contour_asset") == ["auto_arm_line"], "Changing Render Outline must make Contour build provenance actionable again.")
+	contour_application.free()
 
 
 func _test_geometry_sampling_ui_shell() -> void:
@@ -1143,27 +1190,27 @@ func _test_geometry_uv_mapping_service_and_ui() -> void:
 	scale_input.free()
 	application.free()
 	var ribbon := _component()
-	ribbon.merge({"id": "component_ribbon", "name": "ArmLine", "draw_mode": "ribbon", "ribbon_width_px": 8.0, "visibility": true})
+	ribbon.merge({"id": "component_contour", "name": "ArmLine", "draw_mode": "contour", "visibility": true})
 	BezierTopology.add_point(ribbon, Vector2.ZERO, "linear")
 	BezierTopology.add_point(ribbon, Vector2(0.0, 8.0), "linear")
-	var ribbon_mesh := RibbonMeshService.generate(ribbon)
-	ribbon_mesh["bake_id"] = "mesh_ribbon_uv_test"
-	var ribbon_application: Control = application_script.new()
-	var ribbon_document: Dictionary = ribbon_application._default_geometry_document("asset_ribbon", "component_ribbon")
-	ribbon_document["meshing"]["bakes"][RibbonMeshService.METHOD] = ribbon_mesh
-	ribbon_document["component_mesh"] = {"bake_id": "mesh_ribbon_uv_test", "method": RibbonMeshService.METHOD, "mesh_fingerprint": GeometryUVMappingService.mesh_fingerprint(ribbon_mesh)}
-	var ribbon_assets: Array[Dictionary] = [{"id": "asset_ribbon", "name": "Wizard", "visibility": true, "components": [ribbon], "guides": []}]
-	ribbon_application.assets = ribbon_assets
-	ribbon_application.geometry_documents["asset_ribbon/component_ribbon"] = ribbon_document
-	_expect(ribbon_application._all_uv_update_candidates() == [{"asset_id": "asset_ribbon", "component_id": "component_ribbon"}], "The UV batch should include a visible Ribbon with a current accepted Component Mesh.")
-	var ribbon_build: Dictionary = ribbon_application._generate_component_uv_build("asset_ribbon", "component_ribbon")
-	_expect(bool(ribbon_build.get("valid", false)) and str(ribbon_build.get("result", {}).get("mesh_method", "")) == RibbonMeshService.METHOD, "Automatic UV generation should consume the accepted Ribbon Strip Component Mesh without a manual source choice.")
-	ribbon_application._commit_component_uv_build("asset_ribbon", "component_ribbon", ribbon_build)
-	_expect(ribbon_application._all_uv_update_candidates().is_empty() and ribbon_application._geometry_uv_mapping_status("asset_ribbon", "component_ribbon", ribbon) == "Baked", "Committing an automatic Ribbon UV Bake should clear its actionable batch state.")
+	var contour_mesh := ContourMeshService.generate(ribbon)
+	contour_mesh["bake_id"] = "mesh_contour_uv_test"
+	var contour_application: Control = application_script.new()
+	var contour_document: Dictionary = contour_application._default_geometry_document("asset_contour", "component_contour")
+	contour_document["meshing"]["bakes"][ContourMeshService.METHOD] = contour_mesh
+	contour_document["component_mesh"] = {"bake_id": "mesh_contour_uv_test", "method": ContourMeshService.METHOD, "mesh_fingerprint": GeometryUVMappingService.mesh_fingerprint(contour_mesh)}
+	var contour_assets: Array[Dictionary] = [{"id": "asset_contour", "name": "Wizard", "visibility": true, "components": [ribbon], "guides": []}]
+	contour_application.assets = contour_assets
+	contour_application.geometry_documents["asset_contour/component_contour"] = contour_document
+	_expect(contour_application._all_uv_update_candidates() == [{"asset_id": "asset_contour", "component_id": "component_contour"}], "The UV batch should include a visible Contour with a current accepted Component Mesh.")
+	var contour_build: Dictionary = contour_application._generate_component_uv_build("asset_contour", "component_contour")
+	_expect(bool(contour_build.get("valid", false)) and str(contour_build.get("result", {}).get("mesh_method", "")) == ContourMeshService.METHOD, "Automatic UV generation should consume the accepted Contour Stroke Component Mesh without a manual source choice.")
+	contour_application._commit_component_uv_build("asset_contour", "component_contour", contour_build)
+	_expect(contour_application._all_uv_update_candidates().is_empty() and contour_application._geometry_uv_mapping_status("asset_contour", "component_contour", ribbon) == "Baked", "Committing an automatic Contour UV Bake should clear its actionable batch state.")
 	ribbon["visibility"] = false
-	ribbon_document["uv_mapping"]["bakes"].clear()
-	_expect(ribbon_application._all_uv_update_candidates().is_empty(), "The UV batch should not mutate hidden Components.")
-	ribbon_application.free()
+	contour_document["uv_mapping"]["bakes"].clear()
+	_expect(contour_application._all_uv_update_candidates().is_empty(), "The UV batch should not mutate hidden Components.")
+	contour_application.free()
 
 
 func _test_geometry_sdf_service_and_batch() -> void:
@@ -1208,34 +1255,34 @@ func _test_geometry_sdf_service_and_batch() -> void:
 	collapsed_uv["uvs"][2]["uv"] = Vector2(0.50002, 0.5)
 	_expect(not GeometrySDFService.validation_issues(single_triangle_mesh, collapsed_uv).is_empty(), "SDF validation should still reject a truly collinear UV Triangle through its scale-relative orientation test.")
 	var ribbon := _component()
-	ribbon.merge({"id": "component_sdf", "name": "ArmLine", "draw_mode": "ribbon", "ribbon_width_px": 8.0, "visibility": true})
+	ribbon.merge({"id": "component_sdf", "name": "ArmLine", "draw_mode": "contour", "visibility": true})
 	BezierTopology.add_point(ribbon, Vector2.ZERO, "linear")
 	BezierTopology.add_point(ribbon, Vector2(0.0, 8.0), "linear")
-	var ribbon_mesh := RibbonMeshService.generate(ribbon)
-	ribbon_mesh["bake_id"] = "mesh_ribbon_sdf_test"
-	var ribbon_uv_recipe := GeometryUVMappingService.default_recipe()
-	ribbon_uv_recipe["parameters"]["mesh_method"] = RibbonMeshService.METHOD
-	var ribbon_uv := GeometryUVMappingService.generate(ribbon_mesh, ribbon_uv_recipe)
-	ribbon_uv["bake_id"] = "uv_ribbon_sdf_test"
+	var contour_mesh := ContourMeshService.generate(ribbon)
+	contour_mesh["bake_id"] = "mesh_contour_sdf_test"
+	var contour_uv_recipe := GeometryUVMappingService.default_recipe()
+	contour_uv_recipe["parameters"]["mesh_method"] = ContourMeshService.METHOD
+	var contour_uv := GeometryUVMappingService.generate(contour_mesh, contour_uv_recipe)
+	contour_uv["bake_id"] = "uv_contour_sdf_test"
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
 	var document: Dictionary = application._default_geometry_document("asset_sdf", "component_sdf")
-	document["meshing"]["bakes"][RibbonMeshService.METHOD] = ribbon_mesh
-	document["component_mesh"] = {"bake_id": "mesh_ribbon_sdf_test", "method": RibbonMeshService.METHOD, "mesh_fingerprint": GeometryUVMappingService.mesh_fingerprint(ribbon_mesh)}
-	document["uv_mapping"]["recipe"] = ribbon_uv_recipe
-	document["uv_mapping"]["bakes"][GeometryUVMappingService.bake_key(RibbonMeshService.METHOD, GeometryUVMappingService.BOUNDS_PLANAR)] = ribbon_uv
+	document["meshing"]["bakes"][ContourMeshService.METHOD] = contour_mesh
+	document["component_mesh"] = {"bake_id": "mesh_contour_sdf_test", "method": ContourMeshService.METHOD, "mesh_fingerprint": GeometryUVMappingService.mesh_fingerprint(contour_mesh)}
+	document["uv_mapping"]["recipe"] = contour_uv_recipe
+	document["uv_mapping"]["bakes"][GeometryUVMappingService.bake_key(ContourMeshService.METHOD, GeometryUVMappingService.BOUNDS_PLANAR)] = contour_uv
 	document["sdf"]["last_error"] = "Legacy validation failure"
-	document["sdf"]["last_failure_fingerprint"] = GeometrySDFService.source_fingerprint(ribbon_mesh, ribbon_uv, document["sdf"]["recipe"])
+	document["sdf"]["last_failure_fingerprint"] = GeometrySDFService.source_fingerprint(contour_mesh, contour_uv, document["sdf"]["recipe"])
 	var assets: Array[Dictionary] = [{"id": "asset_sdf", "name": "Wizard", "visibility": true, "components": [ribbon], "guides": []}]
 	application.assets = assets
 	application.geometry_documents["asset_sdf/component_sdf"] = document
 	_expect(application._all_sdf_update_candidates() == [{"asset_id": "asset_sdf", "component_id": "component_sdf"}] and application._sdf_batch_summary(application._all_sdf_update_candidates()).get("attention", []).is_empty(), "A superseded validation failure should become actionable again without leaving a stale attention warning.")
 	var build: Dictionary = application._generate_component_sdf_build("asset_sdf", "component_sdf")
-	_expect(bool(build.get("valid", false)) and application._commit_component_sdf_build("asset_sdf", "component_sdf", build), "The SDF batch should generate and atomically accept a Ribbon contour image.")
+	_expect(bool(build.get("valid", false)) and application._commit_component_sdf_build("asset_sdf", "component_sdf", build), "The SDF batch should generate and atomically accept a Contour contour image.")
 	_expect(application._sdf_status("asset_sdf", "component_sdf", ribbon) == "Baked" and application._all_sdf_update_candidates().is_empty(), "A current accepted SDF resource should clear the actionable batch state.")
 	var round_trip: Dictionary = application._normalize_geometry_document(application._serialize_geometry_document(document), "asset_sdf", "component_sdf")
 	_expect(str(round_trip.get("sdf", {}).get("bake", {}).get("pixel_hash", "")) == str(document.get("sdf", {}).get("bake", {}).get("pixel_hash", "")) and not round_trip.get("sdf", {}).get("bake", {}).has("image"), "SDF metadata should survive Geometry persistence without embedding image pixels into JSON.")
-	document["uv_mapping"]["bakes"][GeometryUVMappingService.bake_key(RibbonMeshService.METHOD, GeometryUVMappingService.BOUNDS_PLANAR)]["uvs"][0]["uv"] += Vector2(0.001, 0.0)
+	document["uv_mapping"]["bakes"][GeometryUVMappingService.bake_key(ContourMeshService.METHOD, GeometryUVMappingService.BOUNDS_PLANAR)]["uvs"][0]["uv"] += Vector2(0.001, 0.0)
 	_expect(application._sdf_status("asset_sdf", "component_sdf", ribbon) == "Stale" and application._all_sdf_update_candidates().size() == 1, "Changing accepted UV coordinates should make the dependent SDF stale without mutating Mesh or Component topology.")
 	application.free()
 
@@ -1351,6 +1398,11 @@ func _test_runtime_export_service() -> void:
 	_expect(components[1].get("contour_carrier", {}).get("role", "") == "contour_sdf_carrier" and components[1].get("contour_carrier", {}).get("indices", []) == [0, 1, 2, 0, 2, 3] and is_equal_approx(float(components[1].get("contour_mask", {}).get("outer_padding_meters", {}).get("left", 0.0)), 1.0 / 3.0), "Schema 3 should provide an independently drawable padded Contour Carrier with explicit metric outside padding.")
 	_expect(components[1].get("local_transform", {}).get("position", []) == [1.0, 2.0] and is_equal_approx(float(components[1].get("local_transform", {}).get("rotation_radians", 0.0)), PI / 2.0), "Runtime transforms should preserve Y-up coordinates and publish positions in meters and CCW radians.")
 	_expect(not components[1].has("display_name") and str(components[1].get("semantic_key", "")) == "body", "Runtime Components should expose their Semantic Key as the sole authored designation without a redundant display label.")
+	var open_contour_component: Dictionary = body.duplicate(true)
+	open_contour_component["draw_mode"] = "contour"
+	var open_contour_asset := {"id": "contour_asset", "name": "Contour Asset", "asset_type": "character", "visibility": true, "asset_pivot": Vector2.ZERO, "components": [open_contour_component]}
+	var blocked_contour_export := RuntimeExportService.build_manifest(open_contour_asset, {"component_b": source})
+	_expect(not bool(blocked_contour_export.get("valid", true)) and str(blocked_contour_export.get("errors", [""])[0]).contains("contour_stroke_mesh Runtime role"), "Schema-3 Runtime export must visibly block open Contours instead of serializing their art stroke as a Fill Mesh.")
 	var wizard_head := {"id": "head", "semantic_key": "head", "visibility": true, "parent_component_id": "", "transform": {"position": Vector2(0.0, 8.5), "pivot": Vector2(0.0, 8.5), "rotation": 0.0, "scale": Vector2.ONE}}
 	var wizard_eye := {"id": "eye", "semantic_key": "eye_left", "visibility": true, "parent_component_id": "head", "transform": {"position": Vector2(-0.3, 8.5), "pivot": Vector2(-0.3, 8.5), "rotation": 0.0, "scale": Vector2.ONE}}
 	var head_mesh: Dictionary = mesh.duplicate(true)
@@ -1581,12 +1633,13 @@ func _test_asset_guides() -> void:
 	application.next_component_id = 2
 	application.component_dialog.set_meta("asset_id", "asset_1")
 	application.component_dialog.set_meta("parent_component_id", "component_1")
-	application.component_dialog.set_meta("draw_mode", "ribbon")
+	application.component_dialog.set_meta("draw_mode", "contour")
 	application.component_dialog.set_meta("source_asset_id", "")
 	application.component_semantic_picker.configure(application.semantic_registry.get("semantics", []), "arm_line", ["body"])
 	application._confirm_component_creation()
 	var child_component: Dictionary = application._get_component(application._get_asset("asset_1"), application.selected_component_id)
 	_expect(str(child_component.get("parent_component_id", "")) == "component_1" and Vector2(child_component.get("transform", {}).get("pivot", Vector2.ZERO)).is_equal_approx(Vector2(parent_component.get("transform", {}).get("pivot", Vector2.ZERO))), "Child creation should persist a real Parent relationship and inherit the Parent pivot initially.")
+	_expect(str(child_component.get("draw_mode", "")) == "contour" and not child_component.has("contour_width_px") and not child_component.has("ribbon_width_px"), "New open Contours should be fill-less typed Components without a Component-local width field.")
 	_expect(application.canvas_view.catch_parent_component_id == "component_1", "A Child Component should automatically use its hierarchy Parent as the Catch Parent while drawing.")
 	application._create_guide("asset_1", "component_1", AssetGuide.MOTION)
 	var motion_guide: Dictionary = application._get_guide(application._get_asset("asset_1"), application.selected_guide_id)
@@ -1651,7 +1704,7 @@ func _test_asset_guides() -> void:
 	_expect(str(pupil_component.get("parent_component_id", "")) == "component_1" and str(pupil_component.get("draw_mode", "")) == "primitive" and pupil_component.get("points", []).is_empty() and pupil_component.get("edges", []).is_empty() and pupil_component.get("chains", []).is_empty() and pupil_component.get("primitive", {}).is_empty(), "Primitive Child creation should create an empty Primitive Component without generated Bézier topology.")
 	application._on_primitive_placed(Vector2(0.25, -0.5), 2.5)
 	_expect(PrimitiveGeometryService.has_circle(pupil_component) and is_equal_approx(float(pupil_component.get("primitive", {}).get("diameter_cm", 0.0)), 2.5) and PrimitiveGeometryService.center(pupil_component).is_equal_approx(Vector2(0.25, -0.5)), "Circle placement should persist only its parametric center and diameter.")
-	_expect(application.DRAW_MODES == ["closed_loop", "ribbon", "primitive"], "Components should expose only Closed Loop, Ribbon, and Primitive draw modes.")
+	_expect(application.DRAW_MODES == ["closed_loop", "contour", "primitive"], "Components should expose only Closed Loop, Contour, and Primitive draw modes.")
 	var primitive_sampling := GeometrySamplingService.generate(pupil_component)
 	var refined_primitive_sampling := GeometrySamplingService.generate(pupil_component, {"parameters": {"spacing": 0.01, "feature_detail": 0.5}})
 	_expect(bool(primitive_sampling.get("valid", false)) and int(primitive_sampling.get("sample_count", 0)) >= 4 and int(primitive_sampling.get("sample_count", 0)) != PrimitiveGeometryService.CIRCLE_MESH_SEGMENTS and int(refined_primitive_sampling.get("sample_count", 0)) > int(primitive_sampling.get("sample_count", 0)) and pupil_component.get("points", []).is_empty(), "Primitive sampling should adapt analytically to the recipe without storing Bézier topology or using a fixed mesh segment count.")
@@ -1957,7 +2010,7 @@ func _test_motion_act_evaluator() -> void:
 	var normalized: Dictionary = application._normalize_motion_act({"id": "act_7", "parameters": {"direction": [0.0, 2.0], "distance": 12.0}}, "fallback")
 	_expect(Vector2(normalized.get("parameters", {}).get("direction", Vector2.ZERO)) == Vector2(0.0, 2.0), "Persisted Slide direction arrays should normalize back to Vector2 values.")
 	var serialized: Dictionary = application._serialize_motion_act(normalized)
-	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 39, "Act persistence should serialize vectors as JSON arrays using schema 39.")
+	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 40, "Act persistence should serialize vectors as JSON arrays using schema 40.")
 	var normalized_jump: Dictionary = application._normalize_motion_act({"id": "act_8", "primitive": "jump", "parameters": {"direction": [1.0, 0.0], "distance": 7.0, "height": 2.5, "arc": "snappy"}}, "fallback")
 	var serialized_jump: Dictionary = application._serialize_motion_act(normalized_jump)
 	_expect(str(serialized_jump.get("primitive", "")) == MotionActEvaluator.JUMP and is_equal_approx(float(serialized_jump.get("parameters", {}).get("height", 0.0)), 2.5) and str(serialized_jump.get("parameters", {}).get("arc", "")) == MotionActEvaluator.JUMP_ARC_SNAPPY, "Jump-specific parameters should survive normalization and serialization.")

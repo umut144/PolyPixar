@@ -2,8 +2,8 @@ class_name ContourStrokeService
 extends RefCounted
 
 ## The source Bezier boundary is the stroke centerline. The service derives a
-## deterministic centered mesh for the visible runs of one closed outer or
-## hole Chain without changing canonical Component topology.
+## deterministic centered mesh for the visible runs of one closed outer/hole
+## Chain or one open Contour Chain without changing canonical topology.
 
 const ALGORITHM_VERSION := 2
 const REFERENCE_PIXELS_PER_METER := 128.0
@@ -29,7 +29,8 @@ static func generate(component: Dictionary, stroke_width_px := DEFAULT_STROKE_WI
 	var working_component := component.duplicate(true)
 	BezierGeometry.resolve_auto_handles(working_component.get("points", []), working_component.get("chains", []))
 	var chain: Dictionary = working_component.get("chains", [])[0]
-	var sampled := _sample_chain(working_component, chain)
+	var source_closed := bool(chain.get("closed", false))
+	var sampled := _sample_chain(working_component, chain, source_closed)
 	if not bool(sampled.get("valid", false)):
 		return _failed_result(sampled.get("errors", []), stroke_width_px)
 	var width_meters := stroke_width_meters(stroke_width_px)
@@ -86,7 +87,7 @@ static func generate(component: Dictionary, stroke_width_px := DEFAULT_STROKE_WI
 		"join": JOIN_TYPE,
 		"miter_limit": MITER_LIMIT,
 		"cap": CAP_TYPE,
-		"source_chain_closed": true,
+		"source_chain_closed": source_closed,
 		"chain_id": str(chain.get("id", "")),
 		"topology_role": str(chain.get("topology_role", "outer")),
 		"has_outline": not output_runs.is_empty(),
@@ -105,8 +106,9 @@ static func validation_issues(component: Dictionary, stroke_width_px := DEFAULT_
 	var errors := BezierTopology.validate(component)
 	if not is_finite(stroke_width_px) or stroke_width_px <= 0.0:
 		errors.append("Contour stroke width must be a finite positive authored pixel value.")
-	if str(component.get("draw_mode", "closed_loop")) != "closed_loop":
-		errors.append("Contour Stroke requires a Closed Loop Component.")
+	var draw_mode := str(component.get("draw_mode", "closed_loop"))
+	if draw_mode not in ["closed_loop", "contour"]:
+		errors.append("Contour Stroke requires a Closed Loop or Contour Component.")
 	var chains: Array = component.get("chains", [])
 	if chains.size() != 1:
 		errors.append("Contour Stroke requires exactly one Chain.")
@@ -114,16 +116,22 @@ static func validation_issues(component: Dictionary, stroke_width_px := DEFAULT_
 	var chain: Dictionary = chains[0]
 	var component_role := str(component.get("topology_role", "outer"))
 	var chain_role := str(chain.get("topology_role", "outer"))
-	if component_role not in ["outer", "hole"] or chain_role not in ["outer", "hole"]:
-		errors.append("Contour Stroke requires an outer or hole Chain.")
-	elif component_role != chain_role:
-		errors.append("Contour Stroke Component and Chain topology roles must match.")
-	if not bool(chain.get("closed", false)) or chain.get("point_ids", []).size() < 3:
-		errors.append("Contour Stroke requires one closed Chain with at least three Points.")
+	if draw_mode == "closed_loop":
+		if component_role not in ["outer", "hole"] or chain_role not in ["outer", "hole"]:
+			errors.append("A closed Contour Stroke requires an outer or hole Chain.")
+		elif component_role != chain_role:
+			errors.append("Contour Stroke Component and Chain topology roles must match.")
+		if not bool(chain.get("closed", false)) or chain.get("point_ids", []).size() < 3:
+			errors.append("A closed Contour Stroke requires at least three Points.")
+	else:
+		if bool(chain.get("closed", false)) or chain.get("point_ids", []).size() < 2:
+			errors.append("An open Contour Stroke requires one open Chain with at least two Points.")
+		if component_role != "outer" or chain_role != "outer":
+			errors.append("An open Contour Component must use the outer topology role.")
 	return errors
 
 
-static func _sample_chain(component: Dictionary, chain: Dictionary) -> Dictionary:
+static func _sample_chain(component: Dictionary, chain: Dictionary, source_closed: bool) -> Dictionary:
 	var sampled_edges: Array = []
 	var maximum_flatness := 0.0
 	var errors: Array[String] = []
@@ -150,7 +158,7 @@ static func _sample_chain(component: Dictionary, chain: Dictionary) -> Dictionar
 		sampled_edges.append({"edge_id": edge_id, "visible": true, "samples": edge_samples})
 	var runs: Array = []
 	if errors.is_empty():
-		runs = _build_outline_runs(sampled_edges, str(chain.get("id", "")))
+		runs = _build_outline_runs(sampled_edges, str(chain.get("id", "")), source_closed)
 	return {
 		"valid": errors.is_empty(),
 		"errors": errors,
@@ -159,7 +167,7 @@ static func _sample_chain(component: Dictionary, chain: Dictionary) -> Dictionar
 	}
 
 
-static func _build_outline_runs(sampled_edges: Array, chain_id: String) -> Array:
+static func _build_outline_runs(sampled_edges: Array, chain_id: String, source_closed: bool) -> Array:
 	var runs: Array = []
 	var visible_count := 0
 	for sampled_edge in sampled_edges:
@@ -167,7 +175,7 @@ static func _build_outline_runs(sampled_edges: Array, chain_id: String) -> Array
 			visible_count += 1
 	if visible_count == 0:
 		return runs
-	if visible_count == sampled_edges.size():
+	if source_closed and visible_count == sampled_edges.size():
 		var closed_samples: Array = []
 		var closed_edge_ids: Array[String] = []
 		for sampled_edge in sampled_edges:
@@ -176,6 +184,20 @@ static func _build_outline_runs(sampled_edges: Array, chain_id: String) -> Array
 		if closed_samples.size() > 1 and Vector2(closed_samples.front().get("position", Vector2.ZERO)).is_equal_approx(Vector2(closed_samples.back().get("position", Vector2.ZERO))):
 			closed_samples.pop_back()
 		runs.append({"run_id": "%s:run:0" % chain_id, "closed": true, "edge_ids": closed_edge_ids, "samples": closed_samples})
+		return runs
+	if not source_closed:
+		var open_samples: Array = []
+		var open_edge_ids: Array[String] = []
+		for sampled_edge in sampled_edges:
+			if bool(sampled_edge.get("visible", false)):
+				open_edge_ids.append(str(sampled_edge.get("edge_id", "")))
+				_append_edge_samples(open_samples, sampled_edge.get("samples", []))
+			elif not open_edge_ids.is_empty():
+				runs.append({"run_id": "%s:run:%d" % [chain_id, runs.size()], "closed": false, "edge_ids": open_edge_ids, "samples": open_samples})
+				open_samples = []
+				open_edge_ids = []
+		if not open_edge_ids.is_empty():
+			runs.append({"run_id": "%s:run:%d" % [chain_id, runs.size()], "closed": false, "edge_ids": open_edge_ids, "samples": open_samples})
 		return runs
 	var first_hidden_index := 0
 	while first_hidden_index < sampled_edges.size() and bool(sampled_edges[first_hidden_index].get("visible", false)):

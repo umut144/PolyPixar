@@ -210,7 +210,10 @@ static func source_fingerprint(component: Dictionary, cut_guides: Array = [], ho
 			primitive_center.y,
 			float(component.get("primitive", {}).get("diameter_cm", 1.0))
 		])
-	parts.append("ribbon_width_px|%.9f" % float(component.get("ribbon_width_px", 8.0)))
+	# Preserve the pre-schema-40 constant fingerprint slot so unrelated accepted
+	# closed meshes do not become stale. Component-local open widths no longer
+	# participate in geometry after Ribbon migration.
+	parts.append("ribbon_width_px|%.9f" % 8.0)
 	var sampling_transform: Transform2D = component.get("sampling_transform", Transform2D.IDENTITY)
 	parts.append("sampling_transform|%.9f|%.9f|%.9f|%.9f|%.9f|%.9f" % [sampling_transform.x.x, sampling_transform.x.y, sampling_transform.y.x, sampling_transform.y.y, sampling_transform.origin.x, sampling_transform.origin.y])
 	var hashing_context := HashingContext.new()

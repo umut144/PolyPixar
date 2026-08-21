@@ -62,13 +62,14 @@ into the final single Chain. A single coincident endpoint remains an open
 joined Chain so the remaining endpoint can be authored manually. A closed
 Chain cannot be mirrored.
 
-## Ribbon mesh derivation
+## Contour mesh derivation
 
-A Ribbon Component keeps its canonical source as one open Bézier Chain. Its
-derived `Ribbon Strip` mesh is sampled deterministically in `Mesh →
-Meshing`, offsets paired vertices by the persisted `ribbon_width_px` (default
-8 px; minimum 1 px), and triangulates each
-consecutive pair into a strip.
+A Contour Component keeps its canonical source as one open Bézier Chain. Its
+derived `Contour Stroke` mesh is sampled deterministically in `Mesh →
+Meshing` using the same centered stroke construction as closed contours. The
+current World default is fixed at 4 authored px (`0.03125 m` at `128 px/m`),
+with Miter joins, a limit of `4.0`, Bevel fallback, and Butt caps. It has no
+Fill Mesh and no Component-local width.
 The derived mesh never modifies Points, Edges, or Chains.
 
 ## Ownership

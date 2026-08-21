@@ -97,6 +97,8 @@ static func build_manifest(asset: Dictionary, sources: Dictionary) -> Dictionary
 static func _build_component(component: Dictionary, source: Dictionary, export_transform: Dictionary) -> Dictionary:
 	var errors: Array[String] = []
 	var label := _component_label(component)
+	if str(component.get("draw_mode", "closed_loop")) == "contour":
+		return {"valid": false, "errors": ["%s: open Contours require the future contour_stroke_mesh Runtime role and cannot be exported as Fill Meshes." % label]}
 	var mesh = source.get("mesh", {})
 	var uv = source.get("uv", {})
 	var sdf = source.get("sdf", {})

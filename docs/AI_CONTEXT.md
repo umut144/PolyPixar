@@ -49,8 +49,9 @@ hit testing, sampling, meshing, and export are derived on demand from either
 source. A Primitive's center handle moves its `primitive.center`; its Component
 pivot remains an independent transform handle.
 
-Components support `closed_loop`, `ribbon`, and `primitive` draw modes. Ribbons
-are the sole visible open-curve Component form; simulation and construction
+Components support `closed_loop`, `contour`, and `primitive` draw modes. Contours
+are fill-less and are the sole visible open-curve Component form; simulation
+and construction
 paths are modeled as Guides. Primitive sampling evaluates the analytic Circle at the selected Body's
 adaptive target edge length and scale-aware Curve Detail, so it has no fixed or
 user-editable sample count. Guides remain independent topology records scoped to an Asset or Component. Derived
@@ -92,7 +93,7 @@ the batch expose their concrete source-validation issue in the Meshing
 Inspector without inflating the actionable count.
 
 The persistent `Update UVs (N)` action consumes only current accepted Component
-Meshes, including Ribbon Strips, and accepts deterministic Bounds / Planar UVs
+Meshes, including Contour Strokes, and accepts deterministic Bounds / Planar UVs
 for visible Components with missing or stale mappings. New recipes reserve a
 calibrated UV border for later contour-mask derivation; small Components expand
 that border deterministically to at least 0.1875 m (16 Game00 reference pixels)
@@ -109,8 +110,10 @@ or missing-resource changes make the SDF stale without changing source topology.
 
 The persistent `Export Runtime (N)` action automatically considers every visible
 Asset. Every visible Component must have one unique
-registered `semantic_key`. Ordinary Components require current accepted Mesh,
-UV, and SDF resources. Asset References instead export their local Semantic Key
+registered `semantic_key`. Closed and primitive ordinary Components require
+current accepted Mesh, UV, and SDF resources. Open Contours remain visibly
+blocked until the Runtime contract gains a typed art-stroke role. Asset
+References instead export their local Semantic Key
 plus the referenced Asset's derived `source_asset_key`; they do not duplicate
 the referenced geometry. The editor retains `source_asset_id` only as its
 internal link to the actual authored source Asset.
@@ -139,8 +142,9 @@ disabled.
 
 A World persists Assets plus the currently retained motion and derived
 mesh records. Assets own Components, Guides, reference-image settings, their
-Asset pivot and `asset_type`. World schema 39 makes `semantic_key` the
-required, sole authored Component designation. The key is its registry identity,
+Asset pivot and `asset_type`. World schema 40 retains the schema-39
+`semantic_key` contract and replaces legacy Ribbons with open Contours. The key
+remains the required, sole authored Component designation and registry identity,
 visible name, search term, and runtime target; no independent Component label or
 free-form runtime role is persisted. The World `name` is its stable technical
 key and owns its directory and main JSON filename. A separate persisted

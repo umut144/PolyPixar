@@ -8,11 +8,9 @@ const EXPORT_SUBMODULES: Array[String] = []
 const MOTION_SUBMODULES := ["Animation", "Path", "Act", "Sequence"]
 const WORLDS_ROOT := "res://worlds"
 const CONFIG_PATH := "res://configs/app_config.json"
-const SCHEMA_VERSION := 39
+const SCHEMA_VERSION := 40
 const MAX_HISTORY_SIZE := 100
-const DRAW_MODES := ["closed_loop", "ribbon", "primitive"]
-const DEFAULT_CONTOUR_WIDTH_PX := 8.0
-const DEFAULT_RIBBON_WIDTH_PX := 8.0
+const DRAW_MODES := ["closed_loop", "contour", "primitive"]
 const GRID_BOX_TOOL_UNITS := 0.5
 const GAME_TILE_CENTIMETERS := 50.0
 # Kept available for a later Outliner presentation, but processed outputs are
@@ -1576,7 +1574,7 @@ func _create_duplicate_semantic_dialog() -> void:
 func _create_component_draw_mode_menu() -> void:
 	component_draw_mode_menu = PopupMenu.new()
 	component_draw_mode_menu.add_item("Closed Loop", 0)
-	component_draw_mode_menu.add_item("Ribbon", 1)
+	component_draw_mode_menu.add_item("Contour", 1)
 	component_draw_mode_menu.add_item("Primitive", 2)
 	_style_popup_menu(component_draw_mode_menu)
 	component_draw_mode_menu.id_pressed.connect(_on_component_draw_mode_selected)
@@ -1589,7 +1587,7 @@ func _create_component_add_menu() -> void:
 	component_add_child_menu = PopupMenu.new()
 	component_add_child_menu.name = "ChildTypes"
 	component_add_child_menu.add_item("Closed Loop", 0)
-	component_add_child_menu.add_item("Ribbon", 1)
+	component_add_child_menu.add_item("Contour", 1)
 	component_add_child_menu.add_item("Primitive", 2)
 	component_add_child_menu.id_pressed.connect(_on_component_add_child_selected)
 	component_add_menu.add_child(component_add_child_menu)
@@ -2046,8 +2044,6 @@ func _save_world() -> void:
 				"z_index": int(component.get("z_index", 0)),
 				"draw_mode": str(component.get("draw_mode", "closed_loop")),
 				"topology_role": str(component.get("topology_role", "outer")) if str(component.get("topology_role", "outer")) in ["outer", "hole"] else "outer",
-				"contour_width_px": maxf(DEFAULT_CONTOUR_WIDTH_PX, float(component.get("contour_width_px", DEFAULT_CONTOUR_WIDTH_PX))),
-				"ribbon_width_px": maxf(RibbonMeshService.MIN_WIDTH_PX, float(component.get("ribbon_width_px", DEFAULT_RIBBON_WIDTH_PX))),
 				"catch_parent_component_id": str(component.get("catch_parent_component_id", "")),
 				"show_point_numbers": bool(component.get("show_point_numbers", false)),
 				"primitive": _serialize_primitive(component.get("primitive", {}))
@@ -2381,10 +2377,8 @@ func _load_world(world_entry: String, persist_as_last := true) -> bool:
 				"transform": _deserialize_transform(component_data.get("transform", {})),
 				"visibility": bool(component_data.get("visibility", true)),
 				"z_index": int(component_data.get("z_index", 0)),
-				"draw_mode": str(component_data.get("draw_mode", "closed_loop")) if str(component_data.get("draw_mode", "closed_loop")) in DRAW_MODES else "closed_loop",
+				"draw_mode": _normalize_component_draw_mode(component_data.get("draw_mode", "closed_loop"), int(asset_data.get("schema_version", 0))),
 				"topology_role": str(component_data.get("topology_role", "outer")) if str(component_data.get("topology_role", "outer")) in ["outer", "hole"] else "outer",
-				"contour_width_px": maxf(DEFAULT_CONTOUR_WIDTH_PX, float(component_data.get("contour_width_px", DEFAULT_CONTOUR_WIDTH_PX))),
-				"ribbon_width_px": maxf(RibbonMeshService.MIN_WIDTH_PX, float(component_data.get("ribbon_width_px", DEFAULT_RIBBON_WIDTH_PX))),
 				"catch_parent_component_id": str(component_data.get("catch_parent_component_id", "")),
 				"show_point_numbers": bool(component_data.get("show_point_numbers", false)),
 				"primitive": _deserialize_primitive(component_data.get("primitive", {}))
@@ -3188,7 +3182,7 @@ func _normalize_geometry_document(raw_document, asset_id: String, component_id: 
 	if raw_meshing_bakes.get(preferred_mesh_method, {}) is Dictionary:
 		chosen_raw_bake = raw_meshing_bakes.get(preferred_mesh_method, {})
 	if chosen_raw_bake.is_empty():
-		for fallback_method in [GeometryMeshingService.CONSTRAINED_MESH, GeometryMeshingService.ORGANIC_RELAXED, GeometryMeshingService.CONSTRAINED_DELAUNAY, RibbonMeshService.METHOD]:
+		for fallback_method in [GeometryMeshingService.CONSTRAINED_MESH, GeometryMeshingService.ORGANIC_RELAXED, GeometryMeshingService.CONSTRAINED_DELAUNAY, GeometryMeshingService.RIBBON_STRIP, ContourMeshService.METHOD]:
 			if raw_meshing_bakes.get(fallback_method, {}) is Dictionary and not raw_meshing_bakes.get(fallback_method, {}).is_empty():
 				chosen_raw_bake = raw_meshing_bakes[fallback_method]
 				break
@@ -3318,23 +3312,51 @@ func _normalize_meshing_bake(raw_bake) -> Dictionary:
 	var normalized_vertices: Array = []
 	for raw_vertex in raw_bake.get("vertices", []):
 		if raw_vertex is Dictionary:
-			normalized_vertices.append({
+			var normalized_vertex := {
 				"id": str(raw_vertex.get("id", "")),
 				"position": _deserialize_vector(raw_vertex.get("position", [0.0, 0.0]), Vector2.ZERO),
 				"origin": str(raw_vertex.get("origin", "seed")),
 				"source_id": str(raw_vertex.get("source_id", "")),
 				"preserved": bool(raw_vertex.get("preserved", false))
-			})
+			}
+			if raw_vertex.has("edge_id"):
+				normalized_vertex["edge_id"] = str(raw_vertex.get("edge_id", ""))
+			if raw_vertex.has("curve_t"):
+				normalized_vertex["curve_t"] = float(raw_vertex.get("curve_t", 0.0))
+			normalized_vertices.append(normalized_vertex)
 	var normalized_triangles: Array = []
 	for raw_triangle in raw_bake.get("triangles", []):
 		if raw_triangle is Dictionary and raw_triangle.get("vertex_ids", []) is Array:
-			normalized_triangles.append({"vertex_ids": raw_triangle.get("vertex_ids", []).duplicate()})
-	var normalized_recipe := GeometryMeshingService.normalize_recipe({"method": str(raw_bake.get("method", GeometryMeshingService.CONSTRAINED_MESH)), "parameters": raw_bake.get("parameters", {})})
-	bake["method"] = str(normalized_recipe.get("method", GeometryMeshingService.CONSTRAINED_MESH))
-	bake["parameters"] = normalized_recipe["parameters"]
+			var normalized_triangle := {"vertex_ids": raw_triangle.get("vertex_ids", []).duplicate()}
+			if raw_triangle.has("id"):
+				normalized_triangle["id"] = str(raw_triangle.get("id", ""))
+			normalized_triangles.append(normalized_triangle)
+	var raw_method := str(raw_bake.get("method", GeometryMeshingService.CONSTRAINED_MESH))
+	if raw_method == GeometryMeshingService.RIBBON_STRIP:
+		bake["method"] = raw_method
+		bake["parameters"] = raw_bake.get("parameters", {}).duplicate(true) if raw_bake.get("parameters", {}) is Dictionary else {}
+	else:
+		var normalized_recipe := GeometryMeshingService.normalize_recipe({"method": raw_method, "parameters": raw_bake.get("parameters", {})})
+		bake["method"] = str(normalized_recipe.get("method", GeometryMeshingService.CONSTRAINED_MESH))
+		bake["parameters"] = normalized_recipe["parameters"]
 	bake["algorithm_version"] = int(raw_bake.get("algorithm_version", 0))
 	bake["vertices"] = normalized_vertices
 	bake["triangles"] = normalized_triangles
+	var normalized_runs: Array = []
+	for raw_run in raw_bake.get("runs", []):
+		if not raw_run is Dictionary:
+			continue
+		var normalized_run: Dictionary = raw_run.duplicate(true)
+		var normalized_centerline: Array = []
+		for raw_sample in raw_run.get("centerline", []):
+			if not raw_sample is Dictionary:
+				continue
+			var normalized_sample: Dictionary = raw_sample.duplicate(true)
+			normalized_sample["position"] = _deserialize_vector(raw_sample.get("position", [0.0, 0.0]), Vector2.ZERO)
+			normalized_centerline.append(normalized_sample)
+		normalized_run["centerline"] = normalized_centerline
+		normalized_runs.append(normalized_run)
+	bake["runs"] = normalized_runs
 	bake["boundary_constraints"] = raw_bake.get("boundary_constraints", []).duplicate(true)
 	bake["vertex_count"] = normalized_vertices.size()
 	bake["triangle_count"] = normalized_triangles.size()
@@ -3427,14 +3449,34 @@ func _serialize_meshing_bake(bake: Dictionary) -> Dictionary:
 	var serialized_bake := bake.duplicate(true)
 	var serialized_vertices: Array = []
 	for vertex in bake.get("vertices", []):
-		serialized_vertices.append({
+		var serialized_vertex := {
 			"id": str(vertex.get("id", "")),
 			"position": _serialize_vector(Vector2(vertex.get("position", Vector2.ZERO))),
 			"origin": str(vertex.get("origin", "seed")),
 			"source_id": str(vertex.get("source_id", "")),
 			"preserved": bool(vertex.get("preserved", false))
-		})
+		}
+		if vertex.has("edge_id"):
+			serialized_vertex["edge_id"] = str(vertex.get("edge_id", ""))
+		if vertex.has("curve_t"):
+			serialized_vertex["curve_t"] = float(vertex.get("curve_t", 0.0))
+		serialized_vertices.append(serialized_vertex)
 	serialized_bake["vertices"] = serialized_vertices
+	var serialized_runs: Array = []
+	for run_data in bake.get("runs", []):
+		if not run_data is Dictionary:
+			continue
+		var serialized_run: Dictionary = run_data.duplicate(true)
+		var serialized_centerline: Array = []
+		for sample in run_data.get("centerline", []):
+			if not sample is Dictionary:
+				continue
+			var serialized_sample: Dictionary = sample.duplicate(true)
+			serialized_sample["position"] = _serialize_vector(Vector2(sample.get("position", Vector2.ZERO)))
+			serialized_centerline.append(serialized_sample)
+		serialized_run["centerline"] = serialized_centerline
+		serialized_runs.append(serialized_run)
+	serialized_bake["runs"] = serialized_runs
 	var raw_optimization = bake.get("optimization", {})
 	if raw_optimization is Dictionary:
 		var optimization: Dictionary = raw_optimization.duplicate(true)
@@ -3720,7 +3762,7 @@ func _geometry_meshing_bakes(asset_id: String, component_id: String) -> Dictiona
 
 func _geometry_meshing_bake(asset_id: String, component_id: String, method := "") -> Dictionary:
 	var component := _get_component(_get_asset(asset_id), component_id)
-	var resolved_method := method if not method.is_empty() else (RibbonMeshService.METHOD if str(component.get("draw_mode", "")) == "ribbon" else str(_geometry_meshing_recipe(asset_id, component_id).get("method", "")))
+	var resolved_method := method if not method.is_empty() else (ContourMeshService.METHOD if str(component.get("draw_mode", "")) == "contour" else str(_geometry_meshing_recipe(asset_id, component_id).get("method", "")))
 	return _geometry_meshing_bakes(asset_id, component_id).get(resolved_method, {})
 
 
@@ -3827,8 +3869,8 @@ func _geometry_build_signature(asset_id: String, component_id: String, component
 	var cut_guides := _cut_guides_for_component(asset, component_id)
 	var hole_components := _geometry_sampling_hole_components(asset, component_id)
 	var resolved_recipes := recipes if not recipes.is_empty() else _geometry_build_recipes(asset_id, component_id, component, cut_guides, hole_components)
-	if str(component.get("draw_mode", "")) == "ribbon":
-		resolved_recipes = {"ribbon": {"method": RibbonMeshService.METHOD, "width_px": float(component.get("ribbon_width_px", DEFAULT_RIBBON_WIDTH_PX))}}
+	if str(component.get("draw_mode", "")) == "contour":
+		resolved_recipes = {"contour": {"method": ContourMeshService.METHOD, "algorithm_version": ContourMeshService.ALGORITHM_VERSION, "stroke_width_px": ContourStrokeService.DEFAULT_STROKE_WIDTH_PX}}
 	return GeometryAutoBuildService.source_signature(component, cut_guides, hole_components, resolved_recipes)
 
 
@@ -3842,11 +3884,11 @@ func _component_mesh_source_validation_issues(asset: Dictionary, component: Dict
 	if _is_reference_component(component):
 		return ["Reference Components do not own a Component Mesh."]
 	var draw_mode := str(component.get("draw_mode", "closed_loop"))
-	if draw_mode == "ribbon":
-		var ribbon_issues: Array[String] = []
-		for issue in RibbonMeshService.validation_issues(component):
-			ribbon_issues.append(str(issue))
-		return ribbon_issues
+	if draw_mode == "contour":
+		var contour_issues: Array[String] = []
+		for issue in ContourMeshService.validation_issues(component):
+			contour_issues.append(str(issue))
+		return contour_issues
 	if draw_mode not in ["closed_loop", "primitive"]:
 		return ["Draw Mode '%s' cannot be meshed." % draw_mode]
 	var component_id := str(component.get("id", ""))
@@ -4188,15 +4230,15 @@ func _generate_component_mesh_build(asset_id: String, component_id: String) -> D
 	var component := _get_component(asset, component_id)
 	if not _component_is_meshable_source(asset, component):
 		return {"valid": false, "errors": ["Component source is not meshable."]}
-	if str(component.get("draw_mode", "")) == "ribbon":
-		var ribbon_mesh := RibbonMeshService.generate(component)
-		if bool(ribbon_mesh.get("valid", false)):
-			ribbon_mesh["bake_id"] = "meshing_bake_%d" % ResourceUID.create_id()
+	if str(component.get("draw_mode", "")) == "contour":
+		var contour_mesh := ContourMeshService.generate(component)
+		if bool(contour_mesh.get("valid", false)):
+			contour_mesh["bake_id"] = "meshing_bake_%d" % ResourceUID.create_id()
 		return {
-			"valid": bool(ribbon_mesh.get("valid", false)),
-			"errors": ribbon_mesh.get("errors", []).duplicate(),
+			"valid": bool(contour_mesh.get("valid", false)),
+			"errors": contour_mesh.get("errors", []).duplicate(),
 			"recipes": {},
-			"meshing": ribbon_mesh,
+			"meshing": contour_mesh,
 			"source_signature": _geometry_build_signature(asset_id, component_id, component),
 			"attempts": 1
 		}
@@ -4893,8 +4935,8 @@ func _geometry_meshing_input_is_current(asset_id: String, component_id: String, 
 func _geometry_meshing_result_matches(result: Dictionary, asset_id: String, component_id: String, component: Dictionary) -> bool:
 	if result.is_empty() or not bool(result.get("valid", false)):
 		return false
-	if str(component.get("draw_mode", "")) == "ribbon":
-		return RibbonMeshService.matches_source(result, component)
+	if str(component.get("draw_mode", "")) == "contour":
+		return ContourMeshService.matches_source(result, component)
 	var recipe := _geometry_meshing_recipe(asset_id, component_id)
 	if not _geometry_meshing_input_is_current(asset_id, component_id, component, recipe):
 		return false
@@ -4918,17 +4960,17 @@ func _geometry_meshing_preview_matches(asset_id: String, component_id: String, c
 func _geometry_meshing_status(asset_id: String, component_id: String, component: Dictionary) -> String:
 	if component.is_empty():
 		return "Invalid"
-	if str(component.get("draw_mode", "")) == "ribbon":
-		if not RibbonMeshService.validation_issues(component).is_empty():
+	if str(component.get("draw_mode", "")) == "contour":
+		if not ContourMeshService.validation_issues(component).is_empty():
 			return "Invalid"
-		var ribbon_key := _geometry_document_key(asset_id, component_id)
-		if geometry_meshing_preview_key == ribbon_key:
+		var contour_key := _geometry_document_key(asset_id, component_id)
+		if geometry_meshing_preview_key == contour_key:
 			if geometry_meshing_preview_state == "calculating":
 				return "Calculating"
 			if geometry_meshing_preview_state == "ready" and _geometry_meshing_preview_matches(asset_id, component_id, component):
 				return "Preview Ready"
-		var ribbon_bake := _geometry_meshing_bake(asset_id, component_id, RibbonMeshService.METHOD)
-		return "Ready to Preview" if ribbon_bake.is_empty() else "Baked" if RibbonMeshService.matches_source(ribbon_bake, component) else "Ready to Preview"
+		var contour_bake := _geometry_meshing_bake(asset_id, component_id, ContourMeshService.METHOD)
+		return "Ready to Preview" if contour_bake.is_empty() else "Baked" if ContourMeshService.matches_source(contour_bake, component) else "Ready to Preview"
 	if not _geometry_sampling_bake_is_current(asset_id, component_id, component):
 		return "Sampling Required"
 	if not _geometry_meshing_input_is_current(asset_id, component_id, component):
@@ -4957,8 +4999,8 @@ func _geometry_meshing_bake_is_current(asset_id: String, component_id: String, c
 	var bake := _geometry_meshing_bake(asset_id, component_id, method)
 	if bake.is_empty():
 		return false
-	if method == RibbonMeshService.METHOD:
-		return RibbonMeshService.matches_source(bake, component)
+	if method == ContourMeshService.METHOD:
+		return ContourMeshService.matches_source(bake, component)
 	if method != GeometryMeshingService.CONSTRAINED_MESH or int(bake.get("algorithm_version", 0)) != GeometryMeshingService.ALGORITHM_VERSION:
 		return false
 	var recipe := GeometryMeshingService.normalize_recipe({"method": method, "parameters": bake.get("parameters", {})})
@@ -5652,12 +5694,12 @@ func _set_geometry_seeding_edit_tool(tool: String) -> void:
 
 func _render_geometry_meshing_context_bar() -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	if str(component.get("draw_mode", "")) == "ribbon":
-		var ribbon_label := Label.new()
-		ribbon_label.text = "Ribbon Strip · Automatic"
-		ribbon_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		ribbon_label.add_theme_color_override("font_color", Color("#9aa3b2"))
-		context_bar.add_child(ribbon_label)
+	if str(component.get("draw_mode", "")) == "contour":
+		var contour_label := Label.new()
+		contour_label.text = "Contour Stroke · Automatic"
+		contour_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		contour_label.add_theme_color_override("font_color", Color("#9aa3b2"))
+		context_bar.add_child(contour_label)
 		return
 	var method_label := Label.new()
 	method_label.text = "Constrained Mesh · Automatic"
@@ -7346,7 +7388,7 @@ func _render_geometry_component_asset_entry(asset: Dictionary, force_expand := f
 		if str(component.get("type", "component")) == "guide":
 			continue
 		var draw_mode := str(component.get("draw_mode", "closed_loop"))
-		if active_geometry_submodule in ["Sampling", "Seeding"] and draw_mode == "ribbon":
+		if active_geometry_submodule in ["Sampling", "Seeding"] and draw_mode == "contour":
 			continue
 		var component_id := str(component.get("id", ""))
 		var row := HBoxContainer.new()
@@ -7649,7 +7691,7 @@ func _geometry_bake_methods_for_active_module(bakes: Dictionary) -> Array[String
 		order.append(GeometrySeedingService.SPINE_FLOW)
 	else:
 		order.append(GeometryMeshingService.CONSTRAINED_MESH)
-		order.append(RibbonMeshService.METHOD)
+		order.append(ContourMeshService.METHOD)
 	var methods: Array[String] = []
 	for method in order:
 		if bakes.has(method):
@@ -7666,8 +7708,8 @@ func _geometry_bake_method_label(method: String) -> String:
 		return "Spine Flow"
 	if method in [GeometryMeshingService.CONSTRAINED_MESH, GeometryMeshingService.CONSTRAINED_DELAUNAY, GeometryMeshingService.ORGANIC_RELAXED]:
 		return "Constrained Mesh"
-	if method == RibbonMeshService.METHOD:
-		return "Ribbon Strip"
+	if method == ContourMeshService.METHOD:
+		return "Contour Stroke"
 	return "Poisson Fill"
 
 
@@ -7675,8 +7717,8 @@ func _geometry_bake_status(method: String, bake: Dictionary, asset_id: String, c
 	if active_geometry_submodule == "Sampling":
 		return "Baked" if _geometry_sampling_bake_is_current(asset_id, component_id, component) else "Ready to Preview"
 	if active_geometry_submodule == "Meshing":
-		if method == RibbonMeshService.METHOD:
-			return "Baked" if RibbonMeshService.matches_source(bake, component) else "Ready to Bake"
+		if method == ContourMeshService.METHOD:
+			return "Baked" if ContourMeshService.matches_source(bake, component) else "Ready to Bake"
 		return _geometry_meshing_status(asset_id, component_id, component)
 	var sampling_bake := _geometry_sampling_bake(asset_id, component_id)
 	if sampling_bake.is_empty() or not _geometry_sampling_bake_is_current(asset_id, component_id, component):
@@ -8145,11 +8187,20 @@ func _on_component_draw_mode_selected(index: int) -> void:
 
 
 func _draw_mode_display_name(draw_mode: String) -> String:
-	if draw_mode == "ribbon":
-		return "Ribbon"
+	if draw_mode == "contour":
+		return "Contour"
 	if draw_mode == "primitive":
 		return "Primitive"
 	return "Closed Loop"
+
+
+func _normalize_component_draw_mode(raw_mode, source_schema_version: int) -> String:
+	var draw_mode := str(raw_mode)
+	if draw_mode == "ribbon" and source_schema_version < 40:
+		return "contour"
+	if draw_mode == "ribbon":
+		return draw_mode
+	return draw_mode if draw_mode in DRAW_MODES else "closed_loop"
 
 
 func _open_component_semantic_dialog(asset_id: String, parent_component_id: String, draw_mode: String, source_asset_id := "") -> void:
@@ -8582,8 +8633,6 @@ func _confirm_component_creation() -> void:
 		"topology_role": "outer",
 		"geometry_source": "primitive" if draw_mode == "primitive" else "bezier",
 		"primitive": {},
-		"contour_width_px": DEFAULT_CONTOUR_WIDTH_PX,
-		"ribbon_width_px": DEFAULT_RIBBON_WIDTH_PX,
 		"catch_parent_component_id": "",
 		"show_point_numbers": false
 	})
@@ -10016,8 +10065,8 @@ func _render_geometry_meshing_inspector() -> void:
 	if component.is_empty():
 		inspector_content.add_child(_create_inspector_field_label("Select one Component to generate its derived Mesh."))
 		return
-	if str(component.get("draw_mode", "")) == "ribbon":
-		_render_ribbon_meshing_inspector(component)
+	if str(component.get("draw_mode", "")) == "contour":
+		_render_contour_meshing_inspector(component)
 		return
 	inspector_content.add_child(_create_inspector_field_label(str(component.get("name", "Component"))))
 	var source_issues := _component_mesh_source_validation_issues(_get_asset(selected_asset_id), component)
@@ -10180,11 +10229,11 @@ func _render_geometry_meshing_inspector() -> void:
 	inspector_content.add_child(actions)
 
 
-func _render_ribbon_meshing_inspector(component: Dictionary) -> void:
-	inspector_content.add_child(_create_inspector_field_label(str(component.get("name", "Ribbon"))))
-	inspector_content.add_child(_create_inspector_section("Ribbon Strip · Automatic"))
-	inspector_content.add_child(_create_inspector_field_label("Width: %.1f px (%.2f cm)" % [float(component.get("ribbon_width_px", DEFAULT_RIBBON_WIDTH_PX)), _editor_units_to_world(RibbonMeshService.width_cm(component))]))
-	var issues := RibbonMeshService.validation_issues(component)
+func _render_contour_meshing_inspector(component: Dictionary) -> void:
+	inspector_content.add_child(_create_inspector_field_label(str(component.get("name", "Contour"))))
+	inspector_content.add_child(_create_inspector_section("Contour Stroke · Automatic"))
+	inspector_content.add_child(_create_inspector_field_label("Width: %.1f px (%.5f m) · World default" % [ContourStrokeService.DEFAULT_STROKE_WIDTH_PX, ContourStrokeService.stroke_width_meters()]))
+	var issues := ContourMeshService.validation_issues(component)
 	var input_status := _create_inspector_field_label("Input: Ready" if issues.is_empty() else "Input: Draft · %s" % issues[0])
 	input_status.add_theme_color_override("font_color", Color("#75b88a") if issues.is_empty() else Color("#ef8354"))
 	inspector_content.add_child(input_status)
@@ -10196,7 +10245,7 @@ func _render_ribbon_meshing_inspector(component: Dictionary) -> void:
 		var error_label := _create_inspector_field_label("Update Meshes: %s" % auto_build_error)
 		error_label.add_theme_color_override("font_color", Color("#ef8354"))
 		inspector_content.add_child(error_label)
-	var result := geometry_meshing_preview if _geometry_meshing_preview_matches(selected_asset_id, selected_component_id, component) else _geometry_meshing_bake(selected_asset_id, selected_component_id, RibbonMeshService.METHOD)
+	var result := geometry_meshing_preview if _geometry_meshing_preview_matches(selected_asset_id, selected_component_id, component) else _geometry_meshing_bake(selected_asset_id, selected_component_id, ContourMeshService.METHOD)
 	if not result.is_empty():
 		inspector_content.add_child(_create_inspector_field_label("Vertices: %d" % int(result.get("vertex_count", 0))))
 		inspector_content.add_child(_create_inspector_field_label("Triangles: %d" % int(result.get("triangle_count", 0))))
@@ -10304,11 +10353,11 @@ func _generate_geometry_meshing_preview_after_delay(revision: int) -> void:
 
 func _generate_geometry_meshing_preview() -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	if str(component.get("draw_mode", "")) == "ribbon":
+	if str(component.get("draw_mode", "")) == "contour":
 		geometry_meshing_preview_key = _geometry_document_key(selected_asset_id, selected_component_id)
-		geometry_meshing_preview = RibbonMeshService.generate(component)
+		geometry_meshing_preview = ContourMeshService.generate(component)
 		geometry_meshing_preview_state = "ready" if bool(geometry_meshing_preview.get("valid", false)) else "invalid"
-		_show_status_message("Generated %d Ribbon Triangles." % int(geometry_meshing_preview.get("triangle_count", 0)) if bool(geometry_meshing_preview.get("valid", false)) else str(geometry_meshing_preview.get("errors", ["Ribbon Mesh could not be generated."])[0]))
+		_show_status_message("Generated %d Contour Triangles." % int(geometry_meshing_preview.get("triangle_count", 0)) if bool(geometry_meshing_preview.get("valid", false)) else str(geometry_meshing_preview.get("errors", ["Contour Mesh could not be generated."])[0]))
 		_render_outliner()
 		_render_inspector()
 		_refresh_geometry_meshing_workspace()
@@ -10397,9 +10446,9 @@ func _refresh_geometry_meshing_workspace() -> void:
 	if component.is_empty():
 		geometry_meshing_workspace.clear_context()
 		return
-	if str(component.get("draw_mode", "")) == "ribbon":
-		var ribbon_result := geometry_meshing_preview if _geometry_meshing_preview_matches(selected_asset_id, selected_component_id, component) else _geometry_meshing_bake(selected_asset_id, selected_component_id, RibbonMeshService.METHOD)
-		geometry_meshing_workspace.set_context({}, {}, ribbon_result, _geometry_meshing_status(selected_asset_id, selected_component_id, component))
+	if str(component.get("draw_mode", "")) == "contour":
+		var contour_result := geometry_meshing_preview if _geometry_meshing_preview_matches(selected_asset_id, selected_component_id, component) else _geometry_meshing_bake(selected_asset_id, selected_component_id, ContourMeshService.METHOD)
+		geometry_meshing_workspace.set_context({}, {}, contour_result, _geometry_meshing_status(selected_asset_id, selected_component_id, component))
 		return
 	var recipe := _geometry_meshing_recipe(selected_asset_id, selected_component_id)
 	var input := _geometry_meshing_input(selected_asset_id, selected_component_id, recipe)
@@ -10905,7 +10954,7 @@ func _render_inspector() -> void:
 	var mode_status := _create_inspector_field_label("Geometry: Valid" if mode_issues.is_empty() else "Geometry: Draft · %s" % mode_issues[0])
 	mode_status.add_theme_color_override("font_color", Color("#75b88a") if mode_issues.is_empty() else Color("#f2c94c"))
 	inspector_content.add_child(mode_status)
-	if draw_mode == "ribbon":
+	if draw_mode == "contour":
 		inspector_content.add_child(_create_inspector_section("Drawing Reference"))
 		inspector_content.add_child(_create_inspector_field_label("Catch Parent"))
 		var catch_parent_option := OptionButton.new()
@@ -10925,17 +10974,6 @@ func _render_inspector() -> void:
 				break
 		catch_parent_option.item_selected.connect(_on_component_catch_parent_selected.bind(catch_parent_option))
 		inspector_content.add_child(catch_parent_option)
-	if draw_mode == "ribbon":
-		inspector_content.add_child(_create_inspector_section("Ribbon"))
-		inspector_content.add_child(_create_inspector_field_label("Width (px)"))
-		var ribbon_width := SpinBox.new()
-		ribbon_width.min_value = RibbonMeshService.MIN_WIDTH_PX
-		ribbon_width.max_value = 4096.0
-		ribbon_width.step = 0.5
-		ribbon_width.custom_arrow_step = 1.0
-		ribbon_width.value = float(component.get("ribbon_width_px", DEFAULT_RIBBON_WIDTH_PX))
-		ribbon_width.value_changed.connect(_on_component_ribbon_width_changed)
-		inspector_content.add_child(ribbon_width)
 	inspector_content.add_child(_create_inspector_section("Transform"))
 	var transform_grid := GridContainer.new()
 	transform_grid.columns = 2
@@ -12324,21 +12362,6 @@ func _on_component_catch_parent_selected(index: int, option: OptionButton) -> vo
 	_render_canvas_context()
 
 
-func _on_component_ribbon_width_changed(value: float) -> void:
-	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	if component.is_empty() or str(component.get("draw_mode", "")) != "ribbon":
-		return
-	var width := maxf(value, RibbonMeshService.MIN_WIDTH_PX)
-	if is_equal_approx(float(component.get("ribbon_width_px", DEFAULT_RIBBON_WIDTH_PX)), width):
-		return
-	_record_coalesced_change()
-	component["ribbon_width_px"] = width
-	_render_outliner()
-	if active_module == "Mesh" and active_geometry_submodule == "Meshing":
-		_render_inspector()
-		_refresh_geometry_meshing_workspace()
-
-
 func _on_edge_render_outline_changed(enabled: bool) -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	var edge_ids := selected_edge_ids.duplicate()
@@ -13314,7 +13337,7 @@ func _render_canvas_context() -> void:
 	canvas_view.set_component_draw_mode(str(component.get("draw_mode", "closed_loop")))
 	canvas_view.set_point_numbers_visible(bool(component.get("show_point_numbers", false)))
 	var catch_parent_id := str(component.get("parent_component_id", ""))
-	if catch_parent_id.is_empty() and str(component.get("draw_mode", "closed_loop")) == "ribbon":
+	if catch_parent_id.is_empty() and str(component.get("draw_mode", "closed_loop")) == "contour":
 		catch_parent_id = str(component.get("catch_parent_component_id", ""))
 	canvas_view.set_catch_parent_component(catch_parent_id)
 	BezierGeometry.resolve_auto_handles(component.get("points", []), component.get("chains", []))

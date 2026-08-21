@@ -214,6 +214,13 @@ Asset References use the same local Semantic picker but retain the borrowed
 Asset in internal `source_asset_id`, so local classification never erases
 geometry origin. Runtime export resolves that editor link to `source_asset_key`.
 
+Schema 40 replaces the authored `ribbon` draw mode with the fill-less open
+`contour` mode. Loading schema 39 or older converts Ribbon centerline topology
+explicitly; current-schema Ribbon values are invalid and receive no fallback.
+Component-local Ribbon widths are discarded because Contours use the fixed
+World stroke default. Legacy `ribbon_strip` Bakes remain readable records but
+are never current for a Contour and must be rebuilt as `contour_stroke`.
+
 Sampling results carry their own algorithm version independently of the
 World schema. The junction-aware version invalidates pre-arrangement flat
 Cut Bakes at Sampling, which in turn makes Seeding stale before Meshing can

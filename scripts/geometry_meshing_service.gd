@@ -4,8 +4,9 @@ extends RefCounted
 const CONSTRAINED_MESH := "constrained_mesh"
 const CONSTRAINED_DELAUNAY := "constrained_delaunay" # Legacy schema <= 30.
 const ORGANIC_RELAXED := "organic_relaxed" # Legacy schema <= 30.
-const RIBBON_STRIP := "ribbon_strip"
-const VALID_METHODS := [CONSTRAINED_MESH, RIBBON_STRIP]
+const RIBBON_STRIP := "ribbon_strip" # Legacy schema <= 39.
+const CONTOUR_STROKE := "contour_stroke"
+const VALID_METHODS := [CONSTRAINED_MESH, CONTOUR_STROKE]
 const ALGORITHM_VERSION := 4
 const DEFAULT_MESH_CHARACTER := 0.64
 const DEFAULT_OPTIMIZE_MESH := true
@@ -38,7 +39,7 @@ static func normalize_recipe(raw_recipe) -> Dictionary:
 	var raw_method := str(raw_recipe.get("method", CONSTRAINED_MESH))
 	var method := CONSTRAINED_MESH if raw_method in [CONSTRAINED_MESH, CONSTRAINED_DELAUNAY, ORGANIC_RELAXED] else raw_method
 	recipe["method"] = method if method in VALID_METHODS else CONSTRAINED_MESH
-	if recipe["method"] == RIBBON_STRIP:
+	if recipe["method"] == CONTOUR_STROKE:
 		recipe["parameters"] = raw_recipe.get("parameters", {}).duplicate(true) if raw_recipe.get("parameters", {}) is Dictionary else {}
 		return recipe
 	var parameters = raw_recipe.get("parameters", {})

@@ -24,7 +24,7 @@ Mesh makes the UV Bake stale without reverse synchronization.
 
 The accepted Component Mesh is the only UV input. There is no independent Mesh
 source selection: closed Bodies contribute their accepted Constrained Mesh and
-Ribbon Components contribute their accepted Ribbon Strip. UV Bakes are retained
+Contour Components contribute their accepted Contour Stroke. UV Bakes are retained
 by the combination of Component Mesh method and UV method.
 
 ## Bounds / Planar
@@ -85,7 +85,7 @@ per visible Component. The channel is interpreted linearly: `0.5` is the contour
 greater values are inside, lower values are outside, and the signed-distance
 spread is `16 px`.
 
-Mesh triangles define the filled silhouette, including Ribbon Strips and holes;
+Mesh triangles define the filled silhouette, including Contour Strokes and holes;
 Bézier control polygons are not consulted. UV uses `u` right and `v` up, while
 PNG rows use a top-left image origin, so rasterization applies `y = (1-v) ×
 height`. Bake metadata records the channel, color-space interpretation,
