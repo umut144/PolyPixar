@@ -354,7 +354,7 @@ static func _build_stroke_mesh(centerline: Array, half_width: float, closed: boo
 		"errors": [],
 		"vertices": vertices,
 		"indices": indices,
-		"triangle_count": indices.size() / 3,
+		"triangle_count": int(float(indices.size()) / 3.0),
 		"miter_join_count": miter_join_count,
 		"bevel_join_count": bevel_join_count,
 		"geometry_diagnostics": analysis.get("diagnostics", {}).duplicate(true)
@@ -390,7 +390,7 @@ static func _analyze_centerline(centerline: Array, half_width: float, closed: bo
 	var self_intersection_count := 0
 	var narrow_overlap_pair_count := 0
 	var minimum_clearance := INF
-	var pair_count := segment_count * (segment_count - 1) / 2 - (segment_count if closed else maxi(0, segment_count - 1))
+	var pair_count := int(float(segment_count * (segment_count - 1)) / 2.0) - (segment_count if closed else maxi(0, segment_count - 1))
 	if pair_count > MAX_SEGMENT_PAIR_CHECKS:
 		return {"valid": false, "errors": ["Contour stroke robustness validation exceeded its deterministic segment-pair limit."]}
 	for first_index in range(segment_count):
