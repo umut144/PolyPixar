@@ -53,7 +53,7 @@ static func generate(component: Dictionary, stroke_width_px := ContourStrokeServ
 	var indices: PackedInt32Array = stroke.get("indices", PackedInt32Array())
 	for triangle_offset in range(0, indices.size(), 3):
 		triangles.append({
-			"id": "triangle:contour:%d" % (triangle_offset / 3),
+			"id": "triangle:contour:%d" % int(float(triangle_offset) / 3.0),
 			"vertex_ids": [vertex_ids[indices[triangle_offset]], vertex_ids[indices[triangle_offset + 1]], vertex_ids[indices[triangle_offset + 2]]]
 		})
 	return {

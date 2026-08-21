@@ -12865,12 +12865,12 @@ func _render_asset_scale_rebase_inspector(asset: Dictionary) -> void:
 	if candidates.is_empty() and blockers.is_empty():
 		inspector_content.add_child(_create_inspector_field_label("All Component scales are normalized (1 × 1)."))
 	for candidate in candidates:
-		var scale := Vector2(candidate.get("scale", Vector2.ONE))
+		var component_scale := Vector2(candidate.get("scale", Vector2.ONE))
 		var suffix := " · Circle → Ellipse" if str(candidate.get("result_primitive_type", "")) == PrimitiveGeometryService.ELLIPSE else ""
 		inspector_content.add_child(_create_inspector_field_label("• %s · %s × %s → 1 × 1%s" % [
 			str(candidate.get("name", "Component")),
-			_format_scale_value(scale.x),
-			_format_scale_value(scale.y),
+			_format_scale_value(component_scale.x),
+			_format_scale_value(component_scale.y),
 			suffix
 		]))
 	for blocker in blockers:
