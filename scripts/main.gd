@@ -1413,7 +1413,7 @@ func _update_world_scale_popup() -> void:
 		var boxes_per_game_tile := GAME_TILE_CENTIMETERS / _editor_units_to_world(world_grid_size)
 		world_scale_summary_label.text = "Contour: %s px = %s m\n1 Grid Box = %s cm\n1 Spiel-Tile = %s cm (%s Grid-Boxen)" % [
 			_format_scale_value(world_contour_stroke_width_px),
-			_format_scale_value(ContourStrokeService.stroke_width_meters(world_contour_stroke_width_px)),
+			_format_meter_value(ContourStrokeService.stroke_width_meters(world_contour_stroke_width_px)),
 			_format_scale_value(_editor_units_to_world(world_grid_size)),
 			_format_scale_value(GAME_TILE_CENTIMETERS),
 			_format_scale_value(boxes_per_game_tile)
@@ -1422,6 +1422,15 @@ func _update_world_scale_popup() -> void:
 
 func _format_scale_value(value: float) -> String:
 	var formatted := "%.2f" % value
+	return _trim_decimal_zeros(formatted)
+
+
+func _format_meter_value(value: float) -> String:
+	var formatted := "%.5f" % value
+	return _trim_decimal_zeros(formatted)
+
+
+func _trim_decimal_zeros(formatted: String) -> String:
 	while formatted.ends_with("0"):
 		formatted = formatted.substr(0, formatted.length() - 1)
 	if formatted.ends_with("."):

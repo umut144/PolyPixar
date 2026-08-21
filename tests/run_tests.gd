@@ -553,6 +553,9 @@ func _test_world_contour_settings() -> void:
 	application._build_ui()
 	_expect(int(application.SCHEMA_VERSION) >= 41 and application.world_scale_menu.text.begins_with("World Settings"), "Slice 5 should expose World Settings in the top toolbar and retain its schema-41 persisted contract.")
 	_expect(is_equal_approx(float(application.world_contour_stroke_width_field.value), 4.0), "World Settings should show the 4 px default in its authored Contour width field.")
+	application.world_contour_stroke_width_px = 4.1
+	application._update_world_scale_popup()
+	_expect("Contour: 4.1 px = 0.03203 m" in application.world_scale_summary_label.text, "World Settings should show enough meter precision to distinguish fractional authored pixel widths.")
 	application.world_contour_stroke_width_px = 4.0
 	var four_px_signature: Dictionary = application._geometry_build_signature("", "", contour)
 	application.world_contour_stroke_width_px = 6.0
