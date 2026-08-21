@@ -8,19 +8,19 @@ const METHOD := "contour_stroke"
 const ALGORITHM_VERSION := 2
 
 
-static func validation_issues(component: Dictionary) -> Array[String]:
-	var errors := ContourStrokeService.validation_issues(component, ContourStrokeService.DEFAULT_STROKE_WIDTH_PX)
+static func validation_issues(component: Dictionary, stroke_width_px := ContourStrokeService.DEFAULT_STROKE_WIDTH_PX) -> Array[String]:
+	var errors := ContourStrokeService.validation_issues(component, stroke_width_px)
 	if str(component.get("draw_mode", "")) != "contour":
 		errors.append("Contour Stroke Mesh requires an open Contour Component.")
 	return errors
 
 
-static func generate(component: Dictionary) -> Dictionary:
-	var fingerprint := source_fingerprint(component)
-	var errors := validation_issues(component)
+static func generate(component: Dictionary, stroke_width_px := ContourStrokeService.DEFAULT_STROKE_WIDTH_PX) -> Dictionary:
+	var fingerprint := source_fingerprint(component, stroke_width_px)
+	var errors := validation_issues(component, stroke_width_px)
 	if not errors.is_empty():
 		return _failed_result(fingerprint, errors)
-	var stroke := ContourStrokeService.generate(component, ContourStrokeService.DEFAULT_STROKE_WIDTH_PX)
+	var stroke := ContourStrokeService.generate(component, stroke_width_px)
 	if not bool(stroke.get("valid", false)):
 		return _failed_result(fingerprint, stroke.get("errors", []))
 	if not bool(stroke.get("has_outline", false)):
@@ -55,8 +55,8 @@ static func generate(component: Dictionary) -> Dictionary:
 		"source_fingerprint": fingerprint,
 		"parameters": {
 			"reference_pixels_per_meter": ContourStrokeService.REFERENCE_PIXELS_PER_METER,
-			"stroke_width_px": ContourStrokeService.DEFAULT_STROKE_WIDTH_PX,
-			"stroke_width_meters": ContourStrokeService.stroke_width_meters(),
+			"stroke_width_px": stroke_width_px,
+			"stroke_width_meters": ContourStrokeService.stroke_width_meters(stroke_width_px),
 			"join": ContourStrokeService.JOIN_TYPE,
 			"miter_limit": ContourStrokeService.MITER_LIMIT,
 			"cap": ContourStrokeService.CAP_TYPE
@@ -71,14 +71,14 @@ static func generate(component: Dictionary) -> Dictionary:
 	}
 
 
-static func matches_source(mesh: Dictionary, component: Dictionary) -> bool:
+static func matches_source(mesh: Dictionary, component: Dictionary, stroke_width_px := ContourStrokeService.DEFAULT_STROKE_WIDTH_PX) -> bool:
 	return bool(mesh.get("valid", false)) \
 		and str(mesh.get("method", "")) == METHOD \
 		and int(mesh.get("algorithm_version", 0)) == ALGORITHM_VERSION \
-		and str(mesh.get("source_fingerprint", "")) == source_fingerprint(component)
+		and str(mesh.get("source_fingerprint", "")) == source_fingerprint(component, stroke_width_px)
 
 
-static func source_fingerprint(component: Dictionary) -> String:
+static func source_fingerprint(component: Dictionary, stroke_width_px := ContourStrokeService.DEFAULT_STROKE_WIDTH_PX) -> String:
 	var outline_parts := PackedStringArray()
 	for edge in component.get("edges", []):
 		if edge is Dictionary:
@@ -89,7 +89,7 @@ static func source_fingerprint(component: Dictionary) -> String:
 		GeometrySamplingService.source_fingerprint(component),
 		ALGORITHM_VERSION,
 		ContourStrokeService.ALGORITHM_VERSION,
-		ContourStrokeService.DEFAULT_STROKE_WIDTH_PX,
+		stroke_width_px,
 		",".join(outline_parts)
 	]).to_utf8_buffer())
 	return context.finish().hex_encode()

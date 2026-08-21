@@ -66,10 +66,10 @@ Chain cannot be mirrored.
 
 A Contour Component keeps its canonical source as one open Bézier Chain. Its
 derived `Contour Stroke` mesh is sampled deterministically in `Mesh →
-Meshing` using the same centered stroke construction as closed contours. The
-current World default is fixed at 4 authored px (`0.03125 m` at `128 px/m`),
-with Miter joins, a limit of `4.0`, Bevel fallback, and Butt caps. It has no
-Fill Mesh and no Component-local width.
+Meshing` using the same centered stroke construction as closed contours. World
+Settings own one width for all Assets, defaulting to 4 authored px (`0.03125 m`
+at `128 px/m`), with Miter joins, a limit of `4.0`, Bevel fallback, and Butt
+caps. It has no Fill Mesh and no Component-local width.
 The derived mesh never modifies Points, Edges, or Chains. Robustness analysis
 keeps intentional open-Contour crossings and narrow coverage overlaps visible
 and diagnosed, while ambiguous collinear overlap, exact reversals, and

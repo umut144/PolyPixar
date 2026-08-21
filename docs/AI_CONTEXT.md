@@ -58,6 +58,11 @@ user-editable sample count. Guides remain independent topology records scoped to
 Sampling, Seeding, Meshing, UV, and Weighting records are stored separately
 from source topology.
 
+World schema 41 owns one authored Contour stroke width for every Asset in its
+typed `world_settings` record. It defaults to `4 px` at the fixed `128 px/m`
+reference density, has no Component override, and invalidates derived Contour
+Meshes when changed. Schema 40 and older Worlds migrate explicitly to 4 px.
+
 Seeding consumes the complete accepted Sampling constraint set. Outer bounds
 the valid interior, Holes exclude regions, and Cuts are two-sided barriers with
 clearance. Poisson Fill and combined multi-Spine Flow generate deterministic

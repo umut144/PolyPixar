@@ -8,7 +8,7 @@ const EXPORT_SUBMODULES: Array[String] = []
 const MOTION_SUBMODULES := ["Animation", "Path", "Act", "Sequence"]
 const WORLDS_ROOT := "res://worlds"
 const CONFIG_PATH := "res://configs/app_config.json"
-const SCHEMA_VERSION := 40
+const SCHEMA_VERSION := 41
 const MAX_HISTORY_SIZE := 100
 const DRAW_MODES := ["closed_loop", "contour", "primitive"]
 const GRID_BOX_TOOL_UNITS := 0.5
@@ -242,6 +242,7 @@ var world_scale_menu: Button
 var world_scale_popup: PopupPanel
 var world_unit_option: OptionButton
 var world_grid_size_field: SpinBox
+var world_contour_stroke_width_field: SpinBox
 var world_scale_summary_label: Label
 var update_meshes_button: BatchStatusButton
 var mesh_batch_running := false
@@ -265,6 +266,7 @@ var history_coalesce_timer: Timer
 var history_coalescing := false
 var world_unit := "cm"
 var world_grid_size := GRID_BOX_TOOL_UNITS
+var world_contour_stroke_width_px := WorldSettingsService.DEFAULT_CONTOUR_STROKE_WIDTH_PX
 var semantic_registry := SemanticRegistry.load_registry()
 
 
@@ -1308,11 +1310,11 @@ func _create_snap_popup() -> void:
 
 func _create_world_scale_popup() -> void:
 	world_scale_menu = Button.new()
-	world_scale_menu.text = "World Scale  ▼"
+	world_scale_menu.text = "World Settings  ▼"
 	world_scale_menu.custom_minimum_size = Vector2(144, 32)
 	world_scale_menu.focus_mode = Control.FOCUS_NONE
 	world_scale_popup = PopupPanel.new()
-	world_scale_popup.size = Vector2i(300, 240)
+	world_scale_popup.size = Vector2i(300, 310)
 	var popup_style := StyleBoxFlat.new()
 	popup_style.bg_color = Color("#20242c")
 	popup_style.border_color = Color("#363d48")
@@ -1340,6 +1342,21 @@ func _create_world_scale_popup() -> void:
 	world_grid_size_field.custom_minimum_size = Vector2(260, 26)
 	world_grid_size_field.value_changed.connect(_on_world_grid_size_changed)
 	content.add_child(world_grid_size_field)
+	var contour_width_label := Label.new()
+	contour_width_label.text = "Contour Stroke Width (authored px)"
+	content.add_child(contour_width_label)
+	world_contour_stroke_width_field = SpinBox.new()
+	world_contour_stroke_width_field.min_value = 0.1
+	world_contour_stroke_width_field.max_value = 1024.0
+	world_contour_stroke_width_field.step = 0.1
+	world_contour_stroke_width_field.value = world_contour_stroke_width_px
+	world_contour_stroke_width_field.custom_minimum_size = Vector2(260, 26)
+	world_contour_stroke_width_field.value_changed.connect(_on_world_contour_stroke_width_changed)
+	content.add_child(world_contour_stroke_width_field)
+	var reference_density_label := Label.new()
+	reference_density_label.text = "Reference Density: 128 px/m · all Assets"
+	reference_density_label.add_theme_color_override("font_color", Color("#9aa3b2"))
+	content.add_child(reference_density_label)
 	world_scale_summary_label = Label.new()
 	world_scale_summary_label.add_theme_color_override("font_color", Color("#9aa3b2"))
 	content.add_child(world_scale_summary_label)
@@ -1361,6 +1378,21 @@ func _on_world_grid_size_changed(value: float) -> void:
 	_apply_world_scale()
 
 
+func _on_world_contour_stroke_width_changed(value: float) -> void:
+	if not is_finite(value) or value <= 0.0 or is_equal_approx(value, world_contour_stroke_width_px):
+		_update_world_scale_popup()
+		return
+	_record_direct_change()
+	world_contour_stroke_width_px = value
+	geometry_meshing_preview = {}
+	geometry_meshing_preview_key = ""
+	geometry_meshing_preview_state = "idle"
+	geometry_meshing_preview_revision += 1
+	_update_world_scale_popup()
+	_render_inspector()
+	_render_canvas_context()
+
+
 func _apply_world_scale() -> void:
 	snap_grid_step = _snap_base_step()
 	if is_instance_valid(canvas_view):
@@ -1374,9 +1406,13 @@ func _apply_world_scale() -> void:
 func _update_world_scale_popup() -> void:
 	if is_instance_valid(world_grid_size_field):
 		world_grid_size_field.set_value_no_signal(_editor_units_to_world(world_grid_size))
+	if is_instance_valid(world_contour_stroke_width_field):
+		world_contour_stroke_width_field.set_value_no_signal(world_contour_stroke_width_px)
 	if is_instance_valid(world_scale_summary_label):
 		var boxes_per_game_tile := GAME_TILE_CENTIMETERS / _editor_units_to_world(world_grid_size)
-		world_scale_summary_label.text = "1 Grid Box = %s cm\n1 Spiel-Tile = %s cm (%s Grid-Boxen)" % [
+		world_scale_summary_label.text = "Contour: %s px = %s m\n1 Grid Box = %s cm\n1 Spiel-Tile = %s cm (%s Grid-Boxen)" % [
+			_format_scale_value(world_contour_stroke_width_px),
+			_format_scale_value(ContourStrokeService.stroke_width_meters(world_contour_stroke_width_px)),
 			_format_scale_value(_editor_units_to_world(world_grid_size)),
 			_format_scale_value(GAME_TILE_CENTIMETERS),
 			_format_scale_value(boxes_per_game_tile)
@@ -1755,6 +1791,7 @@ func _confirm_new_world() -> void:
 	new_name = _sanitize_world_name(new_name)
 	world_name = new_name
 	world_title = new_name
+	world_contour_stroke_width_px = WorldSettingsService.DEFAULT_CONTOUR_STROKE_WIDTH_PX
 	assets.clear()
 	motion_paths.clear()
 	motion_acts.clear()
@@ -2088,6 +2125,7 @@ func _save_world() -> void:
 		"schema_version": SCHEMA_VERSION,
 		"name": world_name,
 		"world_name": world_title if not world_title.is_empty() else world_name,
+		"world_settings": _serialize_world_settings(),
 		"assets": asset_ids,
 		"paths": motion_path_ids,
 		"acts": motion_act_ids,
@@ -2105,6 +2143,7 @@ func _save_world() -> void:
 
 func _capture_history_snapshot() -> Dictionary:
 	return {
+		"world_contour_stroke_width_px": world_contour_stroke_width_px,
 		"assets": assets.duplicate(true),
 		"next_asset_id": next_asset_id,
 		"next_component_id": next_component_id,
@@ -2182,6 +2221,7 @@ func _restore_history_snapshot(snapshot: Dictionary) -> void:
 	var retained_edit_point_set_mode := edit_point_set_mode
 	var retained_transform_mode := active_transform_mode
 	assets = snapshot.get("assets", []).duplicate(true)
+	world_contour_stroke_width_px = float(snapshot.get("world_contour_stroke_width_px", WorldSettingsService.DEFAULT_CONTOUR_STROKE_WIDTH_PX))
 	motion_paths = snapshot.get("motion_paths", []).duplicate(true)
 	motion_acts = snapshot.get("motion_acts", []).duplicate(true)
 	motion_sequences = snapshot.get("motion_sequences", []).duplicate(true)
@@ -2286,6 +2326,7 @@ func _restore_history_snapshot(snapshot: Dictionary) -> void:
 		active_transform_mode = retained_transform_mode
 		if active_state == "draw":
 			_restore_draw_anchor_selection()
+	_update_world_scale_popup()
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
@@ -2335,6 +2376,11 @@ func _load_world(world_entry: String, persist_as_last := true) -> bool:
 	var world_data = _read_json("%s/%s.json" % [world_root, world_entry])
 	if not _has_supported_schema(world_data):
 		return false
+	var world_schema := int(world_data.get("schema_version", 0))
+	var decoded_world_settings := WorldSettingsService.decode(world_data.get("world_settings", null), world_schema)
+	if not bool(decoded_world_settings.get("valid", false)):
+		return false
+	var loaded_world_settings: Dictionary = decoded_world_settings.get("settings", {})
 	var loaded_assets: Array[Dictionary] = []
 	for asset_id_variant in world_data.get("assets", []):
 		var asset_id := str(asset_id_variant)
@@ -2431,6 +2477,7 @@ func _load_world(world_entry: String, persist_as_last := true) -> bool:
 	motion_acts = loaded_motion_acts
 	motion_sequences = loaded_motion_sequences
 	geometry_documents = loaded_geometry_documents
+	world_contour_stroke_width_px = float(loaded_world_settings.get("contour_stroke_width_px", WorldSettingsService.DEFAULT_CONTOUR_STROKE_WIDTH_PX))
 	sdf_images.clear()
 	sdf_resource_validation_cache.clear()
 	_invalidate_batch_status()
@@ -2514,6 +2561,10 @@ func _serialize_editor_state() -> Dictionary:
 			"rotation_step": snap_rotation_step
 		}
 	}
+
+
+func _serialize_world_settings() -> Dictionary:
+	return WorldSettingsService.encode(world_contour_stroke_width_px)
 
 
 func _restore_editor_state(state) -> void:
@@ -3870,7 +3921,7 @@ func _geometry_build_signature(asset_id: String, component_id: String, component
 	var hole_components := _geometry_sampling_hole_components(asset, component_id)
 	var resolved_recipes := recipes if not recipes.is_empty() else _geometry_build_recipes(asset_id, component_id, component, cut_guides, hole_components)
 	if str(component.get("draw_mode", "")) == "contour":
-		resolved_recipes = {"contour": {"method": ContourMeshService.METHOD, "algorithm_version": ContourMeshService.ALGORITHM_VERSION, "stroke_width_px": ContourStrokeService.DEFAULT_STROKE_WIDTH_PX}}
+		resolved_recipes = {"contour": {"method": ContourMeshService.METHOD, "algorithm_version": ContourMeshService.ALGORITHM_VERSION, "stroke_width_px": world_contour_stroke_width_px}}
 	return GeometryAutoBuildService.source_signature(component, cut_guides, hole_components, resolved_recipes)
 
 
@@ -3886,7 +3937,7 @@ func _component_mesh_source_validation_issues(asset: Dictionary, component: Dict
 	var draw_mode := str(component.get("draw_mode", "closed_loop"))
 	if draw_mode == "contour":
 		var contour_issues: Array[String] = []
-		for issue in ContourMeshService.validation_issues(component):
+		for issue in ContourMeshService.validation_issues(component, world_contour_stroke_width_px):
 			contour_issues.append(str(issue))
 		return contour_issues
 	if draw_mode not in ["closed_loop", "primitive"]:
@@ -4231,7 +4282,7 @@ func _generate_component_mesh_build(asset_id: String, component_id: String) -> D
 	if not _component_is_meshable_source(asset, component):
 		return {"valid": false, "errors": ["Component source is not meshable."]}
 	if str(component.get("draw_mode", "")) == "contour":
-		var contour_mesh := ContourMeshService.generate(component)
+		var contour_mesh := ContourMeshService.generate(component, world_contour_stroke_width_px)
 		if bool(contour_mesh.get("valid", false)):
 			contour_mesh["bake_id"] = "meshing_bake_%d" % ResourceUID.create_id()
 		return {
@@ -4936,7 +4987,7 @@ func _geometry_meshing_result_matches(result: Dictionary, asset_id: String, comp
 	if result.is_empty() or not bool(result.get("valid", false)):
 		return false
 	if str(component.get("draw_mode", "")) == "contour":
-		return ContourMeshService.matches_source(result, component)
+		return ContourMeshService.matches_source(result, component, world_contour_stroke_width_px)
 	var recipe := _geometry_meshing_recipe(asset_id, component_id)
 	if not _geometry_meshing_input_is_current(asset_id, component_id, component, recipe):
 		return false
@@ -4961,7 +5012,7 @@ func _geometry_meshing_status(asset_id: String, component_id: String, component:
 	if component.is_empty():
 		return "Invalid"
 	if str(component.get("draw_mode", "")) == "contour":
-		if not ContourMeshService.validation_issues(component).is_empty():
+		if not ContourMeshService.validation_issues(component, world_contour_stroke_width_px).is_empty():
 			return "Invalid"
 		var contour_key := _geometry_document_key(asset_id, component_id)
 		if geometry_meshing_preview_key == contour_key:
@@ -4970,7 +5021,7 @@ func _geometry_meshing_status(asset_id: String, component_id: String, component:
 			if geometry_meshing_preview_state == "ready" and _geometry_meshing_preview_matches(asset_id, component_id, component):
 				return "Preview Ready"
 		var contour_bake := _geometry_meshing_bake(asset_id, component_id, ContourMeshService.METHOD)
-		return "Ready to Preview" if contour_bake.is_empty() else "Baked" if ContourMeshService.matches_source(contour_bake, component) else "Ready to Preview"
+		return "Ready to Preview" if contour_bake.is_empty() else "Baked" if ContourMeshService.matches_source(contour_bake, component, world_contour_stroke_width_px) else "Ready to Preview"
 	if not _geometry_sampling_bake_is_current(asset_id, component_id, component):
 		return "Sampling Required"
 	if not _geometry_meshing_input_is_current(asset_id, component_id, component):
@@ -5000,7 +5051,7 @@ func _geometry_meshing_bake_is_current(asset_id: String, component_id: String, c
 	if bake.is_empty():
 		return false
 	if method == ContourMeshService.METHOD:
-		return ContourMeshService.matches_source(bake, component)
+		return ContourMeshService.matches_source(bake, component, world_contour_stroke_width_px)
 	if method != GeometryMeshingService.CONSTRAINED_MESH or int(bake.get("algorithm_version", 0)) != GeometryMeshingService.ALGORITHM_VERSION:
 		return false
 	var recipe := GeometryMeshingService.normalize_recipe({"method": method, "parameters": bake.get("parameters", {})})
@@ -7718,7 +7769,7 @@ func _geometry_bake_status(method: String, bake: Dictionary, asset_id: String, c
 		return "Baked" if _geometry_sampling_bake_is_current(asset_id, component_id, component) else "Ready to Preview"
 	if active_geometry_submodule == "Meshing":
 		if method == ContourMeshService.METHOD:
-			return "Baked" if ContourMeshService.matches_source(bake, component) else "Ready to Bake"
+			return "Baked" if ContourMeshService.matches_source(bake, component, world_contour_stroke_width_px) else "Ready to Bake"
 		return _geometry_meshing_status(asset_id, component_id, component)
 	var sampling_bake := _geometry_sampling_bake(asset_id, component_id)
 	if sampling_bake.is_empty() or not _geometry_sampling_bake_is_current(asset_id, component_id, component):
@@ -10232,8 +10283,8 @@ func _render_geometry_meshing_inspector() -> void:
 func _render_contour_meshing_inspector(component: Dictionary) -> void:
 	inspector_content.add_child(_create_inspector_field_label(str(component.get("name", "Contour"))))
 	inspector_content.add_child(_create_inspector_section("Contour Stroke · Automatic"))
-	inspector_content.add_child(_create_inspector_field_label("Width: %.1f px (%.5f m) · World default" % [ContourStrokeService.DEFAULT_STROKE_WIDTH_PX, ContourStrokeService.stroke_width_meters()]))
-	var issues := ContourMeshService.validation_issues(component)
+	inspector_content.add_child(_create_inspector_field_label("Width: %.1f px (%.5f m) · World Settings · all Assets" % [world_contour_stroke_width_px, ContourStrokeService.stroke_width_meters(world_contour_stroke_width_px)]))
+	var issues := ContourMeshService.validation_issues(component, world_contour_stroke_width_px)
 	var input_status := _create_inspector_field_label("Input: Ready" if issues.is_empty() else "Input: Draft · %s" % issues[0])
 	input_status.add_theme_color_override("font_color", Color("#75b88a") if issues.is_empty() else Color("#ef8354"))
 	inspector_content.add_child(input_status)
@@ -10355,7 +10406,7 @@ func _generate_geometry_meshing_preview() -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	if str(component.get("draw_mode", "")) == "contour":
 		geometry_meshing_preview_key = _geometry_document_key(selected_asset_id, selected_component_id)
-		geometry_meshing_preview = ContourMeshService.generate(component)
+		geometry_meshing_preview = ContourMeshService.generate(component, world_contour_stroke_width_px)
 		geometry_meshing_preview_state = "ready" if bool(geometry_meshing_preview.get("valid", false)) else "invalid"
 		_show_status_message("Generated %d Contour Triangles." % int(geometry_meshing_preview.get("triangle_count", 0)) if bool(geometry_meshing_preview.get("valid", false)) else str(geometry_meshing_preview.get("errors", ["Contour Mesh could not be generated."])[0]))
 		_render_outliner()

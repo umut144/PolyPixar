@@ -218,8 +218,17 @@ Schema 40 replaces the authored `ribbon` draw mode with the fill-less open
 `contour` mode. Loading schema 39 or older converts Ribbon centerline topology
 explicitly; current-schema Ribbon values are invalid and receive no fallback.
 Component-local Ribbon widths are discarded because Contours use the fixed
-World stroke default. Legacy `ribbon_strip` Bakes remain readable records but
+World stroke setting. Legacy `ribbon_strip` Bakes remain readable records but
 are never current for a Contour and must be rebuilt as `contour_stroke`.
+
+Schema 41 renames the toolbar surface to `World Settings` and introduces one
+typed authored Contour width shared by every Asset. The required
+`world_settings` record fixes reference density at `128 px/m` and stores a
+finite positive `contour_stroke_width_px`, defaulting to `4 px` for new Worlds.
+Schema 40 and older Worlds migrate explicitly to that default; schema-41 data
+never receives a silent missing/invalid-value fallback. Width participates in
+Contour Mesh fingerprints and build signatures, so downstream Bakes become
+stale without changing Component topology.
 
 Sampling results carry their own algorithm version independently of the
 World schema. The junction-aware version invalidates pre-arrangement flat

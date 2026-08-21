@@ -15,6 +15,7 @@ func _init() -> void:
 	_test_catch_parent_snapping()
 	_test_contour_stroke_service()
 	_test_contour_stroke_robust_geometry()
+	_test_world_contour_settings()
 	_test_geometry_sampling_service()
 	_test_geometry_auto_build_service()
 	_test_create_outliner_expansion_scope()
@@ -513,6 +514,48 @@ func _test_contour_stroke_robust_geometry() -> void:
 	_expect(not bool(overlapping_stroke.get("valid", true)) and "overlap collinearly" in " ".join(overlapping_stroke.get("errors", [])), "Non-adjacent collinear Boundary overlap must be rejected with a stable validation error, never repaired by an implicit fallback.")
 
 
+func _test_world_contour_settings() -> void:
+	var defaults := WorldSettingsService.default_settings()
+	_expect(is_equal_approx(float(defaults.get("reference_pixels_per_meter", 0.0)), 128.0) and is_equal_approx(float(defaults.get("contour_stroke_width_px", 0.0)), 4.0), "New Worlds should start with the approved 128 px/m reference density and one 4 px Contour width for every Asset.")
+	var migrated := WorldSettingsService.decode(null, 40)
+	_expect(bool(migrated.get("valid", false)) and bool(migrated.get("migrated", false)) and is_equal_approx(float(migrated.get("settings", {}).get("contour_stroke_width_px", 0.0)), 4.0), "Schema 40 and older Worlds must migrate explicitly to the 4 px World Contour default.")
+	_expect(not bool(WorldSettingsService.decode(null, 41).get("valid", true)), "Schema 41 must reject a missing world_settings record instead of silently applying a fallback.")
+	_expect(not bool(WorldSettingsService.decode({"reference_pixels_per_meter": "128", "contour_stroke_width_px": 4.0}, 41).get("valid", true)), "Schema-41 World Settings must reject stringly typed numeric fields.")
+	_expect(not bool(WorldSettingsService.decode({"reference_pixels_per_meter": 128.0, "contour_stroke_width_px": 0.0}, 41).get("valid", true)), "World Settings must reject a non-positive authored Contour width.")
+	var decoded := WorldSettingsService.decode({"reference_pixels_per_meter": 128.0, "contour_stroke_width_px": 6.0}, 41)
+	_expect(bool(decoded.get("valid", false)) and not bool(decoded.get("migrated", true)) and WorldSettingsService.encode(6.0) == decoded.get("settings", {}), "Schema-41 World Settings should round-trip a typed authored pixel width without migration.")
+
+	var contour := _component()
+	contour["id"] = "arm_line"
+	contour["draw_mode"] = "contour"
+	BezierTopology.add_point(contour, Vector2.ZERO, "linear")
+	BezierTopology.add_point(contour, Vector2(8.0, 0.0), "linear")
+	var four_px_mesh := ContourMeshService.generate(contour, 4.0)
+	var six_px_mesh := ContourMeshService.generate(contour, 6.0)
+	_expect(bool(four_px_mesh.get("valid", false)) and bool(six_px_mesh.get("valid", false)) and is_equal_approx(float(six_px_mesh.get("parameters", {}).get("stroke_width_meters", 0.0)), 0.046875), "Contour Mesh generation must derive the selected World width through the fixed 128 px/m density.")
+	_expect(not ContourMeshService.matches_source(four_px_mesh, contour, 6.0) and ContourMeshService.matches_source(six_px_mesh, contour, 6.0), "Changing the World Contour width must invalidate every Mesh baked at the previous width.")
+	var four_vertices: Array = four_px_mesh.get("vertices", [])
+	var six_vertices: Array = six_px_mesh.get("vertices", [])
+	_expect(Vector2(six_vertices[0].get("position", Vector2.ZERO)).distance_to(Vector2(six_vertices[1].get("position", Vector2.ZERO))) > Vector2(four_vertices[0].get("position", Vector2.ZERO)).distance_to(Vector2(four_vertices[1].get("position", Vector2.ZERO))), "The authored World width must change actual centered stroke geometry, not only metadata.")
+
+	var application = load("res://scripts/main.gd").new()
+	application._build_ui()
+	_expect(int(application.SCHEMA_VERSION) == 41 and application.world_scale_menu.text.begins_with("World Settings"), "Slice 5 should expose World Settings in the top toolbar and version its persisted World contract as schema 41.")
+	_expect(is_equal_approx(float(application.world_contour_stroke_width_field.value), 4.0), "World Settings should show the 4 px default in its authored Contour width field.")
+	application.world_contour_stroke_width_px = 4.0
+	var four_px_signature: Dictionary = application._geometry_build_signature("", "", contour)
+	application.world_contour_stroke_width_px = 6.0
+	var six_px_signature: Dictionary = application._geometry_build_signature("", "", contour)
+	_expect(not GeometryAutoBuildService.signatures_match(four_px_signature, six_px_signature), "The World width must participate in the automatic build signature used by batch invalidation.")
+	application.world_contour_stroke_width_px = 4.0
+	var history_snapshot: Dictionary = application._capture_history_snapshot()
+	application._on_world_contour_stroke_width_changed(6.0)
+	_expect(is_equal_approx(application.world_contour_stroke_width_px, 6.0) and is_equal_approx(float(application._serialize_world_settings().get("contour_stroke_width_px", 0.0)), 6.0), "Editing World Settings should update the single persisted width shared by all Assets.")
+	application._restore_history_snapshot(history_snapshot)
+	_expect(is_equal_approx(application.world_contour_stroke_width_px, 4.0) and is_equal_approx(float(application.world_contour_stroke_width_field.value), 4.0), "The authored World Contour width should participate in Undo/Redo snapshots.")
+	application.free()
+
+
 func _distance_to_segment(point: Vector2, start: Vector2, end: Vector2) -> float:
 	var delta := end - start
 	if delta.length_squared() <= 0.000000000001:
@@ -615,9 +658,9 @@ func _test_geometry_sampling_service() -> void:
 	_expect(not bool(GeometrySamplingService.generate(open_component).get("valid", true)), "An open contour should fail visibly at the mesh-pipeline Sampling boundary.")
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
-	_expect(application._has_supported_schema({"schema_version": 40}) and application._has_supported_schema({"schema_version": 39}) and not application._has_supported_schema({"schema_version": 41}), "Schema 40 should keep current and older World documents readable and reject unknown future schemas.")
-	_expect(application._normalize_component_draw_mode("ribbon", 39) == "contour" and application._normalize_component_draw_mode("contour", 40) == "contour", "Schema-40 loading must explicitly migrate legacy Ribbon Components to open Contours.")
-	_expect(application._normalize_component_draw_mode("ribbon", 40) == "ribbon", "Current-schema Ribbon data must remain visibly invalid instead of receiving a silent backward fallback.")
+	_expect(application._has_supported_schema({"schema_version": 41}) and application._has_supported_schema({"schema_version": 40}) and not application._has_supported_schema({"schema_version": 42}), "Schema 41 should keep current and older World documents readable and reject unknown future schemas.")
+	_expect(application._normalize_component_draw_mode("ribbon", 39) == "contour" and application._normalize_component_draw_mode("contour", 41) == "contour", "Schema-41 loading must retain the explicit legacy Ribbon-to-Contour migration boundary.")
+	_expect(application._normalize_component_draw_mode("ribbon", 41) == "ribbon", "Current-schema Ribbon data must remain visibly invalid instead of receiving a silent backward fallback.")
 	var arranged_round_trip: Dictionary = application._normalize_sampling_bake(application._serialize_sampling_bake(arranged_result))
 	_expect(arranged_round_trip.get("cuts", [])[0].get("fragments", []).size() == 2 and arranged_round_trip.get("cuts", [])[0].get("fragments", [])[0].get("samples", [])[0].get("position", null) is Vector2, "Schema 32 should preserve Cut fragment connectivity and restore fragment positions as Vector2 values.")
 	var geometry_document: Dictionary = application._default_geometry_document("asset_1", "component_1")
@@ -626,7 +669,7 @@ func _test_geometry_sampling_service() -> void:
 	baked_result["bake_id"] = "bake_test"
 	geometry_document["sampling"]["bakes"][GeometrySamplingService.ADAPTIVE] = baked_result
 	var serialized_geometry: Dictionary = application._serialize_geometry_document(geometry_document)
-	_expect(int(serialized_geometry.get("schema_version", 0)) == 40 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-40 JSON arrays.")
+	_expect(int(serialized_geometry.get("schema_version", 0)) == 41 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-41 JSON arrays.")
 	var normalized_geometry: Dictionary = application._normalize_geometry_document(serialized_geometry, "asset_1", "component_1")
 	_expect(normalized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Vector2, "Sampling bake loading should restore local sample positions as Vector2 values.")
 	_expect(normalized_geometry["sampling"]["bakes"].size() == 1, "Sampling should retain one Adaptive Bake.")
@@ -2081,7 +2124,7 @@ func _test_motion_act_evaluator() -> void:
 	var normalized: Dictionary = application._normalize_motion_act({"id": "act_7", "parameters": {"direction": [0.0, 2.0], "distance": 12.0}}, "fallback")
 	_expect(Vector2(normalized.get("parameters", {}).get("direction", Vector2.ZERO)) == Vector2(0.0, 2.0), "Persisted Slide direction arrays should normalize back to Vector2 values.")
 	var serialized: Dictionary = application._serialize_motion_act(normalized)
-	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 40, "Act persistence should serialize vectors as JSON arrays using schema 40.")
+	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 41, "Act persistence should serialize vectors as JSON arrays using schema 41.")
 	var normalized_jump: Dictionary = application._normalize_motion_act({"id": "act_8", "primitive": "jump", "parameters": {"direction": [1.0, 0.0], "distance": 7.0, "height": 2.5, "arc": "snappy"}}, "fallback")
 	var serialized_jump: Dictionary = application._serialize_motion_act(normalized_jump)
 	_expect(str(serialized_jump.get("primitive", "")) == MotionActEvaluator.JUMP and is_equal_approx(float(serialized_jump.get("parameters", {}).get("height", 0.0)), 2.5) and str(serialized_jump.get("parameters", {}).get("arc", "")) == MotionActEvaluator.JUMP_ARC_SNAPPY, "Jump-specific parameters should survive normalization and serialization.")

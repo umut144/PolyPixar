@@ -4,7 +4,7 @@ PolyTools treats the final authored Bezier boundary as the exact centerline of
 the visible art contour. A contour is derived geometry and never replaces or
 mutates Component `points`, `edges`, or `chains`.
 
-## Slices 1–4: closed boundaries, open Contours, and robust geometry
+## Slices 1–5: geometry and World-authored width
 
 `ContourStrokeService` derives a deterministic indexed triangle mesh from
 exactly one closed outer/hole Chain or one fill-less open Contour Chain.
@@ -20,11 +20,26 @@ topology. Runtime manifest schema 3 has no matching art-stroke role, so open
 Contours are visibly blocked from Runtime Export rather than serialized as
 Fill Meshes.
 
+World schema 41 adds the required typed `world_settings` record:
+
+```json
+{
+  "reference_pixels_per_meter": 128.0,
+  "contour_stroke_width_px": 4.0
+}
+```
+
+The width is one World-authored value shared by every Asset and Component; a
+Component-local override is not part of the model. Schema 40 and older Worlds
+migrate explicitly to `4 px`. A schema-41 World with a missing or invalid
+record fails loading instead of receiving a fallback. Changing the value
+invalidates Contour Mesh fingerprints and their dependent Bakes.
+
 The fixed technical semantics are:
 
 - authored reference density: `128 px/m`;
-- current fixed World default width: `4 px` = `0.03125 m`;
-- centered offset: `0.015625 m` on each side of the source boundary;
+- new-World default width: `4 px` = `0.03125 m`;
+- centered offset: `stroke_width_px / 128 / 2` meters on each side;
 - adaptive Bezier sampling deviation: at most `0.25 px`;
 - joins: miter with limit `4.0`, then bevel;
 - caps: butt (an uninterrupted closed loop has no cap).
@@ -58,7 +73,7 @@ for downstream consumers but does not alter the centered stroke construction.
 
 Closed outer and Hole chains use the same validation and tessellation rules.
 Wizard-like tips, small eye-scale returns, holes, and visually adjacent lines
-are regression fixtures for this contract. Editable World settings and the
-typed Runtime Export role belong to later slices. Schema 39 and older Ribbons
+are regression fixtures for this contract. The typed Runtime Export role
+belongs to a later slice. Schema 39 and older Ribbons
 migrate explicitly to open Contours; their legacy strip Bakes never qualify as
 current Contour Stroke Bakes.
