@@ -1,7 +1,7 @@
 # PolyTools Runtime Export Contract
 
 **Status:** Normative consumer contract for Asset Catalog schema `1` and
-runtime manifest schema `2`.
+runtime manifest schema `3`.
 
 This document is the single source of truth for consuming PolyTools Runtime
 packages. `AI_CONTEXT.md`, `ARCHITECTURE.md`, and the geometry documents explain
@@ -72,7 +72,7 @@ unique in the Catalog. A consumer must verify that the loaded Manifest's
 
 ## Compatibility and failure policy
 
-Every Catalog and Manifest has an integer `schema_version`. A schema-2 Manifest consumer must reject
+Every Catalog and Manifest has an integer `schema_version`. A schema-3 Manifest consumer must reject
 an absent, non-integer, or unsupported version. It must not guess the meaning of
 unknown fields in place of missing required fields.
 
@@ -88,11 +88,11 @@ must be finite.
 
 ## Top-level Manifest
 
-Schema 2 requires:
+Schema 3 requires:
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `schema_version` | integer | Exactly `2` for this contract. |
+| `schema_version` | integer | Exactly `3` for this contract. Schema 2 is not compatible and must be rejected. |
 | `asset_key` | non-empty lower-snake-case string | Runtime identity and package directory name. |
 | `display_name` | string | Informational authored name. |
 | `asset_type` | string | `character`, `props`, `terrain`, `icon`, or `symbols`. |
@@ -174,14 +174,16 @@ IDs must resolve inside the same Manifest, and the parent graph must be acyclic.
 `semantic_key` is the sole authored runtime designation. Consumers use it for
 gameplay, motion, and simulation lookup. They must not derive a role from
 `display_name`, `component_id`, array position, or `source_asset_key`.
-Keys are registered lower-snake-case strings, but schema 2 does not embed the
+Keys are registered lower-snake-case strings, but schema 3 does not embed the
 Semantic Registry or its version. Consumers should retain the key as a string
 and coordinate any stricter engine-side registry update explicitly.
 
 ## Ordinary Mesh Components
 
-An ordinary Component has no `kind: "asset_reference"`. It requires both
-`mesh` and `contour_mask` and must not be interpreted as a Reference.
+An ordinary Component has no `kind: "asset_reference"`. It requires `mesh`,
+`contour_carrier`, and `contour_mask` and must not be interpreted as a
+Reference. `mesh` remains the unmodified fill mesh; it must never be expanded,
+rewritten, or used to clip the Carrier.
 
 `mesh` requires:
 
@@ -195,7 +197,7 @@ For every index `i`, `vertices[i]` and `uvs[i]` describe the same stable Mesh
 Vertex. The index count is a positive multiple of three. Every index is in
 range, and the three indices of one Triangle are distinct.
 
-Schema 2 does not guarantee one Triangle winding across every Mesh method.
+Schema 3 does not guarantee one Triangle winding across every Mesh method.
 Transforms with a negative determinant may also reverse the final winding. A
 consumer using face culling must calculate and normalize winding explicitly; a
 2D consumer may instead use a non-culling material.
@@ -227,9 +229,18 @@ from Mesh bounds.
 
 ## Contour SDF
 
+`contour_carrier` is the independently drawable rectangle for the Contour SDF.
+It requires `role: "contour_sdf_carrier"`, `primitive: "rectangle"`, four
+local-meter `vertices`, triangle `indices` `[0, 1, 2, 0, 2, 3]`, and matching
+UVs `[[0,0], [1,0], [1,1], [0,1]]`. It receives exactly the same local and
+hierarchical transforms as its Component. A runtime renders fill with `mesh`
+and renders the contour pass with this Carrier; it must not clip the latter to
+the fill mesh. This keeps static masks compatible with translate, rotate, and
+scale animation without SDF regeneration.
+
 `contour_mask` requires:
 
-| Field | Schema-2 value or type |
+| Field | Schema-3 value or type |
 | --- | --- |
 | `path` | Relative package path to the PNG. |
 | `type` | `signed_distance_field` |
@@ -243,12 +254,31 @@ from Mesh bounds.
 | `image_origin` | `top_left` |
 | `uv_to_pixel` | `x=u*width, y=(1-v)*height` |
 | `pixel_hash` | Lowercase SHA-256 of the decoded L8 pixel bytes. |
+| `contour_domain` | `{ min: [x, y], size: [width, height] }`, a positive Component-local meter rectangle mapped linearly from SDF UV `[0,1]²`. |
+| `content_bounds_uv` | `{ min: [u, v], max: [u, v] }`, the actual silhouette UV bounds in that domain. |
+| `outer_padding_sdf_px` | `{ left, right, bottom, top }` finite non-negative SDF-pixel distances from `content_bounds_uv` to the domain edge. |
+| `outer_padding_meters` | `{ left, right, bottom, top }` finite non-negative local-meter distances corresponding to that padding. |
+
+The four metric padding values must each be at least `0.1875` m. This is the
+normative Game00 reference minimum: 16 screen pixels at a 9.375 m vertical
+camera span and 800 px window height. `spread_px` must be at least the largest
+declared `outer_padding_sdf_px`, so the static SDF's signed range covers the
+whole padded Carrier. The exporter rejects a Component that cannot meet these
+requirements; it does not emit a clipped or approximate fallback.
+
+For this contract the accepted UV bake must map the SDF domain to one
+unrotated, positive Component-local rectangle. Arbitrary UV rotation or a
+non-affine mapping is rejected because it cannot truthfully define
+`contour_domain`; its horizontal and vertical metres-per-SDF-pixel must also
+match, preserving metric signed-distance semantics. PolyTools' Bounds / Planar bake automatically enlarges its
+border for small Components to meet the metric minimum, and SDF baking raises
+its static spread deterministically to cover that border.
 
 The resource is a deterministic single-channel L8 PNG. It is data, not color:
 the texture must be sampled without sRGB decoding, and the red channel is the
 normative channel even if an image loader expands L8 to RGB or RGBA.
 
-For a normalized sample `s`, schema 2 encodes signed distance as:
+For a normalized sample `s`, schema 3 encodes signed distance as:
 
 ```text
 signed_distance_px = (s - boundary_value) * 2 * spread_px
@@ -310,6 +340,14 @@ An ordinary Component record is structurally equivalent to:
     "indices": [0, 1, 2],
     "uvs": [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]]
   },
+  "contour_carrier": {
+    "role": "contour_sdf_carrier",
+    "primitive": "rectangle",
+    "local_rect": {"min": [-0.2, -0.2], "size": [1.4, 1.4]},
+    "vertices": [[-0.2, -0.2], [1.2, -0.2], [1.2, 1.2], [-0.2, 1.2]],
+    "indices": [0, 1, 2, 0, 2, 3],
+    "uvs": [[0, 0], [1, 0], [1, 1], [0, 1]]
+  },
   "contour_mask": {
     "path": "masks/component_6.sdf.png",
     "type": "signed_distance_field",
@@ -322,6 +360,10 @@ An ordinary Component record is structurally equivalent to:
     "uv_origin": "bottom_left",
     "image_origin": "top_left",
     "uv_to_pixel": "x=u*width, y=(1-v)*height",
+    "contour_domain": {"min": [-0.2, -0.2], "size": [1.4, 1.4]},
+    "content_bounds_uv": {"min": [0.142857, 0.142857], "max": [0.857143, 0.857143]},
+    "outer_padding_sdf_px": {"left": 36.571, "right": 36.571, "bottom": 36.571, "top": 36.571},
+    "outer_padding_meters": {"left": 0.2, "right": 0.2, "bottom": 0.2, "top": 0.2},
     "pixel_hash": "<sha256-of-decoded-l8-pixels>"
   }
 }

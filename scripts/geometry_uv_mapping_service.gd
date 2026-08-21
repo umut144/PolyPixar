@@ -11,6 +11,7 @@ const DEFAULT_PRESERVE_ASPECT := true
 const DEFAULT_PADDING := 0.0625
 const MIN_SCALE := 0.01
 const MAX_PADDING := 0.49
+const GAME00_MIN_OUTER_CONTOUR_PADDING_METERS := 0.1875
 
 
 static func default_recipe() -> Dictionary:
@@ -50,7 +51,7 @@ static func normalize_recipe(raw_recipe) -> Dictionary:
 
 
 static func generate(mesh_bake: Dictionary, raw_recipe = {}) -> Dictionary:
-	var recipe := normalize_recipe(raw_recipe)
+	var recipe := _effective_recipe(mesh_bake, raw_recipe)
 	var errors := validation_issues(mesh_bake, recipe)
 	if not errors.is_empty():
 		return _failed_result(mesh_bake, recipe, errors)
@@ -66,6 +67,8 @@ static func generate(mesh_bake: Dictionary, raw_recipe = {}) -> Dictionary:
 	var scale := float(recipe["parameters"]["scale"])
 	var offset := Vector2(float(recipe["parameters"]["offset_u"]), float(recipe["parameters"]["offset_v"]))
 	var padding := float(recipe["parameters"]["padding"])
+	if padding >= MAX_PADDING:
+		return _failed_result(mesh_bake, recipe, ["The Component is too small to encode the required metric Contour SDF border at the supported UV padding limit."])
 	var uv_entries: Array = []
 	for vertex in vertices:
 		var position := Vector2(vertex.get("position", Vector2.ZERO))
@@ -122,7 +125,7 @@ static func validation_issues(mesh_bake: Dictionary, recipe: Dictionary = {}) ->
 
 
 static func source_fingerprint(mesh_bake: Dictionary, raw_recipe = {}) -> String:
-	var recipe := normalize_recipe(raw_recipe)
+	var recipe := _effective_recipe(mesh_bake, raw_recipe)
 	var parts := PackedStringArray([
 		mesh_fingerprint(mesh_bake),
 		str(recipe.get("method", "")),
@@ -137,7 +140,7 @@ static func source_fingerprint(mesh_bake: Dictionary, raw_recipe = {}) -> String
 static func result_matches(result: Dictionary, mesh_bake: Dictionary, raw_recipe = {}) -> bool:
 	if result.is_empty() or not bool(result.get("valid", false)):
 		return false
-	var recipe := normalize_recipe(raw_recipe)
+	var recipe := _effective_recipe(mesh_bake, raw_recipe)
 	return str(result.get("method", "")) == str(recipe.get("method", "")) \
 		and result.get("parameters", {}) == recipe.get("parameters", {}) \
 		and str(result.get("mesh_bake_id", "")) == str(mesh_bake.get("bake_id", "")) \
@@ -167,6 +170,22 @@ static func _has_exact_vertex_mapping(uv_entries: Array, vertices: Array) -> boo
 			return false
 		actual[vertex_id] = true
 	return actual.size() == expected.size()
+
+
+static func _effective_recipe(mesh_bake: Dictionary, raw_recipe = {}) -> Dictionary:
+	var recipe := normalize_recipe(raw_recipe)
+	if mesh_bake.get("vertices", []).is_empty():
+		return recipe
+	var first_position := Vector2(mesh_bake["vertices"][0].get("position", Vector2.ZERO))
+	var bounds := Rect2(first_position, Vector2.ZERO)
+	for vertex in mesh_bake.get("vertices", []):
+		if vertex is Dictionary:
+			bounds = bounds.expand(Vector2(vertex.get("position", Vector2.ZERO)))
+	var extent := Vector2(maxf(bounds.size.x, 0.000001), maxf(bounds.size.y, 0.000001))
+	var domain_extent := maxf(extent.x, extent.y) if bool(recipe["parameters"]["preserve_aspect"]) else minf(extent.x, extent.y)
+	var required_padding := GAME00_MIN_OUTER_CONTOUR_PADDING_METERS / (domain_extent * ToolUnits.TO_METERS + GAME00_MIN_OUTER_CONTOUR_PADDING_METERS * 2.0)
+	recipe["parameters"]["padding"] = maxf(float(recipe["parameters"]["padding"]), required_padding)
+	return recipe
 
 
 static func mesh_fingerprint(mesh_bake: Dictionary) -> String:

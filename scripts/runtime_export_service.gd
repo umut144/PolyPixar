@@ -1,7 +1,12 @@
 class_name RuntimeExportService
 extends RefCounted
 
-const MANIFEST_SCHEMA_VERSION := 2
+const MANIFEST_SCHEMA_VERSION := 3
+const GAME00_REFERENCE_VERTICAL_METERS := 9.375
+const GAME00_REFERENCE_WINDOW_HEIGHT_PX := 800.0
+const MIN_OUTER_CONTOUR_PADDING_SCREEN_PX := 16.0
+const MIN_OUTER_CONTOUR_PADDING_METERS := GAME00_REFERENCE_VERTICAL_METERS / GAME00_REFERENCE_WINDOW_HEIGHT_PX * MIN_OUTER_CONTOUR_PADDING_SCREEN_PX
+const AFFINE_EPSILON := 0.000001
 static func build_manifest(asset: Dictionary, sources: Dictionary) -> Dictionary:
 	var errors: Array[String] = []
 	var registry := SemanticRegistry.load_registry()
@@ -122,7 +127,7 @@ static func _build_component(component: Dictionary, source: Dictionary, export_t
 			errors.append("%s: Mesh Vertex IDs and positions must be unique and finite." % label)
 			continue
 		vertex_indices[vertex_id] = vertices.size()
-		# Editor mesh coordinates are authored around the Component pivot.  Schema 2
+		# Editor mesh coordinates are authored around the Component pivot.  Schema 3
 		# instead requires mesh data in Component-local space, so move that pivot to
 		# the local origin before serializing it.
 		vertices.append(_meters(vertex_position - authored_pivot))
@@ -169,6 +174,21 @@ static func _build_component(component: Dictionary, source: Dictionary, export_t
 	var resolution: Array = sdf.get("resolution", []) if sdf is Dictionary else []
 	if resolution.size() != 2 or int(resolution[0]) <= 0 or int(resolution[1]) <= 0:
 		errors.append("%s: SDF resolution metadata is invalid." % label)
+	var contour_layout := _contour_layout(vertices, ordered_uvs, [int(resolution[0]), int(resolution[1])]) if resolution.size() == 2 else {"valid": false, "error": "Contour SDF domain requires a valid resolution."}
+	if not bool(contour_layout.get("valid", false)):
+		errors.append("%s: %s" % [label, str(contour_layout.get("error", "Contour SDF domain is invalid."))])
+	else:
+		var padding_meters: Dictionary = contour_layout["outer_padding_meters"]
+		var padding_px: Dictionary = contour_layout["outer_padding_sdf_px"]
+		var domain_size: Array = contour_layout["contour_domain"].get("size", [])
+		if domain_size.size() != 2 or not is_equal_approx(float(domain_size[0]) / float(resolution[0]), float(domain_size[1]) / float(resolution[1])):
+			errors.append("%s: Contour SDF domain must use equal local meters per SDF pixel." % label)
+		var smallest_padding := minf(minf(float(padding_meters["left"]), float(padding_meters["right"])), minf(float(padding_meters["bottom"]), float(padding_meters["top"])))
+		if smallest_padding + AFFINE_EPSILON < MIN_OUTER_CONTOUR_PADDING_METERS:
+			errors.append("%s: Contour SDF outside padding must be at least %.6f m (16 Game00 reference pixels)." % [label, MIN_OUTER_CONTOUR_PADDING_METERS])
+		var required_spread_px := maxf(maxf(float(padding_px["left"]), float(padding_px["right"])), maxf(float(padding_px["bottom"]), float(padding_px["top"])))
+		if float(sdf.get("spread_px", 0.0)) + AFFINE_EPSILON < required_spread_px:
+			errors.append("%s: SDF spread must cover its declared outside padding." % label)
 	var position := Vector2(export_transform.get("position", Vector2.ZERO))
 	var pivot := Vector2.ZERO
 	var scale := Vector2(export_transform.get("scale", Vector2.ONE))
@@ -205,6 +225,7 @@ static func _build_component(component: Dictionary, source: Dictionary, export_t
 				"scale": [scale.x, scale.y]
 			},
 			"mesh": {"vertices": vertices, "indices": indices, "uvs": ordered_uvs},
+			"contour_carrier": contour_layout["carrier"],
 			"contour_mask": {
 				"path": relative_mask_path,
 				"type": "signed_distance_field",
@@ -217,6 +238,10 @@ static func _build_component(component: Dictionary, source: Dictionary, export_t
 				"uv_origin": "bottom_left",
 				"image_origin": "top_left",
 				"uv_to_pixel": "x=u*width, y=(1-v)*height",
+				"contour_domain": contour_layout["contour_domain"],
+				"content_bounds_uv": contour_layout["content_bounds_uv"],
+				"outer_padding_sdf_px": contour_layout["outer_padding_sdf_px"],
+				"outer_padding_meters": contour_layout["outer_padding_meters"],
 				"pixel_hash": mask["pixel_hash"]
 			}
 		},
@@ -318,3 +343,42 @@ static func _component_label(component: Dictionary) -> String:
 
 static func _meters(value: Vector2) -> Array:
 	return [value.x * ToolUnits.TO_METERS, value.y * ToolUnits.TO_METERS]
+
+
+static func _contour_layout(vertices: Array, uvs: Array, resolution: Array) -> Dictionary:
+	if vertices.size() < 3 or vertices.size() != uvs.size() or resolution.size() != 2:
+		return {"valid": false, "error": "Contour SDF domain requires aligned Mesh positions, UVs, and a resolution."}
+	var local_bounds := Rect2(_vector2(vertices[0]), Vector2.ZERO)
+	var content_min := Vector2(INF, INF)
+	var content_max := Vector2(-INF, -INF)
+	for index in range(vertices.size()):
+		local_bounds = local_bounds.expand(_vector2(vertices[index]))
+		var coordinate := _vector2(uvs[index])
+		content_min = content_min.min(coordinate)
+		content_max = content_max.max(coordinate)
+	var content_size := content_max - content_min
+	if content_size.x <= AFFINE_EPSILON or content_size.y <= AFFINE_EPSILON or local_bounds.size.x <= AFFINE_EPSILON or local_bounds.size.y <= AFFINE_EPSILON:
+		return {"valid": false, "error": "Contour SDF UV and local content bounds must both have positive area."}
+	# Bounds / Planar UVs map the actual local bounds into content_bounds_uv.
+	# Deriving the full UV domain from those two rectangles avoids selecting an
+	# arbitrary triangle (many boundary vertices are collinear) and remains
+	# stable across the accepted deterministic mesh order.
+	var meters_per_uv := Vector2(local_bounds.size.x / content_size.x, local_bounds.size.y / content_size.y)
+	if not is_equal_approx(meters_per_uv.x, meters_per_uv.y):
+		return {"valid": false, "error": "Contour SDF domain must use equal local meters per SDF pixel."}
+	var domain_min := local_bounds.position - meters_per_uv * content_min
+	var domain_size := meters_per_uv
+	var width := float(resolution[0])
+	var height := float(resolution[1])
+	var padding_px := {"left": content_min.x * width, "right": (1.0 - content_max.x) * width, "bottom": content_min.y * height, "top": (1.0 - content_max.y) * height}
+	var padding_meters := {"left": content_min.x * domain_size.x, "right": (1.0 - content_max.x) * domain_size.x, "bottom": content_min.y * domain_size.y, "top": (1.0 - content_max.y) * domain_size.y}
+	var domain := {"min": [domain_min.x, domain_min.y], "size": [domain_size.x, domain_size.y]}
+	return {"valid": true, "contour_domain": domain, "content_bounds_uv": {"min": [content_min.x, content_min.y], "max": [content_max.x, content_max.y]}, "outer_padding_sdf_px": padding_px, "outer_padding_meters": padding_meters, "carrier": {"role": "contour_sdf_carrier", "primitive": "rectangle", "local_rect": domain, "vertices": [[domain_min.x, domain_min.y], [domain_min.x + domain_size.x, domain_min.y], [domain_min.x + domain_size.x, domain_min.y + domain_size.y], [domain_min.x, domain_min.y + domain_size.y]], "indices": [0, 1, 2, 0, 2, 3], "uvs": [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]}}
+
+
+static func _vector2(value) -> Vector2:
+	if value is Vector2:
+		return value
+	if value is Array and value.size() == 2:
+		return Vector2(float(value[0]), float(value[1]))
+	return Vector2.INF

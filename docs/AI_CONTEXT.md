@@ -94,12 +94,15 @@ Inspector without inflating the actionable count.
 The persistent `Update UVs (N)` action consumes only current accepted Component
 Meshes, including Ribbon Strips, and accepts deterministic Bounds / Planar UVs
 for visible Components with missing or stale mappings. New recipes reserve a
-calibrated UV border for later contour-mask derivation. UV results remain keyed
+calibrated UV border for later contour-mask derivation; small Components expand
+that border deterministically to at least 0.1875 m (16 Game00 reference pixels)
+outside the silhouette. UV results remain keyed
 one-to-one by stable Mesh Vertex ID and never alter Component topology or Meshes.
 
 The persistent `Update SDFs (N)` action consumes only current accepted Component
 Meshes and UV Bakes. It derives a deterministic 256×256 single-channel signed
-distance image for each visible Component, with a 16 px spread and values above
+distance image for each visible Component, with a spread raised deterministically
+when necessary to cover the metric outside border and values above
 0.5 inside the triangulated silhouette. Bake metadata remains in the Geometry
 document while `contour_sdf.png` is stored beside it. Mesh, UV, recipe, algorithm,
 or missing-resource changes make the SDF stale without changing source topology.
@@ -117,6 +120,9 @@ the active World-local
 updates the World-root `catalog.json`. Packages are
 staged, verified, and replaced atomically per Asset; an invalid Asset retains
 its older package and no fallback geometry is generated.
+Runtime manifest schema 3 additionally exports an independently renderable
+padded Contour Carrier for each ordinary Component, together with its typed
+local SDF domain and outside-padding metadata; the Fill Mesh is unchanged.
 The normative field-level package and consumer rules live in
 `docs/RUNTIME_EXPORT_CONTRACT.md`; other documents must not redefine them.
 

@@ -36,7 +36,7 @@ static func normalize_recipe(raw_recipe) -> Dictionary:
 
 
 static func generate(mesh_bake: Dictionary, uv_bake: Dictionary, raw_recipe = {}) -> Dictionary:
-	var recipe := normalize_recipe(raw_recipe)
+	var recipe := _effective_recipe(uv_bake, raw_recipe)
 	var errors := validation_issues(mesh_bake, uv_bake, recipe)
 	if not errors.is_empty():
 		return _failed_result(mesh_bake, uv_bake, recipe, errors)
@@ -162,7 +162,7 @@ static func uv_fingerprint(uv_bake: Dictionary) -> String:
 
 
 static func source_fingerprint(mesh_bake: Dictionary, uv_bake: Dictionary, raw_recipe = {}) -> String:
-	var recipe := normalize_recipe(raw_recipe)
+	var recipe := _effective_recipe(uv_bake, raw_recipe)
 	return _strings_hash(PackedStringArray([
 		GeometryUVMappingService.mesh_fingerprint(mesh_bake),
 		uv_fingerprint(uv_bake),
@@ -181,7 +181,7 @@ static func failure_fingerprint(mesh_bake: Dictionary, uv_bake: Dictionary, raw_
 static func result_matches(result: Dictionary, mesh_bake: Dictionary, uv_bake: Dictionary, raw_recipe = {}) -> bool:
 	if result.is_empty() or not bool(result.get("valid", false)):
 		return false
-	var recipe := normalize_recipe(raw_recipe)
+	var recipe := _effective_recipe(uv_bake, raw_recipe)
 	return int(result.get("algorithm_version", 0)) == ALGORITHM_VERSION \
 		and str(result.get("method", "")) == SINGLE_CHANNEL_SDF \
 		and result.get("parameters", {}) == recipe.get("parameters", {}) \
@@ -271,6 +271,22 @@ static func _bytes_hash(bytes: PackedByteArray) -> String:
 	context.start(HashingContext.HASH_SHA256)
 	context.update(bytes)
 	return context.finish().hex_encode()
+
+
+static func _effective_recipe(uv_bake: Dictionary, raw_recipe = {}) -> Dictionary:
+	var recipe := normalize_recipe(raw_recipe)
+	var resolution := int(recipe["parameters"]["resolution"])
+	var content_min := Vector2(INF, INF)
+	var content_max := Vector2(-INF, -INF)
+	for entry in uv_bake.get("uvs", []):
+		if entry is Dictionary:
+			var uv := Vector2(entry.get("uv", Vector2.INF))
+			if uv.is_finite():
+				content_min = content_min.min(uv)
+				content_max = content_max.max(uv)
+	var maximum_padding_px := maxf(maxf(content_min.x * resolution, (1.0 - content_max.x) * resolution), maxf(content_min.y * resolution, (1.0 - content_max.y) * resolution)) if content_min.is_finite() else 0.0
+	recipe["parameters"]["spread_px"] = maxf(float(recipe["parameters"]["spread_px"]), maximum_padding_px)
+	return recipe
 
 
 static func _failed_result(mesh_bake: Dictionary, uv_bake: Dictionary, recipe: Dictionary, errors: Array) -> Dictionary:

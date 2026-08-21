@@ -225,7 +225,7 @@ The normative serialized package and consumer contract is
 [`RUNTIME_EXPORT_CONTRACT.md`](RUNTIME_EXPORT_CONTRACT.md). The summary below
 describes how the editor produces that contract.
 
-`RuntimeExportService` builds manifest schema 2 exclusively from current
+`RuntimeExportService` builds manifest schema 3 exclusively from current
 accepted Component Mesh, UV, and SDF Bakes. It rejects missing or stale inputs,
 missing/corrupt mask resources, invalid or duplicate Semantic Keys, unresolved
 Asset References, and incomplete or cyclic visible hierarchies. Ordinary
@@ -239,7 +239,10 @@ positive rotations are counter-clockwise radians, and one Tool unit equals
 `T(position) * R(rotation) * S(scale) * T(-pivot)`. Components are listed in
 global ascending `(z_index, component_id)` order from back to front. Accepted
 Mesh Vertex order is retained, Triangle Vertex IDs become compact indices, and
-UVs are aligned to that same order through stable Vertex IDs.
+UVs are aligned to that same order through stable Vertex IDs. Each ordinary
+Component also exports a separate padded Contour Carrier rectangle and the
+typed local SDF domain, silhouette UV bounds, and SDF-pixel/metre outside
+padding. The unchanged fill Mesh is never used to clip that Carrier.
 
 Each visible Asset is exported to the active World-local
 `res://worlds/<world_key>/PolyToolsRuntimeExports/<asset_key>/` directory as `manifest.json` plus relative

@@ -1223,11 +1223,11 @@ func _test_runtime_export_service() -> void:
 		"triangles": [{"vertex_ids": ["v0", "v1", "v2"]}]
 	}
 	var uv := {"valid": true, "uvs": [
-		{"vertex_id": "v2", "uv": Vector2(0.0, 1.0)},
-		{"vertex_id": "v0", "uv": Vector2(0.0, 0.0)},
-		{"vertex_id": "v1", "uv": Vector2(1.0, 0.0)}
+		{"vertex_id": "v2", "uv": Vector2(0.2, 0.8)},
+		{"vertex_id": "v0", "uv": Vector2(0.2, 0.2)},
+		{"vertex_id": "v1", "uv": Vector2(0.8, 0.2)}
 	]}
-	var sdf := {"valid": true, "resolution": [256, 256], "spread_px": 16.0, "boundary_value": 0.5, "inside_is_greater": true, "pixel_hash": "stable_pixels"}
+	var sdf := {"valid": true, "resolution": [256, 256], "spread_px": 64.0, "boundary_value": 0.5, "inside_is_greater": true, "pixel_hash": "stable_pixels"}
 	var body := {"id": "component_b", "name": "body", "semantic_key": "body", "visibility": true, "z_index": 2, "parent_component_id": "", "transform": {"position": Vector2(10.0, 20.0), "pivot": Vector2(2.0, 3.0), "rotation": 90.0, "scale": Vector2(2.0, 1.0)}}
 	var eye := {"id": "component_a", "name": "eye_left", "semantic_key": "eye_left", "visibility": true, "z_index": 2, "parent_component_id": "component_b", "transform": {"position": Vector2.ZERO, "pivot": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE}}
 	var asset := {"id": "wizard", "name": "Wizard", "asset_type": "character", "visibility": true, "asset_pivot": Vector2(5.0, 6.0), "components": [body, eye]}
@@ -1235,10 +1235,12 @@ func _test_runtime_export_service() -> void:
 	var result := RuntimeExportService.build_manifest(asset, {"component_a": source, "component_b": source})
 	var manifest: Dictionary = result.get("manifest", {})
 	var components: Array = manifest.get("components", [])
-	_expect(bool(result.get("valid", false)) and int(manifest.get("schema_version", 0)) == 2 and str(manifest.get("asset_key", "")) == "wizard" and not manifest.has("asset_id"), "Runtime export schema 2 should identify packages only by the Asset Key derived from their display name.")
+	_expect(bool(result.get("valid", false)) and int(manifest.get("schema_version", 0)) == 3 and str(manifest.get("asset_key", "")) == "wizard" and not manifest.has("asset_id"), "Runtime export schema 3 should identify packages only by the Asset Key derived from their display name.")
 	_expect(components.size() == 2 and str(components[0].get("component_id", "")) == "component_a" and str(components[1].get("component_id", "")) == "component_b", "Runtime Components should sort globally by ascending z_index and lexicographic Component ID.")
 	_expect(components[1].get("mesh", {}).get("vertices", []) == [[-0.2, -0.30000000000000004], [0.8, -0.30000000000000004], [-0.2, 0.7000000000000001]] and components[1].get("mesh", {}).get("indices", []) == [0, 1, 2], "Runtime Meshes should preserve accepted Vertex order, convert Tool units to meters, compact Triangle IDs, and be local to their Component pivot.")
-	_expect(components[1].get("mesh", {}).get("uvs", []) == [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]], "Runtime UVs should be reordered only through stable Vertex IDs.")
+	var exported_uvs: Array = components[1].get("mesh", {}).get("uvs", [])
+	_expect(exported_uvs.size() == 3 and is_equal_approx(float(exported_uvs[0][0]), 0.2) and is_equal_approx(float(exported_uvs[0][1]), 0.2) and is_equal_approx(float(exported_uvs[1][0]), 0.8) and is_equal_approx(float(exported_uvs[2][1]), 0.8), "Runtime UVs should be reordered only through stable Vertex IDs.")
+	_expect(components[1].get("contour_carrier", {}).get("role", "") == "contour_sdf_carrier" and components[1].get("contour_carrier", {}).get("indices", []) == [0, 1, 2, 0, 2, 3] and is_equal_approx(float(components[1].get("contour_mask", {}).get("outer_padding_meters", {}).get("left", 0.0)), 1.0 / 3.0), "Schema 3 should provide an independently drawable padded Contour Carrier with explicit metric outside padding.")
 	_expect(components[1].get("local_transform", {}).get("position", []) == [1.0, 2.0] and is_equal_approx(float(components[1].get("local_transform", {}).get("rotation_radians", 0.0)), PI / 2.0), "Runtime transforms should preserve Y-up coordinates and publish positions in meters and CCW radians.")
 	_expect(not components[1].has("display_name") and str(components[1].get("semantic_key", "")) == "body", "Runtime Components should expose their Semantic Key as the sole authored designation without a redundant display label.")
 	var wizard_head := {"id": "head", "semantic_key": "head", "visibility": true, "parent_component_id": "", "transform": {"position": Vector2(0.0, 8.5), "pivot": Vector2(0.0, 8.5), "rotation": 0.0, "scale": Vector2.ONE}}
@@ -1248,7 +1250,11 @@ func _test_runtime_export_service() -> void:
 	var eye_mesh: Dictionary = mesh.duplicate(true)
 	eye_mesh["vertices"] = [{"id": "v0", "position": Vector2(-0.25, 8.5)}, {"id": "v1", "position": Vector2(-0.15, 8.5)}, {"id": "v2", "position": Vector2(-0.25, 8.6)}]
 	var nested_asset := {"id": "nested_wizard", "name": "Nested Wizard", "asset_type": "character", "visibility": true, "asset_pivot": Vector2.ZERO, "components": [wizard_head, wizard_eye]}
-	var nested_result := RuntimeExportService.build_manifest(nested_asset, {"head": {"mesh": head_mesh, "uv": uv, "sdf": sdf, "sdf_resource_valid": true, "sdf_source_path": "/tmp/head_sdf.png"}, "eye": {"mesh": eye_mesh, "uv": uv, "sdf": sdf, "sdf_resource_valid": true, "sdf_source_path": "/tmp/eye_sdf.png"}})
+	var nested_uv := {"valid": true, "uvs": [{"vertex_id": "v2", "uv": Vector2(0.4, 0.6)}, {"vertex_id": "v0", "uv": Vector2(0.4, 0.4)}, {"vertex_id": "v1", "uv": Vector2(0.6, 0.4)}]}
+	var tiny_uv := {"valid": true, "uvs": [{"vertex_id": "v2", "uv": Vector2(0.49, 0.51)}, {"vertex_id": "v0", "uv": Vector2(0.49, 0.49)}, {"vertex_id": "v1", "uv": Vector2(0.51, 0.49)}]}
+	var nested_sdf: Dictionary = sdf.duplicate(true)
+	nested_sdf["spread_px"] = 128.0
+	var nested_result := RuntimeExportService.build_manifest(nested_asset, {"head": {"mesh": head_mesh, "uv": nested_uv, "sdf": nested_sdf, "sdf_resource_valid": true, "sdf_source_path": "/tmp/head_sdf.png"}, "eye": {"mesh": eye_mesh, "uv": tiny_uv, "sdf": nested_sdf, "sdf_resource_valid": true, "sdf_source_path": "/tmp/eye_sdf.png"}})
 	var nested_by_id: Dictionary = {}
 	for exported_component in nested_result.get("manifest", {}).get("components", []):
 		nested_by_id[str(exported_component.get("component_id", ""))] = exported_component
