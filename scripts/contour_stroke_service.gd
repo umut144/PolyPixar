@@ -5,7 +5,7 @@ extends RefCounted
 ## deterministic centered mesh for the visible runs of one closed outer/hole
 ## Chain or one open Contour Chain without changing canonical topology.
 
-const ALGORITHM_VERSION := 2
+const ALGORITHM_VERSION := 3
 const REFERENCE_PIXELS_PER_METER := 128.0
 const DEFAULT_STROKE_WIDTH_PX := 4.0
 const MAX_DEVIATION_PX := 0.25
@@ -16,6 +16,7 @@ const MAX_SAMPLE_DEPTH := 18
 const MAX_SAMPLES_PER_EDGE := 20000
 const MAX_TANGENT_TURN_RADIANS := PI / 12.0
 const GEOMETRY_EPSILON := 0.000001
+const MAX_SEGMENT_PAIR_CHECKS := 500000
 
 
 static func stroke_width_meters(stroke_width_px := DEFAULT_STROKE_WIDTH_PX) -> float:
@@ -42,6 +43,9 @@ static func generate(component: Dictionary, stroke_width_px := DEFAULT_STROKE_WI
 	var triangle_count := 0
 	var miter_join_count := 0
 	var bevel_join_count := 0
+	var self_intersection_count := 0
+	var narrow_overlap_pair_count := 0
+	var minimum_nonadjacent_clearance := INF
 	for run_data in sampled.get("runs", []):
 		var run_centerline: Array = run_data.get("samples", [])
 		var mesh := _build_stroke_mesh(run_centerline, width_tool_units * 0.5, bool(run_data.get("closed", false)))
@@ -66,12 +70,20 @@ static func generate(component: Dictionary, stroke_width_px := DEFAULT_STROKE_WI
 			"index_count": mesh.get("indices", PackedInt32Array()).size(),
 			"triangle_count": int(mesh.get("triangle_count", 0)),
 			"miter_join_count": int(mesh.get("miter_join_count", 0)),
-			"bevel_join_count": int(mesh.get("bevel_join_count", 0))
+			"bevel_join_count": int(mesh.get("bevel_join_count", 0)),
+			"geometry_diagnostics": mesh.get("geometry_diagnostics", {}).duplicate(true)
 		}
 		output_runs.append(run_result)
 		triangle_count += int(mesh.get("triangle_count", 0))
 		miter_join_count += int(mesh.get("miter_join_count", 0))
 		bevel_join_count += int(mesh.get("bevel_join_count", 0))
+		var run_diagnostics: Dictionary = mesh.get("geometry_diagnostics", {})
+		self_intersection_count += int(run_diagnostics.get("self_intersection_count", 0))
+		narrow_overlap_pair_count += int(run_diagnostics.get("narrow_overlap_pair_count", 0))
+		minimum_nonadjacent_clearance = minf(minimum_nonadjacent_clearance, float(run_diagnostics.get("minimum_nonadjacent_clearance_tool_units", INF)))
+	var minimum_clearance_meters = null
+	if is_finite(minimum_nonadjacent_clearance):
+		minimum_clearance_meters = minimum_nonadjacent_clearance * ToolUnits.TO_METERS
 	return {
 		"valid": true,
 		"errors": [],
@@ -98,7 +110,13 @@ static func generate(component: Dictionary, stroke_width_px := DEFAULT_STROKE_WI
 		"indices": indices,
 		"triangle_count": triangle_count,
 		"miter_join_count": miter_join_count,
-		"bevel_join_count": bevel_join_count
+		"bevel_join_count": bevel_join_count,
+		"geometry_diagnostics": {
+			"self_intersection_count": self_intersection_count,
+			"narrow_overlap_pair_count": narrow_overlap_pair_count,
+			"minimum_nonadjacent_clearance_meters": minimum_clearance_meters,
+			"triangle_validation": "complete"
+		}
 	}
 
 
@@ -263,6 +281,9 @@ static func _build_stroke_mesh(centerline: Array, half_width: float, closed: boo
 	var minimum_samples := 3 if closed else 2
 	if centerline.size() < minimum_samples:
 		return {"valid": false, "errors": ["Contour stroke run contains too few centerline samples."]}
+	var analysis := _analyze_centerline(centerline, half_width, closed)
+	if not bool(analysis.get("valid", false)):
+		return {"valid": false, "errors": analysis.get("errors", [])}
 	var segment_count := centerline.size() if closed else centerline.size() - 1
 	var directions: Array[Vector2] = []
 	var normals: Array[Vector2] = []
@@ -304,7 +325,9 @@ static func _build_stroke_mesh(centerline: Array, half_width: float, closed: boo
 		if absf(turn) <= GEOMETRY_EPSILON:
 			continue
 		var position := Vector2(centerline[join_index].get("position", Vector2.ZERO))
-		var outer_sign := 1.0 if turn > 0.0 else -1.0
+		# A positive turn bends toward the left normal, therefore its exposed
+		# outer corner is on the right. The inverse applies to a negative turn.
+		var outer_sign := -1.0 if turn > 0.0 else 1.0
 		var outer_previous := position + normals[previous_index] * half_width * outer_sign
 		var outer_next := position + normals[join_index] * half_width * outer_sign
 		var intersection := _line_intersection(outer_previous, previous_direction, outer_next, next_direction)
@@ -323,6 +346,9 @@ static func _build_stroke_mesh(centerline: Array, half_width: float, closed: boo
 			vertices.append(_mesh_vertex(outer_next, "join_outer_next", provenance))
 			_append_triangle(vertices, indices, base, base + 1, base + 2)
 			bevel_join_count += 1
+	var mesh_errors := _mesh_validation_issues(vertices, indices)
+	if not mesh_errors.is_empty():
+		return {"valid": false, "errors": mesh_errors}
 	return {
 		"valid": true,
 		"errors": [],
@@ -330,8 +356,135 @@ static func _build_stroke_mesh(centerline: Array, half_width: float, closed: boo
 		"indices": indices,
 		"triangle_count": indices.size() / 3,
 		"miter_join_count": miter_join_count,
-		"bevel_join_count": bevel_join_count
+		"bevel_join_count": bevel_join_count,
+		"geometry_diagnostics": analysis.get("diagnostics", {}).duplicate(true)
 	}
+
+
+static func _analyze_centerline(centerline: Array, half_width: float, closed: bool) -> Dictionary:
+	var errors: Array[String] = []
+	var segment_count := centerline.size() if closed else centerline.size() - 1
+	var segments: Array = []
+	for segment_index in range(segment_count):
+		var start := Vector2(centerline[segment_index].get("position", Vector2.ZERO))
+		var end := Vector2(centerline[(segment_index + 1) % centerline.size()].get("position", Vector2.ZERO))
+		if not start.is_finite() or not end.is_finite():
+			errors.append("Contour stroke centerline contains a non-finite position.")
+			continue
+		if start.distance_squared_to(end) <= GEOMETRY_EPSILON * GEOMETRY_EPSILON:
+			errors.append("Contour stroke sampling produced a degenerate segment.")
+			continue
+		segments.append({"start": start, "end": end, "index": segment_index})
+	if not errors.is_empty():
+		return {"valid": false, "errors": errors}
+	for join_index in range(1, segment_count):
+		var previous_direction := (Vector2(segments[join_index - 1]["end"]) - Vector2(segments[join_index - 1]["start"])).normalized()
+		var next_direction := (Vector2(segments[join_index]["end"]) - Vector2(segments[join_index]["start"])).normalized()
+		if previous_direction.dot(next_direction) <= -1.0 + GEOMETRY_EPSILON and absf(previous_direction.cross(next_direction)) <= GEOMETRY_EPSILON:
+			errors.append("Contour stroke centerline reverses direction by 180 degrees at sample %d; author an explicit non-overlapping turn." % (join_index + 1))
+	if closed:
+		var last_direction := (Vector2(segments.back()["end"]) - Vector2(segments.back()["start"])).normalized()
+		var first_direction := (Vector2(segments.front()["end"]) - Vector2(segments.front()["start"])).normalized()
+		if last_direction.dot(first_direction) <= -1.0 + GEOMETRY_EPSILON and absf(last_direction.cross(first_direction)) <= GEOMETRY_EPSILON:
+			errors.append("Contour stroke centerline reverses direction by 180 degrees at its closing sample; author an explicit non-overlapping turn.")
+	var self_intersection_count := 0
+	var narrow_overlap_pair_count := 0
+	var minimum_clearance := INF
+	var pair_count := segment_count * (segment_count - 1) / 2 - (segment_count if closed else maxi(0, segment_count - 1))
+	if pair_count > MAX_SEGMENT_PAIR_CHECKS:
+		return {"valid": false, "errors": ["Contour stroke robustness validation exceeded its deterministic segment-pair limit."]}
+	for first_index in range(segment_count):
+		for second_index in range(first_index + 1, segment_count):
+			if _segments_are_adjacent(first_index, second_index, segment_count, closed):
+				continue
+			var first: Dictionary = segments[first_index]
+			var second: Dictionary = segments[second_index]
+			var relation := _segment_relation(first["start"], first["end"], second["start"], second["end"])
+			if relation == "overlap":
+				errors.append("Contour stroke centerline segments %d and %d overlap collinearly; overlapping authored paths are ambiguous." % [first_index + 1, second_index + 1])
+				continue
+			if relation in ["cross", "touch"]:
+				self_intersection_count += 1
+				minimum_clearance = 0.0
+				narrow_overlap_pair_count += 1
+				if closed:
+					errors.append("Closed Contour stroke centerline segments %d and %d intersect; closed outer and Hole boundaries must remain simple loops." % [first_index + 1, second_index + 1])
+				continue
+			var clearance := _segment_clearance(first["start"], first["end"], second["start"], second["end"])
+			minimum_clearance = minf(minimum_clearance, clearance)
+			if clearance < half_width * 2.0 - GEOMETRY_EPSILON:
+				narrow_overlap_pair_count += 1
+	return {
+		"valid": errors.is_empty(),
+		"errors": errors,
+		"diagnostics": {
+			"self_intersection_count": self_intersection_count,
+			"narrow_overlap_pair_count": narrow_overlap_pair_count,
+			"minimum_nonadjacent_clearance_tool_units": minimum_clearance,
+			"centerline_segment_count": segment_count
+		}
+	}
+
+
+static func _segments_are_adjacent(first: int, second: int, segment_count: int, closed: bool) -> bool:
+	return second == first + 1 or (closed and first == 0 and second == segment_count - 1)
+
+
+static func _segment_relation(a: Vector2, b: Vector2, c: Vector2, d: Vector2) -> String:
+	var ab := b - a
+	var cd := d - c
+	var denominator := ab.cross(cd)
+	if absf(denominator) <= GEOMETRY_EPSILON:
+		if absf(ab.cross(c - a)) > GEOMETRY_EPSILON:
+			return "none"
+		var axis := 0 if absf(ab.x) >= absf(ab.y) else 1
+		var a_value := a.x if axis == 0 else a.y
+		var b_value := b.x if axis == 0 else b.y
+		var c_value := c.x if axis == 0 else c.y
+		var d_value := d.x if axis == 0 else d.y
+		var overlap := minf(maxf(a_value, b_value), maxf(c_value, d_value)) - maxf(minf(a_value, b_value), minf(c_value, d_value))
+		if overlap > GEOMETRY_EPSILON:
+			return "overlap"
+		return "touch" if overlap >= -GEOMETRY_EPSILON else "none"
+	var offset := c - a
+	var first_t := offset.cross(cd) / denominator
+	var second_t := offset.cross(ab) / denominator
+	if first_t < -GEOMETRY_EPSILON or first_t > 1.0 + GEOMETRY_EPSILON or second_t < -GEOMETRY_EPSILON or second_t > 1.0 + GEOMETRY_EPSILON:
+		return "none"
+	var proper := first_t > GEOMETRY_EPSILON and first_t < 1.0 - GEOMETRY_EPSILON and second_t > GEOMETRY_EPSILON and second_t < 1.0 - GEOMETRY_EPSILON
+	return "cross" if proper else "touch"
+
+
+static func _segment_clearance(a: Vector2, b: Vector2, c: Vector2, d: Vector2) -> float:
+	return minf(
+		minf(_point_segment_distance(a, c, d), _point_segment_distance(b, c, d)),
+		minf(_point_segment_distance(c, a, b), _point_segment_distance(d, a, b)))
+
+
+static func _point_segment_distance(point: Vector2, start: Vector2, end: Vector2) -> float:
+	return point.distance_to(Geometry2D.get_closest_point_to_segment(point, start, end))
+
+
+static func _mesh_validation_issues(vertices: Array, indices: PackedInt32Array) -> Array[String]:
+	var errors: Array[String] = []
+	if indices.size() % 3 != 0:
+		errors.append("Contour stroke tessellation produced an incomplete triangle index list.")
+		return errors
+	for triangle_offset in range(0, indices.size(), 3):
+		var first := int(indices[triangle_offset])
+		var second := int(indices[triangle_offset + 1])
+		var third := int(indices[triangle_offset + 2])
+		if first < 0 or second < 0 or third < 0 or first >= vertices.size() or second >= vertices.size() or third >= vertices.size():
+			errors.append("Contour stroke tessellation produced an out-of-range triangle index.")
+			continue
+		var a := Vector2(vertices[first].get("position", Vector2.ZERO))
+		var b := Vector2(vertices[second].get("position", Vector2.ZERO))
+		var c := Vector2(vertices[third].get("position", Vector2.ZERO))
+		if not a.is_finite() or not b.is_finite() or not c.is_finite():
+			errors.append("Contour stroke tessellation produced a non-finite triangle.")
+		elif (b - a).cross(c - a) <= GEOMETRY_EPSILON:
+			errors.append("Contour stroke tessellation produced a degenerate or inconsistently wound triangle.")
+	return errors
 
 
 static func _mesh_vertex(position: Vector2, role: String, provenance: Dictionary) -> Dictionary:
@@ -379,5 +532,6 @@ static func _failed_result(errors: Array, stroke_width_px: float) -> Dictionary:
 		"runs": [],
 		"centerline": [],
 		"vertices": [],
-		"indices": PackedInt32Array()
+		"indices": PackedInt32Array(),
+		"geometry_diagnostics": {"triangle_validation": "failed"}
 	}

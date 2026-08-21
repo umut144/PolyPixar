@@ -5,7 +5,7 @@ extends RefCounted
 ## shape used by PolyTools' derived-geometry pipeline. It never derives a fill.
 
 const METHOD := "contour_stroke"
-const ALGORITHM_VERSION := 1
+const ALGORITHM_VERSION := 2
 
 
 static func validation_issues(component: Dictionary) -> Array[String]:
@@ -62,6 +62,7 @@ static func generate(component: Dictionary) -> Dictionary:
 			"cap": ContourStrokeService.CAP_TYPE
 		},
 		"runs": stroke.get("runs", []).duplicate(true),
+		"geometry_diagnostics": stroke.get("geometry_diagnostics", {}).duplicate(true),
 		"vertices": vertices,
 		"triangles": triangles,
 		"boundary_constraints": [],
@@ -101,6 +102,7 @@ static func _failed_result(source_fingerprint_value: String, errors: Array) -> D
 		"method": METHOD,
 		"algorithm_version": ALGORITHM_VERSION,
 		"source_fingerprint": source_fingerprint_value,
+		"geometry_diagnostics": {"triangle_validation": "failed"},
 		"vertices": [],
 		"triangles": [],
 		"boundary_constraints": [],

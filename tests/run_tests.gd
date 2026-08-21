@@ -14,6 +14,7 @@ func _init() -> void:
 	_test_contour_stroke_mesh()
 	_test_catch_parent_snapping()
 	_test_contour_stroke_service()
+	_test_contour_stroke_robust_geometry()
 	_test_geometry_sampling_service()
 	_test_geometry_auto_build_service()
 	_test_create_outliner_expansion_scope()
@@ -273,6 +274,7 @@ func _test_contour_stroke_mesh() -> void:
 	var contour_round_trip: Dictionary = application._normalize_geometry_document(application._serialize_geometry_document(contour_document), "asset_contour", "component_contour")
 	var restored_contour: Dictionary = contour_round_trip.get("meshing", {}).get("bakes", {}).get(ContourMeshService.METHOD, {})
 	_expect(restored_contour.get("vertices", [])[0].has("edge_id") and restored_contour.get("runs", [])[0].get("centerline", [])[0].get("position", null) is Vector2, "Contour Mesh JSON persistence must retain typed Edge/curve provenance and restore Run centerlines as vectors.")
+	_expect(str(restored_contour.get("geometry_diagnostics", {}).get("triangle_validation", "")) == "complete", "Contour Mesh persistence must retain robust geometry diagnostics as typed engine-neutral data.")
 	application.free()
 
 
@@ -440,6 +442,75 @@ func _test_contour_stroke_service() -> void:
 	BezierTopology.close_active_chain(sharp_component)
 	var sharp_stroke := ContourStrokeService.generate(sharp_component)
 	_expect(bool(sharp_stroke.get("valid", false)) and int(sharp_stroke.get("bevel_join_count", 0)) > 0, "A miter longer than four half-widths should deterministically fall back to a bevel join.")
+
+
+func _test_contour_stroke_robust_geometry() -> void:
+	var concave_contour := _component()
+	concave_contour["draw_mode"] = "contour"
+	for position in [Vector2.ZERO, Vector2(10.0, 0.0), Vector2(10.0, 10.0)]:
+		BezierTopology.add_point(concave_contour, position, "linear")
+	var concave_stroke := ContourStrokeService.generate(concave_contour)
+	_expect(bool(concave_stroke.get("valid", false)), "A concave open turn should produce a robust centered stroke.")
+	var found_outer_previous := false
+	var found_outer_next := false
+	for vertex in concave_stroke.get("vertices", []):
+		var role := str(vertex.get("role", ""))
+		var position := Vector2(vertex.get("position", Vector2.ZERO))
+		found_outer_previous = found_outer_previous or (role == "join_outer_previous" and position.is_equal_approx(Vector2(10.0, -0.15625)))
+		found_outer_next = found_outer_next or (role == "join_outer_next" and position.is_equal_approx(Vector2(10.15625, 0.0)))
+	_expect(found_outer_previous and found_outer_next, "A positive turn must tessellate its exposed right-side corner, not add hidden overlap on the inner side.")
+	var concave_vertices: Array = concave_stroke.get("vertices", [])
+	var concave_indices: PackedInt32Array = concave_stroke.get("indices", PackedInt32Array())
+	var triangles_are_stable := concave_indices.size() % 3 == 0
+	for offset in range(0, concave_indices.size(), 3):
+		var a := Vector2(concave_vertices[concave_indices[offset]].get("position", Vector2.ZERO))
+		var b := Vector2(concave_vertices[concave_indices[offset + 1]].get("position", Vector2.ZERO))
+		var c := Vector2(concave_vertices[concave_indices[offset + 2]].get("position", Vector2.ZERO))
+		triangles_are_stable = triangles_are_stable and a.is_finite() and b.is_finite() and c.is_finite() and (b - a).cross(c - a) > ContourStrokeService.GEOMETRY_EPSILON
+	_expect(triangles_are_stable and str(concave_stroke.get("geometry_diagnostics", {}).get("triangle_validation", "")) == "complete", "Every emitted Contour Stroke triangle must be finite, non-degenerate, in range, and consistently wound.")
+
+	var crossing_contour := _component()
+	crossing_contour["draw_mode"] = "contour"
+	for position in [Vector2(0.0, 0.0), Vector2(10.0, 10.0), Vector2(0.0, 10.0), Vector2(10.0, 0.0)]:
+		BezierTopology.add_point(crossing_contour, position, "linear")
+	var crossing_stroke := ContourStrokeService.generate(crossing_contour)
+	_expect(bool(crossing_stroke.get("valid", false)) and int(crossing_stroke.get("geometry_diagnostics", {}).get("self_intersection_count", 0)) == 1, "An authored open-Contour crossing should remain renderable while reporting its exact self-intersection explicitly.")
+	_expect(crossing_stroke == ContourStrokeService.generate(crossing_contour), "Self-intersecting authored Contours must retain deterministic tessellation and diagnostics.")
+	var crossing_loop := crossing_contour.duplicate(true)
+	crossing_loop["draw_mode"] = "closed_loop"
+	BezierTopology.close_active_chain(crossing_loop)
+	var crossing_loop_stroke := ContourStrokeService.generate(crossing_loop)
+	_expect(not bool(crossing_loop_stroke.get("valid", true)) and "must remain simple loops" in " ".join(crossing_loop_stroke.get("errors", [])), "A self-intersecting closed outer or Hole Boundary must fail explicitly because its fill-side topology is ambiguous.")
+
+	var narrow_contour := _component()
+	narrow_contour["draw_mode"] = "contour"
+	for position in [Vector2(0.0, 0.0), Vector2(10.0, 0.0), Vector2(10.0, 0.1), Vector2(0.0, 0.1)]:
+		BezierTopology.add_point(narrow_contour, position, "linear")
+	var narrow_stroke := ContourStrokeService.generate(narrow_contour)
+	var narrow_diagnostics: Dictionary = narrow_stroke.get("geometry_diagnostics", {})
+	_expect(bool(narrow_stroke.get("valid", false)) and int(narrow_diagnostics.get("self_intersection_count", -1)) == 0 and int(narrow_diagnostics.get("narrow_overlap_pair_count", 0)) > 0, "Wizard-eye-scale narrow features should remain valid and explicitly report stroke-coverage overlap without being mistaken for a Boundary crossing.")
+	_expect(is_equal_approx(float(narrow_diagnostics.get("minimum_nonadjacent_clearance_meters", -1.0)), 0.01), "Narrow-feature diagnostics should report deterministic local clearance in meters.")
+
+	var nearby_contour := _component()
+	nearby_contour["draw_mode"] = "contour"
+	for position in [Vector2(0.0, 0.0), Vector2(10.0, 0.0), Vector2(10.0, 5.0), Vector2(0.0, 5.0)]:
+		BezierTopology.add_point(nearby_contour, position, "linear")
+	var nearby_stroke := ContourStrokeService.generate(nearby_contour)
+	_expect(bool(nearby_stroke.get("valid", false)) and int(nearby_stroke.get("geometry_diagnostics", {}).get("narrow_overlap_pair_count", -1)) == 0, "Nearby authored lines farther apart than one stroke width must stay independent and must not be merged by epsilon proximity.")
+
+	var retraced_contour := _component()
+	retraced_contour["draw_mode"] = "contour"
+	for position in [Vector2.ZERO, Vector2(10.0, 0.0), Vector2.ZERO]:
+		BezierTopology.add_point(retraced_contour, position, "linear")
+	var retraced_stroke := ContourStrokeService.generate(retraced_contour)
+	_expect(not bool(retraced_stroke.get("valid", true)) and str(retraced_stroke.get("errors", [""])[0]).contains("reverses direction by 180 degrees"), "A collapsing 180-degree return must fail explicitly instead of silently emitting ambiguous overlapping offset geometry.")
+
+	var overlapping_contour := _component()
+	overlapping_contour["draw_mode"] = "contour"
+	for position in [Vector2.ZERO, Vector2(10.0, 0.0), Vector2(3.0, 4.0), Vector2(8.0, 0.0), Vector2(2.0, 0.0)]:
+		BezierTopology.add_point(overlapping_contour, position, "linear")
+	var overlapping_stroke := ContourStrokeService.generate(overlapping_contour)
+	_expect(not bool(overlapping_stroke.get("valid", true)) and "overlap collinearly" in " ".join(overlapping_stroke.get("errors", [])), "Non-adjacent collinear Boundary overlap must be rejected with a stable validation error, never repaired by an implicit fallback.")
 
 
 func _distance_to_segment(point: Vector2, start: Vector2, end: Vector2) -> float:
