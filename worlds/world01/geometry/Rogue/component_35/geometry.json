@@ -453,7 +453,7 @@
 	"sdf": {
 		"bake": {
 			"algorithm_version": 1,
-			"bake_id": "sdf_bake_4857696062192723785",
+			"bake_id": "sdf_bake_8036162273091880586",
 			"boundary_value": 0.5,
 			"channel": "r",
 			"color_space": "linear",
@@ -467,17 +467,17 @@
 			"method": "single_channel_sdf",
 			"parameters": {
 				"resolution": 256,
-				"spread_px": 16.0
+				"spread_px": 103.008911132812
 			},
-			"pixel_hash": "6a39a76c0d07eda1002cc4f9a7fa18e2d67238288b3ee26176d4352a3b90c4b4",
+			"pixel_hash": "f7ccebb8f5a86ce0afca5b3f3c6db86657fce082d6d4f481c9e6772996fc0f1e",
 			"resolution": [
-				256.0,
-				256.0
+				256,
+				256
 			],
-			"source_fingerprint": "fc5712c3b7e269686195495fdafbc13d65968d227f35dae5dab878f62b2a03b7",
-			"spread_px": 16.0,
-			"uv_bake_id": "uv_bake_7870944668165793928",
-			"uv_fingerprint": "6add1fb5160905b3667d0ed00d8563faf2ec4c3a240728ed2e3f9209d83ec146",
+			"source_fingerprint": "643530d8a88e7057506086b32f5f69512e862d7ac8b8468e9693d0b39812f86e",
+			"spread_px": 103.008911132812,
+			"uv_bake_id": "uv_bake_5279142249436853399",
+			"uv_fingerprint": "46c37eac70b652f8fca22b609e6f38ccee6e6b45f7d5123fc6aca7a1f08b06d1",
 			"uv_origin": "bottom_left",
 			"uv_to_pixel": "x=u*width, y=(1-v)*height",
 			"valid": true
@@ -506,7 +506,7 @@
 	"uv_mapping": {
 		"bakes": {
 			"ribbon_strip/bounds_planar": {
-				"bake_id": "uv_bake_7870944668165793928",
+				"bake_id": "uv_bake_5279142249436853399",
 				"errors": [],
 				"mesh_bake_id": "meshing_bake_6747036647383708475",
 				"mesh_fingerprint": "2c8789d364f37950175f734ba49b15cb28a8b42d9c246781af448b77c6e9742d",
@@ -516,7 +516,7 @@
 					"mesh_method": "ribbon_strip",
 					"offset_u": 0.0,
 					"offset_v": 0.0,
-					"padding": 0.0625,
+					"padding": 0.335697183069282,
 					"preserve_aspect": true,
 					"rotation": 0.0,
 					"scale": 1.0
@@ -525,127 +525,127 @@
 				"uvs": [
 					{
 						"uv": [
-							0.42371478676796,
-							0.0625
+							0.471351146697998,
+							0.335697174072266
 						],
 						"vertex_id": "vertex:ribbon:sample:edge_5801944189178543994:point_1708220041208772133:left"
 					},
 					{
 						"uv": [
-							0.759943068027496,
-							0.222720265388489
+							0.597621440887451,
+							0.395867794752121
 						],
 						"vertex_id": "vertex:ribbon:sample:edge_5801944189178543994:point_1708220041208772133:right"
 					},
 					{
 						"uv": [
-							0.373169660568237,
-							0.16878205537796
+							0.452368944883347,
+							0.375611335039139
 						],
 						"vertex_id": "vertex:ribbon:sample:edge_5801944189178543994:0.500000000:left"
 					},
 					{
 						"uv": [
-							0.71423876285553,
-							0.318421334028244
+							0.580457210540771,
+							0.431808233261108
 						],
 						"vertex_id": "vertex:ribbon:sample:edge_5801944189178543994:0.500000000:right"
 					},
 					{
 						"uv": [
-							0.323637038469315,
-							0.293980985879898
+							0.433767020702362,
+							0.422629684209824
 						],
 						"vertex_id": "vertex:ribbon:sample:edge_5801944189178543994:point_2814076375607499466:left"
 					},
 					{
 						"uv": [
-							0.680675506591797,
-							0.400016725063324
+							0.567852556705475,
+							0.462451338768005
 						],
 						"vertex_id": "vertex:ribbon:sample:edge_5801944189178543994:point_2814076375607499466:right"
 					},
 					{
 						"uv": [
-							0.301140427589417,
-							0.413588345050812
+							0.425318419933319,
+							0.467548131942749
 						],
 						"vertex_id": "vertex:ribbon:sample:edge_8568284480397911906:0.500000000:left"
 					},
 					{
 						"uv": [
-							0.670021653175354,
-							0.465034186840057
+							0.563851475715637,
+							0.486868619918823
 						],
 						"vertex_id": "vertex:ribbon:sample:edge_8568284480397911906:0.500000000:right"
 					},
 					{
 						"uv": [
-							0.291176438331604,
-							0.511978328227997
+							0.42157644033432,
+							0.504498422145844
 						],
 						"vertex_id": "vertex:ribbon:sample:edge_8568284480397911906:point_787232382941698678:left"
 					},
 					{
 						"uv": [
-							0.661212265491486,
-							0.554327130317688
+							0.560543119907379,
+							0.520402491092682
 						],
 						"vertex_id": "vertex:ribbon:sample:edge_8568284480397911906:point_787232382941698678:right"
 					},
 					{
 						"uv": [
-							0.273308038711548,
-							0.658212244510651
+							0.414865970611572,
+							0.559416472911835
 						],
 						"vertex_id": "vertex:ribbon:sample:edge_3846659270139548787:point_6900560850964725159:left"
 					},
 					{
 						"uv": [
-							0.640855669975281,
-							0.718450963497162
+							0.552898228168488,
+							0.58203911781311
 						],
 						"vertex_id": "vertex:ribbon:sample:edge_3846659270139548787:point_6900560850964725159:right"
 					},
 					{
 						"uv": [
-							0.268176764249802,
-							0.67580109834671
+							0.412938952445984,
+							0.566021919250488
 						],
 						"vertex_id": "vertex:ribbon:sample:edge_3409816215130694785:0.250000000:left"
 					},
 					{
 						"uv": [
-							0.615347981452942,
-							0.810679376125336
+							0.543318867683411,
+							0.61667537689209
 						],
 						"vertex_id": "vertex:ribbon:sample:edge_3409816215130694785:0.250000000:right"
 					},
 					{
 						"uv": [
-							0.271866261959076,
-							0.666410863399506
+							0.414324522018433,
+							0.562495470046997
 						],
 						"vertex_id": "vertex:ribbon:sample:edge_3409816215130694785:0.500000000:left"
 					},
 					{
 						"uv": [
-							0.575564384460449,
-							0.882020235061646
+							0.528378129005432,
+							0.643467426300049
 						],
 						"vertex_id": "vertex:ribbon:sample:edge_3409816215130694785:0.500000000:right"
 					},
 					{
 						"uv": [
-							0.240056931972504,
-							0.706112325191498
+							0.402378559112549,
+							0.577405333518982
 						],
 						"vertex_id": "vertex:ribbon:sample:edge_3409816215130694785:point_1946582423912789041:left"
 					},
 					{
 						"uv": [
-							0.531912565231323,
-							0.9375
+							0.511984705924988,
+							0.664302825927734
 						],
 						"vertex_id": "vertex:ribbon:sample:edge_3409816215130694785:point_1946582423912789041:right"
 					}

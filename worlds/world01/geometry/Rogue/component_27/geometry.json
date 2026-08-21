@@ -742,7 +742,7 @@
 	"sdf": {
 		"bake": {
 			"algorithm_version": 1,
-			"bake_id": "sdf_bake_432145698543772566",
+			"bake_id": "sdf_bake_6866110835844920121",
 			"boundary_value": 0.5,
 			"channel": "r",
 			"color_space": "linear",
@@ -756,17 +756,17 @@
 			"method": "single_channel_sdf",
 			"parameters": {
 				"resolution": 256,
-				"spread_px": 16.0
+				"spread_px": 104.074768066406
 			},
-			"pixel_hash": "a8641fcc324ff2864eb316089c2cac18495c94527531f06b215e9104b4010518",
+			"pixel_hash": "1ae66e192ec8d55f3c85b19d6eb5e665e3a456864ea3e6f3bf34fa6da5aa4ae8",
 			"resolution": [
-				256.0,
-				256.0
+				256,
+				256
 			],
-			"source_fingerprint": "13fae2203ea70869430cc022baf37fe5047f74be5e02080e4f26af027938dea1",
-			"spread_px": 16.0,
-			"uv_bake_id": "uv_bake_7751372874541086658",
-			"uv_fingerprint": "ec63eb19884673cd794822d43e9d9f7b992b69d2cade3aba8cd25ea1ad0ab0f8",
+			"source_fingerprint": "83bf4a4d84edda1817e5b50182f2dbac3dcabc6290bb9fe7bc17c80d5967ecdb",
+			"spread_px": 104.074768066406,
+			"uv_bake_id": "uv_bake_5187651370774154778",
+			"uv_fingerprint": "41392903211079a2a65826fe41c4afc1ec108e30bd8eeb70e338d2470872ff29",
 			"uv_origin": "bottom_left",
 			"uv_to_pixel": "x=u*width, y=(1-v)*height",
 			"valid": true
@@ -834,7 +834,7 @@
 	"uv_mapping": {
 		"bakes": {
 			"constrained_mesh/bounds_planar": {
-				"bake_id": "uv_bake_7751372874541086658",
+				"bake_id": "uv_bake_5187651370774154778",
 				"errors": [],
 				"mesh_bake_id": "meshing_bake_2143501979577697586",
 				"mesh_fingerprint": "b968ced51571c61739d92e035e91230e8eab9675e61a453abbf179c8bc1ffb11",
@@ -844,7 +844,7 @@
 					"mesh_method": "constrained_mesh",
 					"offset_u": 0.0,
 					"offset_v": 0.0,
-					"padding": 0.0625,
+					"padding": 0.350467280348645,
 					"preserve_aspect": true,
 					"rotation": 0.0,
 					"scale": 1.0
@@ -853,78 +853,78 @@
 				"uvs": [
 					{
 						"uv": [
-							0.226562529802322,
-							0.9375
+							0.406542062759399,
+							0.649532735347748
 						],
 						"vertex_id": "vertex:boundary:sample:edge_4225185380233931986:point_9116332290628283976"
 					},
 					{
 						"uv": [
-							0.36328125,
-							0.718749940395355
+							0.4532710313797,
+							0.574766337871552
 						],
 						"vertex_id": "vertex:boundary:sample:edge_4225185380233931986:0.250000000"
 					},
 					{
 						"uv": [
 							0.5,
-							0.499999940395355
+							0.5
 						],
 						"vertex_id": "vertex:boundary:sample:edge_4225185380233931986:0.500000000"
 					},
 					{
 						"uv": [
-							0.63671875,
-							0.281249910593033
+							0.5467289686203,
+							0.425233632326126
 						],
 						"vertex_id": "vertex:boundary:sample:edge_4225185380233931986:0.750000000"
 					},
 					{
 						"uv": [
-							0.7734375,
-							0.0625
+							0.593457937240601,
+							0.350467294454575
 						],
 						"vertex_id": "vertex:boundary:sample:edge_4225185380233931986:point_3927641146100866281"
 					},
 					{
 						"uv": [
-							0.7734375,
-							0.281249910593033
+							0.593457937240601,
+							0.425233632326126
 						],
 						"vertex_id": "vertex:boundary:sample:edge_7623884265231740584:0.250000000"
 					},
 					{
 						"uv": [
-							0.7734375,
-							0.499999940395355
+							0.593457937240601,
+							0.5
 						],
 						"vertex_id": "vertex:boundary:sample:edge_7623884265231740584:0.500000000"
 					},
 					{
 						"uv": [
-							0.7734375,
-							0.718749940395355
+							0.593457937240601,
+							0.574766337871552
 						],
 						"vertex_id": "vertex:boundary:sample:edge_7623884265231740584:0.750000000"
 					},
 					{
 						"uv": [
-							0.7734375,
-							0.9375
+							0.593457937240601,
+							0.649532735347748
 						],
 						"vertex_id": "vertex:boundary:sample:edge_7623884265231740584:point_6731753807893819440"
 					},
 					{
 						"uv": [
 							0.5,
-							0.9375
+							0.649532735347748
 						],
 						"vertex_id": "vertex:boundary:sample:edge_4476031888114821339:0.500000000"
 					},
 					{
 						"uv": [
-							0.60472559928894,
-							0.71234405040741
+							0.535794079303741,
+							0.572576880455017
 						],
 						"vertex_id": "vertex:seed:seed:auto:000001"
 					}

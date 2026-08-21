@@ -1948,7 +1948,7 @@
 	"sdf": {
 		"bake": {
 			"algorithm_version": 1,
-			"bake_id": "sdf_bake_8954880721451167083",
+			"bake_id": "sdf_bake_2341372021617856777",
 			"boundary_value": 0.5,
 			"channel": "r",
 			"color_space": "linear",
@@ -1962,17 +1962,17 @@
 			"method": "single_channel_sdf",
 			"parameters": {
 				"resolution": 256,
-				"spread_px": 16.0
+				"spread_px": 83.4782638549805
 			},
-			"pixel_hash": "5d33070ad8f98245fa339204f7b74bafbba737b313449597306f14b2b5ff9319",
+			"pixel_hash": "daa74c882c2ad2a394a3bddbd5b3b3ac8245992cadf0b5c12b79e93921a7c7dd",
 			"resolution": [
-				256.0,
-				256.0
+				256,
+				256
 			],
-			"source_fingerprint": "6d7720c30ce998efdec0e7df872925968515b925ed8ac8316b15c113bf27c696",
-			"spread_px": 16.0,
-			"uv_bake_id": "uv_bake_8773165524302407923",
-			"uv_fingerprint": "4fc6fbe653d491bfd411e781ece912b1ca5bd0446d208239e38bb9d8f8cfdad1",
+			"source_fingerprint": "cf4e727e177d74ddd2624b32151f298035ae0464c9cbffe2e87e6d23e1d53d84",
+			"spread_px": 83.4782638549805,
+			"uv_bake_id": "uv_bake_8032334149972811916",
+			"uv_fingerprint": "7055dc36998508c945507ea766b4488fa042d3a7fbea6f8192c306bc7d03909e",
 			"uv_origin": "bottom_left",
 			"uv_to_pixel": "x=u*width, y=(1-v)*height",
 			"valid": true
@@ -2118,7 +2118,7 @@
 	"uv_mapping": {
 		"bakes": {
 			"constrained_mesh/bounds_planar": {
-				"bake_id": "uv_bake_8773165524302407923",
+				"bake_id": "uv_bake_8032334149972811916",
 				"errors": [],
 				"mesh_bake_id": "meshing_bake_4413693300548655882",
 				"mesh_fingerprint": "83ee3810623565195a9bf0bac74057362ef23b75183d2a4940d5ef941dbf67ed",
@@ -2128,7 +2128,7 @@
 					"mesh_method": "constrained_mesh",
 					"offset_u": 0.0,
 					"offset_v": 0.0,
-					"padding": 0.0625,
+					"padding": 0.326086963282191,
 					"preserve_aspect": true,
 					"rotation": 0.0,
 					"scale": 1.0
@@ -2137,274 +2137,274 @@
 				"uvs": [
 					{
 						"uv": [
-							0.93750011920929,
-							0.500000059604645
+							0.673913061618805,
+							0.5
 						],
 						"vertex_id": "vertex:boundary:sample:circle:outer:0"
 					},
 					{
 						"uv": [
-							0.929093599319458,
-							0.585352063179016
+							0.670571327209473,
+							0.533928751945496
 						],
 						"vertex_id": "vertex:boundary:sample:circle:outer:1"
 					},
 					{
 						"uv": [
-							0.904197335243225,
-							0.667424023151398
+							0.660674691200256,
+							0.56655365228653
 						],
 						"vertex_id": "vertex:boundary:sample:circle:outer:2"
 					},
 					{
 						"uv": [
-							0.863767981529236,
-							0.743062019348145
+							0.644603371620178,
+							0.596620917320251
 						],
 						"vertex_id": "vertex:boundary:sample:circle:outer:3"
 					},
 					{
 						"uv": [
-							0.809359312057495,
-							0.809359312057495
+							0.62297511100769,
+							0.62297511100769
 						],
 						"vertex_id": "vertex:boundary:sample:circle:outer:4"
 					},
 					{
 						"uv": [
-							0.743062019348145,
-							0.863767981529236
+							0.596620917320251,
+							0.644603371620178
 						],
 						"vertex_id": "vertex:boundary:sample:circle:outer:5"
 					},
 					{
 						"uv": [
-							0.667424023151398,
-							0.904197335243225
+							0.56655365228653,
+							0.660674691200256
 						],
 						"vertex_id": "vertex:boundary:sample:circle:outer:6"
 					},
 					{
 						"uv": [
-							0.585352063179016,
-							0.929093599319458
+							0.533928751945496,
+							0.670571327209473
 						],
 						"vertex_id": "vertex:boundary:sample:circle:outer:7"
 					},
 					{
 						"uv": [
-							0.500000059604645,
-							0.93750011920929
+							0.5,
+							0.673913061618805
 						],
 						"vertex_id": "vertex:boundary:sample:circle:outer:8"
 					},
 					{
 						"uv": [
-							0.414648026227951,
-							0.929093599319458
+							0.466071248054504,
+							0.670571327209473
 						],
 						"vertex_id": "vertex:boundary:sample:circle:outer:9"
 					},
 					{
 						"uv": [
-							0.332576036453247,
-							0.904197335243225
+							0.433446377515793,
+							0.660674691200256
 						],
 						"vertex_id": "vertex:boundary:sample:circle:outer:10"
 					},
 					{
 						"uv": [
-							0.2569380402565,
-							0.863767981529236
+							0.403379082679749,
+							0.644603371620178
 						],
 						"vertex_id": "vertex:boundary:sample:circle:outer:11"
 					},
 					{
 						"uv": [
-							0.190640807151794,
-							0.809359312057495
+							0.377024918794632,
+							0.62297511100769
 						],
 						"vertex_id": "vertex:boundary:sample:circle:outer:12"
 					},
 					{
 						"uv": [
-							0.136232048273087,
-							0.743062019348145
+							0.355396598577499,
+							0.596620917320251
 						],
 						"vertex_id": "vertex:boundary:sample:circle:outer:13"
 					},
 					{
 						"uv": [
-							0.0958027243614197,
-							0.667424023151398
+							0.339325308799744,
+							0.56655365228653
 						],
 						"vertex_id": "vertex:boundary:sample:circle:outer:14"
 					},
 					{
 						"uv": [
-							0.0709064602851868,
-							0.585352063179016
+							0.329428672790527,
+							0.533928751945496
 						],
 						"vertex_id": "vertex:boundary:sample:circle:outer:15"
 					},
 					{
 						"uv": [
-							0.0625,
-							0.500000059604645
+							0.326086968183517,
+							0.5
 						],
 						"vertex_id": "vertex:boundary:sample:circle:outer:16"
 					},
 					{
 						"uv": [
-							0.0709064602851868,
-							0.414648026227951
+							0.329428672790527,
+							0.466071248054504
 						],
 						"vertex_id": "vertex:boundary:sample:circle:outer:17"
 					},
 					{
 						"uv": [
-							0.0958027243614197,
-							0.332576036453247
+							0.339325308799744,
+							0.433446377515793
 						],
 						"vertex_id": "vertex:boundary:sample:circle:outer:18"
 					},
 					{
 						"uv": [
-							0.136232048273087,
-							0.2569380402565
+							0.355396598577499,
+							0.403379082679749
 						],
 						"vertex_id": "vertex:boundary:sample:circle:outer:19"
 					},
 					{
 						"uv": [
-							0.190640807151794,
-							0.190640807151794
+							0.377024918794632,
+							0.377024918794632
 						],
 						"vertex_id": "vertex:boundary:sample:circle:outer:20"
 					},
 					{
 						"uv": [
-							0.2569380402565,
-							0.136232048273087
+							0.403379082679749,
+							0.355396598577499
 						],
 						"vertex_id": "vertex:boundary:sample:circle:outer:21"
 					},
 					{
 						"uv": [
-							0.332576036453247,
-							0.0958027243614197
+							0.433446377515793,
+							0.339325308799744
 						],
 						"vertex_id": "vertex:boundary:sample:circle:outer:22"
 					},
 					{
 						"uv": [
-							0.414648026227951,
-							0.0709064602851868
+							0.466071248054504,
+							0.329428672790527
 						],
 						"vertex_id": "vertex:boundary:sample:circle:outer:23"
 					},
 					{
 						"uv": [
-							0.500000059604645,
-							0.0625
+							0.5,
+							0.326086968183517
 						],
 						"vertex_id": "vertex:boundary:sample:circle:outer:24"
 					},
 					{
 						"uv": [
-							0.585352063179016,
-							0.0709064602851868
+							0.533928751945496,
+							0.329428672790527
 						],
 						"vertex_id": "vertex:boundary:sample:circle:outer:25"
 					},
 					{
 						"uv": [
-							0.667424023151398,
-							0.0958027243614197
+							0.56655365228653,
+							0.339325308799744
 						],
 						"vertex_id": "vertex:boundary:sample:circle:outer:26"
 					},
 					{
 						"uv": [
-							0.743062019348145,
-							0.136232048273087
+							0.596620917320251,
+							0.355396598577499
 						],
 						"vertex_id": "vertex:boundary:sample:circle:outer:27"
 					},
 					{
 						"uv": [
-							0.809359312057495,
-							0.190640807151794
+							0.62297511100769,
+							0.377024918794632
 						],
 						"vertex_id": "vertex:boundary:sample:circle:outer:28"
 					},
 					{
 						"uv": [
-							0.863767981529236,
-							0.2569380402565
+							0.644603371620178,
+							0.403379082679749
 						],
 						"vertex_id": "vertex:boundary:sample:circle:outer:29"
 					},
 					{
 						"uv": [
-							0.904197335243225,
-							0.332576036453247
+							0.660674691200256,
+							0.433446377515793
 						],
 						"vertex_id": "vertex:boundary:sample:circle:outer:30"
 					},
 					{
 						"uv": [
-							0.929093599319458,
-							0.414648026227951
+							0.670571327209473,
+							0.466071248054504
 						],
 						"vertex_id": "vertex:boundary:sample:circle:outer:31"
 					},
 					{
 						"uv": [
-							0.527585625648499,
-							0.505675435066223
+							0.510965704917908,
+							0.502256035804749
 						],
 						"vertex_id": "vertex:seed:seed:auto:000001"
 					},
 					{
 						"uv": [
-							0.357191443443298,
-							0.770563006401062
+							0.443231374025345,
+							0.607553005218506
 						],
 						"vertex_id": "vertex:seed:seed:auto:000002"
 					},
 					{
 						"uv": [
-							0.211497634649277,
-							0.483176529407501
+							0.385315835475922,
+							0.493312418460846
 						],
 						"vertex_id": "vertex:seed:seed:auto:000003"
 					},
 					{
 						"uv": [
-							0.649028956890106,
-							0.763970911502838
+							0.55924129486084,
+							0.604932546615601
 						],
 						"vertex_id": "vertex:seed:seed:auto:000004"
 					},
 					{
 						"uv": [
-							0.717551529407501,
-							0.282713115215302
+							0.586480140686035,
+							0.413625091314316
 						],
 						"vertex_id": "vertex:seed:seed:auto:000005"
 					},
 					{
 						"uv": [
-							0.44590562582016,
-							0.206077367067337
+							0.478496640920639,
+							0.383161187171936
 						],
 						"vertex_id": "vertex:seed:seed:auto:000006"
 					},
 					{
 						"uv": [
-							0.814571440219879,
-							0.530160665512085
+							0.625047028064728,
+							0.51198935508728
 						],
 						"vertex_id": "vertex:seed:seed:auto:000007"
 					}

@@ -830,7 +830,7 @@
 	"sdf": {
 		"bake": {
 			"algorithm_version": 1,
-			"bake_id": "sdf_bake_5770511197759519724",
+			"bake_id": "sdf_bake_4447610947863520022",
 			"boundary_value": 0.5,
 			"channel": "r",
 			"color_space": "linear",
@@ -844,17 +844,17 @@
 			"method": "single_channel_sdf",
 			"parameters": {
 				"resolution": 256,
-				"spread_px": 16.0
+				"spread_px": 101.052635192871
 			},
-			"pixel_hash": "6c703634fe990a77bdaa5cc7699d33c1ec2f9566feb57d277ea7075b6bc02dd9",
+			"pixel_hash": "b9e0688909537dce4e823d9335448a933bdc0a364f4d1b1ea427af536a7d71fd",
 			"resolution": [
-				256.0,
-				256.0
+				256,
+				256
 			],
-			"source_fingerprint": "259b74324e3d36d47ecb43fab4696844ebef5cc28e5618f11084dd363173a6c5",
-			"spread_px": 16.0,
-			"uv_bake_id": "uv_bake_7046187615932423002",
-			"uv_fingerprint": "96bea4031f63183983be7ef8849a1441bd9a7e467db3044f1a2cc9819c24c84e",
+			"source_fingerprint": "025af4f02ff038b9814d5c52c993cb54ae69bcd6df4be6a7538f0006550e32ac",
+			"spread_px": 101.052635192871,
+			"uv_bake_id": "uv_bake_2679068086524546943",
+			"uv_fingerprint": "27c1d81c17a22678ee6022bda8ed4fc13d10bab9886e8fc2adee711da5bd4059",
 			"uv_origin": "bottom_left",
 			"uv_to_pixel": "x=u*width, y=(1-v)*height",
 			"valid": true
@@ -922,7 +922,7 @@
 	"uv_mapping": {
 		"bakes": {
 			"constrained_mesh/bounds_planar": {
-				"bake_id": "uv_bake_7046187615932423002",
+				"bake_id": "uv_bake_2679068086524546943",
 				"errors": [],
 				"mesh_bake_id": "meshing_bake_6038056181670140575",
 				"mesh_fingerprint": "bd94f0b7e9d1527244536aa4d256d355512d6def2807d950091a95c871973ce4",
@@ -932,7 +932,7 @@
 					"mesh_method": "constrained_mesh",
 					"offset_u": 0.0,
 					"offset_v": 0.0,
-					"padding": 0.0625,
+					"padding": 0.394736842105263,
 					"preserve_aspect": true,
 					"rotation": 0.0,
 					"scale": 1.0
@@ -941,92 +941,92 @@
 				"uvs": [
 					{
 						"uv": [
-							0.0625,
-							0.928749799728394
+							0.394736856222153,
+							0.603157877922058
 						],
 						"vertex_id": "vertex:boundary:sample:edge_8491062024711700257:point_7095689170725922834"
 					},
 					{
 						"uv": [
-							0.28125,
-							0.930937767028809
+							0.447368443012238,
+							0.603684306144714
 						],
 						"vertex_id": "vertex:boundary:sample:edge_8491062024711700257:0.250000000"
 					},
 					{
 						"uv": [
 							0.5,
-							0.933124899864197
+							0.604210495948792
 						],
 						"vertex_id": "vertex:boundary:sample:edge_8491062024711700257:0.500000000"
 					},
 					{
 						"uv": [
-							0.718749940395355,
-							0.935312032699585
+							0.552631616592407,
+							0.604736745357513
 						],
 						"vertex_id": "vertex:boundary:sample:edge_8491062024711700257:0.750000000"
 					},
 					{
 						"uv": [
-							0.9375,
-							0.9375
+							0.60526317358017,
+							0.60526317358017
 						],
 						"vertex_id": "vertex:boundary:sample:edge_8491062024711700257:point_7307487732236315982"
 					},
 					{
 						"uv": [
-							0.828125,
-							0.71875
+							0.578947365283966,
+							0.552631616592407
 						],
 						"vertex_id": "vertex:boundary:sample:edge_8042079276809768098:0.250000000"
 					},
 					{
 						"uv": [
-							0.71875,
+							0.552631616592407,
 							0.5
 						],
 						"vertex_id": "vertex:boundary:sample:edge_8042079276809768098:0.500000000"
 					},
 					{
 						"uv": [
-							0.609375,
-							0.28125
+							0.526315808296204,
+							0.447368443012238
 						],
 						"vertex_id": "vertex:boundary:sample:edge_8042079276809768098:0.750000000"
 					},
 					{
 						"uv": [
 							0.5,
-							0.0625
+							0.394736856222153
 						],
 						"vertex_id": "vertex:boundary:sample:edge_8042079276809768098:point_8089255888887302388"
 					},
 					{
 						"uv": [
-							0.390625,
-							0.279062032699585
+							0.473684221506119,
+							0.446842014789581
 						],
 						"vertex_id": "vertex:boundary:sample:edge_3597127311230838791:0.250000000"
 					},
 					{
 						"uv": [
-							0.28125,
-							0.495624899864197
+							0.447368443012238,
+							0.498947352170944
 						],
 						"vertex_id": "vertex:boundary:sample:edge_3597127311230838791:0.500000000"
 					},
 					{
 						"uv": [
-							0.171875,
-							0.712187767028809
+							0.421052634716034,
+							0.551052689552307
 						],
 						"vertex_id": "vertex:boundary:sample:edge_3597127311230838791:0.750000000"
 					},
 					{
 						"uv": [
 							0.5,
-							0.542856454849243
+							0.510311365127563
 						],
 						"vertex_id": "vertex:seed:seed:auto:000001"
 					}

@@ -715,7 +715,7 @@
 	"sdf": {
 		"bake": {
 			"algorithm_version": 1,
-			"bake_id": "sdf_bake_3179392190043240752",
+			"bake_id": "sdf_bake_6415513418354706715",
 			"boundary_value": 0.5,
 			"channel": "r",
 			"color_space": "linear",
@@ -729,17 +729,17 @@
 			"method": "single_channel_sdf",
 			"parameters": {
 				"resolution": 256,
-				"spread_px": 16.0
+				"spread_px": 115.809524536133
 			},
-			"pixel_hash": "a4b06c8fea1b222f5cc7bf079026455aa70ebcb98177fb8e4ec955198fb7c5f2",
+			"pixel_hash": "f9502b987adb535e2ca9b9a3f499e19c59c61f20e9b99de29ac338939774cb42",
 			"resolution": [
-				256.0,
-				256.0
+				256,
+				256
 			],
-			"source_fingerprint": "08a2af9436fc90e2253b6b133196e60f9db57834b1c49d26e6228b59e191cca5",
-			"spread_px": 16.0,
-			"uv_bake_id": "uv_bake_4175132970861746411",
-			"uv_fingerprint": "f19691f2f5d897da5891405e32e644db57174cbd1c3fa61fb0121875ac7a3f1f",
+			"source_fingerprint": "57a30118a6a0c73683109fbdcfb08c7b932dac6c8f1f86a13816b874cd21b195",
+			"spread_px": 115.809524536133,
+			"uv_bake_id": "uv_bake_5062262459190033768",
+			"uv_fingerprint": "95338defb58e245b53b1d93c240eaa6d61be2a203735d0c82cf6333d7e5d06a3",
 			"uv_origin": "bottom_left",
 			"uv_to_pixel": "x=u*width, y=(1-v)*height",
 			"valid": true
@@ -793,7 +793,7 @@
 	"uv_mapping": {
 		"bakes": {
 			"constrained_mesh/bounds_planar": {
-				"bake_id": "uv_bake_4175132970861746411",
+				"bake_id": "uv_bake_5062262459190033768",
 				"errors": [],
 				"mesh_bake_id": "meshing_bake_1547345827967331228",
 				"mesh_fingerprint": "f42906329d99a72a88489da0a769f4493ef981e25ca0d70ee23384847ef29af7",
@@ -803,7 +803,7 @@
 					"mesh_method": "constrained_mesh",
 					"offset_u": 0.0,
 					"offset_v": 0.0,
-					"padding": 0.0625,
+					"padding": 0.357142857142857,
 					"preserve_aspect": true,
 					"rotation": 0.0,
 					"scale": 1.0
@@ -812,71 +812,71 @@
 				"uvs": [
 					{
 						"uv": [
-							0.9375,
-							0.354166686534882
+							0.642857193946838,
+							0.452380955219269
 						],
 						"vertex_id": "vertex:boundary:sample:edge_743621669492161197:point_4667641212500460003"
 					},
 					{
 						"uv": [
-							0.832823872566223,
-							0.357404947280884
+							0.608677208423615,
+							0.453438371419907
 						],
 						"vertex_id": "vertex:boundary:sample:edge_743621669492161197:0.250000000"
 					},
 					{
 						"uv": [
-							0.601399004459381,
-							0.357044994831085
+							0.533109903335571,
+							0.45332083106041
 						],
 						"vertex_id": "vertex:boundary:sample:edge_743621669492161197:0.500000000"
 					},
 					{
 						"uv": [
-							0.319274604320526,
-							0.355246484279633
+							0.440987646579742,
+							0.452733546495438
 						],
 						"vertex_id": "vertex:boundary:sample:edge_743621669492161197:0.750000000"
 					},
 					{
 						"uv": [
-							0.0625,
-							0.354166686534882
+							0.357142865657806,
+							0.452380955219269
 						],
 						"vertex_id": "vertex:boundary:sample:edge_743621669492161197:point_2107017988632255334"
 					},
 					{
 						"uv": [
-							0.0625,
-							0.645833373069763
+							0.357142865657806,
+							0.547619104385376
 						],
 						"vertex_id": "vertex:boundary:sample:edge_7361438053607849219:point_6520340787657298006"
 					},
 					{
 						"uv": [
-							0.28125,
-							0.645833373069763
+							0.428571432828903,
+							0.547619104385376
 						],
 						"vertex_id": "vertex:boundary:sample:edge_6377971574412512735:0.250000000"
 					},
 					{
 						"uv": [
 							0.5,
-							0.645833373069763
+							0.547619104385376
 						],
 						"vertex_id": "vertex:boundary:sample:edge_6377971574412512735:0.500000000"
 					},
 					{
 						"uv": [
-							0.71875,
-							0.645833373069763
+							0.571428596973419,
+							0.547619104385376
 						],
 						"vertex_id": "vertex:boundary:sample:edge_6377971574412512735:0.750000000"
 					},
 					{
 						"uv": [
-							0.9375,
-							0.645833373069763
+							0.642857193946838,
+							0.547619104385376
 						],
 						"vertex_id": "vertex:boundary:sample:edge_6377971574412512735:point_4925888274026831720"
 					}
