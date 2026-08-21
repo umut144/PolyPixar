@@ -150,8 +150,8 @@ func _fit_boundary() -> void:
 		fitted = true
 		return
 	var bounds := Rect2(positions[0], Vector2.ZERO)
-	for position in positions:
-		bounds = bounds.expand(position)
+	for sample_position in positions:
+		bounds = bounds.expand(sample_position)
 	camera_position = bounds.get_center()
 	var available := Vector2(maxf(size.x - 96.0, 1.0), maxf(size.y - 96.0, 1.0))
 	var extent := Vector2(maxf(bounds.size.x, 1.0), maxf(bounds.size.y, 1.0))

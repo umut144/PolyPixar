@@ -106,10 +106,10 @@ func _draw_uv_space(rect: Rect2) -> void:
 			var cell := Rect2(uv_rect.position + Vector2(column, row) * square_size / 8.0, Vector2.ONE * square_size / 8.0)
 			draw_rect(cell, Color("#252b34") if (row + column) % 2 == 0 else Color("#20262e"))
 	for grid_index in range(9):
-		var position := float(grid_index) / 8.0
+		var uv_fraction := float(grid_index) / 8.0
 		var color := GRID_MAJOR if grid_index in [0, 4, 8] else GRID_MINOR
-		draw_line(Vector2(uv_rect.position.x + position * square_size, uv_rect.position.y), Vector2(uv_rect.position.x + position * square_size, uv_rect.end.y), color, 1.0)
-		draw_line(Vector2(uv_rect.position.x, uv_rect.position.y + position * square_size), Vector2(uv_rect.end.x, uv_rect.position.y + position * square_size), color, 1.0)
+		draw_line(Vector2(uv_rect.position.x + uv_fraction * square_size, uv_rect.position.y), Vector2(uv_rect.position.x + uv_fraction * square_size, uv_rect.end.y), color, 1.0)
+		draw_line(Vector2(uv_rect.position.x, uv_rect.position.y + uv_fraction * square_size), Vector2(uv_rect.end.x, uv_rect.position.y + uv_fraction * square_size), color, 1.0)
 	if not bool(uv_result.get("valid", false)):
 		return
 	var positions: Dictionary = {}

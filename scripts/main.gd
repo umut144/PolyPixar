@@ -4082,12 +4082,12 @@ func _batch_summary_tooltip(summary: Dictionary, current_message: String) -> Str
 
 
 func _summarize_tooltip_lines(lines: PackedStringArray, maximum := 6) -> String:
-	var visible := PackedStringArray()
+	var visible_lines := PackedStringArray()
 	for index in range(mini(lines.size(), maximum)):
-		visible.append(lines[index])
+		visible_lines.append(lines[index])
 	if lines.size() > maximum:
-		visible.append("… and %d more" % (lines.size() - maximum))
-	return "\n".join(visible)
+			visible_lines.append("… and %d more" % (lines.size() - maximum))
+	return "\n".join(visible_lines)
 
 
 func _candidate_tooltip_lines(candidates: Array[Dictionary]) -> PackedStringArray:
@@ -6149,9 +6149,9 @@ func _flip_component_geometry_x(asset_id: String, component_id: String) -> void:
 	for point_data in points:
 		if not point_data is Dictionary:
 			continue
-		var position: Vector2 = point_data.get("position", Vector2.ZERO)
-		position.x = 2.0 * pivot.x - position.x
-		point_data["position"] = position
+		var point_position: Vector2 = point_data.get("position", Vector2.ZERO)
+		point_position.x = 2.0 * pivot.x - point_position.x
+		point_data["position"] = point_position
 		var handle_in: Vector2 = point_data.get("handle_in", Vector2.ZERO)
 		handle_in.x = -handle_in.x
 		point_data["handle_in"] = handle_in
@@ -7073,21 +7073,21 @@ func _rename_motion_sequence(new_name: String, sequence_document: Dictionary, ed
 		motion_sequence_workspace.set_document(sequence_document)
 
 
-func _on_motion_path_point_add_requested(position: Vector2) -> void:
+func _on_motion_path_point_add_requested(world_position: Vector2) -> void:
 	var path_document := _get_motion_path(selected_motion_path_id)
 	if path_document.is_empty():
 		return
 	_record_direct_change()
-	MotionPathTopology.add_point(path_document["topology"], position)
+	MotionPathTopology.add_point(path_document["topology"], world_position)
 	motion_path_phase = 0.0
 	_refresh_motion_path_workspace()
 	_render_inspector()
 	_render_context_bar()
 
 
-func _on_motion_path_point_move_requested(point_id: String, position: Vector2) -> void:
+func _on_motion_path_point_move_requested(point_id: String, world_position: Vector2) -> void:
 	var path_document := _get_motion_path(selected_motion_path_id)
-	if path_document.is_empty() or not MotionPathTopology.move_point(path_document["topology"], point_id, position):
+	if path_document.is_empty() or not MotionPathTopology.move_point(path_document["topology"], point_id, world_position):
 		return
 	_refresh_motion_path_workspace()
 
@@ -9922,19 +9922,19 @@ func _editable_geometry_seeding_bake() -> Dictionary:
 	return _geometry_seeding_bake(selected_asset_id, selected_component_id)
 
 
-func _on_geometry_seed_add_requested(position: Vector2) -> void:
+func _on_geometry_seed_add_requested(world_position: Vector2) -> void:
 	var bake := _editable_geometry_seeding_bake()
 	var sampling_bake := _geometry_sampling_bake(selected_asset_id, selected_component_id)
 	var recipe := _geometry_seeding_recipe(selected_asset_id, selected_component_id)
-	if bake.is_empty() or not GeometrySeedingService.point_is_valid(sampling_bake, position, _geometry_seeding_constraint_clearance(recipe)):
+	if bake.is_empty() or not GeometrySeedingService.point_is_valid(sampling_bake, world_position, _geometry_seeding_constraint_clearance(recipe)):
 		_show_status_message("Seeds must respect Outer, Hole, Cut, and constraint clearance.")
 		return
 	for seed_data in bake.get("seeds", []):
-		if position.distance_to(Vector2(seed_data.get("position", Vector2.ZERO))) < _geometry_seeding_manual_minimum_distance(recipe):
+		if world_position.distance_to(Vector2(seed_data.get("position", Vector2.ZERO))) < _geometry_seeding_manual_minimum_distance(recipe):
 			_show_status_message("Seeds must respect the current minimum spacing.")
 			return
 	_record_direct_change()
-	bake["seeds"].append({"id": "seed:manual:%d" % ResourceUID.create_id(), "position": position, "origin": "manual", "method": "manual", "provenance": {}})
+	bake["seeds"].append({"id": "seed:manual:%d" % ResourceUID.create_id(), "position": world_position, "origin": "manual", "method": "manual", "provenance": {}})
 	_mark_geometry_seeding_bake_edited(bake)
 
 
@@ -9943,17 +9943,17 @@ func _on_geometry_seed_move_started(_seed_id: String) -> void:
 		_record_direct_change()
 
 
-func _on_geometry_seed_move_requested(seed_id: String, position: Vector2) -> void:
+func _on_geometry_seed_move_requested(seed_id: String, world_position: Vector2) -> void:
 	var bake := _editable_geometry_seeding_bake()
 	var recipe := _geometry_seeding_recipe(selected_asset_id, selected_component_id)
-	if bake.is_empty() or not GeometrySeedingService.point_is_valid(_geometry_sampling_bake(selected_asset_id, selected_component_id), position, _geometry_seeding_constraint_clearance(recipe)):
+	if bake.is_empty() or not GeometrySeedingService.point_is_valid(_geometry_sampling_bake(selected_asset_id, selected_component_id), world_position, _geometry_seeding_constraint_clearance(recipe)):
 		return
 	for other_seed in bake.get("seeds", []):
-		if str(other_seed.get("id", "")) != seed_id and position.distance_to(Vector2(other_seed.get("position", Vector2.ZERO))) < _geometry_seeding_manual_minimum_distance(recipe):
+		if str(other_seed.get("id", "")) != seed_id and world_position.distance_to(Vector2(other_seed.get("position", Vector2.ZERO))) < _geometry_seeding_manual_minimum_distance(recipe):
 			return
 	for seed_data in bake.get("seeds", []):
 		if str(seed_data.get("id", "")) == seed_id:
-			seed_data["position"] = position
+			seed_data["position"] = world_position
 			if str(seed_data.get("origin", "generated")) == "generated":
 				seed_data["origin"] = "manual_adjusted"
 			bake["edited"] = true
@@ -13423,13 +13423,13 @@ func _normalized_component_name(component: Dictionary) -> String:
 
 
 func _component_outliner_name(asset: Dictionary, component: Dictionary) -> String:
-	var name := _normalized_component_name(component)
+	var component_name := _normalized_component_name(component)
 	if not _is_reference_component(component):
-		return name
+		return component_name
 	var parent := _get_component(asset, str(component.get("parent_component_id", "")))
 	if not parent.is_empty():
-		return "%s → %s" % [str(parent.get("name", "Component")), name]
-	return name
+		return "%s → %s" % [str(parent.get("name", "Component")), component_name]
+	return component_name
 
 
 func _reference_asset_shapes(target_asset: Dictionary, reference: Dictionary, emphasized_component_id: String) -> Array:
@@ -13523,13 +13523,13 @@ func _on_primitive_preview_cancelled() -> void:
 	_render_canvas_context()
 
 
-func _on_bezier_point_added(position: Vector2, point_mode: String = "linear", drawn_handle_out: Vector2 = Vector2.ZERO) -> void:
+func _on_bezier_point_added(world_position: Vector2, point_mode: String = "linear", drawn_handle_out: Vector2 = Vector2.ZERO) -> void:
 	if active_draw_tool == "spine" and not selected_guide_id.is_empty():
 		var guide := _get_guide(_get_asset(selected_asset_id), selected_guide_id)
 		if guide.is_empty():
 			return
 		_record_direct_change()
-		BezierTopology.add_point(guide, canvas_view.constrain_draw_position(position), "aligned", Vector2.ZERO)
+		BezierTopology.add_point(guide, canvas_view.constrain_draw_position(world_position), "aligned", Vector2.ZERO)
 		BezierGeometry.resolve_auto_handles(guide.get("points", []), guide.get("chains", []))
 		canvas_view.set_bezier_geometry(guide.get("points", []), guide.get("edges", []), guide.get("chains", []))
 		_render_inspector()
@@ -13545,7 +13545,7 @@ func _on_bezier_point_added(position: Vector2, point_mode: String = "linear", dr
 		return
 	_record_direct_change()
 	var resolved_mode := point_mode if point_mode in BezierTopology.VALID_POINT_MODES else active_draw_point_mode
-	var point_id := BezierTopology.add_point_from(component, anchor_id, position, resolved_mode, drawn_handle_out) if not anchor_id.is_empty() else BezierTopology.start_chain(component, position, resolved_mode, drawn_handle_out)
+	var point_id := BezierTopology.add_point_from(component, anchor_id, world_position, resolved_mode, drawn_handle_out) if not anchor_id.is_empty() else BezierTopology.start_chain(component, world_position, resolved_mode, drawn_handle_out)
 	if point_id.is_empty():
 		return
 	selected_point_id = point_id
@@ -13732,13 +13732,13 @@ func _on_bezier_points_moved(point_ids: Array, world_delta: Vector2) -> void:
 		_on_bezier_points_move_started(point_ids)
 	var transform_component_id := str(guide.get("scope", {}).get("component_id", "")) if not guide.is_empty() else selected_component_id
 	var transform := ComponentHierarchy.world_transform_record(asset, transform_component_id)
-	var rotation := deg_to_rad(float(transform.get("rotation", 0.0)))
-	var scale: Vector2 = transform.get("scale", Vector2.ONE)
-	var local_delta := world_delta.rotated(-rotation)
-	if not is_zero_approx(scale.x):
-		local_delta.x /= scale.x
-	if not is_zero_approx(scale.y):
-		local_delta.y /= scale.y
+	var transform_rotation := deg_to_rad(float(transform.get("rotation", 0.0)))
+	var transform_scale: Vector2 = transform.get("scale", Vector2.ONE)
+	var local_delta := world_delta.rotated(-transform_rotation)
+	if not is_zero_approx(transform_scale.x):
+		local_delta.x /= transform_scale.x
+	if not is_zero_approx(transform_scale.y):
+		local_delta.y /= transform_scale.y
 	# Snap the group's anchor position once, then apply the resulting delta to
 	# every selected point so their relative spacing remains unchanged.
 	var anchor_id := str(point_ids[0])

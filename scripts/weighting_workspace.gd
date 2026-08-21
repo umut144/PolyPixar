@@ -30,13 +30,13 @@ func _draw() -> void:
 	var bounds := Rect2()
 	var first := true
 	for vertex in mesh_bake.get("vertices", []):
-		var position := Vector2(vertex.get("position", Vector2.ZERO))
-		vertices_by_id[str(vertex.get("id", ""))] = position
+		var vertex_position := Vector2(vertex.get("position", Vector2.ZERO))
+		vertices_by_id[str(vertex.get("id", ""))] = vertex_position
 		if first:
-			bounds = Rect2(position, Vector2.ZERO)
+			bounds = Rect2(vertex_position, Vector2.ZERO)
 			first = false
 		else:
-			bounds = bounds.expand(position)
+			bounds = bounds.expand(vertex_position)
 	if first:
 		_draw_message("Component Mesh has no Vertices")
 		return
@@ -45,7 +45,7 @@ func _draw() -> void:
 		weights_by_id[str(entry.get("vertex_id", ""))] = float(entry.get("weight", 0.0))
 	var padding := 54.0
 	var extent := Vector2(maxf(bounds.size.x, 0.001), maxf(bounds.size.y, 0.001))
-	var scale := minf((size.x - padding * 2.0) / extent.x, (size.y - padding * 2.0) / extent.y)
+	var view_scale := minf((size.x - padding * 2.0) / extent.x, (size.y - padding * 2.0) / extent.y)
 	var center := bounds.position + bounds.size * 0.5
 	var screen_center := size * 0.5
 	for triangle in mesh_bake.get("triangles", []):
@@ -59,7 +59,7 @@ func _draw() -> void:
 			if not vertices_by_id.has(vertex_id):
 				continue
 			var local := Vector2(vertices_by_id[vertex_id])
-			polygon.append(screen_center + Vector2(local.x - center.x, -(local.y - center.y)) * scale)
+			polygon.append(screen_center + Vector2(local.x - center.x, -(local.y - center.y)) * view_scale)
 			colors.append(_weight_color(float(weights_by_id.get(vertex_id, 0.0))))
 		if polygon.size() == 3:
 			draw_polygon(polygon, colors)
