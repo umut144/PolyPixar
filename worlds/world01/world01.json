@@ -13,9 +13,9 @@
 		"asset_10"
 	],
 	"editor_state": {
-		"active_create_submodule": "Character",
+		"active_create_submodule": "Props",
 		"active_geometry_submodule": "Sampling",
-		"active_module": "Export",
+		"active_module": "Create",
 		"active_motion_submodule": "Animation",
 		"active_style_submodule": "Weighting",
 		"asset_cameras": {
@@ -100,7 +100,7 @@
 			"asset_6": false,
 			"asset_7": false,
 			"asset_8": false,
-			"asset_9": true
+			"asset_9": false
 		},
 		"motion_act_preview_asset_id": "",
 		"motion_act_preview_loop": true,
@@ -114,8 +114,8 @@
 			"symbols": true,
 			"terrain": true
 		},
-		"selected_asset_id": "asset_9",
-		"selected_component_id": "component_59",
+		"selected_asset_id": "asset_10",
+		"selected_component_id": "",
 		"selected_edge_ids": [],
 		"selected_guide_id": "",
 		"selected_motion_act_id": "",
@@ -135,12 +135,12 @@
 		}
 	},
 	"name": "world01",
-	"paths": [
-		"path_1"
-	],
-	"schema_version": 39,
-	"sequences": [
-		"sequence_1"
-	],
-	"world_name": "Secrets, Room's & Travels'"
+	"paths": [],
+	"schema_version": 42,
+	"sequences": [],
+	"world_name": "Secrets, Room's & Travels'",
+	"world_settings": {
+		"contour_stroke_width_px": 4.0,
+		"reference_pixels_per_meter": 128.0
+	}
 }
