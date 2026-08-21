@@ -80,7 +80,9 @@ static func generate(component: Dictionary, stroke_width_px := DEFAULT_STROKE_WI
 		var run_diagnostics: Dictionary = mesh.get("geometry_diagnostics", {})
 		self_intersection_count += int(run_diagnostics.get("self_intersection_count", 0))
 		narrow_overlap_pair_count += int(run_diagnostics.get("narrow_overlap_pair_count", 0))
-		minimum_nonadjacent_clearance = minf(minimum_nonadjacent_clearance, float(run_diagnostics.get("minimum_nonadjacent_clearance_tool_units", INF)))
+		var run_clearance = run_diagnostics.get("minimum_nonadjacent_clearance_tool_units", null)
+		if run_clearance != null:
+			minimum_nonadjacent_clearance = minf(minimum_nonadjacent_clearance, float(run_clearance))
 	var minimum_clearance_meters = null
 	if is_finite(minimum_nonadjacent_clearance):
 		minimum_clearance_meters = minimum_nonadjacent_clearance * ToolUnits.TO_METERS
@@ -414,13 +416,16 @@ static func _analyze_centerline(centerline: Array, half_width: float, closed: bo
 			minimum_clearance = minf(minimum_clearance, clearance)
 			if clearance < half_width * 2.0 - GEOMETRY_EPSILON:
 				narrow_overlap_pair_count += 1
+	var minimum_clearance_value: Variant = null
+	if is_finite(minimum_clearance):
+		minimum_clearance_value = minimum_clearance
 	return {
 		"valid": errors.is_empty(),
 		"errors": errors,
 		"diagnostics": {
 			"self_intersection_count": self_intersection_count,
 			"narrow_overlap_pair_count": narrow_overlap_pair_count,
-			"minimum_nonadjacent_clearance_tool_units": minimum_clearance,
+			"minimum_nonadjacent_clearance_tool_units": minimum_clearance_value,
 			"centerline_segment_count": segment_count
 		}
 	}
