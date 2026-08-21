@@ -44,12 +44,14 @@ static func build_manifest(asset: Dictionary, sources: Dictionary) -> Dictionary
 		if not parent_id.is_empty() and not ids.has(parent_id):
 			errors.append("%s: parent '%s' is not part of the visible export set." % [_component_label(component), parent_id])
 	errors.append_array(_hierarchy_errors(visible_components))
+	var export_transforms := _canonical_export_transforms(asset, visible_components)
 	var manifest_components: Array = []
 	var masks: Array = []
 	for component in visible_components:
 		var component_id := str(component.get("id", ""))
 		var source: Dictionary = sources.get(component_id, {})
-		var built := _build_reference_component(component, source) if str(component.get("type", "component")) == "reference" else _build_component(component, source)
+		var export_transform: Dictionary = export_transforms.get(component_id, {})
+		var built := _build_reference_component(component, source, export_transform) if str(component.get("type", "component")) == "reference" else _build_component(component, source, export_transform)
 		errors.append_array(built.get("errors", []))
 		if bool(built.get("valid", false)):
 			manifest_components.append(built["component"])
@@ -87,7 +89,7 @@ static func build_manifest(asset: Dictionary, sources: Dictionary) -> Dictionary
 	return {"valid": true, "errors": [], "manifest": manifest, "masks": masks}
 
 
-static func _build_component(component: Dictionary, source: Dictionary) -> Dictionary:
+static func _build_component(component: Dictionary, source: Dictionary, export_transform: Dictionary) -> Dictionary:
 	var errors: Array[String] = []
 	var label := _component_label(component)
 	var mesh = source.get("mesh", {})
@@ -104,6 +106,10 @@ static func _build_component(component: Dictionary, source: Dictionary) -> Dicti
 		sdf = {}
 	if not bool(source.get("sdf_resource_valid", false)):
 		errors.append("%s: the accepted SDF image is missing or corrupt." % label)
+	var authored_transform = component.get("transform", {})
+	if not authored_transform is Dictionary:
+		authored_transform = {}
+	var authored_pivot := Vector2(authored_transform.get("pivot", Vector2.ZERO))
 	var vertices: Array = []
 	var vertex_indices: Dictionary = {}
 	for raw_vertex in mesh.get("vertices", []):
@@ -116,7 +122,10 @@ static func _build_component(component: Dictionary, source: Dictionary) -> Dicti
 			errors.append("%s: Mesh Vertex IDs and positions must be unique and finite." % label)
 			continue
 		vertex_indices[vertex_id] = vertices.size()
-		vertices.append(_meters(position))
+		# Editor mesh coordinates are authored around the Component pivot.  Schema 2
+		# instead requires mesh data in Component-local space, so move that pivot to
+		# the local origin before serializing it.
+		vertices.append(_meters(position - authored_pivot))
 	var uv_by_vertex: Dictionary = {}
 	for raw_entry in uv.get("uvs", []):
 		if not raw_entry is Dictionary:
@@ -160,13 +169,10 @@ static func _build_component(component: Dictionary, source: Dictionary) -> Dicti
 	var resolution: Array = sdf.get("resolution", []) if sdf is Dictionary else []
 	if resolution.size() != 2 or int(resolution[0]) <= 0 or int(resolution[1]) <= 0:
 		errors.append("%s: SDF resolution metadata is invalid." % label)
-	var transform = component.get("transform", {})
-	if not transform is Dictionary:
-		transform = {}
-	var position := Vector2(transform.get("position", Vector2.ZERO))
-	var pivot := Vector2(transform.get("pivot", Vector2.ZERO))
-	var scale := Vector2(transform.get("scale", Vector2.ONE))
-	var rotation := float(transform.get("rotation", 0.0))
+	var position := Vector2(export_transform.get("position", Vector2.ZERO))
+	var pivot := Vector2.ZERO
+	var scale := Vector2(export_transform.get("scale", Vector2.ONE))
+	var rotation := float(export_transform.get("rotation", 0.0))
 	if not position.is_finite() or not pivot.is_finite() or not scale.is_finite() or not is_finite(rotation):
 		errors.append("%s: Component transform is not finite." % label)
 	if not errors.is_empty():
@@ -215,7 +221,7 @@ static func _build_component(component: Dictionary, source: Dictionary) -> Dicti
 	}
 
 
-static func _build_reference_component(component: Dictionary, source: Dictionary) -> Dictionary:
+static func _build_reference_component(component: Dictionary, source: Dictionary, export_transform: Dictionary) -> Dictionary:
 	var errors: Array[String] = []
 	var label := _component_label(component)
 	var source_asset_id := str(component.get("source_asset_id", ""))
@@ -226,13 +232,10 @@ static func _build_reference_component(component: Dictionary, source: Dictionary
 		errors.append("%s: referenced source Asset has no usable Asset Key." % label)
 	if source_asset_id == str(source.get("owner_asset_id", "")):
 		errors.append("%s: an Asset cannot reference itself." % label)
-	var transform = component.get("transform", {})
-	if not transform is Dictionary:
-		transform = {}
-	var position := Vector2(transform.get("position", Vector2.ZERO))
-	var pivot := Vector2(transform.get("pivot", Vector2.ZERO))
-	var scale := Vector2(transform.get("scale", Vector2.ONE))
-	var rotation := float(transform.get("rotation", 0.0))
+	var position := Vector2(export_transform.get("position", Vector2.ZERO))
+	var pivot := Vector2.ZERO
+	var scale := Vector2(export_transform.get("scale", Vector2.ONE))
+	var rotation := float(export_transform.get("rotation", 0.0))
 	if not position.is_finite() or not pivot.is_finite() or not scale.is_finite() or not is_finite(rotation):
 		errors.append("%s: Component transform is not finite." % label)
 	if not errors.is_empty():
@@ -255,6 +258,29 @@ static func _build_reference_component(component: Dictionary, source: Dictionary
 			}
 		}
 	}
+
+
+static func _canonical_export_transforms(asset: Dictionary, components: Array[Dictionary]) -> Dictionary:
+	# Keep the visible world geometry unchanged while changing the coordinate
+	# origin of every Component to its local pivot.  Deriving each local affine
+	# from its parent's canonical affine is what makes child positions genuinely
+	# parent-relative instead of duplicating asset-space coordinates.
+	var world_by_id: Dictionary = {}
+	for component in components:
+		var component_id := str(component.get("id", ""))
+		var transform = component.get("transform", {})
+		if not transform is Dictionary:
+			transform = {}
+		var pivot := Vector2(transform.get("pivot", Vector2.ZERO))
+		world_by_id[component_id] = ComponentHierarchy.world_transform(asset, component_id) * Transform2D(0.0, pivot)
+	var result: Dictionary = {}
+	for component in components:
+		var component_id := str(component.get("id", ""))
+		var parent_id := str(component.get("parent_component_id", ""))
+		var parent_world: Transform2D = world_by_id.get(parent_id, Transform2D.IDENTITY)
+		var local_affine: Transform2D = parent_world.affine_inverse() * world_by_id.get(component_id, Transform2D.IDENTITY)
+		result[component_id] = ComponentHierarchy.transform_record_from_affine(local_affine, Vector2.ZERO)
+	return result
 
 
 static func _hierarchy_errors(components: Array[Dictionary]) -> Array[String]:

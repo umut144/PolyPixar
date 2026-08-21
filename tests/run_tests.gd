@@ -54,6 +54,21 @@ func _expect(condition: bool, message: String) -> void:
 		push_error(message)
 
 
+func _runtime_export_world_transform(components_by_id: Dictionary, component_id: String) -> Transform2D:
+	var component: Dictionary = components_by_id.get(component_id, {})
+	var transform: Dictionary = component.get("local_transform", {})
+	var position_data: Array = transform.get("position", [])
+	var pivot_data: Array = component.get("local_pivot", [])
+	var scale_data: Array = transform.get("scale", [])
+	var position := Vector2(float(position_data[0]), float(position_data[1]))
+	var pivot := Vector2(float(pivot_data[0]), float(pivot_data[1]))
+	var scale := Vector2(float(scale_data[0]), float(scale_data[1]))
+	var local := Transform2D(float(transform.get("rotation_radians", 0.0)), scale, 0.0, Vector2.ZERO)
+	local.origin = position - local.basis_xform(pivot)
+	var parent_id = component.get("parent_component_id", null)
+	return local if parent_id == null else _runtime_export_world_transform(components_by_id, str(parent_id)) * local
+
+
 func _context_menu(application: Control, prefix: String) -> MenuButton:
 	for child in application.context_bar.get_children():
 		if child is MenuButton and str(child.text).begins_with(prefix):
@@ -1222,10 +1237,26 @@ func _test_runtime_export_service() -> void:
 	var components: Array = manifest.get("components", [])
 	_expect(bool(result.get("valid", false)) and int(manifest.get("schema_version", 0)) == 2 and str(manifest.get("asset_key", "")) == "wizard" and not manifest.has("asset_id"), "Runtime export schema 2 should identify packages only by the Asset Key derived from their display name.")
 	_expect(components.size() == 2 and str(components[0].get("component_id", "")) == "component_a" and str(components[1].get("component_id", "")) == "component_b", "Runtime Components should sort globally by ascending z_index and lexicographic Component ID.")
-	_expect(components[1].get("mesh", {}).get("vertices", []) == [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]] and components[1].get("mesh", {}).get("indices", []) == [0, 1, 2], "Runtime Meshes should preserve accepted Vertex order, convert Tool units to meters, and compact Triangle IDs.")
+	_expect(components[1].get("mesh", {}).get("vertices", []) == [[-0.2, -0.30000000000000004], [0.8, -0.30000000000000004], [-0.2, 0.7000000000000001]] and components[1].get("mesh", {}).get("indices", []) == [0, 1, 2], "Runtime Meshes should preserve accepted Vertex order, convert Tool units to meters, compact Triangle IDs, and be local to their Component pivot.")
 	_expect(components[1].get("mesh", {}).get("uvs", []) == [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]], "Runtime UVs should be reordered only through stable Vertex IDs.")
 	_expect(components[1].get("local_transform", {}).get("position", []) == [1.0, 2.0] and is_equal_approx(float(components[1].get("local_transform", {}).get("rotation_radians", 0.0)), PI / 2.0), "Runtime transforms should preserve Y-up coordinates and publish positions in meters and CCW radians.")
 	_expect(not components[1].has("display_name") and str(components[1].get("semantic_key", "")) == "body", "Runtime Components should expose their Semantic Key as the sole authored designation without a redundant display label.")
+	var wizard_head := {"id": "head", "semantic_key": "head", "visibility": true, "parent_component_id": "", "transform": {"position": Vector2(0.0, 8.5), "pivot": Vector2(0.0, 8.5), "rotation": 0.0, "scale": Vector2.ONE}}
+	var wizard_eye := {"id": "eye", "semantic_key": "eye_left", "visibility": true, "parent_component_id": "head", "transform": {"position": Vector2(-0.3, 8.5), "pivot": Vector2(-0.3, 8.5), "rotation": 0.0, "scale": Vector2.ONE}}
+	var head_mesh: Dictionary = mesh.duplicate(true)
+	head_mesh["vertices"] = [{"id": "v0", "position": Vector2(0.0, 8.5)}, {"id": "v1", "position": Vector2(1.0, 8.5)}, {"id": "v2", "position": Vector2(0.0, 9.5)}]
+	var eye_mesh: Dictionary = mesh.duplicate(true)
+	eye_mesh["vertices"] = [{"id": "v0", "position": Vector2(-0.25, 8.5)}, {"id": "v1", "position": Vector2(-0.15, 8.5)}, {"id": "v2", "position": Vector2(-0.25, 8.6)}]
+	var nested_asset := {"id": "nested_wizard", "name": "Nested Wizard", "asset_type": "character", "visibility": true, "asset_pivot": Vector2.ZERO, "components": [wizard_head, wizard_eye]}
+	var nested_result := RuntimeExportService.build_manifest(nested_asset, {"head": {"mesh": head_mesh, "uv": uv, "sdf": sdf, "sdf_resource_valid": true, "sdf_source_path": "/tmp/head_sdf.png"}, "eye": {"mesh": eye_mesh, "uv": uv, "sdf": sdf, "sdf_resource_valid": true, "sdf_source_path": "/tmp/eye_sdf.png"}})
+	var nested_by_id: Dictionary = {}
+	for exported_component in nested_result.get("manifest", {}).get("components", []):
+		nested_by_id[str(exported_component.get("component_id", ""))] = exported_component
+	var exported_eye: Dictionary = nested_by_id.get("eye", {})
+	var eye_vertex: Array = exported_eye.get("mesh", {}).get("vertices", [])[0]
+	var reconstructed_eye := _runtime_export_world_transform(nested_by_id, "eye") * Vector2(float(eye_vertex[0]), float(eye_vertex[1]))
+	var eye_local_position: Array = exported_eye.get("local_transform", {}).get("position", [])
+	_expect(bool(nested_result.get("valid", false)) and exported_eye.get("local_pivot", []) == [0.0, 0.0] and is_equal_approx(float(eye_local_position[0]), -0.03) and is_zero_approx(float(eye_local_position[1])) and reconstructed_eye.is_equal_approx(Vector2(-0.025, 0.85)), "Nested Wizard Head → Eye export should use child-local mesh/pivot data and reconstruct its intended asset-space world position exactly.")
 	var reference := {"id": "component_orb", "type": "reference", "semantic_key": "belly", "source_asset_id": "orb", "visibility": true, "z_index": 3, "parent_component_id": "component_b", "transform": {"position": Vector2(3.0, 4.0), "pivot": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE}}
 	var referenced_asset: Dictionary = asset.duplicate(true)
 	referenced_asset["components"].append(reference)
