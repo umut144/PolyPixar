@@ -556,6 +556,7 @@ func _test_world_contour_settings() -> void:
 	application.world_contour_stroke_width_px = 4.1
 	application._update_world_scale_popup()
 	_expect("Contour: 4.1 px = 0.03203 m" in application.world_scale_summary_label.text, "World Settings should show enough meter precision to distinguish fractional authored pixel widths.")
+	_expect("1 Spiel-Tile = 100 cm (20 Grid-Boxen)" in application.world_scale_summary_label.text, "World Settings should expose the shared 1 m game Tile as twenty default 5 cm Grid Boxes.")
 	application.world_contour_stroke_width_px = 4.0
 	var four_px_signature: Dictionary = application._geometry_build_signature("", "", contour)
 	application.world_contour_stroke_width_px = 6.0

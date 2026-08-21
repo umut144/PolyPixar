@@ -229,6 +229,9 @@ Schema 41 renames the toolbar surface to `World Settings` and introduces one
 typed authored Contour width shared by every Asset. The required
 `world_settings` record fixes reference density at `128 px/m` and stores a
 finite positive `contour_stroke_width_px`, defaulting to `4 px` for new Worlds.
+The World Settings summary expresses the shared `1 m` game Tile as `100 cm`,
+or twenty default `5 cm` Grid Boxes; Tile size does not alter Component
+geometry or the persisted World scale contract.
 Schema 40 and older Worlds migrate explicitly to that default; schema-41 data
 never receives a silent missing/invalid-value fallback. Width participates in
 Contour Mesh fingerprints and build signatures, so downstream Bakes become

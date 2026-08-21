@@ -12,7 +12,7 @@ const SCHEMA_VERSION := 42
 const MAX_HISTORY_SIZE := 100
 const DRAW_MODES := ["closed_loop", "contour", "primitive"]
 const GRID_BOX_TOOL_UNITS := 0.5
-const GAME_TILE_CENTIMETERS := 50.0
+const GAME_TILE_CENTIMETERS := 100.0
 # Kept available for a later Outliner presentation, but processed outputs are
 # currently reached through the Import Preview instead of additional rows.
 const SHOW_PROCESSED_OUTLINER := false
