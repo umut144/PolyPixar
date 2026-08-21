@@ -13,6 +13,7 @@ func _init() -> void:
 	_test_closed_loop_selection_mirror()
 	_test_ribbon_strip_mesh()
 	_test_catch_parent_snapping()
+	_test_contour_stroke_service()
 	_test_geometry_sampling_service()
 	_test_geometry_auto_build_service()
 	_test_create_outliner_expansion_scope()
@@ -310,6 +311,86 @@ func _test_create_outliner_expansion_scope() -> void:
 	application._render_canvas_context()
 	_expect(application.canvas_view.get_camera_state() == {"position": Vector2(42.0, -17.0), "zoom": 7.0}, "Reloading editor state should restore the selected Asset's saved canvas camera.")
 	application.free()
+
+
+func _test_contour_stroke_service() -> void:
+	var component := {
+		"id": "wizard_reference",
+		"draw_mode": "closed_loop",
+		"points": [
+			{"id": "tip", "position": Vector2(0.0, -6.0), "mode": "free", "handle_source": "manual", "handle_in": Vector2(-0.8, 1.2), "handle_out": Vector2(0.8, 1.2)},
+			{"id": "right", "position": Vector2(5.0, 2.0), "mode": "free", "handle_source": "manual", "handle_in": Vector2(-1.4, -0.4), "handle_out": Vector2(0.2, 1.0)},
+			{"id": "brim_right", "position": Vector2(3.5, 4.0), "mode": "corner", "handle_source": "manual", "handle_in": Vector2.ZERO, "handle_out": Vector2.ZERO},
+			{"id": "brim_left", "position": Vector2(-3.5, 4.0), "mode": "corner", "handle_source": "manual", "handle_in": Vector2.ZERO, "handle_out": Vector2.ZERO},
+			{"id": "left", "position": Vector2(-5.0, 2.0), "mode": "free", "handle_source": "manual", "handle_in": Vector2(-0.2, 1.0), "handle_out": Vector2(1.4, -0.4)}
+		],
+		"edges": [
+			{"id": "edge_tip_right", "start_point_id": "tip", "end_point_id": "right", "render_outline": true},
+			{"id": "edge_right_brim", "start_point_id": "right", "end_point_id": "brim_right", "render_outline": true},
+			{"id": "edge_brim", "start_point_id": "brim_right", "end_point_id": "brim_left", "render_outline": true},
+			{"id": "edge_left_brim", "start_point_id": "brim_left", "end_point_id": "left", "render_outline": true},
+			{"id": "edge_left_tip", "start_point_id": "left", "end_point_id": "tip", "render_outline": true}
+		],
+		"chains": [{"id": "outer", "point_ids": ["tip", "right", "brim_right", "brim_left", "left"], "edge_ids": ["edge_tip_right", "edge_right_brim", "edge_brim", "edge_left_brim", "edge_left_tip"], "closed": true, "topology_role": "outer"}]
+	}
+	var source_snapshot := component.duplicate(true)
+	var stroke := ContourStrokeService.generate(component)
+	var repeated := ContourStrokeService.generate(component)
+	_expect(bool(stroke.get("valid", false)), "A closed Wizard-like Boundary should generate a centered Contour Stroke mesh.")
+	_expect(stroke == repeated, "Contour Stroke generation must be deterministic for identical authored topology.")
+	_expect(component == source_snapshot, "Contour Stroke generation must not mutate canonical Component topology.")
+	_expect(int(stroke.get("algorithm_version", 0)) == ContourStrokeService.ALGORITHM_VERSION, "Contour Stroke results should expose their algorithm version.")
+	_expect(is_equal_approx(float(stroke.get("reference_pixels_per_meter", 0.0)), 128.0), "Contour Stroke should use the fixed authored reference density of 128 px/m.")
+	_expect(is_equal_approx(float(stroke.get("stroke_width_px", 0.0)), 4.0) and is_equal_approx(float(stroke.get("stroke_width_meters", 0.0)), 0.03125), "The Slice-1 default should derive an exact 4 px / 0.03125 m stroke width.")
+	_expect(is_equal_approx(float(stroke.get("centerline_offset_meters", 0.0)), 0.015625), "The stroke mesh should extend exactly half its width to either side of the authored Boundary.")
+	_expect(str(stroke.get("join", "")) == "miter" and is_equal_approx(float(stroke.get("miter_limit", 0.0)), 4.0) and str(stroke.get("cap", "")) == "butt", "Contour Stroke output should state the approved join, fallback limit, and cap semantics.")
+	var vertices: Array = stroke.get("vertices", [])
+	var indices: PackedInt32Array = stroke.get("indices", PackedInt32Array())
+	_expect(not vertices.is_empty() and indices.size() >= 3 and indices.size() % 3 == 0, "Contour Stroke should emit indexed triangle geometry.")
+	if vertices.size() >= 2:
+		var first_left := Vector2(vertices[0].get("position", Vector2.ZERO))
+		var first_right := Vector2(vertices[1].get("position", Vector2.ZERO))
+		_expect(is_equal_approx(first_left.distance_to(first_right) * ToolUnits.TO_METERS, 0.03125), "Each segment quad should remain centered at the exact authored width.")
+	var centerline: Array = stroke.get("centerline", [])
+	var analytic_maximum_distance := 0.0
+	for edge_data in component.get("edges", []):
+		var start_point := BezierTopology.point_by_id(component["points"], str(edge_data.get("start_point_id", "")))
+		var end_point := BezierTopology.point_by_id(component["points"], str(edge_data.get("end_point_id", "")))
+		var controls := BezierGeometry.cubic_controls(start_point, end_point)
+		for dense_index in range(129):
+			var analytic_position := BezierGeometry.cubic_position(controls, float(dense_index) / 128.0)
+			var nearest := INF
+			for centerline_index in range(centerline.size()):
+				var segment_start := Vector2(centerline[centerline_index].get("position", Vector2.ZERO))
+				var segment_end := Vector2(centerline[(centerline_index + 1) % centerline.size()].get("position", Vector2.ZERO))
+				nearest = minf(nearest, _distance_to_segment(analytic_position, segment_start, segment_end))
+			analytic_maximum_distance = maxf(analytic_maximum_distance, nearest)
+	_expect(analytic_maximum_distance * ToolUnits.TO_METERS <= ContourStrokeService.MAX_DEVIATION_PX / ContourStrokeService.REFERENCE_PIXELS_PER_METER + 0.000001, "The sampled centerline must stay within 0.25 reference px of the analytic authored Boundary.")
+	_expect(float(stroke.get("certified_max_deviation_meters", INF)) <= ContourStrokeService.MAX_DEVIATION_PX / ContourStrokeService.REFERENCE_PIXELS_PER_METER + 0.000001, "Contour Stroke should report a sampling deviation bound no larger than the approved tolerance.")
+	for sample in centerline:
+		var edge := BezierTopology.edge_by_id(component["edges"], str(sample.get("edge_id", "")))
+		var start_point := BezierTopology.point_by_id(component["points"], str(edge.get("start_point_id", "")))
+		var end_point := BezierTopology.point_by_id(component["points"], str(edge.get("end_point_id", "")))
+		var analytic := BezierGeometry.cubic_position(BezierGeometry.cubic_controls(start_point, end_point), float(sample.get("curve_t", -1.0)))
+		_expect(analytic.distance_to(Vector2(sample.get("position", Vector2.ZERO))) <= 0.000001, "Every centerline sample must retain exact Edge/curve_t provenance on the original Bezier.")
+	var hidden_outline := component.duplicate(true)
+	hidden_outline["edges"][0]["render_outline"] = false
+	var hidden_result := ContourStrokeService.generate(hidden_outline)
+	_expect(not bool(hidden_result.get("valid", true)) and "Contour Stroke Slice 1 does not yet support disabled Render Outline edges." in hidden_result.get("errors", []), "Slice 1 must reject disabled outline runs explicitly instead of silently stroking them.")
+	var sharp_component := _component()
+	for sharp_position in [Vector2.ZERO, Vector2(10.0, 0.0), Vector2(0.01, 0.01), Vector2(0.0, 10.0)]:
+		BezierTopology.add_point(sharp_component, sharp_position, "linear")
+	BezierTopology.close_active_chain(sharp_component)
+	var sharp_stroke := ContourStrokeService.generate(sharp_component)
+	_expect(bool(sharp_stroke.get("valid", false)) and int(sharp_stroke.get("bevel_join_count", 0)) > 0, "A miter longer than four half-widths should deterministically fall back to a bevel join.")
+
+
+func _distance_to_segment(point: Vector2, start: Vector2, end: Vector2) -> float:
+	var delta := end - start
+	if delta.length_squared() <= 0.000000000001:
+		return point.distance_to(start)
+	var t := clampf((point - start).dot(delta) / delta.length_squared(), 0.0, 1.0)
+	return point.distance_to(start + delta * t)
 
 
 func _test_geometry_sampling_service() -> void:
