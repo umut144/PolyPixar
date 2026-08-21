@@ -105,48 +105,36 @@ pointer jitter do not trigger the batch pipeline. Components rejected before
 the batch expose their concrete source-validation issue in the Meshing
 Inspector without inflating the actionable count.
 
-The persistent `Update UVs (N)` action consumes only current accepted Component
-Meshes, including Contour Strokes, and accepts deterministic Bounds / Planar UVs
-for visible Components with missing or stale mappings. New recipes reserve a
-calibrated UV border for later contour-mask derivation; small Components expand
-that border deterministically to at least 0.1875 m (16 Game00 reference pixels)
-outside the silhouette. UV results remain keyed
-one-to-one by stable Mesh Vertex ID and never alter Component topology or Meshes.
-
-The persistent `Update SDFs (N)` action consumes only current accepted Component
-Meshes and UV Bakes. It derives a deterministic 256×256 single-channel signed
-distance image for each visible Component, with a spread raised deterministically
-when necessary to cover the metric outside border and values above
-0.5 inside the triangulated silhouette. Bake metadata remains in the Geometry
-document while `contour_sdf.png` is stored beside it. Mesh, UV, recipe, algorithm,
-or missing-resource changes make the SDF stale without changing source topology.
+UV and SDF services and their existing derived records remain readable Legacy
+data. They are not active batch stages, Runtime dependencies, or schema-4
+fields. PolyTools does not delete or silently reinterpret those records.
 
 The persistent `Export Runtime (N)` action automatically considers every visible
 Asset. Every visible Component must have one unique
-registered `semantic_key`. Closed and primitive ordinary Components require
-current accepted Mesh, UV, and SDF resources. Open Contours remain visibly
-blocked until the Runtime contract gains a typed art-stroke role. Asset
+registered `semantic_key`. Closed and primitive ordinary Components require a
+current Fill Mesh and current centered Contour Stroke Mesh. Open Contours
+require only that Stroke and export no Fill. Asset
 References instead export their local Semantic Key
 plus the referenced Asset's derived `source_asset_key`; they do not duplicate
 the referenced geometry. The editor retains `source_asset_id` only as its
 internal link to the actual authored source Asset.
-The batch writes a versioned engine-neutral manifest plus copied SDF masks to
+The batch writes a versioned engine-neutral Manifest to
 the active World-local
 `res://worlds/<world_key>/PolyToolsRuntimeExports/<asset_key>/` directory and
 updates the World-root `catalog.json`. Packages are
 staged, verified, and replaced atomically per Asset; an invalid Asset retains
 its older package and no fallback geometry is generated.
-Runtime manifest schema 3 additionally exports an independently renderable
-padded Contour Carrier for each ordinary Component, together with its typed
-local SDF domain and outside-padding metadata; the Fill Mesh is unchanged.
+Runtime Manifest schema 4 exports `contour_stroke_mesh` independently from the
+unchanged Fill Mesh. It contains no UV, SDF, mask, or Carrier compatibility
+fields; schema-3 consumers must reject it.
 The normative field-level package and consumer rules live in
 `docs/RUNTIME_EXPORT_CONTRACT.md`; other documents must not redefine them.
 
-All four persistent batch buttons use the same compact tooltip summary. A
+The active Mesh and Runtime batch stages use the same compact tooltip summary. A
 `Pending` section lists actionable work, while `Needs attention` lists visible
 Components or Assets blocked by invalid source data, missing/stale upstream
 resources, or the last failed batch attempt. Attention entries remain outside
-the actionable Mesh, UV, and SDF button counts. Each Batch button draws its own
+the actionable counts. Each active Batch button draws its own
 orange attention point whenever that same summary contains at least one
 `Needs attention` entry; the point remains visible even if the Button itself is
 disabled.

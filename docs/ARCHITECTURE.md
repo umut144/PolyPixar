@@ -188,6 +188,9 @@ scale. It rejects truly collinear mappings without misclassifying small,
 well-shaped normalized UV Triangles as degenerate. Its failure-retry signature
 is versioned independently from the pixel algorithm, allowing repaired
 validation failures to retry without invalidating every accepted SDF image.
+Runtime Manifest schema 4 later retires UV/SDF from the active build and
+package path. These services and records remain readable Legacy data and are
+not deleted or reinterpreted.
 
 Schema 38 adds the Component-level `semantic_role` field. It retires the
 standalone Godot-scene Export workspace in favor of the persistent
@@ -251,34 +254,34 @@ The normative serialized package and consumer contract is
 [`RUNTIME_EXPORT_CONTRACT.md`](RUNTIME_EXPORT_CONTRACT.md). The summary below
 describes how the editor produces that contract.
 
-`RuntimeExportService` builds manifest schema 3 exclusively from current
-accepted Component Mesh, UV, and SDF Bakes. It rejects missing or stale inputs,
-missing/corrupt mask resources, invalid or duplicate Semantic Keys, unresolved
+`RuntimeExportService` builds Manifest schema 4 exclusively from current
+accepted Fill and Contour Stroke Mesh Bakes. It rejects missing or stale inputs,
+invalid or duplicate Semantic Keys, non-rebased Scale, unresolved
 Asset References, and incomplete or cyclic visible hierarchies. Ordinary
 Components never derive replacement geometry during export. References emit an
 `asset_reference` record containing the local `semantic_key` and actual
-`source_asset_key`, without copying a second Mesh or contour mask into the owner.
+`source_asset_key`, without copying geometry into the owner.
 
 The contract is engine-neutral: X points right, Y points up, lengths are meters,
 positive rotations are counter-clockwise radians, and one Tool unit equals
 0.1 m. Component local transforms mean
 `T(position) * R(rotation) * S(scale) * T(-pivot)`. Components are listed in
 global ascending `(z_index, component_id)` order from back to front. Accepted
-Mesh Vertex order is retained, Triangle Vertex IDs become compact indices, and
-UVs are aligned to that same order through stable Vertex IDs. Each ordinary
-Component also exports a separate padded Contour Carrier rectangle and the
-typed local SDF domain, silhouette UV bounds, and SDF-pixel/metre outside
-padding. The unchanged fill Mesh is never used to clip that Carrier.
+Mesh Vertex order is retained and Triangle Vertex IDs become compact indices.
+Every ordinary Component exports a separate centered `contour_stroke_mesh`;
+closed and Primitive Components additionally export their unchanged Fill Mesh,
+while open Contours do not invent one. Schema 4 contains no UV/SDF/Carrier
+fields and has no schema-3 fallback.
 
 Each visible Asset is exported to the active World-local
-`res://worlds/<world_key>/PolyToolsRuntimeExports/<asset_key>/` directory as `manifest.json` plus relative
-`masks/<component_id>.sdf.png` resources. The batch verifies a staging package
+`res://worlds/<world_key>/PolyToolsRuntimeExports/<asset_key>/` directory as
+`manifest.json`. The batch verifies a staging package
 before atomically replacing the prior package; validation or I/O failure leaves
 the prior package intact. Once all required packages are current, the same batch
 atomically updates World-root Asset Catalog schema 1. The Catalog is the closed
 consumer set; generated directories absent from it are ignored and pruned only
 after every listed package is current and the new Catalog has been committed. Package freshness is derived by comparing the expected
-manifest and mask hashes, not by persisting export diagnostics in the Asset.
+Manifest bytes, not by persisting export diagnostics in the Asset.
 
 ## Testing
 

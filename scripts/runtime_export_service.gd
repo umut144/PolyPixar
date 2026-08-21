@@ -1,12 +1,7 @@
 class_name RuntimeExportService
 extends RefCounted
 
-const MANIFEST_SCHEMA_VERSION := 3
-const GAME00_REFERENCE_VERTICAL_METERS := 9.375
-const GAME00_REFERENCE_WINDOW_HEIGHT_PX := 800.0
-const MIN_OUTER_CONTOUR_PADDING_SCREEN_PX := 16.0
-const MIN_OUTER_CONTOUR_PADDING_METERS := GAME00_REFERENCE_VERTICAL_METERS / GAME00_REFERENCE_WINDOW_HEIGHT_PX * MIN_OUTER_CONTOUR_PADDING_SCREEN_PX
-const AFFINE_EPSILON := 0.000001
+const MANIFEST_SCHEMA_VERSION := 4
 static func build_manifest(asset: Dictionary, sources: Dictionary) -> Dictionary:
 	var errors: Array[String] = []
 	var registry := SemanticRegistry.load_registry()
@@ -57,23 +52,20 @@ static func build_manifest(asset: Dictionary, sources: Dictionary) -> Dictionary
 	errors.append_array(_hierarchy_errors(visible_components))
 	var export_transforms := _canonical_export_transforms(asset, visible_components)
 	var manifest_components: Array = []
-	var masks: Array = []
 	for component in visible_components:
 		var component_id := str(component.get("id", ""))
 		var source: Dictionary = sources.get(component_id, {})
 		var export_transform: Dictionary = export_transforms.get(component_id, {})
-		var built := _build_reference_component(component, source, export_transform) if str(component.get("type", "component")) == "reference" else _build_component(component, source, export_transform)
+		var built := _build_reference_component(component, source, export_transform) if str(component.get("type", "component")) == "reference" else _build_component_v4(component, source, export_transform)
 		errors.append_array(built.get("errors", []))
 		if bool(built.get("valid", false)):
 			manifest_components.append(built["component"])
-			if built.has("mask"):
-				masks.append(built["mask"])
 	if visible_components.is_empty():
 		errors.append("The Asset has no visible Components to export.")
 	if not bool(asset.get("visibility", true)):
 		errors.append("The Asset is hidden.")
 	if not errors.is_empty():
-		return {"valid": false, "errors": errors, "manifest": {}, "masks": []}
+		return {"valid": false, "errors": errors, "manifest": {}}
 	var manifest := {
 		"schema_version": MANIFEST_SCHEMA_VERSION,
 		"asset_key": asset_key,
@@ -97,164 +89,166 @@ static func build_manifest(asset: Dictionary, sources: Dictionary) -> Dictionary
 		"asset_pivot": _meters(asset_pivot),
 		"components": manifest_components
 	}
-	return {"valid": true, "errors": [], "manifest": manifest, "masks": masks}
+	return {"valid": true, "errors": [], "manifest": manifest}
 
 
-static func _build_component(component: Dictionary, source: Dictionary, export_transform: Dictionary) -> Dictionary:
+static func _build_component_v4(component: Dictionary, source: Dictionary, export_transform: Dictionary) -> Dictionary:
 	var errors: Array[String] = []
 	var label := _component_label(component)
-	if str(component.get("draw_mode", "closed_loop")) == "contour":
-		return {"valid": false, "errors": ["%s: open Contours require the future contour_stroke_mesh Runtime role and cannot be exported as Fill Meshes." % label]}
-	var mesh = source.get("mesh", {})
-	var uv = source.get("uv", {})
-	var sdf = source.get("sdf", {})
-	if not mesh is Dictionary or not bool(mesh.get("valid", false)):
-		errors.append("%s: a current accepted Component Mesh is required." % label)
-		mesh = {}
-	if not uv is Dictionary or not bool(uv.get("valid", false)):
-		errors.append("%s: a current accepted UV Bake is required." % label)
-		uv = {}
-	if not sdf is Dictionary or not bool(sdf.get("valid", false)):
-		errors.append("%s: a current accepted SDF Bake is required." % label)
-		sdf = {}
-	if not bool(source.get("sdf_resource_valid", false)):
-		errors.append("%s: the accepted SDF image is missing or corrupt." % label)
+	var draw_mode := str(component.get("draw_mode", "closed_loop"))
 	var authored_transform = component.get("transform", {})
 	if not authored_transform is Dictionary:
 		authored_transform = {}
 	var authored_pivot := Vector2(authored_transform.get("pivot", Vector2.ZERO))
+	var stroke = source.get("contour_stroke", {})
+	if not stroke is Dictionary or not bool(stroke.get("valid", false)) or str(stroke.get("method", "")) != ContourMeshService.METHOD:
+		errors.append("%s: a current accepted Contour Stroke Mesh is required." % label)
+		stroke = {}
+	var stroke_has_outline := bool(stroke.get("has_outline", false))
+	var stroke_mesh := _serialize_indexed_mesh(stroke, authored_pivot, not stroke_has_outline, label, "Contour Stroke")
+	errors.append_array(stroke_mesh.get("errors", []))
+	errors.append_array(_stroke_run_validation_issues(stroke.get("runs", []), stroke_has_outline, stroke_mesh.get("vertices", []).size(), stroke_mesh.get("indices", []).size(), label))
+	var parameters: Dictionary = stroke.get("parameters", {}) if stroke is Dictionary else {}
+	var width_px := float(parameters.get("stroke_width_px", 0.0))
+	var width_meters := float(parameters.get("stroke_width_meters", 0.0))
+	var reference_density := float(parameters.get("reference_pixels_per_meter", 0.0))
+	if not is_finite(width_px) or width_px <= 0.0 or not is_finite(width_meters) or width_meters <= 0.0 \
+		or not is_equal_approx(reference_density, ContourStrokeService.REFERENCE_PIXELS_PER_METER) \
+		or not is_equal_approx(width_meters, width_px / reference_density):
+		errors.append("%s: Contour Stroke width metadata is invalid or non-metric." % label)
+	if str(parameters.get("join", "")) != ContourStrokeService.JOIN_TYPE or not is_equal_approx(float(parameters.get("miter_limit", 0.0)), ContourStrokeService.MITER_LIMIT) or str(parameters.get("cap", "")) != ContourStrokeService.CAP_TYPE:
+		errors.append("%s: Contour Stroke join/cap metadata does not match the authored contract." % label)
+	if str(stroke.get("topology_role", component.get("topology_role", "outer"))) not in ["outer", "hole"]:
+		errors.append("%s: Contour Stroke topology role must be outer or hole." % label)
+	var fill_mesh := {}
+	if draw_mode != "contour":
+		var mesh = source.get("mesh", {})
+		if not mesh is Dictionary or not bool(mesh.get("valid", false)) or str(mesh.get("method", "")) == ContourMeshService.METHOD:
+			errors.append("%s: a current accepted Fill Mesh is required." % label)
+			mesh = {}
+		fill_mesh = _serialize_indexed_mesh(mesh, authored_pivot, false, label, "Fill Mesh")
+		errors.append_array(fill_mesh.get("errors", []))
+	var position := Vector2(export_transform.get("position", Vector2.ZERO))
+	var scale := Vector2(export_transform.get("scale", Vector2.ONE))
+	var rotation := float(export_transform.get("rotation", 0.0))
+	if not position.is_finite() or not scale.is_finite() or not is_finite(rotation):
+		errors.append("%s: Component transform is not finite." % label)
+	if not errors.is_empty():
+		return {"valid": false, "errors": errors}
+	var parent_component_id: Variant = null
+	if not str(component.get("parent_component_id", "")).is_empty():
+		parent_component_id = str(component.get("parent_component_id", ""))
+	var runtime_component := {
+		"component_id": str(component.get("id", "")),
+		"semantic_key": str(component.get("semantic_key", "")).strip_edges(),
+		"parent_component_id": parent_component_id,
+		"z_index": int(component.get("z_index", 0)),
+		"local_pivot": [0.0, 0.0],
+		"local_transform": {"position": _meters(position), "rotation_radians": deg_to_rad(rotation), "scale": [scale.x, scale.y]},
+		"contour_stroke_mesh": {
+			"role": "centered_boundary_stroke",
+			"has_outline": stroke_has_outline,
+			"vertices": stroke_mesh.get("vertices", []),
+			"indices": stroke_mesh.get("indices", []),
+			"reference_pixels_per_meter": reference_density,
+			"stroke_width_px": width_px,
+			"stroke_width_meters": width_meters,
+			"centerline": "original_authored_boundary",
+			"inner_offset_meters": width_meters * 0.5,
+			"outer_offset_meters": width_meters * 0.5,
+			"join": {"type": ContourStrokeService.JOIN_TYPE, "miter_limit": ContourStrokeService.MITER_LIMIT, "fallback": "bevel"},
+			"cap": ContourStrokeService.CAP_TYPE,
+			"topology_role": str(stroke.get("topology_role", component.get("topology_role", "outer"))),
+			"runs": _serialize_stroke_runs(stroke.get("runs", []))
+		}
+	}
+	if draw_mode != "contour":
+		runtime_component["mesh"] = {"vertices": fill_mesh.get("vertices", []), "indices": fill_mesh.get("indices", [])}
+	return {"valid": true, "errors": [], "component": runtime_component}
+
+
+static func _serialize_indexed_mesh(mesh: Dictionary, authored_pivot: Vector2, allow_empty: bool, label: String, role: String) -> Dictionary:
+	var errors: Array[String] = []
 	var vertices: Array = []
 	var vertex_indices: Dictionary = {}
 	for raw_vertex in mesh.get("vertices", []):
 		if not raw_vertex is Dictionary:
-			errors.append("%s: Mesh contains an invalid Vertex record." % label)
+			errors.append("%s: %s contains an invalid Vertex record." % [label, role])
 			continue
 		var vertex_id := str(raw_vertex.get("id", ""))
-		var vertex_position := Vector2(raw_vertex.get("position", Vector2.INF))
-		if vertex_id.is_empty() or vertex_indices.has(vertex_id) or not vertex_position.is_finite():
-			errors.append("%s: Mesh Vertex IDs and positions must be unique and finite." % label)
+		var position := Vector2(raw_vertex.get("position", Vector2.INF))
+		if vertex_id.is_empty() or vertex_indices.has(vertex_id) or not position.is_finite():
+			errors.append("%s: %s Vertex IDs and positions must be unique and finite." % [label, role])
 			continue
 		vertex_indices[vertex_id] = vertices.size()
-		# Editor mesh coordinates are authored around the Component pivot.  Schema 3
-		# instead requires mesh data in Component-local space, so move that pivot to
-		# the local origin before serializing it.
-		vertices.append(_meters(vertex_position - authored_pivot))
-	var uv_by_vertex: Dictionary = {}
-	for raw_entry in uv.get("uvs", []):
-		if not raw_entry is Dictionary:
-			continue
-		var vertex_id := str(raw_entry.get("vertex_id", ""))
-		var coordinate := Vector2(raw_entry.get("uv", Vector2.INF))
-		if vertex_id.is_empty() or uv_by_vertex.has(vertex_id) or not coordinate.is_finite() \
-			or coordinate.x < 0.0 or coordinate.x > 1.0 or coordinate.y < 0.0 or coordinate.y > 1.0:
-			errors.append("%s: UVs must uniquely map every Vertex ID inside [0, 1]." % label)
-			continue
-		uv_by_vertex[vertex_id] = [coordinate.x, coordinate.y]
-	var ordered_uvs: Array = []
-	for raw_vertex in mesh.get("vertices", []):
-		var vertex_id := str(raw_vertex.get("id", "")) if raw_vertex is Dictionary else ""
-		if not uv_by_vertex.has(vertex_id):
-			errors.append("%s: UV for Mesh Vertex '%s' is missing." % [label, vertex_id])
-		else:
-			ordered_uvs.append(uv_by_vertex[vertex_id])
-	if uv_by_vertex.size() != vertex_indices.size():
-		errors.append("%s: UV count does not match the accepted Mesh Vertex count." % label)
+		vertices.append(_meters(position - authored_pivot))
 	var indices: Array[int] = []
 	for raw_triangle in mesh.get("triangles", []):
-		var triangle_ids: Array = raw_triangle.get("vertex_ids", []) if raw_triangle is Dictionary else []
-		if triangle_ids.size() != 3:
-			errors.append("%s: every Mesh Triangle must contain exactly three Vertex IDs." % label)
+		var ids: Array = raw_triangle.get("vertex_ids", []) if raw_triangle is Dictionary else []
+		if ids.size() != 3:
+			errors.append("%s: %s Triangle must contain exactly three Vertex IDs." % [label, role])
 			continue
-		var triangle_indices: Array[int] = []
-		for vertex_id_variant in triangle_ids:
-			var vertex_id := str(vertex_id_variant)
-			if not vertex_indices.has(vertex_id):
-				errors.append("%s: Triangle references unknown Vertex '%s'." % [label, vertex_id])
+		var compact: Array[int] = []
+		for raw_id in ids:
+			if vertex_indices.has(str(raw_id)):
+				compact.append(int(vertex_indices[str(raw_id)]))
 			else:
-				triangle_indices.append(int(vertex_indices[vertex_id]))
-		if triangle_indices.size() == 3:
-			if triangle_indices[0] == triangle_indices[1] or triangle_indices[1] == triangle_indices[2] or triangle_indices[0] == triangle_indices[2]:
-				errors.append("%s: degenerate Triangle indices are not exportable." % label)
+				errors.append("%s: %s Triangle references an unknown Vertex." % [label, role])
+		if compact.size() == 3:
+			if compact[0] == compact[1] or compact[1] == compact[2] or compact[0] == compact[2]:
+				errors.append("%s: %s contains degenerate Triangle indices." % [label, role])
 			else:
-				indices.append_array(triangle_indices)
-	if vertices.is_empty() or indices.is_empty():
-		errors.append("%s: Mesh Vertices and Triangles are required." % label)
-	var resolution: Array = sdf.get("resolution", []) if sdf is Dictionary else []
-	if resolution.size() != 2 or int(resolution[0]) <= 0 or int(resolution[1]) <= 0:
-		errors.append("%s: SDF resolution metadata is invalid." % label)
-	var contour_layout := _contour_layout(vertices, ordered_uvs, [int(resolution[0]), int(resolution[1])]) if resolution.size() == 2 else {"valid": false, "error": "Contour SDF domain requires a valid resolution."}
-	if not bool(contour_layout.get("valid", false)):
-		errors.append("%s: %s" % [label, str(contour_layout.get("error", "Contour SDF domain is invalid."))])
-	else:
-		var padding_meters: Dictionary = contour_layout["outer_padding_meters"]
-		var padding_px: Dictionary = contour_layout["outer_padding_sdf_px"]
-		var domain_size: Array = contour_layout["contour_domain"].get("size", [])
-		if domain_size.size() != 2 or not is_equal_approx(float(domain_size[0]) / float(resolution[0]), float(domain_size[1]) / float(resolution[1])):
-			errors.append("%s: Contour SDF domain must use equal local meters per SDF pixel." % label)
-		var smallest_padding := minf(minf(float(padding_meters["left"]), float(padding_meters["right"])), minf(float(padding_meters["bottom"]), float(padding_meters["top"])))
-		if smallest_padding + AFFINE_EPSILON < MIN_OUTER_CONTOUR_PADDING_METERS:
-			errors.append("%s: Contour SDF outside padding must be at least %.6f m (16 Game00 reference pixels)." % [label, MIN_OUTER_CONTOUR_PADDING_METERS])
-		var required_spread_px := maxf(maxf(float(padding_px["left"]), float(padding_px["right"])), maxf(float(padding_px["bottom"]), float(padding_px["top"])))
-		if float(sdf.get("spread_px", 0.0)) + AFFINE_EPSILON < required_spread_px:
-			errors.append("%s: SDF spread must cover its declared outside padding." % label)
-	var position := Vector2(export_transform.get("position", Vector2.ZERO))
-	var pivot := Vector2.ZERO
-	var scale := Vector2(export_transform.get("scale", Vector2.ONE))
-	var rotation := float(export_transform.get("rotation", 0.0))
-	if not position.is_finite() or not pivot.is_finite() or not scale.is_finite() or not is_finite(rotation):
-		errors.append("%s: Component transform is not finite." % label)
-	if not errors.is_empty():
-		return {"valid": false, "errors": errors}
-	var component_id := str(component.get("id", ""))
-	var relative_mask_path := "masks/%s.sdf.png" % component_id
-	var mask := {
-		"component_id": component_id,
-		"source_path": str(source.get("sdf_source_path", "")),
-		"relative_path": relative_mask_path,
-		"pixel_hash": str(sdf.get("pixel_hash", ""))
-	}
-	if mask["source_path"].is_empty() or mask["pixel_hash"].is_empty():
-		return {"valid": false, "errors": ["%s: SDF resource path or pixel hash is missing." % label]}
-	var parent_component_id: Variant = null
-	if not str(component.get("parent_component_id", "")).is_empty():
-		parent_component_id = str(component.get("parent_component_id", ""))
-	return {
-		"valid": true,
-		"errors": [],
-		"component": {
-			"component_id": component_id,
-			"semantic_key": str(component.get("semantic_key", "")).strip_edges(),
-			"parent_component_id": parent_component_id,
-			"z_index": int(component.get("z_index", 0)),
-			"local_pivot": _meters(pivot),
-			"local_transform": {
-				"position": _meters(position),
-				"rotation_radians": deg_to_rad(rotation),
-				"scale": [scale.x, scale.y]
-			},
-			"mesh": {"vertices": vertices, "indices": indices, "uvs": ordered_uvs},
-			"contour_carrier": contour_layout["carrier"],
-			"contour_mask": {
-				"path": relative_mask_path,
-				"type": "signed_distance_field",
-				"channel": "r",
-				"color_space": "linear",
-				"resolution": [int(resolution[0]), int(resolution[1])],
-				"spread_px": float(sdf.get("spread_px", 0.0)),
-				"boundary_value": float(sdf.get("boundary_value", 0.5)),
-				"inside_is_greater": bool(sdf.get("inside_is_greater", true)),
-				"uv_origin": "bottom_left",
-				"image_origin": "top_left",
-				"uv_to_pixel": "x=u*width, y=(1-v)*height",
-				"contour_domain": contour_layout["contour_domain"],
-				"content_bounds_uv": contour_layout["content_bounds_uv"],
-				"outer_padding_sdf_px": contour_layout["outer_padding_sdf_px"],
-				"outer_padding_meters": contour_layout["outer_padding_meters"],
-				"pixel_hash": mask["pixel_hash"]
-			}
-		},
-		"mask": mask
-	}
+				indices.append_array(compact)
+	if not allow_empty and (vertices.is_empty() or indices.is_empty()):
+		errors.append("%s: %s Vertices and Triangles are required." % [label, role])
+	if allow_empty and (not vertices.is_empty() or not indices.is_empty()):
+		errors.append("%s: disabled Contour Stroke must not contain geometry." % label)
+	return {"valid": errors.is_empty(), "errors": errors, "vertices": vertices, "indices": indices}
+
+
+static func _serialize_stroke_runs(raw_runs: Array) -> Array:
+	var runs: Array = []
+	for raw_run in raw_runs:
+		if not raw_run is Dictionary:
+			continue
+		runs.append({
+			"run_id": str(raw_run.get("run_id", "")),
+			"edge_ids": raw_run.get("edge_ids", []).duplicate(),
+			"closed": bool(raw_run.get("closed", false)),
+			"start_cap": str(raw_run.get("start_cap", "butt")),
+			"end_cap": str(raw_run.get("end_cap", "butt")),
+			"vertex_offset": int(raw_run.get("vertex_offset", 0)),
+			"vertex_count": int(raw_run.get("vertex_count", 0)),
+			"index_offset": int(raw_run.get("index_offset", 0)),
+			"index_count": int(raw_run.get("index_count", 0))
+		})
+	return runs
+
+
+static func _stroke_run_validation_issues(raw_runs: Array, has_outline: bool, vertex_count: int, index_count: int, label: String) -> Array[String]:
+	var errors: Array[String] = []
+	if has_outline and raw_runs.is_empty():
+		errors.append("%s: visible Contour Stroke requires at least one typed run." % label)
+	if not has_outline and not raw_runs.is_empty():
+		errors.append("%s: disabled Contour Stroke must not contain runs." % label)
+	for raw_run in raw_runs:
+		if not raw_run is Dictionary:
+			errors.append("%s: Contour Stroke contains an invalid run record." % label)
+			continue
+		var vertex_offset := int(raw_run.get("vertex_offset", -1))
+		var run_vertex_count := int(raw_run.get("vertex_count", -1))
+		var index_offset := int(raw_run.get("index_offset", -1))
+		var run_index_count := int(raw_run.get("index_count", -1))
+		if str(raw_run.get("run_id", "")).is_empty() or not raw_run.get("edge_ids", []) is Array:
+			errors.append("%s: every Contour Stroke run requires an ID and ordered Edge IDs." % label)
+		if vertex_offset < 0 or run_vertex_count <= 0 or vertex_offset + run_vertex_count > vertex_count \
+			or index_offset < 0 or run_index_count <= 0 or index_offset + run_index_count > index_count or run_index_count % 3 != 0:
+			errors.append("%s: Contour Stroke run ranges must resolve inside the combined Mesh." % label)
+		var closed := bool(raw_run.get("closed", false))
+		var expected_cap := "none" if closed else ContourStrokeService.CAP_TYPE
+		if str(raw_run.get("start_cap", "")) != expected_cap or str(raw_run.get("end_cap", "")) != expected_cap:
+			errors.append("%s: Contour Stroke run cap metadata is inconsistent." % label)
+	return errors
 
 
 static func _build_reference_component(component: Dictionary, source: Dictionary, export_transform: Dictionary) -> Dictionary:
@@ -351,42 +345,3 @@ static func _component_label(component: Dictionary) -> String:
 
 static func _meters(value: Vector2) -> Array:
 	return [value.x * ToolUnits.TO_METERS, value.y * ToolUnits.TO_METERS]
-
-
-static func _contour_layout(vertices: Array, uvs: Array, resolution: Array) -> Dictionary:
-	if vertices.size() < 3 or vertices.size() != uvs.size() or resolution.size() != 2:
-		return {"valid": false, "error": "Contour SDF domain requires aligned Mesh positions, UVs, and a resolution."}
-	var local_bounds := Rect2(_vector2(vertices[0]), Vector2.ZERO)
-	var content_min := Vector2(INF, INF)
-	var content_max := Vector2(-INF, -INF)
-	for index in range(vertices.size()):
-		local_bounds = local_bounds.expand(_vector2(vertices[index]))
-		var coordinate := _vector2(uvs[index])
-		content_min = content_min.min(coordinate)
-		content_max = content_max.max(coordinate)
-	var content_size := content_max - content_min
-	if content_size.x <= AFFINE_EPSILON or content_size.y <= AFFINE_EPSILON or local_bounds.size.x <= AFFINE_EPSILON or local_bounds.size.y <= AFFINE_EPSILON:
-		return {"valid": false, "error": "Contour SDF UV and local content bounds must both have positive area."}
-	# Bounds / Planar UVs map the actual local bounds into content_bounds_uv.
-	# Deriving the full UV domain from those two rectangles avoids selecting an
-	# arbitrary triangle (many boundary vertices are collinear) and remains
-	# stable across the accepted deterministic mesh order.
-	var meters_per_uv := Vector2(local_bounds.size.x / content_size.x, local_bounds.size.y / content_size.y)
-	if not is_equal_approx(meters_per_uv.x, meters_per_uv.y):
-		return {"valid": false, "error": "Contour SDF domain must use equal local meters per SDF pixel."}
-	var domain_min := local_bounds.position - meters_per_uv * content_min
-	var domain_size := meters_per_uv
-	var width := float(resolution[0])
-	var height := float(resolution[1])
-	var padding_px := {"left": content_min.x * width, "right": (1.0 - content_max.x) * width, "bottom": content_min.y * height, "top": (1.0 - content_max.y) * height}
-	var padding_meters := {"left": content_min.x * domain_size.x, "right": (1.0 - content_max.x) * domain_size.x, "bottom": content_min.y * domain_size.y, "top": (1.0 - content_max.y) * domain_size.y}
-	var domain := {"min": [domain_min.x, domain_min.y], "size": [domain_size.x, domain_size.y]}
-	return {"valid": true, "contour_domain": domain, "content_bounds_uv": {"min": [content_min.x, content_min.y], "max": [content_max.x, content_max.y]}, "outer_padding_sdf_px": padding_px, "outer_padding_meters": padding_meters, "carrier": {"role": "contour_sdf_carrier", "primitive": "rectangle", "local_rect": domain, "vertices": [[domain_min.x, domain_min.y], [domain_min.x + domain_size.x, domain_min.y], [domain_min.x + domain_size.x, domain_min.y + domain_size.y], [domain_min.x, domain_min.y + domain_size.y]], "indices": [0, 1, 2, 0, 2, 3], "uvs": [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]}}
-
-
-static func _vector2(value) -> Vector2:
-	if value is Vector2:
-		return value
-	if value is Array and value.size() == 2:
-		return Vector2(float(value[0]), float(value[1]))
-	return Vector2.INF

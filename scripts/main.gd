@@ -3256,6 +3256,13 @@ func _normalize_geometry_document(raw_document, asset_id: String, component_id: 
 				document["meshing"]["recipe"] = GeometryMeshingService.normalize_recipe({"method": preferred_mesh_method, "parameters": chosen_raw_bake.get("parameters", {})})
 			if str(document["component_mesh"].get("bake_id", "")) == str(meshing_bake.get("bake_id", "")):
 				document["component_mesh"]["method"] = str(meshing_bake.get("method", GeometryMeshingService.CONSTRAINED_MESH))
+	# Schema 4 Runtime needs the centered Stroke beside, rather than instead of,
+	# a closed Component's selected Fill Mesh. Legacy normalization previously
+	# retained only the selected Meshing Bake.
+	if preferred_mesh_method != ContourMeshService.METHOD and raw_meshing_bakes.get(ContourMeshService.METHOD, {}) is Dictionary:
+		var contour_stroke_bake := _normalize_meshing_bake(raw_meshing_bakes.get(ContourMeshService.METHOD, {}))
+		if not contour_stroke_bake.is_empty():
+			document["meshing"]["bakes"][ContourMeshService.METHOD] = contour_stroke_bake
 	var uv_mapping_source = source.get("uv_mapping", {})
 	if not uv_mapping_source is Dictionary:
 		uv_mapping_source = {}
@@ -3843,6 +3850,14 @@ func _component_mesh_bake(asset_id: String, component_id: String) -> Dictionary:
 	return bake if str(bake.get("bake_id", "")) == bake_id else {}
 
 
+func _contour_stroke_bake(asset_id: String, component_id: String) -> Dictionary:
+	return _geometry_meshing_bake(asset_id, component_id, ContourMeshService.METHOD)
+
+
+func _contour_stroke_bake_is_current(asset_id: String, component_id: String, component: Dictionary) -> bool:
+	return ContourMeshService.matches_source(_contour_stroke_bake(asset_id, component_id), component, world_contour_stroke_width_px)
+
+
 func _component_mesh_status(asset_id: String, component_id: String, component: Dictionary) -> String:
 	var reference := _component_mesh_reference(asset_id, component_id)
 	if str(reference.get("bake_id", "")).is_empty():
@@ -3933,6 +3948,9 @@ func _geometry_build_signature(asset_id: String, component_id: String, component
 	var resolved_recipes := recipes if not recipes.is_empty() else _geometry_build_recipes(asset_id, component_id, component, cut_guides, hole_components)
 	if str(component.get("draw_mode", "")) == "contour":
 		resolved_recipes = {"contour": {"method": ContourMeshService.METHOD, "algorithm_version": ContourMeshService.ALGORITHM_VERSION, "stroke_width_px": world_contour_stroke_width_px}}
+	else:
+		resolved_recipes = resolved_recipes.duplicate(true)
+		resolved_recipes["contour_stroke"] = {"method": ContourMeshService.METHOD, "algorithm_version": ContourMeshService.ALGORITHM_VERSION, "stroke_width_px": world_contour_stroke_width_px}
 	return GeometryAutoBuildService.source_signature(component, cut_guides, hole_components, resolved_recipes)
 
 
@@ -3961,6 +3979,8 @@ func _component_mesh_source_validation_issues(asset: Dictionary, component: Dict
 		_geometry_sampling_hole_components(asset, component_id)
 	):
 		sampling_issues.append(str(issue))
+	for issue in ContourMeshService.validation_issues(component, world_contour_stroke_width_px):
+		sampling_issues.append(str(issue))
 	return sampling_issues
 
 
@@ -3976,6 +3996,8 @@ func _component_mesh_needs_update(asset_id: String, component: Dictionary) -> bo
 	var failure_signature = reference.get("last_failure_signature", {})
 	if failure_signature is Dictionary and GeometryAutoBuildService.signatures_match(current_signature, failure_signature):
 		return false
+	if not _contour_stroke_bake_is_current(asset_id, component_id, component):
+		return true
 	var provenance = reference.get("build_provenance", {})
 	if not provenance is Dictionary:
 		return true
@@ -4021,13 +4043,11 @@ func _batch_status_snapshot() -> Dictionary:
 
 func _rebuild_batch_status_snapshot() -> Dictionary:
 	var mesh_candidates := _all_mesh_update_candidates()
-	var uv_candidates := _all_uv_update_candidates()
-	var sdf_candidates := _all_sdf_update_candidates()
 	var runtime_candidates := _all_runtime_export_candidates()
 	batch_status_snapshot = {
 		"mesh": {"candidates": mesh_candidates, "summary": _mesh_batch_summary(mesh_candidates)},
-		"uv": {"candidates": uv_candidates, "summary": _uv_batch_summary(uv_candidates)},
-		"sdf": {"candidates": sdf_candidates, "summary": _sdf_batch_summary(sdf_candidates)},
+		"uv": {"candidates": [], "summary": {"pending": PackedStringArray(), "attention": PackedStringArray()}},
+		"sdf": {"candidates": [], "summary": {"pending": PackedStringArray(), "attention": PackedStringArray()}},
 		"runtime": {"candidates": runtime_candidates, "summary": _runtime_export_batch_summary(runtime_candidates)}
 	}
 	batch_status_snapshot_revision = batch_status_revision
@@ -4304,6 +4324,16 @@ func _generate_component_mesh_build(asset_id: String, component_id: String) -> D
 			"source_signature": _geometry_build_signature(asset_id, component_id, component),
 			"attempts": 1
 		}
+	var contour_stroke := ContourMeshService.generate(component, world_contour_stroke_width_px)
+	if not bool(contour_stroke.get("valid", false)):
+		return {
+			"valid": false,
+			"errors": contour_stroke.get("errors", []).duplicate(),
+			"recipes": {},
+			"source_signature": _geometry_build_signature(asset_id, component_id, component),
+			"attempts": 1
+		}
+	contour_stroke["bake_id"] = "contour_stroke_bake_%d" % ResourceUID.create_id()
 	var cut_guides := _cut_guides_for_component(asset, component_id)
 	var hole_components := _geometry_sampling_hole_components(asset, component_id)
 	var has_existing_recipe := geometry_documents.has(_geometry_document_key(asset_id, component_id))
@@ -4344,10 +4374,11 @@ func _generate_component_mesh_build(asset_id: String, component_id: String) -> D
 			"sampling": sampling,
 			"seeding": seeding,
 			"meshing": meshing,
-			"source_signature": GeometryAutoBuildService.source_signature(component, cut_guides, hole_components, recipes),
+			"contour_stroke": contour_stroke,
+			"source_signature": _geometry_build_signature(asset_id, component_id, component, recipes),
 			"attempts": attempt_index + 1
 		}
-	return {"valid": false, "errors": last_errors if not last_errors.is_empty() else ["Automatic Mesh generation failed."], "recipes": base_recipes, "source_signature": GeometryAutoBuildService.source_signature(component, cut_guides, hole_components, base_recipes), "attempts": maximum_attempts}
+	return {"valid": false, "errors": last_errors if not last_errors.is_empty() else ["Automatic Mesh generation failed."], "recipes": base_recipes, "source_signature": _geometry_build_signature(asset_id, component_id, component, base_recipes), "attempts": maximum_attempts}
 
 
 func _commit_component_mesh_build(asset_id: String, component_id: String, build: Dictionary) -> void:
@@ -4363,6 +4394,9 @@ func _commit_component_mesh_build(asset_id: String, component_id: String, build:
 		document["sampling"]["bakes"][str(sampling.get("method", ""))] = sampling
 		document["seeding"]["bakes"][str(seeding.get("method", ""))] = seeding
 	document["meshing"]["bakes"][str(mesh.get("method", ""))] = mesh
+	var contour_stroke = build.get("contour_stroke", mesh if str(mesh.get("method", "")) == ContourMeshService.METHOD else {})
+	if contour_stroke is Dictionary and bool(contour_stroke.get("valid", false)):
+		document["meshing"]["bakes"][ContourMeshService.METHOD] = contour_stroke
 	document["component_mesh"] = {
 		"bake_id": str(mesh.get("bake_id", "")),
 		"method": str(mesh.get("method", "")),
@@ -4633,19 +4667,14 @@ func _runtime_export_build(asset: Dictionary) -> Dictionary:
 				"source_asset_key": _asset_key(source_asset) if not source_asset.is_empty() else ""
 			}
 			continue
-		var mesh := _component_mesh_bake(asset_id, component_id)
-		var uv := _geometry_uv_mapping_bake(asset_id, component_id)
-		var sdf := _sdf_bake(asset_id, component_id)
-		var mesh_current := _component_mesh_status(asset_id, component_id, component) == "Ready"
-		var uv_current := mesh_current and _geometry_uv_mapping_bake_is_current(asset_id, component_id, component, uv)
-		var sdf_current := uv_current and GeometrySDFService.result_matches(sdf, mesh, uv, _sdf_recipe(asset_id, component_id))
-		var sdf_path := _sdf_image_path(asset, component_id)
+		var contour_stroke := _contour_stroke_bake(asset_id, component_id)
+		var stroke_current := _contour_stroke_bake_is_current(asset_id, component_id, component)
+		var fill_required := str(component.get("draw_mode", "closed_loop")) != "contour"
+		var mesh := _component_mesh_bake(asset_id, component_id) if fill_required else {}
+		var mesh_current := not fill_required or _component_mesh_status(asset_id, component_id, component) == "Ready"
 		sources[component_id] = {
 			"mesh": mesh if mesh_current else {},
-			"uv": uv if uv_current else {},
-			"sdf": sdf if sdf_current else {},
-			"sdf_resource_valid": sdf_current and _sdf_resource_available(asset_id, component_id) and not sdf_path.is_empty() and FileAccess.file_exists(sdf_path),
-			"sdf_source_path": ProjectSettings.globalize_path(sdf_path) if not sdf_path.is_empty() else ""
+			"contour_stroke": contour_stroke if stroke_current else {}
 		}
 	var result := RuntimeExportService.build_manifest(asset, sources)
 	var catalog_errors := AssetCatalogService.validation_errors(assets)
@@ -4655,7 +4684,6 @@ func _runtime_export_build(asset: Dictionary) -> Dictionary:
 		result["valid"] = false
 		result["errors"] = errors
 		result["manifest"] = {}
-		result["masks"] = []
 	return result
 
 
@@ -4671,13 +4699,6 @@ func _runtime_export_is_stale(asset: Dictionary, build: Dictionary = {}) -> bool
 	var expected_manifest_text := JSON.stringify(expected.get("manifest", {}), "\t")
 	if not FileAccess.file_exists(manifest_path) or not _runtime_manifest_text_matches(expected_manifest_text, FileAccess.get_file_as_string(manifest_path)):
 		return true
-	for mask in expected.get("masks", []):
-		var mask_path := target.path_join(str(mask.get("relative_path", "")))
-		if not FileAccess.file_exists(mask_path):
-			return true
-		var image := Image.load_from_file(mask_path)
-		if image == null or image.is_empty() or GeometrySDFService.image_pixel_hash(image) != str(mask.get("pixel_hash", "")):
-			return true
 	return false
 
 
@@ -4790,7 +4811,7 @@ func _write_runtime_export_package(asset: Dictionary, build: Dictionary) -> bool
 	var backup := export_root.path_join(".%s.backup" % asset_key)
 	_remove_runtime_export_tree(staging)
 	_remove_runtime_export_tree(backup)
-	if DirAccess.make_dir_recursive_absolute(staging.path_join("masks")) != OK:
+	if DirAccess.make_dir_recursive_absolute(staging) != OK:
 		return false
 	var manifest_text := JSON.stringify(build.get("manifest", {}), "\t")
 	var manifest_file := FileAccess.open(staging.path_join("manifest.json"), FileAccess.WRITE)
@@ -4799,20 +4820,9 @@ func _write_runtime_export_package(asset: Dictionary, build: Dictionary) -> bool
 		return false
 	manifest_file.store_string(manifest_text)
 	manifest_file.close()
-	for mask in build.get("masks", []):
-		var source_path := str(mask.get("source_path", ""))
-		var destination := staging.path_join(str(mask.get("relative_path", "")))
-		if not FileAccess.file_exists(source_path) or DirAccess.copy_absolute(source_path, destination) != OK:
-			_remove_runtime_export_tree(staging)
-			return false
 	if not _runtime_manifest_text_matches(manifest_text, FileAccess.get_file_as_string(staging.path_join("manifest.json"))):
 		_remove_runtime_export_tree(staging)
 		return false
-	for mask in build.get("masks", []):
-		var staged_image := Image.load_from_file(staging.path_join(str(mask.get("relative_path", ""))))
-		if staged_image == null or staged_image.is_empty() or GeometrySDFService.image_pixel_hash(staged_image) != str(mask.get("pixel_hash", "")):
-			_remove_runtime_export_tree(staging)
-			return false
 	if DirAccess.dir_exists_absolute(target) and DirAccess.rename_absolute(target, backup) != OK:
 		_remove_runtime_export_tree(staging)
 		return false
@@ -13039,18 +13049,14 @@ func _render_export_preflight() -> void:
 	if not is_instance_valid(export_log) or not is_instance_valid(export_summary_label):
 		return
 	var mesh: Dictionary = export_preflight.get("mesh", {})
-	var uv: Dictionary = export_preflight.get("uv", {})
-	var sdf: Dictionary = export_preflight.get("sdf", {})
 	var runtime: Dictionary = export_preflight.get("runtime", {})
-	var pending := (mesh.get("candidates", []) as Array).size() + (uv.get("candidates", []) as Array).size() + (sdf.get("candidates", []) as Array).size() + (runtime.get("candidates", []) as Array).size()
-	var issues := _export_attention_count(mesh) + _export_attention_count(uv) + _export_attention_count(sdf) + _export_attention_count(runtime)
+	var pending := (mesh.get("candidates", []) as Array).size() + (runtime.get("candidates", []) as Array).size()
+	var issues := _export_attention_count(mesh) + _export_attention_count(runtime)
 	export_summary_label.text = "Preflight abgeschlossen · %d ausstehende Arbeitsschritte · %d Auffälligkeiten" % [pending, issues]
 	_update_export_toolbar_buttons()
 	export_log.clear()
 	export_log.append_text("[b]Preflight[/b]\n")
 	_append_export_preflight_stage("Mesh", mesh)
-	_append_export_preflight_stage("UV", uv)
-	_append_export_preflight_stage("SDF", sdf)
 	_append_export_preflight_stage("Runtime Export", runtime)
 	if pending == 0 and issues == 0:
 		export_log.append_text("\n[color=#75b88a]Alles ist aktuell und exportbereit.[/color]\n")
@@ -13080,7 +13086,7 @@ func _update_export_toolbar_buttons() -> void:
 
 func _export_build_count() -> int:
 	var unique_components := {}
-	for stage in ["mesh", "uv", "sdf"]:
+	for stage in ["mesh"]:
 		var status: Dictionary = export_preflight.get(stage, {})
 		for candidate in status.get("candidates", []):
 			unique_components["%s/%s" % [str(candidate.get("asset_id", "")), str(candidate.get("component_id", ""))]] = true
@@ -13114,32 +13120,24 @@ func _on_build_all_pressed() -> void:
 		return
 	export_running = true
 	mesh_batch_running = true
-	uv_batch_running = true
-	sdf_batch_running = true
 	export_run_button.disabled = true
 	export_valid_button.disabled = true
 	export_log.clear()
 	export_log.append_text("[b]Build All[/b]\n")
 	export_log.append_text("[color=#9aa3b2]Verarbeite alle validen Einträge. Fehlerhafte Einträge werden übersprungen; Export wird nicht gestartet.[/color]\n")
 	var mesh_candidates := _all_mesh_update_candidates()
-	var uv_candidates := _all_uv_update_candidates()
-	var sdf_candidates := _all_sdf_update_candidates()
-	var history_recorded := not (mesh_candidates.is_empty() and uv_candidates.is_empty() and sdf_candidates.is_empty())
+	var history_recorded := not mesh_candidates.is_empty()
 	if history_recorded:
 		_record_direct_change()
 	var mesh_result := await _run_export_mesh_stage(mesh_candidates)
-	var uv_result := await _run_export_uv_stage(_all_uv_update_candidates())
-	var sdf_result := await _run_export_sdf_stage(_all_sdf_update_candidates())
 	mesh_batch_running = false
-	uv_batch_running = false
-	sdf_batch_running = false
 	_invalidate_batch_status()
 	batch_status_snapshot = {}
 	export_preflight = _rebuild_batch_status_snapshot()
 	export_preflight_revision = batch_status_revision
-	var succeeded := int(mesh_result.get("succeeded", 0)) + int(uv_result.get("succeeded", 0)) + int(sdf_result.get("succeeded", 0))
-	var failed := int(mesh_result.get("failed", 0)) + int(uv_result.get("failed", 0)) + int(sdf_result.get("failed", 0))
-	var remaining_issues := _export_attention_count(export_preflight.get("mesh", {})) + _export_attention_count(export_preflight.get("uv", {})) + _export_attention_count(export_preflight.get("sdf", {})) + _export_attention_count(export_preflight.get("runtime", {}))
+	var succeeded := int(mesh_result.get("succeeded", 0))
+	var failed := int(mesh_result.get("failed", 0))
+	var remaining_issues := _export_attention_count(export_preflight.get("mesh", {})) + _export_attention_count(export_preflight.get("runtime", {}))
 	export_summary_label.text = "Build abgeschlossen · %d erfolgreiche Schritte · %d Probleme" % [succeeded, failed + remaining_issues]
 	export_log.append_text("\n[b]Ergebnis[/b]\n")
 	export_log.append_text("[color=#75b88a]• %d Schritte erfolgreich abgeschlossen[/color]\n" % succeeded)
@@ -13150,8 +13148,6 @@ func _on_build_all_pressed() -> void:
 	if remaining_issues > 0:
 		export_log.append_text("\n[b]Verbleibende Auffälligkeiten[/b]\n")
 		_append_export_attention("Mesh", export_preflight.get("mesh", {}))
-		_append_export_attention("UV", export_preflight.get("uv", {}))
-		_append_export_attention("SDF", export_preflight.get("sdf", {}))
 		_append_export_attention("Runtime Export", export_preflight.get("runtime", {}))
 	export_running = false
 	_update_export_toolbar_buttons()

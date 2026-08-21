@@ -1,6 +1,11 @@
 # PolyTools – Geometry UV Mapping
 
-**Status:** UV Mapping MVP contract.
+**Status:** Legacy derived-data contract. Runtime Manifest schema 4 and active
+Build All do not consume UV or SDF data.
+
+The services and existing Bakes described below remain readable for possible
+future effects and masks. Their former batch/export role is historical; no
+missing UV or SDF is actionable in the active pipeline.
 
 ## Observable result
 
@@ -40,9 +45,9 @@ for later contour-mask derivation. Scale and rotation operate around the centre
 of UV space; offsets are applied afterward. Identical Mesh and recipe inputs
 produce identical UV coordinates.
 
-## Update UVs
+## Legacy Update UVs
 
-The persistent `Update UVs (N)` action accepts deterministic Bounds / Planar UVs
+The retained legacy update implementation accepts deterministic Bounds / Planar UVs
 for every visible Component whose accepted Component Mesh is current and whose
 UV Bake is missing or stale. Existing recipes are preserved; Components without
 an authored recipe use the calibrated padded default. Each Component is committed
@@ -73,14 +78,14 @@ or Bakes.
 Sampler-Spine or Shader-Flow mapping, packing, atlases, distortion analysis,
 manual SDF editing, and export consumption are outside this Slice.
 
-## Contour SDF
+## Legacy Contour SDF
 
-The normative exported UV and SDF interpretation is defined in
-[`RUNTIME_EXPORT_CONTRACT.md`](RUNTIME_EXPORT_CONTRACT.md). This section
-describes how the editor derives those resources.
+Runtime schema 4 exports neither UV nor SDF. This section documents the retained
+legacy derivation only.
 
 The downstream contour stage consumes the exact accepted Component Mesh and UV
-Bake. `Update SDFs (N)` creates one deterministic `256×256` single-channel PNG
+Bake. The retained legacy SDF implementation creates one deterministic
+`256×256` single-channel PNG
 per visible Component. The channel is interpreted linearly: `0.5` is the contour,
 greater values are inside, lower values are outside, and the signed-distance
 spread is `16 px`.

@@ -256,8 +256,18 @@ func _test_contour_stroke_mesh() -> void:
 	for edge in hidden_contour["edges"]:
 		edge["render_outline"] = false
 	var hidden_result := ContourMeshService.generate(hidden_contour)
-	_expect(not bool(hidden_result.get("valid", true)) and "An open Contour with no visible outline Edges has no renderable geometry." in hidden_result.get("errors", []), "A fill-less Contour with every Edge hidden must fail explicitly instead of producing fallback geometry.")
+	_expect(bool(hidden_result.get("valid", false)) and not bool(hidden_result.get("has_outline", true)) and hidden_result.get("vertices", []).is_empty() and hidden_result.get("triangles", []).is_empty(), "A permanently disabled Render Outline must remain an explicit valid no-outline Bake without fallback geometry.")
 	_expect(not ContourMeshService.matches_source(first, hidden_contour), "Changing Render Outline flags must invalidate an accepted Contour Stroke Mesh.")
+	var closed := _component()
+	closed["draw_mode"] = "closed_loop"
+	for position in [Vector2.ZERO, Vector2(4.0, 0.0), Vector2(4.0, 3.0), Vector2(0.0, 3.0)]:
+		BezierTopology.add_point(closed, position, "linear")
+	BezierTopology.close_active_chain(closed)
+	var closed_stroke := ContourMeshService.generate(closed)
+	_expect(bool(closed_stroke.get("valid", false)) and bool(closed_stroke.get("source_chain_closed", false)) and bool(closed_stroke.get("has_outline", false)), "Closed Fill Components must derive a separate centered Contour Stroke Bake from their authored Boundary.")
+	var ellipse := {"draw_mode": "primitive", "primitive": {"type": PrimitiveGeometryService.ELLIPSE, "center": Vector2(1.0, 2.0), "diameter_x_cm": 20.0, "diameter_y_cm": 5.0}, "points": [], "edges": [], "chains": []}
+	var ellipse_stroke := ContourMeshService.generate(ellipse)
+	_expect(bool(ellipse_stroke.get("valid", false)) and str(ellipse_stroke.get("source_draw_mode", "")) == "primitive" and int(ellipse_stroke.get("triangle_count", 0)) > 0 and ellipse_stroke == ContourMeshService.generate(ellipse), "Analytic Circles and Ellipses must derive deterministic centered Stroke Bakes without persisted polygon topology.")
 	var application = load("res://scripts/main.gd").new()
 	var legacy_document: Dictionary = application._default_geometry_document("asset_legacy", "component_legacy")
 	var legacy_bake: Dictionary = first.duplicate(true)
@@ -832,12 +842,12 @@ func _test_geometry_auto_build_service() -> void:
 	_expect(application._mesh_update_candidates("auto_asset") == ["auto_body"], "A valid unmeshed Component should appear exactly once in Update Meshes.")
 	_expect(application._all_mesh_update_candidates() == [{"asset_id": "auto_asset", "component_id": "auto_body"}, {"asset_id": "auto_symbol", "component_id": "auto_symbol_body"}], "Update Meshes should collect stable candidates globally across every Create Asset type, independent of the selected Asset.")
 	var build: Dictionary = application._generate_component_mesh_build("auto_asset", "auto_body")
-	_expect(bool(build.get("valid", false)) and int(build.get("meshing", {}).get("triangle_count", 0)) > 0, "The automatic batch runner should complete Sampling, Seeding, CDT, Optimization, and final validation.")
+	_expect(bool(build.get("valid", false)) and int(build.get("meshing", {}).get("triangle_count", 0)) > 0 and int(build.get("contour_stroke", {}).get("triangle_count", 0)) > 0, "The automatic batch runner should atomically complete the Fill pipeline and the independent centered Contour Stroke Bake.")
 	application._commit_component_mesh_build("auto_asset", "auto_body", build)
 	_expect(application._mesh_update_candidates("auto_asset").is_empty(), "A successfully committed automatic Mesh should become clean without a mutable dirty flag.")
 	_expect(application._all_mesh_update_candidates() == [{"asset_id": "auto_symbol", "component_id": "auto_symbol_body"}], "A committed Mesh should leave only dirty Components from other Assets in the global batch.")
 	var round_trip: Dictionary = application._normalize_geometry_document(application._serialize_geometry_document(application.geometry_documents["auto_asset/auto_body"]), "auto_asset", "auto_body")
-	_expect(not round_trip.get("component_mesh", {}).get("build_provenance", {}).get("source_signature", {}).is_empty(), "Semantic Mesh build provenance should survive Geometry JSON persistence.")
+	_expect(not round_trip.get("component_mesh", {}).get("build_provenance", {}).get("source_signature", {}).is_empty() and round_trip.get("meshing", {}).get("bakes", {}).has(ContourMeshService.METHOD), "Fill provenance and the separate Contour Stroke Bake should survive Geometry JSON persistence.")
 	application.free()
 	var contour_component := _component()
 	contour_component.merge({"id": "auto_arm_line", "name": "Arm Line", "draw_mode": "contour", "visibility": true, "transform": {"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}})
@@ -888,6 +898,7 @@ func _test_geometry_sampling_ui_shell() -> void:
 	_expect(application.batch_status_snapshot_build_count == 0, "Editing workspaces must not calculate Batch status for detached toolbar controls.")
 	application._on_category_pressed("Export")
 	_expect(application.export_workspace.visible and application.export_summary_label.text.contains("Preflight abgeschlossen") and application.export_log.get_parsed_text().contains("Wizard / Body"), "Export should run one preflight on entry and list affected Asset / Component data in its read-only log.")
+	_expect(not application.export_log.get_parsed_text().contains("UV ·") and not application.export_log.get_parsed_text().contains("SDF ·"), "Schema-4 Build/Export preflight must not retain legacy UV or SDF stages.")
 	_expect(application.export_run_button.visible and application.export_run_button.text == "Build All (1)" and application.export_valid_button.visible and application.context_bar_panel.visible == false and application.draw_mode_status.visible == false, "Export should replace Create context controls with Build and valid-only Export actions in the top toolbar.")
 	var batch_snapshot_builds: int = application.batch_status_snapshot_build_count
 	application._record_direct_change()
@@ -1600,25 +1611,28 @@ func _test_runtime_export_service() -> void:
 		],
 		"triangles": [{"vertex_ids": ["v0", "v1", "v2"]}]
 	}
-	var uv := {"valid": true, "uvs": [
-		{"vertex_id": "v2", "uv": Vector2(0.2, 0.8)},
-		{"vertex_id": "v0", "uv": Vector2(0.2, 0.2)},
-		{"vertex_id": "v1", "uv": Vector2(0.8, 0.2)}
-	]}
-	var sdf := {"valid": true, "resolution": [256, 256], "spread_px": 64.0, "boundary_value": 0.5, "inside_is_greater": true, "pixel_hash": "stable_pixels"}
+	var contour_stroke: Dictionary = mesh.duplicate(true)
+	contour_stroke.merge({"method": ContourMeshService.METHOD, "has_outline": true, "topology_role": "outer", "runs": [{"run_id": "boundary:run:0", "edge_ids": ["edge_0"], "closed": true, "start_cap": "none", "end_cap": "none", "vertex_offset": 0, "vertex_count": 3, "index_offset": 0, "index_count": 3}], "parameters": {"reference_pixels_per_meter": 128.0, "stroke_width_px": 4.0, "stroke_width_meters": 0.03125, "join": "miter", "miter_limit": 4.0, "cap": "butt"}}, true)
 	var body := {"id": "component_b", "name": "body", "semantic_key": "body", "visibility": true, "z_index": 2, "parent_component_id": "", "transform": {"position": Vector2(10.0, 20.0), "pivot": Vector2(2.0, 3.0), "rotation": 90.0, "scale": Vector2.ONE}}
 	var eye := {"id": "component_a", "name": "eye_left", "semantic_key": "eye_left", "visibility": true, "z_index": 2, "parent_component_id": "component_b", "transform": {"position": Vector2.ZERO, "pivot": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE}}
 	var asset := {"id": "wizard", "name": "Wizard", "asset_type": "character", "visibility": true, "asset_pivot": Vector2(5.0, 6.0), "components": [body, eye]}
-	var source := {"mesh": mesh, "uv": uv, "sdf": sdf, "sdf_resource_valid": true, "sdf_source_path": "/tmp/contour_sdf.png"}
+	var source := {"mesh": mesh, "contour_stroke": contour_stroke}
 	var result := RuntimeExportService.build_manifest(asset, {"component_a": source, "component_b": source})
 	var manifest: Dictionary = result.get("manifest", {})
 	var components: Array = manifest.get("components", [])
-	_expect(bool(result.get("valid", false)) and int(manifest.get("schema_version", 0)) == 3 and str(manifest.get("asset_key", "")) == "wizard" and not manifest.has("asset_id"), "Runtime export schema 3 should identify packages only by the Asset Key derived from their display name.")
+	_expect(bool(result.get("valid", false)) and int(manifest.get("schema_version", 0)) == 4 and str(manifest.get("asset_key", "")) == "wizard" and not manifest.has("asset_id"), "Runtime export schema 4 should identify packages only by the Asset Key derived from their display name.")
 	_expect(components.size() == 2 and str(components[0].get("component_id", "")) == "component_a" and str(components[1].get("component_id", "")) == "component_b", "Runtime Components should sort globally by ascending z_index and lexicographic Component ID.")
 	_expect(components[1].get("mesh", {}).get("vertices", []) == [[-0.2, -0.30000000000000004], [0.8, -0.30000000000000004], [-0.2, 0.7000000000000001]] and components[1].get("mesh", {}).get("indices", []) == [0, 1, 2], "Runtime Meshes should preserve accepted Vertex order, convert Tool units to meters, compact Triangle IDs, and be local to their Component pivot.")
-	var exported_uvs: Array = components[1].get("mesh", {}).get("uvs", [])
-	_expect(exported_uvs.size() == 3 and is_equal_approx(float(exported_uvs[0][0]), 0.2) and is_equal_approx(float(exported_uvs[0][1]), 0.2) and is_equal_approx(float(exported_uvs[1][0]), 0.8) and is_equal_approx(float(exported_uvs[2][1]), 0.8), "Runtime UVs should be reordered only through stable Vertex IDs.")
-	_expect(components[1].get("contour_carrier", {}).get("role", "") == "contour_sdf_carrier" and components[1].get("contour_carrier", {}).get("indices", []) == [0, 1, 2, 0, 2, 3] and is_equal_approx(float(components[1].get("contour_mask", {}).get("outer_padding_meters", {}).get("left", 0.0)), 1.0 / 3.0), "Schema 3 should provide an independently drawable padded Contour Carrier with explicit metric outside padding.")
+	_expect(not components[1].get("mesh", {}).has("uvs") and not components[1].has("contour_carrier") and not components[1].has("contour_mask"), "Schema 4 must remove UV, Carrier, and SDF fields rather than retaining a silent compatibility payload.")
+	var exported_stroke: Dictionary = components[1].get("contour_stroke_mesh", {})
+	_expect(str(exported_stroke.get("role", "")) == "centered_boundary_stroke" and bool(exported_stroke.get("has_outline", false)) and is_equal_approx(float(exported_stroke.get("stroke_width_px", 0.0)), 4.0) and is_equal_approx(float(exported_stroke.get("inner_offset_meters", 0.0)), 0.015625) and is_equal_approx(float(exported_stroke.get("outer_offset_meters", 0.0)), 0.015625), "Schema 4 should export the original Boundary as the centered metric Stroke with symmetric inner and outer offsets.")
+	var disabled_stroke: Dictionary = contour_stroke.duplicate(true)
+	disabled_stroke["has_outline"] = false
+	disabled_stroke["vertices"] = []
+	disabled_stroke["triangles"] = []
+	disabled_stroke["runs"] = []
+	var disabled_result := RuntimeExportService.build_manifest(asset, {"component_a": {"mesh": mesh, "contour_stroke": disabled_stroke}, "component_b": source})
+	_expect(bool(disabled_result.get("valid", false)) and not bool(disabled_result.get("manifest", {}).get("components", [])[0].get("contour_stroke_mesh", {}).get("has_outline", true)), "Schema 4 must preserve Render Outline off as an explicit empty Stroke without generating fallback art.")
 	_expect(components[1].get("local_transform", {}).get("position", []) == [1.0, 2.0] and is_equal_approx(float(components[1].get("local_transform", {}).get("rotation_radians", 0.0)), PI / 2.0), "Runtime transforms should preserve Y-up coordinates and publish positions in meters and CCW radians.")
 	_expect(not components[1].has("display_name") and str(components[1].get("semantic_key", "")) == "body", "Runtime Components should expose their Semantic Key as the sole authored designation without a redundant display label.")
 	var scaled_export_asset: Dictionary = asset.duplicate(true)
@@ -1628,8 +1642,9 @@ func _test_runtime_export_service() -> void:
 	var open_contour_component: Dictionary = body.duplicate(true)
 	open_contour_component["draw_mode"] = "contour"
 	var open_contour_asset := {"id": "contour_asset", "name": "Contour Asset", "asset_type": "character", "visibility": true, "asset_pivot": Vector2.ZERO, "components": [open_contour_component]}
-	var blocked_contour_export := RuntimeExportService.build_manifest(open_contour_asset, {"component_b": source})
-	_expect(not bool(blocked_contour_export.get("valid", true)) and str(blocked_contour_export.get("errors", [""])[0]).contains("contour_stroke_mesh Runtime role"), "Schema-3 Runtime export must visibly block open Contours instead of serializing their art stroke as a Fill Mesh.")
+	var contour_export := RuntimeExportService.build_manifest(open_contour_asset, {"component_b": {"contour_stroke": contour_stroke}})
+	var exported_contour: Dictionary = contour_export.get("manifest", {}).get("components", [])[0]
+	_expect(bool(contour_export.get("valid", false)) and exported_contour.has("contour_stroke_mesh") and not exported_contour.has("mesh"), "Schema 4 must export an open Contour exclusively as its typed art Stroke without inventing Fill geometry.")
 	var wizard_head := {"id": "head", "semantic_key": "head", "visibility": true, "parent_component_id": "", "transform": {"position": Vector2(0.0, 8.5), "pivot": Vector2(0.0, 8.5), "rotation": 0.0, "scale": Vector2.ONE}}
 	var wizard_eye := {"id": "eye", "semantic_key": "eye_left", "visibility": true, "parent_component_id": "head", "transform": {"position": Vector2(-0.3, 8.5), "pivot": Vector2(-0.3, 8.5), "rotation": 0.0, "scale": Vector2.ONE}}
 	var head_mesh: Dictionary = mesh.duplicate(true)
@@ -1637,11 +1652,11 @@ func _test_runtime_export_service() -> void:
 	var eye_mesh: Dictionary = mesh.duplicate(true)
 	eye_mesh["vertices"] = [{"id": "v0", "position": Vector2(-0.25, 8.5)}, {"id": "v1", "position": Vector2(-0.15, 8.5)}, {"id": "v2", "position": Vector2(-0.25, 8.6)}]
 	var nested_asset := {"id": "nested_wizard", "name": "Nested Wizard", "asset_type": "character", "visibility": true, "asset_pivot": Vector2.ZERO, "components": [wizard_head, wizard_eye]}
-	var nested_uv := {"valid": true, "uvs": [{"vertex_id": "v2", "uv": Vector2(0.4, 0.6)}, {"vertex_id": "v0", "uv": Vector2(0.4, 0.4)}, {"vertex_id": "v1", "uv": Vector2(0.6, 0.4)}]}
-	var tiny_uv := {"valid": true, "uvs": [{"vertex_id": "v2", "uv": Vector2(0.49, 0.51)}, {"vertex_id": "v0", "uv": Vector2(0.49, 0.49)}, {"vertex_id": "v1", "uv": Vector2(0.51, 0.49)}]}
-	var nested_sdf: Dictionary = sdf.duplicate(true)
-	nested_sdf["spread_px"] = 128.0
-	var nested_result := RuntimeExportService.build_manifest(nested_asset, {"head": {"mesh": head_mesh, "uv": nested_uv, "sdf": nested_sdf, "sdf_resource_valid": true, "sdf_source_path": "/tmp/head_sdf.png"}, "eye": {"mesh": eye_mesh, "uv": tiny_uv, "sdf": nested_sdf, "sdf_resource_valid": true, "sdf_source_path": "/tmp/eye_sdf.png"}})
+	var head_stroke: Dictionary = contour_stroke.duplicate(true)
+	head_stroke["vertices"] = head_mesh["vertices"].duplicate(true)
+	var eye_stroke: Dictionary = contour_stroke.duplicate(true)
+	eye_stroke["vertices"] = eye_mesh["vertices"].duplicate(true)
+	var nested_result := RuntimeExportService.build_manifest(nested_asset, {"head": {"mesh": head_mesh, "contour_stroke": head_stroke}, "eye": {"mesh": eye_mesh, "contour_stroke": eye_stroke}})
 	var nested_by_id: Dictionary = {}
 	for exported_component in nested_result.get("manifest", {}).get("components", []):
 		nested_by_id[str(exported_component.get("component_id", ""))] = exported_component
@@ -1663,9 +1678,9 @@ func _test_runtime_export_service() -> void:
 	var duplicate_role_asset: Dictionary = asset.duplicate(true)
 	duplicate_role_asset["components"][1]["semantic_key"] = "body"
 	_expect(not bool(RuntimeExportService.build_manifest(duplicate_role_asset, {"component_a": source, "component_b": source}).get("valid", true)), "Runtime export should reject duplicate Semantic Keys.")
-	var missing_resource: Dictionary = source.duplicate(true)
-	missing_resource["sdf_resource_valid"] = false
-	_expect(not bool(RuntimeExportService.build_manifest(asset, {"component_a": missing_resource, "component_b": source}).get("valid", true)), "Runtime export should reject a missing or corrupt SDF resource without fallback.")
+	var missing_stroke: Dictionary = source.duplicate(true)
+	missing_stroke["contour_stroke"] = {}
+	_expect(not bool(RuntimeExportService.build_manifest(asset, {"component_a": missing_stroke, "component_b": source}).get("valid", true)), "Runtime export should reject a missing Contour Stroke Bake without fallback.")
 
 
 func _test_weighting_service_and_ui() -> void:
