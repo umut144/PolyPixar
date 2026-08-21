@@ -145,8 +145,8 @@ func get_camera_state() -> Dictionary:
 	}
 
 
-func set_camera_state(position: Vector2, saved_zoom: float) -> void:
-	view_center = position
+func set_camera_state(camera_position: Vector2, saved_zoom: float) -> void:
+	view_center = camera_position
 	zoom = clampf(saved_zoom, MIN_ZOOM, MAX_ZOOM)
 	camera_state_restored = true
 	queue_redraw()
@@ -565,31 +565,31 @@ func clear_draw_constraint() -> void:
 	queue_redraw()
 
 
-func constrain_draw_position(position: Vector2) -> Vector2:
+func constrain_draw_position(world_position: Vector2) -> Vector2:
 	if draw_constraint_outer.size() < 3:
-		return position
-	if not _point_on_polygon_boundary(position, draw_constraint_outer) and not Geometry2D.is_point_in_polygon(position, draw_constraint_outer):
-		return _closest_point_on_polygon(position, draw_constraint_outer)
+		return world_position
+	if not _point_on_polygon_boundary(world_position, draw_constraint_outer) and not Geometry2D.is_point_in_polygon(world_position, draw_constraint_outer):
+		return _closest_point_on_polygon(world_position, draw_constraint_outer)
 	for hole in draw_constraint_holes:
-		if hole is PackedVector2Array and hole.size() >= 3 and Geometry2D.is_point_in_polygon(position, hole) and not _point_on_polygon_boundary(position, hole):
-			return _closest_point_on_polygon(position, hole)
-	return position
+		if hole is PackedVector2Array and hole.size() >= 3 and Geometry2D.is_point_in_polygon(world_position, hole) and not _point_on_polygon_boundary(world_position, hole):
+			return _closest_point_on_polygon(world_position, hole)
+	return world_position
 
 
-func _closest_point_on_polygon(position: Vector2, polygon: PackedVector2Array) -> Vector2:
+func _closest_point_on_polygon(world_position: Vector2, polygon: PackedVector2Array) -> Vector2:
 	var closest := polygon[0]
 	var closest_distance_squared := INF
 	for index in range(polygon.size()):
-		var candidate := Geometry2D.get_closest_point_to_segment(position, polygon[index], polygon[(index + 1) % polygon.size()])
-		var distance_squared := position.distance_squared_to(candidate)
+		var candidate := Geometry2D.get_closest_point_to_segment(world_position, polygon[index], polygon[(index + 1) % polygon.size()])
+		var distance_squared := world_position.distance_squared_to(candidate)
 		if distance_squared < closest_distance_squared:
 			closest = candidate
 			closest_distance_squared = distance_squared
 	return closest
 
 
-func _point_on_polygon_boundary(position: Vector2, polygon: PackedVector2Array) -> bool:
-	return position.distance_squared_to(_closest_point_on_polygon(position, polygon)) <= 0.000001
+func _point_on_polygon_boundary(world_position: Vector2, polygon: PackedVector2Array) -> bool:
+	return world_position.distance_squared_to(_closest_point_on_polygon(world_position, polygon)) <= 0.000001
 
 
 func set_edit_mode(mode: String) -> void:
@@ -613,8 +613,8 @@ func set_edit_point_set_enabled(enabled: bool) -> void:
 	queue_redraw()
 
 
-func set_point_numbers_visible(visible: bool) -> void:
-	point_numbers_visible = visible
+func set_point_numbers_visible(point_numbers_enabled: bool) -> void:
+	point_numbers_visible = point_numbers_enabled
 	queue_redraw()
 
 
@@ -672,8 +672,8 @@ func set_snap_settings(enabled: bool, new_grid_step: float, new_rotation_step: f
 	queue_redraw()
 
 
-func snap_position(position: Vector2) -> Vector2:
-	return _snap_to_grid(position)
+func snap_position(world_position: Vector2) -> Vector2:
+	return _snap_to_grid(world_position)
 
 
 func set_world_scale(new_grid_size: float) -> void:
@@ -797,7 +797,7 @@ func start_mirror_command() -> bool:
 	return true
 
 
-func cancel_mirror_command(emit_signal := true) -> void:
+func cancel_mirror_command(should_emit_signal := true) -> void:
 	if mirror_command_stage.is_empty():
 		return
 	mirror_command_stage = ""
@@ -805,7 +805,7 @@ func cancel_mirror_command(emit_signal := true) -> void:
 	selection_mirror_preview_points.clear()
 	selection_mirror_preview_edges.clear()
 	queue_redraw()
-	if emit_signal:
+	if should_emit_signal:
 		mirror_axis_cancelled.emit()
 
 
@@ -977,11 +977,11 @@ func _draw_measurement_guides() -> void:
 		origin_world = component_transform.get("position", Vector2.ZERO)
 		cursor_position_world = _local_to_world(cursor_world)
 	var cursor_screen := _world_to_screen(cursor_position_world)
-	var guide_color := Color("#f2c94c")
+	var measurement_guide_color := Color("#f2c94c")
 	var coordinate_lines: Array[String] = []
 	coordinate_lines.append("x: %.2f cm" % ToolUnits.to_centimeters(cursor_position_world.x - origin_world.x))
 	coordinate_lines.append("y: %.2f cm" % ToolUnits.to_centimeters(cursor_position_world.y - origin_world.y))
-	_draw_coordinate_readout(coordinate_lines, cursor_screen, guide_color, interaction_state == "edit")
+	_draw_coordinate_readout(coordinate_lines, cursor_screen, measurement_guide_color, interaction_state == "edit")
 
 
 func _draw_dashed_line(line_start: Vector2, line_end: Vector2, line_color: Color) -> void:

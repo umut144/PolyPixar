@@ -136,8 +136,8 @@ func _fit_component() -> void:
 		fitted = true
 		return
 	var bounds := Rect2(positions[0], Vector2.ZERO)
-	for position in positions:
-		bounds = bounds.expand(position)
+	for sample_position in positions:
+		bounds = bounds.expand(sample_position)
 	camera_position = bounds.get_center()
 	var available := Vector2(maxf(size.x - 96.0, 1.0), maxf(size.y - 96.0, 1.0))
 	var extent := Vector2(maxf(bounds.size.x, 1.0), maxf(bounds.size.y, 1.0))
@@ -184,9 +184,9 @@ func _draw_samples() -> void:
 			if sample_index == samples.size() - 1 and bool(chain_data.get("closed", false)) and samples.size() > 1:
 				draw_line(current, _to_screen(Vector2(samples[0].get("position", Vector2.ZERO))), line_color, 2.5 if selected else 1.5, true)
 		for sample in samples:
-			var position := _to_screen(Vector2(sample.get("position", Vector2.ZERO)))
-			var preserved := bool(sample.get("preserved", false))
-			draw_circle(position, 4.5 if preserved or selected else 3.0, PRESERVE_COLOR if preserved else point_color)
+				var sample_position := _to_screen(Vector2(sample.get("position", Vector2.ZERO)))
+				var preserved := bool(sample.get("preserved", false))
+				draw_circle(sample_position, 4.5 if preserved or selected else 3.0, PRESERVE_COLOR if preserved else point_color)
 	for cut in preview.get("cuts", []):
 		if not cut is Dictionary or not bool(cut.get("valid", false)):
 			continue

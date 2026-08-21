@@ -139,9 +139,9 @@ func _sample_chain(points_by_id: Dictionary, chain: Dictionary, transform: Dicti
 				continue
 			var local_point := MotionPathSampler.cubic_point(start, end, float(sample_index) / 16.0)
 			var pivot: Vector2 = transform.get("pivot", Vector2.ZERO)
-			var scale: Vector2 = transform.get("scale", Vector2.ONE)
-			var rotation := deg_to_rad(float(transform.get("rotation", 0.0)))
-			result.append(Vector2(transform.get("position", Vector2.ZERO)) + ((local_point - pivot) * scale).rotated(rotation))
+			var transform_scale: Vector2 = transform.get("scale", Vector2.ONE)
+			var transform_rotation := deg_to_rad(float(transform.get("rotation", 0.0)))
+			result.append(Vector2(transform.get("position", Vector2.ZERO)) + ((local_point - pivot) * transform_scale).rotated(transform_rotation))
 	return result
 
 
@@ -174,8 +174,8 @@ func _draw_grid() -> void:
 		y += spacing
 
 
-func _world_offset(value: Vector2, scale: float) -> Vector2:
-	return Vector2(value.x, -value.y) * scale
+func _world_offset(value: Vector2, world_scale: float) -> Vector2:
+	return Vector2(value.x, -value.y) * world_scale
 
 
 func _draw_centered_text(text: String) -> void:

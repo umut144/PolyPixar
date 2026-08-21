@@ -118,9 +118,15 @@ func set_asset(value_id: String, value_name: String, components: Array = [], ani
 		else:
 			preview_documents[asset_id] = normalize_animation_document(animation_document)
 	if selection != null and selection.asset_id != asset_id:
-		selection.select_asset(asset_id) if not asset_id.is_empty() else selection.clear()
+		if not asset_id.is_empty():
+			selection.select_asset(asset_id)
+		else:
+			selection.clear()
 	elif selection != null and selection.kind != MotionSelection.ASSET and get_selected_preview().is_empty():
-		selection.select_asset(asset_id) if not asset_id.is_empty() else selection.clear()
+		if not asset_id.is_empty():
+			selection.select_asset(asset_id)
+		else:
+			selection.clear()
 	_rebuild()
 
 
@@ -244,9 +250,9 @@ func next_default_state_name() -> String:
 	return candidate
 
 
-func add_state(state_name: String) -> String:
+func add_state(proposed_state_name: String) -> String:
 	var document := _active_document()
-	var normalized_name := state_name.strip_edges()
+	var normalized_name := proposed_state_name.strip_edges()
 	if document.is_empty():
 		return "Select an Asset before adding a State."
 	if normalized_name.is_empty():
@@ -274,10 +280,10 @@ func add_state(state_name: String) -> String:
 	return ""
 
 
-func rename_state(state_id: String, state_name: String) -> String:
+func rename_state(state_id: String, proposed_state_name: String) -> String:
 	var states := get_states_for_asset(asset_id)
 	var state := _find_state(states, state_id)
-	var normalized_name := state_name.strip_edges()
+	var normalized_name := proposed_state_name.strip_edges()
 	if state.is_empty():
 		return "The selected State no longer exists."
 	if normalized_name.is_empty():
@@ -479,9 +485,9 @@ func add_transition(state_id: String) -> String:
 	if target_state_id.is_empty():
 		return "Add another State before creating a Transition."
 	document_change_requested.emit()
-	var transition_index := maxi(1, int(state.get("next_transition_index", 1)))
-	var transition_id := "transition_%s_%02d" % [state_id.trim_prefix("state_"), transition_index]
-	state["next_transition_index"] = transition_index + 1
+	var next_transition_number := maxi(1, int(state.get("next_transition_index", 1)))
+	var transition_id := "transition_%s_%02d" % [state_id.trim_prefix("state_"), next_transition_number]
+	state["next_transition_index"] = next_transition_number + 1
 	state["transitions"].append({
 		"id": transition_id,
 		"target_state_id": target_state_id,
@@ -883,8 +889,8 @@ func item_summary(kind: String, item: Dictionary) -> String:
 	if kind == MotionSelection.TRANSITION:
 		if _find_state(get_states_for_asset(asset_id), str(item.get("target_state_id", ""))).is_empty():
 			return "Missing target · Preview invalid"
-		var owner := _state_for_item("transitions", str(item.get("id", "")))
-		var priority := transition_index(str(owner.get("id", "")), str(item.get("id", ""))) + 1
+		var owning_state := _state_for_item("transitions", str(item.get("id", "")))
+		var priority := transition_index(str(owning_state.get("id", "")), str(item.get("id", ""))) + 1
 		return "#%d · %s · %s · %d Rules" % [priority, exit_policy_label(str(item.get("exit_policy", EXIT_ANY_PHASE))), entry_mode_label(str(item.get("entry_mode", ENTRY_RESTART))), item.get("rules", []).size()]
 	if kind == MotionSelection.MARKER:
 		return "%s · Phase %.2f" % [marker_kind_label(str(item.get("kind", MARKER_EVENT))), float(item.get("phase", 0.0))]
@@ -932,8 +938,8 @@ func _find_state(states: Array, state_id: String) -> Dictionary:
 	return {}
 
 
-func _has_state_name(states: Array, state_name: String, excluded_state_id: String = "") -> bool:
-	var normalized_name := state_name.to_lower()
+func _has_state_name(states: Array, candidate_state_name: String, excluded_state_id: String = "") -> bool:
+	var normalized_name := candidate_state_name.to_lower()
 	for state in states:
 		if str(state.get("id", "")) != excluded_state_id and str(state.get("name", "")).to_lower() == normalized_name:
 			return true

@@ -146,11 +146,11 @@ func _draw_selected_handles() -> void:
 	var point := MotionPathTopology.point_by_id(_points(), selected_point_id)
 	if point.is_empty():
 		return
-	var position: Vector2 = point.get("position", Vector2.ZERO)
+	var point_position: Vector2 = point.get("position", Vector2.ZERO)
 	for side in ["in", "out"]:
 		var handle := _display_handle(point, side)
-		var point_screen := _world_to_screen(position)
-		var handle_screen := _world_to_screen(position + handle)
+		var point_screen := _world_to_screen(point_position)
+		var handle_screen := _world_to_screen(point_position + handle)
 		draw_line(point_screen, handle_screen, Color("#7c8ba1"), 1.0)
 		draw_circle(handle_screen, HANDLE_RADIUS, Color("#75b88a"))
 
@@ -165,12 +165,12 @@ func _draw_preview_asset() -> void:
 	if paths.is_empty():
 		return
 	var asset_center := _paths_bounds(paths).get_center()
-	var rotation := deg_to_rad(float(path_sample.get("rotation", 0.0))) if bool(path_document.get("playback", {}).get("orient_along_path", false)) else 0.0
+	var path_rotation := deg_to_rad(float(path_sample.get("rotation", 0.0))) if bool(path_document.get("playback", {}).get("orient_along_path", false)) else 0.0
 	var path_position: Vector2 = path_sample.get("position", Vector2.ZERO)
 	for path_data in paths:
 		var screen_points := PackedVector2Array()
 		for asset_point in path_data.get("points", []):
-			var placed := path_position + (Vector2(asset_point) - asset_center).rotated(rotation)
+			var placed := path_position + (Vector2(asset_point) - asset_center).rotated(path_rotation)
 			screen_points.append(_world_to_screen(placed))
 		if bool(path_data.get("closed", false)) and screen_points.size() >= 3:
 			draw_colored_polygon(screen_points, Color("#6f87aa44"))
@@ -210,9 +210,9 @@ func _sample_asset_chain(points_by_id: Dictionary, chain: Dictionary, transform:
 				continue
 			var local_point := MotionPathSampler.cubic_point(start, end, float(sample_index) / 16.0)
 			var pivot: Vector2 = transform.get("pivot", Vector2.ZERO)
-			var scale: Vector2 = transform.get("scale", Vector2.ONE)
-			var rotation := deg_to_rad(float(transform.get("rotation", 0.0)))
-			result.append(Vector2(transform.get("position", Vector2.ZERO)) + ((local_point - pivot) * scale).rotated(rotation))
+			var transform_scale: Vector2 = transform.get("scale", Vector2.ONE)
+			var transform_rotation := deg_to_rad(float(transform.get("rotation", 0.0)))
+			result.append(Vector2(transform.get("position", Vector2.ZERO)) + ((local_point - pivot) * transform_scale).rotated(transform_rotation))
 	return result
 
 
@@ -269,9 +269,9 @@ func _handle_at(screen_position: Vector2) -> String:
 	var point := MotionPathTopology.point_by_id(_points(), selected_point_id)
 	if point.is_empty():
 		return ""
-	var position: Vector2 = point.get("position", Vector2.ZERO)
+	var point_position: Vector2 = point.get("position", Vector2.ZERO)
 	for side in ["in", "out"]:
-		var handle_position := position + _display_handle(point, side)
+		var handle_position := point_position + _display_handle(point, side)
 		if _world_to_screen(handle_position).distance_to(screen_position) <= HANDLE_RADIUS * 1.8:
 			return side
 	return ""
@@ -289,15 +289,15 @@ func _display_handle(point: Dictionary, side: String) -> Vector2:
 			break
 	if point_index < 0:
 		return Vector2.LEFT if side == "in" else Vector2.RIGHT
-	var position: Vector2 = point.get("position", Vector2.ZERO)
+	var point_position: Vector2 = point.get("position", Vector2.ZERO)
 	if side == "in":
 		if point_index > 0:
-			return (Vector2(points[point_index - 1].get("position", position)) - position) / 3.0
+			return (Vector2(points[point_index - 1].get("position", point_position)) - point_position) / 3.0
 		if point_index + 1 < points.size():
-			return -(Vector2(points[point_index + 1].get("position", position)) - position) / 3.0
+			return -(Vector2(points[point_index + 1].get("position", point_position)) - point_position) / 3.0
 	else:
 		if point_index + 1 < points.size():
-			return (Vector2(points[point_index + 1].get("position", position)) - position) / 3.0
+			return (Vector2(points[point_index + 1].get("position", point_position)) - point_position) / 3.0
 		if point_index > 0:
 			return -(Vector2(points[point_index - 1].get("position", position)) - position) / 3.0
 	return Vector2.LEFT if side == "in" else Vector2.RIGHT

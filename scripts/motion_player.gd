@@ -123,9 +123,14 @@ func _sync_parameter_values() -> void:
 	for parameter in document.get("simulation_contract", {}).get("parameters", []):
 		var parameter_id := str(parameter.get("id", ""))
 		var parameter_type := str(parameter.get("type", MotionWorkspace.PARAM_NUMBER))
-		var fallback = false if parameter_type == MotionWorkspace.PARAM_BOOL else 0.0
-		var retained = retained_values.get(parameter_id, fallback)
-		parameter_values[parameter_id] = bool(retained) if parameter_type == MotionWorkspace.PARAM_BOOL else float(retained)
+		var fallback: Variant = 0.0
+		if parameter_type == MotionWorkspace.PARAM_BOOL:
+			fallback = false
+		var retained: Variant = retained_values.get(parameter_id, fallback)
+		if parameter_type == MotionWorkspace.PARAM_BOOL:
+			parameter_values[parameter_id] = bool(retained)
+		else:
+			parameter_values[parameter_id] = float(retained)
 
 
 func _find_state(state_id: String) -> Dictionary:

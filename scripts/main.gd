@@ -1886,14 +1886,14 @@ func _sanitize_asset_storage_name(value: String, fallback: String = "asset") -> 
 
 func _asset_storage_name(asset: Dictionary) -> String:
 	var base := _sanitize_asset_storage_name(str(asset.get("name", "")), str(asset.get("id", "asset")))
-	var duplicate := false
+	var has_name_collision := false
 	for other_asset in assets:
 		if other_asset == asset:
 			continue
 		if _sanitize_asset_storage_name(str(other_asset.get("name", "")), str(other_asset.get("id", "asset"))) == base:
-			duplicate = true
+			has_name_collision = true
 			break
-	return "%s__%s" % [base, str(asset.get("id", "asset"))] if duplicate else base
+	return "%s__%s" % [base, str(asset.get("id", "asset"))] if has_name_collision else base
 
 
 func _asset_storage_root(world_root: String, asset: Dictionary) -> String:
@@ -4870,7 +4870,6 @@ func _geometry_meshing_input_is_current(asset_id: String, component_id: String, 
 	var seeding_bake: Dictionary = input.get("seeding", {})
 	if component.is_empty() or sampling_bake.is_empty() or seeding_bake.is_empty():
 		return false
-	var asset := _get_asset(asset_id)
 	if not _geometry_sampling_bake_is_current(asset_id, component_id, component):
 		return false
 	if str(seeding_bake.get("sampling_bake_id", "")) != str(sampling_bake.get("bake_id", "")) \
@@ -4987,7 +4986,7 @@ func _geometry_uv_mapping_bake(asset_id: String, component_id: String, mesh_meth
 	return _geometry_uv_mapping_bakes(asset_id, component_id).get(GeometryUVMappingService.bake_key(resolved_mesh_method, resolved_uv_method), {})
 
 
-func _geometry_uv_mapping_input(asset_id: String, component_id: String, recipe: Dictionary = {}) -> Dictionary:
+func _geometry_uv_mapping_input(asset_id: String, component_id: String, _recipe: Dictionary = {}) -> Dictionary:
 	return _component_mesh_bake(asset_id, component_id)
 
 
@@ -4999,7 +4998,7 @@ func _resolved_geometry_uv_mapping_recipe(asset_id: String, component_id: String
 	return resolved
 
 
-func _geometry_uv_mapping_input_is_current(asset_id: String, component_id: String, component: Dictionary, recipe: Dictionary = {}) -> bool:
+func _geometry_uv_mapping_input_is_current(asset_id: String, component_id: String, component: Dictionary, _recipe: Dictionary = {}) -> bool:
 	return not component.is_empty() and _component_mesh_status(asset_id, component_id, component) == "Ready"
 
 
@@ -5096,10 +5095,10 @@ func _render_context_bar() -> void:
 	if active_module == "Export":
 		_clear_context_bar()
 		return
-	var draw_mode_status := find_child("DrawModeStatus", true, false) as Label
-	if draw_mode_status != null:
-		var selected_component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-		draw_mode_status.text = "Draw Mode: %s" % _draw_mode_display_name(str(selected_component.get("draw_mode", "closed_loop"))) if not selected_component.is_empty() else "Draw Mode: —"
+	var draw_mode_label := find_child("DrawModeStatus", true, false) as Label
+	if draw_mode_label != null:
+		var current_component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+		draw_mode_label.text = "Draw Mode: %s" % _draw_mode_display_name(str(current_component.get("draw_mode", "closed_loop"))) if not current_component.is_empty() else "Draw Mode: —"
 	_update_context_action_button()
 	_clear_context_bar()
 	if active_module == "Motion":
@@ -6578,22 +6577,22 @@ func _apply_reference_image_orientation(image: Image, source_path: String) -> vo
 		return
 	var orientation := _jpeg_exif_orientation(source_path)
 	if orientation == 3:
-		image.rotate_90(0)
-		image.rotate_90(0)
+		image.rotate_90(ClockDirection.CLOCKWISE)
+		image.rotate_90(ClockDirection.CLOCKWISE)
 	elif orientation == 6:
-		image.rotate_90(0)
+		image.rotate_90(ClockDirection.CLOCKWISE)
 	elif orientation == 8:
-		image.rotate_90(1)
+		image.rotate_90(ClockDirection.COUNTERCLOCKWISE)
 	elif orientation == 2:
 		image.flip_x()
 	elif orientation == 4:
 		image.flip_y()
 	elif orientation == 5:
 		image.flip_x()
-		image.rotate_90(0)
+		image.rotate_90(ClockDirection.CLOCKWISE)
 	elif orientation == 7:
 		image.flip_x()
-		image.rotate_90(1)
+		image.rotate_90(ClockDirection.COUNTERCLOCKWISE)
 
 
 func _jpeg_exif_orientation(path: String) -> int:
@@ -7468,8 +7467,8 @@ func _render_geometry_seeding_dependency_row(container: VBoxContainer, asset_id:
 	indent.custom_minimum_size = Vector2(34, 0)
 	row.add_child(indent)
 	var button := Button.new()
-	var ready := _geometry_sampling_bake_is_current(asset_id, component_id, component)
-	button.text = "Sampling · Adaptive  ·  %s" % ("Baked" if ready else "Required")
+	var sampling_ready := _geometry_sampling_bake_is_current(asset_id, component_id, component)
+	button.text = "Sampling · Adaptive  ·  %s" % ("Baked" if sampling_ready else "Required")
 	button.custom_minimum_size = Vector2(0, 26)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
@@ -8246,13 +8245,13 @@ func _duplicate_selected_guide() -> void:
 	if asset.is_empty() or source.is_empty():
 		return
 	_record_direct_change()
-	var duplicate := _duplicate_guide_record(source, asset)
-	asset["guides"].append(duplicate)
-	selected_guide_id = str(duplicate.get("id", ""))
+	var guide_copy := _duplicate_guide_record(source, asset)
+	asset["guides"].append(guide_copy)
+	selected_guide_id = str(guide_copy.get("id", ""))
 	selected_component_id = ""
 	active_state = ""
 	_set_outliner_asset_expanded(selected_asset_id, true)
-	_show_status_message("Duplicated %s." % _guide_display_name(asset, duplicate))
+	_show_status_message("Duplicated %s." % _guide_display_name(asset, guide_copy))
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
@@ -8363,18 +8362,18 @@ func _commit_pending_component_duplicate() -> void:
 	var duplicate_root: Dictionary = {}
 	for source_node in source_tree:
 		var source_node_id := str(source_node.get("id", ""))
-		var duplicate := _duplicate_component_record(source_node, asset, str(id_map[source_node_id]))
+		var component_copy := _duplicate_component_record(source_node, asset, str(id_map[source_node_id]))
 		var semantic_key := str(semantic_map[source_node_id])
-		duplicate["semantic_key"] = semantic_key
-		duplicate["missing_semantic_source"] = ""
-		duplicate["name"] = semantic_key
+		component_copy["semantic_key"] = semantic_key
+		component_copy["missing_semantic_source"] = ""
+		component_copy["name"] = semantic_key
 		var source_parent_id := str(source_node.get("parent_component_id", ""))
-		duplicate["parent_component_id"] = str(id_map.get(source_parent_id, source_parent_id))
+		component_copy["parent_component_id"] = str(id_map.get(source_parent_id, source_parent_id))
 		if mirror_mode != "none" and source_node_id == component_id:
-			duplicate["transform"] = _mirrored_duplicate_transform(duplicate, mirror_mode)
-		asset["components"].append(duplicate)
+			component_copy["transform"] = _mirrored_duplicate_transform(component_copy, mirror_mode)
+		asset["components"].append(component_copy)
 		if source_node_id == component_id:
-			duplicate_root = duplicate
+			duplicate_root = component_copy
 	pending_component_duplicate.clear()
 	selected_asset_id = asset_id
 	selected_component_id = str(duplicate_root.get("id", ""))
@@ -8393,30 +8392,30 @@ func _commit_pending_component_duplicate() -> void:
 func _mirrored_duplicate_transform(component: Dictionary, mirror_mode: String) -> Dictionary:
 	var transform: Dictionary = component.get("transform", _default_component_transform()).duplicate(true)
 	if mirror_mode == "flip_orientation":
-		var position: Vector2 = transform.get("position", Vector2.ZERO)
-		position.x = -position.x
-		transform["position"] = position
+		var transform_position: Vector2 = transform.get("position", Vector2.ZERO)
+		transform_position.x = -transform_position.x
+		transform["position"] = transform_position
 		transform["rotation"] = -float(transform.get("rotation", 0.0))
-		var scale: Vector2 = transform.get("scale", Vector2.ONE)
-		scale.x = -scale.x
-		transform["scale"] = scale
+		var transform_scale: Vector2 = transform.get("scale", Vector2.ONE)
+		transform_scale.x = -transform_scale.x
+		transform["scale"] = transform_scale
 	else:
 		# Keep the component orientation while reflecting its visible placement.
 		# Applying this to every local level mirrors the complete subtree.
 		var visual_center := _component_visual_center_in_parent_space(component)
-		var position: Vector2 = transform.get("position", Vector2.ZERO)
-		position.x -= visual_center.x * 2.0
-		transform["position"] = position
+		var transform_position: Vector2 = transform.get("position", Vector2.ZERO)
+		transform_position.x -= visual_center.x * 2.0
+		transform["position"] = transform_position
 	return transform
-func _duplicate_component_record(source: Dictionary, asset: Dictionary, forced_id := "") -> Dictionary:
-	var duplicate := source.duplicate(true)
-	duplicate["id"] = forced_id if not forced_id.is_empty() else "component_%d" % next_component_id
+func _duplicate_component_record(source: Dictionary, _asset: Dictionary, forced_id := "") -> Dictionary:
+	var component_copy := source.duplicate(true)
+	component_copy["id"] = forced_id if not forced_id.is_empty() else "component_%d" % next_component_id
 	if forced_id.is_empty():
 		next_component_id += 1
-	duplicate["name"] = str(source.get("name", "Component"))
+	component_copy["name"] = str(source.get("name", "Component"))
 	# The duplicated Component stays beside its source: same Parent, no copied
 	# descendants, and no copied Guides.
-	duplicate["parent_component_id"] = str(source.get("parent_component_id", ""))
+	component_copy["parent_component_id"] = str(source.get("parent_component_id", ""))
 	var point_id_map: Dictionary = {}
 	var new_points: Array = []
 	for point in source.get("points", []):
@@ -8448,11 +8447,11 @@ func _duplicate_component_record(source: Dictionary, asset: Dictionary, forced_i
 		chain_copy["point_ids"] = remapped_points
 		chain_copy["edge_ids"] = remapped_edges
 		new_chains.append(chain_copy)
-	duplicate["points"] = new_points
-	duplicate["edges"] = new_edges
-	duplicate["chains"] = new_chains
+	component_copy["points"] = new_points
+	component_copy["edges"] = new_edges
+	component_copy["chains"] = new_chains
 	BezierGeometry.resolve_auto_handles(new_points, new_chains)
-	return duplicate
+	return component_copy
 
 
 
@@ -8475,22 +8474,21 @@ func _component_visual_center_in_parent_space(component: Dictionary) -> Vector2:
 	var minimum := Vector2(INF, INF)
 	var maximum := Vector2(-INF, -INF)
 	for point in points:
-		var position: Vector2 = point.get("position", Vector2.ZERO)
-		minimum.x = minf(minimum.x, position.x)
-		minimum.y = minf(minimum.y, position.y)
-		maximum.x = maxf(maximum.x, position.x)
-		maximum.y = maxf(maximum.y, position.y)
+		var point_position: Vector2 = point.get("position", Vector2.ZERO)
+		minimum.x = minf(minimum.x, point_position.x)
+		minimum.y = minf(minimum.y, point_position.y)
+		maximum.x = maxf(maximum.x, point_position.x)
+		maximum.y = maxf(maximum.y, point_position.y)
 	var local_center := (minimum + maximum) * 0.5
 	return ComponentHierarchy.local_transform(component.get("transform", {})) * local_center
 
 
 func _duplicate_guide_record(source: Dictionary, asset: Dictionary) -> Dictionary:
-	var duplicate := source.duplicate(true)
-	var source_id := str(source.get("id", ""))
+	var guide_copy := source.duplicate(true)
 	var guide_id := "guide_%d" % next_guide_id
 	next_guide_id += 1
-	duplicate["id"] = guide_id
-	duplicate["ordinal"] = ComponentHierarchy.next_guide_ordinal(asset, str(source.get("scope", {}).get("component_id", "")), str(source.get("guide_type", AssetGuide.SAMPLE)))
+	guide_copy["id"] = guide_id
+	guide_copy["ordinal"] = ComponentHierarchy.next_guide_ordinal(asset, str(source.get("scope", {}).get("component_id", "")), str(source.get("guide_type", AssetGuide.SAMPLE)))
 	var base_name := str(source.get("name", AssetGuide.display_name(str(source.get("guide_type", AssetGuide.SAMPLER_SPINE))))) + " Copy"
 	var candidate := base_name
 	var suffix := 2
@@ -8500,7 +8498,7 @@ func _duplicate_guide_record(source: Dictionary, asset: Dictionary) -> Dictionar
 	while existing_names.has(candidate.to_lower()):
 		candidate = "%s %d" % [base_name, suffix]
 		suffix += 1
-	duplicate["name"] = candidate
+	guide_copy["name"] = candidate
 	var point_id_map: Dictionary = {}
 	var new_points: Array = []
 	for point in source.get("points", []):
@@ -8534,10 +8532,10 @@ func _duplicate_guide_record(source: Dictionary, asset: Dictionary) -> Dictionar
 		chain_copy["point_ids"] = remapped_points
 		chain_copy["edge_ids"] = remapped_edges
 		new_chains.append(chain_copy)
-	duplicate["points"] = new_points
-	duplicate["edges"] = new_edges
-	duplicate["chains"] = new_chains
-	return AssetGuide.normalize(duplicate)
+	guide_copy["points"] = new_points
+	guide_copy["edges"] = new_edges
+	guide_copy["chains"] = new_chains
+	return AssetGuide.normalize(guide_copy)
 
 
 func _confirm_component_creation() -> void:
@@ -8944,11 +8942,11 @@ func _render_weighting_inspector() -> void:
 
 func _rename_weighting_style(new_name: String) -> void:
 	var style := _weighting_style(selected_asset_id, selected_component_id, selected_weighting_style_id)
-	var name := new_name.strip_edges()
-	if style.is_empty() or name.is_empty() or name == str(style.get("name", "")):
+	var style_name := new_name.strip_edges()
+	if style.is_empty() or style_name.is_empty() or style_name == str(style.get("name", "")):
 		return
 	_record_direct_change()
-	style["name"] = name
+	style["name"] = style_name
 	_render_outliner()
 
 
@@ -9109,7 +9107,7 @@ func _get_sampling_input(asset: Dictionary, input_id: String, input_kind: String
 	return {}
 
 
-func _sampling_input_display_name(asset: Dictionary, parent: Dictionary, input: Dictionary, input_kind: String) -> String:
+func _sampling_input_display_name(asset: Dictionary, _parent: Dictionary, input: Dictionary, input_kind: String) -> String:
 	if input_kind == "guide":
 		return _guide_display_name(asset, input)
 	return _component_outliner_name(asset, input)
@@ -11764,9 +11762,9 @@ func _render_animation_validation_inspector() -> void:
 	inspector_content.add_child(_create_inspector_section("Validation"))
 	var issues := motion_workspace.validation_issues()
 	if issues.is_empty():
-		var ready := _create_inspector_field_label("Animation document is valid.")
-		ready.add_theme_color_override("font_color", Color("#75b88a"))
-		inspector_content.add_child(ready)
+		var valid_label := _create_inspector_field_label("Animation document is valid.")
+		valid_label.add_theme_color_override("font_color", Color("#75b88a"))
+		inspector_content.add_child(valid_label)
 		return
 	var summary := _create_inspector_field_label("%d issue%s" % [issues.size(), "" if issues.size() == 1 else "s"])
 	summary.add_theme_color_override("font_color", Color("#f2c94c"))
@@ -11975,13 +11973,13 @@ func _sync_motion_player_document(asset: Dictionary) -> void:
 		motion_player.set_document({})
 		motion_player_asset_id = ""
 		return
-	var next_asset_id := str(asset.get("id", ""))
-	var changed_asset := motion_player_asset_id != next_asset_id
+	var incoming_asset_id := str(asset.get("id", ""))
+	var changed_asset := motion_player_asset_id != incoming_asset_id
 	if changed_asset:
 		motion_player.pause()
 		motion_player.parameter_values.clear()
 	motion_player.set_document(_ensure_asset_animation(asset))
-	motion_player_asset_id = next_asset_id
+	motion_player_asset_id = incoming_asset_id
 	if changed_asset:
 		var states: Array = motion_player.document.get("states", [])
 		if not states.is_empty():
@@ -13917,7 +13915,7 @@ func _on_edge_selection_set_changed(edge_ids: Array) -> void:
 	_render_context_bar()
 
 
-func _on_face_selection_changed(selected: bool) -> void:
+func _on_face_selection_changed(_selected: bool) -> void:
 	_render_inspector()
 
 
@@ -14272,7 +14270,7 @@ func _set_active_module_visual(module_name: String, submodule: String) -> void:
 		module_section.set_active_submodule(submodule if module_section.module_name == module_name else "")
 
 
-func _select_submodule(module_name: String, submodule: String, section: ModuleSection) -> void:
+func _select_submodule(module_name: String, submodule: String, _section: ModuleSection) -> void:
 	if active_draw_tool == "spine":
 		_stop_guide_draw_state()
 	if module_name != "Mesh" or submodule != "Sampling":

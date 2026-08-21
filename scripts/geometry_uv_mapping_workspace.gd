@@ -79,14 +79,14 @@ func _draw_source_mesh(rect: Rect2) -> void:
 	if world_positions.is_empty():
 		return
 	var bounds := Rect2(world_positions[0], Vector2.ZERO)
-	for position in world_positions:
-		bounds = bounds.expand(position)
+	for world_position in world_positions:
+		bounds = bounds.expand(world_position)
 	var available := rect.size - Vector2(40.0, 40.0)
 	var extent := Vector2(maxf(bounds.size.x, 1.0), maxf(bounds.size.y, 1.0))
 	var zoom := minf(available.x / extent.x, available.y / extent.y)
 	for vertex in mesh_bake.get("vertices", []):
-		var position := Vector2(vertex.get("position", Vector2.ZERO))
-		positions[str(vertex.get("id", ""))] = rect.get_center() + Vector2((position.x - bounds.get_center().x) * zoom, -(position.y - bounds.get_center().y) * zoom)
+		var vertex_position := Vector2(vertex.get("position", Vector2.ZERO))
+		positions[str(vertex.get("id", ""))] = rect.get_center() + Vector2((vertex_position.x - bounds.get_center().x) * zoom, -(vertex_position.y - bounds.get_center().y) * zoom)
 	if checker_overlay_enabled and bool(uv_result.get("valid", false)) and checker_texture != null:
 		var uvs: Dictionary = {}
 		for entry in uv_result.get("uvs", []):
@@ -153,10 +153,10 @@ func _draw_uv_checker_overlay(triangles: Array, positions: Dictionary, uvs: Dict
 
 func _create_checker_texture() -> ImageTexture:
 	var image := Image.create(CHECKER_SIZE, CHECKER_SIZE, false, Image.FORMAT_RGBA8)
-	var cell_size := CHECKER_SIZE / CHECKER_CELLS
+	var cell_size := float(CHECKER_SIZE) / float(CHECKER_CELLS)
 	for y in range(CHECKER_SIZE):
 		for x in range(CHECKER_SIZE):
-			var even := ((x / cell_size) + (y / cell_size)) % 2 == 0
+			var even := (int(float(x) / cell_size) + int(float(y) / cell_size)) % 2 == 0
 			image.set_pixel(x, y, CHECKER_LIGHT if even else CHECKER_DARK)
 	return ImageTexture.create_from_image(image)
 

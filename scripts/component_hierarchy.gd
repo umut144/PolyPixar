@@ -6,28 +6,28 @@ static func normalize_asset(asset: Dictionary) -> void:
 	var components: Array = asset.get("components", []) if asset.get("components", []) is Array else []
 	asset["components"] = components
 	var known_ids: Dictionary = {}
-	for component in components:
-		if component is Dictionary and str(component.get("type", "component")) != "guide":
-			var component_id := str(component.get("id", ""))
+	for component_data in components:
+		if component_data is Dictionary and str(component_data.get("type", "component")) != "guide":
+			var component_id := str(component_data.get("id", ""))
 			if not component_id.is_empty():
 				known_ids[component_id] = true
-	for component in components:
-		if not component is Dictionary or str(component.get("type", "component")) == "guide":
+	for component_data in components:
+		if not component_data is Dictionary or str(component_data.get("type", "component")) == "guide":
 			continue
-		var component_id := str(component.get("id", ""))
-		var parent_id := str(component.get("parent_component_id", ""))
-		if parent_id == component_id or not parent_id.is_empty() and not known_ids.has(parent_id):
-			parent_id = ""
-		component["parent_component_id"] = parent_id
+		var component_id := str(component_data.get("id", ""))
+		var parent_component_id := str(component_data.get("parent_component_id", ""))
+		if parent_component_id == component_id or not parent_component_id.is_empty() and not known_ids.has(parent_component_id):
+			parent_component_id = ""
+		component_data["parent_component_id"] = parent_component_id
 	_break_cycles(components)
 	_normalize_guide_ordinals(asset)
 
 
-static func parent_id(component: Dictionary) -> String:
-	return str(component.get("parent_component_id", ""))
+static func parent_id(component_data: Dictionary) -> String:
+	return str(component_data.get("parent_component_id", ""))
 
 
-static func component(asset: Dictionary, component_id: String) -> Dictionary:
+static func component_by_id(asset: Dictionary, component_id: String) -> Dictionary:
 	for candidate in asset.get("components", []):
 		if candidate is Dictionary and str(candidate.get("type", "component")) != "guide" and str(candidate.get("id", "")) == component_id:
 			return candidate
@@ -55,8 +55,8 @@ static func descendants(asset: Dictionary, parent_component_id: String) -> Array
 
 static func can_parent(asset: Dictionary, component_id: String, candidate_parent_id: String) -> bool:
 	if candidate_parent_id.is_empty():
-		return not component(asset, component_id).is_empty()
-	if component_id == candidate_parent_id or component(asset, component_id).is_empty() or component(asset, candidate_parent_id).is_empty():
+		return not component_by_id(asset, component_id).is_empty()
+	if component_id == candidate_parent_id or component_by_id(asset, component_id).is_empty() or component_by_id(asset, candidate_parent_id).is_empty():
 		return false
 	var cursor := candidate_parent_id
 	var visited: Dictionary = {}
@@ -64,7 +64,7 @@ static func can_parent(asset: Dictionary, component_id: String, candidate_parent
 		if cursor == component_id or visited.has(cursor):
 			return false
 		visited[cursor] = true
-		cursor = parent_id(component(asset, cursor))
+		cursor = parent_id(component_by_id(asset, cursor))
 	return true
 
 
@@ -80,7 +80,7 @@ static func next_guide_ordinal(asset: Dictionary, component_id: String, guide_ty
 
 static func world_transform(asset: Dictionary, component_id: String) -> Transform2D:
 	var chain: Array[Dictionary] = []
-	var cursor := component(asset, component_id)
+	var cursor := component_by_id(asset, component_id)
 	var visited: Dictionary = {}
 	while not cursor.is_empty():
 		var cursor_id := str(cursor.get("id", ""))
@@ -88,7 +88,7 @@ static func world_transform(asset: Dictionary, component_id: String) -> Transfor
 			break
 		visited[cursor_id] = true
 		chain.push_front(cursor)
-		cursor = component(asset, parent_id(cursor))
+		cursor = component_by_id(asset, parent_id(cursor))
 	var result := Transform2D.IDENTITY
 	for chain_component in chain:
 		result = result * local_transform(chain_component.get("transform", {}))
@@ -96,14 +96,14 @@ static func world_transform(asset: Dictionary, component_id: String) -> Transfor
 
 
 static func world_transform_record(asset: Dictionary, component_id: String) -> Dictionary:
-	var current := component(asset, component_id)
+	var current := component_by_id(asset, component_id)
 	if current.is_empty():
 		return _default_transform_record()
 	return transform_record_from_affine(world_transform(asset, component_id), _vector(current.get("transform", {}).get("pivot", Vector2.ZERO), Vector2.ZERO))
 
 
 static func local_transform_from_world_record(asset: Dictionary, component_id: String, world_record: Dictionary) -> Dictionary:
-	var current := component(asset, component_id)
+	var current := component_by_id(asset, component_id)
 	if current.is_empty():
 		return _default_transform_record()
 	var parent_world := Transform2D.IDENTITY

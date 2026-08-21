@@ -117,15 +117,15 @@ static func _build_component(component: Dictionary, source: Dictionary, export_t
 			errors.append("%s: Mesh contains an invalid Vertex record." % label)
 			continue
 		var vertex_id := str(raw_vertex.get("id", ""))
-		var position := Vector2(raw_vertex.get("position", Vector2.INF))
-		if vertex_id.is_empty() or vertex_indices.has(vertex_id) or not position.is_finite():
+		var vertex_position := Vector2(raw_vertex.get("position", Vector2.INF))
+		if vertex_id.is_empty() or vertex_indices.has(vertex_id) or not vertex_position.is_finite():
 			errors.append("%s: Mesh Vertex IDs and positions must be unique and finite." % label)
 			continue
 		vertex_indices[vertex_id] = vertices.size()
 		# Editor mesh coordinates are authored around the Component pivot.  Schema 2
 		# instead requires mesh data in Component-local space, so move that pivot to
 		# the local origin before serializing it.
-		vertices.append(_meters(position - authored_pivot))
+		vertices.append(_meters(vertex_position - authored_pivot))
 	var uv_by_vertex: Dictionary = {}
 	for raw_entry in uv.get("uvs", []):
 		if not raw_entry is Dictionary:
@@ -187,13 +187,16 @@ static func _build_component(component: Dictionary, source: Dictionary, export_t
 	}
 	if mask["source_path"].is_empty() or mask["pixel_hash"].is_empty():
 		return {"valid": false, "errors": ["%s: SDF resource path or pixel hash is missing." % label]}
+	var parent_component_id: Variant = null
+	if not str(component.get("parent_component_id", "")).is_empty():
+		parent_component_id = str(component.get("parent_component_id", ""))
 	return {
 		"valid": true,
 		"errors": [],
 		"component": {
 			"component_id": component_id,
 			"semantic_key": str(component.get("semantic_key", "")).strip_edges(),
-			"parent_component_id": null if str(component.get("parent_component_id", "")).is_empty() else str(component.get("parent_component_id", "")),
+			"parent_component_id": parent_component_id,
 			"z_index": int(component.get("z_index", 0)),
 			"local_pivot": _meters(pivot),
 			"local_transform": {
@@ -240,6 +243,9 @@ static func _build_reference_component(component: Dictionary, source: Dictionary
 		errors.append("%s: Component transform is not finite." % label)
 	if not errors.is_empty():
 		return {"valid": false, "errors": errors}
+	var parent_component_id: Variant = null
+	if not str(component.get("parent_component_id", "")).is_empty():
+		parent_component_id = str(component.get("parent_component_id", ""))
 	return {
 		"valid": true,
 		"errors": [],
@@ -248,7 +254,7 @@ static func _build_reference_component(component: Dictionary, source: Dictionary
 			"semantic_key": str(component.get("semantic_key", "")),
 			"kind": "asset_reference",
 			"source_asset_key": source_asset_key,
-			"parent_component_id": null if str(component.get("parent_component_id", "")).is_empty() else str(component.get("parent_component_id", "")),
+			"parent_component_id": parent_component_id,
 			"z_index": int(component.get("z_index", 0)),
 			"local_pivot": _meters(pivot),
 			"local_transform": {

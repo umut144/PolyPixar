@@ -72,10 +72,10 @@ static func _world_offset_to_preview(world_offset: Vector2, fit_scale: float) ->
 
 
 static func _apply_preview_transform(world_point: Vector2, origin: Vector2, sample: Dictionary) -> Vector2:
-	var position: Vector2 = sample.get("position", Vector2.ZERO)
-	var rotation := deg_to_rad(float(sample.get("rotation", 0.0)))
-	var scale: Vector2 = sample.get("scale", Vector2.ONE)
-	return origin + ((world_point - origin) * scale).rotated(rotation) + position
+	var sample_position: Vector2 = sample.get("position", Vector2.ZERO)
+	var sample_rotation := deg_to_rad(float(sample.get("rotation", 0.0)))
+	var sample_scale: Vector2 = sample.get("scale", Vector2.ONE)
+	return origin + ((world_point - origin) * sample_scale).rotated(sample_rotation) + sample_position
 
 
 func _draw_grid() -> void:
@@ -148,10 +148,10 @@ func _cubic_point(start: Dictionary, end: Dictionary, t: float) -> Vector2:
 
 func _component_to_world(local_point: Vector2, transform: Dictionary) -> Vector2:
 	var pivot: Vector2 = transform.get("pivot", Vector2.ZERO)
-	var position: Vector2 = transform.get("position", Vector2.ZERO)
-	var scale: Vector2 = transform.get("scale", Vector2.ONE)
-	var rotation := deg_to_rad(float(transform.get("rotation", 0.0)))
-	return position + ((local_point - pivot) * scale).rotated(rotation)
+	var transform_position: Vector2 = transform.get("position", Vector2.ZERO)
+	var transform_scale: Vector2 = transform.get("scale", Vector2.ONE)
+	var transform_rotation := deg_to_rad(float(transform.get("rotation", 0.0)))
+	return transform_position + ((local_point - pivot) * transform_scale).rotated(transform_rotation)
 
 
 func _paths_bounds(paths: Array) -> Rect2:

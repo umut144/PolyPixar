@@ -52,38 +52,38 @@ static func _chain_neighbor(points_by_id: Dictionary, point_ids: Array, point_in
 
 
 static func _apply_automatic_handles(point_data: Dictionary, previous: Dictionary, next: Dictionary, mode: String) -> void:
-	var position: Vector2 = point_data.get("position", Vector2.ZERO)
+	var anchor_position: Vector2 = point_data.get("position", Vector2.ZERO)
 	if previous.is_empty() and next.is_empty():
 		point_data["handle_in"] = Vector2.ZERO
 		point_data["handle_out"] = Vector2.ZERO
 		return
 	if previous.is_empty():
-		var next_position: Vector2 = next.get("position", position)
+		var endpoint_position: Vector2 = next.get("position", anchor_position)
 		point_data["handle_in"] = Vector2.ZERO
-		point_data["handle_out"] = (next_position - position) / 3.0
+		point_data["handle_out"] = (endpoint_position - anchor_position) / 3.0
 		return
 	if next.is_empty():
-		var previous_position: Vector2 = previous.get("position", position)
-		point_data["handle_in"] = (previous_position - position) / 3.0
+		var endpoint_position: Vector2 = previous.get("position", anchor_position)
+		point_data["handle_in"] = (endpoint_position - anchor_position) / 3.0
 		point_data["handle_out"] = Vector2.ZERO
 		return
-	var previous_position: Vector2 = previous.get("position", position)
-	var next_position: Vector2 = next.get("position", position)
-	var tangent := next_position - previous_position
+	var previous_anchor_position: Vector2 = previous.get("position", anchor_position)
+	var next_anchor_position: Vector2 = next.get("position", anchor_position)
+	var tangent := next_anchor_position - previous_anchor_position
 	if tangent.length_squared() <= 0.000001:
-		tangent = next_position - position
+		tangent = next_anchor_position - anchor_position
 	if tangent.length_squared() <= 0.000001:
 		point_data["handle_in"] = Vector2.ZERO
 		point_data["handle_out"] = Vector2.ZERO
 		return
 	var direction := tangent.normalized()
-	var incoming_length := position.distance_to(previous_position) / 3.0
-	var outgoing_length := position.distance_to(next_position) / 3.0
+	var incoming_length := anchor_position.distance_to(previous_anchor_position) / 3.0
+	var outgoing_length := anchor_position.distance_to(next_anchor_position) / 3.0
 	# A corner intentionally has no shared tangent. Each handle follows its own
 	# neighbouring edge, so both curve segments meet exactly at a sharp cusp.
 	if mode == "corner":
-		point_data["handle_in"] = (previous_position - position) / 3.0
-		point_data["handle_out"] = (next_position - position) / 3.0
+		point_data["handle_in"] = (previous_anchor_position - anchor_position) / 3.0
+		point_data["handle_out"] = (next_anchor_position - anchor_position) / 3.0
 		return
 	if mode == "mirrored":
 		var mirrored_length := minf(incoming_length, outgoing_length)
