@@ -1,11 +1,11 @@
 class_name ContourStrokeService
 extends RefCounted
 
-## Slice 1 of the authored contour pipeline. The source Bezier boundary is the
-## stroke centerline; this service derives a deterministic, centered mesh from
-## one closed outer Chain without changing canonical Component topology.
+## The source Bezier boundary is the stroke centerline. The service derives a
+## deterministic centered mesh for the visible runs of one closed outer or
+## hole Chain without changing canonical Component topology.
 
-const ALGORITHM_VERSION := 1
+const ALGORITHM_VERSION := 2
 const REFERENCE_PIXELS_PER_METER := 128.0
 const DEFAULT_STROKE_WIDTH_PX := 4.0
 const MAX_DEVIATION_PX := 0.25
@@ -28,16 +28,49 @@ static func generate(component: Dictionary, stroke_width_px := DEFAULT_STROKE_WI
 		return _failed_result(errors, stroke_width_px)
 	var working_component := component.duplicate(true)
 	BezierGeometry.resolve_auto_handles(working_component.get("points", []), working_component.get("chains", []))
-	var chain := BezierTopology.outer_chain(working_component)
+	var chain: Dictionary = working_component.get("chains", [])[0]
 	var sampled := _sample_chain(working_component, chain)
 	if not bool(sampled.get("valid", false)):
 		return _failed_result(sampled.get("errors", []), stroke_width_px)
-	var centerline: Array = sampled.get("samples", [])
 	var width_meters := stroke_width_meters(stroke_width_px)
 	var width_tool_units := width_meters / ToolUnits.TO_METERS
-	var mesh := _build_closed_mesh(centerline, width_tool_units * 0.5)
-	if not bool(mesh.get("valid", false)):
-		return _failed_result(mesh.get("errors", []), stroke_width_px)
+	var vertices: Array = []
+	var indices := PackedInt32Array()
+	var output_runs: Array = []
+	var combined_centerline: Array = []
+	var triangle_count := 0
+	var miter_join_count := 0
+	var bevel_join_count := 0
+	for run_data in sampled.get("runs", []):
+		var run_centerline: Array = run_data.get("samples", [])
+		var mesh := _build_stroke_mesh(run_centerline, width_tool_units * 0.5, bool(run_data.get("closed", false)))
+		if not bool(mesh.get("valid", false)):
+			return _failed_result(mesh.get("errors", []), stroke_width_px)
+		var vertex_offset := vertices.size()
+		var index_offset := indices.size()
+		vertices.append_array(mesh.get("vertices", []))
+		for mesh_index in mesh.get("indices", PackedInt32Array()):
+			indices.append(vertex_offset + int(mesh_index))
+		combined_centerline.append_array(run_centerline)
+		var run_result := {
+			"run_id": str(run_data.get("run_id", "")),
+			"closed": bool(run_data.get("closed", false)),
+			"start_cap": "none" if bool(run_data.get("closed", false)) else CAP_TYPE,
+			"end_cap": "none" if bool(run_data.get("closed", false)) else CAP_TYPE,
+			"edge_ids": run_data.get("edge_ids", []).duplicate(),
+			"centerline": run_centerline,
+			"vertex_offset": vertex_offset,
+			"vertex_count": mesh.get("vertices", []).size(),
+			"index_offset": index_offset,
+			"index_count": mesh.get("indices", PackedInt32Array()).size(),
+			"triangle_count": int(mesh.get("triangle_count", 0)),
+			"miter_join_count": int(mesh.get("miter_join_count", 0)),
+			"bevel_join_count": int(mesh.get("bevel_join_count", 0))
+		}
+		output_runs.append(run_result)
+		triangle_count += int(mesh.get("triangle_count", 0))
+		miter_join_count += int(mesh.get("miter_join_count", 0))
+		bevel_join_count += int(mesh.get("bevel_join_count", 0))
 	return {
 		"valid": true,
 		"errors": [],
@@ -53,14 +86,18 @@ static func generate(component: Dictionary, stroke_width_px := DEFAULT_STROKE_WI
 		"join": JOIN_TYPE,
 		"miter_limit": MITER_LIMIT,
 		"cap": CAP_TYPE,
-		"closed": true,
+		"source_chain_closed": true,
 		"chain_id": str(chain.get("id", "")),
-		"centerline": centerline,
-		"vertices": mesh.get("vertices", []),
-		"indices": mesh.get("indices", PackedInt32Array()),
-		"triangle_count": int(mesh.get("triangle_count", 0)),
-		"miter_join_count": int(mesh.get("miter_join_count", 0)),
-		"bevel_join_count": int(mesh.get("bevel_join_count", 0))
+		"topology_role": str(chain.get("topology_role", "outer")),
+		"has_outline": not output_runs.is_empty(),
+		"outline_run_count": output_runs.size(),
+		"runs": output_runs,
+		"centerline": combined_centerline,
+		"vertices": vertices,
+		"indices": indices,
+		"triangle_count": triangle_count,
+		"miter_join_count": miter_join_count,
+		"bevel_join_count": bevel_join_count
 	}
 
 
@@ -69,26 +106,25 @@ static func validation_issues(component: Dictionary, stroke_width_px := DEFAULT_
 	if not is_finite(stroke_width_px) or stroke_width_px <= 0.0:
 		errors.append("Contour stroke width must be a finite positive authored pixel value.")
 	if str(component.get("draw_mode", "closed_loop")) != "closed_loop":
-		errors.append("Contour Stroke Slice 1 requires a Closed Loop Component.")
+		errors.append("Contour Stroke requires a Closed Loop Component.")
 	var chains: Array = component.get("chains", [])
 	if chains.size() != 1:
-		errors.append("Contour Stroke Slice 1 requires exactly one Chain.")
+		errors.append("Contour Stroke requires exactly one Chain.")
 		return errors
 	var chain: Dictionary = chains[0]
-	if str(chain.get("topology_role", "outer")) != "outer":
-		errors.append("Contour Stroke Slice 1 requires an outer Chain.")
+	var component_role := str(component.get("topology_role", "outer"))
+	var chain_role := str(chain.get("topology_role", "outer"))
+	if component_role not in ["outer", "hole"] or chain_role not in ["outer", "hole"]:
+		errors.append("Contour Stroke requires an outer or hole Chain.")
+	elif component_role != chain_role:
+		errors.append("Contour Stroke Component and Chain topology roles must match.")
 	if not bool(chain.get("closed", false)) or chain.get("point_ids", []).size() < 3:
-		errors.append("Contour Stroke Slice 1 requires one closed Chain with at least three Points.")
-	for edge_id_value in chain.get("edge_ids", []):
-		var edge := BezierTopology.edge_by_id(component.get("edges", []), str(edge_id_value))
-		if not edge.is_empty() and not bool(edge.get("render_outline", true)):
-			errors.append("Contour Stroke Slice 1 does not yet support disabled Render Outline edges.")
-			break
+		errors.append("Contour Stroke requires one closed Chain with at least three Points.")
 	return errors
 
 
 static func _sample_chain(component: Dictionary, chain: Dictionary) -> Dictionary:
-	var samples: Array = []
+	var sampled_edges: Array = []
 	var maximum_flatness := 0.0
 	var errors: Array[String] = []
 	for edge_id_value in chain.get("edge_ids", []):
@@ -99,27 +135,73 @@ static func _sample_chain(component: Dictionary, chain: Dictionary) -> Dictionar
 		if edge.is_empty() or start_point.is_empty() or end_point.is_empty():
 			errors.append("Contour stroke Chain contains an unresolved Edge.")
 			continue
+		var visible := bool(edge.get("render_outline", true))
+		if not visible:
+			sampled_edges.append({"edge_id": edge_id, "visible": false, "samples": []})
+			continue
 		var controls := BezierGeometry.cubic_controls(start_point, end_point)
-		if samples.is_empty():
-			samples.append(_centerline_sample(controls[0], edge_id, 0.0, str(edge.get("start_point_id", ""))))
-		var edge_samples: Array = []
+		var edge_samples: Array = [_centerline_sample(controls[0], edge_id, 0.0, str(edge.get("start_point_id", "")))]
 		var edge_stats := {"maximum_flatness": 0.0, "error": ""}
 		_sample_cubic(controls, edge_id, 0.0, 1.0, 0, edge_samples, edge_stats)
 		if not str(edge_stats.get("error", "")).is_empty():
 			errors.append(str(edge_stats["error"]))
 			continue
 		maximum_flatness = maxf(maximum_flatness, float(edge_stats["maximum_flatness"]))
-		samples.append_array(edge_samples)
-	if not samples.is_empty() and Vector2(samples.front().get("position", Vector2.ZERO)).is_equal_approx(Vector2(samples.back().get("position", Vector2.ZERO))):
-		samples.pop_back()
-	if samples.size() < 3:
-		errors.append("Contour stroke sampling produced fewer than three distinct centerline samples.")
+		sampled_edges.append({"edge_id": edge_id, "visible": true, "samples": edge_samples})
+	var runs: Array = []
+	if errors.is_empty():
+		runs = _build_outline_runs(sampled_edges, str(chain.get("id", "")))
 	return {
 		"valid": errors.is_empty(),
 		"errors": errors,
-		"samples": samples,
+		"runs": runs,
 		"certified_max_deviation_tool_units": maximum_flatness
 	}
+
+
+static func _build_outline_runs(sampled_edges: Array, chain_id: String) -> Array:
+	var runs: Array = []
+	var visible_count := 0
+	for sampled_edge in sampled_edges:
+		if bool(sampled_edge.get("visible", false)):
+			visible_count += 1
+	if visible_count == 0:
+		return runs
+	if visible_count == sampled_edges.size():
+		var closed_samples: Array = []
+		var closed_edge_ids: Array[String] = []
+		for sampled_edge in sampled_edges:
+			closed_edge_ids.append(str(sampled_edge.get("edge_id", "")))
+			_append_edge_samples(closed_samples, sampled_edge.get("samples", []))
+		if closed_samples.size() > 1 and Vector2(closed_samples.front().get("position", Vector2.ZERO)).is_equal_approx(Vector2(closed_samples.back().get("position", Vector2.ZERO))):
+			closed_samples.pop_back()
+		runs.append({"run_id": "%s:run:0" % chain_id, "closed": true, "edge_ids": closed_edge_ids, "samples": closed_samples})
+		return runs
+	var first_hidden_index := 0
+	while first_hidden_index < sampled_edges.size() and bool(sampled_edges[first_hidden_index].get("visible", false)):
+		first_hidden_index += 1
+	var current_samples: Array = []
+	var current_edge_ids: Array[String] = []
+	for offset in range(1, sampled_edges.size() + 1):
+		var edge_index := (first_hidden_index + offset) % sampled_edges.size()
+		var sampled_edge: Dictionary = sampled_edges[edge_index]
+		if bool(sampled_edge.get("visible", false)):
+			current_edge_ids.append(str(sampled_edge.get("edge_id", "")))
+			_append_edge_samples(current_samples, sampled_edge.get("samples", []))
+		elif not current_edge_ids.is_empty():
+			runs.append({"run_id": "%s:run:%d" % [chain_id, runs.size()], "closed": false, "edge_ids": current_edge_ids, "samples": current_samples})
+			current_samples = []
+			current_edge_ids = []
+	if not current_edge_ids.is_empty():
+		runs.append({"run_id": "%s:run:%d" % [chain_id, runs.size()], "closed": false, "edge_ids": current_edge_ids, "samples": current_samples})
+	return runs
+
+
+static func _append_edge_samples(target: Array, edge_samples: Array) -> void:
+	for sample_index in range(edge_samples.size()):
+		if not target.is_empty() and sample_index == 0 and Vector2(target.back().get("position", Vector2.ZERO)).is_equal_approx(Vector2(edge_samples[sample_index].get("position", Vector2.ZERO))):
+			continue
+		target.append(edge_samples[sample_index])
 
 
 static func _sample_cubic(controls: Array[Vector2], edge_id: String, t_start: float, t_end: float, depth: int, output: Array, stats: Dictionary) -> void:
@@ -153,16 +235,19 @@ static func _centerline_sample(position: Vector2, edge_id: String, curve_t: floa
 	}
 
 
-static func _build_closed_mesh(centerline: Array, half_width: float) -> Dictionary:
+static func _build_stroke_mesh(centerline: Array, half_width: float, closed: bool) -> Dictionary:
 	var vertices: Array = []
 	var indices := PackedInt32Array()
-	var segment_count := centerline.size()
+	var minimum_samples := 3 if closed else 2
+	if centerline.size() < minimum_samples:
+		return {"valid": false, "errors": ["Contour stroke run contains too few centerline samples."]}
+	var segment_count := centerline.size() if closed else centerline.size() - 1
 	var directions: Array[Vector2] = []
 	var normals: Array[Vector2] = []
 	var errors: Array[String] = []
 	for sample_index in range(segment_count):
 		var start := Vector2(centerline[sample_index].get("position", Vector2.ZERO))
-		var end := Vector2(centerline[(sample_index + 1) % segment_count].get("position", Vector2.ZERO))
+		var end := Vector2(centerline[(sample_index + 1) % centerline.size()].get("position", Vector2.ZERO))
 		var delta := end - start
 		if delta.length_squared() <= GEOMETRY_EPSILON * GEOMETRY_EPSILON:
 			errors.append("Contour stroke sampling produced a degenerate segment.")
@@ -174,7 +259,7 @@ static func _build_closed_mesh(centerline: Array, half_width: float) -> Dictiona
 		return {"valid": false, "errors": errors}
 	for segment_index in range(segment_count):
 		var start_sample: Dictionary = centerline[segment_index]
-		var end_sample: Dictionary = centerline[(segment_index + 1) % segment_count]
+		var end_sample: Dictionary = centerline[(segment_index + 1) % centerline.size()]
 		var start := Vector2(start_sample.get("position", Vector2.ZERO))
 		var end := Vector2(end_sample.get("position", Vector2.ZERO))
 		var normal := normals[segment_index]
@@ -187,7 +272,9 @@ static func _build_closed_mesh(centerline: Array, half_width: float) -> Dictiona
 		_append_triangle(vertices, indices, base + 2, base + 1, base + 3)
 	var miter_join_count := 0
 	var bevel_join_count := 0
-	for join_index in range(segment_count):
+	var join_start := 0 if closed else 1
+	var join_end := centerline.size() if closed else centerline.size() - 1
+	for join_index in range(join_start, join_end):
 		var previous_index := posmod(join_index - 1, segment_count)
 		var previous_direction := directions[previous_index]
 		var next_direction := directions[join_index]
@@ -265,6 +352,10 @@ static func _failed_result(errors: Array, stroke_width_px: float) -> Dictionary:
 		"reference_pixels_per_meter": REFERENCE_PIXELS_PER_METER,
 		"stroke_width_px": stroke_width_px,
 		"stroke_width_meters": stroke_width_meters(stroke_width_px) if is_finite(stroke_width_px) else 0.0,
+		"has_outline": false,
+		"outline_run_count": 0,
+		"runs": [],
+		"centerline": [],
 		"vertices": [],
 		"indices": PackedInt32Array()
 	}

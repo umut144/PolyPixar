@@ -376,7 +376,34 @@ func _test_contour_stroke_service() -> void:
 	var hidden_outline := component.duplicate(true)
 	hidden_outline["edges"][0]["render_outline"] = false
 	var hidden_result := ContourStrokeService.generate(hidden_outline)
-	_expect(not bool(hidden_result.get("valid", true)) and "Contour Stroke Slice 1 does not yet support disabled Render Outline edges." in hidden_result.get("errors", []), "Slice 1 must reject disabled outline runs explicitly instead of silently stroking them.")
+	_expect(bool(hidden_result.get("valid", false)) and int(hidden_result.get("outline_run_count", 0)) == 1, "One disabled Edge in a closed Boundary should split the remaining visible Edges into one open outline run.")
+	var hidden_run: Dictionary = hidden_result.get("runs", [])[0]
+	_expect(not bool(hidden_run.get("closed", true)) and str(hidden_run.get("start_cap", "")) == "butt" and str(hidden_run.get("end_cap", "")) == "butt", "A Render Outline interruption should terminate both ends at explicit butt caps.")
+	_expect(hidden_run.get("edge_ids", []) == ["edge_right_brim", "edge_brim", "edge_left_brim", "edge_left_tip"], "A wrapped visible run should retain deterministic canonical Edge ordering after its hidden Edge.")
+	var hidden_centerline: Array = hidden_run.get("centerline", [])
+	_expect(Vector2(hidden_centerline.front().get("position", Vector2.ZERO)).is_equal_approx(Vector2(component["points"][1].get("position", Vector2.ZERO))) and Vector2(hidden_centerline.back().get("position", Vector2.ZERO)).is_equal_approx(Vector2(component["points"][0].get("position", Vector2.ZERO))), "Butt cap centerlines must stop exactly at the original authored Edge endpoints.")
+	var split_outline := component.duplicate(true)
+	for split_edge_index in range(split_outline["edges"].size()):
+		split_outline["edges"][split_edge_index]["render_outline"] = split_edge_index in [0, 2]
+	var split_result := ContourStrokeService.generate(split_outline)
+	_expect(bool(split_result.get("valid", false)) and int(split_result.get("outline_run_count", 0)) == 2 and not bool(split_result.get("runs", [])[0].get("closed", true)) and not bool(split_result.get("runs", [])[1].get("closed", true)), "Separated visible Edges should produce two independent open Contour Stroke runs without bridging hidden Boundaries.")
+	var single_outline := component.duplicate(true)
+	for single_edge in single_outline["edges"]:
+		single_edge["render_outline"] = str(single_edge.get("id", "")) == "edge_brim"
+	var single_result := ContourStrokeService.generate(single_outline)
+	var single_run: Dictionary = single_result.get("runs", [])[0]
+	_expect(bool(single_result.get("valid", false)) and int(single_result.get("outline_run_count", 0)) == 1 and int(single_run.get("triangle_count", 0)) == 2 and int(single_run.get("miter_join_count", -1)) == 0 and int(single_run.get("bevel_join_count", -1)) == 0, "One visible straight Edge should produce exactly one centered quad and no joins across its hidden neighbours.")
+	var no_outline := component.duplicate(true)
+	for hidden_edge in no_outline["edges"]:
+		hidden_edge["render_outline"] = false
+	var no_outline_result := ContourStrokeService.generate(no_outline)
+	_expect(bool(no_outline_result.get("valid", false)) and not bool(no_outline_result.get("has_outline", true)) and no_outline_result.get("vertices", []).is_empty() and no_outline_result.get("indices", PackedInt32Array()).is_empty(), "A fully disabled Render Outline must be a valid permanent no-outline result with no derived geometry.")
+	var hole_component := component.duplicate(true)
+	hole_component["topology_role"] = "hole"
+	hole_component["chains"][0]["topology_role"] = "hole"
+	var hole_result := ContourStrokeService.generate(hole_component)
+	_expect(bool(hole_result.get("valid", false)) and str(hole_result.get("topology_role", "")) == "hole" and bool(hole_result.get("runs", [])[0].get("closed", false)), "A closed Hole Boundary should generate its own centered closed Contour Stroke with explicit Hole semantics.")
+	_expect(hole_result.get("vertices", []).size() == stroke.get("vertices", []).size() and hole_result.get("indices", PackedInt32Array()).size() == stroke.get("indices", PackedInt32Array()).size(), "Outer and Hole roles should not change the centered geometric stroke construction.")
 	var sharp_component := _component()
 	for sharp_position in [Vector2.ZERO, Vector2(10.0, 0.0), Vector2(0.01, 0.01), Vector2(0.0, 10.0)]:
 		BezierTopology.add_point(sharp_component, sharp_position, "linear")
