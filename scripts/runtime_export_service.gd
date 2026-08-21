@@ -48,6 +48,12 @@ static func build_manifest(asset: Dictionary, sources: Dictionary) -> Dictionary
 		var parent_id := str(component.get("parent_component_id", ""))
 		if not parent_id.is_empty() and not ids.has(parent_id):
 			errors.append("%s: parent '%s' is not part of the visible export set." % [_component_label(component), parent_id])
+		var authored_transform = component.get("transform", {})
+		var authored_scale := Vector2.ONE
+		if authored_transform is Dictionary:
+			authored_scale = Vector2(authored_transform.get("scale", Vector2.ONE))
+		if not authored_scale.is_finite() or not authored_scale.is_equal_approx(Vector2.ONE):
+			errors.append("%s: Component Scale must be rebased to (1, 1) before Runtime Export." % _component_label(component))
 	errors.append_array(_hierarchy_errors(visible_components))
 	var export_transforms := _canonical_export_transforms(asset, visible_components)
 	var manifest_components: Array = []

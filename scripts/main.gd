@@ -8,7 +8,7 @@ const EXPORT_SUBMODULES: Array[String] = []
 const MOTION_SUBMODULES := ["Animation", "Path", "Act", "Sequence"]
 const WORLDS_ROOT := "res://worlds"
 const CONFIG_PATH := "res://configs/app_config.json"
-const SCHEMA_VERSION := 41
+const SCHEMA_VERSION := 42
 const MAX_HISTORY_SIZE := 100
 const DRAW_MODES := ["closed_loop", "contour", "primitive"]
 const GRID_BOX_TOOL_UNITS := 0.5
@@ -130,6 +130,7 @@ var selected_edge_ids: Array[String] = []
 var selected_point_id := ""
 var selected_point_ids: Array[String] = []
 var asset_pivot_fields: Dictionary = {}
+var asset_scale_rebase_button: Button
 var bezier_point_move_start_positions: Dictionary = {}
 var bezier_point_move_component_id := ""
 var bezier_point_move_guide_id := ""
@@ -3004,23 +3005,33 @@ func _deserialize_vector(value, fallback: Vector2) -> Vector2:
 
 
 func _serialize_primitive(raw_primitive) -> Dictionary:
-	if not raw_primitive is Dictionary or str(raw_primitive.get("type", "")) != "circle":
+	if not raw_primitive is Dictionary:
 		return {}
-	return {
-		"type": "circle",
-		"diameter_cm": maxf(float(raw_primitive.get("diameter_cm", 1.0)), 0.001),
-		"center": _serialize_vector(PrimitiveGeometryService.center({"draw_mode": "primitive", "primitive": raw_primitive}))
-	}
+	var primitive_type := str(raw_primitive.get("type", ""))
+	var result := {"type": primitive_type, "center": _serialize_vector(PrimitiveGeometryService.center({"draw_mode": "primitive", "primitive": raw_primitive}))}
+	if primitive_type == "circle":
+		result["diameter_cm"] = maxf(float(raw_primitive.get("diameter_cm", 1.0)), 0.001)
+		return result
+	if primitive_type == PrimitiveGeometryService.ELLIPSE:
+		result["diameter_x_cm"] = maxf(float(raw_primitive.get("diameter_x_cm", 1.0)), 0.001)
+		result["diameter_y_cm"] = maxf(float(raw_primitive.get("diameter_y_cm", 1.0)), 0.001)
+		return result
+	return {}
 
 
 func _deserialize_primitive(raw_primitive) -> Dictionary:
-	if not raw_primitive is Dictionary or str(raw_primitive.get("type", "")) != "circle":
+	if not raw_primitive is Dictionary:
 		return {}
-	return {
-		"type": "circle",
-		"diameter_cm": maxf(float(raw_primitive.get("diameter_cm", 1.0)), 0.001),
-		"center": _deserialize_vector(raw_primitive.get("center", [0.0, 0.0]), Vector2.ZERO)
-	}
+	var primitive_type := str(raw_primitive.get("type", ""))
+	var result := {"type": primitive_type, "center": _deserialize_vector(raw_primitive.get("center", [0.0, 0.0]), Vector2.ZERO)}
+	if primitive_type == "circle":
+		result["diameter_cm"] = maxf(float(raw_primitive.get("diameter_cm", 1.0)), 0.001)
+		return result
+	if primitive_type == PrimitiveGeometryService.ELLIPSE:
+		result["diameter_x_cm"] = maxf(float(raw_primitive.get("diameter_x_cm", 1.0)), 0.001)
+		result["diameter_y_cm"] = maxf(float(raw_primitive.get("diameter_y_cm", 1.0)), 0.001)
+		return result
+	return {}
 
 
 func _serialize_asset_guide(raw_guide: Dictionary) -> Dictionary:
@@ -8560,7 +8571,7 @@ func _duplicate_component_record(source: Dictionary, _asset: Dictionary, forced_
 
 func _component_visual_center_in_parent_space(component: Dictionary) -> Vector2:
 	var points: Array = component.get("points", [])
-	if points.is_empty() and PrimitiveGeometryService.has_circle(component):
+	if points.is_empty() and PrimitiveGeometryService.has_analytic_shape(component):
 		var primitive_contour := PrimitiveGeometryService.contour(component)
 		if not primitive_contour.is_empty():
 			var primitive_minimum := Vector2(INF, INF)
@@ -9587,7 +9598,7 @@ func _geometry_sampling_hole_components(asset: Dictionary, component_id: String)
 			var hole_id := "%s:%s" % [str(reference.get("id", "")), str(source_component.get("id", ""))]
 			var source_world := ComponentHierarchy.world_transform(source_asset, str(source_component.get("id", "")))
 			var transform := parent_inverse * reference_world * source_world
-			if PrimitiveGeometryService.has_circle(source_component):
+			if PrimitiveGeometryService.has_analytic_shape(source_component):
 				var primitive_hole: Dictionary = source_component.duplicate(true)
 				primitive_hole["id"] = hole_id
 				primitive_hole["sampling_input_id"] = str(reference.get("id", hole_id))
@@ -10731,6 +10742,7 @@ func _render_inspector() -> void:
 	_clear(inspector_content)
 	transform_fields.clear()
 	asset_pivot_fields.clear()
+	asset_scale_rebase_button = null
 	if active_module == "Export":
 		return
 	if active_module == "Motion":
@@ -10783,6 +10795,7 @@ func _render_inspector() -> void:
 		_add_asset_pivot_field(asset_transform_grid, "Pivot X (cm)", _editor_units_to_world(asset_pivot.x), "pivot_x")
 		_add_asset_pivot_field(asset_transform_grid, "Pivot Y (cm)", _editor_units_to_world(asset_pivot.y), "pivot_y")
 		inspector_content.add_child(asset_transform_grid)
+		_render_asset_scale_rebase_inspector(asset)
 		var reference_image := _normalize_reference_image(asset.get("reference_image", {}))
 		inspector_content.add_child(_create_inspector_section("Reference Image"))
 		var reference_buttons := HBoxContainer.new()
@@ -10986,17 +10999,22 @@ func _render_inspector() -> void:
 		topology_role_option.item_selected.connect(_on_component_topology_role_selected.bind(topology_role_option))
 		inspector_content.add_child(topology_role_option)
 	var primitive = component.get("primitive", {})
-	if primitive is Dictionary and str(primitive.get("type", "")) == "circle":
+	if primitive is Dictionary and str(primitive.get("type", "")) in ["circle", PrimitiveGeometryService.ELLIPSE]:
 		inspector_content.add_child(_create_inspector_section("Geometry"))
-		inspector_content.add_child(_create_inspector_field_label("Type: Circle"))
-		inspector_content.add_child(_create_inspector_field_label("Diameter (cm)"))
-		var diameter_field := SpinBox.new()
-		diameter_field.min_value = 0.1
-		diameter_field.max_value = 100000.0
-		diameter_field.step = 0.1
-		diameter_field.value = float(primitive.get("diameter_cm", 1.0))
-		diameter_field.value_changed.connect(_on_circle_primitive_diameter_changed)
-		inspector_content.add_child(diameter_field)
+		var primitive_type := str(primitive.get("type", ""))
+		inspector_content.add_child(_create_inspector_field_label("Type: %s" % primitive_type.capitalize()))
+		if primitive_type == "circle":
+			inspector_content.add_child(_create_inspector_field_label("Diameter (cm)"))
+			var diameter_field := SpinBox.new()
+			diameter_field.min_value = 0.1
+			diameter_field.max_value = 100000.0
+			diameter_field.step = 0.1
+			diameter_field.value = float(primitive.get("diameter_cm", 1.0))
+			diameter_field.value_changed.connect(_on_circle_primitive_diameter_changed)
+			inspector_content.add_child(diameter_field)
+		else:
+			_add_ellipse_diameter_field("Diameter X (cm)", float(primitive.get("diameter_x_cm", 1.0)), "diameter_x_cm")
+			_add_ellipse_diameter_field("Diameter Y (cm)", float(primitive.get("diameter_y_cm", 1.0)), "diameter_y_cm")
 	var mode_issues := PrimitiveGeometryService.validation_issues(component) if draw_mode == "primitive" else BezierTopology.mode_validation_issues(component, true)
 	var configured_catch_parent_id := str(component.get("catch_parent_component_id", ""))
 	if not configured_catch_parent_id.is_empty() and (configured_catch_parent_id == selected_component_id or _get_component(asset, configured_catch_parent_id).is_empty()):
@@ -12798,6 +12816,90 @@ func _on_circle_primitive_diameter_changed(value: float) -> void:
 	_render_canvas_context()
 
 
+func _add_ellipse_diameter_field(label_text: String, value: float, property_name: String) -> void:
+	inspector_content.add_child(_create_inspector_field_label(label_text))
+	var field := SpinBox.new()
+	field.min_value = 0.1
+	field.max_value = 100000.0
+	field.step = 0.1
+	field.value = value
+	field.value_changed.connect(_on_ellipse_primitive_diameter_changed.bind(property_name))
+	inspector_content.add_child(field)
+
+
+func _on_ellipse_primitive_diameter_changed(value: float, property_name: String) -> void:
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if not PrimitiveGeometryService.has_ellipse(component) or property_name not in ["diameter_x_cm", "diameter_y_cm"]:
+		return
+	_record_direct_change()
+	component["primitive"][property_name] = maxf(value, 0.1)
+	_refresh_component_geometry(component)
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _render_asset_scale_rebase_inspector(asset: Dictionary) -> void:
+	inspector_content.add_child(_create_inspector_section("Scale Rebase"))
+	var analysis := ComponentScaleRebaseService.analyze_asset(asset)
+	var candidates: Array = analysis.get("candidates", [])
+	var blockers: Array = analysis.get("blockers", [])
+	if candidates.is_empty() and blockers.is_empty():
+		inspector_content.add_child(_create_inspector_field_label("All Component scales are normalized (1 × 1)."))
+	for candidate in candidates:
+		var scale := Vector2(candidate.get("scale", Vector2.ONE))
+		var suffix := " · Circle → Ellipse" if str(candidate.get("result_primitive_type", "")) == PrimitiveGeometryService.ELLIPSE else ""
+		inspector_content.add_child(_create_inspector_field_label("• %s · %s × %s → 1 × 1%s" % [
+			str(candidate.get("name", "Component")),
+			_format_scale_value(scale.x),
+			_format_scale_value(scale.y),
+			suffix
+		]))
+	for blocker in blockers:
+		var blocker_label := _create_inspector_field_label("• %s · Blocked: %s" % [str(blocker.get("name", "Component")), str(blocker.get("reason", "Scale cannot be rebased."))])
+		blocker_label.add_theme_color_override("font_color", Color("#ef8354"))
+		inspector_content.add_child(blocker_label)
+	asset_scale_rebase_button = Button.new()
+	asset_scale_rebase_button.text = "Rebase Component Scales (%d)" % candidates.size()
+	asset_scale_rebase_button.custom_minimum_size = Vector2(0, 28)
+	asset_scale_rebase_button.focus_mode = Control.FOCUS_NONE
+	asset_scale_rebase_button.disabled = not bool(analysis.get("can_rebase", false))
+	asset_scale_rebase_button.tooltip_text = "Bake positive Component Scale into owned geometry without changing Position or Rotation." if blockers.is_empty() else "Resolve every listed blocker before rebasing this Asset atomically."
+	asset_scale_rebase_button.pressed.connect(_on_rebase_asset_scales_pressed)
+	inspector_content.add_child(asset_scale_rebase_button)
+
+
+func _on_rebase_asset_scales_pressed() -> void:
+	var asset := _get_asset(selected_asset_id)
+	var analysis := ComponentScaleRebaseService.analyze_asset(asset)
+	if asset.is_empty() or not bool(analysis.get("can_rebase", false)):
+		return
+	_record_direct_change()
+	var result := ComponentScaleRebaseService.rebase_asset(asset)
+	if not bool(result.get("valid", false)):
+		_show_status_message(str(result.get("errors", ["Scale Rebase failed."])[0]))
+		return
+	geometry_sampling_preview = {}
+	geometry_sampling_preview_key = ""
+	geometry_sampling_preview_state = "idle"
+	geometry_sampling_preview_revision += 1
+	geometry_seeding_preview = {}
+	geometry_seeding_preview_key = ""
+	geometry_seeding_preview_state = "idle"
+	geometry_seeding_preview_revision += 1
+	geometry_meshing_preview = {}
+	geometry_meshing_preview_key = ""
+	geometry_meshing_preview_state = "idle"
+	geometry_meshing_preview_revision += 1
+	geometry_uv_mapping_preview = {}
+	geometry_uv_mapping_preview_key = ""
+	weighting_preview = {}
+	weighting_preview_key = ""
+	_show_status_message("Rebased %d Component scale(s) in %s." % [result.get("rebased_component_ids", []).size(), str(asset.get("name", "Asset"))])
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
 func _on_asset_visibility_changed(visibility_enabled: bool, asset_id: String) -> void:
 	var asset := _get_asset(asset_id)
 	if asset.is_empty():
@@ -13471,7 +13573,7 @@ func _build_reference_shapes(asset: Dictionary, excluded_component_id := "", emp
 		if _is_reference_component(component):
 			shapes.append_array(_reference_asset_shapes(asset, component, emphasized_component_id))
 			continue
-		var primitive_component := PrimitiveGeometryService.has_circle(component)
+		var primitive_component := PrimitiveGeometryService.has_analytic_shape(component)
 		shapes.append({
 			"id": str(component["id"]),
 			"points": PrimitiveGeometryService.contour(component) if primitive_component else BezierTopology.outer_control_polygon(component),
@@ -13517,10 +13619,10 @@ func _reference_asset_shapes(target_asset: Dictionary, reference: Dictionary, em
 			continue
 		var points: Array[Vector2] = []
 		var source_transform := ComponentHierarchy.world_transform_record(source_asset, str(source_component.get("id", "")))
-		var contour := PrimitiveGeometryService.contour(source_component) if PrimitiveGeometryService.has_circle(source_component) else BezierTopology.outer_control_polygon(source_component)
+		var contour := PrimitiveGeometryService.contour(source_component) if PrimitiveGeometryService.has_analytic_shape(source_component) else BezierTopology.outer_control_polygon(source_component)
 		for point in contour:
 			points.append(_transform_point(_transform_point(Vector2(point), source_transform), reference_transform))
-		result.append({"id": str(reference.get("id", "")), "points": points, "closed": PrimitiveGeometryService.has_circle(source_component) or BezierTopology.outer_chain_closed(source_component), "transform": _default_component_transform(), "visibility": bool(target_asset.get("visibility", true)) and bool(reference.get("visibility", true)), "z_index": int(reference.get("z_index", 0)), "emphasized": str(reference.get("id", "")) == emphasized_component_id, "topology_role": str(reference.get("topology_role", "outer"))})
+		result.append({"id": str(reference.get("id", "")), "points": points, "closed": PrimitiveGeometryService.has_analytic_shape(source_component) or BezierTopology.outer_chain_closed(source_component), "transform": _default_component_transform(), "visibility": bool(target_asset.get("visibility", true)) and bool(reference.get("visibility", true)), "z_index": int(reference.get("z_index", 0)), "emphasized": str(reference.get("id", "")) == emphasized_component_id, "topology_role": str(reference.get("topology_role", "outer"))})
 	return result
 
 
@@ -13534,7 +13636,7 @@ func _component_guide_boundaries(component: Dictionary) -> Dictionary:
 	var holes: Array = []
 	if component.is_empty():
 		return {"outer": outer, "holes": holes}
-	if PrimitiveGeometryService.has_circle(component):
+	if PrimitiveGeometryService.has_analytic_shape(component):
 		return {"outer": PackedVector2Array(PrimitiveGeometryService.contour(component)), "holes": holes}
 	var resolved_component := component.duplicate(true)
 	BezierGeometry.resolve_auto_handles(resolved_component.get("points", []), resolved_component.get("chains", []))
@@ -13555,8 +13657,8 @@ func _component_guide_boundaries(component: Dictionary) -> Dictionary:
 func _refresh_component_geometry(component: Dictionary) -> void:
 	if component.is_empty() or not is_instance_valid(canvas_view):
 		return
-	var contour := PrimitiveGeometryService.contour(component) if PrimitiveGeometryService.has_circle(component) else BezierTopology.outer_control_polygon(component)
-	canvas_view.set_display_polygon(contour, PrimitiveGeometryService.has_circle(component) or BezierTopology.outer_chain_closed(component))
+	var contour := PrimitiveGeometryService.contour(component) if PrimitiveGeometryService.has_analytic_shape(component) else BezierTopology.outer_control_polygon(component)
+	canvas_view.set_display_polygon(contour, PrimitiveGeometryService.has_analytic_shape(component) or BezierTopology.outer_chain_closed(component))
 	canvas_view.set_bezier_geometry(component.get("points", []), component.get("edges", []), component.get("chains", []))
 
 
@@ -13577,7 +13679,7 @@ func _on_primitive_placed(center: Vector2, diameter_cm: float) -> void:
 
 func _on_primitive_center_changed(center: Vector2) -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	if not PrimitiveGeometryService.has_circle(component):
+	if not PrimitiveGeometryService.has_analytic_shape(component):
 		return
 	var primitive: Dictionary = component["primitive"]
 	if PrimitiveGeometryService.center(component).is_equal_approx(center):

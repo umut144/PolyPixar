@@ -4,7 +4,7 @@ extends RefCounted
 const ADAPTIVE := "adaptive"
 const EVEN_SPACING := "even_spacing"
 const VALID_METHODS := [ADAPTIVE]
-const ALGORITHM_VERSION := 2
+const ALGORITHM_VERSION := 3
 const DEFAULT_SPACING := 1.0
 const DEFAULT_FEATURE_DETAIL := 0.5
 const MIN_SPACING := 0.01
@@ -58,15 +58,15 @@ static func normalize_recipe(raw_recipe) -> Dictionary:
 static func generate(component: Dictionary, raw_recipe = {}, cut_guides: Array = [], hole_components: Array = []) -> Dictionary:
 	var recipe := normalize_recipe(raw_recipe)
 	var allow_open := bool(raw_recipe.get("allow_open", false)) if raw_recipe is Dictionary else false
-	if PrimitiveGeometryService.has_circle(component):
-		var sampled_circle := _sample_circle(component, recipe, "", "outer")
+	if PrimitiveGeometryService.has_analytic_shape(component):
+		var sampled_circle := _sample_analytic_primitive(component, recipe, "", "outer")
 		if not bool(sampled_circle.get("valid", false)):
 			return _failed_result(recipe, sampled_circle.get("errors", []), source_fingerprint(component, cut_guides, hole_components))
 		var samples: Array = sampled_circle.get("samples", [])
 		var primitive_result := {
 			"valid": true, "errors": [], "method": recipe["method"], "parameters": recipe["parameters"].duplicate(true),
 			"algorithm_version": ALGORITHM_VERSION,
-			"source_fingerprint": source_fingerprint(component, cut_guides, hole_components), "chains": [{"chain_id": "primitive:circle", "input_id": "", "topology_role": "outer", "closed": true, "effective_spacing": sampled_circle["effective_spacing"], "samples": samples}], "cuts": [],
+			"source_fingerprint": source_fingerprint(component, cut_guides, hole_components), "chains": [{"chain_id": "primitive:%s" % str(component.get("primitive", {}).get("type", "")), "input_id": "", "topology_role": "outer", "closed": true, "effective_spacing": sampled_circle["effective_spacing"], "samples": samples}], "cuts": [],
 			"sample_count": samples.size(), "preserve_count": 0
 		}
 		var primitive_holes := _sample_hole_components(hole_components, recipe)
@@ -151,14 +151,14 @@ static func generate(component: Dictionary, raw_recipe = {}, cut_guides: Array =
 
 static func validation_issues(component: Dictionary, cut_guides: Array = [], hole_components: Array = []) -> Array[String]:
 	var errors: Array[String] = []
-	if PrimitiveGeometryService.has_circle(component):
+	if PrimitiveGeometryService.has_analytic_shape(component):
 		errors.append_array(PrimitiveGeometryService.validation_issues(component))
 	else:
 		errors.append_array(_validation_issues(component, false))
 	for hole in hole_components:
 		if not hole is Dictionary:
 			continue
-		if PrimitiveGeometryService.has_circle(hole):
+		if PrimitiveGeometryService.has_analytic_shape(hole):
 			errors.append_array(PrimitiveGeometryService.validation_issues(hole))
 		else:
 			errors.append_array(_validation_issues(hole, false, false))
@@ -203,12 +203,16 @@ static func source_fingerprint(component: Dictionary, cut_guides: Array = [], ho
 	for hole in hole_components:
 		if hole is Dictionary:
 			parts.append("hole|%s|%s" % [str(hole.get("id", "")), source_fingerprint(hole)])
-	if PrimitiveGeometryService.has_circle(component):
+	if PrimitiveGeometryService.has_analytic_shape(component):
 		var primitive_center := PrimitiveGeometryService.center(component)
-		parts.append("primitive|circle|%.9f|%.9f|%.9f" % [
+		var primitive_diameters_tool_units := PrimitiveGeometryService.diameters_tool_units(component)
+		var primitive_diameters := Vector2(ToolUnits.to_centimeters(primitive_diameters_tool_units.x), ToolUnits.to_centimeters(primitive_diameters_tool_units.y))
+		parts.append("primitive|%s|%.9f|%.9f|%.9f|%.9f" % [
+			str(component.get("primitive", {}).get("type", "")),
 			primitive_center.x,
 			primitive_center.y,
-			float(component.get("primitive", {}).get("diameter_cm", 1.0))
+			primitive_diameters.x,
+			primitive_diameters.y
 		])
 	# Preserve the pre-schema-40 constant fingerprint slot so unrelated accepted
 	# closed meshes do not become stale. Component-local open widths no longer
@@ -233,14 +237,14 @@ static func _sample_hole_components(hole_components: Array, recipe: Dictionary) 
 		var working_hole: Dictionary = hole_component.duplicate(true)
 		var input_id := str(hole_component.get("sampling_input_id", hole_component.get("id", "")))
 		var hole_recipe := _recipe_for_input(recipe, input_id)
-		if PrimitiveGeometryService.has_circle(working_hole):
-			var sampled_circle := _sample_circle(working_hole, hole_recipe, input_id, "hole")
+		if PrimitiveGeometryService.has_analytic_shape(working_hole):
+			var sampled_circle := _sample_analytic_primitive(working_hole, hole_recipe, input_id, "hole")
 			if not bool(sampled_circle.get("valid", false)):
 				errors.append_array(sampled_circle.get("errors", []))
 				continue
 			var circle_samples: Array = sampled_circle.get("samples", [])
 			sample_count += circle_samples.size()
-			sampled_chains.append({"chain_id": "hole:%s:primitive:circle" % str(hole_component.get("id", "")), "input_id": input_id, "topology_role": "hole", "closed": true, "effective_spacing": sampled_circle["effective_spacing"], "samples": circle_samples})
+			sampled_chains.append({"chain_id": "hole:%s:primitive:%s" % [str(hole_component.get("id", "")), str(working_hole.get("primitive", {}).get("type", ""))], "input_id": input_id, "topology_role": "hole", "closed": true, "effective_spacing": sampled_circle["effective_spacing"], "samples": circle_samples})
 			continue
 		BezierGeometry.resolve_auto_handles(working_hole.get("points", []), working_hole.get("chains", []))
 		var hole_errors := _validation_issues(working_hole, false, false)
@@ -576,7 +580,7 @@ static func _sample_chain(component: Dictionary, chain_data: Dictionary, recipe:
 	return {"valid": true, "errors": [], "samples": samples}
 
 
-static func _sample_circle(component: Dictionary, recipe: Dictionary, input_id: String, role: String) -> Dictionary:
+static func _sample_analytic_primitive(component: Dictionary, recipe: Dictionary, input_id: String, role: String) -> Dictionary:
 	var spacing := float(recipe.get("parameters", {}).get("spacing", DEFAULT_SPACING))
 	var detail := float(recipe.get("parameters", {}).get("feature_detail", DEFAULT_FEATURE_DETAIL))
 	var density_factor := maxf(float(recipe.get("parameters", {}).get("density_factor", 1.0)), MIN_REFINEMENT_FACTOR)
@@ -584,23 +588,24 @@ static func _sample_circle(component: Dictionary, recipe: Dictionary, input_id: 
 	var turn_tolerance := deg_to_rad(clampf(lerpf(90.0, 15.0, detail) / density_factor, 0.5, 120.0))
 	var transform: Transform2D = component.get("sampling_transform", Transform2D.IDENTITY)
 	var center := PrimitiveGeometryService.center(component)
-	var radius := PrimitiveGeometryService.diameter_tool_units(component) * 0.5
-	var samples: Array = [{"position": transform * (center + Vector2.RIGHT * radius)}]
+	var radii := PrimitiveGeometryService.diameters_tool_units(component) * 0.5
+	var primitive_type := str(component.get("primitive", {}).get("type", ""))
+	var samples: Array = [{"position": transform * (center + Vector2.RIGHT * radii.x)}]
 	for quadrant in range(4):
 		var angle_start := TAU * float(quadrant) / 4.0
 		var angle_end := TAU * float(quadrant + 1) / 4.0
-		_append_adaptive_circle_segment(samples, transform, center, radius, angle_start, angle_end, spacing, flatness_tolerance, turn_tolerance, 0)
+		_append_adaptive_ellipse_segment(samples, transform, center, radii, angle_start, angle_end, spacing, flatness_tolerance, turn_tolerance, 0)
 		if samples.size() > MAX_SAMPLES_PER_CHAIN:
 			return {"valid": false, "errors": ["Sampling exceeded the safety limit of %d Points per Chain." % MAX_SAMPLES_PER_CHAIN]}
 	if samples.size() > 1:
 		samples.pop_back()
 	if samples.size() < 4:
-		return {"valid": false, "errors": ["A sampled Circle requires at least four boundary Points."]}
+		return {"valid": false, "errors": ["A sampled analytic Primitive requires at least four boundary Points."]}
 	for index in range(samples.size()):
 		samples[index] = {
-			"id": "sample:circle:%s:%d" % [input_id if not input_id.is_empty() else "outer", index],
+			"id": "sample:%s:%s:%d" % [primitive_type, input_id if not input_id.is_empty() else "outer", index],
 			"position": Vector2(samples[index].get("position", Vector2.ZERO)),
-			"edge_id": "primitive:circle",
+			"edge_id": "primitive:%s" % primitive_type,
 			"curve_t": float(index) / float(samples.size()),
 			"source_point_id": "",
 			"preserved": false
@@ -608,19 +613,19 @@ static func _sample_circle(component: Dictionary, recipe: Dictionary, input_id: 
 	return {"valid": true, "errors": [], "samples": samples, "role": role, "effective_spacing": spacing}
 
 
-static func _append_adaptive_circle_segment(result: Array, transform: Transform2D, center: Vector2, radius: float, angle_start: float, angle_end: float, spacing: float, flatness_tolerance: float, turn_tolerance: float, depth: int) -> void:
-	var start := transform * (center + Vector2(cos(angle_start), sin(angle_start)) * radius)
-	var end := transform * (center + Vector2(cos(angle_end), sin(angle_end)) * radius)
+static func _append_adaptive_ellipse_segment(result: Array, transform: Transform2D, center: Vector2, radii: Vector2, angle_start: float, angle_end: float, spacing: float, flatness_tolerance: float, turn_tolerance: float, depth: int) -> void:
+	var start := transform * (center + Vector2(cos(angle_start) * radii.x, sin(angle_start) * radii.y))
+	var end := transform * (center + Vector2(cos(angle_end) * radii.x, sin(angle_end) * radii.y))
 	var angle_mid := (angle_start + angle_end) * 0.5
-	var midpoint := transform * (center + Vector2(cos(angle_mid), sin(angle_mid)) * radius)
-	var tangent_start := transform.basis_xform(Vector2(-sin(angle_start), cos(angle_start))).normalized()
-	var tangent_end := transform.basis_xform(Vector2(-sin(angle_end), cos(angle_end))).normalized()
+	var midpoint := transform * (center + Vector2(cos(angle_mid) * radii.x, sin(angle_mid) * radii.y))
+	var tangent_start := transform.basis_xform(Vector2(-sin(angle_start) * radii.x, cos(angle_start) * radii.y)).normalized()
+	var tangent_end := transform.basis_xform(Vector2(-sin(angle_end) * radii.x, cos(angle_end) * radii.y)).normalized()
 	var should_split := start.distance_to(end) > spacing \
 		or midpoint.distance_to((start + end) * 0.5) > flatness_tolerance \
 		or absf(tangent_start.angle_to(tangent_end)) > turn_tolerance
 	if should_split and depth < MAX_ADAPTIVE_DEPTH and result.size() < MAX_SAMPLES_PER_CHAIN:
-		_append_adaptive_circle_segment(result, transform, center, radius, angle_start, angle_mid, spacing, flatness_tolerance, turn_tolerance, depth + 1)
-		_append_adaptive_circle_segment(result, transform, center, radius, angle_mid, angle_end, spacing, flatness_tolerance, turn_tolerance, depth + 1)
+		_append_adaptive_ellipse_segment(result, transform, center, radii, angle_start, angle_mid, spacing, flatness_tolerance, turn_tolerance, depth + 1)
+		_append_adaptive_ellipse_segment(result, transform, center, radii, angle_mid, angle_end, spacing, flatness_tolerance, turn_tolerance, depth + 1)
 		return
 	result.append({"position": end})
 

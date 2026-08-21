@@ -86,11 +86,19 @@ stable IDs.
 ## Primitive geometry
 
 A `primitive` Component owns a typed `primitive` record rather than Bézier
-topology. The first supported form is `{ type: "circle", center, diameter_cm }`.
-Its render contour, mesh samples, hit-test polygon, and export polygon are all
-derived deterministically from those parameters. The Circle center handle moves
+topology. Authored Circles use `{ type: "circle", center, diameter_cm }`.
+An anisotropic Scale Rebase preserves them as
+`{ type: "ellipse", center, diameter_x_cm, diameter_y_cm }`. Render contours,
+mesh samples, hit-test polygons, and export polygons are derived
+deterministically from those parameters. The primitive center handle moves
 `center`; the Component pivot remains independent. Primitive Components cannot
 be edited with Bézier point, edge, or face tools.
+
+Scale Rebase is the sole normalization path for positive non-unit Component
+Scale. It affinely bakes Points, resolved handles, analytic primitive axes, and
+Component-scoped Guides around the unchanged Pivot, then sets Scale to
+`(1, 1)`. Position and Rotation never change. See
+[`SCALE_REBASE.md`](SCALE_REBASE.md).
 
 The current fill and Godot export derive a control polygon from the outer
 Chain. Production mesh sampling is intentionally separate and may later

@@ -40,8 +40,9 @@ Components have an explicit geometry source. Bézier Components are canonical
 only as `points`, `edges`, and `chains`; `BezierTopology` owns their structural
 changes and validation, and `BezierGeometry` owns cubic mathematics and handle
 resolution. Primitive Components instead own a typed `primitive` record and
-never store generated Bézier points, edges, chains, or samples. The currently
-supported primitive is `{ type: "circle", center, diameter_cm }`.
+never store generated Bézier points, edges, chains, or samples. Authored
+primitives are `{ type: "circle", center, diameter_cm }`; Scale Rebase may
+derive `{ type: "ellipse", center, diameter_x_cm, diameter_y_cm }`.
 
 `ComponentCanvas` receives immutable view copies, renders them, and emits user
 intent; it never mutates World geometry directly. Polygon arrays for fill,
@@ -52,7 +53,7 @@ pivot remains an independent transform handle.
 Components support `closed_loop`, `contour`, and `primitive` draw modes. Contours
 are fill-less and are the sole visible open-curve Component form; simulation
 and construction
-paths are modeled as Guides. Primitive sampling evaluates the analytic Circle at the selected Body's
+paths are modeled as Guides. Primitive sampling evaluates analytic Circles and Ellipses at the selected Body's
 adaptive target edge length and scale-aware Curve Detail, so it has no fixed or
 user-editable sample count. Guides remain independent topology records scoped to an Asset or Component. Derived
 Sampling, Seeding, Meshing, UV, and Weighting records are stored separately
@@ -62,6 +63,13 @@ World schema 41 owns one authored Contour stroke width for every Asset in its
 typed `world_settings` record. It defaults to `4 px` at the fixed `128 px/m`
 reference density, has no Component override, and invalidates derived Contour
 Meshes when changed. Schema 40 and older Worlds migrate explicitly to 4 px.
+
+World schema 42 adds the Asset Inspector's atomic Scale Rebase. Positive local
+Scale is baked around the unchanged Pivot into owned Points, resolved handles,
+Component Guides, or analytic primitive axes; local Scale becomes `(1, 1)` and
+Position/Rotation remain unchanged. Non-uniform Circles become analytic
+Ellipses. Negative Scale, scaled References, and scaled Components with Children
+are explicit blockers with no partial fallback.
 
 Seeding consumes the complete accepted Sampling constraint set. Outer bounds
 the valid interior, Holes exclude regions, and Cuts are two-sided barriers with

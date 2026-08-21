@@ -152,13 +152,8 @@ static func exact_signature_hash(signature: Dictionary) -> String:
 
 
 static func _outer_contour(component: Dictionary) -> PackedVector2Array:
-	if PrimitiveGeometryService.has_circle(component):
-		var center := PrimitiveGeometryService.center(component)
-		var radius := float(component.get("primitive", {}).get("diameter_cm", 1.0)) * 0.5
-		var contour := PackedVector2Array()
-		for index in range(64):
-			contour.append(center + Vector2.RIGHT.rotated(TAU * float(index) / 64.0) * radius)
-		return contour
+	if PrimitiveGeometryService.has_analytic_shape(component):
+		return PackedVector2Array(PrimitiveGeometryService.contour(component))
 	var working := component.duplicate(true)
 	BezierGeometry.resolve_auto_handles(working.get("points", []), working.get("chains", []))
 	for chain in working.get("chains", []):
@@ -184,10 +179,12 @@ static func _append_source_signature(prefix: String, source: Dictionary, topolog
 	for chain in working.get("chains", []):
 		if chain is Dictionary:
 			topology_parts.append("chain|%s|%s|%s|%s|%d|%s" % [prefix, str(chain.get("id", "")), ",".join(chain.get("point_ids", [])), ",".join(chain.get("edge_ids", [])), int(bool(chain.get("closed", false))), str(chain.get("topology_role", "outer"))])
-	if PrimitiveGeometryService.has_circle(working):
-		topology_parts.append("primitive|%s|circle" % prefix)
+	if PrimitiveGeometryService.has_analytic_shape(working):
+		topology_parts.append("primitive|%s|%s" % [prefix, str(working.get("primitive", {}).get("type", ""))])
 		_append_vector(vectors, PrimitiveGeometryService.center(working))
-		scalars.append(float(working.get("primitive", {}).get("diameter_cm", 1.0)))
+		var primitive_diameters := PrimitiveGeometryService.diameters_tool_units(working)
+		scalars.append(primitive_diameters.x)
+		scalars.append(primitive_diameters.y)
 	if str(working.get("draw_mode", "")) == "contour":
 		scalars.append(float(ContourStrokeService.DEFAULT_STROKE_WIDTH_PX))
 		scalars.append(float(ContourMeshService.ALGORITHM_VERSION))

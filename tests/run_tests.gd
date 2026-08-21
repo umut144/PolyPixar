@@ -16,6 +16,7 @@ func _init() -> void:
 	_test_contour_stroke_service()
 	_test_contour_stroke_robust_geometry()
 	_test_world_contour_settings()
+	_test_component_scale_rebase()
 	_test_geometry_sampling_service()
 	_test_geometry_auto_build_service()
 	_test_create_outliner_expansion_scope()
@@ -540,7 +541,7 @@ func _test_world_contour_settings() -> void:
 
 	var application = load("res://scripts/main.gd").new()
 	application._build_ui()
-	_expect(int(application.SCHEMA_VERSION) == 41 and application.world_scale_menu.text.begins_with("World Settings"), "Slice 5 should expose World Settings in the top toolbar and version its persisted World contract as schema 41.")
+	_expect(int(application.SCHEMA_VERSION) >= 41 and application.world_scale_menu.text.begins_with("World Settings"), "Slice 5 should expose World Settings in the top toolbar and retain its schema-41 persisted contract.")
 	_expect(is_equal_approx(float(application.world_contour_stroke_width_field.value), 4.0), "World Settings should show the 4 px default in its authored Contour width field.")
 	application.world_contour_stroke_width_px = 4.0
 	var four_px_signature: Dictionary = application._geometry_build_signature("", "", contour)
@@ -553,6 +554,114 @@ func _test_world_contour_settings() -> void:
 	_expect(is_equal_approx(application.world_contour_stroke_width_px, 6.0) and is_equal_approx(float(application._serialize_world_settings().get("contour_stroke_width_px", 0.0)), 6.0), "Editing World Settings should update the single persisted width shared by all Assets.")
 	application._restore_history_snapshot(history_snapshot)
 	_expect(is_equal_approx(application.world_contour_stroke_width_px, 4.0) and is_equal_approx(float(application.world_contour_stroke_width_field.value), 4.0), "The authored World Contour width should participate in Undo/Redo snapshots.")
+	application.free()
+
+
+func _test_component_scale_rebase() -> void:
+	var curved := _component()
+	curved.merge({"id": "scaled_body", "name": "Body", "draw_mode": "closed_loop", "type": "component", "parent_component_id": "", "transform": {"position": Vector2(3.0, -2.0), "rotation": 27.0, "scale": Vector2(2.0, 0.5), "pivot": Vector2(1.0, 1.0)}})
+	for position in [Vector2(0.0, 0.0), Vector2(4.0, -1.0), Vector2(6.0, 3.0), Vector2(1.0, 5.0)]:
+		BezierTopology.add_point(curved, position, "free")
+	BezierTopology.close_active_chain(curved)
+	var circle := {"id": "scaled_eye", "name": "Eye", "draw_mode": "primitive", "type": "component", "parent_component_id": "", "points": [], "edges": [], "chains": [], "primitive": {"type": "circle", "center": Vector2(2.0, 3.0), "diameter_cm": 10.0}, "transform": {"position": Vector2(-4.0, 5.0), "rotation": -15.0, "scale": Vector2(2.0, 0.5), "pivot": Vector2(1.0, 1.0)}}
+	var guide := _component()
+	guide.merge({"id": "guide_body", "name": "Body Guide", "type": "guide", "guide_type": AssetGuide.SAMPLER_SPINE, "scope": {"component_id": "scaled_body"}})
+	BezierTopology.add_point(guide, Vector2(0.5, 0.5), "free")
+	BezierTopology.add_point(guide, Vector2(3.0, 2.0), "free")
+	var animation := {"states": [{"id": "state_test", "motions": [{"id": "motion_scale", "parameters": {"strength": 0.75}}]}]}
+	var asset := {"id": "wizard_rebase", "name": "Wizard", "components": [curved, circle], "guides": [guide], "animation": animation.duplicate(true)}
+	var animation_before: Dictionary = asset["animation"].duplicate(true)
+	var curved_transform_before: Dictionary = curved["transform"].duplicate(true)
+	var curved_source := curved.duplicate(true)
+	BezierGeometry.resolve_auto_handles(curved_source.get("points", []), curved_source.get("chains", []))
+	var curved_edge: Dictionary = curved_source.get("edges", [])[0]
+	var curved_start := BezierTopology.point_by_id(curved_source["points"], str(curved_edge.get("start_point_id", "")))
+	var curved_end := BezierTopology.point_by_id(curved_source["points"], str(curved_edge.get("end_point_id", "")))
+	var curved_controls := BezierGeometry.cubic_controls(curved_start, curved_end)
+	var curved_world_before: Array[Vector2] = []
+	var curved_world_transform_before := ComponentHierarchy.world_transform(asset, "scaled_body")
+	for sample_index in range(17):
+		curved_world_before.append(curved_world_transform_before * BezierGeometry.cubic_position(curved_controls, float(sample_index) / 16.0))
+	var guide_world_before := curved_world_transform_before * Vector2(guide.get("points", [])[0].get("position", Vector2.ZERO))
+	var circle_world_before: Array[Vector2] = []
+	var circle_world_transform_before := ComponentHierarchy.world_transform(asset, "scaled_eye")
+	for point in PrimitiveGeometryService.contour(circle, 64):
+		circle_world_before.append(circle_world_transform_before * point)
+
+	var analysis := ComponentScaleRebaseService.analyze_asset(asset)
+	_expect(bool(analysis.get("can_rebase", false)) and analysis.get("candidates", []).size() == 2 and analysis.get("blockers", []).is_empty(), "An Asset with positive scaled leaf geometry should expose every affected Component as one atomic Rebase candidate set.")
+	var result := ComponentScaleRebaseService.rebase_asset(asset)
+	_expect(bool(result.get("valid", false)) and result.get("rebased_component_ids", []).size() == 2, "Scale Rebase should atomically normalize every eligible Component in the Asset.")
+	var rebased_curved := ComponentHierarchy.component_by_id(asset, "scaled_body")
+	var rebased_circle := ComponentHierarchy.component_by_id(asset, "scaled_eye")
+	_expect(Vector2(rebased_curved.get("transform", {}).get("scale", Vector2.ZERO)) == Vector2.ONE and Vector2(rebased_circle.get("transform", {}).get("scale", Vector2.ZERO)) == Vector2.ONE, "Successful Rebase must set both Component scale axes exactly to one.")
+	_expect(Vector2(rebased_curved.get("transform", {}).get("position", Vector2.ZERO)) == curved_transform_before["position"] and is_equal_approx(float(rebased_curved.get("transform", {}).get("rotation", 0.0)), float(curved_transform_before["rotation"])) and Vector2(rebased_curved.get("transform", {}).get("pivot", Vector2.ZERO)) == curved_transform_before["pivot"], "Rebase must not change Component Position, Rotation, or Pivot.")
+	var rebased_edge: Dictionary = rebased_curved.get("edges", [])[0]
+	var rebased_start := BezierTopology.point_by_id(rebased_curved["points"], str(rebased_edge.get("start_point_id", "")))
+	var rebased_end := BezierTopology.point_by_id(rebased_curved["points"], str(rebased_edge.get("end_point_id", "")))
+	var rebased_controls := BezierGeometry.cubic_controls(rebased_start, rebased_end)
+	var rebased_world_transform := ComponentHierarchy.world_transform(asset, "scaled_body")
+	var curve_preserved := true
+	for sample_index in range(17):
+		var after := rebased_world_transform * BezierGeometry.cubic_position(rebased_controls, float(sample_index) / 16.0)
+		curve_preserved = curve_preserved and after.distance_to(curved_world_before[sample_index]) <= 0.000001
+	_expect(curve_preserved and str(rebased_start.get("handle_source", "")) == "manual", "Anisotropic Rebase must preserve the complete authored Bézier curve by retaining its affinely transformed resolved handles.")
+	var rebased_guide: Dictionary = asset.get("guides", [])[0]
+	var guide_world_after := rebased_world_transform * Vector2(rebased_guide.get("points", [])[0].get("position", Vector2.ZERO))
+	_expect(guide_world_after.distance_to(guide_world_before) <= 0.000001 and str(rebased_guide.get("points", [])[0].get("handle_source", "")) == "manual", "Component-scoped Guides must retain their world-space curve when their target Component is rebased.")
+	_expect(PrimitiveGeometryService.has_ellipse(rebased_circle) and is_equal_approx(float(rebased_circle.get("primitive", {}).get("diameter_x_cm", 0.0)), 20.0) and is_equal_approx(float(rebased_circle.get("primitive", {}).get("diameter_y_cm", 0.0)), 5.0) and PrimitiveGeometryService.center(rebased_circle).is_equal_approx(Vector2(3.0, 2.0)), "A non-uniformly scaled Circle must rebase to an analytic Ellipse with scaled center and axis diameters.")
+	var circle_world_after: Array[Vector2] = []
+	var circle_world_transform_after := ComponentHierarchy.world_transform(asset, "scaled_eye")
+	for point in PrimitiveGeometryService.contour(rebased_circle, 64):
+		circle_world_after.append(circle_world_transform_after * point)
+	var ellipse_preserved := circle_world_after.size() == circle_world_before.size()
+	for point_index in range(circle_world_after.size()):
+		ellipse_preserved = ellipse_preserved and circle_world_after[point_index].distance_to(circle_world_before[point_index]) <= 0.000001
+	_expect(ellipse_preserved, "Circle-to-Ellipse Rebase must preserve the exact transformed analytic contour.")
+	var ellipse_sampling := GeometrySamplingService.generate(rebased_circle, {"parameters": {"spacing": 0.2, "feature_detail": 0.7}})
+	var ellipse_metrics := GeometryAutoBuildService.analyze(rebased_circle)
+	_expect(bool(ellipse_sampling.get("valid", false)) and str(ellipse_sampling.get("chains", [])[0].get("chain_id", "")) == "primitive:ellipse" and float(ellipse_metrics.get("area", 0.0)) > 0.0, "The sampling and automatic geometry analyzers must consume rebased Ellipses analytically.")
+	_expect(asset.get("animation", {}) == animation_before, "Scale Rebase must leave authored animation data unchanged so later simulation Scale remains relative to the normalized reference drawing.")
+
+	var blocked_parent := curved_source.duplicate(true)
+	blocked_parent["id"] = "parent"
+	blocked_parent["name"] = "Parent"
+	blocked_parent["transform"] = {"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2(2.0, 2.0), "pivot": Vector2.ZERO}
+	var child := curved_source.duplicate(true)
+	child["id"] = "child"
+	child["name"] = "Child"
+	child["parent_component_id"] = "parent"
+	child["transform"] = {"position": Vector2.ONE, "rotation": 15.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}
+	var negative := curved_source.duplicate(true)
+	negative["id"] = "negative"
+	negative["name"] = "Negative"
+	negative["parent_component_id"] = ""
+	negative["transform"] = {"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2(-1.0, 1.0), "pivot": Vector2.ZERO}
+	var scaled_reference := {"id": "reference", "name": "Reference", "type": "reference", "source_asset_id": "other", "parent_component_id": "", "draw_mode": "closed_loop", "points": [], "edges": [], "chains": [], "transform": {"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2(2.0, 1.0), "pivot": Vector2.ZERO}}
+	var blocked_asset := {"id": "blocked", "name": "Blocked", "components": [blocked_parent, child, negative, scaled_reference], "guides": []}
+	var blocked_snapshot := blocked_asset.duplicate(true)
+	var blocked_analysis := ComponentScaleRebaseService.analyze_asset(blocked_asset)
+	_expect(not bool(blocked_analysis.get("can_rebase", true)) and blocked_analysis.get("blockers", []).size() == 3, "Negative Scale, scaled References, and a scaled Parent with Children must be explicit atomic Rebase blockers.")
+	_expect(not bool(ComponentScaleRebaseService.rebase_asset(blocked_asset).get("valid", true)) and blocked_asset == blocked_snapshot, "A blocked Asset Rebase must not partially mutate any Component.")
+
+	var ui_asset := {"id": "ui_rebase", "name": "UI Rebase", "asset_type": "character", "visibility": true, "asset_pivot": Vector2.ZERO, "components": [curved_source.duplicate(true)], "guides": [], "animation": MotionWorkspace.create_default_animation_document()}
+	ui_asset["components"][0]["id"] = "ui_component"
+	ui_asset["components"][0]["name"] = "UI Component"
+	ui_asset["components"][0]["parent_component_id"] = ""
+	ui_asset["components"][0]["transform"] = {"position": Vector2.ZERO, "rotation": 5.0, "scale": Vector2(1.5, 0.75), "pivot": Vector2.ZERO}
+	var application = load("res://scripts/main.gd").new()
+	application._build_ui()
+	var serialized_ellipse: Dictionary = application._serialize_primitive(rebased_circle.get("primitive", {}))
+	var restored_ellipse: Dictionary = application._deserialize_primitive(serialized_ellipse)
+	_expect(serialized_ellipse.get("center", null) is Array and str(restored_ellipse.get("type", "")) == PrimitiveGeometryService.ELLIPSE and is_equal_approx(float(restored_ellipse.get("diameter_x_cm", 0.0)), 20.0), "Schema-42 persistence must round-trip analytic Ellipse parameters without storing a polygon approximation.")
+	var ui_assets: Array[Dictionary] = [ui_asset]
+	application.assets = ui_assets
+	application.selected_asset_id = "ui_rebase"
+	application.selected_component_id = ""
+	application._render_inspector()
+	_expect(is_instance_valid(application.asset_scale_rebase_button) and not application.asset_scale_rebase_button.disabled and application.asset_scale_rebase_button.text.contains("(1)"), "The Asset Inspector should enable Rebase only when its compact candidate list is non-empty and unblocked.")
+	application._on_rebase_asset_scales_pressed()
+	_expect(Vector2(application._get_component(application._get_asset("ui_rebase"), "ui_component").get("transform", {}).get("scale", Vector2.ZERO)) == Vector2.ONE and application.asset_scale_rebase_button.disabled, "The Asset Inspector Rebase action should normalize the candidate and disable itself once no work remains.")
 	application.free()
 
 
@@ -658,9 +767,9 @@ func _test_geometry_sampling_service() -> void:
 	_expect(not bool(GeometrySamplingService.generate(open_component).get("valid", true)), "An open contour should fail visibly at the mesh-pipeline Sampling boundary.")
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
-	_expect(application._has_supported_schema({"schema_version": 41}) and application._has_supported_schema({"schema_version": 40}) and not application._has_supported_schema({"schema_version": 42}), "Schema 41 should keep current and older World documents readable and reject unknown future schemas.")
-	_expect(application._normalize_component_draw_mode("ribbon", 39) == "contour" and application._normalize_component_draw_mode("contour", 41) == "contour", "Schema-41 loading must retain the explicit legacy Ribbon-to-Contour migration boundary.")
-	_expect(application._normalize_component_draw_mode("ribbon", 41) == "ribbon", "Current-schema Ribbon data must remain visibly invalid instead of receiving a silent backward fallback.")
+	_expect(application._has_supported_schema({"schema_version": 42}) and application._has_supported_schema({"schema_version": 41}) and not application._has_supported_schema({"schema_version": 43}), "Schema 42 should keep current and older World documents readable and reject unknown future schemas.")
+	_expect(application._normalize_component_draw_mode("ribbon", 39) == "contour" and application._normalize_component_draw_mode("contour", 42) == "contour", "Schema-42 loading must retain the explicit legacy Ribbon-to-Contour migration boundary.")
+	_expect(application._normalize_component_draw_mode("ribbon", 42) == "ribbon", "Current-schema Ribbon data must remain visibly invalid instead of receiving a silent backward fallback.")
 	var arranged_round_trip: Dictionary = application._normalize_sampling_bake(application._serialize_sampling_bake(arranged_result))
 	_expect(arranged_round_trip.get("cuts", [])[0].get("fragments", []).size() == 2 and arranged_round_trip.get("cuts", [])[0].get("fragments", [])[0].get("samples", [])[0].get("position", null) is Vector2, "Schema 32 should preserve Cut fragment connectivity and restore fragment positions as Vector2 values.")
 	var geometry_document: Dictionary = application._default_geometry_document("asset_1", "component_1")
@@ -669,7 +778,7 @@ func _test_geometry_sampling_service() -> void:
 	baked_result["bake_id"] = "bake_test"
 	geometry_document["sampling"]["bakes"][GeometrySamplingService.ADAPTIVE] = baked_result
 	var serialized_geometry: Dictionary = application._serialize_geometry_document(geometry_document)
-	_expect(int(serialized_geometry.get("schema_version", 0)) == 41 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-41 JSON arrays.")
+	_expect(int(serialized_geometry.get("schema_version", 0)) == 42 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-42 JSON arrays.")
 	var normalized_geometry: Dictionary = application._normalize_geometry_document(serialized_geometry, "asset_1", "component_1")
 	_expect(normalized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Vector2, "Sampling bake loading should restore local sample positions as Vector2 values.")
 	_expect(normalized_geometry["sampling"]["bakes"].size() == 1, "Sampling should retain one Adaptive Bake.")
@@ -1497,7 +1606,7 @@ func _test_runtime_export_service() -> void:
 		{"vertex_id": "v1", "uv": Vector2(0.8, 0.2)}
 	]}
 	var sdf := {"valid": true, "resolution": [256, 256], "spread_px": 64.0, "boundary_value": 0.5, "inside_is_greater": true, "pixel_hash": "stable_pixels"}
-	var body := {"id": "component_b", "name": "body", "semantic_key": "body", "visibility": true, "z_index": 2, "parent_component_id": "", "transform": {"position": Vector2(10.0, 20.0), "pivot": Vector2(2.0, 3.0), "rotation": 90.0, "scale": Vector2(2.0, 1.0)}}
+	var body := {"id": "component_b", "name": "body", "semantic_key": "body", "visibility": true, "z_index": 2, "parent_component_id": "", "transform": {"position": Vector2(10.0, 20.0), "pivot": Vector2(2.0, 3.0), "rotation": 90.0, "scale": Vector2.ONE}}
 	var eye := {"id": "component_a", "name": "eye_left", "semantic_key": "eye_left", "visibility": true, "z_index": 2, "parent_component_id": "component_b", "transform": {"position": Vector2.ZERO, "pivot": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE}}
 	var asset := {"id": "wizard", "name": "Wizard", "asset_type": "character", "visibility": true, "asset_pivot": Vector2(5.0, 6.0), "components": [body, eye]}
 	var source := {"mesh": mesh, "uv": uv, "sdf": sdf, "sdf_resource_valid": true, "sdf_source_path": "/tmp/contour_sdf.png"}
@@ -1512,6 +1621,10 @@ func _test_runtime_export_service() -> void:
 	_expect(components[1].get("contour_carrier", {}).get("role", "") == "contour_sdf_carrier" and components[1].get("contour_carrier", {}).get("indices", []) == [0, 1, 2, 0, 2, 3] and is_equal_approx(float(components[1].get("contour_mask", {}).get("outer_padding_meters", {}).get("left", 0.0)), 1.0 / 3.0), "Schema 3 should provide an independently drawable padded Contour Carrier with explicit metric outside padding.")
 	_expect(components[1].get("local_transform", {}).get("position", []) == [1.0, 2.0] and is_equal_approx(float(components[1].get("local_transform", {}).get("rotation_radians", 0.0)), PI / 2.0), "Runtime transforms should preserve Y-up coordinates and publish positions in meters and CCW radians.")
 	_expect(not components[1].has("display_name") and str(components[1].get("semantic_key", "")) == "body", "Runtime Components should expose their Semantic Key as the sole authored designation without a redundant display label.")
+	var scaled_export_asset: Dictionary = asset.duplicate(true)
+	scaled_export_asset["components"][0]["transform"]["scale"] = Vector2(2.0, 1.0)
+	var scaled_export_result := RuntimeExportService.build_manifest(scaled_export_asset, {"component_a": source, "component_b": source})
+	_expect(not bool(scaled_export_result.get("valid", true)) and str(scaled_export_result.get("errors", [])).contains("Component Scale must be rebased to (1, 1) before Runtime Export."), "Runtime export must explicitly reject non-rebased authored Component Scale without a fallback.")
 	var open_contour_component: Dictionary = body.duplicate(true)
 	open_contour_component["draw_mode"] = "contour"
 	var open_contour_asset := {"id": "contour_asset", "name": "Contour Asset", "asset_type": "character", "visibility": true, "asset_pivot": Vector2.ZERO, "components": [open_contour_component]}
@@ -2124,7 +2237,7 @@ func _test_motion_act_evaluator() -> void:
 	var normalized: Dictionary = application._normalize_motion_act({"id": "act_7", "parameters": {"direction": [0.0, 2.0], "distance": 12.0}}, "fallback")
 	_expect(Vector2(normalized.get("parameters", {}).get("direction", Vector2.ZERO)) == Vector2(0.0, 2.0), "Persisted Slide direction arrays should normalize back to Vector2 values.")
 	var serialized: Dictionary = application._serialize_motion_act(normalized)
-	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 41, "Act persistence should serialize vectors as JSON arrays using schema 41.")
+	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 42, "Act persistence should serialize vectors as JSON arrays using schema 42.")
 	var normalized_jump: Dictionary = application._normalize_motion_act({"id": "act_8", "primitive": "jump", "parameters": {"direction": [1.0, 0.0], "distance": 7.0, "height": 2.5, "arc": "snappy"}}, "fallback")
 	var serialized_jump: Dictionary = application._serialize_motion_act(normalized_jump)
 	_expect(str(serialized_jump.get("primitive", "")) == MotionActEvaluator.JUMP and is_equal_approx(float(serialized_jump.get("parameters", {}).get("height", 0.0)), 2.5) and str(serialized_jump.get("parameters", {}).get("arc", "")) == MotionActEvaluator.JUMP_ARC_SNAPPY, "Jump-specific parameters should survive normalization and serialization.")

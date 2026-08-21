@@ -40,8 +40,8 @@ values above `1×` refine it. Boundary adjustments never
 select a separate method or Curve Detail value. Schema-28 Even Spacing recipes
 and absolute boundary overrides normalize to the adaptive recipe and factors.
 
-Circle Primitives remain canonical as center plus diameter. Sampling evaluates
-their analytic curve directly, including a Reference transform into Body-local
+Circle and Ellipse Primitives remain canonical as center plus axis diameters.
+Sampling evaluates their analytic curve directly, including a Reference transform into Body-local
 space, so their sample count follows Target Edge Length and Curve Detail rather
 than the fixed render-contour segment count.
 

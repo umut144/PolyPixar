@@ -37,7 +37,8 @@ category is disabled. Transform and Effects categories do not exist.
 
 Each Component declares a geometry source. Bézier sources contain only
 `points`, `edges`, and `chains`; primitive sources contain one typed primitive
-definition, currently `circle` with `center` and `diameter_cm`. Generated
+definition: authored `circle` with `center` and `diameter_cm`, or an `ellipse`
+with `center`, `diameter_x_cm`, and `diameter_y_cm` produced by Scale Rebase. Generated
 primitive contours, samples, fill, and hit-test polygons are derived and are
 never persisted. Do not add `outer_shape`, Component-level `closed`, the old
 Line tool, or synchronization from a display polygon back into source geometry.
@@ -71,7 +72,7 @@ Sampling owns one adaptive Body recipe. Its Outer boundary, referenced Hole
 inputs, and scoped Cut Guides inherit the Body target edge length and Curve
 Detail; Hole and Cut inputs may apply a boundary-density factor from `0.25×`
 through `16×`. Values below `1×` coarsen all adaptive criteria, while values
-above `1×` refine them. Primitive Circles
+above `1×` refine them. Primitive Circles and Ellipses
 remain analytic through sampling, including their transform into Body-local
 space. A debounced transient Preview is generated once per settled recipe and
 an explicit Bake copies that exact Preview without regenerating it.
@@ -229,6 +230,15 @@ Schema 40 and older Worlds migrate explicitly to that default; schema-41 data
 never receives a silent missing/invalid-value fallback. Width participates in
 Contour Mesh fingerprints and build signatures, so downstream Bakes become
 stale without changing Component topology.
+
+Schema 42 adds atomic Asset-level Component Scale Rebase and analytic Ellipses.
+The service bakes positive Scale into owned Bézier geometry, resolved handles,
+Component-scoped Guides, or primitive axes around the unchanged Pivot before
+setting local Scale to `(1, 1)`. Position, Rotation, hierarchy, and animation
+data remain untouched. Scaled References, non-positive Scale, and scaled
+Components with Children block the whole operation rather than triggering a
+partial or compensating transform fallback. See
+[`SCALE_REBASE.md`](SCALE_REBASE.md).
 
 Sampling results carry their own algorithm version independently of the
 World schema. The junction-aware version invalidates pre-arrangement flat
