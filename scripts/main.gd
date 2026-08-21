@@ -4,6 +4,7 @@ const SELECTION_MIRROR_SERVICE_SCRIPT = preload("res://scripts/selection_mirror_
 const CREATE_SUBMODULES := ["Character", "Props", "Terrain", "Icon", "Symbols"]
 const GEOMETRY_SUBMODULES := ["Sampling", "Seeding", "Meshing"]
 const STYLE_SUBMODULES := ["Weighting"]
+const EXPORT_SUBMODULES: Array[String] = []
 const MOTION_SUBMODULES := ["Animation", "Path", "Act", "Sequence"]
 const WORLDS_ROOT := "res://worlds"
 const CONFIG_PATH := "res://configs/app_config.json"
@@ -69,6 +70,18 @@ var batch_status_revision := 0
 var batch_status_snapshot_revision := -1
 var batch_status_snapshot_build_count := 0
 var batch_status_refresh_timer: Timer
+var export_workspace: VBoxContainer
+var export_summary_label: Label
+var export_log: RichTextLabel
+var export_run_button: Button
+var export_valid_button: Button
+var export_preflight: Dictionary = {}
+var export_preflight_revision := -1
+var export_running := false
+var outliner_panel: Control
+var inspector_panel: Control
+var context_bar_panel: Control
+var draw_mode_status: Label
 var weighting_preview: Dictionary = {}
 var weighting_preview_key := ""
 var geometry_seeding_edit_active := false
@@ -272,11 +285,6 @@ func _ready() -> void:
 	history_coalesce_timer.wait_time = 0.25
 	history_coalesce_timer.timeout.connect(_finish_history_coalescing)
 	add_child(history_coalesce_timer)
-	batch_status_refresh_timer = Timer.new()
-	batch_status_refresh_timer.one_shot = true
-	batch_status_refresh_timer.wait_time = 0.15
-	batch_status_refresh_timer.timeout.connect(_refresh_batch_status_snapshot)
-	add_child(batch_status_refresh_timer)
 	_apply_world_scale()
 	_render_outliner()
 	_render_inspector()
@@ -682,13 +690,29 @@ func _build_ui() -> void:
 	create_action_button.focus_mode = Control.FOCUS_NONE
 	create_action_button.pressed.connect(_on_create_action_pressed)
 	toolbar.add_child(create_action_button)
-	var draw_mode_status := Label.new()
+	draw_mode_status = Label.new()
 	draw_mode_status.name = "DrawModeStatus"
 	draw_mode_status.text = "Draw Mode: —"
 	draw_mode_status.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	draw_mode_status.add_theme_font_size_override("font_size", 11)
 	draw_mode_status.add_theme_color_override("font_color", Color("#9aa3b2"))
 	toolbar.add_child(draw_mode_status)
+	export_run_button = Button.new()
+	export_run_button.text = "Build All (0)"
+	export_run_button.custom_minimum_size = Vector2(132, 32)
+	export_run_button.focus_mode = Control.FOCUS_NONE
+	export_run_button.visible = false
+	export_run_button.disabled = true
+	export_run_button.pressed.connect(_on_build_all_pressed)
+	toolbar.add_child(export_run_button)
+	export_valid_button = Button.new()
+	export_valid_button.text = "Export All Valid (0)"
+	export_valid_button.custom_minimum_size = Vector2(174, 32)
+	export_valid_button.focus_mode = Control.FOCUS_NONE
+	export_valid_button.visible = false
+	export_valid_button.disabled = true
+	export_valid_button.pressed.connect(_on_export_all_valid_pressed)
+	toolbar.add_child(export_valid_button)
 	snap_button = Button.new()
 	snap_button.text = "Snap: %s  ▼" % _snap_mode_label()
 	snap_button.custom_minimum_size = Vector2(128, 32)
@@ -709,6 +733,8 @@ func _build_ui() -> void:
 	world_popup.add_item("Load")
 	world_popup.id_pressed.connect(_on_world_menu_id)
 	_create_world_scale_popup()
+	# Batch commands live in the Export module. Keep these detached controls for
+	# the existing command implementations, but never update them while editing.
 	update_meshes_button = BatchStatusButton.new()
 	update_meshes_button.text = "Update Meshes (0)"
 	update_meshes_button.tooltip_text = "All Meshes current"
@@ -716,7 +742,6 @@ func _build_ui() -> void:
 	update_meshes_button.focus_mode = Control.FOCUS_NONE
 	update_meshes_button.disabled = true
 	update_meshes_button.pressed.connect(_on_update_meshes_pressed)
-	toolbar.add_child(update_meshes_button)
 	update_uvs_button = BatchStatusButton.new()
 	update_uvs_button.text = "Update UVs (0)"
 	update_uvs_button.tooltip_text = "All UVs current"
@@ -724,7 +749,6 @@ func _build_ui() -> void:
 	update_uvs_button.focus_mode = Control.FOCUS_NONE
 	update_uvs_button.disabled = true
 	update_uvs_button.pressed.connect(_on_update_uvs_pressed)
-	toolbar.add_child(update_uvs_button)
 	update_sdfs_button = BatchStatusButton.new()
 	update_sdfs_button.text = "Update SDFs (0)"
 	update_sdfs_button.tooltip_text = "All SDFs current"
@@ -732,7 +756,6 @@ func _build_ui() -> void:
 	update_sdfs_button.focus_mode = Control.FOCUS_NONE
 	update_sdfs_button.disabled = true
 	update_sdfs_button.pressed.connect(_on_update_sdfs_pressed)
-	toolbar.add_child(update_sdfs_button)
 	runtime_export_button = BatchStatusButton.new()
 	runtime_export_button.text = "Export Runtime (0)"
 	runtime_export_button.tooltip_text = "No pending runtime exports"
@@ -740,7 +763,6 @@ func _build_ui() -> void:
 	runtime_export_button.focus_mode = Control.FOCUS_NONE
 	runtime_export_button.disabled = true
 	runtime_export_button.pressed.connect(_on_runtime_export_pressed)
-	toolbar.add_child(runtime_export_button)
 	toolbar.add_child(world_scale_menu)
 	toolbar.add_child(world_menu)
 
@@ -758,6 +780,7 @@ func _build_ui() -> void:
 	_add_module_section(module_rail, "Create", CREATE_SUBMODULES, true)
 	_add_module_section(module_rail, "Mesh", GEOMETRY_SUBMODULES, true, false, -1)
 	_add_module_section(module_rail, "Style", STYLE_SUBMODULES, true)
+	_add_module_section(module_rail, "Export", EXPORT_SUBMODULES, true)
 	_set_active_module_visual("Create", active_create_submodule)
 
 	var workspace_split := HSplitContainer.new()
@@ -768,7 +791,7 @@ func _build_ui() -> void:
 	workspace_split.split_offset = 220
 	workspace_row.add_child(workspace_split)
 
-	var outliner_panel := _create_panel()
+	outliner_panel = _create_panel()
 	outliner_panel.custom_minimum_size = Vector2(180, 0)
 	workspace_split.add_child(outliner_panel)
 	var outliner_content := VBoxContainer.new()
@@ -840,11 +863,11 @@ func _build_ui() -> void:
 	canvas_column.add_theme_constant_override("separation", 1)
 	canvas_split.add_child(canvas_column)
 
-	var action_bar_panel := _create_panel()
-	canvas_column.add_child(action_bar_panel)
+	context_bar_panel = _create_panel()
+	canvas_column.add_child(context_bar_panel)
 	context_bar = HBoxContainer.new()
 	context_bar.custom_minimum_size = Vector2(0, 32)
-	action_bar_panel.add_child(context_bar)
+	context_bar_panel.add_child(context_bar)
 	_create_snap_popup()
 
 	var canvas_panel := _create_panel(Color("#1b1e24"))
@@ -898,12 +921,13 @@ func _build_ui() -> void:
 	canvas_context_label.add_theme_color_override("font_color", Color("#9aa3b2"))
 	canvas.add_child(canvas_context_label)
 
-	var inspector_panel := _create_panel()
+	inspector_panel = _create_panel()
 	inspector_panel.custom_minimum_size = Vector2(260, 0)
 	canvas_split.add_child(inspector_panel)
 	inspector_content = VBoxContainer.new()
 	inspector_content.add_theme_constant_override("separation", 2)
 	inspector_panel.add_child(inspector_content)
+	_create_export_workspace(canvas_panel)
 
 	var status_bar := _create_panel()
 	status_bar.custom_minimum_size = Vector2(0, 24)
@@ -1684,6 +1708,9 @@ func _on_create_action_pressed() -> void:
 func _update_context_action_button() -> void:
 	if not is_instance_valid(create_action_button):
 		return
+	_update_export_toolbar_buttons()
+	if is_instance_valid(draw_mode_status):
+		draw_mode_status.visible = active_module != "Export"
 	create_action_button.visible = (active_module == "Create" and active_create_submodule in CREATE_SUBMODULES) or (active_module == "Style" and active_style_submodule == "Weighting")
 	create_action_button.disabled = active_module == "Style" and active_style_submodule == "Weighting" and selected_component_id.is_empty()
 	var show_asset_create_controls := active_module == "Create" and active_create_submodule in CREATE_SUBMODULES
@@ -2077,7 +2104,6 @@ func _save_world() -> void:
 		return
 	_invalidate_batch_status()
 	batch_status_snapshot = {}
-	_update_runtime_export_button()
 	_show_status_message("Saved World: %s!" % world_name)
 
 
@@ -3881,16 +3907,10 @@ func _all_mesh_update_candidates() -> Array[Dictionary]:
 
 func _invalidate_batch_status() -> void:
 	batch_status_revision += 1
-	if is_instance_valid(batch_status_refresh_timer) and batch_status_refresh_timer.is_inside_tree():
-		batch_status_refresh_timer.start()
 
 
 func _batch_status_snapshot() -> Dictionary:
 	if batch_status_snapshot_revision == batch_status_revision and not batch_status_snapshot.is_empty():
-		return batch_status_snapshot
-	# Keep the prior UI-only snapshot during a short edit burst. Batch commands
-	# never consume this cache and always rebuild their authoritative candidates.
-	if not batch_status_snapshot.is_empty() and is_instance_valid(batch_status_refresh_timer) and not batch_status_refresh_timer.is_stopped():
 		return batch_status_snapshot
 	return _rebuild_batch_status_snapshot()
 
@@ -3912,14 +3932,7 @@ func _rebuild_batch_status_snapshot() -> Dictionary:
 
 
 func _refresh_batch_status_snapshot() -> void:
-	if mesh_batch_running or uv_batch_running or sdf_batch_running or runtime_export_batch_running:
-		batch_status_refresh_timer.start()
-		return
 	_rebuild_batch_status_snapshot()
-	_update_meshes_button()
-	_update_uvs_button()
-	_update_sdfs_button()
-	_update_runtime_export_button()
 
 
 func _update_meshes_button() -> void:
@@ -5079,6 +5092,9 @@ func _id_suffix_number(identifier: String) -> int:
 
 func _render_context_bar() -> void:
 	if not is_instance_valid(context_bar):
+		return
+	if active_module == "Export":
+		_clear_context_bar()
 		return
 	var draw_mode_status := find_child("DrawModeStatus", true, false) as Label
 	if draw_mode_status != null:
@@ -6733,11 +6749,9 @@ func _next_default_asset_name() -> String:
 func _render_outliner() -> void:
 	_clear(outliner_list)
 	_update_context_action_button()
-	_update_meshes_button()
-	_update_uvs_button()
-	_update_sdfs_button()
-	_update_runtime_export_button()
 	_update_outliner_asset_type_filter_visibility()
+	if active_module == "Export":
+		return
 	if active_module == "Motion":
 		_render_motion_outliner()
 		return
@@ -10619,6 +10633,8 @@ func _render_inspector() -> void:
 	_clear(inspector_content)
 	transform_fields.clear()
 	asset_pivot_fields.clear()
+	if active_module == "Export":
+		return
 	if active_module == "Motion":
 		if active_motion_submodule == "Path":
 			_render_motion_path_inspector()
@@ -12782,7 +12798,6 @@ func _set_selected_component_semantic_key(key: String) -> void:
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
-	_update_runtime_export_button()
 
 
 func _on_import_threshold_changed(value: float) -> void:
@@ -12800,6 +12815,344 @@ func _read_import_threshold() -> float:
 		if entered_text.is_valid_float():
 			return clampf(float(entered_text), 0.0, 1.0)
 	return clampf(pending_import_threshold, 0.0, 1.0)
+
+
+func _create_export_workspace(parent: Control) -> void:
+	export_workspace = VBoxContainer.new()
+	export_workspace.name = "ExportWorkspace"
+	export_workspace.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	export_workspace.offset_left = 18.0
+	export_workspace.offset_top = 18.0
+	export_workspace.offset_right = -18.0
+	export_workspace.offset_bottom = -18.0
+	export_workspace.add_theme_constant_override("separation", 12)
+	export_workspace.visible = false
+	parent.add_child(export_workspace)
+
+	var title := Label.new()
+	title.text = "Export"
+	title.add_theme_font_size_override("font_size", 22)
+	title.add_theme_color_override("font_color", Color("#e5e9f0"))
+	export_workspace.add_child(title)
+	export_summary_label = Label.new()
+	export_summary_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	export_summary_label.add_theme_font_size_override("font_size", 12)
+	export_summary_label.add_theme_color_override("font_color", Color("#aeb8c8"))
+	export_workspace.add_child(export_summary_label)
+	var separator := HSeparator.new()
+	export_workspace.add_child(separator)
+	export_log = RichTextLabel.new()
+	export_log.bbcode_enabled = true
+	export_log.fit_content = false
+	export_log.scroll_following = true
+	export_log.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	export_log.add_theme_font_size_override("normal_font_size", 12)
+	export_log.add_theme_color_override("default_color", Color("#c5cedb"))
+	export_workspace.add_child(export_log)
+
+
+func _refresh_export_preflight(force := false) -> void:
+	if not is_instance_valid(export_workspace) or active_module != "Export" or export_running:
+		return
+	if not force and export_preflight_revision == batch_status_revision:
+		return
+	export_preflight = _rebuild_batch_status_snapshot()
+	export_preflight_revision = batch_status_revision
+	_render_export_preflight()
+
+
+func _render_export_preflight() -> void:
+	if not is_instance_valid(export_log) or not is_instance_valid(export_summary_label):
+		return
+	var mesh: Dictionary = export_preflight.get("mesh", {})
+	var uv: Dictionary = export_preflight.get("uv", {})
+	var sdf: Dictionary = export_preflight.get("sdf", {})
+	var runtime: Dictionary = export_preflight.get("runtime", {})
+	var pending := (mesh.get("candidates", []) as Array).size() + (uv.get("candidates", []) as Array).size() + (sdf.get("candidates", []) as Array).size() + (runtime.get("candidates", []) as Array).size()
+	var issues := _export_attention_count(mesh) + _export_attention_count(uv) + _export_attention_count(sdf) + _export_attention_count(runtime)
+	export_summary_label.text = "Preflight abgeschlossen · %d ausstehende Arbeitsschritte · %d Auffälligkeiten" % [pending, issues]
+	_update_export_toolbar_buttons()
+	export_log.clear()
+	export_log.append_text("[b]Preflight[/b]\n")
+	_append_export_preflight_stage("Mesh", mesh)
+	_append_export_preflight_stage("UV", uv)
+	_append_export_preflight_stage("SDF", sdf)
+	_append_export_preflight_stage("Runtime Export", runtime)
+	if pending == 0 and issues == 0:
+		export_log.append_text("\n[color=#75b88a]Alles ist aktuell und exportbereit.[/color]\n")
+
+
+func _export_attention_count(status: Dictionary) -> int:
+	var summary: Dictionary = status.get("summary", {})
+	return (summary.get("attention", PackedStringArray()) as PackedStringArray).size()
+
+
+func _update_export_toolbar_buttons() -> void:
+	if not is_instance_valid(export_run_button) or not is_instance_valid(export_valid_button):
+		return
+	var export_active := active_module == "Export"
+	export_run_button.visible = export_active
+	export_valid_button.visible = export_active
+	if not export_active:
+		return
+	var preflight_current := export_preflight_revision == batch_status_revision
+	var build_count := _export_build_count() if preflight_current else 0
+	var valid_export_count := _export_valid_count() if preflight_current else 0
+	export_run_button.text = "Build All (%d)" % build_count
+	export_valid_button.text = "Export All Valid (%d)" % valid_export_count
+	export_run_button.disabled = export_running or not preflight_current or build_count == 0
+	export_valid_button.disabled = export_running or not preflight_current or valid_export_count == 0
+
+
+func _export_build_count() -> int:
+	var unique_components := {}
+	for stage in ["mesh", "uv", "sdf"]:
+		var status: Dictionary = export_preflight.get(stage, {})
+		for candidate in status.get("candidates", []):
+			unique_components["%s/%s" % [str(candidate.get("asset_id", "")), str(candidate.get("component_id", ""))]] = true
+	return unique_components.size()
+
+
+func _export_valid_count() -> int:
+	var runtime: Dictionary = export_preflight.get("runtime", {})
+	var count := 0
+	for candidate in runtime.get("candidates", []):
+		var build: Dictionary = candidate.get("build", {})
+		if bool(build.get("valid", false)):
+			count += 1
+	return count
+
+
+func _append_export_preflight_stage(stage: String, status: Dictionary) -> void:
+	var candidates: Array = status.get("candidates", [])
+	var summary: Dictionary = status.get("summary", {})
+	var attention: PackedStringArray = summary.get("attention", PackedStringArray())
+	var pending: PackedStringArray = summary.get("pending", PackedStringArray())
+	export_log.append_text("\n[b]%s[/b] · %d ausstehend · %d Auffälligkeiten\n" % [stage, candidates.size(), attention.size()])
+	for line in pending:
+		export_log.append_text("  [color=#9aa3b2]• %s[/color]\n" % line)
+	for line in attention:
+		export_log.append_text("  [color=#ef8354]• %s[/color]\n" % line)
+
+
+func _on_build_all_pressed() -> void:
+	if export_running:
+		return
+	export_running = true
+	mesh_batch_running = true
+	uv_batch_running = true
+	sdf_batch_running = true
+	export_run_button.disabled = true
+	export_valid_button.disabled = true
+	export_log.clear()
+	export_log.append_text("[b]Build All[/b]\n")
+	export_log.append_text("[color=#9aa3b2]Verarbeite alle validen Einträge. Fehlerhafte Einträge werden übersprungen; Export wird nicht gestartet.[/color]\n")
+	var mesh_candidates := _all_mesh_update_candidates()
+	var uv_candidates := _all_uv_update_candidates()
+	var sdf_candidates := _all_sdf_update_candidates()
+	var history_recorded := not (mesh_candidates.is_empty() and uv_candidates.is_empty() and sdf_candidates.is_empty())
+	if history_recorded:
+		_record_direct_change()
+	var mesh_result := await _run_export_mesh_stage(mesh_candidates)
+	var uv_result := await _run_export_uv_stage(_all_uv_update_candidates())
+	var sdf_result := await _run_export_sdf_stage(_all_sdf_update_candidates())
+	mesh_batch_running = false
+	uv_batch_running = false
+	sdf_batch_running = false
+	_invalidate_batch_status()
+	batch_status_snapshot = {}
+	export_preflight = _rebuild_batch_status_snapshot()
+	export_preflight_revision = batch_status_revision
+	var succeeded := int(mesh_result.get("succeeded", 0)) + int(uv_result.get("succeeded", 0)) + int(sdf_result.get("succeeded", 0))
+	var failed := int(mesh_result.get("failed", 0)) + int(uv_result.get("failed", 0)) + int(sdf_result.get("failed", 0))
+	var remaining_issues := _export_attention_count(export_preflight.get("mesh", {})) + _export_attention_count(export_preflight.get("uv", {})) + _export_attention_count(export_preflight.get("sdf", {})) + _export_attention_count(export_preflight.get("runtime", {}))
+	export_summary_label.text = "Build abgeschlossen · %d erfolgreiche Schritte · %d Probleme" % [succeeded, failed + remaining_issues]
+	export_log.append_text("\n[b]Ergebnis[/b]\n")
+	export_log.append_text("[color=#75b88a]• %d Schritte erfolgreich abgeschlossen[/color]\n" % succeeded)
+	if failed + remaining_issues > 0:
+		export_log.append_text("[color=#ef8354]• %d Einträge konnten nicht verarbeitet werden oder brauchen Aufmerksamkeit[/color]\n" % [failed + remaining_issues])
+	else:
+		export_log.append_text("[color=#75b88a]• Keine Fehler festgestellt[/color]\n")
+	if remaining_issues > 0:
+		export_log.append_text("\n[b]Verbleibende Auffälligkeiten[/b]\n")
+		_append_export_attention("Mesh", export_preflight.get("mesh", {}))
+		_append_export_attention("UV", export_preflight.get("uv", {}))
+		_append_export_attention("SDF", export_preflight.get("sdf", {}))
+		_append_export_attention("Runtime Export", export_preflight.get("runtime", {}))
+	export_running = false
+	_update_export_toolbar_buttons()
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _on_export_all_valid_pressed() -> void:
+	if export_running:
+		return
+	export_running = true
+	runtime_export_batch_running = true
+	export_run_button.disabled = true
+	export_valid_button.disabled = true
+	export_log.clear()
+	export_log.append_text("[b]Export All Valid[/b]\n")
+	export_log.append_text("[color=#9aa3b2]Exportiere nur aktuell valide Runtime-Pakete. Auffällige Einträge bleiben ausgeschlossen.[/color]\n")
+	var result := await _run_export_runtime_stage(true)
+	runtime_export_batch_running = false
+	_invalidate_batch_status()
+	batch_status_snapshot = {}
+	export_preflight = _rebuild_batch_status_snapshot()
+	export_preflight_revision = batch_status_revision
+	var succeeded := int(result.get("succeeded", 0))
+	var failed := int(result.get("failed", 0))
+	var remaining_issues := _export_attention_count(export_preflight.get("runtime", {}))
+	export_summary_label.text = "Export abgeschlossen · %d Runtime-Pakete exportiert · %d Probleme" % [succeeded, failed + remaining_issues]
+	export_log.append_text("\n[b]Ergebnis[/b]\n")
+	export_log.append_text("[color=#75b88a]• %d Runtime-Pakete exportiert[/color]\n" % succeeded)
+	if failed + remaining_issues > 0:
+		export_log.append_text("[color=#ef8354]• %d Einträge wurden nicht exportiert oder brauchen Aufmerksamkeit[/color]\n" % [failed + remaining_issues])
+		_append_export_attention("Runtime Export", export_preflight.get("runtime", {}))
+	export_running = false
+	_update_export_toolbar_buttons()
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _run_export_mesh_stage(candidates: Array[Dictionary]) -> Dictionary:
+	var succeeded := 0
+	var failed := 0
+	export_log.append_text("\n[b]Mesh[/b] · %d Kandidaten\n" % candidates.size())
+	for candidate in candidates:
+		await get_tree().process_frame
+		var asset_id := str(candidate.get("asset_id", ""))
+		var component_id := str(candidate.get("component_id", ""))
+		var build := _generate_component_mesh_build(asset_id, component_id)
+		var label := _export_component_label(asset_id, component_id)
+		if bool(build.get("valid", false)):
+			var component := _get_component(_get_asset(asset_id), component_id)
+			var signature := _geometry_build_signature(asset_id, component_id, component, build.get("recipes", {}))
+			if GeometryAutoBuildService.signatures_match(signature, build.get("source_signature", {})):
+				_commit_component_mesh_build(asset_id, component_id, build)
+				succeeded += 1
+				export_log.append_text("  [color=#75b88a]✓ %s[/color]\n" % label)
+			else:
+				build["errors"] = ["Component changed while its Mesh was being generated."]
+				_record_component_mesh_failure(asset_id, component_id, build)
+				failed += 1
+				export_log.append_text("  [color=#ef8354]✕ %s — %s[/color]\n" % [label, build["errors"][0]])
+		else:
+			_record_component_mesh_failure(asset_id, component_id, build)
+			failed += 1
+			var errors: Array = build.get("errors", [])
+			export_log.append_text("  [color=#ef8354]✕ %s — %s[/color]\n" % [label, str(errors[0]) if not errors.is_empty() else "Mesh generation failed."])
+	return {"succeeded": succeeded, "failed": failed}
+
+
+func _run_export_uv_stage(candidates: Array[Dictionary]) -> Dictionary:
+	var succeeded := 0
+	var failed := 0
+	export_log.append_text("\n[b]UV[/b] · %d Kandidaten\n" % candidates.size())
+	for candidate in candidates:
+		await get_tree().process_frame
+		var asset_id := str(candidate.get("asset_id", ""))
+		var component_id := str(candidate.get("component_id", ""))
+		var build := _generate_component_uv_build(asset_id, component_id)
+		var label := _export_component_label(asset_id, component_id)
+		if bool(build.get("valid", false)):
+			var component := _get_component(_get_asset(asset_id), component_id)
+			var mesh := _component_mesh_bake(asset_id, component_id)
+			var recipe := _resolved_geometry_uv_mapping_recipe(asset_id, component_id, build.get("recipe", {}))
+			if _component_mesh_status(asset_id, component_id, component) == "Ready" and GeometryUVMappingService.source_fingerprint(mesh, recipe) == str(build.get("source_fingerprint", "")):
+				_commit_component_uv_build(asset_id, component_id, build)
+				succeeded += 1
+				export_log.append_text("  [color=#75b88a]✓ %s[/color]\n" % label)
+			else:
+				build["errors"] = ["Component Mesh changed while its UVs were being generated."]
+				_record_component_uv_failure(asset_id, component_id, build)
+				failed += 1
+				export_log.append_text("  [color=#ef8354]✕ %s — %s[/color]\n" % [label, build["errors"][0]])
+		else:
+			_record_component_uv_failure(asset_id, component_id, build)
+			failed += 1
+			var errors: Array = build.get("errors", [])
+			export_log.append_text("  [color=#ef8354]✕ %s — %s[/color]\n" % [label, str(errors[0]) if not errors.is_empty() else "UV generation failed."])
+	return {"succeeded": succeeded, "failed": failed}
+
+
+func _run_export_sdf_stage(candidates: Array[Dictionary]) -> Dictionary:
+	var succeeded := 0
+	var failed := 0
+	export_log.append_text("\n[b]SDF[/b] · %d Kandidaten\n" % candidates.size())
+	for candidate in candidates:
+		await get_tree().process_frame
+		var asset_id := str(candidate.get("asset_id", ""))
+		var component_id := str(candidate.get("component_id", ""))
+		var build := _generate_component_sdf_build(asset_id, component_id)
+		var label := _export_component_label(asset_id, component_id)
+		if bool(build.get("valid", false)) and GeometrySDFService.source_fingerprint(_component_mesh_bake(asset_id, component_id), _geometry_uv_mapping_bake(asset_id, component_id), _sdf_recipe(asset_id, component_id)) == str(build.get("source_fingerprint", "")) and _commit_component_sdf_build(asset_id, component_id, build):
+			succeeded += 1
+			export_log.append_text("  [color=#75b88a]✓ %s[/color]\n" % label)
+		else:
+			if bool(build.get("valid", false)):
+				build["errors"] = ["SDF inputs changed or the contour image could not be written."]
+			_record_component_sdf_failure(asset_id, component_id, build)
+			failed += 1
+			var errors: Array = build.get("errors", [])
+			export_log.append_text("  [color=#ef8354]✕ %s — %s[/color]\n" % [label, str(errors[0]) if not errors.is_empty() else "SDF generation failed."])
+	return {"succeeded": succeeded, "failed": failed}
+
+
+func _run_export_runtime_stage(valid_only := false) -> Dictionary:
+	var succeeded := 0
+	var failed := 0
+	var candidates := _all_valid_runtime_export_candidates() if valid_only else _all_runtime_export_candidates()
+	var catalog_requested := false
+	export_log.append_text("\n[b]Runtime Export[/b] · %d Kandidaten\n" % candidates.size())
+	for candidate in candidates:
+		await get_tree().process_frame
+		if str(candidate.get("kind", "package")) == "catalog":
+			catalog_requested = true
+			continue
+		var asset := _get_asset(str(candidate.get("asset_id", "")))
+		var build := _runtime_export_build(asset)
+		var label := str(asset.get("name", "Asset"))
+		if bool(build.get("valid", false)) and _write_runtime_export_package(asset, build):
+			succeeded += 1
+			export_log.append_text("  [color=#75b88a]✓ %s[/color]\n" % label)
+		else:
+			failed += 1
+			var errors: Array = build.get("errors", [])
+			export_log.append_text("  [color=#ef8354]✕ %s — %s[/color]\n" % [label, str(errors[0]) if not errors.is_empty() else "Runtime export failed."])
+	if catalog_requested or succeeded > 0:
+		if _all_runtime_package_candidates().is_empty() and _write_asset_catalog():
+			_prune_uncataloged_runtime_packages()
+			export_log.append_text("  [color=#75b88a]✓ World Catalog[/color]\n")
+		else:
+			failed += 1
+			export_log.append_text("  [color=#ef8354]✕ World Catalog — catalog.json could not be updated.[/color]\n")
+	return {"succeeded": succeeded, "failed": failed}
+
+
+func _all_valid_runtime_export_candidates() -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	for candidate in _all_runtime_export_candidates():
+		var build: Dictionary = candidate.get("build", {})
+		if bool(build.get("valid", false)):
+			result.append(candidate)
+	return result
+
+
+func _export_component_label(asset_id: String, component_id: String) -> String:
+	var asset := _get_asset(asset_id)
+	var component := _get_component(asset, component_id)
+	return "%s / %s" % [str(asset.get("name", "Asset")), str(component.get("name", "Component"))]
+
+
+func _append_export_attention(stage: String, status: Dictionary) -> void:
+	var summary: Dictionary = status.get("summary", {})
+	var attention: PackedStringArray = summary.get("attention", PackedStringArray())
+	for line in attention:
+		export_log.append_text("  [color=#ef8354]• %s · %s[/color]\n" % [stage, line])
 
 
 func _render_canvas_context() -> void:
@@ -12821,6 +13174,23 @@ func _render_canvas_context() -> void:
 	geometry_meshing_workspace.visible = false
 	geometry_uv_mapping_workspace.visible = false
 	weighting_workspace.visible = false
+	if is_instance_valid(export_workspace):
+		export_workspace.visible = active_module == "Export"
+	if is_instance_valid(outliner_panel):
+		outliner_panel.visible = active_module != "Export"
+	if is_instance_valid(inspector_panel):
+		inspector_panel.visible = active_module != "Export"
+	if is_instance_valid(context_bar_panel):
+		context_bar_panel.visible = active_module != "Export"
+	if active_module == "Export":
+		canvas_view.visible = false
+		motion_workspace.visible = false
+		motion_path_workspace.visible = false
+		motion_act_workspace.visible = false
+		motion_sequence_workspace.visible = false
+		canvas_context_label.text = ""
+		_refresh_export_preflight()
+		return
 	if active_module == "Motion":
 		canvas_view.visible = false
 		motion_workspace.visible = active_motion_submodule == "Animation"
@@ -12842,6 +13212,10 @@ func _render_canvas_context() -> void:
 	motion_path_workspace.visible = false
 	motion_act_workspace.visible = false
 	motion_sequence_workspace.visible = false
+	if is_instance_valid(outliner_panel):
+		outliner_panel.visible = true
+	if is_instance_valid(inspector_panel):
+		inspector_panel.visible = true
 	if active_module == "Mesh":
 		motion_workspace.visible = false
 		canvas_view.visible = false

@@ -480,7 +480,7 @@ func _test_geometry_sampling_ui_shell() -> void:
 	for module_section in application.module_sections:
 		visible_categories.append(module_section.module_name)
 		every_category_expanded = every_category_expanded and module_section.expanded
-	_expect(visible_categories == ["Create", "Mesh", "Style"], "The module rail should omit the retired Export workspace and the deferred Texture, Material, Motion, Transform, and Effects categories.")
+	_expect(visible_categories == ["Create", "Mesh", "Style", "Export"], "The module rail should provide the dedicated Export workspace while omitting deferred categories.")
 	_expect(every_category_expanded, "Every visible category should remain expanded.")
 	var test_assets: Array[Dictionary] = [{"id": "asset_1", "name": "Wizard", "visibility": true, "components": [component]}]
 	application.assets = test_assets
@@ -492,19 +492,15 @@ func _test_geometry_sampling_ui_shell() -> void:
 	application._render_outliner()
 	application._render_inspector()
 	application._render_canvas_context()
-	_expect(is_instance_valid(application.update_meshes_button) and application.update_meshes_button.text == "Update Meshes (1)" and not application.update_meshes_button.disabled, "The persistent toolbar should expose one actionable valid unmeshed Component across all Create Assets.")
-	_expect(application.update_meshes_button.tooltip_text == "Pending (1):\nWizard / Body", "Update Meshes hover text should summarize the actionable Asset / Component list.")
-	_expect(application.update_uvs_button.tooltip_text.contains("Needs attention (1):") and application.update_uvs_button.tooltip_text.contains("Current Component Mesh required"), "Update UVs hover text should summarize Components blocked by missing or stale Meshes.")
-	_expect(application.update_sdfs_button.tooltip_text.contains("Needs attention (1):") and application.update_sdfs_button.tooltip_text.contains("Current Component Mesh required"), "Update SDFs hover text should summarize Components blocked by missing or stale upstream data.")
-	_expect(application.runtime_export_button.text == "Export Runtime (1)" and application.runtime_export_button.tooltip_text.contains("Needs attention (1):"), "Every visible Asset should enter Runtime Export automatically and expose invalid contract data in the tooltip without an opt-in flag.")
-	_expect(application.update_meshes_button is BatchStatusButton and application.update_meshes_button.attention_count == 0, "An actionable Mesh alone should not illuminate the Mesh attention indicator.")
-	_expect(application.update_uvs_button.attention_count == 1 and application.update_sdfs_button.attention_count == 1 and application.runtime_export_button.attention_count == 1, "Each affected Batch button should own an independent attention indicator derived from its own summary.")
+	_expect(application.batch_status_snapshot_build_count == 0, "Editing workspaces must not calculate Batch status for detached toolbar controls.")
+	application._on_category_pressed("Export")
+	_expect(application.export_workspace.visible and application.export_summary_label.text.contains("Preflight abgeschlossen") and application.export_log.get_parsed_text().contains("Wizard / Body"), "Export should run one preflight on entry and list affected Asset / Component data in its read-only log.")
+	_expect(application.export_run_button.visible and application.export_run_button.text == "Build All (1)" and application.export_valid_button.visible and application.context_bar_panel.visible == false and application.draw_mode_status.visible == false, "Export should replace Create context controls with Build and valid-only Export actions in the top toolbar.")
 	var batch_snapshot_builds: int = application.batch_status_snapshot_build_count
-	application._render_outliner()
-	_expect(application.batch_status_snapshot_build_count == batch_snapshot_builds, "Selection-only Outliner rendering should reuse one shared Batch-status snapshot across all four toolbar buttons.")
 	application._record_direct_change()
-	application._render_outliner()
-	_expect(application.batch_status_snapshot_build_count == batch_snapshot_builds + 1, "A document mutation should invalidate the shared Batch-status snapshot exactly once.")
+	_expect(application.batch_status_snapshot_build_count == batch_snapshot_builds, "A document mutation must only mark Batch status dirty until Export is opened again.")
+	application.active_module = "Mesh"
+	application._render_canvas_context()
 	_expect(application.geometry_sampling_workspace.visible, "Geometry Sampling should own a dedicated visible centre workspace.")
 	_expect(application.outliner_list.get_child_count() > 1, "Sampling Outliner should expose the Asset/Component hierarchy.")
 	_expect(application.inspector_content.get_child_count() >= 8, "A selected Component should expose Adaptive parameters, boundary inputs, result, and Bake controls.")
@@ -1000,8 +996,8 @@ func _test_geometry_uv_mapping_service_and_ui() -> void:
 	application._render_inspector()
 	application._render_canvas_context()
 	_expect(application.geometry_uv_mapping_workspace.visible and application.inspector_content.get_child_count() >= 14, "UV Mapping should expose its dedicated split Workspace and compact Bounds / Planar Inspector.")
-	_expect(application.update_uvs_button.text == "Update UVs (0)" and application.update_uvs_button.disabled, "A current accepted UV Bake should leave the global UV batch empty.")
-	_expect(application.update_sdfs_button.text == "Update SDFs (1)" and not application.update_sdfs_button.disabled, "A visible Component with current Mesh and UV Bakes should become an actionable SDF batch candidate.")
+	_expect(application._all_uv_update_candidates().is_empty(), "A current accepted UV Bake should leave the global UV batch empty.")
+	_expect(application._all_sdf_update_candidates().size() == 1, "A visible Component with current Mesh and UV Bakes should become an actionable SDF batch candidate.")
 	application._activate_geometry_uv_mapping_method_choice()
 	var active_style := application.geometry_uv_mapping_method_menu.get_theme_stylebox("normal") as StyleBoxFlat
 	_expect(application.active_context_command == "geometry.uv_mapping.method" and application.geometry_uv_mapping_method_choice_active and active_style != null and active_style.bg_color == Color("#8fd8f5"), "UV Mapping CMD+1 should use the shared exclusive Method state and highlight.")
