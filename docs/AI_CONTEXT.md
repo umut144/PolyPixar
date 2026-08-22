@@ -70,15 +70,6 @@ individual Component Z Index values are retained only for compatibility and
 are ignored while grouped. Runtime export does not emit Group records; it
 resolves Group transforms and layer values into ordinary Component exports.
 
-Edge outline visibility is authored manually as `render_outline = on | off`.
-Older boolean `true` values and earlier experimental `auto` values migrate to
-`on`, while `false` values remain explicit `off`. Grouped exact shared edges
-produce cached derived diagnostics only; they never change authored
-visibility. The diagnostic resolver is invalidated by relevant document
-changes and refreshed at save time; it must not run in a per-frame polling
-loop. The editor may show disabled outlines as dashed and exactly covered
-disabled shared outlines as dash-dot diagnostics.
-
 World schema 41 owns one authored Contour stroke width for every Asset in its
 typed `world_settings` record. It defaults to `4 px` at the fixed `128 px/m`
 reference density, has no Component override, and invalidates derived Contour

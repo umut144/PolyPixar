@@ -2076,7 +2076,6 @@ func _save_world() -> void:
 	if world_name.is_empty():
 		_open_new_world_dialog(true)
 		return
-	_refresh_outline_resolution_cache()
 	var catalog_build := _asset_catalog_build()
 	if not bool(catalog_build.get("valid", false)):
 		var catalog_errors: Array = catalog_build.get("errors", [])
@@ -2879,7 +2878,7 @@ func _serialize_edges(edges: Array) -> Array:
 			"id": str(edge_data.get("id", "")),
 			"start_point_id": str(edge_data.get("start_point_id", "")),
 			"end_point_id": str(edge_data.get("end_point_id", "")),
-			"render_outline": OutlineService.normalize_mode(edge_data.get("render_outline", OutlineService.ON))
+			"render_outline": OutlineService.normalize_mode(edge_data.get("render_outline", OutlineService.AUTO))
 		})
 	return serialized
 
@@ -2940,7 +2939,7 @@ func _deserialize_component_topology(component_data: Dictionary) -> Dictionary:
 			"id": edge_id,
 			"start_point_id": start_point_id,
 			"end_point_id": end_point_id,
-			"render_outline": OutlineService.normalize_mode(raw_edge.get("render_outline", OutlineService.ON))
+			"render_outline": OutlineService.normalize_mode(raw_edge.get("render_outline", OutlineService.AUTO))
 		})
 		known_edge_ids[edge_id] = true
 	var chains: Array[Dictionary] = []
@@ -8753,16 +8752,6 @@ func _invalidate_outline_resolution_cache() -> void:
 	outline_resolution_cache.clear()
 
 
-func _refresh_outline_resolution_cache() -> void:
-	outline_resolution_cache.clear()
-	for asset in assets:
-		for group in asset.get("groups", []):
-			if group is Dictionary:
-				var group_id := str(group.get("id", ""))
-				if not group_id.is_empty():
-					outline_resolution_cache[group_id] = OutlineResolutionService.resolve_group(asset, group_id)
-
-
 func _outline_resolution_for_component(asset: Dictionary, component_id: String) -> Dictionary:
 	var group_id := ComponentHierarchy.membership_group_id(asset, component_id)
 	if group_id.is_empty():
@@ -13126,13 +13115,15 @@ func _on_component_catch_parent_selected(index: int, option: OptionButton) -> vo
 func _create_render_outline_mode_option(edges: Array[Dictionary]) -> OptionButton:
 	var option := OptionButton.new()
 	option.custom_minimum_size = Vector2(0, 26)
+	option.add_item("Render Outline: Auto")
+	option.set_item_metadata(0, OutlineService.AUTO)
 	option.add_item("Render Outline: On")
-	option.set_item_metadata(0, OutlineService.ON)
+	option.set_item_metadata(1, OutlineService.ON)
 	option.add_item("Render Outline: Off")
-	option.set_item_metadata(1, OutlineService.OFF)
+	option.set_item_metadata(2, OutlineService.OFF)
 	var mode := ""
 	for edge in edges:
-		var edge_mode := OutlineService.normalize_mode(edge.get("render_outline", OutlineService.ON))
+		var edge_mode := OutlineService.normalize_mode(edge.get("render_outline", OutlineService.AUTO))
 		if mode.is_empty():
 			mode = edge_mode
 		elif mode != edge_mode:
@@ -13158,7 +13149,8 @@ func _on_edge_render_outline_mode_changed(index: int, option: OptionButton) -> v
 
 
 func _on_edge_render_outline_changed(enabled: bool) -> void:
-	# Compatibility entry point for existing editor/test integrations.
+	# Compatibility entry point for existing editor/test integrations. New UI
+	# writes an explicit mode through the Auto/On/Off selector above.
 	_set_selected_edges_render_outline_mode(OutlineService.ON if enabled else OutlineService.OFF)
 
 
@@ -14146,7 +14138,6 @@ func _render_canvas_context() -> void:
 		canvas_view.set_context("")
 		canvas_view.set_interaction_state("")
 		canvas_view.set_tool_mode("")
-		canvas_view.set_outline_resolution({})
 		canvas_view.set_component_transform({})
 		canvas_view.set_reference_shapes([])
 		canvas_view.set_display_polygon([])
@@ -14163,7 +14154,6 @@ func _render_canvas_context() -> void:
 		canvas_view.set_context(str(asset["name"]))
 		canvas_view.set_interaction_state("asset")
 		canvas_view.set_asset_pivot(_asset_pivot(asset))
-		canvas_view.set_outline_resolution({})
 		canvas_view.set_tool_mode("")
 		canvas_view.set_component_transform({})
 		canvas_view.set_reference_shapes(_build_reference_shapes(asset, "", selected_component_id))
@@ -14177,7 +14167,6 @@ func _render_canvas_context() -> void:
 		canvas_view.set_context(str(asset["name"]))
 		canvas_view.set_interaction_state("asset")
 		canvas_view.set_tool_mode("")
-		canvas_view.set_outline_resolution({})
 		canvas_view.set_component_transform({})
 		canvas_view.set_reference_shapes(_build_reference_shapes(asset, "", selected_component_id))
 		canvas_view.set_display_polygon([])
@@ -14190,7 +14179,6 @@ func _render_canvas_context() -> void:
 		canvas_view.set_interaction_state("transform")
 		canvas_view.set_tool_mode("")
 		canvas_view.set_component_transform(ComponentHierarchy.world_transform_record(asset, selected_component_id))
-		canvas_view.set_outline_resolution(_outline_resolution_for_component(asset, selected_component_id))
 		canvas_view.set_reference_shapes(_build_reference_shapes(asset))
 		canvas_view.set_display_polygon([])
 		canvas_view.set_bezier_geometry([], [], [])
@@ -14214,7 +14202,6 @@ func _render_canvas_context() -> void:
 	component_transform["visibility"] = bool(asset.get("visibility", true)) and _effective_component_visibility(asset, component)
 	component_transform["z_index"] = _effective_component_z_index(asset, component)
 	canvas_view.set_component_transform(component_transform)
-	canvas_view.set_outline_resolution(_outline_resolution_for_component(asset, selected_component_id))
 	canvas_view.set_reference_shapes(_build_reference_shapes(asset, selected_component_id))
 	canvas_view.set_component_draw_mode(str(component.get("draw_mode", "closed_loop")))
 	canvas_view.set_point_numbers_visible(bool(component.get("show_point_numbers", false)))
@@ -14339,8 +14326,7 @@ func _build_reference_shapes(asset: Dictionary, excluded_component_id := "", emp
 			"visibility": asset_is_visible and _effective_component_visibility(asset, component),
 			"z_index": _effective_component_z_index(asset, component),
 			"emphasized": str(component["id"]) == emphasized_component_id,
-			"topology_role": str(component.get("topology_role", "outer")),
-			"outline_resolution": _outline_resolution_for_component(asset, str(component.get("id", "")))
+			"topology_role": str(component.get("topology_role", "outer"))
 		})
 	return shapes
 

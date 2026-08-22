@@ -103,7 +103,7 @@ static func add_point(component: Dictionary, position: Vector2, requested_mode: 
 			"id": edge_id,
 			"start_point_id": str(point_ids.back()),
 			"end_point_id": point_id,
-			"render_outline": OutlineService.ON
+			"render_outline": OutlineService.AUTO
 		})
 		edge_ids.append(edge_id)
 	point_ids.append(point_id)
@@ -234,7 +234,7 @@ static func close_chain(component: Dictionary, chain_id: String) -> bool:
 		"id": edge_id,
 		"start_point_id": str(point_ids.back()),
 		"end_point_id": str(point_ids.front()),
-		"render_outline": OutlineService.ON
+		"render_outline": OutlineService.AUTO
 	})
 	edge_ids.append(edge_id)
 	chain["edge_ids"] = edge_ids
@@ -557,7 +557,7 @@ static func rebuild_chain_edges(component: Dictionary, chain: Dictionary) -> voi
 			"id": edge_id,
 			"start_point_id": str(point_ids[point_index]),
 			"end_point_id": str(point_ids[(point_index + 1) % point_ids.size()]),
-			"render_outline": OutlineService.ON
+			"render_outline": OutlineService.AUTO
 		})
 		edge_ids.append(edge_id)
 	chain["edge_ids"] = edge_ids

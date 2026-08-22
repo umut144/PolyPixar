@@ -1836,14 +1836,13 @@ func _test_component_hierarchy_model() -> void:
 
 
 func _test_outline_resolution() -> void:
-	_expect(OutlineService.normalize_mode(true) == OutlineService.ON and OutlineService.normalize_mode("auto") == OutlineService.ON and OutlineService.normalize_mode(false) == OutlineService.OFF, "Outline migration should normalize visible and experimental Auto values to manual On while preserving Off.")
 	var left := {
 		"id": "head_left",
 		"group_id": "head",
 		"parent_component_id": "",
 		"transform": {"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO},
 		"points": [{"id": "a", "position": Vector2(0, 0), "handle_in": Vector2.ZERO, "handle_out": Vector2.ZERO}, {"id": "b", "position": Vector2(0, 10), "handle_in": Vector2.ZERO, "handle_out": Vector2.ZERO}],
-		"edges": [{"id": "left_edge", "start_point_id": "a", "end_point_id": "b", "render_outline": OutlineService.OFF}],
+		"edges": [{"id": "left_edge", "start_point_id": "a", "end_point_id": "b", "render_outline": OutlineService.AUTO}],
 		"chains": []
 	}
 	var right := left.duplicate(true)
@@ -1852,21 +1851,15 @@ func _test_outline_resolution() -> void:
 	right["points"][0]["position"] = Vector2(-10, 0)
 	right["points"][1]["position"] = Vector2(-10, 10)
 	right["edges"][0]["id"] = "right_edge"
-	right["edges"][0]["render_outline"] = OutlineService.ON
 	var asset := {"components": [left, right], "groups": [{"id": "head", "name": "head", "transform": {"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}}]}
 	ComponentHierarchy.normalize_asset(asset)
 	var resolved := OutlineResolutionService.resolve_group(asset, "head")
-	_expect(not bool(resolved["head_left"]["left_edge"].get("enabled", true)) and str(resolved["head_left"]["left_edge"].get("diagnostic", "")) == "covered", "An exact shared Off edge should receive the covered diagnostic.")
-	_expect(bool(resolved["head_right"]["right_edge"].get("enabled", false)), "A manually enabled shared edge should remain visible.")
+	_expect(not bool(resolved["head_left"]["left_edge"].get("enabled", true)) and str(resolved["head_left"]["left_edge"].get("diagnostic", "")) == "covered", "Automatic outline ownership should suppress the lower-priority shared edge.")
+	_expect(bool(resolved["head_right"]["right_edge"].get("enabled", false)), "Automatic outline ownership should keep the higher-priority shared edge visible.")
 	left["edges"][0]["render_outline"] = OutlineService.ON
 	right["edges"][0]["render_outline"] = OutlineService.OFF
 	resolved = OutlineResolutionService.resolve_group(asset, "head")
 	_expect(bool(resolved["head_left"]["left_edge"].get("enabled", false)) and not bool(resolved["head_right"]["right_edge"].get("enabled", true)), "Manual outline modes must override automatic ownership.")
-	right["transform"]["position"] = Vector2(100, 0)
-	right["points"][0]["position"] = Vector2(0, 0)
-	right["points"][1]["position"] = Vector2(0, 10)
-	resolved = OutlineResolutionService.resolve_group(asset, "head")
-	_expect(not bool(resolved["head_right"]["right_edge"].get("enabled", true)) and str(resolved["head_right"]["right_edge"].get("diagnostic", "")) == "hidden", "Manual Off must remain disabled even without a shared automatic edge.")
 func _test_asset_guides() -> void:
 	var component := _component()
 	component.merge({"id": "component_1", "name": "body", "visibility": true, "transform": {"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}})

@@ -106,7 +106,7 @@ static func _primitive_stroke_source(component: Dictionary) -> Dictionary:
 		point_ids.append(point_id)
 		edge_ids.append(edge_id)
 		points.append({"id": point_id, "position": positions[index], "mode": "linear", "handle_source": "manual", "handle_in": Vector2.ZERO, "handle_out": Vector2.ZERO, "preserve_point": false})
-		edges.append({"id": edge_id, "start_point_id": point_id, "end_point_id": "", "render_outline": OutlineService.ON})
+		edges.append({"id": edge_id, "start_point_id": point_id, "end_point_id": "", "render_outline": OutlineService.AUTO})
 	for index in range(edges.size()):
 		edges[index]["end_point_id"] = point_ids[(index + 1) % point_ids.size()]
 	return {"valid": true, "errors": [], "component": {
