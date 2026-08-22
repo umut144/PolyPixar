@@ -2076,6 +2076,7 @@ func _save_world() -> void:
 	if world_name.is_empty():
 		_open_new_world_dialog(true)
 		return
+	_refresh_outline_resolution_cache()
 	var catalog_build := _asset_catalog_build()
 	if not bool(catalog_build.get("valid", false)):
 		var catalog_errors: Array = catalog_build.get("errors", [])
@@ -8746,6 +8747,16 @@ func _group_world_center(asset: Dictionary, component_ids: Array) -> Vector2:
 
 func _invalidate_outline_resolution_cache() -> void:
 	outline_resolution_cache.clear()
+
+
+func _refresh_outline_resolution_cache() -> void:
+	outline_resolution_cache.clear()
+	for asset in assets:
+		for group in asset.get("groups", []):
+			if group is Dictionary:
+				var group_id := str(group.get("id", ""))
+				if not group_id.is_empty():
+					outline_resolution_cache[group_id] = OutlineResolutionService.resolve_group(asset, group_id)
 
 
 func _outline_resolution_for_component(asset: Dictionary, component_id: String) -> Dictionary:
