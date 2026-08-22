@@ -59,9 +59,9 @@ An Asset contains:
 
 A Component contains its geometry source, hierarchy reference, local transform,
 visibility/layer settings, draw mode, widths, catch-parent reference, and point
-number display setting. It carries one required `semantic_key`, which is both
-its registry identity and its only authored name. Keys must be registered and
-unique within an Asset. It has no Material assignment.
+number display setting. It carries a free-form `name`, unique within its Asset.
+The name is the authored identity used by runtime animation bindings. It has
+no Material assignment.
 
 Derived mesh documents are keyed by Asset and Component IDs. Sampling feeds
 Seeding, Seeding feeds Meshing, and accepted Bakes remain separate from source
@@ -205,18 +205,11 @@ render-only changes reuse it; document mutations invalidate it and coalesced
 edits refresh it after a short debounce. Batch execution never trusts the UI
 cache and recomputes authoritative candidates before mutating derived data.
 
-Schema 39 replaces the provisional free-form `name` / `semantic_role` pair with
-one required `semantic_key`. `configs/semantic_keys.json` owns the independent
-Semantic Registry schema 1. The registry is read-only in the application;
-creation uses a searchable alphabetical picker, while Inspector reassignment
-places that searchable list in a compact dropdown. Unknown links display as
-`missing_semantic (<key/source>)`. Pre-schema-39 data
-migrates through the explicitly reviewed legacy mapping. Known left/right pairs
-are mirrored automatically during duplication; all other copied Components
-must receive an explicit available key before the duplicate is committed.
-Asset References use the same local Semantic picker but retain the borrowed
-Asset in internal `source_asset_id`, so local classification never erases
-geometry origin. Runtime export resolves that editor link to `source_asset_key`.
+Schema 43 restores free-form Component names. Existing names are preserved;
+older Semantic Key fields are used only as a deterministic one-time migration
+fallback, and case-insensitive name collisions receive numbered suffixes.
+Names remain unique within an Asset. Asset References retain their internal
+`source_asset_id`; runtime export resolves that link to `source_asset_key`.
 
 Weapon Components use the namespaced keys `weapon_body`, `weapon_collar`,
 `weapon_grip`, `weapon_head`, `weapon_head_left`, `weapon_rear`, `weapon_shaft`, and
@@ -266,12 +259,12 @@ The normative serialized package and consumer contract is
 [`RUNTIME_EXPORT_CONTRACT.md`](RUNTIME_EXPORT_CONTRACT.md). The summary below
 describes how the editor produces that contract.
 
-`RuntimeExportService` builds Manifest schema 4 exclusively from current
+`RuntimeExportService` builds Manifest schema 5 exclusively from current
 accepted Fill and Contour Stroke Mesh Bakes. It rejects missing or stale inputs,
-invalid or duplicate Semantic Keys, non-rebased Scale, unresolved
+invalid or duplicate Component Names, non-rebased Scale, unresolved
 Asset References, and incomplete or cyclic visible hierarchies. Ordinary
 Components never derive replacement geometry during export. References emit an
-`asset_reference` record containing the local `semantic_key` and actual
+`asset_reference` record containing the local `name` and actual
 `source_asset_key`, without copying geometry into the owner.
 
 The contract is engine-neutral: X points right, Y points up, lengths are meters,

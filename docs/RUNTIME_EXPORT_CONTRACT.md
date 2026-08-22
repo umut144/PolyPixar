@@ -84,7 +84,7 @@ part of the contract.
 
 ## Common Component fields
 
-Every Component requires `component_id`, unique `semantic_key`, nullable
+Every Component requires `component_id`, unique `name`, nullable
 `parent_component_id`, integer `z_index`, two-float `local_pivot`, and
 `local_transform`:
 
@@ -153,7 +153,7 @@ otherwise consumed identically.
 
 An Asset Reference adds `kind: "asset_reference"` and required
 `source_asset_key`. It contains neither `mesh` nor `contour_stroke_mesh`.
-`semantic_key` is its classification in the owner Asset; `source_asset_key`
+`name` is its authored identity in the owner Asset; `source_asset_key`
 identifies the borrowed package. Consumers resolve References through the
 Catalog, retain the referenced Asset pivot/hierarchy, apply the Reference
 transform as placement, and reject missing packages or cross-Asset cycles.
@@ -165,7 +165,7 @@ Closed Component:
 ```json
 {
   "component_id": "component_6",
-  "semantic_key": "body",
+  "name": "body",
   "parent_component_id": null,
   "z_index": 0,
   "local_pivot": [0.0, 0.0],

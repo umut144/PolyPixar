@@ -111,11 +111,11 @@ data. They are not active batch stages, Runtime dependencies, or schema-4
 fields. PolyTools does not delete or silently reinterpret those records.
 
 The persistent `Export Runtime (N)` action automatically considers every visible
-Asset. Every visible Component must have one unique
-registered `semantic_key`. Closed and primitive ordinary Components require a
+Asset. Every visible Component must have one unique free-form `name`. Closed
+and primitive ordinary Components require a
 current Fill Mesh and current centered Contour Stroke Mesh. Open Contours
 require only that Stroke and export no Fill. Asset
-References instead export their local Semantic Key
+References instead export their local Component name
 plus the referenced Asset's derived `source_asset_key`; they do not duplicate
 the referenced geometry. The editor retains `source_asset_id` only as its
 internal link to the actual authored source Asset.
@@ -145,10 +145,8 @@ disabled.
 A World persists Assets plus the currently retained motion and derived
 mesh records. Assets own Components, Guides, reference-image settings, their
 Asset pivot and `asset_type`. World schema 40 retains the schema-39
-`semantic_key` contract and replaces legacy Ribbons with open Contours. The key
-remains the required, sole authored Component designation and registry identity,
-visible name, search term, and runtime target; no independent Component label or
-free-form runtime role is persisted. The World `name` is its stable technical
+free-form Component names and replaces legacy Ribbons with open Contours. Names
+are unique within an Asset and are the authored runtime-target bindings. The World `name` is its stable technical
 key and owns its directory and main JSON filename. A separate persisted
 `world_name` stores the human-facing title and does not need to be visible in
 the current UI. New persistence must not add display polygons or reverse
@@ -162,34 +160,22 @@ reject collisions across all Assets, including hidden Assets. The Catalog and
 runtime contract expose no internal Asset IDs; the Catalog is the authoritative
 closed export set, so consumers do not discover packages by directory listing.
 
-## Semantic Registry workflow
+## Component naming
 
-`configs/semantic_keys.json` is the independently versioned, read-only Semantic
-Registry. Its schema version is currently `1`; keys are unique, stable,
-alphabetically sorted `lower_snake_case` values. The editor provides no inline
-add, rename, or delete action. Component and Asset-Reference creation require a
-choice from the searchable registry picker, and the Inspector uses the same
-searchable list inside a compact dropdown. A key may occur only once inside an
-Asset.
+Component names are free-form and unique within each Asset. Runtime animation
+configs bind generic targets such as `target01` to these names per Asset.
 
 References classify the borrowed geometry locally: for example, Barde may use
 the Orb Asset through its stable Asset ID in `source_asset_id` while assigning the local
-`semantic_key = "belly"`. Runtime export resolves that internal link to
+`name = "belly"`. Runtime export resolves that internal link to
 `source_asset_key = "orb"`. Duplicate maps the known pairs `eye_left` /
 `eye_right` and `eyebrow_left` / `eyebrow_right` automatically. Every other
 copied Component requires an explicit picker choice before the duplicate is
 committed.
 
-Registry changes are a Mensch-AI maintenance operation. Before adding or
-replacing a key, inspect all World, Motion, export, test, and documentation
-uses; then update the registry and every affected reference atomically. Do not
-silently repurpose an existing key. A removed or unknown link must remain
-visible as `missing_semantic (<key/source>)` and block runtime export until a
-valid replacement is chosen.
+Asset References retain `source_asset_id` as their internal source link.
 
-Weapon Components use the namespaced registry keys `weapon_body`,
-`weapon_collar`, `weapon_grip`, `weapon_head`, `weapon_head_left`, `weapon_rear`, `weapon_shaft`,
-and `weapon_string`. Weapon Point Guides use the separate Guide types
+Weapon Point Guides use the separate Guide types
 `weapon_grip_point`, `weapon_cast_point`, `weapon_nocking_point`, and
 `weapon_aim_point`; Guides are not Component Semantic Keys.
 
