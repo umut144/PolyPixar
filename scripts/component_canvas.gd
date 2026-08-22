@@ -110,6 +110,7 @@ var component_transform: Dictionary = {
 	"scale": Vector2.ONE,
 	"pivot": Vector2.ZERO
 }
+var outline_coverage: Dictionary = {}
 var asset_pivot := Vector2.ZERO
 var reference_image: Texture2D
 var reference_image_visible := true
@@ -709,6 +710,11 @@ func set_component_transform(transform: Dictionary) -> void:
 	queue_redraw()
 
 
+func set_outline_coverage(coverage: Dictionary) -> void:
+	outline_coverage = coverage.duplicate(true)
+	queue_redraw()
+
+
 func set_asset_pivot(pivot: Vector2) -> void:
 	asset_pivot = pivot
 	queue_redraw()
@@ -1211,7 +1217,10 @@ func _draw_reference_bezier_shape(shape: Dictionary, points: Array, edges: Array
 				if bool(edge_data.get("render_outline", true)):
 					draw_polyline(curve_points, reference_color, reference_width, true)
 				else:
-					_draw_dashed_polyline(curve_points, reference_color, reference_width)
+					if bool(shape.get("outline_coverage", {}).get(edge_id, false)):
+						_draw_dash_dot_polyline(curve_points, reference_color, reference_width)
+					else:
+						_draw_dashed_polyline(curve_points, reference_color, reference_width)
 	for point_data in points:
 		if point_data is Dictionary:
 			draw_circle(_world_to_screen(_local_to_world_with_transform(point_data.get("position", Vector2.ZERO), transform)), 3.0, reference_color)
@@ -1349,7 +1358,10 @@ func _draw_bezier_geometry() -> void:
 			if curve_points.size() >= 2:
 				var edge_color := selection_color if edge_id in selected_edge_ids or (edit_mode == "face" and face_selected) else edge_mode_highlight
 				if guide_style or not bool(edge_data.get("render_outline", true)):
-					_draw_dashed_polyline(curve_points, edge_color, 2.0)
+					if bool(outline_coverage.get(edge_id, false)):
+						_draw_dash_dot_polyline(curve_points, edge_color, 2.0)
+					else:
+						_draw_dashed_polyline(curve_points, edge_color, 2.0)
 				else:
 					draw_polyline(curve_points, edge_color, 2.0, true)
 	if interaction_state != "transform":
@@ -1762,6 +1774,31 @@ func _draw_dashed_polyline(points: PackedVector2Array, line_color: Color, line_w
 					if gap_remaining <= 0.001:
 						drawing_dash = true
 						dash_remaining = dash_length
+
+
+func _draw_dash_dot_polyline(points: PackedVector2Array, line_color: Color, line_width: float) -> void:
+	if points.size() < 2:
+		return
+	var pattern: Array[float] = [7.0, 3.0, 1.5, 3.0]
+	var pattern_index := 0
+	var remaining: float = pattern[0]
+	for index in range(points.size() - 1):
+		var start := points[index]
+		var end := points[index + 1]
+		var segment := end - start
+		var length := segment.length()
+		if length <= 0.001:
+			continue
+		var distance := 0.0
+		while distance < length:
+			var step := minf(remaining, length - distance)
+			if pattern_index % 2 == 0:
+				draw_line(start + segment * (distance / length), start + segment * ((distance + step) / length), line_color, line_width)
+			distance += step
+			remaining -= step
+			if remaining <= 0.001:
+				pattern_index = (pattern_index + 1) % pattern.size()
+				remaining = pattern[pattern_index]
 
 
 func _world_to_screen(world_position: Vector2) -> Vector2:

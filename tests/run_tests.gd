@@ -30,6 +30,7 @@ func _init() -> void:
 	_test_runtime_export_service()
 	_test_weighting_service_and_ui()
 	_test_component_hierarchy_model()
+	_test_outline_coverage()
 	_test_asset_guides()
 	_test_motion_selection_context()
 	_test_motion_player()
@@ -1833,6 +1834,38 @@ func _test_component_hierarchy_model() -> void:
 	parent["parent_component_id"] = "component_child"
 	ComponentHierarchy.normalize_asset(asset)
 	_expect(str(parent.get("parent_component_id", "")).is_empty(), "Loading cyclic Component data should safely promote one participant to the Asset root.")
+
+
+func _test_outline_coverage() -> void:
+	var target := {
+		"id": "head_mid",
+		"parent_component_id": "",
+		"group_id": "hammer_head",
+		"visibility": true,
+		"z_index": 0,
+		"transform": {"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO},
+		"points": [{"id": "a", "position": Vector2(0, 0)}, {"id": "b", "position": Vector2(0, 10)}],
+		"edges": [{"id": "mid_left", "start_point_id": "a", "end_point_id": "b", "render_outline": false}],
+		"chains": []
+	}
+	var overlay := {
+		"id": "head_right",
+		"parent_component_id": "",
+		"group_id": "hammer_head",
+		"visibility": true,
+		"z_index": 0,
+		"transform": {"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO},
+		"points": [{"id": "c", "position": Vector2(0, 5)}, {"id": "d", "position": Vector2(0, 15)}],
+		"edges": [{"id": "right_edge", "start_point_id": "c", "end_point_id": "d", "render_outline": true}],
+		"chains": []
+	}
+	var asset := {"id": "hammer", "visibility": true, "components": [target, overlay], "groups": [{"id": "hammer_head", "visibility": true, "z_index": 0, "transform": {"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}}]}
+	ComponentHierarchy.normalize_asset(asset)
+	var coverage := OutlineCoverageService.resolve_asset(asset)
+	_expect(bool(coverage["head_mid"]["mid_left"]), "An Off edge should receive coverage diagnostics when a longer visible edge partially overlaps it.")
+	target["edges"][0]["render_outline"] = true
+	coverage = OutlineCoverageService.resolve_asset(asset)
+	_expect(not bool(coverage["head_mid"]["mid_left"]), "Coverage diagnostics should not be evaluated for an enabled Render Outline.")
 
 
 func _test_asset_guides() -> void:
