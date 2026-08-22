@@ -1,12 +1,9 @@
 class_name RuntimeExportService
 extends RefCounted
 
-const MANIFEST_SCHEMA_VERSION := 4
+const MANIFEST_SCHEMA_VERSION := 5
 static func build_manifest(asset: Dictionary, sources: Dictionary) -> Dictionary:
 	var errors: Array[String] = []
-	var registry := SemanticRegistry.load_registry()
-	if not bool(registry.get("valid", false)):
-		errors.append_array(registry.get("errors", []))
 	var asset_id := str(asset.get("id", ""))
 	if asset_id.is_empty():
 		errors.append("Asset ID is missing.")
@@ -18,25 +15,25 @@ static func build_manifest(asset: Dictionary, sources: Dictionary) -> Dictionary
 		errors.append("Asset pivot is not finite.")
 	var visible_components: Array[Dictionary] = []
 	var ids: Dictionary = {}
-	var roles: Dictionary = {}
+	var names: Dictionary = {}
 	for raw_component in asset.get("components", []):
 		if not raw_component is Dictionary or not bool(raw_component.get("visibility", true)):
 			continue
 		var component: Dictionary = raw_component
 		var component_id := str(component.get("id", ""))
-		var role := str(component.get("semantic_key", "")).strip_edges()
+		var component_name := str(component.get("name", "")).strip_edges()
 		if component_id.is_empty():
 			errors.append("A visible Component has no stable ID.")
 		elif ids.has(component_id):
 			errors.append("Component ID '%s' is duplicated." % component_id)
 		else:
 			ids[component_id] = true
-		if not SemanticRegistry.contains(registry, role):
-			errors.append("%s: Semantic Key is missing from the registry." % _component_label(component))
-		elif roles.has(role):
-			errors.append("Semantic Key '%s' is duplicated." % role)
+		if component_name.is_empty():
+			errors.append("%s: Component Name is missing." % _component_label(component))
+		elif names.has(component_name.to_lower()):
+			errors.append("Component Name '%s' is duplicated." % component_name)
 		else:
-			roles[role] = true
+			names[component_name.to_lower()] = true
 		visible_components.append(component)
 	visible_components.sort_custom(_component_less)
 	for component in visible_components:
@@ -140,7 +137,7 @@ static func _build_component_v4(component: Dictionary, source: Dictionary, expor
 		parent_component_id = str(component.get("parent_component_id", ""))
 	var runtime_component := {
 		"component_id": str(component.get("id", "")),
-		"semantic_key": str(component.get("semantic_key", "")).strip_edges(),
+		"name": str(component.get("name", "")).strip_edges(),
 		"parent_component_id": parent_component_id,
 		"z_index": int(component.get("z_index", 0)),
 		"local_pivot": [0.0, 0.0],
@@ -278,7 +275,7 @@ static func _build_reference_component(component: Dictionary, source: Dictionary
 		"errors": [],
 		"component": {
 			"component_id": str(component.get("id", "")),
-			"semantic_key": str(component.get("semantic_key", "")),
+			"name": str(component.get("name", "")),
 			"kind": "asset_reference",
 			"source_asset_key": source_asset_key,
 			"parent_component_id": parent_component_id,
@@ -340,7 +337,7 @@ static func _component_less(a: Dictionary, b: Dictionary) -> bool:
 
 
 static func _component_label(component: Dictionary) -> String:
-	return "%s (%s)" % [str(component.get("semantic_key", "missing_semantic")), str(component.get("id", "missing-id"))]
+	return "%s (%s)" % [str(component.get("name", "Component")), str(component.get("id", "missing-id"))]
 
 
 static func _meters(value: Vector2) -> Array:

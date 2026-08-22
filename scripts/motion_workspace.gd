@@ -911,7 +911,7 @@ func _motion_summary(motion: Dictionary) -> String:
 	var target_label := "Entire Asset" if str(motion.get("target_scope", TARGET_COMPONENT)) == TARGET_ASSET else "Select Component"
 	for component in asset_components:
 		if str(component.get("id", "")) == target_id:
-			target_label = str(component.get("semantic_key", component.get("name", "missing_semantic")))
+			target_label = str(component.get("name", "Component"))
 			break
 	var guide_required := str(motion.get("domain", OUTER)) == INNER
 	var disabled_label := "Disabled · " if not bool(motion.get("enabled", true)) else ""

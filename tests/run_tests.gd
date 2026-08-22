@@ -1643,14 +1643,14 @@ func _test_runtime_export_service() -> void:
 	}
 	var contour_stroke: Dictionary = mesh.duplicate(true)
 	contour_stroke.merge({"method": ContourMeshService.METHOD, "has_outline": true, "topology_role": "outer", "runs": [{"run_id": "boundary:run:0", "edge_ids": ["edge_0"], "closed": true, "start_cap": "none", "end_cap": "none", "vertex_offset": 0, "vertex_count": 3, "index_offset": 0, "index_count": 3}], "parameters": {"reference_pixels_per_meter": 128.0, "stroke_width_px": 4.0, "stroke_width_meters": 0.03125, "join": "miter", "miter_limit": 4.0, "cap": "butt"}}, true)
-	var body := {"id": "component_b", "name": "body", "semantic_key": "body", "visibility": true, "z_index": 2, "parent_component_id": "", "transform": {"position": Vector2(10.0, 20.0), "pivot": Vector2(2.0, 3.0), "rotation": 90.0, "scale": Vector2.ONE}}
-	var eye := {"id": "component_a", "name": "eye_left", "semantic_key": "eye_left", "visibility": true, "z_index": 2, "parent_component_id": "component_b", "transform": {"position": Vector2.ZERO, "pivot": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE}}
+	var body := {"id": "component_b", "name": "body", "visibility": true, "z_index": 2, "parent_component_id": "", "transform": {"position": Vector2(10.0, 20.0), "pivot": Vector2(2.0, 3.0), "rotation": 90.0, "scale": Vector2.ONE}}
+	var eye := {"id": "component_a", "name": "eye_left", "visibility": true, "z_index": 2, "parent_component_id": "component_b", "transform": {"position": Vector2.ZERO, "pivot": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE}}
 	var asset := {"id": "wizard", "name": "Wizard", "asset_type": "character", "visibility": true, "asset_pivot": Vector2(5.0, 6.0), "components": [body, eye]}
 	var source := {"mesh": mesh, "contour_stroke": contour_stroke}
 	var result := RuntimeExportService.build_manifest(asset, {"component_a": source, "component_b": source})
 	var manifest: Dictionary = result.get("manifest", {})
 	var components: Array = manifest.get("components", [])
-	_expect(bool(result.get("valid", false)) and int(manifest.get("schema_version", 0)) == 4 and str(manifest.get("asset_key", "")) == "wizard" and not manifest.has("asset_id"), "Runtime export schema 4 should identify packages only by the Asset Key derived from their display name.")
+	_expect(bool(result.get("valid", false)) and int(manifest.get("schema_version", 0)) == 5 and str(manifest.get("asset_key", "")) == "wizard" and not manifest.has("asset_id"), "Runtime export schema 5 should identify packages only by the Asset Key derived from their display name.")
 	_expect(components.size() == 2 and str(components[0].get("component_id", "")) == "component_a" and str(components[1].get("component_id", "")) == "component_b", "Runtime Components should sort globally by ascending z_index and lexicographic Component ID.")
 	_expect(components[1].get("mesh", {}).get("vertices", []) == [[-0.2, -0.30000000000000004], [0.8, -0.30000000000000004], [-0.2, 0.7000000000000001]] and components[1].get("mesh", {}).get("indices", []) == [0, 1, 2], "Runtime Meshes should preserve accepted Vertex order, convert Tool units to meters, compact Triangle IDs, and be local to their Component pivot.")
 	_expect(not components[1].get("mesh", {}).has("uvs") and not components[1].has("contour_carrier") and not components[1].has("contour_mask"), "Schema 4 must remove UV, Carrier, and SDF fields rather than retaining a silent compatibility payload.")
@@ -1664,7 +1664,7 @@ func _test_runtime_export_service() -> void:
 	var disabled_result := RuntimeExportService.build_manifest(asset, {"component_a": {"mesh": mesh, "contour_stroke": disabled_stroke}, "component_b": source})
 	_expect(bool(disabled_result.get("valid", false)) and not bool(disabled_result.get("manifest", {}).get("components", [])[0].get("contour_stroke_mesh", {}).get("has_outline", true)), "Schema 4 must preserve Render Outline off as an explicit empty Stroke without generating fallback art.")
 	_expect(components[1].get("local_transform", {}).get("position", []) == [1.0, 2.0] and is_equal_approx(float(components[1].get("local_transform", {}).get("rotation_radians", 0.0)), PI / 2.0), "Runtime transforms should preserve Y-up coordinates and publish positions in meters and CCW radians.")
-	_expect(not components[1].has("display_name") and str(components[1].get("semantic_key", "")) == "body", "Runtime Components should expose their Semantic Key as the sole authored designation without a redundant display label.")
+	_expect(not components[1].has("display_name") and str(components[1].get("name", "")) == "body" and not components[1].has("semantic_key"), "Runtime Components should expose their free Component name without a redundant display label or Semantic Key.")
 	var scaled_export_asset: Dictionary = asset.duplicate(true)
 	scaled_export_asset["components"][0]["transform"]["scale"] = Vector2(2.0, 1.0)
 	var scaled_export_result := RuntimeExportService.build_manifest(scaled_export_asset, {"component_a": source, "component_b": source})
@@ -1675,8 +1675,8 @@ func _test_runtime_export_service() -> void:
 	var contour_export := RuntimeExportService.build_manifest(open_contour_asset, {"component_b": {"contour_stroke": contour_stroke}})
 	var exported_contour: Dictionary = contour_export.get("manifest", {}).get("components", [])[0]
 	_expect(bool(contour_export.get("valid", false)) and exported_contour.has("contour_stroke_mesh") and not exported_contour.has("mesh"), "Schema 4 must export an open Contour exclusively as its typed art Stroke without inventing Fill geometry.")
-	var wizard_head := {"id": "head", "semantic_key": "head", "visibility": true, "parent_component_id": "", "transform": {"position": Vector2(0.0, 8.5), "pivot": Vector2(0.0, 8.5), "rotation": 0.0, "scale": Vector2.ONE}}
-	var wizard_eye := {"id": "eye", "semantic_key": "eye_left", "visibility": true, "parent_component_id": "head", "transform": {"position": Vector2(-0.3, 8.5), "pivot": Vector2(-0.3, 8.5), "rotation": 0.0, "scale": Vector2.ONE}}
+	var wizard_head := {"id": "head", "name": "head", "visibility": true, "parent_component_id": "", "transform": {"position": Vector2(0.0, 8.5), "pivot": Vector2(0.0, 8.5), "rotation": 0.0, "scale": Vector2.ONE}}
+	var wizard_eye := {"id": "eye", "name": "eye_left", "visibility": true, "parent_component_id": "head", "transform": {"position": Vector2(-0.3, 8.5), "pivot": Vector2(-0.3, 8.5), "rotation": 0.0, "scale": Vector2.ONE}}
 	var head_mesh: Dictionary = mesh.duplicate(true)
 	head_mesh["vertices"] = [{"id": "v0", "position": Vector2(0.0, 8.5)}, {"id": "v1", "position": Vector2(1.0, 8.5)}, {"id": "v2", "position": Vector2(0.0, 9.5)}]
 	var eye_mesh: Dictionary = mesh.duplicate(true)
@@ -1695,19 +1695,19 @@ func _test_runtime_export_service() -> void:
 	var reconstructed_eye := _runtime_export_world_transform(nested_by_id, "eye") * Vector2(float(eye_vertex[0]), float(eye_vertex[1]))
 	var eye_local_position: Array = exported_eye.get("local_transform", {}).get("position", [])
 	_expect(bool(nested_result.get("valid", false)) and exported_eye.get("local_pivot", []) == [0.0, 0.0] and is_equal_approx(float(eye_local_position[0]), -0.03) and is_zero_approx(float(eye_local_position[1])) and reconstructed_eye.is_equal_approx(Vector2(-0.025, 0.85)), "Nested Wizard Head → Eye export should use child-local mesh/pivot data and reconstruct its intended asset-space world position exactly.")
-	var reference := {"id": "component_orb", "type": "reference", "semantic_key": "belly", "source_asset_id": "orb", "visibility": true, "z_index": 3, "parent_component_id": "component_b", "transform": {"position": Vector2(3.0, 4.0), "pivot": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE}}
+	var reference := {"id": "component_orb", "type": "reference", "name": "orb_reference", "source_asset_id": "orb", "visibility": true, "z_index": 3, "parent_component_id": "component_b", "transform": {"position": Vector2(3.0, 4.0), "pivot": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE}}
 	var referenced_asset: Dictionary = asset.duplicate(true)
 	referenced_asset["components"].append(reference)
 	var reference_source := {"owner_asset_id": "wizard", "source_asset_exists": true, "source_asset_key": "orb"}
 	var referenced_result := RuntimeExportService.build_manifest(referenced_asset, {"component_a": source, "component_b": source, "component_orb": reference_source})
 	var referenced_components: Array = referenced_result.get("manifest", {}).get("components", [])
 	var exported_reference: Dictionary = referenced_components[2] if referenced_components.size() == 3 else {}
-	_expect(bool(referenced_result.get("valid", false)) and str(exported_reference.get("kind", "")) == "asset_reference" and str(exported_reference.get("source_asset_key", "")) == "orb" and not exported_reference.has("source_asset_id") and str(exported_reference.get("semantic_key", "")) == "belly" and not exported_reference.has("mesh"), "A local Semantic Key should classify a Reference while source_asset_key preserves the referenced runtime Asset identity.")
+	_expect(bool(referenced_result.get("valid", false)) and str(exported_reference.get("kind", "")) == "asset_reference" and str(exported_reference.get("source_asset_key", "")) == "orb" and not exported_reference.has("source_asset_id") and str(exported_reference.get("name", "")) == "orb_reference" and not exported_reference.has("mesh"), "A local free Component name should classify a Reference while source_asset_key preserves the referenced runtime Asset identity.")
 	reference_source["source_asset_exists"] = false
 	_expect(not bool(RuntimeExportService.build_manifest(referenced_asset, {"component_a": source, "component_b": source, "component_orb": reference_source}).get("valid", true)), "Runtime export should reject a Reference whose actual source Asset cannot be resolved.")
 	var duplicate_role_asset: Dictionary = asset.duplicate(true)
-	duplicate_role_asset["components"][1]["semantic_key"] = "body"
-	_expect(not bool(RuntimeExportService.build_manifest(duplicate_role_asset, {"component_a": source, "component_b": source}).get("valid", true)), "Runtime export should reject duplicate Semantic Keys.")
+	duplicate_role_asset["components"][1]["name"] = "body"
+	_expect(not bool(RuntimeExportService.build_manifest(duplicate_role_asset, {"component_a": source, "component_b": source}).get("valid", true)), "Runtime export should reject duplicate Component Names.")
 	var missing_stroke: Dictionary = source.duplicate(true)
 	missing_stroke["contour_stroke"] = {}
 	_expect(not bool(RuntimeExportService.build_manifest(asset, {"component_a": missing_stroke, "component_b": source}).get("valid", true)), "Runtime export should reject a missing Contour Stroke Bake without fallback.")
@@ -1811,7 +1811,7 @@ func _test_component_hierarchy_model() -> void:
 
 func _test_asset_guides() -> void:
 	var component := _component()
-	component.merge({"id": "component_1", "name": "body", "semantic_key": "body", "visibility": true, "transform": {"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}})
+	component.merge({"id": "component_1", "name": "body", "visibility": true, "transform": {"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}})
 	BezierTopology.add_point(component, Vector2.ZERO, "linear")
 	BezierTopology.add_point(component, Vector2(10.0, 0.0), "linear")
 	BezierTopology.add_point(component, Vector2(10.0, 10.0), "linear")

@@ -19,7 +19,7 @@ static func analyze_asset(asset: Dictionary) -> Dictionary:
 			continue
 		var entry := {
 			"component_id": str(component.get("id", "")),
-			"name": str(component.get("name", component.get("semantic_key", "Component"))),
+			"name": str(component.get("name", "Component")),
 			"scale": scale
 		}
 		var reason := _blocking_reason(asset, component, scale)
