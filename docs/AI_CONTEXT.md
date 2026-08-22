@@ -59,6 +59,15 @@ user-editable sample count. Guides remain independent topology records scoped to
 Sampling, Seeding, Meshing, UV, and Weighting records are stored separately
 from source topology.
 
+Assets may also contain editor-only Component Groups. A Group owns a stable ID,
+a unique lower-snake-case name, visibility, and a shared world-level transform
+with a pivot initially placed at the world center. Group membership does not
+replace Component parentage: parent/child links remain independent, and a child
+inherits its ancestor's effective Group membership. Moving a Component into or
+out of a Group, or changing its parent through the Outliner, must preserve its
+world transform. Runtime export does not emit Group records; it resolves Group
+transforms into the ordinary Component export transforms.
+
 World schema 41 owns one authored Contour stroke width for every Asset in its
 typed `world_settings` record. It defaults to `4 px` at the fixed `128 px/m`
 reference density, has no Component override, and invalidates derived Contour

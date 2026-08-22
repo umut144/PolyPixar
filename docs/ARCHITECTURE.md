@@ -54,7 +54,7 @@ An Asset contains:
 
 - stable ID, name, visibility, and `asset_type`;
 - Asset pivot and reference-image settings;
-- Components and Guides;
+- Components, Groups, and Guides;
 - retained asset-local animation data.
 
 A Component contains its geometry source, hierarchy reference, local transform,
@@ -62,6 +62,17 @@ visibility/layer settings, draw mode, widths, catch-parent reference, and point
 number display setting. It carries a free-form `name`, unique within its Asset.
 The name is the authored identity used by runtime animation bindings. It has
 no Material assignment.
+
+A Group is an Asset-local authoring container with a stable ID, a unique
+lower-snake-case name, visibility, and one shared transform/pivot. Components
+retain their own local transforms for editing, while the Group transform is
+applied as the outer transform of every member. Component parent/child
+hierarchy remains independent from Group membership; descendants inherit their
+ancestor's effective Group membership unless explicitly assigned otherwise.
+Outliner drag-and-drop preserves each affected Component's world transform when
+changing Group membership or Component parentage. Groups are editor-only
+containers: runtime export emits the ordinary Components and resolves the
+Group transform into their canonical exported transforms.
 
 Derived mesh documents are keyed by Asset and Component IDs. Sampling feeds
 Seeding, Seeding feeds Meshing, and accepted Bakes remain separate from source
