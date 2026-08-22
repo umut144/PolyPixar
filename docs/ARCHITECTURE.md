@@ -205,7 +205,9 @@ render-only changes reuse it; document mutations invalidate it and coalesced
 edits refresh it after a short debounce. Batch execution never trusts the UI
 cache and recomputes authoritative candidates before mutating derived data.
 
-Schema 43 restores free-form Component names. Existing names are preserved;
+Schema 43 restores free-form Component names. New and renamed names use
+`lower_snake_case`; the vocabulary remains unrestricted. The Component dialog
+and Inspector reject invalid names before committing. Existing names are preserved;
 older Semantic Key fields are used only as a deterministic one-time migration
 fallback, and case-insensitive name collisions receive numbered suffixes.
 Names remain unique within an Asset. Asset References retain their internal

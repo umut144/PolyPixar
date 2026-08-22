@@ -30,6 +30,8 @@ static func build_manifest(asset: Dictionary, sources: Dictionary) -> Dictionary
 			ids[component_id] = true
 		if component_name.is_empty():
 			errors.append("%s: Component Name is missing." % _component_label(component))
+		elif not _is_lower_snake_case(component_name):
+			errors.append("%s: Component Name must use lower_snake_case." % _component_label(component))
 		elif names.has(component_name.to_lower()):
 			errors.append("Component Name '%s' is duplicated." % component_name)
 		else:
@@ -338,6 +340,17 @@ static func _component_less(a: Dictionary, b: Dictionary) -> bool:
 
 static func _component_label(component: Dictionary) -> String:
 	return "%s (%s)" % [str(component.get("name", "Component")), str(component.get("id", "missing-id"))]
+
+
+static func _is_lower_snake_case(value: String) -> bool:
+	if value.is_empty() or value.begins_with("_") or value.ends_with("_") or value.contains("__"):
+		return false
+	for character in value:
+		var code := character.unicode_at(0)
+		if not ((code >= 97 and code <= 122) or (code >= 48 and code <= 57) or code == 95):
+			return false
+	var first := value.unicode_at(0)
+	return first >= 97 and first <= 122
 
 
 static func _meters(value: Vector2) -> Array:

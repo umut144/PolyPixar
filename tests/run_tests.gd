@@ -1578,6 +1578,10 @@ func _test_geometry_sdf_service_and_batch() -> void:
 func _test_component_names() -> void:
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
+	var naming_asset := {"components": []}
+	_expect(application._component_name_validation_error("weapon_head_left", naming_asset).is_empty(), "Component names should accept lower_snake_case.")
+	_expect(not application._component_name_validation_error("Weapon Head", naming_asset).is_empty(), "Component names should reject spaces and uppercase letters.")
+	_expect(not application._component_name_validation_error("_weapon_head", naming_asset).is_empty(), "Component names should reject a leading underscore.")
 	var source_component := _component()
 	source_component.merge({"id": "component_1", "name": "body", "visibility": true})
 	var semantic_asset := {"id": "character", "name": "Character", "asset_type": "character", "visibility": true, "components": [source_component], "guides": []}
@@ -1711,6 +1715,9 @@ func _test_runtime_export_service() -> void:
 	var missing_stroke: Dictionary = source.duplicate(true)
 	missing_stroke["contour_stroke"] = {}
 	_expect(not bool(RuntimeExportService.build_manifest(asset, {"component_a": missing_stroke, "component_b": source}).get("valid", true)), "Runtime export should reject a missing Contour Stroke Bake without fallback.")
+	var invalid_name_asset: Dictionary = asset.duplicate(true)
+	invalid_name_asset["components"][0]["name"] = "Body"
+	_expect(not bool(RuntimeExportService.build_manifest(invalid_name_asset, {"component_a": source, "component_b": source}).get("valid", true)), "Runtime export should reject Component Names outside lower_snake_case.")
 
 
 func _test_weighting_service_and_ui() -> void:

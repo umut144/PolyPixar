@@ -149,6 +149,7 @@ var asset_name_input: LineEdit
 var component_dialog: ConfirmationDialog
 var component_name_input: LineEdit
 var component_name_editor: LineEdit
+var component_name_hint: Label
 var component_draw_mode_menu: PopupMenu
 var component_add_menu: PopupMenu
 var component_add_child_menu: PopupMenu
@@ -1598,7 +1599,12 @@ func _create_component_dialog() -> void:
 	component_name_input.custom_minimum_size = Vector2(320, 32)
 	component_name_input.focus_mode = Control.FOCUS_ALL
 	component_name_input.text_submitted.connect(_submit_component_name)
+	component_name_input.text_changed.connect(_on_component_name_input_changed)
 	component_dialog.add_child(component_name_input)
+	component_name_hint = Label.new()
+	component_name_hint.custom_minimum_size = Vector2(320, 24)
+	component_name_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	component_dialog.add_child(component_name_hint)
 	add_child(component_dialog)
 
 
@@ -8303,7 +8309,7 @@ func _open_component_name_dialog(asset_id: String, parent_component_id: String, 
 	component_dialog.set_meta("source_asset_id", source_asset_id)
 	component_dialog.title = "Add %s" % ("Symbol Reference" if draw_mode == "reference" else "%s Component" % _draw_mode_display_name(draw_mode))
 	component_name_input.text = ""
-	component_dialog.get_ok_button().disabled = false
+	_update_component_name_dialog_validation()
 	canvas_view.set_navigation_locked(true)
 	component_dialog.popup_centered()
 	component_name_input.call_deferred("grab_focus")
@@ -8311,6 +8317,21 @@ func _open_component_name_dialog(asset_id: String, parent_component_id: String, 
 
 func _submit_component_name(_name: String) -> void:
 	_confirm_component_creation()
+
+
+func _on_component_name_input_changed(_name: String) -> void:
+	_update_component_name_dialog_validation()
+
+
+func _update_component_name_dialog_validation() -> void:
+	if not is_instance_valid(component_name_input) or not is_instance_valid(component_dialog):
+		return
+	var asset := _get_asset(str(component_dialog.get_meta("asset_id", "")))
+	var error := _component_name_validation_error(component_name_input.text, asset)
+	component_dialog.get_ok_button().disabled = not error.is_empty()
+	if is_instance_valid(component_name_hint):
+		component_name_hint.text = "" if error.is_empty() else error
+		component_name_hint.add_theme_color_override("font_color", Color("#ef6c78"))
 
 
 func _on_component_dialog_canceled() -> void:
@@ -8629,8 +8650,10 @@ func _confirm_component_creation() -> void:
 	var component_name := component_name_input.text.strip_edges()
 	if component_name.is_empty():
 		component_name = _next_default_component_name(asset)
-	if _has_component_name(asset, component_name):
-		_show_status_message("Component name must be unique within the Asset.")
+	var name_error := _component_name_validation_error(component_name, asset)
+	if not name_error.is_empty():
+		_update_component_name_dialog_validation()
+		_show_status_message(name_error)
 		return
 	_record_direct_change()
 	var component_id := "component_%d" % next_component_id
@@ -8691,6 +8714,26 @@ func _has_component_name(asset: Dictionary, component_name: String) -> bool:
 		if str(component.get("name", "")).strip_edges().to_lower() == component_name.to_lower():
 			return true
 	return false
+
+
+func _component_name_validation_error(raw_name: String, asset: Dictionary, excluded_component_id := "") -> String:
+	var component_name := raw_name.strip_edges()
+	if component_name.is_empty():
+		return "Enter a Component name."
+	if component_name.begins_with("_") or component_name.ends_with("_") or component_name.contains("__"):
+		return "Use lower_snake_case, e.g. weapon_head_left."
+	for character in component_name:
+		var code := character.unicode_at(0)
+		if not ((code >= 97 and code <= 122) or (code >= 48 and code <= 57) or code == 95):
+			return "Use lower_snake_case, e.g. weapon_head_left."
+	if component_name.unicode_at(0) >= 48 and component_name.unicode_at(0) <= 57:
+		return "Component names must start with a lowercase letter."
+	for component in asset.get("components", []):
+		if str(component.get("id", "")) == excluded_component_id:
+			continue
+		if str(component.get("name", "")).strip_edges().to_lower() == component_name.to_lower():
+			return "Component name must be unique within the Asset."
+	return ""
 
 
 func _select_component(asset_id: String, component_id: String, focus_outliner := false) -> void:
@@ -12964,18 +13007,16 @@ func _rename_selected_component(new_name: String) -> void:
 	var asset := _get_asset(selected_asset_id)
 	var component := _get_component(asset, selected_component_id)
 	var name := new_name.strip_edges()
-	if component.is_empty() or name.is_empty():
+	if component.is_empty():
+		return
+	var name_error := _component_name_validation_error(name, asset, selected_component_id)
+	if not name_error.is_empty():
 		if is_instance_valid(component_name_editor):
 			component_name_editor.text = _normalized_component_name(component)
+		_show_status_message(name_error)
 		return
 	if name == str(component.get("name", "")):
 		return
-	for other_component in asset.get("components", []):
-		if str(other_component.get("id", "")) != selected_component_id and str(other_component.get("name", "")).to_lower() == name.to_lower():
-			if is_instance_valid(component_name_editor):
-				component_name_editor.text = _normalized_component_name(component)
-			_show_status_message("Component name must be unique within the Asset.")
-			return
 	_record_direct_change()
 	component["name"] = name
 	_render_outliner()

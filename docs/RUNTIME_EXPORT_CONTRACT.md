@@ -84,7 +84,7 @@ part of the contract.
 
 ## Common Component fields
 
-Every Component requires `component_id`, unique `name`, nullable
+Every Component requires `component_id`, unique `name` in `lower_snake_case`, nullable
 `parent_component_id`, integer `z_index`, two-float `local_pivot`, and
 `local_transform`:
 
@@ -153,7 +153,8 @@ otherwise consumed identically.
 
 An Asset Reference adds `kind: "asset_reference"` and required
 `source_asset_key`. It contains neither `mesh` nor `contour_stroke_mesh`.
-`name` is its authored identity in the owner Asset; `source_asset_key`
+`name` is its authored identity in the owner Asset and must use
+`lower_snake_case`; `source_asset_key`
 identifies the borrowed package. Consumers resolve References through the
 Catalog, retain the referenced Asset pivot/hierarchy, apply the Reference
 transform as placement, and reject missing packages or cross-Asset cycles.
