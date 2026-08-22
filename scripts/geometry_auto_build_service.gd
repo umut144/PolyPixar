@@ -190,7 +190,7 @@ static func _append_source_signature(prefix: String, source: Dictionary, topolog
 		scalars.append(float(ContourMeshService.ALGORITHM_VERSION))
 		for edge in working.get("edges", []):
 			if edge is Dictionary:
-				topology_parts.append("contour_outline|%s|%d" % [str(edge.get("id", "")), int(OutlineService.is_enabled(edge))])
+				topology_parts.append("contour_outline|%s|%d" % [str(edge.get("id", "")), int(bool(edge.get("render_outline", true)))])
 	var sampling_transform: Transform2D = working.get("sampling_transform", Transform2D.IDENTITY)
 	_append_vector(vectors, sampling_transform.x)
 	_append_vector(vectors, sampling_transform.y)

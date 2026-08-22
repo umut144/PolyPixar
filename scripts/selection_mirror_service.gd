@@ -26,7 +26,7 @@ static func preview(component: Dictionary, selected_point_ids: Array, axis_start
 			"id": "preview:edge:%d" % index,
 			"start_point_id": str(start.get("id", "")),
 			"end_point_id": str(end.get("id", "")),
-			"render_outline": OutlineService.AUTO
+			"render_outline": true
 		})
 	return {"valid": true, "errors": [], "points": preview_points, "edges": preview_edges}
 

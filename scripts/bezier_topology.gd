@@ -103,7 +103,7 @@ static func add_point(component: Dictionary, position: Vector2, requested_mode: 
 			"id": edge_id,
 			"start_point_id": str(point_ids.back()),
 			"end_point_id": point_id,
-			"render_outline": OutlineService.AUTO
+			"render_outline": true
 		})
 		edge_ids.append(edge_id)
 	point_ids.append(point_id)
@@ -234,7 +234,7 @@ static func close_chain(component: Dictionary, chain_id: String) -> bool:
 		"id": edge_id,
 		"start_point_id": str(point_ids.back()),
 		"end_point_id": str(point_ids.front()),
-		"render_outline": OutlineService.AUTO
+		"render_outline": true
 	})
 	edge_ids.append(edge_id)
 	chain["edge_ids"] = edge_ids
@@ -323,7 +323,7 @@ static func insert_point_on_edge(component: Dictionary, edge_id: String, t: floa
 		"id": new_edge_id,
 		"start_point_id": new_point_id,
 		"end_point_id": end_id,
-		"render_outline": OutlineService.is_enabled(edge)
+		"render_outline": bool(edge.get("render_outline", true))
 	})
 	point_ids.insert(start_index + 1, new_point_id)
 	edge_ids.insert(edge_index + 1, new_edge_id)
@@ -519,7 +519,7 @@ static func _combined_outline_visibility(edges: Array, edge_ids: Array[String]) 
 	var visible := true
 	for edge_data in edges:
 		if edge_data is Dictionary and str(edge_data.get("id", "")) in edge_ids:
-			visible = visible and OutlineService.is_enabled(edge_data)
+			visible = visible and bool(edge_data.get("render_outline", true))
 	return visible
 
 
@@ -557,7 +557,7 @@ static func rebuild_chain_edges(component: Dictionary, chain: Dictionary) -> voi
 			"id": edge_id,
 			"start_point_id": str(point_ids[point_index]),
 			"end_point_id": str(point_ids[(point_index + 1) % point_ids.size()]),
-			"render_outline": OutlineService.AUTO
+			"render_outline": true
 		})
 		edge_ids.append(edge_id)
 	chain["edge_ids"] = edge_ids

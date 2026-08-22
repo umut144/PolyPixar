@@ -30,7 +30,6 @@ func _init() -> void:
 	_test_runtime_export_service()
 	_test_weighting_service_and_ui()
 	_test_component_hierarchy_model()
-	_test_outline_resolution()
 	_test_asset_guides()
 	_test_motion_selection_context()
 	_test_motion_player()
@@ -1019,7 +1018,7 @@ func _test_geometry_sampling_ui_shell() -> void:
 	_expect(application.selected_edge_ids.size() == 2, "Shift-click should preserve a multi-edge selection.")
 	application._on_edge_render_outline_changed(false)
 	var selected_component_after_outline: Dictionary = application._get_component(application._get_asset("asset_1"), "component_1")
-	_expect(str(selected_component_after_outline.get("edges", [])[0].get("render_outline", "")) == OutlineService.OFF and str(selected_component_after_outline.get("edges", [])[1].get("render_outline", "")) == OutlineService.OFF, "Render Outline should apply to every selected edge.")
+	_expect(not bool(selected_component_after_outline.get("edges", [])[0].get("render_outline", true)) and not bool(selected_component_after_outline.get("edges", [])[1].get("render_outline", true)), "Render Outline should apply to every selected edge.")
 	application.canvas_view._select_edge_by_click(edge_ids[0], true)
 	_expect(application.selected_edge_ids.size() == 1 and application.selected_edge_ids[0] == edge_ids[1], "Shift-clicking a selected edge should remove it from the selection.")
 	var edge_command := _context_menu(application, "⌘3")
@@ -1835,31 +1834,6 @@ func _test_component_hierarchy_model() -> void:
 	_expect(str(parent.get("parent_component_id", "")).is_empty(), "Loading cyclic Component data should safely promote one participant to the Asset root.")
 
 
-func _test_outline_resolution() -> void:
-	var left := {
-		"id": "head_left",
-		"group_id": "head",
-		"parent_component_id": "",
-		"transform": {"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO},
-		"points": [{"id": "a", "position": Vector2(0, 0), "handle_in": Vector2.ZERO, "handle_out": Vector2.ZERO}, {"id": "b", "position": Vector2(0, 10), "handle_in": Vector2.ZERO, "handle_out": Vector2.ZERO}],
-		"edges": [{"id": "left_edge", "start_point_id": "a", "end_point_id": "b", "render_outline": OutlineService.AUTO}],
-		"chains": []
-	}
-	var right := left.duplicate(true)
-	right["id"] = "head_right"
-	right["transform"]["position"] = Vector2(10, 0)
-	right["points"][0]["position"] = Vector2(-10, 0)
-	right["points"][1]["position"] = Vector2(-10, 10)
-	right["edges"][0]["id"] = "right_edge"
-	var asset := {"components": [left, right], "groups": [{"id": "head", "name": "head", "transform": {"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}}]}
-	ComponentHierarchy.normalize_asset(asset)
-	var resolved := OutlineResolutionService.resolve_group(asset, "head")
-	_expect(not bool(resolved["head_left"]["left_edge"].get("enabled", true)) and str(resolved["head_left"]["left_edge"].get("diagnostic", "")) == "covered", "Automatic outline ownership should suppress the lower-priority shared edge.")
-	_expect(bool(resolved["head_right"]["right_edge"].get("enabled", false)), "Automatic outline ownership should keep the higher-priority shared edge visible.")
-	left["edges"][0]["render_outline"] = OutlineService.ON
-	right["edges"][0]["render_outline"] = OutlineService.OFF
-	resolved = OutlineResolutionService.resolve_group(asset, "head")
-	_expect(bool(resolved["head_left"]["left_edge"].get("enabled", false)) and not bool(resolved["head_right"]["right_edge"].get("enabled", true)), "Manual outline modes must override automatic ownership.")
 func _test_asset_guides() -> void:
 	var component := _component()
 	component.merge({"id": "component_1", "name": "body", "visibility": true, "transform": {"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}})

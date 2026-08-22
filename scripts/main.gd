@@ -2875,7 +2875,7 @@ func _serialize_edges(edges: Array) -> Array:
 			"id": str(edge_data.get("id", "")),
 			"start_point_id": str(edge_data.get("start_point_id", "")),
 			"end_point_id": str(edge_data.get("end_point_id", "")),
-			"render_outline": OutlineService.normalize_mode(edge_data.get("render_outline", OutlineService.AUTO))
+			"render_outline": bool(edge_data.get("render_outline", true))
 		})
 	return serialized
 
@@ -2936,7 +2936,7 @@ func _deserialize_component_topology(component_data: Dictionary) -> Dictionary:
 			"id": edge_id,
 			"start_point_id": start_point_id,
 			"end_point_id": end_point_id,
-			"render_outline": OutlineService.normalize_mode(raw_edge.get("render_outline", OutlineService.AUTO))
+			"render_outline": bool(raw_edge.get("render_outline", true))
 		})
 		known_edge_ids[edge_id] = true
 	var chains: Array[Dictionary] = []
@@ -11600,7 +11600,15 @@ func _render_inspector() -> void:
 			edge_hint.add_theme_color_override("font_color", Color("#9aa3b2"))
 			inspector_content.add_child(edge_hint)
 		else:
-			inspector_content.add_child(_create_render_outline_mode_option(selected_edges))
+			var render_outline := CheckButton.new()
+			render_outline.text = "Render Outline"
+			render_outline.custom_minimum_size = Vector2(0, 26)
+			var all_rendered := true
+			for edge in selected_edges:
+				all_rendered = all_rendered and bool(edge.get("render_outline", true))
+			render_outline.button_pressed = all_rendered
+			render_outline.toggled.connect(_on_edge_render_outline_changed)
+			inspector_content.add_child(render_outline)
 		return
 	if active_state == "edit" and active_edit_mode == "face":
 		inspector_content.add_child(_create_inspector_field_label("Face"))
@@ -11614,7 +11622,12 @@ func _render_inspector() -> void:
 		if not selected_edge.is_empty():
 			inspector_content.add_child(_create_inspector_field_label("Edge"))
 			inspector_content.add_child(_create_inspector_section("Edge Settings"))
-			inspector_content.add_child(_create_render_outline_mode_option([selected_edge]))
+			var render_outline := CheckButton.new()
+			render_outline.text = "Render Outline"
+			render_outline.custom_minimum_size = Vector2(0, 26)
+			render_outline.button_pressed = bool(selected_edge.get("render_outline", true))
+			render_outline.toggled.connect(_on_edge_render_outline_changed)
+			inspector_content.add_child(render_outline)
 			return
 	inspector_content.add_child(_create_inspector_section("Component"))
 	component_name_editor = _create_name_editor(_normalized_component_name(component), "Component name")
@@ -13094,51 +13107,8 @@ func _on_component_catch_parent_selected(index: int, option: OptionButton) -> vo
 	_render_canvas_context()
 
 
-func _create_render_outline_mode_option(edges: Array[Dictionary]) -> OptionButton:
-	var option := OptionButton.new()
-	option.custom_minimum_size = Vector2(0, 26)
-	option.add_item("Render Outline: Auto")
-	option.set_item_metadata(0, OutlineService.AUTO)
-	option.add_item("Render Outline: On")
-	option.set_item_metadata(1, OutlineService.ON)
-	option.add_item("Render Outline: Off")
-	option.set_item_metadata(2, OutlineService.OFF)
-	var mode := ""
-	for edge in edges:
-		var edge_mode := OutlineService.normalize_mode(edge.get("render_outline", OutlineService.AUTO))
-		if mode.is_empty():
-			mode = edge_mode
-		elif mode != edge_mode:
-			mode = ""
-			break
-	if mode.is_empty():
-		option.select(-1)
-		option.placeholder_text = "Render Outline: Mixed"
-	else:
-		for index in range(option.item_count):
-			if str(option.get_item_metadata(index)) == mode:
-				option.select(index)
-				break
-	option.item_selected.connect(_on_edge_render_outline_mode_changed.bind(option))
-	return option
-
-
-func _on_edge_render_outline_mode_changed(index: int, option: OptionButton) -> void:
-	if index < 0 or index >= option.item_count:
-		return
-	var mode := OutlineService.normalize_mode(option.get_item_metadata(index))
-	_set_selected_edges_render_outline_mode(mode)
-
-
 func _on_edge_render_outline_changed(enabled: bool) -> void:
-	# Compatibility entry point for existing editor/test integrations. New UI
-	# writes an explicit mode through the Auto/On/Off selector above.
-	_set_selected_edges_render_outline_mode(OutlineService.ON if enabled else OutlineService.OFF)
-
-
-func _set_selected_edges_render_outline_mode(mode: String) -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	mode = OutlineService.normalize_mode(mode)
 	var edge_ids := selected_edge_ids.duplicate()
 	if edge_ids.is_empty() and not selected_edge_id.is_empty():
 		edge_ids.append(selected_edge_id)
@@ -13153,7 +13123,7 @@ func _set_selected_edges_render_outline_mode(mode: String) -> void:
 	_record_direct_change()
 	for edge in component.get("edges", []):
 		if str(edge.get("id", "")) in valid_edge_ids:
-			edge["render_outline"] = mode
+			edge["render_outline"] = enabled
 	canvas_view.set_bezier_geometry(component.get("points", []), component.get("edges", []), component.get("chains", []))
 	canvas_view.selected_edge_ids = restored_edge_ids.duplicate()
 	canvas_view.selected_edge_id = canvas_view.selected_edge_ids[0] if not canvas_view.selected_edge_ids.is_empty() else ""
