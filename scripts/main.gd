@@ -8746,7 +8746,7 @@ func _place_selected_group_pivot_at_mouse() -> bool:
 	_record_coalesced_change()
 	var transform: Dictionary = group.get("transform", _default_component_transform())
 	var old_pivot: Vector2 = transform.get("pivot", Vector2.ZERO)
-	var new_pivot := canvas_view.mouse_world_position()
+	var new_pivot := canvas_view.mouse_local_position()
 	var transform_scale: Vector2 = transform.get("scale", Vector2.ONE)
 	var transform_rotation := deg_to_rad(float(transform.get("rotation", 0.0)))
 	var transform_position: Vector2 = transform.get("position", Vector2.ZERO)
@@ -14109,6 +14109,19 @@ func _render_canvas_context() -> void:
 		var selected_guide := _get_guide(asset, selected_guide_id)
 		if not selected_guide.is_empty():
 			_render_spine_canvas(asset, selected_guide, active_state == "draw" and active_draw_tool == "spine")
+			return
+	if not selected_group_id.is_empty():
+		var selected_group := ComponentHierarchy.group_by_id(asset, selected_group_id)
+		if not selected_group.is_empty():
+			canvas_context_label.text = "Group: %s" % str(selected_group.get("name", "Group"))
+			canvas_view.set_context(str(selected_group.get("name", "Group")))
+			canvas_view.set_interaction_state("")
+			canvas_view.set_tool_mode("")
+			canvas_view.set_component_transform(selected_group.get("transform", _default_component_transform()))
+			canvas_view.set_reference_shapes(_build_reference_shapes(asset))
+			canvas_view.set_display_polygon([])
+			canvas_view.set_bezier_geometry([], [], [])
+			canvas_view.call_deferred("grab_focus")
 			return
 	if selected_component_id.is_empty():
 		canvas_context_label.text = "Asset: %s" % str(asset["name"])

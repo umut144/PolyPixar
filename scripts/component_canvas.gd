@@ -835,6 +835,10 @@ func mouse_world_position() -> Vector2:
 	return _screen_to_world(get_local_mouse_position())
 
 
+func mouse_local_position() -> Vector2:
+	return _snap_to_grid(_world_to_local(_screen_to_world(get_local_mouse_position())))
+
+
 func _confirm_mirror_axis(axis_end: Vector2) -> void:
 	var confirmed_start := mirror_axis_start
 	var confirmed_end := axis_end
