@@ -111,6 +111,7 @@ var component_transform: Dictionary = {
 	"pivot": Vector2.ZERO
 }
 var asset_pivot := Vector2.ZERO
+var outline_resolution: Dictionary = {}
 var reference_image: Texture2D
 var reference_image_visible := true
 var reference_image_opacity := 0.5
@@ -714,6 +715,11 @@ func set_asset_pivot(pivot: Vector2) -> void:
 	queue_redraw()
 
 
+func set_outline_resolution(resolution: Dictionary) -> void:
+	outline_resolution = resolution.duplicate(true)
+	queue_redraw()
+
+
 func set_reference_image(texture: Texture2D, image_visible := true, image_opacity := 0.5, image_position := Vector2.ZERO, image_scale := 1.0) -> void:
 	reference_image = texture
 	reference_image_visible = image_visible
@@ -1192,6 +1198,7 @@ func _draw_reference_bezier_shape(shape: Dictionary, points: Array, edges: Array
 	var role_color := Color("#ef6c78") if is_hole else Color("#55c7d9")
 	var reference_color := role_color if emphasized else Color(role_color.r, role_color.g, role_color.b, 0.4)
 	var reference_width := 3.5 if emphasized else 2.0
+	var shape_outline_resolution: Dictionary = shape.get("outline_resolution", {})
 	for chain_data in chains:
 		if not chain_data is Dictionary:
 			continue
@@ -1208,10 +1215,15 @@ func _draw_reference_bezier_shape(shape: Dictionary, points: Array, edges: Array
 			var end_point: Dictionary = points_by_id[end_id]
 			var curve_points := _bezier_edge_screen_points_with_transform(start_point, end_point, transform)
 			if curve_points.size() >= 2:
-				if OutlineService.is_enabled(edge_data):
+				var outline_state: Dictionary = shape_outline_resolution.get(edge_id, {})
+				var outline_enabled := bool(outline_state.get("enabled", OutlineService.is_enabled(edge_data)))
+				if outline_enabled:
 					draw_polyline(curve_points, reference_color, reference_width, true)
 				else:
-					_draw_dashed_polyline(curve_points, reference_color, reference_width)
+					if str(outline_state.get("diagnostic", "")) == "covered":
+						_draw_dash_dot_polyline(curve_points, reference_color, reference_width)
+					else:
+						_draw_dashed_polyline(curve_points, reference_color, reference_width)
 	for point_data in points:
 		if point_data is Dictionary:
 			draw_circle(_world_to_screen(_local_to_world_with_transform(point_data.get("position", Vector2.ZERO), transform)), 3.0, reference_color)
@@ -1348,8 +1360,14 @@ func _draw_bezier_geometry() -> void:
 			var curve_points := _bezier_edge_screen_points(start_point, end_point)
 			if curve_points.size() >= 2:
 				var edge_color := selection_color if edge_id in selected_edge_ids or (edit_mode == "face" and face_selected) else edge_mode_highlight
-				if guide_style or not OutlineService.is_enabled(edge_data):
-					_draw_dashed_polyline(curve_points, edge_color, 2.0)
+				var outline_state: Dictionary = outline_resolution.get(edge_id, {})
+				var outline_enabled := bool(outline_state.get("enabled", OutlineService.is_enabled(edge_data)))
+				var diagnostic := str(outline_state.get("diagnostic", ""))
+				if guide_style or not outline_enabled:
+					if diagnostic == "covered":
+						_draw_dash_dot_polyline(curve_points, edge_color, 2.0)
+					else:
+						_draw_dashed_polyline(curve_points, edge_color, 2.0)
 				else:
 					draw_polyline(curve_points, edge_color, 2.0, true)
 	if interaction_state != "transform":
@@ -1757,11 +1775,36 @@ func _draw_dashed_polyline(points: PackedVector2Array, line_color: Color, line_w
 				if dash_remaining <= 0.001:
 					drawing_dash = false
 					gap_remaining = gap_length
-			else:
-				gap_remaining -= step
-				if gap_remaining <= 0.001:
-					drawing_dash = true
-					dash_remaining = dash_length
+				else:
+					gap_remaining -= step
+					if gap_remaining <= 0.001:
+						drawing_dash = true
+						dash_remaining = dash_length
+
+
+func _draw_dash_dot_polyline(points: PackedVector2Array, line_color: Color, line_width: float) -> void:
+	if points.size() < 2:
+		return
+	var pattern: Array[float] = [7.0, 3.0, 1.5, 3.0]
+	var pattern_index := 0
+	var pattern_remaining: float = pattern[0]
+	for index in range(points.size() - 1):
+		var segment_start := points[index]
+		var segment_end := points[index + 1]
+		var segment := segment_end - segment_start
+		var segment_length := segment.length()
+		if segment_length <= 0.001:
+			continue
+		var distance := 0.0
+		while distance < segment_length:
+			var step := minf(pattern_remaining, segment_length - distance)
+			if pattern_index % 2 == 0:
+				draw_line(segment_start + segment * (distance / segment_length), segment_start + segment * ((distance + step) / segment_length), line_color, line_width)
+			distance += step
+			pattern_remaining -= step
+			if pattern_remaining <= 0.001:
+				pattern_index = (pattern_index + 1) % pattern.size()
+				pattern_remaining = pattern[pattern_index]
 
 
 func _world_to_screen(world_position: Vector2) -> Vector2:

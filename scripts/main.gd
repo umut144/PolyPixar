@@ -123,6 +123,7 @@ var selected_asset_id := ""
 var selected_component_id := ""
 var selected_component_ids: Array[String] = []
 var selected_group_id := ""
+var outline_resolution_cache: Dictionary = {}
 var selected_guide_id := ""
 var selected_sampling_input_id := ""
 var selected_sampling_input_kind := ""
@@ -2240,6 +2241,7 @@ func _push_undo_snapshot() -> void:
 
 func _record_direct_change() -> void:
 	_invalidate_batch_status()
+	_invalidate_outline_resolution_cache()
 	history_coalescing = false
 	if is_instance_valid(history_coalesce_timer):
 		history_coalesce_timer.stop()
@@ -2248,6 +2250,7 @@ func _record_direct_change() -> void:
 
 func _record_coalesced_change() -> void:
 	_invalidate_batch_status()
+	_invalidate_outline_resolution_cache()
 	if not history_coalescing:
 		_push_undo_snapshot()
 		history_coalescing = true
@@ -8741,6 +8744,19 @@ func _group_world_center(asset: Dictionary, component_ids: Array) -> Vector2:
 	return center / float(component_ids.size())
 
 
+func _invalidate_outline_resolution_cache() -> void:
+	outline_resolution_cache.clear()
+
+
+func _outline_resolution_for_component(asset: Dictionary, component_id: String) -> Dictionary:
+	var group_id := ComponentHierarchy.membership_group_id(asset, component_id)
+	if group_id.is_empty():
+		return {}
+	if not outline_resolution_cache.has(group_id):
+		outline_resolution_cache[group_id] = OutlineResolutionService.resolve_group(asset, group_id)
+	return outline_resolution_cache.get(group_id, {}).get(component_id, {}).duplicate(true)
+
+
 func _place_selected_group_pivot_at_mouse() -> bool:
 	var asset := _get_asset(selected_asset_id)
 	var group := ComponentHierarchy.group_by_id(asset, selected_group_id)
@@ -13985,6 +14001,7 @@ func _render_canvas_context() -> void:
 		canvas_view.set_context("")
 		canvas_view.set_interaction_state("")
 		canvas_view.set_tool_mode("")
+		canvas_view.set_outline_resolution({})
 		canvas_view.set_component_transform({})
 		canvas_view.set_reference_shapes([])
 		canvas_view.set_display_polygon([])
@@ -14001,6 +14018,7 @@ func _render_canvas_context() -> void:
 		canvas_view.set_context(str(asset["name"]))
 		canvas_view.set_interaction_state("asset")
 		canvas_view.set_asset_pivot(_asset_pivot(asset))
+		canvas_view.set_outline_resolution({})
 		canvas_view.set_tool_mode("")
 		canvas_view.set_component_transform({})
 		canvas_view.set_reference_shapes(_build_reference_shapes(asset, "", selected_component_id))
@@ -14014,6 +14032,7 @@ func _render_canvas_context() -> void:
 		canvas_view.set_context(str(asset["name"]))
 		canvas_view.set_interaction_state("asset")
 		canvas_view.set_tool_mode("")
+		canvas_view.set_outline_resolution({})
 		canvas_view.set_component_transform({})
 		canvas_view.set_reference_shapes(_build_reference_shapes(asset, "", selected_component_id))
 		canvas_view.set_display_polygon([])
@@ -14026,6 +14045,7 @@ func _render_canvas_context() -> void:
 		canvas_view.set_interaction_state("transform")
 		canvas_view.set_tool_mode("")
 		canvas_view.set_component_transform(ComponentHierarchy.world_transform_record(asset, selected_component_id))
+		canvas_view.set_outline_resolution(_outline_resolution_for_component(asset, selected_component_id))
 		canvas_view.set_reference_shapes(_build_reference_shapes(asset))
 		canvas_view.set_display_polygon([])
 		canvas_view.set_bezier_geometry([], [], [])
@@ -14049,6 +14069,7 @@ func _render_canvas_context() -> void:
 	component_transform["visibility"] = bool(asset.get("visibility", true)) and bool(component.get("visibility", true))
 	component_transform["z_index"] = int(component.get("z_index", 0))
 	canvas_view.set_component_transform(component_transform)
+	canvas_view.set_outline_resolution(_outline_resolution_for_component(asset, selected_component_id))
 	canvas_view.set_reference_shapes(_build_reference_shapes(asset, selected_component_id))
 	canvas_view.set_component_draw_mode(str(component.get("draw_mode", "closed_loop")))
 	canvas_view.set_point_numbers_visible(bool(component.get("show_point_numbers", false)))
@@ -14173,7 +14194,8 @@ func _build_reference_shapes(asset: Dictionary, excluded_component_id := "", emp
 			"visibility": asset_is_visible and bool(component.get("visibility", true)),
 			"z_index": int(component.get("z_index", 0)),
 			"emphasized": str(component["id"]) == emphasized_component_id,
-			"topology_role": str(component.get("topology_role", "outer"))
+			"topology_role": str(component.get("topology_role", "outer")),
+			"outline_resolution": _outline_resolution_for_component(asset, str(component.get("id", "")))
 		})
 	return shapes
 
