@@ -68,6 +68,57 @@ static func rebase_asset(asset: Dictionary) -> Dictionary:
 	return {"valid": true, "errors": [], "analysis": analysis, "rebased_component_ids": rebased_ids}
 
 
+static func rebase_components(asset: Dictionary, component_ids: Array) -> Dictionary:
+	var requested_ids: Dictionary = {}
+	for component_id_value in component_ids:
+		var component_id := str(component_id_value)
+		if not ComponentHierarchy.component_by_id(asset, component_id).is_empty():
+			requested_ids[component_id] = true
+	var candidates: Array[Dictionary] = []
+	var blockers: Array[String] = []
+	for component_id in requested_ids:
+		var component := ComponentHierarchy.component_by_id(asset, component_id)
+		var scale := _component_scale(component)
+		if _is_unit_scale(scale):
+			continue
+		var reason := _target_blocking_reason(component, scale)
+		if reason.is_empty():
+			candidates.append({"component_id": component_id, "scale": scale})
+		else:
+			blockers.append("%s: %s" % [str(component.get("name", "Component")), reason])
+	if not blockers.is_empty():
+		return {"valid": false, "errors": blockers, "rebased_component_ids": []}
+	if candidates.is_empty():
+		return {"valid": true, "errors": [], "rebased_component_ids": []}
+	var working_asset := asset.duplicate(true)
+	var world_records: Dictionary = {}
+	for component in asset.get("components", []):
+		if component is Dictionary and str(component.get("type", "component")) != "guide":
+			world_records[str(component.get("id", ""))] = ComponentHierarchy.world_transform_record(asset, str(component.get("id", "")))
+	candidates.sort_custom(func(left: Dictionary, right: Dictionary) -> bool:
+		return _component_depth(working_asset, str(left.get("component_id", ""))) < _component_depth(working_asset, str(right.get("component_id", "")))
+	)
+	var rebased_ids: Array[String] = []
+	for candidate in candidates:
+		var component_id := str(candidate.get("component_id", ""))
+		var component := ComponentHierarchy.component_by_id(working_asset, component_id)
+		var scale := _component_scale(component)
+		var pivot := Vector2(component.get("transform", {}).get("pivot", Vector2.ZERO))
+		_bake_component_geometry(component, pivot, scale)
+		_bake_component_guides(working_asset, component_id, pivot, scale)
+		var transform: Dictionary = component.get("transform", {}).duplicate(true)
+		transform["scale"] = Vector2.ONE
+		component["transform"] = transform
+		for child in ComponentHierarchy.children(working_asset, component_id):
+			var child_id := str(child.get("id", ""))
+			if world_records.has(child_id):
+				child["transform"] = ComponentHierarchy.local_transform_from_world_record(working_asset, child_id, world_records[child_id])
+		rebased_ids.append(component_id)
+	asset.clear()
+	asset.merge(working_asset, true)
+	return {"valid": true, "errors": [], "rebased_component_ids": rebased_ids}
+
+
 static func _blocking_reason(asset: Dictionary, component: Dictionary, scale: Vector2) -> String:
 	if not scale.is_finite() or absf(scale.x) <= SCALE_EPSILON or absf(scale.y) <= SCALE_EPSILON:
 		return "Scale axes must be finite and non-zero."
@@ -81,6 +132,36 @@ static func _blocking_reason(asset: Dictionary, component: Dictionary, scale: Ve
 	if draw_mode == "primitive":
 		return "" if PrimitiveGeometryService.has_analytic_shape(component) else "Primitive must be a complete Circle or Ellipse."
 	return "Draw Mode '%s' does not own rebaseable geometry." % draw_mode
+
+
+static func _target_blocking_reason(component: Dictionary, scale: Vector2) -> String:
+	if not scale.is_finite() or absf(scale.x) <= SCALE_EPSILON or absf(scale.y) <= SCALE_EPSILON:
+		return "Scale axes must be finite and non-zero."
+	if str(component.get("type", "component")) == "reference":
+		return "Reference Components do not own geometry that can absorb Scale."
+	var draw_mode := str(component.get("draw_mode", "closed_loop"))
+	if draw_mode in ["closed_loop", "contour"]:
+		return "" if not component.get("points", []).is_empty() else "Component has no geometry that can absorb Scale."
+	if draw_mode == "primitive":
+		return "" if PrimitiveGeometryService.has_analytic_shape(component) else "Primitive must be a complete Circle or Ellipse."
+	return "Draw Mode '%s' does not own rebaseable geometry." % draw_mode
+
+
+static func _component_depth(asset: Dictionary, component_id: String) -> int:
+	var depth := 0
+	var component := ComponentHierarchy.component_by_id(asset, component_id)
+	var visited: Dictionary = {}
+	while not component.is_empty():
+		var current_id := str(component.get("id", ""))
+		if visited.has(current_id):
+			break
+		visited[current_id] = true
+		var parent_id := str(component.get("parent_component_id", ""))
+		if parent_id.is_empty():
+			break
+		depth += 1
+		component = ComponentHierarchy.component_by_id(asset, parent_id)
+	return depth
 
 
 static func _bake_component_geometry(component: Dictionary, pivot: Vector2, scale: Vector2) -> void:

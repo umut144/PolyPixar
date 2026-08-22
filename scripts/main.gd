@@ -8855,6 +8855,7 @@ func _duplicate_group(asset_id: String, group_id: String, mirror_mode := "none")
 		group_copy["transform"] = _mirrored_group_transform(group_copy.get("transform", _default_component_transform()), mirror_mode)
 	asset["groups"].append(group_copy)
 	var id_map: Dictionary = {}
+	var duplicated_component_ids: Array[String] = []
 	for source_node in source_tree:
 		var new_id := "component_%d" % next_component_id
 		next_component_id += 1
@@ -8866,6 +8867,25 @@ func _duplicate_group(asset_id: String, group_id: String, mirror_mode := "none")
 		component_copy["group_id"] = new_group_id if str(source_node.get("group_id", "")) == group_id else ""
 		component_copy["parent_component_id"] = str(id_map.get(str(source_node.get("parent_component_id", "")), source_node.get("parent_component_id", "")))
 		asset["components"].append(component_copy)
+		duplicated_component_ids.append(str(component_copy.get("id", "")))
+	if mirror_mode == "flip_orientation":
+		var mirrored_world_records: Dictionary = {}
+		for duplicated_id in duplicated_component_ids:
+			mirrored_world_records[duplicated_id] = ComponentHierarchy.world_transform_record(asset, duplicated_id)
+		var normalized_group_transform: Dictionary = group_copy.get("transform", _default_component_transform()).duplicate(true)
+		var normalized_group_scale: Vector2 = normalized_group_transform.get("scale", Vector2.ONE)
+		normalized_group_scale.x = absf(normalized_group_scale.x)
+		normalized_group_transform["scale"] = normalized_group_scale
+		group_copy["transform"] = normalized_group_transform
+		for duplicated_id in duplicated_component_ids:
+			var duplicated_component := ComponentHierarchy.component_by_id(asset, duplicated_id)
+			var duplicated_parent_id := str(duplicated_component.get("parent_component_id", ""))
+			if not duplicated_parent_id.is_empty() and duplicated_component_ids.has(duplicated_parent_id):
+				continue
+			duplicated_component["transform"] = ComponentHierarchy.local_transform_from_world_record(asset, duplicated_id, mirrored_world_records[duplicated_id])
+		var rebase_result := ComponentScaleRebaseService.rebase_components(asset, duplicated_component_ids)
+		if not bool(rebase_result.get("valid", false)):
+			_show_status_message("Mirrored Group created, but Scale Rebase was skipped: %s" % str(rebase_result.get("errors", ["Unknown error"])[0]))
 	selected_asset_id = asset_id
 	selected_group_id = new_group_id
 	selected_component_id = ""
@@ -8915,6 +8935,7 @@ func _duplicate_component(asset_id: String, component_id: String, mirror_mode :=
 		source_tree.append(descendant)
 	_record_direct_change()
 	var id_map: Dictionary = {}
+	var duplicated_component_ids: Array[String] = []
 	for source_node in source_tree:
 		var new_id := "component_%d" % next_component_id
 		next_component_id += 1
@@ -8929,8 +8950,13 @@ func _duplicate_component(asset_id: String, component_id: String, mirror_mode :=
 		if mirror_mode != "none" and source_node_id == component_id:
 			component_copy["transform"] = _mirrored_duplicate_transform(component_copy, mirror_mode)
 		asset["components"].append(component_copy)
+		duplicated_component_ids.append(str(component_copy.get("id", "")))
 		if source_node_id == component_id:
 			duplicate_root = component_copy
+	if mirror_mode == "flip_orientation":
+		var rebase_result := ComponentScaleRebaseService.rebase_components(asset, duplicated_component_ids)
+		if not bool(rebase_result.get("valid", false)):
+			_show_status_message("Mirrored Component created, but Scale Rebase was skipped: %s" % str(rebase_result.get("errors", ["Unknown error"])[0]))
 	selected_asset_id = asset_id
 	selected_component_id = str(duplicate_root.get("id", ""))
 	selected_guide_id = ""

@@ -39,6 +39,14 @@ Component with Child Components is also blocked: preserving those Children
 while forbidding Position/Rotation compensation is not generally possible,
 especially under anisotropic Scale. There is no partial or silent fallback.
 
+Duplicate & Mirror with Flip Orientation uses a targeted atomic Rebase for the
+newly duplicated Component subtree. It preserves the subtree's world transforms
+while baking the mirrored negative Scale into the duplicated geometry, so the
+new Components finish with Scale `(1, 1)` without changing unrelated Asset
+Components. The same rule applies to a duplicated Group: its mirrored Group
+Scale is normalized and the duplicated member transforms are compensated
+before the subtree Rebase.
+
 Runtime Export rejects every visible Component whose authored Scale is not
 `(1, 1)` and directs the author to Rebase. It never bakes Scale implicitly and
 never exports a negative Mirror scale. It does not silently preserve the old
