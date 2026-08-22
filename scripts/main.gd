@@ -122,6 +122,7 @@ var motion_last_marker := ""
 var selected_asset_id := ""
 var selected_component_id := ""
 var selected_component_ids: Array[String] = []
+var selected_group_id := ""
 var selected_guide_id := ""
 var selected_sampling_input_id := ""
 var selected_sampling_input_kind := ""
@@ -2202,6 +2203,7 @@ func _capture_history_snapshot() -> Dictionary:
 		"next_motion_sequence_id": next_motion_sequence_id,
 		"selected_asset_id": selected_asset_id,
 		"selected_component_id": selected_component_id,
+		"selected_group_id": selected_group_id,
 		"selected_guide_id": selected_guide_id,
 		"selected_edge_id": selected_edge_id,
 		"selected_edge_ids": selected_edge_ids.duplicate(),
@@ -2638,6 +2640,7 @@ func _restore_editor_state(state) -> void:
 	selected_asset_id = ""
 	selected_component_id = ""
 	selected_guide_id = ""
+	selected_group_id = ""
 	selected_edge_id = ""
 	selected_edge_ids.clear()
 	selected_weighting_style_id = ""
@@ -2672,6 +2675,9 @@ func _restore_editor_state(state) -> void:
 		var requested_component_id := str(state.get("selected_component_id", ""))
 		if not _get_component(selected_asset, requested_component_id).is_empty():
 			selected_component_id = requested_component_id
+		var requested_group_id := str(state.get("selected_group_id", ""))
+		if not ComponentHierarchy.group_by_id(selected_asset, requested_group_id).is_empty():
+			selected_group_id = requested_group_id
 		var requested_guide_id := str(state.get("selected_guide_id", ""))
 		if not _get_guide(selected_asset, requested_guide_id).is_empty():
 			selected_guide_id = requested_guide_id
@@ -6690,6 +6696,7 @@ func _confirm_asset_creation() -> void:
 	selected_asset_id = asset_id
 	selected_component_id = ""
 	selected_component_ids.clear()
+	selected_group_id = ""
 	selected_guide_id = ""
 	active_state = ""
 	_set_outliner_asset_expanded(asset_id, true)
@@ -8184,6 +8191,8 @@ func _render_group_outliner_tree(container: VBoxContainer, asset: Dictionary, gr
 	group_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	group_button.focus_mode = Control.FOCUS_NONE
 	group_button.tooltip_text = "Component Group"
+	group_button.pressed.connect(_select_group.bind(str(asset.get("id", "")), group_id))
+	group_button.gui_input.connect(_on_group_outliner_gui_input.bind(str(asset.get("id", "")), group_id, group_button))
 	group_row.add_child(group_button)
 	var group_components: Array = []
 	for component in asset.get("components", []):
@@ -8195,6 +8204,34 @@ func _render_group_outliner_tree(container: VBoxContainer, asset: Dictionary, gr
 	group_components.sort_custom(_sort_named_documents)
 	for component in group_components:
 		_render_component_outliner_tree(container, asset, component, indent + 16, rendered_component_ids)
+
+
+func _select_group(asset_id: String, group_id: String) -> void:
+	var asset := _get_asset(asset_id)
+	if asset.is_empty() or ComponentHierarchy.group_by_id(asset, group_id).is_empty():
+		return
+	selected_asset_id = asset_id
+	selected_group_id = group_id
+	selected_component_id = ""
+	selected_component_ids.clear()
+	selected_guide_id = ""
+	active_state = ""
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _on_group_outliner_gui_input(event: InputEvent, asset_id: String, group_id: String, button: Button) -> void:
+	if not event is InputEventMouseButton or event.button_index != MOUSE_BUTTON_RIGHT or not event.pressed:
+		return
+	_select_group(asset_id, group_id)
+	component_context_menu.set_meta("asset_id", asset_id)
+	component_context_menu.set_meta("component_id", "")
+	component_context_menu.set_meta("group_id", group_id)
+	component_context_menu.set_item_disabled(component_context_menu.get_item_index(4), true)
+	component_context_menu.position = Vector2i(button.global_position + event.position)
+	component_context_menu.popup()
+	get_viewport().set_input_as_handled()
 
 
 func _render_component_outliner_tree(container: VBoxContainer, asset: Dictionary, component: Dictionary, indent: int, rendered_component_ids: Dictionary) -> void:
@@ -8247,6 +8284,8 @@ func _on_component_outliner_gui_input(event: InputEvent, asset_id: String, compo
 		selected_component_id = component_id
 	component_context_menu.set_meta("asset_id", asset_id)
 	component_context_menu.set_meta("component_id", component_id)
+	component_context_menu.set_meta("group_id", "")
+	component_context_menu.set_item_disabled(component_context_menu.get_item_index(4), false)
 	var component := _get_component(_get_asset(asset_id), component_id)
 	var detach_index := component_context_menu.get_item_index(3)
 	component_context_menu.set_item_disabled(detach_index, str(component.get("parent_component_id", "")).is_empty())
@@ -8301,6 +8340,7 @@ func _select_asset(asset_id: String) -> void:
 	selected_asset_id = asset_id
 	selected_component_id = ""
 	selected_component_ids.clear()
+	selected_group_id = ""
 	selected_guide_id = ""
 	active_state = ""
 	canvas_view.set_interaction_state("")
@@ -8548,13 +8588,15 @@ func _selected_component_ids_for_group(asset: Dictionary) -> Array[String]:
 	return selected
 
 
-func _group_name_validation_error(asset: Dictionary, raw_name: String) -> String:
+func _group_name_validation_error(asset: Dictionary, raw_name: String, excluded_group_id := "") -> String:
 	var name := raw_name.strip_edges()
 	if name.is_empty():
 		return "Enter a Group name."
 	if not _component_name_validation_error(name, {"components": []}).is_empty():
 		return "Use lower_snake_case for the Group name."
 	for group in asset.get("groups", []):
+		if str(group.get("id", "")) == excluded_group_id:
+			continue
 		if str(group.get("name", "")).to_lower() == name.to_lower():
 			return "Group name must be unique within the Asset."
 	return ""
@@ -8610,8 +8652,13 @@ func _on_component_context_menu_selected(action_id: int) -> void:
 		return
 	var asset_id := str(component_context_menu.get_meta("asset_id", ""))
 	var component_id := str(component_context_menu.get_meta("component_id", ""))
+	var group_id := str(component_context_menu.get_meta("group_id", ""))
 	if action_id == 4:
 		_open_group_dialog(asset_id)
+		return
+	if not group_id.is_empty() and action_id in [0, 1, 2]:
+		var group_mirror_mode := "none" if action_id == 0 else "keep_orientation" if action_id == 1 else "flip_orientation"
+		_duplicate_group(asset_id, group_id, group_mirror_mode)
 		return
 	if action_id == 3:
 		_detach_component(asset_id, component_id)
@@ -8619,6 +8666,84 @@ func _on_component_context_menu_selected(action_id: int) -> void:
 	var mirror_mode := "none" if action_id == 0 else "keep_orientation" if action_id == 1 else "flip_orientation"
 	if mirror_mode == "none" or mirror_mode == "keep_orientation" or mirror_mode == "flip_orientation":
 		_duplicate_component(asset_id, component_id, mirror_mode)
+
+
+func _duplicate_group(asset_id: String, group_id: String, mirror_mode := "none") -> void:
+	var asset := _get_asset(asset_id)
+	var source_group := ComponentHierarchy.group_by_id(asset, group_id)
+	if asset.is_empty() or source_group.is_empty():
+		return
+	var roots: Array[Dictionary] = []
+	for component in asset.get("components", []):
+		if str(component.get("group_id", "")) != group_id:
+			continue
+		var parent_id := str(component.get("parent_component_id", ""))
+		if parent_id.is_empty() or ComponentHierarchy.membership_group_id(asset, parent_id) != group_id:
+			roots.append(component)
+	var source_tree: Array[Dictionary] = []
+	for root in roots:
+		source_tree.append(root)
+		for descendant in ComponentHierarchy.descendants(asset, str(root.get("id", ""))):
+			if ComponentHierarchy.membership_group_id(asset, str(descendant.get("id", ""))) == group_id:
+				source_tree.append(descendant)
+	if source_tree.is_empty():
+		return
+	_record_direct_change()
+	var new_group_id := "group_%d" % next_group_id
+	next_group_id += 1
+	var group_copy := source_group.duplicate(true)
+	group_copy["id"] = new_group_id
+	group_copy["name"] = _next_duplicate_group_name(asset, str(source_group.get("name", "Group")))
+	if mirror_mode != "none":
+		group_copy["transform"] = _mirrored_group_transform(group_copy.get("transform", _default_component_transform()), mirror_mode)
+	asset["groups"].append(group_copy)
+	var id_map: Dictionary = {}
+	for source_node in source_tree:
+		var new_id := "component_%d" % next_component_id
+		next_component_id += 1
+		id_map[str(source_node.get("id", ""))] = new_id
+	for source_node in source_tree:
+		var source_id := str(source_node.get("id", ""))
+		var component_copy := _duplicate_component_record(source_node, asset, str(id_map[source_id]))
+		component_copy["name"] = _next_duplicate_component_name(asset, str(source_node.get("name", "Component")))
+		component_copy["group_id"] = new_group_id if str(source_node.get("group_id", "")) == group_id else ""
+		component_copy["parent_component_id"] = str(id_map.get(str(source_node.get("parent_component_id", "")), source_node.get("parent_component_id", "")))
+		asset["components"].append(component_copy)
+	selected_asset_id = asset_id
+	selected_group_id = new_group_id
+	selected_component_id = ""
+	selected_component_ids.clear()
+	selected_guide_id = ""
+	_set_outliner_asset_expanded(asset_id, true)
+	_show_status_message("Duplicated Group %s." % str(group_copy.get("name", "Group")))
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _next_duplicate_group_name(asset: Dictionary, source_name: String) -> String:
+	var base_name := source_name.strip_edges() + "_copy"
+	if base_name.is_empty():
+		base_name = "group_copy"
+	var candidate := base_name
+	var suffix := 2
+	while not _group_name_validation_error(asset, candidate).is_empty():
+		candidate = "%s_%d" % [base_name, suffix]
+		suffix += 1
+	return candidate
+
+
+func _mirrored_group_transform(raw_transform: Dictionary, mirror_mode: String) -> Dictionary:
+	var transform := _deserialize_transform(raw_transform).duplicate(true)
+	var position: Vector2 = transform.get("position", Vector2.ZERO)
+	position.x = -position.x
+	transform["position"] = position
+	if mirror_mode == "flip_orientation":
+		transform["rotation"] = -float(transform.get("rotation", 0.0))
+		var scale: Vector2 = transform.get("scale", Vector2.ONE)
+		scale.x = -scale.x
+		transform["scale"] = scale
+	return transform
 
 
 
@@ -8947,6 +9072,7 @@ func _select_component(asset_id: String, component_id: String, focus_outliner :=
 		selected_component_ids = [component_id]
 		selected_component_id = component_id
 	selected_asset_id = asset_id
+	selected_group_id = ""
 	selected_guide_id = ""
 	selected_edge_id = ""
 	selected_point_id = ""
@@ -8990,6 +9116,7 @@ func _select_guide(asset_id: String, guide_id: String) -> void:
 	selected_asset_id = asset_id
 	selected_component_id = ""
 	selected_component_ids.clear()
+	selected_group_id = ""
 	selected_guide_id = guide_id
 	selected_sampling_input_id = ""
 	selected_sampling_input_kind = ""
@@ -9142,6 +9269,35 @@ func _style_guide_outliner_button(button: Button, selected: bool, guide_type := 
 	button.add_theme_color_override("font_hover_color", selected_text_color if selected else guide_color.lightened(0.55))
 	button.add_theme_color_override("font_pressed_color", selected_text_color)
 	button.add_theme_color_override("font_focus_color", selected_text_color if selected else guide_color.lightened(0.35))
+
+
+func _render_group_inspector(_asset: Dictionary, group: Dictionary) -> void:
+	inspector_content.add_child(_create_inspector_section("Group"))
+	if group.is_empty():
+		inspector_content.add_child(_create_inspector_field_label("Group not found."))
+		return
+	inspector_content.add_child(_create_inspector_field_label("Name"))
+	var name_editor := _create_name_editor(str(group.get("name", "Group")), "Group name")
+	name_editor.text_submitted.connect(_rename_selected_group)
+	name_editor.focus_exited.connect(func() -> void: _rename_selected_group(name_editor.text))
+	inspector_content.add_child(name_editor)
+	inspector_content.add_child(_create_inspector_field_label("Group transform and pivot apply to all contained Components."))
+
+
+func _rename_selected_group(new_name: String) -> void:
+	var asset := _get_asset(selected_asset_id)
+	var group := ComponentHierarchy.group_by_id(asset, selected_group_id)
+	var name := new_name.strip_edges()
+	var name_error := _group_name_validation_error(asset, name, selected_group_id)
+	if group.is_empty() or not name_error.is_empty():
+		_show_status_message(name_error)
+		return
+	if name == str(group.get("name", "")):
+		return
+	_record_direct_change()
+	group["name"] = name
+	_render_outliner()
+	_render_inspector()
 
 
 func _render_guide_inspector(asset: Dictionary, guide: Dictionary) -> void:
@@ -11032,6 +11188,9 @@ func _render_inspector() -> void:
 		return
 	if not selected_guide_id.is_empty():
 		_render_guide_inspector(asset, _get_guide(asset, selected_guide_id))
+		return
+	if not selected_group_id.is_empty():
+		_render_group_inspector(asset, ComponentHierarchy.group_by_id(asset, selected_group_id))
 		return
 	if selected_component_id.is_empty():
 		inspector_content.add_child(_create_inspector_field_label("Name"))
