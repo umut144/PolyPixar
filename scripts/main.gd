@@ -2936,7 +2936,7 @@ func _deserialize_component_topology(component_data: Dictionary) -> Dictionary:
 			"id": edge_id,
 			"start_point_id": start_point_id,
 			"end_point_id": end_point_id,
-			"render_outline": bool(raw_edge.get("render_outline", true))
+			"render_outline": _deserialize_render_outline(raw_edge.get("render_outline", true))
 		})
 		known_edge_ids[edge_id] = true
 	var chains: Array[Dictionary] = []
@@ -2967,6 +2967,20 @@ func _deserialize_component_topology(component_data: Dictionary) -> Dictionary:
 		})
 	BezierGeometry.resolve_auto_handles(points, chains)
 	return {"points": points, "edges": edges, "chains": chains}
+
+
+func _deserialize_render_outline(raw_value) -> bool:
+	if raw_value is bool:
+		return raw_value
+	if raw_value is String:
+		var normalized := str(raw_value).strip_edges().to_lower()
+		if normalized in ["off", "false", "0", "disabled"]:
+			return false
+		if normalized in ["on", "true", "1", "auto", "enabled"]:
+			return true
+	if raw_value is int or raw_value is float:
+		return not is_zero_approx(float(raw_value))
+	return true
 
 
 func _default_component_transform() -> Dictionary:
