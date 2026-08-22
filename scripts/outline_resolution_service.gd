@@ -43,7 +43,11 @@ static func resolve_group(asset: Dictionary, group_id: String) -> Dictionary:
 				"center": _sample_center(samples)
 			})
 			result[component_id] = result.get(component_id, {})
-			result[component_id][str(edge.get("id", ""))] = {"enabled": true, "diagnostic": "visible"}
+			var edge_mode := OutlineService.normalize_mode(edge.get("render_outline", OutlineService.AUTO))
+			result[component_id][str(edge.get("id", ""))] = {
+				"enabled": edge_mode != OutlineService.OFF,
+				"diagnostic": "hidden" if edge_mode == OutlineService.OFF else "visible"
+			}
 	for first_index in range(edge_records.size()):
 		var first: Dictionary = edge_records[first_index]
 		for second_index in range(first_index + 1, edge_records.size()):

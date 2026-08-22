@@ -1855,6 +1855,11 @@ func _test_outline_resolution() -> void:
 	right["edges"][0]["render_outline"] = OutlineService.OFF
 	resolved = OutlineResolutionService.resolve_group(asset, "head")
 	_expect(bool(resolved["head_left"]["left_edge"].get("enabled", false)) and not bool(resolved["head_right"]["right_edge"].get("enabled", true)), "Manual outline modes must override automatic ownership.")
+	right["transform"]["position"] = Vector2(100, 0)
+	right["points"][0]["position"] = Vector2(0, 0)
+	right["points"][1]["position"] = Vector2(0, 10)
+	resolved = OutlineResolutionService.resolve_group(asset, "head")
+	_expect(not bool(resolved["head_right"]["right_edge"].get("enabled", true)) and str(resolved["head_right"]["right_edge"].get("diagnostic", "")) == "hidden", "Manual Off must remain disabled even without a shared automatic edge.")
 func _test_asset_guides() -> void:
 	var component := _component()
 	component.merge({"id": "component_1", "name": "body", "visibility": true, "transform": {"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}})
