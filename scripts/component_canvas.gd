@@ -593,12 +593,13 @@ func _point_on_polygon_boundary(world_position: Vector2, polygon: PackedVector2A
 
 
 func set_edit_mode(mode: String) -> void:
+	var mode_changed := edit_mode != mode
 	edit_mode = mode
-	if edit_mode != "point":
+	if mode_changed and edit_mode != "point":
 		clear_selection()
-	if edit_mode != "edge":
+	if mode_changed and edit_mode != "edge":
 		_set_selected_edge_ids([])
-	if edit_mode != "face":
+	if mode_changed and edit_mode != "face":
 		face_selected = false
 	queue_redraw()
 
@@ -1697,11 +1698,11 @@ func _draw_dashed_polyline(points: PackedVector2Array, line_color: Color, line_w
 				if dash_remaining <= 0.001:
 					drawing_dash = false
 					gap_remaining = gap_length
-				else:
-					gap_remaining -= step
-					if gap_remaining <= 0.001:
-						drawing_dash = true
-						dash_remaining = dash_length
+			else:
+				gap_remaining -= step
+				if gap_remaining <= 0.001:
+					drawing_dash = true
+					dash_remaining = dash_length
 
 
 func _world_to_screen(world_position: Vector2) -> Vector2:
