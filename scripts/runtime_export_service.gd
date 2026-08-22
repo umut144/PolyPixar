@@ -17,9 +17,10 @@ static func build_manifest(asset: Dictionary, sources: Dictionary) -> Dictionary
 	var ids: Dictionary = {}
 	var names: Dictionary = {}
 	for raw_component in asset.get("components", []):
-		if not raw_component is Dictionary or not bool(raw_component.get("visibility", true)):
+		if not raw_component is Dictionary or not _effective_visibility(asset, raw_component):
 			continue
-		var component: Dictionary = raw_component
+		var component: Dictionary = raw_component.duplicate(true)
+		component["z_index"] = _effective_z_index(asset, component)
 		var component_id := str(component.get("id", ""))
 		var component_name := str(component.get("name", "")).strip_edges()
 		if component_id.is_empty():
@@ -336,6 +337,26 @@ static func _component_less(a: Dictionary, b: Dictionary) -> bool:
 	var z_a := int(a.get("z_index", 0))
 	var z_b := int(b.get("z_index", 0))
 	return str(a.get("id", "")) < str(b.get("id", "")) if z_a == z_b else z_a < z_b
+
+
+static func _effective_group(asset: Dictionary, component: Dictionary) -> Dictionary:
+	var group_id := str(component.get("group_id", ""))
+	if group_id.is_empty():
+		return {}
+	for group in asset.get("groups", []):
+		if group is Dictionary and str(group.get("id", "")) == group_id:
+			return group
+	return {}
+
+
+static func _effective_visibility(asset: Dictionary, component: Dictionary) -> bool:
+	var group := _effective_group(asset, component)
+	return bool(component.get("visibility", true)) and (group.is_empty() or bool(group.get("visibility", true)))
+
+
+static func _effective_z_index(asset: Dictionary, component: Dictionary) -> int:
+	var group := _effective_group(asset, component)
+	return int(group.get("z_index", 0)) if not group.is_empty() else int(component.get("z_index", 0))
 
 
 static func _component_label(component: Dictionary) -> String:
