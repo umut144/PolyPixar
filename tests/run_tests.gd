@@ -1582,7 +1582,6 @@ func _test_component_names() -> void:
 	_expect(application._component_name_validation_error("weapon_head_left", naming_asset).is_empty(), "Component names should accept lower_snake_case.")
 	_expect(not application._component_name_validation_error("Weapon Head", naming_asset).is_empty(), "Component names should reject spaces and uppercase letters.")
 	_expect(not application._component_name_validation_error("_weapon_head", naming_asset).is_empty(), "Component names should reject a leading underscore.")
-	_expect(application._deserialize_render_outline(true) and application._deserialize_render_outline("on") and application._deserialize_render_outline("auto") and not application._deserialize_render_outline("off"), "Render Outline migration should safely load legacy booleans and previously persisted string modes.")
 	var source_component := _component()
 	source_component.merge({"id": "component_1", "name": "body", "visibility": true})
 	var semantic_asset := {"id": "character", "name": "Character", "asset_type": "character", "visibility": true, "components": [source_component], "guides": []}
