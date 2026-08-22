@@ -188,7 +188,7 @@ visible as `missing_semantic (<key/source>)` and block runtime export until a
 valid replacement is chosen.
 
 Weapon Components use the namespaced registry keys `weapon_body`,
-`weapon_collar`, `weapon_grip`, `weapon_head`, `weapon_rear`, `weapon_shaft`,
+`weapon_collar`, `weapon_grip`, `weapon_head`, `weapon_head_left`, `weapon_rear`, `weapon_shaft`,
 and `weapon_string`. Weapon Point Guides use the separate Guide types
 `weapon_grip_point`, `weapon_cast_point`, `weapon_nocking_point`, and
 `weapon_aim_point`; Guides are not Component Semantic Keys.

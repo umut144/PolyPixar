@@ -219,7 +219,7 @@ Asset in internal `source_asset_id`, so local classification never erases
 geometry origin. Runtime export resolves that editor link to `source_asset_key`.
 
 Weapon Components use the namespaced keys `weapon_body`, `weapon_collar`,
-`weapon_grip`, `weapon_head`, `weapon_rear`, `weapon_shaft`, and
+`weapon_grip`, `weapon_head`, `weapon_head_left`, `weapon_rear`, `weapon_shaft`, and
 `weapon_string`. Weapon Point Guides use the separate selectable Guide types
 `weapon_grip_point`, `weapon_cast_point`, `weapon_nocking_point`, and
 `weapon_aim_point`. They persist one authored Point without Edges or Chains
