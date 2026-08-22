@@ -1589,7 +1589,7 @@ func _test_component_names() -> void:
 	var semantic_assets: Array[Dictionary] = [semantic_asset, symbol_asset]
 	application.assets = semantic_assets
 	application._build_ui()
-	_expect(application.component_context_menu.get_item_text(0) == "Group" and application.component_context_menu.get_item_text(2) == "Duplicate", "The Component context menu should expose Group above Duplicate with a separator.")
+	_expect(application.component_context_menu.get_item_text(0) == "Group" and application.component_context_menu.get_item_text(3) == "Duplicate", "The Component context menu should expose Group above Duplicate with a separator.")
 	_expect(not application.component_dialog.dialog_text.is_empty(), "Component creation should use a normal free-name input.")
 	application._duplicate_component("character", "component_1")
 	_expect(semantic_asset.get("components", []).size() == 2 and str(semantic_asset.get("components", [])[1].get("name", "")) == "body Copy", "Duplicating a Component should generate a unique free name automatically.")

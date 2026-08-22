@@ -1688,6 +1688,7 @@ func _create_component_context_menu() -> void:
 	component_context_menu = PopupMenu.new()
 	component_context_menu.name = "ComponentContextMenu"
 	component_context_menu.add_item("Group", 4)
+	component_context_menu.add_item("Remove from Group", 5)
 	component_context_menu.add_separator()
 	component_context_menu.add_item("Duplicate", 0)
 	component_context_menu.add_separator()
@@ -8232,6 +8233,7 @@ func _on_group_outliner_gui_input(event: InputEvent, asset_id: String, group_id:
 	component_context_menu.set_meta("component_id", "")
 	component_context_menu.set_meta("group_id", group_id)
 	component_context_menu.set_item_disabled(component_context_menu.get_item_index(4), true)
+	component_context_menu.set_item_disabled(component_context_menu.get_item_index(5), true)
 	component_context_menu.position = Vector2i(button.global_position + event.position)
 	component_context_menu.popup()
 	get_viewport().set_input_as_handled()
@@ -8372,6 +8374,8 @@ func _on_component_outliner_gui_input(event: InputEvent, asset_id: String, compo
 	component_context_menu.set_meta("group_id", "")
 	component_context_menu.set_item_disabled(component_context_menu.get_item_index(4), false)
 	var component := _get_component(_get_asset(asset_id), component_id)
+	var effective_group_id := ComponentHierarchy.membership_group_id(_get_asset(asset_id), component_id)
+	component_context_menu.set_item_disabled(component_context_menu.get_item_index(5), effective_group_id.is_empty())
 	var detach_index := component_context_menu.get_item_index(3)
 	component_context_menu.set_item_disabled(detach_index, str(component.get("parent_component_id", "")).is_empty())
 	component_context_menu.position = Vector2i(button.global_position + event.position)
@@ -8740,6 +8744,25 @@ func _on_component_context_menu_selected(action_id: int) -> void:
 	var group_id := str(component_context_menu.get_meta("group_id", ""))
 	if action_id == 4:
 		_open_group_dialog(asset_id)
+		return
+	if action_id == 5:
+		var selected_ids := _selected_component_ids_for_group(_get_asset(asset_id))
+		if selected_ids.is_empty() and not component_id.is_empty():
+			selected_ids = [component_id]
+		if selected_ids.is_empty():
+			return
+		_record_direct_change()
+		var asset := _get_asset(asset_id)
+		for selected_id in selected_ids:
+			_set_component_group_preserving_world(asset, str(selected_id), "")
+		selected_asset_id = asset_id
+		selected_group_id = ""
+		selected_component_ids = selected_ids.duplicate()
+		selected_component_id = str(selected_ids.back())
+		_render_outliner()
+		_render_inspector()
+		_render_canvas_context()
+		_show_status_message("Removed %d Component%s from Group." % [selected_ids.size(), "" if selected_ids.size() == 1 else "s"])
 		return
 	if not group_id.is_empty() and action_id in [0, 1, 2]:
 		var group_mirror_mode := "none" if action_id == 0 else "keep_orientation" if action_id == 1 else "flip_orientation"
