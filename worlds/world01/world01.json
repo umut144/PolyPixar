@@ -10,10 +10,11 @@
 		"asset_7",
 		"asset_8",
 		"asset_9",
-		"asset_10"
+		"asset_10",
+		"asset_11"
 	],
 	"editor_state": {
-		"active_create_submodule": "Character",
+		"active_create_submodule": "Weapons",
 		"active_geometry_submodule": "Sampling",
 		"active_module": "Create",
 		"active_motion_submodule": "Animation",
@@ -32,6 +33,13 @@
 					19.9986572265625
 				],
 				"zoom": 11.9465613388049
+			},
+			"asset_11": {
+				"position": [
+					0.29758208990097,
+					4.84464406967163
+				],
+				"zoom": 159.75128444321
 			},
 			"asset_2": {
 				"position": [
@@ -93,6 +101,7 @@
 		"expanded_assets": {
 			"asset_1": true,
 			"asset_10": true,
+			"asset_11": true,
 			"asset_2": false,
 			"asset_3": false,
 			"asset_4": false,
@@ -102,9 +111,9 @@
 			"asset_8": false,
 			"asset_9": false
 		},
-		"motion_act_preview_asset_id": "",
+		"motion_act_preview_asset_id": "asset_1",
 		"motion_act_preview_loop": true,
-		"motion_path_preview_asset_id": "",
+		"motion_path_preview_asset_id": "asset_1",
 		"motion_sequence_preview_loop": true,
 		"motion_sequence_view": "composition",
 		"outliner_asset_type_filters": {
@@ -112,10 +121,11 @@
 			"icon": true,
 			"props": true,
 			"symbols": true,
-			"terrain": true
+			"terrain": true,
+			"weapons": true
 		},
-		"selected_asset_id": "asset_1",
-		"selected_component_id": "component_6",
+		"selected_asset_id": "asset_11",
+		"selected_component_id": "component_61",
 		"selected_edge_ids": [],
 		"selected_guide_id": "",
 		"selected_motion_act_id": "",
