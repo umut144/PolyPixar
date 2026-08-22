@@ -191,9 +191,7 @@ committed.
 
 Asset References retain `source_asset_id` as their internal source link.
 
-Weapon Point Guides use the separate Guide types
-`weapon_grip_point`, `weapon_cast_point`, `weapon_nocking_point`, and
-`weapon_aim_point`; Guides are not Component Semantic Keys.
+Guides are not Component Semantic Keys.
 
 ## Verification
 

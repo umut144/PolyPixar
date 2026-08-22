@@ -230,10 +230,7 @@ Names remain unique within an Asset. Asset References retain their internal
 
 Weapon Components use the namespaced keys `weapon_body`, `weapon_collar`,
 `weapon_grip`, `weapon_head`, `weapon_head_left`, `weapon_rear`, `weapon_shaft`, and
-`weapon_string`. Weapon Point Guides use the separate selectable Guide types
-`weapon_grip_point`, `weapon_cast_point`, `weapon_nocking_point`, and
-`weapon_aim_point`. They persist one authored Point without Edges or Chains
-and render as a distinct labeled marker on the Component Canvas.
+`weapon_string`.
 
 Schema 40 replaces the authored `ribbon` draw mode with the fill-less open
 `contour` mode. Loading schema 39 or older converts Ribbon centerline topology

@@ -1899,9 +1899,6 @@ func _test_asset_guides() -> void:
 	var animation_round_trip: Dictionary = application._deserialize_asset_guide(application._serialize_asset_guide(animation_guide))
 	_expect(str(animation_round_trip.get("guide_type", "")) == AssetGuide.MOTION and AssetGuide.display_name(AssetGuide.MOTION) == "Motion", "Motion Guides should persist as an independent Guide type.")
 	_expect(AssetGuide.validation_issues(animation_guide).is_empty(), "Animation Spines should use the same valid open Spine topology contract.")
-	var weapon_point_guide := AssetGuide.create_point("guide_weapon", "Weapon Grip Point", AssetGuide.WEAPON_GRIP_POINT, "component_1", Vector2(3.0, 4.0))
-	var weapon_point_round_trip: Dictionary = application._deserialize_asset_guide(application._serialize_asset_guide(weapon_point_guide))
-	_expect(AssetGuide.is_point_type(AssetGuide.WEAPON_GRIP_POINT) and AssetGuide.display_name(AssetGuide.WEAPON_AIM_POINT) == "Weapon Aim Point" and AssetGuide.validation_issues(weapon_point_round_trip).is_empty() and weapon_point_round_trip.get("edges", []).is_empty() and weapon_point_round_trip.get("chains", []).is_empty(), "Weapon Point Guides should persist as one-point Guides without Spine topology.")
 	var legacy_guide := guide.duplicate(true)
 	legacy_guide["type"] = "guide"
 	var test_asset := {"id": "asset_1", "name": "Asset", "visibility": true, "components": [component, legacy_guide], "guides": []}
@@ -1987,13 +1984,7 @@ func _test_asset_guides() -> void:
 	application._activate_guide_draw_state()
 	application._on_bezier_point_added(Vector2(15.0, 5.0), "aligned", Vector2.ZERO)
 	_expect(application.active_state == "draw" and Vector2(flow_guide.get("points", [])[0].get("position", Vector2.ZERO)).is_equal_approx(Vector2(10.0, 5.0)), "Flow Guides should catch Draw Guide Points on their parent Component contour just like Sample Guides.")
-	application._create_guide("asset_1", "component_1", AssetGuide.WEAPON_GRIP_POINT)
-	var grip_point_guide: Dictionary = application._get_guide(application._get_asset("asset_1"), application.selected_guide_id)
-	_expect(grip_point_guide.get("points", []).size() == 1 and grip_point_guide.get("edges", []).is_empty() and grip_point_guide.get("chains", []).is_empty() and application.canvas_view.point_guide_marker_enabled and application.canvas_view.interaction_state == "point_guide", "Weapon Point Guide creation should use one point, activate the distinct canvas marker, and open the point interaction context.")
-	application._on_point_guide_move_started()
-	application._on_point_guide_moved(Vector2(2.5, 3.5))
-	_expect(Vector2(grip_point_guide.get("points", [])[0].get("position", Vector2.ZERO)).is_equal_approx(Vector2(2.5, 3.5)), "Weapon Point Guides should move their authored point without creating Spine topology.")
-	_expect(application.component_add_child_menu.item_count == 3 and application.component_add_guide_menu.item_count == 5 and application.component_add_weapon_point_menu.item_count == 4, "Every Component add menu should expose all three Child draw modes, the four base Guide types, and the nested Weapon Points submenu.")
+	_expect(application.component_add_child_menu.item_count == 3 and application.component_add_guide_menu.item_count == 4, "Every Component add menu should expose all three Child draw modes and the four base Guide types.")
 	parent_component["transform"] = {"position": Vector2(-3.0, 2.0), "rotation": 20.0, "scale": Vector2(1.0, 1.5), "pivot": Vector2.ZERO}
 	parent_component["name"] = "eyebrow_left"
 	child_component["name"] = "eye_left"

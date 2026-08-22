@@ -158,7 +158,6 @@ var component_draw_mode_menu: PopupMenu
 var component_add_menu: PopupMenu
 var component_add_child_menu: PopupMenu
 var component_add_guide_menu: PopupMenu
-var component_add_weapon_point_menu: PopupMenu
 var component_add_reference_menu: PopupMenu
 var component_context_menu: PopupMenu
 var group_dialog: ConfirmationDialog
@@ -912,8 +911,6 @@ func _build_ui() -> void:
 	canvas_view.primitive_placed.connect(_on_primitive_placed)
 	canvas_view.primitive_center_changed.connect(_on_primitive_center_changed)
 	canvas_view.primitive_preview_cancelled.connect(_on_primitive_preview_cancelled)
-	canvas_view.point_guide_move_started.connect(_on_point_guide_move_started)
-	canvas_view.point_guide_moved.connect(_on_point_guide_moved)
 	var canvas := canvas_view
 	canvas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -1665,16 +1662,7 @@ func _create_component_add_menu() -> void:
 	component_add_guide_menu.add_item("Flow", 2)
 	component_add_guide_menu.add_item("Cut", 3)
 	component_add_guide_menu.id_pressed.connect(_on_component_add_guide_selected)
-	component_add_weapon_point_menu = PopupMenu.new()
-	component_add_weapon_point_menu.name = "WeaponPointTypes"
-	component_add_weapon_point_menu.add_item("Weapon Grip Point", 0)
-	component_add_weapon_point_menu.add_item("Weapon Cast Point", 1)
-	component_add_weapon_point_menu.add_item("Weapon Nocking Point", 2)
-	component_add_weapon_point_menu.add_item("Weapon Aim Point", 3)
-	component_add_weapon_point_menu.id_pressed.connect(_on_component_add_weapon_point_selected)
 	component_add_menu.add_child(component_add_guide_menu)
-	component_add_guide_menu.add_child(component_add_weapon_point_menu)
-	component_add_guide_menu.add_submenu_item("Weapon Points", "WeaponPointTypes")
 	component_add_reference_menu = PopupMenu.new()
 	component_add_reference_menu.name = "ReferenceSymbols"
 	component_add_reference_menu.id_pressed.connect(_on_component_add_reference_selected)
@@ -1685,7 +1673,6 @@ func _create_component_add_menu() -> void:
 	_style_popup_menu(component_add_menu)
 	_style_popup_menu(component_add_child_menu)
 	_style_popup_menu(component_add_guide_menu)
-	_style_popup_menu(component_add_weapon_point_menu)
 	_style_popup_menu(component_add_reference_menu)
 	add_child(component_add_menu)
 
@@ -8507,12 +8494,6 @@ func _on_component_add_guide_selected(index: int) -> void:
 	_create_guide(str(component_add_menu.get_meta("asset_id", "")), str(component_add_menu.get_meta("parent_component_id", "")), str(guide_types[index]))
 
 
-func _on_component_add_weapon_point_selected(index: int) -> void:
-	if index < 0 or index >= AssetGuide.POINT_TYPES.size():
-		return
-	_create_guide(str(component_add_menu.get_meta("asset_id", "")), str(component_add_menu.get_meta("parent_component_id", "")), AssetGuide.POINT_TYPES[index])
-
-
 func _on_component_add_reference_selected(index: int) -> void:
 	var item_index := component_add_reference_menu.get_item_index(index)
 	var source_asset := _get_asset(str(component_add_reference_menu.get_item_metadata(item_index)))
@@ -8622,7 +8603,7 @@ func _create_guide(asset_id: String, component_id: String, guide_type: String, l
 	var guide_id := "guide_%d" % next_guide_id
 	next_guide_id += 1
 	var guide_ordinal := ComponentHierarchy.next_guide_ordinal(asset, component_id, guide_type)
-	var guide := AssetGuide.create_point(guide_id, guide_name, guide_type, component_id, _component_local_visual_center(_get_component(asset, component_id)), guide_ordinal) if AssetGuide.is_point_type(guide_type) else AssetGuide.create(guide_id, guide_name, guide_type, component_id, guide_ordinal)
+	var guide := AssetGuide.create(guide_id, guide_name, guide_type, component_id, guide_ordinal)
 	if not asset.get("guides", []) is Array:
 		asset["guides"] = []
 	asset["guides"].append(guide)
@@ -9607,9 +9588,6 @@ func _render_guide_inspector(asset: Dictionary, guide: Dictionary) -> void:
 	type_option.set_item_metadata(1, AssetGuide.SAMPLER_SPINE)
 	type_option.add_item("Motion")
 	type_option.set_item_metadata(2, AssetGuide.ANIMATION_SPINE)
-	for point_type in AssetGuide.POINT_TYPES:
-		type_option.add_item(AssetGuide.display_name(point_type))
-		type_option.set_item_metadata(type_option.item_count - 1, point_type)
 	var guide_type := str(guide.get("guide_type", AssetGuide.BODY_FLOW))
 	for type_index in range(type_option.item_count):
 		if str(type_option.get_item_metadata(type_index)) == guide_type:
@@ -9632,10 +9610,7 @@ func _render_guide_inspector(asset: Dictionary, guide: Dictionary) -> void:
 	visible_toggle.toggled.connect(_on_selected_guide_visibility_changed)
 	inspector_content.add_child(visible_toggle)
 	inspector_content.add_child(_create_inspector_section("Topology"))
-	if AssetGuide.is_point_type(guide_type):
-		inspector_content.add_child(_create_inspector_field_label("Point Guide · %d Point" % guide.get("points", []).size()))
-	else:
-		inspector_content.add_child(_create_inspector_field_label("Open Spine · %d Points" % guide.get("points", []).size()))
+	inspector_content.add_child(_create_inspector_field_label("Open Spine · %d Points" % guide.get("points", []).size()))
 	var status := "Ready" if AssetGuide.validation_issues(guide).is_empty() else "Ready to draw" if guide.get("points", []).is_empty() else "Invalid"
 	if _get_component(asset, target_id).is_empty():
 		status = "Unassigned"
@@ -9813,28 +9788,8 @@ func _on_guide_type_selected(index: int, option: OptionButton) -> void:
 		return
 	_record_direct_change()
 	var guide_ordinal := ComponentHierarchy.next_guide_ordinal(asset, str(guide.get("scope", {}).get("component_id", "")), guide_type)
-	var old_type := str(guide.get("guide_type", ""))
 	guide["guide_type"] = guide_type
 	guide["ordinal"] = guide_ordinal
-	if AssetGuide.is_point_type(guide_type):
-		var point_position := _component_local_visual_center(_get_component(asset, str(guide.get("scope", {}).get("component_id", ""))))
-		if not guide.get("points", []).is_empty():
-			point_position = Vector2(guide.get("points", [])[0].get("position", point_position))
-		guide["points"] = [{
-			"id": BezierTopology.next_id([], "point"),
-			"position": point_position,
-			"mode": "corner",
-			"preserve_point": true,
-			"handle_source": "auto",
-			"handle_in": Vector2.ZERO,
-			"handle_out": Vector2.ZERO
-		}]
-		guide["edges"] = []
-		guide["chains"] = []
-	elif AssetGuide.is_point_type(old_type):
-		guide["points"] = []
-		guide["edges"] = []
-		guide["chains"] = []
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
@@ -14033,7 +13988,6 @@ func _render_canvas_context() -> void:
 		return
 	canvas_view.set_reference_image(null)
 	canvas_view.set_guide_style(false)
-	canvas_view.set_point_guide_marker(false)
 	canvas_view.set_point_numbers_visible(false)
 	canvas_view.set_catch_parent_component("")
 	canvas_view.set_component_draw_mode("closed_loop")
@@ -14202,9 +14156,6 @@ func _render_canvas_context() -> void:
 
 
 func _render_spine_canvas(asset: Dictionary, guide: Dictionary, drawing: bool) -> void:
-	if AssetGuide.is_point_type(str(guide.get("guide_type", AssetGuide.SAMPLER_SPINE))):
-		_render_point_guide_canvas(asset, guide)
-		return
 	var target_component_id := str(guide.get("scope", {}).get("component_id", ""))
 	var target_component := _get_component(asset, target_component_id)
 	var type_name := AssetGuide.display_name(str(guide.get("guide_type", AssetGuide.SAMPLER_SPINE)))
@@ -14239,28 +14190,6 @@ func _render_spine_canvas(asset: Dictionary, guide: Dictionary, drawing: bool) -
 	else:
 		canvas_view.set_interaction_state("")
 		canvas_view.set_tool_mode("")
-	canvas_view.call_deferred("grab_focus")
-
-
-func _render_point_guide_canvas(asset: Dictionary, guide: Dictionary) -> void:
-	var target_component_id := str(guide.get("scope", {}).get("component_id", ""))
-	var target_component := _get_component(asset, target_component_id)
-	var guide_type := str(guide.get("guide_type", AssetGuide.WEAPON_GRIP_POINT))
-	var guide_name := _guide_display_name(asset, guide)
-	canvas_context_label.text = "%s: %s" % [AssetGuide.display_name(guide_type), guide_name]
-	canvas_view.set_context(guide_name)
-	canvas_view.set_guide_style(false)
-	canvas_view.set_reference_shapes(_build_reference_shapes(asset, "", target_component_id))
-	canvas_view.set_display_polygon([])
-	canvas_view.set_bezier_geometry([], [], [])
-	var target_transform := ComponentHierarchy.world_transform_record(asset, target_component_id) if not target_component.is_empty() else _default_component_transform()
-	target_transform["visibility"] = bool(asset.get("visibility", true)) and bool(guide.get("visibility", true))
-	canvas_view.set_component_transform(target_transform)
-	var point = guide.get("points", [])[0] if guide.get("points", []).size() == 1 else Vector2.ZERO
-	var point_position: Vector2 = point.get("position", Vector2.ZERO) if point is Dictionary else Vector2.ZERO
-	canvas_view.set_point_guide_marker(true, point_position, AssetGuide.display_name(guide_type), true)
-	canvas_view.set_interaction_state("point_guide")
-	canvas_view.set_tool_mode("")
 	canvas_view.call_deferred("grab_focus")
 
 
@@ -14624,24 +14553,6 @@ func _on_bezier_points_move_started(point_ids: Array) -> void:
 		var point := BezierTopology.point_by_id(subject.get("points", []), point_id)
 		if not point.is_empty():
 			bezier_point_move_start_positions[point_id] = Vector2(point.get("position", Vector2.ZERO))
-
-
-func _on_point_guide_move_started() -> void:
-	var guide := _get_guide(_get_asset(selected_asset_id), selected_guide_id)
-	if guide.is_empty() or not AssetGuide.is_point_type(str(guide.get("guide_type", ""))):
-		return
-	_record_direct_change()
-
-
-func _on_point_guide_moved(position: Vector2) -> void:
-	var guide := _get_guide(_get_asset(selected_asset_id), selected_guide_id)
-	if guide.is_empty() or not AssetGuide.is_point_type(str(guide.get("guide_type", ""))) or guide.get("points", []).size() != 1:
-		return
-	_record_coalesced_change()
-	var point: Dictionary = guide["points"][0]
-	point["position"] = position
-	canvas_view.set_point_guide_marker(true, point["position"], AssetGuide.display_name(str(guide.get("guide_type", ""))), true)
-	_render_inspector()
 
 
 func _on_bezier_points_moved(point_ids: Array, world_delta: Vector2) -> void:
