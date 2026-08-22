@@ -123,7 +123,6 @@ var selected_asset_id := ""
 var selected_component_id := ""
 var selected_component_ids: Array[String] = []
 var selected_group_id := ""
-var outline_resolution_cache: Dictionary = {}
 var selected_guide_id := ""
 var selected_sampling_input_id := ""
 var selected_sampling_input_kind := ""
@@ -2242,7 +2241,6 @@ func _push_undo_snapshot() -> void:
 
 func _record_direct_change() -> void:
 	_invalidate_batch_status()
-	_invalidate_outline_resolution_cache()
 	history_coalescing = false
 	if is_instance_valid(history_coalesce_timer):
 		history_coalesce_timer.stop()
@@ -2251,7 +2249,6 @@ func _record_direct_change() -> void:
 
 func _record_coalesced_change() -> void:
 	_invalidate_batch_status()
-	_invalidate_outline_resolution_cache()
 	if not history_coalescing:
 		_push_undo_snapshot()
 		history_coalescing = true
@@ -8748,19 +8745,6 @@ func _group_world_center(asset: Dictionary, component_ids: Array) -> Vector2:
 	return center / float(component_ids.size())
 
 
-func _invalidate_outline_resolution_cache() -> void:
-	outline_resolution_cache.clear()
-
-
-func _outline_resolution_for_component(asset: Dictionary, component_id: String) -> Dictionary:
-	var group_id := ComponentHierarchy.membership_group_id(asset, component_id)
-	if group_id.is_empty():
-		return {}
-	if not outline_resolution_cache.has(group_id):
-		outline_resolution_cache[group_id] = OutlineResolutionService.resolve_group(asset, group_id)
-	return outline_resolution_cache.get(group_id, {}).get(component_id, {}).duplicate(true)
-
-
 func _component_group(asset: Dictionary, component: Dictionary) -> Dictionary:
 	return ComponentHierarchy.group_by_id(asset, ComponentHierarchy.membership_group_id(asset, str(component.get("id", ""))))
 
@@ -8773,8 +8757,6 @@ func _effective_component_visibility(asset: Dictionary, component: Dictionary) -
 func _effective_component_z_index(asset: Dictionary, component: Dictionary) -> int:
 	var group := _component_group(asset, component)
 	return int(group.get("z_index", 0)) if not group.is_empty() else int(component.get("z_index", 0))
-
-
 func _place_selected_group_pivot_at_mouse() -> bool:
 	var asset := _get_asset(selected_asset_id)
 	var group := ComponentHierarchy.group_by_id(asset, selected_group_id)
