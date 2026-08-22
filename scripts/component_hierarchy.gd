@@ -122,11 +122,11 @@ static func world_transform(asset: Dictionary, component_id: String) -> Transfor
 		chain.push_front(cursor)
 		cursor = component_by_id(asset, parent_id(cursor))
 	var result := Transform2D.IDENTITY
-	var effective_group_id := membership_group_id(asset, component_id)
-	if not effective_group_id.is_empty():
-		result = local_transform(group_by_id(asset, effective_group_id).get("transform", {}))
 	for chain_component in chain:
 		result = result * local_transform(chain_component.get("transform", {}))
+	var effective_group_id := membership_group_id(asset, component_id)
+	if not effective_group_id.is_empty():
+		result = local_transform(group_by_id(asset, effective_group_id).get("transform", {})) * result
 	return result
 
 

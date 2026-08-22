@@ -121,6 +121,7 @@ var motion_player_asset_id := ""
 var motion_last_marker := ""
 var selected_asset_id := ""
 var selected_component_id := ""
+var selected_component_ids: Array[String] = []
 var selected_guide_id := ""
 var selected_sampling_input_id := ""
 var selected_sampling_input_kind := ""
@@ -143,6 +144,7 @@ var asset_camera_states: Dictionary = {}
 var canvas_camera_asset_id := ""
 var next_asset_id := 1
 var next_component_id := 1
+var next_group_id := 1
 var next_guide_id := 1
 var asset_dialog: ConfirmationDialog
 var asset_name_input: LineEdit
@@ -157,6 +159,8 @@ var component_add_guide_menu: PopupMenu
 var component_add_weapon_point_menu: PopupMenu
 var component_add_reference_menu: PopupMenu
 var component_context_menu: PopupMenu
+var group_dialog: ConfirmationDialog
+var group_name_input: LineEdit
 var guide_dialog: ConfirmationDialog
 var guide_name_input: LineEdit
 var reference_image_dialog: FileDialog
@@ -966,6 +970,7 @@ func _build_ui() -> void:
 
 	_create_asset_dialog()
 	_create_component_dialog()
+	_create_group_dialog()
 	_create_component_draw_mode_menu()
 	_create_component_add_menu()
 	_create_component_context_menu()
@@ -1608,6 +1613,24 @@ func _create_component_dialog() -> void:
 	add_child(component_dialog)
 
 
+func _create_group_dialog() -> void:
+	group_dialog = ConfirmationDialog.new()
+	group_dialog.title = "Create Group"
+	group_dialog.dialog_text = "Enter a Group name"
+	group_dialog.size = Vector2i(360, 160)
+	group_dialog.confirmed.connect(_confirm_group_creation)
+	group_name_input = LineEdit.new()
+	group_name_input.placeholder_text = "Group name"
+	group_name_input.custom_minimum_size = Vector2(320, 32)
+	group_name_input.text_submitted.connect(func(_text: String) -> void: _confirm_group_creation())
+	group_name_input.text_changed.connect(func(_text: String) -> void:
+		var asset := _get_asset(str(group_dialog.get_meta("asset_id", "")))
+		group_dialog.get_ok_button().disabled = not _group_name_validation_error(asset, group_name_input.text).is_empty()
+	)
+	group_dialog.add_child(group_name_input)
+	add_child(group_dialog)
+
+
 func _create_component_draw_mode_menu() -> void:
 	component_draw_mode_menu = PopupMenu.new()
 	component_draw_mode_menu.add_item("Closed Loop", 0)
@@ -1663,6 +1686,8 @@ func _create_component_add_menu() -> void:
 func _create_component_context_menu() -> void:
 	component_context_menu = PopupMenu.new()
 	component_context_menu.name = "ComponentContextMenu"
+	component_context_menu.add_item("Group", 4)
+	component_context_menu.add_separator()
 	component_context_menu.add_item("Duplicate", 0)
 	component_context_menu.add_separator()
 	component_context_menu.add_item("Duplicate & Mirror Y · Keep Orientation", 1)
@@ -2166,6 +2191,7 @@ func _capture_history_snapshot() -> Dictionary:
 		"assets": assets.duplicate(true),
 		"next_asset_id": next_asset_id,
 		"next_component_id": next_component_id,
+		"next_group_id": next_group_id,
 		"next_guide_id": next_guide_id,
 		"motion_paths": motion_paths.duplicate(true),
 		"next_motion_path_id": next_motion_path_id,
@@ -2264,6 +2290,7 @@ func _restore_history_snapshot(snapshot: Dictionary) -> void:
 	_stop_guide_draw_state()
 	next_asset_id = int(snapshot.get("next_asset_id", 1))
 	next_component_id = int(snapshot.get("next_component_id", 1))
+	next_group_id = int(snapshot.get("next_group_id", 1))
 	next_guide_id = int(snapshot.get("next_guide_id", 1))
 	next_motion_path_id = int(snapshot.get("next_motion_path_id", 1))
 	next_motion_act_id = int(snapshot.get("next_motion_act_id", 1))
@@ -5219,6 +5246,7 @@ func _has_supported_schema(data) -> bool:
 func _update_next_ids() -> void:
 	next_asset_id = 1
 	next_component_id = 1
+	next_group_id = 1
 	next_guide_id = 1
 	next_motion_path_id = 1
 	next_motion_act_id = 1
@@ -5227,6 +5255,8 @@ func _update_next_ids() -> void:
 		next_asset_id = maxi(next_asset_id, _id_suffix_number(str(asset["id"])) + 1)
 		for component in asset["components"]:
 			next_component_id = maxi(next_component_id, _id_suffix_number(str(component["id"])) + 1)
+		for group in asset.get("groups", []):
+			next_group_id = maxi(next_group_id, _id_suffix_number(str(group.get("id", ""))) + 1)
 		for guide in asset.get("guides", []):
 			next_guide_id = maxi(next_guide_id, _id_suffix_number(str(guide.get("id", ""))) + 1)
 	for path_document in motion_paths:
@@ -6659,6 +6689,7 @@ func _confirm_asset_creation() -> void:
 	assets.append({"id": asset_id, "name": asset_name, "asset_type": _create_submodule_asset_type(active_create_submodule), "visibility": true, "asset_pivot": Vector2.ZERO, "reference_image": _default_reference_image(), "animation": MotionWorkspace.create_default_animation_document(), "components": [], "groups": [], "guides": []})
 	selected_asset_id = asset_id
 	selected_component_id = ""
+	selected_component_ids.clear()
 	selected_guide_id = ""
 	active_state = ""
 	_set_outliner_asset_expanded(asset_id, true)
@@ -8116,8 +8147,12 @@ func _render_asset_outliner_entry(asset: Dictionary, force_expand := false) -> v
 	guides.sort_custom(func(left: Dictionary, right: Dictionary) -> bool: return _guide_display_name(asset, left).naturalnocasecmp_to(_guide_display_name(asset, right)) < 0)
 	asset_container.add_child(_create_outliner_child_group_label("Components"))
 	var rendered_component_ids: Dictionary = {}
+	var groups: Array = asset.get("groups", []).duplicate(true)
+	groups.sort_custom(_sort_named_documents)
+	for group in groups:
+		_render_group_outliner_tree(asset_container, asset, group, 16, rendered_component_ids)
 	for component in components:
-		if str(component.get("parent_component_id", "")).is_empty():
+		if str(component.get("parent_component_id", "")).is_empty() and ComponentHierarchy.membership_group_id(asset, str(component.get("id", ""))).is_empty():
 			_render_component_outliner_tree(asset_container, asset, component, 16, rendered_component_ids)
 	# A malformed in-memory document should remain editable even before its next load migration.
 	for component in components:
@@ -8130,6 +8165,36 @@ func _render_asset_outliner_entry(asset: Dictionary, force_expand := false) -> v
 	asset_container.add_child(_create_outliner_child_group_label("Guides"))
 	for guide in guides:
 		_render_component_guide_row(asset_container, asset, guide)
+
+
+func _render_group_outliner_tree(container: VBoxContainer, asset: Dictionary, group: Dictionary, indent: int, rendered_component_ids: Dictionary) -> void:
+	var group_id := str(group.get("id", ""))
+	if group_id.is_empty():
+		return
+	var group_row := HBoxContainer.new()
+	group_row.add_theme_constant_override("separation", 0)
+	container.add_child(group_row)
+	var placeholder := Control.new()
+	placeholder.custom_minimum_size = Vector2(indent, 0)
+	group_row.add_child(placeholder)
+	var group_button := Button.new()
+	group_button.text = "G: %s" % str(group.get("name", "Group"))
+	group_button.custom_minimum_size = Vector2(0, 30)
+	group_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	group_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	group_button.focus_mode = Control.FOCUS_NONE
+	group_button.tooltip_text = "Component Group"
+	group_row.add_child(group_button)
+	var group_components: Array = []
+	for component in asset.get("components", []):
+		if str(component.get("group_id", "")) != group_id:
+			continue
+		var parent_id := str(component.get("parent_component_id", ""))
+		if parent_id.is_empty() or ComponentHierarchy.membership_group_id(asset, parent_id) != group_id:
+			group_components.append(component)
+	group_components.sort_custom(_sort_named_documents)
+	for component in group_components:
+		_render_component_outliner_tree(container, asset, component, indent + 16, rendered_component_ids)
 
 
 func _render_component_outliner_tree(container: VBoxContainer, asset: Dictionary, component: Dictionary, indent: int, rendered_component_ids: Dictionary) -> void:
@@ -8152,7 +8217,7 @@ func _render_component_outliner_tree(container: VBoxContainer, asset: Dictionary
 	component_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	component_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	component_button.focus_mode = Control.FOCUS_NONE
-	_style_outliner_button(component_button, component_id == selected_component_id and asset_id == selected_asset_id, str(component.get("topology_role", "outer")))
+	_style_outliner_button(component_button, (component_id == selected_component_id or selected_component_ids.has(component_id)) and asset_id == selected_asset_id, str(component.get("topology_role", "outer")))
 	component_button.pressed.connect(_select_component.bind(asset_id, component_id, true))
 	component_button.gui_input.connect(_on_component_outliner_gui_input.bind(asset_id, component_id, component_button))
 	component_row.add_child(component_button)
@@ -8176,7 +8241,10 @@ func _on_component_outliner_gui_input(event: InputEvent, asset_id: String, compo
 		return
 	if not is_instance_valid(component_context_menu):
 		return
-	_select_component(asset_id, component_id)
+	if not selected_component_ids.has(component_id):
+		_select_component(asset_id, component_id)
+	else:
+		selected_component_id = component_id
 	component_context_menu.set_meta("asset_id", asset_id)
 	component_context_menu.set_meta("component_id", component_id)
 	var component := _get_component(_get_asset(asset_id), component_id)
@@ -8232,6 +8300,7 @@ func _select_asset(asset_id: String) -> void:
 	_set_create_submodule_context(_asset_type_create_submodule(_asset_type(selected_asset)))
 	selected_asset_id = asset_id
 	selected_component_id = ""
+	selected_component_ids.clear()
 	selected_guide_id = ""
 	active_state = ""
 	canvas_view.set_interaction_state("")
@@ -8247,6 +8316,7 @@ func _select_asset(asset_id: String) -> void:
 func _open_component_dialog(asset_id: String, anchor: Control) -> void:
 	selected_asset_id = asset_id
 	selected_component_id = ""
+	selected_component_ids.clear()
 	selected_guide_id = ""
 	component_draw_mode_menu.set_meta("asset_id", asset_id)
 	component_draw_mode_menu.set_meta("parent_component_id", "")
@@ -8445,11 +8515,104 @@ func _duplicate_selected_guide() -> void:
 	_render_canvas_context()
 
 
+func _open_group_dialog(asset_id: String) -> void:
+	var asset := _get_asset(asset_id)
+	if asset.is_empty():
+		return
+	var component_ids := _selected_component_ids_for_group(asset)
+	if component_ids.is_empty():
+		_show_status_message("Select at least one Component to group.")
+		return
+	group_dialog.set_meta("asset_id", asset_id)
+	group_dialog.set_meta("component_ids", component_ids)
+	group_name_input.text = ""
+	group_dialog.title = "Group Components"
+	group_dialog.dialog_text = "Enter a Group name"
+	group_dialog.popup_centered()
+	group_dialog.get_ok_button().disabled = true
+	group_name_input.call_deferred("grab_focus")
+
+
+func _selected_component_ids_for_group(asset: Dictionary) -> Array[String]:
+	var selected: Array[String] = []
+	var candidates: Array[String] = selected_component_ids.duplicate()
+	if candidates.is_empty() and not selected_component_id.is_empty():
+		candidates.append(selected_component_id)
+	for component_id in candidates:
+		if _get_component(asset, component_id).is_empty():
+			continue
+		var parent_id := str(_get_component(asset, component_id).get("parent_component_id", ""))
+		if not parent_id.is_empty() and candidates.has(parent_id):
+			continue
+		selected.append(component_id)
+	return selected
+
+
+func _group_name_validation_error(asset: Dictionary, raw_name: String) -> String:
+	var name := raw_name.strip_edges()
+	if name.is_empty():
+		return "Enter a Group name."
+	if not _component_name_validation_error(name, {"components": []}).is_empty():
+		return "Use lower_snake_case for the Group name."
+	for group in asset.get("groups", []):
+		if str(group.get("name", "")).to_lower() == name.to_lower():
+			return "Group name must be unique within the Asset."
+	return ""
+
+
+func _confirm_group_creation() -> void:
+	var asset_id := str(group_dialog.get_meta("asset_id", ""))
+	var asset := _get_asset(asset_id)
+	var component_ids: Array = group_dialog.get_meta("component_ids", [])
+	var group_name := group_name_input.text.strip_edges()
+	var name_error := _group_name_validation_error(asset, group_name)
+	if asset.is_empty() or component_ids.is_empty() or not name_error.is_empty():
+		if not name_error.is_empty():
+			_show_status_message(name_error)
+		return
+	_record_direct_change()
+	var group_id := "group_%d" % next_group_id
+	next_group_id += 1
+	var center := _group_world_center(asset, component_ids)
+	if not asset.has("groups") or not asset.get("groups") is Array:
+		asset["groups"] = []
+	asset["groups"].append({
+		"id": group_id,
+		"name": group_name,
+		"transform": {"position": center, "rotation": 0.0, "scale": Vector2.ONE, "pivot": center},
+		"visibility": true
+	})
+	for component_id in component_ids:
+		var component := _get_component(asset, component_id)
+		if not component.is_empty():
+			component["group_id"] = group_id
+	group_dialog.hide()
+	selected_component_ids = component_ids.duplicate()
+	selected_component_id = str(component_ids.back())
+	_set_outliner_asset_expanded(asset_id, true)
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _group_world_center(asset: Dictionary, component_ids: Array) -> Vector2:
+	if component_ids.is_empty():
+		return Vector2.ZERO
+	var center := Vector2.ZERO
+	for component_id in component_ids:
+		var component := _get_component(asset, str(component_id))
+		center += ComponentHierarchy.world_transform(asset, str(component_id)) * _component_local_visual_center(component)
+	return center / float(component_ids.size())
+
+
 func _on_component_context_menu_selected(action_id: int) -> void:
 	if not is_instance_valid(component_context_menu):
 		return
 	var asset_id := str(component_context_menu.get_meta("asset_id", ""))
 	var component_id := str(component_context_menu.get_meta("component_id", ""))
+	if action_id == 4:
+		_open_group_dialog(asset_id)
+		return
 	if action_id == 3:
 		_detach_component(asset_id, component_id)
 		return
@@ -8766,8 +8929,24 @@ func _select_component(asset_id: String, component_id: String, focus_outliner :=
 	# the generic "Asset" label here normalizes to Character and hides Symbols
 	# (and the other non-character asset types) from the Outliner.
 	_set_create_submodule_context(_asset_type_create_submodule(_asset_type(_get_asset(asset_id))))
+	var additive_selection := focus_outliner and (Input.is_key_pressed(KEY_CTRL) or Input.is_key_pressed(KEY_META))
+	if additive_selection:
+		if selected_asset_id != asset_id:
+			selected_component_ids.clear()
+		if selected_component_ids.is_empty() and not selected_component_id.is_empty():
+			selected_component_ids.append(selected_component_id)
+		if selected_component_ids.has(component_id):
+			selected_component_ids.erase(component_id)
+		else:
+			selected_component_ids.append(component_id)
+		if selected_component_ids.is_empty():
+			selected_component_id = ""
+		else:
+			selected_component_id = selected_component_ids.back()
+	else:
+		selected_component_ids = [component_id]
+		selected_component_id = component_id
 	selected_asset_id = asset_id
-	selected_component_id = component_id
 	selected_guide_id = ""
 	selected_edge_id = ""
 	selected_point_id = ""
@@ -8810,6 +8989,7 @@ func _select_guide(asset_id: String, guide_id: String) -> void:
 	_set_create_submodule_context(_asset_type_create_submodule(_asset_type(_get_asset(asset_id))))
 	selected_asset_id = asset_id
 	selected_component_id = ""
+	selected_component_ids.clear()
 	selected_guide_id = guide_id
 	selected_sampling_input_id = ""
 	selected_sampling_input_kind = ""
@@ -8878,6 +9058,7 @@ func _confirm_component_deletion() -> void:
 		if removed_component_ids.has(str(surviving_component.get("catch_parent_component_id", ""))):
 			surviving_component["catch_parent_component_id"] = ""
 	selected_component_id = ""
+	selected_component_ids.clear()
 	selected_guide_id = ""
 	active_state = ""
 	_render_outliner()
