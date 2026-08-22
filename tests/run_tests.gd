@@ -25,7 +25,7 @@ func _init() -> void:
 	_test_geometry_meshing_service_and_ui()
 	_test_geometry_uv_mapping_service_and_ui()
 	_test_geometry_sdf_service_and_batch()
-	_test_semantic_registry_and_picker()
+	_test_component_names()
 	_test_asset_catalog_service()
 	_test_runtime_export_service()
 	_test_weighting_service_and_ui()
@@ -826,7 +826,7 @@ func _test_geometry_sampling_service() -> void:
 	_expect(not bool(GeometrySamplingService.generate(open_component).get("valid", true)), "An open contour should fail visibly at the mesh-pipeline Sampling boundary.")
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
-	_expect(application._has_supported_schema({"schema_version": 42}) and application._has_supported_schema({"schema_version": 41}) and not application._has_supported_schema({"schema_version": 43}), "Schema 42 should keep current and older World documents readable and reject unknown future schemas.")
+	_expect(application._has_supported_schema({"schema_version": 43}) and application._has_supported_schema({"schema_version": 42}) and not application._has_supported_schema({"schema_version": 44}), "Schema 43 should keep current and older World documents readable and reject unknown future schemas.")
 	_expect(application._normalize_component_draw_mode("ribbon", 39) == "contour" and application._normalize_component_draw_mode("contour", 42) == "contour", "Schema-42 loading must retain the explicit legacy Ribbon-to-Contour migration boundary.")
 	_expect(application._normalize_component_draw_mode("ribbon", 42) == "ribbon", "Current-schema Ribbon data must remain visibly invalid instead of receiving a silent backward fallback.")
 	var arranged_round_trip: Dictionary = application._normalize_sampling_bake(application._serialize_sampling_bake(arranged_result))
@@ -837,7 +837,7 @@ func _test_geometry_sampling_service() -> void:
 	baked_result["bake_id"] = "bake_test"
 	geometry_document["sampling"]["bakes"][GeometrySamplingService.ADAPTIVE] = baked_result
 	var serialized_geometry: Dictionary = application._serialize_geometry_document(geometry_document)
-	_expect(int(serialized_geometry.get("schema_version", 0)) == 42 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-42 JSON arrays.")
+	_expect(int(serialized_geometry.get("schema_version", 0)) == 43 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-43 JSON arrays.")
 	var normalized_geometry: Dictionary = application._normalize_geometry_document(serialized_geometry, "asset_1", "component_1")
 	_expect(normalized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Vector2, "Sampling bake loading should restore local sample positions as Vector2 values.")
 	_expect(normalized_geometry["sampling"]["bakes"].size() == 1, "Sampling should retain one Adaptive Bake.")
@@ -1575,51 +1575,27 @@ func _test_geometry_sdf_service_and_batch() -> void:
 	application.free()
 
 
-func _test_semantic_registry_and_picker() -> void:
-	var registry := SemanticRegistry.load_registry()
-	_expect(bool(registry.get("valid", false)) and int(registry.get("schema_version", SemanticRegistry.REGISTRY_SCHEMA_VERSION)) == SemanticRegistry.REGISTRY_SCHEMA_VERSION, "The read-only Semantic Registry should load its independently versioned contract.")
-	_expect(registry.get("semantics", []) == ["arm_line", "belly", "body", "cloak", "eye_left", "eye_right", "eyebrow_left", "eyebrow_right", "feet", "hat", "hat_back", "hat_tip", "head", "head_tip", "weapon_body", "weapon_collar", "weapon_grip", "weapon_head", "weapon_head_left", "weapon_rear", "weapon_shaft", "weapon_string"], "Semantic Keys should remain canonical, unique, and alphabetically sorted.")
-	_expect(SemanticRegistry.migrate_legacy_key("Barde", {"name": "Orb"}, registry) == "belly" and SemanticRegistry.migrate_legacy_key("Orb", {"name": "orb"}, registry) == "body" and SemanticRegistry.migrate_legacy_key("Tree", {"name": "Trunk"}, registry) == "body" and SemanticRegistry.migrate_legacy_key("Hammerer", {"name": "Trapez"}, registry) == "feet", "Legacy migration should apply the explicitly approved asset-specific semantic mappings.")
-	_expect(SemanticRegistry.migrate_legacy_key("Glavier", {"name": "HeadTip"}, registry) == "head_tip" and SemanticRegistry.migrate_legacy_key("Mage", {"name": "HatTip"}, registry) == "hat_tip" and SemanticRegistry.migrate_legacy_key("Glavier", {"name": "Belly"}, registry) == "belly", "Legacy migration should preserve Head Tip, Hat Tip, and Belly as distinct approved meanings.")
-	_expect(SemanticRegistry.mirror_key("eye_left") == "eye_right" and SemanticRegistry.mirror_key("eyebrow_right") == "eyebrow_left", "Known left/right Semantic pairs should expose deterministic duplicate mappings.")
-	_expect(SemanticRegistry.component_display_name({"semantic_key": "removed_key"}, registry) == "missing_semantic (removed_key)", "A missing Registry link should remain visible without inventing a replacement Semantic Key.")
-	var picker := SemanticPicker.new()
-	picker.configure(registry.get("semantics", []), "body", ["hat"])
-	_expect(picker.list.item_count == registry.get("semantics", []).size() - 1 and picker.selected_key == "body", "The Semantic Picker should list available keys alphabetically, exclude already-used keys, and retain its current selection.")
-	picker.search_input.text = "eye"
-	picker._render_items("eye")
-	_expect(picker.list.item_count == 4 and str(picker.list.get_item_metadata(0)).begins_with("eye"), "The Semantic Picker should filter keys immediately through its integrated search field.")
-	picker.free()
-	var dropdown := SemanticDropdown.new()
-	dropdown.configure(registry.get("semantics", []), "body", ["hat"])
-	_expect(dropdown.selected_key == "body" and dropdown.text.begins_with("body") and dropdown.list.item_count == registry.get("semantics", []).size() - 1, "The Inspector Semantic control should stay compact while its dropdown retains the searchable filtered list.")
-	dropdown.search_input.text = "tip"
-	dropdown._render_items("tip")
-	_expect(dropdown.list.item_count == 2, "The Semantic dropdown should provide its search field inside the opened menu.")
-	dropdown.free()
+func _test_component_names() -> void:
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
 	var source_component := _component()
-	source_component.merge({"id": "component_1", "name": "body", "semantic_key": "body", "visibility": true})
+	source_component.merge({"id": "component_1", "name": "body", "visibility": true})
 	var semantic_asset := {"id": "character", "name": "Character", "asset_type": "character", "visibility": true, "components": [source_component], "guides": []}
 	var symbol_asset := {"id": "orb", "name": "Orb", "asset_type": "symbols", "visibility": true, "components": [], "guides": []}
 	var semantic_assets: Array[Dictionary] = [semantic_asset, symbol_asset]
 	application.assets = semantic_assets
 	application._build_ui()
-	_expect(application.component_dialog.dialog_text.is_empty() and application.duplicate_semantic_dialog.dialog_text.is_empty(), "Semantic dialogs should keep AcceptDialog's built-in text empty so it cannot overlap the custom search field.")
+	_expect(not application.component_dialog.dialog_text.is_empty(), "Component creation should use a normal free-name input.")
 	application._duplicate_component("character", "component_1")
-	_expect(semantic_asset.get("components", []).size() == 1 and application.pending_component_duplicate.get("unresolved", []).size() == 1, "Duplicating a Component without a known mirror pair should pause before mutation and require an explicit Semantic Key.")
-	application.duplicate_semantic_picker.configure(registry.get("semantics", []), "belly", ["body"])
-	application._confirm_duplicate_semantic()
-	_expect(semantic_asset.get("components", []).size() == 2 and str(semantic_asset.get("components", [])[1].get("semantic_key", "")) == "belly", "Choosing an available Semantic Key should commit the previously unresolved duplicate.")
+	_expect(semantic_asset.get("components", []).size() == 2 and str(semantic_asset.get("components", [])[1].get("name", "")) == "body Copy", "Duplicating a Component should generate a unique free name automatically.")
 	application.component_dialog.set_meta("asset_id", "character")
 	application.component_dialog.set_meta("parent_component_id", "")
 	application.component_dialog.set_meta("draw_mode", "reference")
 	application.component_dialog.set_meta("source_asset_id", "orb")
-	application.component_semantic_picker.configure(registry.get("semantics", []), "feet", ["body", "belly"])
+	application.component_name_input.text = "reference"
 	application._confirm_component_creation()
 	var created_reference: Dictionary = semantic_asset.get("components", [])[2]
-	_expect(str(created_reference.get("type", "")) == "reference" and str(created_reference.get("semantic_key", "")) == "feet" and str(created_reference.get("source_asset_id", "")) == "orb", "Reference creation should require a local Semantic Key while retaining the actual source Asset ID.")
+	_expect(str(created_reference.get("type", "")) == "reference" and str(created_reference.get("name", "")) == "reference" and str(created_reference.get("source_asset_id", "")) == "orb", "Reference creation should use a local free name while retaining the source Asset ID.")
 	application.free()
 
 
@@ -1934,7 +1910,7 @@ func _test_asset_guides() -> void:
 	application.component_dialog.set_meta("parent_component_id", "component_1")
 	application.component_dialog.set_meta("draw_mode", "contour")
 	application.component_dialog.set_meta("source_asset_id", "")
-	application.component_semantic_picker.configure(application.semantic_registry.get("semantics", []), "arm_line", ["body"])
+	application.component_name_input.text = "arm_line"
 	application._confirm_component_creation()
 	var child_component: Dictionary = application._get_component(application._get_asset("asset_1"), application.selected_component_id)
 	_expect(str(child_component.get("parent_component_id", "")) == "component_1" and Vector2(child_component.get("transform", {}).get("pivot", Vector2.ZERO)).is_equal_approx(Vector2(parent_component.get("transform", {}).get("pivot", Vector2.ZERO))), "Child creation should persist a real Parent relationship and inherit the Parent pivot initially.")
@@ -1961,9 +1937,7 @@ func _test_asset_guides() -> void:
 	_expect(application.component_add_child_menu.item_count == 3 and application.component_add_guide_menu.item_count == 5 and application.component_add_weapon_point_menu.item_count == 4, "Every Component add menu should expose all three Child draw modes, the four base Guide types, and the nested Weapon Points submenu.")
 	parent_component["transform"] = {"position": Vector2(-3.0, 2.0), "rotation": 20.0, "scale": Vector2(1.0, 1.5), "pivot": Vector2.ZERO}
 	parent_component["name"] = "eyebrow_left"
-	parent_component["semantic_key"] = "eyebrow_left"
 	child_component["name"] = "eye_left"
-	child_component["semantic_key"] = "eye_left"
 	var duplicate_asset: Dictionary = application._get_asset("asset_1")
 	var component_count_before_duplicate: int = duplicate_asset.get("components", []).size()
 	var guide_count_before_duplicate: int = duplicate_asset.get("guides", []).size()
@@ -1971,7 +1945,7 @@ func _test_asset_guides() -> void:
 	application._duplicate_component("asset_1", "component_1")
 	var plain_duplicate: Dictionary = application._get_component(application._get_asset("asset_1"), application.selected_component_id)
 	var plain_duplicate_children := ComponentHierarchy.children(application._get_asset("asset_1"), str(plain_duplicate.get("id", "")))
-	_expect(application._get_asset("asset_1").get("components", []).size() == component_count_before_duplicate + 1 + descendant_count_before_duplicate and application._get_asset("asset_1").get("guides", []).size() == guide_count_before_duplicate and str(plain_duplicate.get("parent_component_id", "")) == str(parent_component.get("parent_component_id", "")) and str(plain_duplicate.get("semantic_key", "")) == "eyebrow_right" and plain_duplicate_children.size() == descendant_count_before_duplicate and str(plain_duplicate_children[0].get("semantic_key", "")) == "eye_right", "Component Duplicate should copy the complete Component subtree and map known left/right Semantic Keys automatically.")
+	_expect(application._get_asset("asset_1").get("components", []).size() == component_count_before_duplicate + 1 + descendant_count_before_duplicate and application._get_asset("asset_1").get("guides", []).size() == guide_count_before_duplicate and str(plain_duplicate.get("parent_component_id", "")) == str(parent_component.get("parent_component_id", "")) and str(plain_duplicate.get("name", "")) == "eyebrow_left Copy" and plain_duplicate_children.size() == descendant_count_before_duplicate and str(plain_duplicate_children[0].get("name", "")) == "eye_left Copy", "Component Duplicate should copy the complete Component subtree with unique free names.")
 	_expect(str(plain_duplicate.get("id", "")) != "component_1" and str(plain_duplicate.get("points", [])[0].get("id", "")) != str(parent_component.get("points", [])[0].get("id", "")), "Component Duplicate should remap the Component and topology IDs independently.")
 	for duplicate_child in plain_duplicate_children:
 		application._get_asset("asset_1")["components"].erase(duplicate_child)
@@ -2003,7 +1977,7 @@ func _test_asset_guides() -> void:
 	application.component_dialog.set_meta("parent_component_id", "component_1")
 	application.component_dialog.set_meta("draw_mode", "primitive")
 	application.component_dialog.set_meta("source_asset_id", "")
-	application.component_semantic_picker.configure(application.semantic_registry.get("semantics", []), "cloak", ["eyebrow_left", "eye_left", "eyebrow_right", "eye_right"])
+	application.component_name_input.text = "cloak"
 	application._confirm_component_creation()
 	var pupil_component: Dictionary = application._get_component(application._get_asset("asset_1"), application.selected_component_id)
 	_expect(str(pupil_component.get("parent_component_id", "")) == "component_1" and str(pupil_component.get("draw_mode", "")) == "primitive" and pupil_component.get("points", []).is_empty() and pupil_component.get("edges", []).is_empty() and pupil_component.get("chains", []).is_empty() and pupil_component.get("primitive", {}).is_empty(), "Primitive Child creation should create an empty Primitive Component without generated Bézier topology.")
@@ -2315,7 +2289,7 @@ func _test_motion_act_evaluator() -> void:
 	var normalized: Dictionary = application._normalize_motion_act({"id": "act_7", "parameters": {"direction": [0.0, 2.0], "distance": 12.0}}, "fallback")
 	_expect(Vector2(normalized.get("parameters", {}).get("direction", Vector2.ZERO)) == Vector2(0.0, 2.0), "Persisted Slide direction arrays should normalize back to Vector2 values.")
 	var serialized: Dictionary = application._serialize_motion_act(normalized)
-	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 42, "Act persistence should serialize vectors as JSON arrays using schema 42.")
+	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 43, "Act persistence should serialize vectors as JSON arrays using schema 43.")
 	var normalized_jump: Dictionary = application._normalize_motion_act({"id": "act_8", "primitive": "jump", "parameters": {"direction": [1.0, 0.0], "distance": 7.0, "height": 2.5, "arc": "snappy"}}, "fallback")
 	var serialized_jump: Dictionary = application._serialize_motion_act(normalized_jump)
 	_expect(str(serialized_jump.get("primitive", "")) == MotionActEvaluator.JUMP and is_equal_approx(float(serialized_jump.get("parameters", {}).get("height", 0.0)), 2.5) and str(serialized_jump.get("parameters", {}).get("arc", "")) == MotionActEvaluator.JUMP_ARC_SNAPPY, "Jump-specific parameters should survive normalization and serialization.")

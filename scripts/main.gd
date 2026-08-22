@@ -8,7 +8,7 @@ const EXPORT_SUBMODULES: Array[String] = []
 const MOTION_SUBMODULES := ["Animation", "Path", "Act", "Sequence"]
 const WORLDS_ROOT := "res://worlds"
 const CONFIG_PATH := "res://configs/app_config.json"
-const SCHEMA_VERSION := 42
+const SCHEMA_VERSION := 43
 const MAX_HISTORY_SIZE := 100
 const DRAW_MODES := ["closed_loop", "contour", "primitive"]
 const GRID_BOX_TOOL_UNITS := 0.5
@@ -147,10 +147,8 @@ var next_guide_id := 1
 var asset_dialog: ConfirmationDialog
 var asset_name_input: LineEdit
 var component_dialog: ConfirmationDialog
-var component_semantic_picker: SemanticPicker
-var duplicate_semantic_dialog: ConfirmationDialog
-var duplicate_semantic_picker: SemanticPicker
-var pending_component_duplicate: Dictionary = {}
+var component_name_input: LineEdit
+var component_name_editor: LineEdit
 var component_draw_mode_menu: PopupMenu
 var component_add_menu: PopupMenu
 var component_add_child_menu: PopupMenu
@@ -165,7 +163,6 @@ var reference_image_crop_dialog: ReferenceImageCropDialog
 var element_dialog: ConfirmationDialog
 var element_name_input: LineEdit
 var asset_name_editor: LineEdit
-var inspector_semantic_dropdown: SemanticDropdown
 var transform_fields: Dictionary = {}
 var canvas_context_label: Label
 var canvas_view: ComponentCanvas
@@ -270,7 +267,6 @@ var history_coalescing := false
 var world_unit := "cm"
 var world_grid_size := GRID_BOX_TOOL_UNITS
 var world_contour_stroke_width_px := WorldSettingsService.DEFAULT_CONTOUR_STROKE_WIDTH_PX
-var semantic_registry := SemanticRegistry.load_registry()
 
 
 func _ready() -> void:
@@ -969,7 +965,6 @@ func _build_ui() -> void:
 
 	_create_asset_dialog()
 	_create_component_dialog()
-	_create_duplicate_semantic_dialog()
 	_create_component_draw_mode_menu()
 	_create_component_add_menu()
 	_create_component_context_menu()
@@ -1594,31 +1589,17 @@ func _create_asset_dialog() -> void:
 func _create_component_dialog() -> void:
 	component_dialog = ConfirmationDialog.new()
 	component_dialog.title = "Add Component"
-	component_dialog.dialog_text = ""
-	component_dialog.size = Vector2i(420, 360)
+	component_dialog.dialog_text = "Enter a component name"
+	component_dialog.size = Vector2i(360, 160)
 	component_dialog.confirmed.connect(_confirm_component_creation)
 	component_dialog.canceled.connect(_on_component_dialog_canceled)
-	component_semantic_picker = SemanticPicker.new()
-	component_semantic_picker.custom_minimum_size = Vector2(380, 210)
-	component_semantic_picker.selection_changed.connect(_on_component_dialog_semantic_selected)
-	component_dialog.add_child(component_semantic_picker)
+	component_name_input = LineEdit.new()
+	component_name_input.placeholder_text = "Component name"
+	component_name_input.custom_minimum_size = Vector2(320, 32)
+	component_name_input.focus_mode = Control.FOCUS_ALL
+	component_name_input.text_submitted.connect(_submit_component_name)
+	component_dialog.add_child(component_name_input)
 	add_child(component_dialog)
-
-
-func _create_duplicate_semantic_dialog() -> void:
-	duplicate_semantic_dialog = ConfirmationDialog.new()
-	duplicate_semantic_dialog.title = "Duplicate Component"
-	duplicate_semantic_dialog.dialog_text = ""
-	duplicate_semantic_dialog.size = Vector2i(420, 360)
-	duplicate_semantic_dialog.confirmed.connect(_confirm_duplicate_semantic)
-	duplicate_semantic_dialog.canceled.connect(func() -> void: pending_component_duplicate.clear())
-	duplicate_semantic_picker = SemanticPicker.new()
-	duplicate_semantic_picker.custom_minimum_size = Vector2(380, 210)
-	duplicate_semantic_picker.selection_changed.connect(func(_key: String) -> void:
-		duplicate_semantic_dialog.get_ok_button().disabled = duplicate_semantic_picker.selected_key.is_empty()
-	)
-	duplicate_semantic_dialog.add_child(duplicate_semantic_picker)
-	add_child(duplicate_semantic_dialog)
 
 
 func _create_component_draw_mode_menu() -> void:
@@ -2093,8 +2074,7 @@ func _save_world() -> void:
 			asset_data["components"].append({
 				"id": str(component["id"]),
 				"type": str(component.get("type", "component")),
-				"semantic_key": str(component.get("semantic_key", "")),
-				"missing_semantic_source": str(component.get("missing_semantic_source", "")),
+				"name": _normalized_component_name(component),
 				"source_asset_id": str(component.get("source_asset_id", "")),
 				"parent_component_id": str(component.get("parent_component_id", "")),
 				"points": _serialize_bezier_points(component.get("points", [])),
@@ -2412,6 +2392,7 @@ func _load_world(world_entry: String, persist_as_last := true) -> bool:
 		if not _has_supported_schema(asset_data):
 			continue
 		var components: Array[Dictionary] = []
+		var used_component_names: Dictionary = {}
 		var guides: Array[Dictionary] = []
 		for component_data in asset_data.get("components", []):
 			if not component_data is Dictionary:
@@ -2425,20 +2406,11 @@ func _load_world(world_entry: String, persist_as_last := true) -> bool:
 				guides.append(AssetGuide.normalize(legacy_guide))
 				continue
 			var component_type := str(component_data.get("type", "component"))
-			var persisted_semantic_key := str(component_data.get("semantic_key", "")).strip_edges()
-			var semantic_key := persisted_semantic_key if SemanticRegistry.contains(semantic_registry, persisted_semantic_key) else ""
-			if semantic_key.is_empty() and int(asset_data.get("schema_version", 0)) < 39:
-				semantic_key = SemanticRegistry.migrate_legacy_key(str(asset_data.get("name", asset_id)), component_data, semantic_registry)
-			var missing_semantic_source := str(component_data.get("missing_semantic_source", ""))
-			if semantic_key.is_empty() and missing_semantic_source.is_empty():
-				missing_semantic_source = persisted_semantic_key if not persisted_semantic_key.is_empty() else str(component_data.get("semantic_role", component_data.get("name", "unassigned")))
-			var semantic_component := {"semantic_key": semantic_key, "missing_semantic_source": missing_semantic_source}
+			var component_name := _migrated_component_name(component_data, used_component_names)
 			components.append({
 				"id": str(component_data.get("id", "")),
 				"type": component_type,
-				"name": SemanticRegistry.component_display_name(semantic_component, semantic_registry),
-				"semantic_key": semantic_key,
-				"missing_semantic_source": missing_semantic_source,
+				"name": component_name,
 				"source_asset_id": str(component_data.get("source_asset_id", "")),
 				"parent_component_id": str(component_data.get("parent_component_id", "")),
 				"points": topology["points"],
@@ -2534,6 +2506,23 @@ func _load_world(world_entry: String, persist_as_last := true) -> bool:
 	if persist_as_last:
 		_write_json(CONFIG_PATH, {"schema_version": SCHEMA_VERSION, "last_world": world_name})
 	return true
+
+
+func _migrated_component_name(component_data: Dictionary, used_names: Dictionary) -> String:
+	var candidate := str(component_data.get("name", "")).strip_edges()
+	if candidate.is_empty() or candidate.begins_with("missing_semantic"):
+		candidate = str(component_data.get("semantic_key", "")).strip_edges()
+	if candidate.is_empty() or candidate.begins_with("missing_semantic"):
+		candidate = str(component_data.get("missing_semantic_source", component_data.get("semantic_role", ""))).strip_edges()
+	if candidate.is_empty() or candidate.begins_with("missing_semantic"):
+		candidate = "Component"
+	var base_name := candidate
+	var suffix := 2
+	while used_names.has(candidate.to_lower()):
+		candidate = "%s %d" % [base_name, suffix]
+		suffix += 1
+	used_names[candidate.to_lower()] = true
+	return candidate
 
 
 func _serialize_editor_state() -> Dictionary:
@@ -8256,7 +8245,7 @@ func _open_component_add_menu(asset_id: String, parent_component_id: String, anc
 func _on_component_add_child_selected(index: int) -> void:
 	if index < 0 or index >= DRAW_MODES.size():
 		return
-	_open_component_semantic_dialog(str(component_add_menu.get_meta("asset_id", "")), str(component_add_menu.get_meta("parent_component_id", "")), DRAW_MODES[index])
+	_open_component_name_dialog(str(component_add_menu.get_meta("asset_id", "")), str(component_add_menu.get_meta("parent_component_id", "")), DRAW_MODES[index])
 
 
 func _on_component_add_guide_selected(index: int) -> void:
@@ -8278,13 +8267,13 @@ func _on_component_add_reference_selected(index: int) -> void:
 	var asset := _get_asset(str(component_add_menu.get_meta("asset_id", "")))
 	if source_asset.is_empty() or asset.is_empty():
 		return
-	_open_component_semantic_dialog(str(asset.get("id", "")), str(component_add_menu.get_meta("parent_component_id", "")), "reference", str(source_asset.get("id", "")))
+	_open_component_name_dialog(str(asset.get("id", "")), str(component_add_menu.get_meta("parent_component_id", "")), "reference", str(source_asset.get("id", "")))
 
 
 func _on_component_draw_mode_selected(index: int) -> void:
 	if index < 0 or index >= DRAW_MODES.size():
 		return
-	_open_component_semantic_dialog(str(component_draw_mode_menu.get_meta("asset_id", "")), str(component_draw_mode_menu.get_meta("parent_component_id", "")), DRAW_MODES[index])
+	_open_component_name_dialog(str(component_draw_mode_menu.get_meta("asset_id", "")), str(component_draw_mode_menu.get_meta("parent_component_id", "")), DRAW_MODES[index])
 
 
 func _draw_mode_display_name(draw_mode: String) -> String:
@@ -8304,31 +8293,24 @@ func _normalize_component_draw_mode(raw_mode, source_schema_version: int) -> Str
 	return draw_mode if draw_mode in DRAW_MODES else "closed_loop"
 
 
-func _open_component_semantic_dialog(asset_id: String, parent_component_id: String, draw_mode: String, source_asset_id := "") -> void:
+func _open_component_name_dialog(asset_id: String, parent_component_id: String, draw_mode: String, source_asset_id := "") -> void:
 	var asset := _get_asset(asset_id)
-	if asset.is_empty() or not bool(semantic_registry.get("valid", false)):
-		_show_status_message("Semantic Registry is unavailable.")
+	if asset.is_empty():
 		return
-	var used_keys: Array[String] = []
-	for component in asset.get("components", []):
-		var key := str(component.get("semantic_key", ""))
-		if not key.is_empty():
-			used_keys.append(key)
 	component_dialog.set_meta("asset_id", asset_id)
 	component_dialog.set_meta("parent_component_id", parent_component_id)
 	component_dialog.set_meta("draw_mode", draw_mode)
 	component_dialog.set_meta("source_asset_id", source_asset_id)
 	component_dialog.title = "Add %s" % ("Symbol Reference" if draw_mode == "reference" else "%s Component" % _draw_mode_display_name(draw_mode))
-	component_semantic_picker.set_prompt("Select a Semantic Key")
-	component_semantic_picker.configure(semantic_registry.get("semantics", []), "", used_keys)
-	component_dialog.get_ok_button().disabled = true
+	component_name_input.text = ""
+	component_dialog.get_ok_button().disabled = false
 	canvas_view.set_navigation_locked(true)
 	component_dialog.popup_centered()
-	component_semantic_picker.call_deferred("focus_search")
+	component_name_input.call_deferred("grab_focus")
 
 
-func _on_component_dialog_semantic_selected(_key: String) -> void:
-	component_dialog.get_ok_button().disabled = component_semantic_picker.selected_key.is_empty()
+func _submit_component_name(_name: String) -> void:
+	_confirm_component_creation()
 
 
 func _on_component_dialog_canceled() -> void:
@@ -8444,79 +8426,6 @@ func _duplicate_component(asset_id: String, component_id: String, mirror_mode :=
 	var source_tree: Array[Dictionary] = [source]
 	for descendant in ComponentHierarchy.descendants(asset, component_id):
 		source_tree.append(descendant)
-	var semantic_map: Dictionary = {}
-	var unresolved: Array[String] = []
-	var reserved: Dictionary = {}
-	for source_node in source_tree:
-		var source_id := str(source_node.get("id", ""))
-		var mirrored_key := SemanticRegistry.mirror_key(str(source_node.get("semantic_key", "")))
-		if not mirrored_key.is_empty() and not SemanticRegistry.key_used_by_other(asset, mirrored_key) and not reserved.has(mirrored_key):
-			semantic_map[source_id] = mirrored_key
-			reserved[mirrored_key] = true
-		else:
-			unresolved.append(source_id)
-	pending_component_duplicate = {
-		"asset_id": asset_id,
-		"component_id": component_id,
-		"mirror_mode": mirror_mode,
-		"source_ids": source_tree.map(func(component: Dictionary): return str(component.get("id", ""))),
-		"semantic_map": semantic_map,
-		"unresolved": unresolved
-	}
-	if unresolved.is_empty():
-		_commit_pending_component_duplicate()
-	else:
-		_open_next_duplicate_semantic_picker()
-
-
-func _open_next_duplicate_semantic_picker() -> void:
-	var asset := _get_asset(str(pending_component_duplicate.get("asset_id", "")))
-	var unresolved: Array = pending_component_duplicate.get("unresolved", [])
-	if asset.is_empty() or unresolved.is_empty():
-		return
-	var source := _get_component(asset, str(unresolved[0]))
-	var excluded: Array[String] = []
-	for component in asset.get("components", []):
-		var key := str(component.get("semantic_key", ""))
-		if not key.is_empty():
-			excluded.append(key)
-	for key in pending_component_duplicate.get("semantic_map", {}).values():
-		excluded.append(str(key))
-	duplicate_semantic_dialog.title = "Duplicate %s" % _normalized_component_name(source)
-	duplicate_semantic_picker.set_prompt("Select a Semantic Key for the duplicate")
-	duplicate_semantic_picker.configure(semantic_registry.get("semantics", []), "", excluded)
-	duplicate_semantic_dialog.get_ok_button().disabled = true
-	if duplicate_semantic_dialog.is_inside_tree():
-		duplicate_semantic_dialog.popup_centered()
-		duplicate_semantic_picker.call_deferred("focus_search")
-
-
-func _confirm_duplicate_semantic() -> void:
-	var unresolved: Array = pending_component_duplicate.get("unresolved", [])
-	var key := duplicate_semantic_picker.selected_key
-	if unresolved.is_empty() or key.is_empty():
-		return
-	pending_component_duplicate["semantic_map"][str(unresolved.pop_front())] = key
-	pending_component_duplicate["unresolved"] = unresolved
-	if unresolved.is_empty():
-		_commit_pending_component_duplicate()
-	else:
-		call_deferred("_open_next_duplicate_semantic_picker")
-
-
-func _commit_pending_component_duplicate() -> void:
-	var asset_id := str(pending_component_duplicate.get("asset_id", ""))
-	var component_id := str(pending_component_duplicate.get("component_id", ""))
-	var mirror_mode := str(pending_component_duplicate.get("mirror_mode", "none"))
-	var asset := _get_asset(asset_id)
-	var semantic_map: Dictionary = pending_component_duplicate.get("semantic_map", {})
-	var source_tree: Array[Dictionary] = []
-	for source_id in pending_component_duplicate.get("source_ids", []):
-		var source_node := _get_component(asset, str(source_id))
-		if source_node.is_empty() or not semantic_map.has(str(source_id)):
-			pending_component_duplicate.clear()
-			return
-		source_tree.append(source_node)
 	_record_direct_change()
 	var id_map: Dictionary = {}
 	for source_node in source_tree:
@@ -8527,10 +8436,7 @@ func _commit_pending_component_duplicate() -> void:
 	for source_node in source_tree:
 		var source_node_id := str(source_node.get("id", ""))
 		var component_copy := _duplicate_component_record(source_node, asset, str(id_map[source_node_id]))
-		var semantic_key := str(semantic_map[source_node_id])
-		component_copy["semantic_key"] = semantic_key
-		component_copy["missing_semantic_source"] = ""
-		component_copy["name"] = semantic_key
+		component_copy["name"] = _next_duplicate_component_name(asset, str(source_node.get("name", "Component")))
 		var source_parent_id := str(source_node.get("parent_component_id", ""))
 		component_copy["parent_component_id"] = str(id_map.get(source_parent_id, source_parent_id))
 		if mirror_mode != "none" and source_node_id == component_id:
@@ -8538,7 +8444,6 @@ func _commit_pending_component_duplicate() -> void:
 		asset["components"].append(component_copy)
 		if source_node_id == component_id:
 			duplicate_root = component_copy
-	pending_component_duplicate.clear()
 	selected_asset_id = asset_id
 	selected_component_id = str(duplicate_root.get("id", ""))
 	selected_guide_id = ""
@@ -8551,6 +8456,18 @@ func _commit_pending_component_duplicate() -> void:
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
+
+
+func _next_duplicate_component_name(asset: Dictionary, source_name: String) -> String:
+	var base_name := source_name.strip_edges() + " Copy"
+	if base_name.strip_edges().is_empty():
+		base_name = "Component Copy"
+	var candidate := base_name
+	var suffix := 2
+	while _has_component_name(asset, candidate):
+		candidate = "%s %d" % [base_name, suffix]
+		suffix += 1
+	return candidate
 
 
 func _mirrored_duplicate_transform(component: Dictionary, mirror_mode: String) -> Dictionary:
@@ -8709,9 +8626,11 @@ func _confirm_component_creation() -> void:
 		component_dialog.hide()
 		canvas_view.set_navigation_locked(false)
 		return
-	var semantic_key := component_semantic_picker.selected_key
-	if not SemanticRegistry.contains(semantic_registry, semantic_key) or SemanticRegistry.key_used_by_other(asset, semantic_key):
-		_show_status_message("Select one unused Semantic Key.")
+	var component_name := component_name_input.text.strip_edges()
+	if component_name.is_empty():
+		component_name = _next_default_component_name(asset)
+	if _has_component_name(asset, component_name):
+		_show_status_message("Component name must be unique within the Asset.")
 		return
 	_record_direct_change()
 	var component_id := "component_%d" % next_component_id
@@ -8732,8 +8651,7 @@ func _confirm_component_creation() -> void:
 	asset["components"].append({
 		"id": component_id,
 		"type": "reference" if is_reference else "component",
-		"name": semantic_key,
-		"semantic_key": semantic_key,
+		"name": component_name,
 		"source_asset_id": str(component_dialog.get_meta("source_asset_id", "")) if is_reference else "",
 		"parent_component_id": parent_component_id,
 		"points": [],
@@ -8759,6 +8677,20 @@ func _confirm_component_creation() -> void:
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
+
+
+func _next_default_component_name(asset: Dictionary) -> String:
+	var index := 1
+	while _has_component_name(asset, "component%02d" % index):
+		index += 1
+	return "component%02d" % index
+
+
+func _has_component_name(asset: Dictionary, component_name: String) -> bool:
+	for component in asset.get("components", []):
+		if str(component.get("name", "")).strip_edges().to_lower() == component_name.to_lower():
+			return true
+	return false
 
 
 func _select_component(asset_id: String, component_id: String, focus_outliner := false) -> void:
@@ -11027,18 +10959,11 @@ func _render_inspector() -> void:
 			render_outline.toggled.connect(_on_edge_render_outline_changed)
 			inspector_content.add_child(render_outline)
 			return
-	inspector_content.add_child(_create_inspector_section("Semantic Key"))
-	inspector_content.add_child(_create_inspector_field_label(SemanticRegistry.component_display_name(component, semantic_registry)))
-	var excluded_semantics: Array[String] = []
-	for other_component in asset.get("components", []):
-		if other_component is Dictionary and str(other_component.get("id", "")) != selected_component_id:
-			var other_key := str(other_component.get("semantic_key", ""))
-			if not other_key.is_empty():
-				excluded_semantics.append(other_key)
-	inspector_semantic_dropdown = SemanticDropdown.new()
-	inspector_semantic_dropdown.configure(semantic_registry.get("semantics", []), str(component.get("semantic_key", "")), excluded_semantics)
-	inspector_semantic_dropdown.selection_changed.connect(_set_selected_component_semantic_key)
-	inspector_content.add_child(inspector_semantic_dropdown)
+	inspector_content.add_child(_create_inspector_section("Component"))
+	component_name_editor = _create_name_editor(_normalized_component_name(component), "Component name")
+	component_name_editor.text_submitted.connect(_rename_selected_component)
+	component_name_editor.focus_exited.connect(func() -> void: _rename_selected_component(component_name_editor.text))
+	inspector_content.add_child(component_name_editor)
 	inspector_content.add_child(_create_inspector_section("Hierarchy"))
 	inspector_content.add_child(_create_inspector_field_label("Parent Component"))
 	var hierarchy_parent_option := OptionButton.new()
@@ -13035,17 +12960,24 @@ func _rename_selected_asset(new_name: String) -> void:
 	_render_canvas_context()
 
 
-func _set_selected_component_semantic_key(key: String) -> void:
+func _rename_selected_component(new_name: String) -> void:
 	var asset := _get_asset(selected_asset_id)
 	var component := _get_component(asset, selected_component_id)
-	if component.is_empty() or not SemanticRegistry.contains(semantic_registry, key) or SemanticRegistry.key_used_by_other(asset, key, selected_component_id):
+	var name := new_name.strip_edges()
+	if component.is_empty() or name.is_empty():
+		if is_instance_valid(component_name_editor):
+			component_name_editor.text = _normalized_component_name(component)
 		return
-	if key == str(component.get("semantic_key", "")):
+	if name == str(component.get("name", "")):
 		return
+	for other_component in asset.get("components", []):
+		if str(other_component.get("id", "")) != selected_component_id and str(other_component.get("name", "")).to_lower() == name.to_lower():
+			if is_instance_valid(component_name_editor):
+				component_name_editor.text = _normalized_component_name(component)
+			_show_status_message("Component name must be unique within the Asset.")
+			return
 	_record_direct_change()
-	component["semantic_key"] = key
-	component["missing_semantic_source"] = ""
-	component["name"] = key
+	component["name"] = name
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
@@ -13684,7 +13616,8 @@ func _is_reference_component(component: Dictionary) -> bool:
 
 
 func _normalized_component_name(component: Dictionary) -> String:
-	return SemanticRegistry.component_display_name(component, semantic_registry)
+	var name := str(component.get("name", "")).strip_edges()
+	return name if not name.is_empty() else "Component"
 
 
 func _component_outliner_name(asset: Dictionary, component: Dictionary) -> String:
