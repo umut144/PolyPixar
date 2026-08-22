@@ -124,7 +124,6 @@ var selected_component_id := ""
 var selected_component_ids: Array[String] = []
 var selected_group_id := ""
 var selected_guide_id := ""
-var outline_coverage_cache: Dictionary = {}
 var selected_sampling_input_id := ""
 var selected_sampling_input_kind := ""
 var geometry_sampling_input_refresh_pending := false
@@ -2229,7 +2228,6 @@ func _push_undo_snapshot() -> void:
 
 func _record_direct_change() -> void:
 	_invalidate_batch_status()
-	outline_coverage_cache.clear()
 	history_coalescing = false
 	if is_instance_valid(history_coalesce_timer):
 		history_coalesce_timer.stop()
@@ -2238,7 +2236,6 @@ func _record_direct_change() -> void:
 
 func _record_coalesced_change() -> void:
 	_invalidate_batch_status()
-	outline_coverage_cache.clear()
 	if not history_coalescing:
 		_push_undo_snapshot()
 		history_coalescing = true
@@ -2252,7 +2249,6 @@ func _finish_history_coalescing() -> void:
 
 func _restore_history_snapshot(snapshot: Dictionary) -> void:
 	_invalidate_batch_status()
-	outline_coverage_cache.clear()
 	# Undo/redo restores document data, not the user's currently selected tool.
 	# Keep the interaction state when the same component remains selected.
 	var retained_module := active_module
@@ -8756,14 +8752,6 @@ func _effective_component_visibility(asset: Dictionary, component: Dictionary) -
 func _effective_component_z_index(_asset: Dictionary, component: Dictionary) -> int:
 	return int(component.get("z_index", 0))
 
-
-func _outline_coverage_for_asset(asset: Dictionary) -> Dictionary:
-	var asset_id := str(asset.get("id", ""))
-	if asset_id.is_empty():
-		return {}
-	if not outline_coverage_cache.has(asset_id):
-		outline_coverage_cache[asset_id] = OutlineCoverageService.resolve_asset(asset)
-	return outline_coverage_cache.get(asset_id, {})
 func _place_selected_group_pivot_at_mouse() -> bool:
 	var asset := _get_asset(selected_asset_id)
 	var group := ComponentHierarchy.group_by_id(asset, selected_group_id)
@@ -14125,7 +14113,6 @@ func _render_canvas_context() -> void:
 		canvas_view.set_context("")
 		canvas_view.set_interaction_state("")
 		canvas_view.set_tool_mode("")
-		canvas_view.set_outline_coverage({})
 		canvas_view.set_component_transform({})
 		canvas_view.set_reference_shapes([])
 		canvas_view.set_display_polygon([])
@@ -14143,7 +14130,6 @@ func _render_canvas_context() -> void:
 		canvas_view.set_interaction_state("asset")
 		canvas_view.set_asset_pivot(_asset_pivot(asset))
 		canvas_view.set_tool_mode("")
-		canvas_view.set_outline_coverage({})
 		canvas_view.set_component_transform({})
 		canvas_view.set_reference_shapes(_build_reference_shapes(asset, "", selected_component_id))
 		canvas_view.set_display_polygon([])
@@ -14151,13 +14137,11 @@ func _render_canvas_context() -> void:
 		canvas_view.call_deferred("grab_focus")
 		return
 	var component := _get_component(asset, selected_component_id)
-	var asset_outline_coverage := _outline_coverage_for_asset(asset)
 	if component.is_empty():
 		canvas_context_label.text = "Asset: %s" % str(asset["name"])
 		canvas_view.set_context(str(asset["name"]))
 		canvas_view.set_interaction_state("asset")
 		canvas_view.set_tool_mode("")
-		canvas_view.set_outline_coverage({})
 		canvas_view.set_component_transform({})
 		canvas_view.set_reference_shapes(_build_reference_shapes(asset, "", selected_component_id))
 		canvas_view.set_display_polygon([])
@@ -14168,7 +14152,6 @@ func _render_canvas_context() -> void:
 		canvas_context_label.text = "Reference: %s" % str(component.get("name", "Reference"))
 		canvas_view.set_context(str(component.get("name", "Reference")))
 		canvas_view.set_interaction_state("transform")
-		canvas_view.set_outline_coverage(asset_outline_coverage.get(selected_component_id, {}))
 		canvas_view.set_tool_mode("")
 		canvas_view.set_component_transform(ComponentHierarchy.world_transform_record(asset, selected_component_id))
 		canvas_view.set_reference_shapes(_build_reference_shapes(asset))
@@ -14194,7 +14177,6 @@ func _render_canvas_context() -> void:
 	component_transform["visibility"] = bool(asset.get("visibility", true)) and _effective_component_visibility(asset, component)
 	component_transform["z_index"] = _effective_component_z_index(asset, component)
 	canvas_view.set_component_transform(component_transform)
-	canvas_view.set_outline_coverage(asset_outline_coverage.get(selected_component_id, {}))
 	canvas_view.set_reference_shapes(_build_reference_shapes(asset, selected_component_id))
 	canvas_view.set_component_draw_mode(str(component.get("draw_mode", "closed_loop")))
 	canvas_view.set_point_numbers_visible(bool(component.get("show_point_numbers", false)))
@@ -14294,8 +14276,7 @@ func _build_reference_shapes(asset: Dictionary, excluded_component_id := "", emp
 			"visibility": asset_is_visible and _effective_component_visibility(asset, component),
 			"z_index": _effective_component_z_index(asset, component),
 			"emphasized": str(component["id"]) == emphasized_component_id,
-			"topology_role": str(component.get("topology_role", "outer")),
-			"outline_coverage": _outline_coverage_for_asset(asset).get(str(component.get("id", "")), {})
+			"topology_role": str(component.get("topology_role", "outer"))
 		})
 	return shapes
 
