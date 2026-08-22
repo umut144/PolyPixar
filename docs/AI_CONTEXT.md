@@ -8,7 +8,7 @@ small and database-oriented.
 
 The left rail is always expanded and exposes exactly these categories:
 
-- `Create`: `Character`, `Props`, `Terrain`, `Icon`, `Symbols`
+- `Create`: `Character`, `Props`, `Weapons`, `Terrain`, `Icon`, `Symbols`
 - `Mesh`: `Sampling`, `Seeding`, `Meshing`
 - `Style`: `Weighting`
 
@@ -19,13 +19,13 @@ categories. Texture and Material authoring are not part of the application.
 
 ## Asset kinds
 
-All five Create modules use the same Asset, Component, Guide, canvas, and
+All six Create modules use the same Asset, Component, Guide, canvas, and
 Inspector implementation. An Asset stores one stable `asset_type` value:
-`character`, `props`, `terrain`, `icon`, or `symbols`. Create views filter the Outliner by
+`character`, `props`, `weapons`, `terrain`, `icon`, or `symbols`. Create views filter the Outliner by
 that value. Documents without an `asset_type` normalize to `character`.
 
 Mesh and Style show a shared multi-select Asset filter above the Outliner
-search field. Character, Props, Terrain, Icon, and Symbols are checked by default;
+search field. Character, Props, Weapons, Terrain, Icon, and Symbols are checked by default;
 search text and checked types are combined. The filter is an editor-state
 preference, not a document mutation.
 
@@ -186,6 +186,12 @@ uses; then update the registry and every affected reference atomically. Do not
 silently repurpose an existing key. A removed or unknown link must remain
 visible as `missing_semantic (<key/source>)` and block runtime export until a
 valid replacement is chosen.
+
+Weapon Components use the namespaced registry keys `weapon_body`,
+`weapon_collar`, `weapon_grip`, `weapon_head`, `weapon_rear`, `weapon_shaft`,
+and `weapon_string`. Weapon Point Guides use the separate Guide types
+`weapon_grip_point`, `weapon_cast_point`, `weapon_nocking_point`, and
+`weapon_aim_point`; Guides are not Component Semantic Keys.
 
 ## Verification
 

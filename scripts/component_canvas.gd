@@ -25,6 +25,8 @@ signal transform_changed(transform: Dictionary)
 signal primitive_placed(center: Vector2, diameter_cm: float)
 signal primitive_center_changed(center: Vector2)
 signal primitive_preview_cancelled()
+signal point_guide_move_started()
+signal point_guide_moved(position: Vector2)
 
 const PAN_SPEED := 420.0
 const MIN_ZOOM := 0.25
@@ -128,6 +130,11 @@ var face_dragging := false
 var face_drag_start_world := Vector2.ZERO
 var primitive_preview_active := false
 var primitive_preview_diameter_cm := 1.0
+var point_guide_marker_enabled := false
+var point_guide_marker_position := Vector2.ZERO
+var point_guide_marker_label := "Point"
+var point_guide_marker_selected := false
+var point_guide_dragging := false
 
 
 func _ready() -> void:
@@ -163,6 +170,11 @@ func _gui_input(event: InputEvent) -> void:
 		if event.button_index == MOUSE_BUTTON_LEFT and primitive_preview_active:
 			primitive_placed.emit(_snap_to_grid(_world_to_local(_screen_to_world(event.position))), primitive_preview_diameter_cm)
 			primitive_preview_active = false
+			queue_redraw()
+			return
+		if event.button_index == MOUSE_BUTTON_LEFT and interaction_state == "point_guide" and _is_near_point_guide_marker(event.position):
+			point_guide_dragging = true
+			point_guide_move_started.emit()
 			queue_redraw()
 			return
 		if primitive_preview_active and event.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
@@ -286,6 +298,10 @@ func _gui_input(event: InputEvent) -> void:
 			if not component_id.is_empty():
 				reference_component_selected.emit(component_id)
 	if event is InputEventMouseButton and not event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		if point_guide_dragging:
+			point_guide_dragging = false
+			queue_redraw()
+			return
 		if draw_pointer_down and interaction_state == "draw" and active_tool in ["point", "spine"]:
 			_commit_draw_pointer()
 			queue_redraw()
@@ -323,6 +339,11 @@ func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:
 		cursor_over_canvas = true
 		cursor_world = constrain_draw_position(_snap_to_catch_parent(_snap_to_grid(_world_to_local(_screen_to_world(event.position)))))
+		if point_guide_dragging and interaction_state == "point_guide":
+			point_guide_marker_position = _snap_to_grid(_world_to_local(_screen_to_world(event.position)))
+			point_guide_moved.emit(point_guide_marker_position)
+			queue_redraw()
+			return
 		if mirror_command_stage == "first":
 			mirror_axis_end = _snap_to_grid(_world_to_local(_screen_to_world(event.position)))
 			mirror_axis_candidate_visible = true
@@ -861,6 +882,15 @@ func set_guide_color(color: Color) -> void:
 	queue_redraw()
 
 
+func set_point_guide_marker(enabled: bool, local_position := Vector2.ZERO, marker_label := "Point", selected := false) -> void:
+	point_guide_marker_enabled = enabled
+	point_guide_marker_position = local_position
+	point_guide_marker_label = marker_label
+	point_guide_marker_selected = selected
+	point_guide_dragging = false
+	queue_redraw()
+
+
 func _process(delta: float) -> void:
 	if navigation_locked or command_shortcut_active or not has_focus():
 		return
@@ -903,6 +933,7 @@ func _draw() -> void:
 	_draw_edge_selection_marquee()
 	_draw_draw_preview()
 	_draw_primitive_preview()
+	_draw_point_guide_marker()
 	_draw_measurement_guides()
 
 
@@ -1225,6 +1256,35 @@ func _draw_primitive_preview() -> void:
 	draw_arc(screen_center, radius * zoom, 0.0, TAU, 64, Color("#f2c94c"), 2.0, true)
 	draw_circle(screen_center, 5.0, Color("#f2c94c"))
 	_draw_measurement_label("Circle · %.1f cm" % primitive_preview_diameter_cm, screen_center + Vector2(0.0, -radius * zoom - 16.0), Color("#f2c94c"))
+
+
+func _draw_point_guide_marker() -> void:
+	if not point_guide_marker_enabled or not bool(component_transform.get("visibility", true)):
+		return
+	var center := _world_to_screen(_local_to_world(point_guide_marker_position))
+	var marker_color := Color("#ff8a65")
+	draw_circle(center, 18.0, Color(marker_color.r, marker_color.g, marker_color.b, 0.18))
+	draw_circle(center, 13.0, Color("#181a1fcc"))
+	draw_circle(center, 13.0, marker_color, false, 2.5)
+	var diamond := PackedVector2Array([
+		center + Vector2(0.0, -9.0),
+		center + Vector2(9.0, 0.0),
+		center + Vector2(0.0, 9.0),
+		center + Vector2(-9.0, 0.0)
+	])
+	draw_colored_polygon(diamond, Color("#ff8a65cc") if point_guide_marker_selected else Color("#ff8a6566"))
+	diamond.append(diamond[0])
+	draw_polyline(diamond, Color("#fff3e0"), 1.5, true)
+	draw_line(center - Vector2(22.0, 0.0), center + Vector2(22.0, 0.0), marker_color, 1.5)
+	draw_line(center - Vector2(0.0, 22.0), center + Vector2(0.0, 22.0), marker_color, 1.5)
+	draw_circle(center, 3.0, Color("#fff3e0"))
+	_draw_measurement_label(point_guide_marker_label, center + Vector2(0.0, -27.0), Color("#ffccbc"))
+
+
+func _is_near_point_guide_marker(screen_position: Vector2) -> bool:
+	if not point_guide_marker_enabled:
+		return false
+	return screen_position.distance_to(_world_to_screen(_local_to_world(point_guide_marker_position))) <= 22.0
 
 
 func _draw_primitive_geometry() -> void:

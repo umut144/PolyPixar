@@ -990,7 +990,12 @@ func _test_geometry_sampling_ui_shell() -> void:
 	application.asset_name_input.text = "Shield"
 	application._confirm_asset_creation()
 	_expect(str(application.assets[-1].get("asset_type", "")) == "props", "Create Props should persist the stable props Asset type.")
-	_expect(application._normalize_asset_type("") == "character" and application._asset_type_create_submodule("icon") == "Icon", "Missing Asset types should normalize to Character while valid types map back to their Create module.")
+	application._select_submodule("Create", "Weapons", create_section)
+	_expect(application.active_module == "Create" and application.active_create_submodule == "Weapons" and application.canvas_view.visible, "Selecting Create Weapons should immediately render the shared asset workspace.")
+	application.asset_name_input.text = "Sword"
+	application._confirm_asset_creation()
+	_expect(str(application.assets[-1].get("asset_type", "")) == "weapons", "Create Weapons should persist the stable weapons Asset type.")
+	_expect(application._normalize_asset_type("") == "character" and application._asset_type_create_submodule("icon") == "Icon" and application._asset_type_create_submodule("weapons") == "Weapons", "Missing Asset types should normalize to Character while valid types map back to their Create module.")
 	application._on_outliner_asset_type_filter_toggled(false, "character")
 	_expect(not application.outliner_asset_type_filters["character"] and application.outliner_asset_type_filters["props"], "Mesh and Style filters should support independent Asset type checkboxes.")
 	application.active_module = "Style"
@@ -1573,7 +1578,7 @@ func _test_geometry_sdf_service_and_batch() -> void:
 func _test_semantic_registry_and_picker() -> void:
 	var registry := SemanticRegistry.load_registry()
 	_expect(bool(registry.get("valid", false)) and int(registry.get("schema_version", SemanticRegistry.REGISTRY_SCHEMA_VERSION)) == SemanticRegistry.REGISTRY_SCHEMA_VERSION, "The read-only Semantic Registry should load its independently versioned contract.")
-	_expect(registry.get("semantics", []) == ["arm_line", "belly", "body", "cloak", "eye_left", "eye_right", "eyebrow_left", "eyebrow_right", "feet", "hat", "hat_back", "hat_tip", "head", "head_tip"], "Semantic Keys should remain canonical, unique, and alphabetically sorted.")
+	_expect(registry.get("semantics", []) == ["arm_line", "belly", "body", "cloak", "eye_left", "eye_right", "eyebrow_left", "eyebrow_right", "feet", "hat", "hat_back", "hat_tip", "head", "head_tip", "weapon_body", "weapon_collar", "weapon_grip", "weapon_head", "weapon_rear", "weapon_shaft", "weapon_string"], "Semantic Keys should remain canonical, unique, and alphabetically sorted.")
 	_expect(SemanticRegistry.migrate_legacy_key("Barde", {"name": "Orb"}, registry) == "belly" and SemanticRegistry.migrate_legacy_key("Orb", {"name": "orb"}, registry) == "body" and SemanticRegistry.migrate_legacy_key("Tree", {"name": "Trunk"}, registry) == "body" and SemanticRegistry.migrate_legacy_key("Hammerer", {"name": "Trapez"}, registry) == "feet", "Legacy migration should apply the explicitly approved asset-specific semantic mappings.")
 	_expect(SemanticRegistry.migrate_legacy_key("Glavier", {"name": "HeadTip"}, registry) == "head_tip" and SemanticRegistry.migrate_legacy_key("Mage", {"name": "HatTip"}, registry) == "hat_tip" and SemanticRegistry.migrate_legacy_key("Glavier", {"name": "Belly"}, registry) == "belly", "Legacy migration should preserve Head Tip, Hat Tip, and Belly as distinct approved meanings.")
 	_expect(SemanticRegistry.mirror_key("eye_left") == "eye_right" and SemanticRegistry.mirror_key("eyebrow_right") == "eyebrow_left", "Known left/right Semantic pairs should expose deterministic duplicate mappings.")
@@ -1859,6 +1864,9 @@ func _test_asset_guides() -> void:
 	var animation_round_trip: Dictionary = application._deserialize_asset_guide(application._serialize_asset_guide(animation_guide))
 	_expect(str(animation_round_trip.get("guide_type", "")) == AssetGuide.MOTION and AssetGuide.display_name(AssetGuide.MOTION) == "Motion", "Motion Guides should persist as an independent Guide type.")
 	_expect(AssetGuide.validation_issues(animation_guide).is_empty(), "Animation Spines should use the same valid open Spine topology contract.")
+	var weapon_point_guide := AssetGuide.create_point("guide_weapon", "Weapon Grip Point", AssetGuide.WEAPON_GRIP_POINT, "component_1", Vector2(3.0, 4.0))
+	var weapon_point_round_trip: Dictionary = application._deserialize_asset_guide(application._serialize_asset_guide(weapon_point_guide))
+	_expect(AssetGuide.is_point_type(AssetGuide.WEAPON_GRIP_POINT) and AssetGuide.display_name(AssetGuide.WEAPON_AIM_POINT) == "Weapon Aim Point" and AssetGuide.validation_issues(weapon_point_round_trip).is_empty() and weapon_point_round_trip.get("edges", []).is_empty() and weapon_point_round_trip.get("chains", []).is_empty(), "Weapon Point Guides should persist as one-point Guides without Spine topology.")
 	var legacy_guide := guide.duplicate(true)
 	legacy_guide["type"] = "guide"
 	var test_asset := {"id": "asset_1", "name": "Asset", "visibility": true, "components": [component, legacy_guide], "guides": []}
@@ -1944,7 +1952,13 @@ func _test_asset_guides() -> void:
 	application._activate_guide_draw_state()
 	application._on_bezier_point_added(Vector2(15.0, 5.0), "aligned", Vector2.ZERO)
 	_expect(application.active_state == "draw" and Vector2(flow_guide.get("points", [])[0].get("position", Vector2.ZERO)).is_equal_approx(Vector2(10.0, 5.0)), "Flow Guides should catch Draw Guide Points on their parent Component contour just like Sample Guides.")
-	_expect(application.component_add_child_menu.item_count == 3 and application.component_add_guide_menu.item_count == 4, "Every Component add menu should expose all three Child draw modes and all four Guide types.")
+	application._create_guide("asset_1", "component_1", AssetGuide.WEAPON_GRIP_POINT)
+	var grip_point_guide: Dictionary = application._get_guide(application._get_asset("asset_1"), application.selected_guide_id)
+	_expect(grip_point_guide.get("points", []).size() == 1 and grip_point_guide.get("edges", []).is_empty() and grip_point_guide.get("chains", []).is_empty() and application.canvas_view.point_guide_marker_enabled and application.canvas_view.interaction_state == "point_guide", "Weapon Point Guide creation should use one point, activate the distinct canvas marker, and open the point interaction context.")
+	application._on_point_guide_move_started()
+	application._on_point_guide_moved(Vector2(2.5, 3.5))
+	_expect(Vector2(grip_point_guide.get("points", [])[0].get("position", Vector2.ZERO)).is_equal_approx(Vector2(2.5, 3.5)), "Weapon Point Guides should move their authored point without creating Spine topology.")
+	_expect(application.component_add_child_menu.item_count == 3 and application.component_add_guide_menu.item_count == 5 and application.component_add_weapon_point_menu.item_count == 4, "Every Component add menu should expose all three Child draw modes, the four base Guide types, and the nested Weapon Points submenu.")
 	parent_component["transform"] = {"position": Vector2(-3.0, 2.0), "rotation": 20.0, "scale": Vector2(1.0, 1.5), "pivot": Vector2.ZERO}
 	parent_component["name"] = "eyebrow_left"
 	parent_component["semantic_key"] = "eyebrow_left"
@@ -2330,12 +2344,12 @@ func _test_motion_module_separators() -> void:
 	_expect(separator_count == 1 and separator_height == 6 and section.content_list.get_child_count() == 5, "Motion should use one thick non-interactive separator between its Core and Extended workspace groups.")
 	section.free()
 	var create_section := ModuleSection.new()
-	create_section.setup("Create", ["Character", "Props", "Terrain", "Icon", "Symbols"], true)
+	create_section.setup("Create", ["Character", "Props", "Weapons", "Terrain", "Icon", "Symbols"], true)
 	var create_separator_count := 0
 	for child in create_section.content_list.get_children():
 		if child is ColorRect:
 			create_separator_count += 1
-	_expect(create_separator_count == 0 and create_section.content_list.get_child_count() == 5, "Create should contain Character, Props, Terrain, Icon, and Symbols.")
+	_expect(create_separator_count == 0 and create_section.content_list.get_child_count() == 6, "Create should contain Character, Props, Weapons, Terrain, Icon, and Symbols.")
 	create_section._toggle()
 	_expect(create_section.expanded, "Product categories should remain expanded when their headers are pressed.")
 	create_section.free()

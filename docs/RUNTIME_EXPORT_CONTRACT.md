@@ -51,7 +51,7 @@ Schema 4 requires:
 | `schema_version` | integer | Exactly `4`. |
 | `asset_key` | non-empty lower-snake-case string | Runtime identity. |
 | `display_name` | string | Informational authored name. |
-| `asset_type` | string | `character`, `props`, `terrain`, `icon`, or `symbols`. |
+| `asset_type` | string | `character`, `props`, `weapons`, `terrain`, `icon`, or `symbols`. |
 | `coordinate_system` | object | Exact convention below. |
 | `z_order` | object | Exact convention below. |
 | `asset_pivot` | two floats | Asset anchor in meters. |

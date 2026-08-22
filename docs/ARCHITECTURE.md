@@ -8,11 +8,11 @@ contains always-expanded Create, Mesh, and Style categories. A single
 `active_module` plus its category-specific submodule identifies the one active
 workspace.
 
-Create has five database views over the same Asset implementation:
-`Character`, `Props`, `Terrain`, `Icon`, and `Symbols`. Their stable persisted discriminator
+Create has six database views over the same Asset implementation:
+`Character`, `Props`, `Weapons`, `Terrain`, `Icon`, and `Symbols`. Their stable persisted discriminator
 is `asset_type`; missing or invalid values normalize to `character`.
 
-Mesh and Style share a multi-select Outliner Asset filter. Its five checkbox
+Mesh and Style share a multi-select Outliner Asset filter. Its six checkbox
 states are persisted in `editor_state`; the filter is applied together with
 the Outliner search and does not alter the selected Asset or document data.
 
@@ -217,6 +217,13 @@ must receive an explicit available key before the duplicate is committed.
 Asset References use the same local Semantic picker but retain the borrowed
 Asset in internal `source_asset_id`, so local classification never erases
 geometry origin. Runtime export resolves that editor link to `source_asset_key`.
+
+Weapon Components use the namespaced keys `weapon_body`, `weapon_collar`,
+`weapon_grip`, `weapon_head`, `weapon_rear`, `weapon_shaft`, and
+`weapon_string`. Weapon Point Guides use the separate selectable Guide types
+`weapon_grip_point`, `weapon_cast_point`, `weapon_nocking_point`, and
+`weapon_aim_point`. They persist one authored Point without Edges or Chains
+and render as a distinct labeled marker on the Component Canvas.
 
 Schema 40 replaces the authored `ribbon` draw mode with the fill-less open
 `contour` mode. Loading schema 39 or older converts Ribbon centerline topology

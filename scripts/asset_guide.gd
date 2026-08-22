@@ -8,10 +8,16 @@ const CUT := "cut"
 const BODY_FLOW := FLOW
 const SAMPLER_SPINE := SAMPLE
 const ANIMATION_SPINE := MOTION
-const VALID_TYPES := [FLOW, SAMPLE, MOTION, CUT]
+const WEAPON_GRIP_POINT := "weapon_grip_point"
+const WEAPON_CAST_POINT := "weapon_cast_point"
+const WEAPON_NOCKING_POINT := "weapon_nocking_point"
+const WEAPON_AIM_POINT := "weapon_aim_point"
+const POINT_TYPES := [WEAPON_GRIP_POINT, WEAPON_CAST_POINT, WEAPON_NOCKING_POINT, WEAPON_AIM_POINT]
+const VALID_TYPES := [FLOW, SAMPLE, MOTION, CUT, WEAPON_GRIP_POINT, WEAPON_CAST_POINT, WEAPON_NOCKING_POINT, WEAPON_AIM_POINT]
 const FLOW_COLOR := Color("#4267b2")
 const SAMPLE_COLOR := Color("#f2c94c")
 const MOTION_COLOR := Color("#c084fc")
+const WEAPON_POINT_COLOR := Color("#ff8a65")
 const SAMPLER_SPINE_COLOR := SAMPLE_COLOR
 const ANIMATION_SPINE_COLOR := MOTION_COLOR
 
@@ -29,6 +35,20 @@ static func create(guide_id: String, guide_name: String, guide_type: String, com
 		"edges": [],
 		"chains": []
 	}
+
+
+static func create_point(guide_id: String, guide_name: String, guide_type: String, component_id: String, position: Vector2, ordinal := 1) -> Dictionary:
+	var guide := create(guide_id, guide_name, guide_type, component_id, ordinal)
+	guide["points"] = [{
+		"id": BezierTopology.next_id([], "point"),
+		"position": position,
+		"mode": "corner",
+		"preserve_point": true,
+		"handle_source": "auto",
+		"handle_in": Vector2.ZERO,
+		"handle_out": Vector2.ZERO
+	}]
+	return guide
 
 
 static func normalize(raw_guide) -> Dictionary:
@@ -54,6 +74,11 @@ static func normalize(raw_guide) -> Dictionary:
 		"edges": topology["edges"],
 		"chains": topology["chains"]
 	}
+	if is_point_type(guide_type):
+		var point_guides: Array = normalized["points"]
+		normalized["points"] = [point_guides[0]] if not point_guides.is_empty() else []
+		normalized["edges"] = []
+		normalized["chains"] = []
 	for point_data in normalized["points"]:
 		if point_data is Dictionary:
 			point_data["mode"] = "aligned"
@@ -70,6 +95,14 @@ static func display_name(guide_type: String) -> String:
 		return "Motion"
 	if normalized_type == CUT:
 		return "Cut"
+	if normalized_type == WEAPON_GRIP_POINT:
+		return "Weapon Grip Point"
+	if normalized_type == WEAPON_CAST_POINT:
+		return "Weapon Cast Point"
+	if normalized_type == WEAPON_NOCKING_POINT:
+		return "Weapon Nocking Point"
+	if normalized_type == WEAPON_AIM_POINT:
+		return "Weapon Aim Point"
 	return "Sample"
 
 
@@ -81,6 +114,8 @@ static func canonical_type(guide_type: String) -> String:
 			return MOTION
 		CUT:
 			return CUT
+		WEAPON_GRIP_POINT, WEAPON_CAST_POINT, WEAPON_NOCKING_POINT, WEAPON_AIM_POINT:
+			return guide_type
 		SAMPLE, "sampler_spine":
 			return SAMPLE
 	return SAMPLE
@@ -98,7 +133,11 @@ static func color(guide_type: String) -> Color:
 			return MOTION_COLOR
 		CUT:
 			return Color("#ef6c78")
-	return SAMPLE_COLOR
+	return WEAPON_POINT_COLOR if is_point_type(guide_type) else SAMPLE_COLOR
+
+
+static func is_point_type(guide_type: String) -> bool:
+	return canonical_type(guide_type) in POINT_TYPES
 
 
 static func validation_issues(guide: Dictionary) -> Array[String]:
@@ -107,6 +146,10 @@ static func validation_issues(guide: Dictionary) -> Array[String]:
 		errors.append("Unknown Guide type.")
 	if str(guide.get("scope", {}).get("component_id", "")).is_empty():
 		errors.append("The Guide needs a target Component.")
+	if is_point_type(str(guide.get("guide_type", ""))):
+		if guide.get("points", []).size() != 1 or not guide.get("edges", []).is_empty() or not guide.get("chains", []).is_empty():
+			errors.append("A Weapon Point Guide must contain exactly one Point and no Edges or Chains.")
+		return errors
 	var chains: Array = guide.get("chains", [])
 	if chains.size() != 1 or bool(chains[0].get("closed", false)) or chains[0].get("point_ids", []).size() < 2:
 		errors.append("A Spine must contain one open Chain with at least two Points.")
