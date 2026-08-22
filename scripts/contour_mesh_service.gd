@@ -106,7 +106,7 @@ static func _primitive_stroke_source(component: Dictionary) -> Dictionary:
 		point_ids.append(point_id)
 		edge_ids.append(edge_id)
 		points.append({"id": point_id, "position": positions[index], "mode": "linear", "handle_source": "manual", "handle_in": Vector2.ZERO, "handle_out": Vector2.ZERO, "preserve_point": false})
-		edges.append({"id": edge_id, "start_point_id": point_id, "end_point_id": "", "render_outline": true})
+		edges.append({"id": edge_id, "start_point_id": point_id, "end_point_id": "", "render_outline": OutlineService.AUTO})
 	for index in range(edges.size()):
 		edges[index]["end_point_id"] = point_ids[(index + 1) % point_ids.size()]
 	return {"valid": true, "errors": [], "component": {
@@ -149,7 +149,7 @@ static func source_fingerprint(component: Dictionary, stroke_width_px := Contour
 	var outline_parts := PackedStringArray()
 	for edge in component.get("edges", []):
 		if edge is Dictionary:
-			outline_parts.append("%s:%d" % [str(edge.get("id", "")), int(bool(edge.get("render_outline", true)))])
+			outline_parts.append("%s:%d" % [str(edge.get("id", "")), int(OutlineService.is_enabled(edge))])
 	var context := HashingContext.new()
 	context.start(HashingContext.HASH_SHA256)
 	context.update(("%s\ncontour_mesh|%d|stroke|%d|width_px|%.9f|outline|%s" % [

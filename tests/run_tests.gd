@@ -1018,7 +1018,7 @@ func _test_geometry_sampling_ui_shell() -> void:
 	_expect(application.selected_edge_ids.size() == 2, "Shift-click should preserve a multi-edge selection.")
 	application._on_edge_render_outline_changed(false)
 	var selected_component_after_outline: Dictionary = application._get_component(application._get_asset("asset_1"), "component_1")
-	_expect(not bool(selected_component_after_outline.get("edges", [])[0].get("render_outline", true)) and not bool(selected_component_after_outline.get("edges", [])[1].get("render_outline", true)), "Render Outline should apply to every selected edge.")
+	_expect(str(selected_component_after_outline.get("edges", [])[0].get("render_outline", "")) == OutlineService.OFF and str(selected_component_after_outline.get("edges", [])[1].get("render_outline", "")) == OutlineService.OFF, "Render Outline should apply to every selected edge.")
 	application.canvas_view._select_edge_by_click(edge_ids[0], true)
 	_expect(application.selected_edge_ids.size() == 1 and application.selected_edge_ids[0] == edge_ids[1], "Shift-clicking a selected edge should remove it from the selection.")
 	var edge_command := _context_menu(application, "⌘3")

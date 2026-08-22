@@ -1208,7 +1208,7 @@ func _draw_reference_bezier_shape(shape: Dictionary, points: Array, edges: Array
 			var end_point: Dictionary = points_by_id[end_id]
 			var curve_points := _bezier_edge_screen_points_with_transform(start_point, end_point, transform)
 			if curve_points.size() >= 2:
-				if bool(edge_data.get("render_outline", true)):
+				if OutlineService.is_enabled(edge_data):
 					draw_polyline(curve_points, reference_color, reference_width, true)
 				else:
 					_draw_dashed_polyline(curve_points, reference_color, reference_width)
@@ -1348,7 +1348,7 @@ func _draw_bezier_geometry() -> void:
 			var curve_points := _bezier_edge_screen_points(start_point, end_point)
 			if curve_points.size() >= 2:
 				var edge_color := selection_color if edge_id in selected_edge_ids or (edit_mode == "face" and face_selected) else edge_mode_highlight
-				if guide_style or not bool(edge_data.get("render_outline", true)):
+				if guide_style or not OutlineService.is_enabled(edge_data):
 					_draw_dashed_polyline(curve_points, edge_color, 2.0)
 				else:
 					draw_polyline(curve_points, edge_color, 2.0, true)

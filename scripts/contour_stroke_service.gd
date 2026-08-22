@@ -163,7 +163,7 @@ static func _sample_chain(component: Dictionary, chain: Dictionary, source_close
 		if edge.is_empty() or start_point.is_empty() or end_point.is_empty():
 			errors.append("Contour stroke Chain contains an unresolved Edge.")
 			continue
-		var visible := bool(edge.get("render_outline", true))
+		var visible := OutlineService.is_enabled(edge)
 		if not visible:
 			sampled_edges.append({"edge_id": edge_id, "visible": false, "samples": []})
 			continue
