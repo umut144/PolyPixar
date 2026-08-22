@@ -64,11 +64,15 @@ The name is the authored identity used by runtime animation bindings. It has
 no Material assignment.
 
 A Group is an Asset-local authoring container with a stable ID, a unique
-lower-snake-case name, visibility, and one shared transform/pivot. Components
+lower-snake-case name, visibility, one shared transform/pivot, and one shared
+Z Index. Components
 retain their own local transforms for editing, while the Group transform is
 applied as the outer transform of every member. Component parent/child
 hierarchy remains independent from Group membership; descendants inherit their
 ancestor's effective Group membership unless explicitly assigned otherwise.
+For grouped Components, Group visibility and Group Z Index are the effective
+layer values; their individual Component Z Index is retained only for
+compatibility and is not used.
 Outliner drag-and-drop preserves each affected Component's world transform when
 changing Group membership or Component parentage. Groups are editor-only
 containers: runtime export emits the ordinary Components and resolves the

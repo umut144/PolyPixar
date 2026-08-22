@@ -60,13 +60,15 @@ Sampling, Seeding, Meshing, UV, and Weighting records are stored separately
 from source topology.
 
 Assets may also contain editor-only Component Groups. A Group owns a stable ID,
-a unique lower-snake-case name, visibility, and a shared world-level transform
-with a pivot initially placed at the world center. Group membership does not
+a unique lower-snake-case name, visibility, a shared Z Index, and a shared
+world-level transform with a pivot initially placed at the world center. Group membership does not
 replace Component parentage: parent/child links remain independent, and a child
 inherits its ancestor's effective Group membership. Moving a Component into or
 out of a Group, or changing its parent through the Outliner, must preserve its
-world transform. Runtime export does not emit Group records; it resolves Group
-transforms into the ordinary Component export transforms.
+world transform. Group visibility and Z Index are effective for all members;
+individual Component Z Index values are retained only for compatibility and
+are ignored while grouped. Runtime export does not emit Group records; it
+resolves Group transforms and layer values into ordinary Component exports.
 
 Edge outline visibility is authored manually as `render_outline = on | off`.
 Older boolean `true` values and earlier experimental `auto` values migrate to
