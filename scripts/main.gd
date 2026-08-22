@@ -377,8 +377,13 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if event.echo and not _can_nudge_selected_point():
 		return
 	var has_command_modifier: bool = event.meta_pressed or event.ctrl_pressed
-	if not has_command_modifier and event.keycode == KEY_P and active_state.is_empty() and not selected_component_id.is_empty() and is_instance_valid(canvas_view):
-		if canvas_view.place_pivot_at_mouse():
+	if not has_command_modifier and event.keycode == KEY_P and active_state.is_empty() and is_instance_valid(canvas_view):
+		if not selected_group_id.is_empty() and _place_selected_group_pivot_at_mouse():
+			outliner_component_navigation_active = false
+			canvas_view.grab_focus()
+			get_viewport().set_input_as_handled()
+			return
+		if not selected_component_id.is_empty() and canvas_view.place_pivot_at_mouse():
 			outliner_component_navigation_active = false
 			canvas_view.grab_focus()
 			get_viewport().set_input_as_handled()
@@ -8734,6 +8739,27 @@ func _group_world_center(asset: Dictionary, component_ids: Array) -> Vector2:
 		var component := _get_component(asset, str(component_id))
 		center += ComponentHierarchy.world_transform(asset, str(component_id)) * _component_local_visual_center(component)
 	return center / float(component_ids.size())
+
+
+func _place_selected_group_pivot_at_mouse() -> bool:
+	var asset := _get_asset(selected_asset_id)
+	var group := ComponentHierarchy.group_by_id(asset, selected_group_id)
+	if asset.is_empty() or group.is_empty():
+		return false
+	_record_coalesced_change()
+	var transform: Dictionary = group.get("transform", _default_component_transform())
+	var old_pivot: Vector2 = transform.get("pivot", Vector2.ZERO)
+	var new_pivot := canvas_view.mouse_world_position()
+	var transform_scale: Vector2 = transform.get("scale", Vector2.ONE)
+	var transform_rotation := deg_to_rad(float(transform.get("rotation", 0.0)))
+	var transform_position: Vector2 = transform.get("position", Vector2.ZERO)
+	transform_position += ((new_pivot - old_pivot) * transform_scale).rotated(transform_rotation)
+	transform["pivot"] = new_pivot
+	transform["position"] = transform_position
+	group["transform"] = transform
+	_render_inspector()
+	_render_canvas_context()
+	return true
 
 
 func _on_component_context_menu_selected(action_id: int) -> void:
