@@ -354,9 +354,8 @@ static func _effective_visibility(asset: Dictionary, component: Dictionary) -> b
 	return bool(component.get("visibility", true)) and (group.is_empty() or bool(group.get("visibility", true)))
 
 
-static func _effective_z_index(asset: Dictionary, component: Dictionary) -> int:
-	var group := _effective_group(asset, component)
-	return int(group.get("z_index", 0)) if not group.is_empty() else int(component.get("z_index", 0))
+static func _effective_z_index(_asset: Dictionary, component: Dictionary) -> int:
+	return int(component.get("z_index", 0))
 
 
 static func _component_label(component: Dictionary) -> String:

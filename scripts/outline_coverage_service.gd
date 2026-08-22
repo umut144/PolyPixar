@@ -70,9 +70,8 @@ static func _component_visible(asset: Dictionary, component: Dictionary) -> bool
 	return group.is_empty() or bool(group.get("visibility", true))
 
 
-static func _effective_z_index(asset: Dictionary, component: Dictionary) -> int:
-	var group := ComponentHierarchy.group_by_id(asset, str(component.get("group_id", "")))
-	return int(group.get("z_index", 0)) if not group.is_empty() else int(component.get("z_index", 0))
+static func _effective_z_index(_asset: Dictionary, component: Dictionary) -> int:
+	return int(component.get("z_index", 0))
 
 
 static func _edge_samples(start: Dictionary, end: Dictionary, transform: Transform2D) -> PackedVector2Array:

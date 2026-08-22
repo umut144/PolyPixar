@@ -1807,7 +1807,8 @@ func _test_component_hierarchy_model() -> void:
 	_expect(ComponentHierarchy.membership_group_id(asset, "component_child") == "group_face", "Child Components should inherit their Parent Component's Group membership.")
 	_expect(ComponentHierarchy.group_by_id(asset, "group_face").get("name", "") == "face_details", "Groups should be first-class Asset records with stable names.")
 	group["z_index"] = 17
-	_expect(int(ComponentHierarchy.group_by_id(asset, "group_face").get("z_index", 0)) == 17 and RuntimeExportService._effective_z_index(asset, parent) == 17, "A Group Z Index should become the effective exported Z Index for every member.")
+	parent["z_index"] = 4
+	_expect(int(ComponentHierarchy.group_by_id(asset, "group_face").get("z_index", 0)) == 17 and RuntimeExportService._effective_z_index(asset, parent) == 4, "Grouped Components should retain individual exported Z Indices; legacy Group Z Index values must not override them.")
 	group["visibility"] = false
 	_expect(not RuntimeExportService._effective_visibility(asset, parent), "Group visibility should hide every member from the effective export set.")
 	group["visibility"] = true

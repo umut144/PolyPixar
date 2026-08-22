@@ -64,15 +64,13 @@ The name is the authored identity used by runtime animation bindings. It has
 no Material assignment.
 
 A Group is an Asset-local authoring container with a stable ID, a unique
-lower-snake-case name, visibility, one shared transform/pivot, and one shared
-Z Index. Components
-retain their own local transforms for editing, while the Group transform is
-applied as the outer transform of every member. Component parent/child
+lower-snake-case name, visibility, and one shared transform/pivot. Components
+retain their own transforms, while the Group transform is applied as the outer
+transform of every member. Component parent/child
 hierarchy remains independent from Group membership; descendants inherit their
 ancestor's effective Group membership unless explicitly assigned otherwise.
-For grouped Components, Group visibility and Group Z Index are the effective
-layer values; their individual Component Z Index is retained only for
-compatibility and is not used.
+For grouped Components, Group visibility is effective while each Component's
+individual Z Index remains authoritative.
 Outliner drag-and-drop preserves each affected Component's world transform when
 changing Group membership or Component parentage. Groups are editor-only
 containers: runtime export emits the ordinary Components and resolves the
@@ -285,7 +283,7 @@ The contract is engine-neutral: X points right, Y points up, lengths are meters,
 positive rotations are counter-clockwise radians, and one Tool unit equals
 0.1 m. Component local transforms mean
 `T(position) * R(rotation) * S(scale) * T(-pivot)`. Components are listed in
-global ascending `(z_index, component_id)` order from back to front. Accepted
+global ascending `(z_index, component_id)` order from back to front. Group membership does not override a Component's individual `z_index`; the Group Transform and visibility still apply to its members. Accepted
 Mesh Vertex order is retained and Triangle Vertex IDs become compact indices.
 Every ordinary Component exports a separate centered `contour_stroke_mesh`;
 closed and Primitive Components additionally export their unchanged Fill Mesh,

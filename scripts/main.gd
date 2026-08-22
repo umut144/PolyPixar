@@ -8753,9 +8753,8 @@ func _effective_component_visibility(asset: Dictionary, component: Dictionary) -
 	return bool(component.get("visibility", true)) and (group.is_empty() or bool(group.get("visibility", true)))
 
 
-func _effective_component_z_index(asset: Dictionary, component: Dictionary) -> int:
-	var group := _component_group(asset, component)
-	return int(group.get("z_index", 0)) if not group.is_empty() else int(component.get("z_index", 0))
+func _effective_component_z_index(_asset: Dictionary, component: Dictionary) -> int:
+	return int(component.get("z_index", 0))
 
 
 func _outline_coverage_for_asset(asset: Dictionary) -> Dictionary:
@@ -9456,24 +9455,14 @@ func _render_group_inspector(_asset: Dictionary, group: Dictionary) -> void:
 	_add_group_transform_field(transform_grid, "Pivot X (cm)", _editor_units_to_world(pivot.x), "pivot_x", 0.001)
 	_add_group_transform_field(transform_grid, "Pivot Y (cm)", _editor_units_to_world(pivot.y), "pivot_y", 0.001)
 	inspector_content.add_child(transform_grid)
-	inspector_content.add_child(_create_inspector_section("Group Visibility / Layer"))
+	inspector_content.add_child(_create_inspector_section("Group Visibility"))
 	var visibility_toggle := CheckButton.new()
 	visibility_toggle.text = "Visible"
 	visibility_toggle.custom_minimum_size = Vector2(0, 26)
 	visibility_toggle.button_pressed = bool(group.get("visibility", true))
 	visibility_toggle.toggled.connect(_on_group_visibility_changed)
 	inspector_content.add_child(visibility_toggle)
-	inspector_content.add_child(_create_inspector_field_label("Z Index"))
-	var z_index_field := SpinBox.new()
-	z_index_field.min_value = -10000
-	z_index_field.max_value = 10000
-	z_index_field.step = 1
-	z_index_field.value = int(group.get("z_index", 0))
-	z_index_field.custom_minimum_size = Vector2(0, 26)
-	z_index_field.add_theme_font_size_override("font_size", 11)
-	z_index_field.value_changed.connect(_on_group_z_index_changed)
-	inspector_content.add_child(z_index_field)
-	inspector_content.add_child(_create_inspector_field_label("Transform and Z Index apply to all contained Components."))
+	inspector_content.add_child(_create_inspector_field_label("Group Transform applies to all contained Components. Z Index remains individual per Component."))
 
 
 func _rename_selected_group(new_name: String) -> void:
@@ -9558,17 +9547,6 @@ func _on_group_visibility_changed(visibility_enabled: bool) -> void:
 		return
 	_record_direct_change()
 	group["visibility"] = visibility_enabled
-	_render_outliner()
-	_render_canvas_context()
-
-
-func _on_group_z_index_changed(value: float) -> void:
-	var asset := _get_asset(selected_asset_id)
-	var group := ComponentHierarchy.group_by_id(asset, selected_group_id)
-	if group.is_empty():
-		return
-	_record_direct_change()
-	group["z_index"] = int(value)
 	_render_outliner()
 	_render_canvas_context()
 
@@ -11697,7 +11675,9 @@ func _render_inspector() -> void:
 				break
 		catch_parent_option.item_selected.connect(_on_component_catch_parent_selected.bind(catch_parent_option))
 		inspector_content.add_child(catch_parent_option)
-	inspector_content.add_child(_create_inspector_section("Transform"))
+	var component_group_id := ComponentHierarchy.membership_group_id(asset, selected_component_id)
+	var show_global_transform := not component_group_id.is_empty()
+	inspector_content.add_child(_create_inspector_section("Global Transform" if show_global_transform else "Transform"))
 	var transform_grid := GridContainer.new()
 	transform_grid.columns = 2
 	transform_grid.add_theme_constant_override("h_separation", 8)
@@ -11707,11 +11687,21 @@ func _render_inspector() -> void:
 	var transform_position: Vector2 = transform.get("position", Vector2.ZERO)
 	var transform_scale: Vector2 = transform.get("scale", Vector2.ONE)
 	var pivot: Vector2 = transform.get("pivot", Vector2.ZERO)
-	_add_transform_field(transform_grid, "Position X (cm)", _editor_units_to_world(transform_position.x), "position_x", 0.01)
-	_add_transform_field(transform_grid, "Position Y (cm)", _editor_units_to_world(transform_position.y), "position_y", 0.01)
-	_add_transform_field(transform_grid, "Rotation", float(transform.get("rotation", 0.0)), "rotation", 1.0)
-	_add_transform_field(transform_grid, "Scale X", transform_scale.x, "scale_x", 0.01)
-	_add_transform_field(transform_grid, "Scale Y", transform_scale.y, "scale_y", 0.01)
+	if show_global_transform:
+		var displayed_transform: Dictionary = ComponentHierarchy.world_transform_record(asset, selected_component_id)
+		var global_position: Vector2 = displayed_transform.get("position", Vector2.ZERO)
+		var global_scale: Vector2 = displayed_transform.get("scale", Vector2.ONE)
+		_add_global_transform_field(transform_grid, "Position X (cm)", _editor_units_to_world(global_position.x), "position_x", 0.01)
+		_add_global_transform_field(transform_grid, "Position Y (cm)", _editor_units_to_world(global_position.y), "position_y", 0.01)
+		_add_global_transform_field(transform_grid, "Rotation", float(displayed_transform.get("rotation", 0.0)), "rotation", 1.0)
+		_add_global_transform_field(transform_grid, "Scale X", global_scale.x, "scale_x", 0.01)
+		_add_global_transform_field(transform_grid, "Scale Y", global_scale.y, "scale_y", 0.01)
+	else:
+		_add_transform_field(transform_grid, "Position X (cm)", _editor_units_to_world(transform_position.x), "position_x", 0.01)
+		_add_transform_field(transform_grid, "Position Y (cm)", _editor_units_to_world(transform_position.y), "position_y", 0.01)
+		_add_transform_field(transform_grid, "Rotation", float(transform.get("rotation", 0.0)), "rotation", 1.0)
+		_add_transform_field(transform_grid, "Scale X", transform_scale.x, "scale_x", 0.01)
+		_add_transform_field(transform_grid, "Scale Y", transform_scale.y, "scale_y", 0.01)
 	_add_transform_field(transform_grid, "Pivot X (cm)", _editor_units_to_world(pivot.x), "pivot_x", 0.001)
 	_add_transform_field(transform_grid, "Pivot Y (cm)", _editor_units_to_world(pivot.y), "pivot_y", 0.001)
 	inspector_content.add_child(_create_inspector_section("Visibility / Layer"))
@@ -11722,21 +11712,16 @@ func _render_inspector() -> void:
 	visibility_toggle.button_pressed = bool(component.get("visibility", true))
 	visibility_toggle.toggled.connect(_on_component_visibility_changed)
 	inspector_content.add_child(visibility_toggle)
-	var component_group_id := ComponentHierarchy.membership_group_id(asset, selected_component_id)
-	if component_group_id.is_empty():
-		var z_index_label := _create_inspector_field_label("Z Index")
-		inspector_content.add_child(z_index_label)
-		var z_index_field := SpinBox.new()
-		z_index_field.min_value = -10000
-		z_index_field.max_value = 10000
-		z_index_field.step = 1
-		z_index_field.value = int(component.get("z_index", 0))
-		z_index_field.custom_minimum_size = Vector2(0, 26)
-		z_index_field.add_theme_font_size_override("font_size", 11)
-		z_index_field.value_changed.connect(_on_component_z_index_changed)
-		inspector_content.add_child(z_index_field)
-	else:
-		inspector_content.add_child(_create_inspector_field_label("Z Index: controlled by G: %s" % str(ComponentHierarchy.group_by_id(asset, component_group_id).get("name", "Group"))))
+	inspector_content.add_child(_create_inspector_field_label("Z Index"))
+	var z_index_field := SpinBox.new()
+	z_index_field.min_value = -10000
+	z_index_field.max_value = 10000
+	z_index_field.step = 1
+	z_index_field.value = int(component.get("z_index", 0))
+	z_index_field.custom_minimum_size = Vector2(0, 26)
+	z_index_field.add_theme_font_size_override("font_size", 11)
+	z_index_field.value_changed.connect(_on_component_z_index_changed)
+	inspector_content.add_child(z_index_field)
 
 
 func _render_motion_inspector() -> void:
@@ -13344,6 +13329,25 @@ func _add_transform_field(grid: GridContainer, label_text: String, value: float,
 	grid.add_child(field)
 
 
+func _add_global_transform_field(grid: GridContainer, label_text: String, value: float, property_name: String, step: float) -> void:
+	var label := Label.new()
+	label.text = label_text
+	label.add_theme_font_size_override("font_size", 10)
+	label.add_theme_color_override("font_color", Color("#7f8a9b"))
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	grid.add_child(label)
+	var field := SpinBox.new()
+	field.min_value = -100000.0
+	field.max_value = 100000.0
+	field.step = step
+	field.custom_arrow_step = 0.1
+	field.value = value
+	field.custom_minimum_size = Vector2(96, 26)
+	field.add_theme_font_size_override("font_size", 11)
+	field.value_changed.connect(_on_global_transform_value_changed.bind(property_name))
+	grid.add_child(field)
+
+
 func _add_point_position_field(grid: GridContainer, label_text: String, value: float, property_name: String) -> void:
 	var label := Label.new()
 	label.text = label_text
@@ -13452,6 +13456,30 @@ func _on_transform_value_changed(value: float, property_name: String) -> void:
 	transform["scale"] = transform_scale
 	transform["pivot"] = pivot
 	component["transform"] = transform
+	_render_canvas_context()
+
+
+func _on_global_transform_value_changed(value: float, property_name: String) -> void:
+	var asset := _get_asset(selected_asset_id)
+	var component := _get_component(asset, selected_component_id)
+	if component.is_empty() or property_name not in ["position_x", "position_y", "rotation", "scale_x", "scale_y"]:
+		return
+	_record_direct_change()
+	var world_record := ComponentHierarchy.world_transform_record(asset, selected_component_id)
+	if property_name in ["position_x", "position_y"]:
+		value = _world_to_editor_units(value)
+	var world_position: Vector2 = world_record.get("position", Vector2.ZERO)
+	var world_scale: Vector2 = world_record.get("scale", Vector2.ONE)
+	match property_name:
+		"position_x": world_position.x = value
+		"position_y": world_position.y = value
+		"rotation": world_record["rotation"] = value
+		"scale_x": world_scale.x = value
+		"scale_y": world_scale.y = value
+	world_record["position"] = world_position
+	world_record["scale"] = world_scale
+	component["transform"] = ComponentHierarchy.local_transform_from_world_record(asset, selected_component_id, world_record)
+	_render_inspector()
 	_render_canvas_context()
 
 

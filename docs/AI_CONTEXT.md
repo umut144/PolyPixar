@@ -66,7 +66,8 @@ replace Component parentage: parent/child links remain independent, and a child
 inherits its ancestor's effective Group membership. Moving a Component into or
 out of a Group, or changing its parent through the Outliner, must preserve its
 <<<<<<< HEAD
-world transform. Group visibility and Z Index are effective for all members;
+world transform. Group visibility is effective for all members, while each
+Component retains its individual Z Index;
 individual Component Z Index values are retained only for compatibility and
 are ignored while grouped. Runtime export does not emit Group records; it
 resolves Group transforms and layer values into ordinary Component exports.
