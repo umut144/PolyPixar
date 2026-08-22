@@ -3,6 +3,14 @@ extends RefCounted
 
 
 static func normalize_asset(asset: Dictionary) -> void:
+	var groups: Array = asset.get("groups", []) if asset.get("groups", []) is Array else []
+	asset["groups"] = groups
+	var known_group_ids: Dictionary = {}
+	for group in groups:
+		if group is Dictionary:
+			var candidate_group_id := str(group.get("id", ""))
+			if not candidate_group_id.is_empty():
+				known_group_ids[candidate_group_id] = true
 	var components: Array = asset.get("components", []) if asset.get("components", []) is Array else []
 	asset["components"] = components
 	var known_ids: Dictionary = {}
@@ -19,6 +27,8 @@ static func normalize_asset(asset: Dictionary) -> void:
 		if parent_component_id == component_id or not parent_component_id.is_empty() and not known_ids.has(parent_component_id):
 			parent_component_id = ""
 		component_data["parent_component_id"] = parent_component_id
+		var component_group_id := str(component_data.get("group_id", ""))
+		component_data["group_id"] = component_group_id if known_group_ids.has(component_group_id) else ""
 	_break_cycles(components)
 	_normalize_guide_ordinals(asset)
 
@@ -32,6 +42,28 @@ static func component_by_id(asset: Dictionary, component_id: String) -> Dictiona
 		if candidate is Dictionary and str(candidate.get("type", "component")) != "guide" and str(candidate.get("id", "")) == component_id:
 			return candidate
 	return {}
+
+
+static func group_by_id(asset: Dictionary, group_id: String) -> Dictionary:
+	for group in asset.get("groups", []):
+		if group is Dictionary and str(group.get("id", "")) == group_id:
+			return group
+	return {}
+
+
+static func membership_group_id(asset: Dictionary, component_id: String) -> String:
+	var cursor := component_by_id(asset, component_id)
+	var visited: Dictionary = {}
+	while not cursor.is_empty():
+		var cursor_id := str(cursor.get("id", ""))
+		if visited.has(cursor_id):
+			return ""
+		visited[cursor_id] = true
+		var own_group_id := str(cursor.get("group_id", ""))
+		if not own_group_id.is_empty() and not group_by_id(asset, own_group_id).is_empty():
+			return own_group_id
+		cursor = component_by_id(asset, parent_id(cursor))
+	return ""
 
 
 static func children(asset: Dictionary, parent_component_id: String) -> Array[Dictionary]:
@@ -90,6 +122,9 @@ static func world_transform(asset: Dictionary, component_id: String) -> Transfor
 		chain.push_front(cursor)
 		cursor = component_by_id(asset, parent_id(cursor))
 	var result := Transform2D.IDENTITY
+	var effective_group_id := membership_group_id(asset, component_id)
+	if not effective_group_id.is_empty():
+		result = local_transform(group_by_id(asset, effective_group_id).get("transform", {}))
 	for chain_component in chain:
 		result = result * local_transform(chain_component.get("transform", {}))
 	return result
@@ -107,6 +142,9 @@ static func local_transform_from_world_record(asset: Dictionary, component_id: S
 	if current.is_empty():
 		return _default_transform_record()
 	var parent_world := Transform2D.IDENTITY
+	var effective_group_id := membership_group_id(asset, component_id)
+	if not effective_group_id.is_empty():
+		parent_world = local_transform(group_by_id(asset, effective_group_id).get("transform", {}))
 	var current_parent_id := parent_id(current)
 	if not current_parent_id.is_empty():
 		parent_world = world_transform(asset, current_parent_id)

@@ -8,7 +8,7 @@ const EXPORT_SUBMODULES: Array[String] = []
 const MOTION_SUBMODULES := ["Animation", "Path", "Act", "Sequence"]
 const WORLDS_ROOT := "res://worlds"
 const CONFIG_PATH := "res://configs/app_config.json"
-const SCHEMA_VERSION := 43
+const SCHEMA_VERSION := 44
 const MAX_HISTORY_SIZE := 100
 const DRAW_MODES := ["closed_loop", "contour", "primitive"]
 const GRID_BOX_TOOL_UNITS := 0.5
@@ -2074,8 +2074,16 @@ func _save_world() -> void:
 			"reference_image": _serialize_reference_image(asset.get("reference_image", {})),
 			"animation": MotionWorkspace.normalize_animation_document(asset.get("animation", {})).duplicate(true),
 			"components": [],
+			"groups": [],
 			"guides": []
 		}
+		for group in asset.get("groups", []):
+			asset_data["groups"].append({
+				"id": str(group.get("id", "")),
+				"name": str(group.get("name", "Group")),
+				"transform": _serialize_transform(group.get("transform", _default_component_transform())),
+				"visibility": bool(group.get("visibility", true))
+			})
 		for component in asset["components"]:
 			asset_data["components"].append({
 				"id": str(component["id"]),
@@ -2083,6 +2091,7 @@ func _save_world() -> void:
 				"name": _normalized_component_name(component),
 				"source_asset_id": str(component.get("source_asset_id", "")),
 				"parent_component_id": str(component.get("parent_component_id", "")),
+				"group_id": str(component.get("group_id", "")),
 				"points": _serialize_bezier_points(component.get("points", [])),
 				"edges": _serialize_edges(component.get("edges", [])),
 				"chains": _serialize_chains(component.get("chains", [])),
@@ -2399,7 +2408,17 @@ func _load_world(world_entry: String, persist_as_last := true) -> bool:
 			continue
 		var components: Array[Dictionary] = []
 		var used_component_names: Dictionary = {}
+		var groups: Array[Dictionary] = []
 		var guides: Array[Dictionary] = []
+		for group_data in asset_data.get("groups", []):
+			if not group_data is Dictionary:
+				continue
+			groups.append({
+				"id": str(group_data.get("id", "")),
+				"name": str(group_data.get("name", "Group")),
+				"transform": _deserialize_transform(group_data.get("transform", {})),
+				"visibility": bool(group_data.get("visibility", true))
+			})
 		for component_data in asset_data.get("components", []):
 			if not component_data is Dictionary:
 				continue
@@ -2419,6 +2438,7 @@ func _load_world(world_entry: String, persist_as_last := true) -> bool:
 				"name": component_name,
 				"source_asset_id": str(component_data.get("source_asset_id", "")),
 				"parent_component_id": str(component_data.get("parent_component_id", "")),
+				"group_id": str(component_data.get("group_id", "")),
 				"points": topology["points"],
 				"edges": topology["edges"],
 				"chains": topology["chains"],
@@ -2444,6 +2464,7 @@ func _load_world(world_entry: String, persist_as_last := true) -> bool:
 			"reference_image": _normalize_reference_image(asset_data.get("reference_image", {})),
 			"animation": MotionWorkspace.normalize_animation_document(asset_data.get("animation", {})),
 			"components": components,
+			"groups": groups,
 			"guides": guides
 		}
 		ComponentHierarchy.normalize_asset(loaded_asset)
@@ -6635,7 +6656,7 @@ func _confirm_asset_creation() -> void:
 	_record_direct_change()
 	var asset_id := "asset_%d" % next_asset_id
 	next_asset_id += 1
-	assets.append({"id": asset_id, "name": asset_name, "asset_type": _create_submodule_asset_type(active_create_submodule), "visibility": true, "asset_pivot": Vector2.ZERO, "reference_image": _default_reference_image(), "animation": MotionWorkspace.create_default_animation_document(), "components": [], "guides": []})
+	assets.append({"id": asset_id, "name": asset_name, "asset_type": _create_submodule_asset_type(active_create_submodule), "visibility": true, "asset_pivot": Vector2.ZERO, "reference_image": _default_reference_image(), "animation": MotionWorkspace.create_default_animation_document(), "components": [], "groups": [], "guides": []})
 	selected_asset_id = asset_id
 	selected_component_id = ""
 	selected_guide_id = ""
@@ -8677,6 +8698,7 @@ func _confirm_component_creation() -> void:
 		"name": component_name,
 		"source_asset_id": str(component_dialog.get_meta("source_asset_id", "")) if is_reference else "",
 		"parent_component_id": parent_component_id,
+		"group_id": "",
 		"points": [],
 		"edges": [],
 		"chains": [],
