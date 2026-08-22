@@ -8152,7 +8152,9 @@ func _render_asset_outliner_entry(asset: Dictionary, force_expand := false) -> v
 			components.append(component)
 	components.sort_custom(_sort_named_documents)
 	guides.sort_custom(func(left: Dictionary, right: Dictionary) -> bool: return _guide_display_name(asset, left).naturalnocasecmp_to(_guide_display_name(asset, right)) < 0)
-	asset_container.add_child(_create_outliner_child_group_label("Components"))
+	var components_label := _create_outliner_child_group_label("Components")
+	components_label.set_drag_forwarding(_outliner_get_drag_data.bind(str(asset.get("id", "")), "root"), _outliner_can_drop_data.bind(str(asset.get("id", "")), "root"), _outliner_drop_data.bind(str(asset.get("id", "")), "root"))
+	asset_container.add_child(components_label)
 	var rendered_component_ids: Dictionary = {}
 	var groups: Array = asset.get("groups", []).duplicate(true)
 	groups.sort_custom(_sort_named_documents)
@@ -8193,6 +8195,7 @@ func _render_group_outliner_tree(container: VBoxContainer, asset: Dictionary, gr
 	group_button.tooltip_text = "Component Group"
 	group_button.pressed.connect(_select_group.bind(str(asset.get("id", "")), group_id))
 	group_button.gui_input.connect(_on_group_outliner_gui_input.bind(str(asset.get("id", "")), group_id, group_button))
+	group_button.set_drag_forwarding(_outliner_get_drag_data.bind(str(asset.get("id", "")), group_id), _outliner_can_drop_data.bind(str(asset.get("id", "")), group_id), _outliner_drop_data.bind(str(asset.get("id", "")), group_id))
 	group_row.add_child(group_button)
 	var group_components: Array = []
 	for component in asset.get("components", []):
@@ -8234,6 +8237,87 @@ func _on_group_outliner_gui_input(event: InputEvent, asset_id: String, group_id:
 	get_viewport().set_input_as_handled()
 
 
+func _outliner_get_drag_data(_at_position: Vector2, asset_id: String, target_id: String):
+	if target_id == "root":
+		return null
+	var component := _get_component(_get_asset(asset_id), target_id)
+	if component.is_empty():
+		return null
+	var component_ids: Array[String] = []
+	if selected_component_ids.has(target_id):
+		component_ids = selected_component_ids.duplicate()
+	else:
+		component_ids = [target_id]
+	var preview := Label.new()
+	preview.text = str(component.get("name", "Component")) if component_ids.size() == 1 else "%d Components" % component_ids.size()
+	set_drag_preview(preview)
+	return {"kind": "components", "asset_id": asset_id, "component_ids": component_ids}
+
+
+func _outliner_can_drop_data(_at_position: Vector2, data, asset_id: String, target_id: String) -> bool:
+	if not data is Dictionary or str(data.get("kind", "")) != "components" or str(data.get("asset_id", "")) != asset_id:
+		return false
+	var asset := _get_asset(asset_id)
+	var component_ids: Array = data.get("component_ids", [])
+	if component_ids.is_empty():
+		return false
+	if target_id == "root":
+		return true
+	if not ComponentHierarchy.group_by_id(asset, target_id).is_empty():
+		return true
+	if _get_component(asset, target_id).is_empty():
+		return false
+	for component_id in component_ids:
+		if not ComponentHierarchy.can_parent(asset, str(component_id), target_id):
+			return false
+	return true
+
+
+func _outliner_drop_data(_at_position: Vector2, data, asset_id: String, target_id: String) -> void:
+	if not _outliner_can_drop_data(Vector2.ZERO, data, asset_id, target_id):
+		return
+	var asset := _get_asset(asset_id)
+	var component_ids: Array = data.get("component_ids", [])
+	_record_direct_change()
+	if target_id == "root":
+		for component_id in component_ids:
+			_set_component_group_preserving_world(asset, str(component_id), "")
+		_show_status_message("Removed %d Component%s from Group." % [component_ids.size(), "" if component_ids.size() == 1 else "s"])
+	elif not ComponentHierarchy.group_by_id(asset, target_id).is_empty():
+		for component_id in component_ids:
+			_set_component_group_preserving_world(asset, str(component_id), target_id)
+		_show_status_message("Moved %d Component%s into Group." % [component_ids.size(), "" if component_ids.size() == 1 else "s"])
+	else:
+		for component_id in component_ids:
+			_set_component_parent_preserving_world(asset, str(component_id), target_id)
+		_show_status_message("Parented %d Component%s." % [component_ids.size(), "" if component_ids.size() == 1 else "s"])
+	selected_asset_id = asset_id
+	selected_component_id = str(component_ids.back())
+	selected_component_ids = component_ids.duplicate()
+	selected_group_id = ""
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _set_component_group_preserving_world(asset: Dictionary, component_id: String, group_id: String) -> void:
+	var component := _get_component(asset, component_id)
+	if component.is_empty():
+		return
+	var world_record := ComponentHierarchy.world_transform_record(asset, component_id)
+	component["group_id"] = group_id
+	component["transform"] = ComponentHierarchy.local_transform_from_world_record(asset, component_id, world_record)
+
+
+func _set_component_parent_preserving_world(asset: Dictionary, component_id: String, parent_id: String) -> void:
+	var component := _get_component(asset, component_id)
+	if component.is_empty() or not ComponentHierarchy.can_parent(asset, component_id, parent_id):
+		return
+	var world_record := ComponentHierarchy.world_transform_record(asset, component_id)
+	component["parent_component_id"] = parent_id
+	component["transform"] = ComponentHierarchy.local_transform_from_world_record(asset, component_id, world_record)
+
+
 func _render_component_outliner_tree(container: VBoxContainer, asset: Dictionary, component: Dictionary, indent: int, rendered_component_ids: Dictionary) -> void:
 	var asset_id := str(asset.get("id", ""))
 	var component_id := str(component.get("id", ""))
@@ -8257,6 +8341,7 @@ func _render_component_outliner_tree(container: VBoxContainer, asset: Dictionary
 	_style_outliner_button(component_button, (component_id == selected_component_id or selected_component_ids.has(component_id)) and asset_id == selected_asset_id, str(component.get("topology_role", "outer")))
 	component_button.pressed.connect(_select_component.bind(asset_id, component_id, true))
 	component_button.gui_input.connect(_on_component_outliner_gui_input.bind(asset_id, component_id, component_button))
+	component_button.set_drag_forwarding(_outliner_get_drag_data.bind(asset_id, component_id), _outliner_can_drop_data.bind(asset_id, component_id), _outliner_drop_data.bind(asset_id, component_id))
 	component_row.add_child(component_button)
 	if _is_reference_component(component):
 		return
