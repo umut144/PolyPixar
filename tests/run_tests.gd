@@ -1805,6 +1805,11 @@ func _test_component_hierarchy_model() -> void:
 	ComponentHierarchy.normalize_asset(asset)
 	_expect(ComponentHierarchy.membership_group_id(asset, "component_child") == "group_face", "Child Components should inherit their Parent Component's Group membership.")
 	_expect(ComponentHierarchy.group_by_id(asset, "group_face").get("name", "") == "face_details", "Groups should be first-class Asset records with stable names.")
+	group["z_index"] = 17
+	_expect(int(ComponentHierarchy.group_by_id(asset, "group_face").get("z_index", 0)) == 17 and RuntimeExportService._effective_z_index(asset, parent) == 17, "A Group Z Index should become the effective exported Z Index for every member.")
+	group["visibility"] = false
+	_expect(not RuntimeExportService._effective_visibility(asset, parent), "Group visibility should hide every member from the effective export set.")
+	group["visibility"] = true
 	_expect(ComponentHierarchy.children(asset, "component_parent").size() == 1 and ComponentHierarchy.descendants(asset, "component_parent").size() == 1, "The internal Component model should expose explicit recursive Parent-Child relationships.")
 	_expect(ComponentHierarchy.world_transform(asset, "component_child").origin.is_equal_approx(Vector2(12.0, 0.0)), "Child Component transforms should compose locally through their Parent.")
 	group["transform"]["position"] = Vector2(12.0, 0.0)
