@@ -74,6 +74,13 @@ changing Group membership or Component parentage. Groups are editor-only
 containers: runtime export emits the ordinary Components and resolves the
 Group transform into their canonical exported transforms.
 
+Each authored Bézier Edge has a `render_outline` mode: `auto`, `on`, or `off`.
+Legacy boolean `true` migrates to `auto`; legacy `false` remains `off`. Within
+a Group, `auto` resolves exact shared-edge ownership as derived presentation
+state. Explicit `on` and `off` always override that resolver. Resolution is
+cached per Group, invalidated by document changes, and refreshed for all Groups
+at save time; it is never polled per frame or persisted as authored geometry.
+
 Derived mesh documents are keyed by Asset and Component IDs. Sampling feeds
 Seeding, Seeding feeds Meshing, and accepted Bakes remain separate from source
 Component geometry. Weighting styles reference accepted mesh data without
