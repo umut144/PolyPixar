@@ -1,8 +1,8 @@
 class_name OutlineResolutionService
 extends RefCounted
 
-## Resolves automatic outline ownership for exact shared edges inside Groups.
-## The result is derived and never written back into authored topology.
+## Detects exact shared edges inside Groups for editor diagnostics only. It
+## never changes authored On/Off visibility or assigns outline ownership.
 
 const SAMPLE_COUNT := 17
 const POSITION_EPSILON := 0.0005
@@ -43,7 +43,7 @@ static func resolve_group(asset: Dictionary, group_id: String) -> Dictionary:
 				"center": _sample_center(samples)
 			})
 			result[component_id] = result.get(component_id, {})
-			var edge_mode := OutlineService.normalize_mode(edge.get("render_outline", OutlineService.AUTO))
+			var edge_mode := OutlineService.normalize_mode(edge.get("render_outline", OutlineService.ON))
 			result[component_id][str(edge.get("id", ""))] = {
 				"enabled": edge_mode != OutlineService.OFF,
 				"diagnostic": "hidden" if edge_mode == OutlineService.OFF else "visible"
@@ -61,29 +61,12 @@ static func resolve_group(asset: Dictionary, group_id: String) -> Dictionary:
 static func _resolve_pair(result: Dictionary, first: Dictionary, second: Dictionary) -> void:
 	var first_edge: Dictionary = first.get("edge", {})
 	var second_edge: Dictionary = second.get("edge", {})
-	var first_mode := OutlineService.normalize_mode(first_edge.get("render_outline", OutlineService.AUTO))
-	var second_mode := OutlineService.normalize_mode(second_edge.get("render_outline", OutlineService.AUTO))
-	if first_mode == OutlineService.OFF and second_mode == OutlineService.OFF:
-		_set_result(result, first, false, "hidden")
-		_set_result(result, second, false, "hidden")
-		return
-	if first_mode == OutlineService.ON and second_mode != OutlineService.ON:
-		_set_result(result, first, true, "visible")
-		_set_result(result, second, false, "covered")
-		return
-	if second_mode == OutlineService.ON and first_mode != OutlineService.ON:
+	var first_mode := OutlineService.normalize_mode(first_edge.get("render_outline", OutlineService.ON))
+	var second_mode := OutlineService.normalize_mode(second_edge.get("render_outline", OutlineService.ON))
+	if first_mode == OutlineService.OFF:
 		_set_result(result, first, false, "covered")
-		_set_result(result, second, true, "visible")
-		return
-	if first_mode != OutlineService.AUTO or second_mode != OutlineService.AUTO:
-		return
-	var first_center: Vector2 = first.get("center", Vector2.ZERO)
-	var second_center: Vector2 = second.get("center", Vector2.ZERO)
-	var first_wins := first_center.y > second_center.y + POSITION_EPSILON or (is_equal_approx(first_center.y, second_center.y) and first_center.x > second_center.x + POSITION_EPSILON)
-	var winner: Dictionary = first if first_wins else second
-	var loser: Dictionary = second if first_wins else first
-	_set_result(result, winner, true, "visible")
-	_set_result(result, loser, false, "covered")
+	if second_mode == OutlineService.OFF:
+		_set_result(result, second, false, "covered")
 
 
 static func _set_result(result: Dictionary, record: Dictionary, enabled: bool, diagnostic: String) -> void:

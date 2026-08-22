@@ -2877,7 +2877,7 @@ func _serialize_edges(edges: Array) -> Array:
 			"id": str(edge_data.get("id", "")),
 			"start_point_id": str(edge_data.get("start_point_id", "")),
 			"end_point_id": str(edge_data.get("end_point_id", "")),
-			"render_outline": OutlineService.normalize_mode(edge_data.get("render_outline", OutlineService.AUTO))
+			"render_outline": OutlineService.normalize_mode(edge_data.get("render_outline", OutlineService.ON))
 		})
 	return serialized
 
@@ -2938,7 +2938,7 @@ func _deserialize_component_topology(component_data: Dictionary) -> Dictionary:
 			"id": edge_id,
 			"start_point_id": start_point_id,
 			"end_point_id": end_point_id,
-			"render_outline": OutlineService.normalize_mode(raw_edge.get("render_outline", OutlineService.AUTO))
+			"render_outline": OutlineService.normalize_mode(raw_edge.get("render_outline", OutlineService.ON))
 		})
 		known_edge_ids[edge_id] = true
 	var chains: Array[Dictionary] = []
@@ -12989,15 +12989,13 @@ func _on_component_catch_parent_selected(index: int, option: OptionButton) -> vo
 func _create_render_outline_mode_option(edges: Array[Dictionary]) -> OptionButton:
 	var option := OptionButton.new()
 	option.custom_minimum_size = Vector2(0, 26)
-	option.add_item("Render Outline: Auto")
-	option.set_item_metadata(0, OutlineService.AUTO)
 	option.add_item("Render Outline: On")
-	option.set_item_metadata(1, OutlineService.ON)
+	option.set_item_metadata(0, OutlineService.ON)
 	option.add_item("Render Outline: Off")
-	option.set_item_metadata(2, OutlineService.OFF)
+	option.set_item_metadata(1, OutlineService.OFF)
 	var mode := ""
 	for edge in edges:
-		var edge_mode := OutlineService.normalize_mode(edge.get("render_outline", OutlineService.AUTO))
+		var edge_mode := OutlineService.normalize_mode(edge.get("render_outline", OutlineService.ON))
 		if mode.is_empty():
 			mode = edge_mode
 		elif mode != edge_mode:
@@ -13023,8 +13021,7 @@ func _on_edge_render_outline_mode_changed(index: int, option: OptionButton) -> v
 
 
 func _on_edge_render_outline_changed(enabled: bool) -> void:
-	# Compatibility entry point for existing editor/test integrations. New UI
-	# writes an explicit mode through the Auto/On/Off selector above.
+	# Compatibility entry point for existing editor/test integrations.
 	_set_selected_edges_render_outline_mode(OutlineService.ON if enabled else OutlineService.OFF)
 
 

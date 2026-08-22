@@ -1,26 +1,27 @@
 class_name OutlineService
 extends RefCounted
 
-## Render Outline is authored per Edge. `auto` delegates the visible decision
-## to the owning Asset/Group resolver; `on` and `off` are explicit overrides.
+## Render Outline is authored per Edge. Visibility is always a manual choice;
+## overlap analysis is diagnostic only and never changes this decision.
 
-const AUTO := "auto"
 const ON := "on"
 const OFF := "off"
-const MODES := [AUTO, ON, OFF]
+const MODES := [ON, OFF]
 
 
-static func normalize_mode(raw_value, default_mode := AUTO) -> String:
-	# Schema-44 and older data stored this as a bool. Preserve explicit Off,
-	# while migrating the old visible/default state to the new automatic mode.
+static func normalize_mode(raw_value, default_mode := ON) -> String:
+	# Older data stored this as a bool. Earlier experimental Auto values are
+	# intentionally normalized back to visible On now that resolution is manual.
 	if raw_value is bool:
-		return AUTO if raw_value else OFF
+		return ON if raw_value else OFF
 	var mode := str(raw_value).to_lower()
+	if mode == "auto":
+		return ON
 	return mode if mode in MODES else default_mode
 
 
 static func is_enabled(edge: Dictionary, auto_enabled := true) -> bool:
-	var mode := normalize_mode(edge.get("render_outline", AUTO))
+	var mode := normalize_mode(edge.get("render_outline", ON))
 	if mode == ON:
 		return true
 	if mode == OFF:
@@ -30,10 +31,8 @@ static func is_enabled(edge: Dictionary, auto_enabled := true) -> bool:
 
 static func display_name(mode: String) -> String:
 	match normalize_mode(mode):
-		AUTO:
-			return "Auto"
 		ON:
 			return "On"
 		OFF:
 			return "Off"
-	return "Auto"
+	return "On"

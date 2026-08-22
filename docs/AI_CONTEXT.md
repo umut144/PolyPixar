@@ -68,13 +68,14 @@ out of a Group, or changing its parent through the Outliner, must preserve its
 world transform. Runtime export does not emit Group records; it resolves Group
 transforms into the ordinary Component export transforms.
 
-Edge outline visibility is authored as `render_outline = auto | on | off`.
-Older boolean `true` values migrate to `auto`, while `false` values remain
-explicit `off`. Grouped exact shared edges are resolved from cached derived
-state, with explicit modes taking precedence. The resolver is invalidated by
-relevant document changes and refreshed at save time; it must not run in a
-per-frame polling loop. The editor may show disabled outlines as dashed and
-automatically covered shared outlines as dash-dot diagnostics.
+Edge outline visibility is authored manually as `render_outline = on | off`.
+Older boolean `true` values and earlier experimental `auto` values migrate to
+`on`, while `false` values remain explicit `off`. Grouped exact shared edges
+produce cached derived diagnostics only; they never change authored
+visibility. The diagnostic resolver is invalidated by relevant document
+changes and refreshed at save time; it must not run in a per-frame polling
+loop. The editor may show disabled outlines as dashed and exactly covered
+disabled shared outlines as dash-dot diagnostics.
 
 World schema 41 owns one authored Contour stroke width for every Asset in its
 typed `world_settings` record. It defaults to `4 px` at the fixed `128 px/m`
