@@ -65,10 +65,15 @@ world-level transform with a pivot initially placed at the world center. Group m
 replace Component parentage: parent/child links remain independent, and a child
 inherits its ancestor's effective Group membership. Moving a Component into or
 out of a Group, or changing its parent through the Outliner, must preserve its
+<<<<<<< HEAD
 world transform. Group visibility and Z Index are effective for all members;
 individual Component Z Index values are retained only for compatibility and
 are ignored while grouped. Runtime export does not emit Group records; it
 resolves Group transforms and layer values into ordinary Component exports.
+=======
+world transform. Runtime export does not emit Group records; it resolves Group
+transforms into the ordinary Component export transforms.
+>>>>>>> parent of 87f83a9 (Document outline resolution contract)
 
 World schema 41 owns one authored Contour stroke width for every Asset in its
 typed `world_settings` record. It defaults to `4 px` at the fixed `128 px/m`
