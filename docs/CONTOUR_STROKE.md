@@ -23,22 +23,25 @@ World schema 41 adds the required typed `world_settings` record:
 
 ```json
 {
-  "reference_pixels_per_meter": 128.0,
+  "reference_pixels_per_meter": 192.0,
   "contour_stroke_width_px": 4.0
 }
 ```
 
-The width is one World-authored value shared by every Asset and Component; a
-Component-local override is not part of the model. Schema 40 and older Worlds
-migrate explicitly to `4 px`. A schema-41 World with a missing or invalid
-record fails loading instead of receiving a fallback. Changing the value
-invalidates Contour Mesh fingerprints and their dependent Bakes.
+The width is one World-authored value shared by every Asset and Component. A
+non-reference Component may store a finite positive `contour_stroke_width_px`;
+it is an implicit local override only when it differs from the World value.
+The Inspector always exposes the width field and has no separate Override
+toggle. Schema 40 and older Worlds migrate explicitly to `4 px`. A schema-41
+World with a missing or invalid record fails loading instead of receiving a
+fallback. Changing the value invalidates Contour Mesh fingerprints and their
+dependent Bakes.
 
 The fixed technical semantics are:
 
-- authored reference density: `128 px/m`;
+- authored reference density: `192 px/m`;
 - new-World default width: `4 px` = `0.03125 m`;
-- centered offset: `stroke_width_px / 128 / 2` meters on each side;
+- centered offset: `stroke_width_px / 192 / 2` meters on each side;
 - adaptive Bezier sampling deviation: at most `0.25 px`;
 - joins: miter with limit `4.0`, then bevel;
 - caps: butt (an uninterrupted closed loop has no cap).

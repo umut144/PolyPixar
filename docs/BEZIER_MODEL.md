@@ -67,8 +67,8 @@ Chain cannot be mirrored.
 A Contour Component keeps its canonical source as one open Bézier Chain. Its
 derived `Contour Stroke` mesh is sampled deterministically in `Mesh →
 Meshing` using the same centered stroke construction as closed contours. World
-Settings own one width for all Assets, defaulting to 4 authored px (`0.03125 m`
-at `128 px/m`), with Miter joins, a limit of `4.0`, Bevel fallback, and Butt
+Settings own one width for all Assets, defaulting to 4 authored px (`0.0208333 m`
+at `192 px/m`), with Miter joins, a limit of `4.0`, Bevel fallback, and Butt
 caps. It has no Fill Mesh and no Component-local width.
 The derived mesh never modifies Points, Edges, or Chains. Robustness analysis
 keeps intentional open-Contour crossings and narrow coverage overlaps visible
@@ -97,8 +97,9 @@ be edited with Bézier point, edge, or face tools.
 Scale Rebase is the sole normalization path for finite, non-zero signed
 non-unit Component Scale. It affinely bakes Points, resolved handles, analytic
 primitive axes, and Component-scoped Guides around the unchanged Pivot, then
-sets Scale to `(1, 1)`. Negative axes preserve transient Mirror reflections in
-the owned geometry. Position and Rotation never change. See
+sets Scale to `(1, 1)`. A parent Rebase compensates direct Child local
+transforms to preserve the Child subtree's visible world transform. Negative
+axes preserve transient Mirror reflections in the owned geometry. See
 [`SCALE_REBASE.md`](SCALE_REBASE.md).
 
 The current fill and Godot export derive a control polygon from the outer

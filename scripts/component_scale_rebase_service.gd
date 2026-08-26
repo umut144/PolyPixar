@@ -2,9 +2,9 @@ class_name ComponentScaleRebaseService
 extends RefCounted
 
 ## Explicitly bakes finite, non-zero signed local Component scale into owned source geometry.
-## Position, rotation, pivot, hierarchy, and animation data remain unchanged.
+## Parent Rebase compensates direct Child transforms to preserve Child world transforms.
 
-const ALGORITHM_VERSION := 2
+const ALGORITHM_VERSION := 3
 const SCALE_EPSILON := 0.000001
 
 
@@ -13,6 +13,8 @@ static func analyze_asset(asset: Dictionary) -> Dictionary:
 	var blockers: Array = []
 	for component in asset.get("components", []):
 		if not component is Dictionary or str(component.get("type", "component")) == "guide":
+			continue
+		if str(component.get("type", "component")) == "reference":
 			continue
 		var scale := _component_scale(component)
 		if _is_unit_scale(scale):
@@ -50,22 +52,16 @@ static func rebase_asset(asset: Dictionary) -> Dictionary:
 		else:
 			errors.append("No Component scale requires Rebase.")
 		return {"valid": false, "errors": errors, "analysis": analysis, "rebased_component_ids": []}
-	var working_asset := asset.duplicate(true)
-	var rebased_ids: Array[String] = []
+	var candidate_ids: Array[String] = []
 	for candidate in analysis.get("candidates", []):
-		var component_id := str(candidate.get("component_id", ""))
-		var component := ComponentHierarchy.component_by_id(working_asset, component_id)
-		var scale := _component_scale(component)
-		var pivot := Vector2(component.get("transform", {}).get("pivot", Vector2.ZERO))
-		_bake_component_geometry(component, pivot, scale)
-		_bake_component_guides(working_asset, component_id, pivot, scale)
-		var transform: Dictionary = component.get("transform", {}).duplicate(true)
-		transform["scale"] = Vector2.ONE
-		component["transform"] = transform
-		rebased_ids.append(component_id)
+		candidate_ids.append(str(candidate.get("component_id", "")))
+	var working_asset := asset.duplicate(true)
+	var result := rebase_components(working_asset, candidate_ids)
+	if not bool(result.get("valid", false)):
+		return {"valid": false, "errors": result.get("errors", []), "analysis": analysis, "rebased_component_ids": []}
 	asset.clear()
 	asset.merge(working_asset, true)
-	return {"valid": true, "errors": [], "analysis": analysis, "rebased_component_ids": rebased_ids}
+	return {"valid": true, "errors": [], "analysis": analysis, "rebased_component_ids": result.get("rebased_component_ids", [])}
 
 
 static func rebase_components(asset: Dictionary, component_ids: Array) -> Dictionary:
@@ -78,6 +74,8 @@ static func rebase_components(asset: Dictionary, component_ids: Array) -> Dictio
 	var blockers: Array[String] = []
 	for component_id in requested_ids:
 		var component := ComponentHierarchy.component_by_id(asset, component_id)
+		if str(component.get("type", "component")) == "reference":
+			continue
 		var scale := _component_scale(component)
 		if _is_unit_scale(scale):
 			continue
@@ -119,13 +117,9 @@ static func rebase_components(asset: Dictionary, component_ids: Array) -> Dictio
 	return {"valid": true, "errors": [], "rebased_component_ids": rebased_ids}
 
 
-static func _blocking_reason(asset: Dictionary, component: Dictionary, scale: Vector2) -> String:
+static func _blocking_reason(_asset: Dictionary, component: Dictionary, scale: Vector2) -> String:
 	if not scale.is_finite() or absf(scale.x) <= SCALE_EPSILON or absf(scale.y) <= SCALE_EPSILON:
 		return "Scale axes must be finite and non-zero."
-	if str(component.get("type", "component")) == "reference":
-		return "Reference Components do not own geometry that can absorb Scale."
-	if not ComponentHierarchy.children(asset, str(component.get("id", ""))).is_empty():
-		return "A scaled Component with Children cannot preserve their transforms without changing Position or Rotation."
 	var draw_mode := str(component.get("draw_mode", "closed_loop"))
 	if draw_mode in ["closed_loop", "contour"]:
 		return "" if not component.get("points", []).is_empty() else "Component has no geometry that can absorb Scale."
@@ -137,8 +131,6 @@ static func _blocking_reason(asset: Dictionary, component: Dictionary, scale: Ve
 static func _target_blocking_reason(component: Dictionary, scale: Vector2) -> String:
 	if not scale.is_finite() or absf(scale.x) <= SCALE_EPSILON or absf(scale.y) <= SCALE_EPSILON:
 		return "Scale axes must be finite and non-zero."
-	if str(component.get("type", "component")) == "reference":
-		return "Reference Components do not own geometry that can absorb Scale."
 	var draw_mode := str(component.get("draw_mode", "closed_loop"))
 	if draw_mode in ["closed_loop", "contour"]:
 		return "" if not component.get("points", []).is_empty() else "Component has no geometry that can absorb Scale."

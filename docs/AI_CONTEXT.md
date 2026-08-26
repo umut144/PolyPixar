@@ -76,18 +76,26 @@ world transform. Runtime export does not emit Group records; it resolves Group
 transforms into the ordinary Component export transforms.
 >>>>>>> parent of 87f83a9 (Document outline resolution contract)
 
-World schema 41 owns one authored Contour stroke width for every Asset in its
-typed `world_settings` record. It defaults to `4 px` at the fixed `128 px/m`
-reference density, has no Component override, and invalidates derived Contour
-Meshes when changed. Schema 40 and older Worlds migrate explicitly to 4 px.
+World schema 41 owns the default authored Contour stroke width in its typed
+`world_settings` record. It defaults to `4 px` at the fixed `192 px/m`
+reference density. Schema 45 adds an optional finite positive
+`contour_stroke_width_px` to an ordinary Component. A Component inherits the
+World default when the field is absent or equal to that default; a different
+value is its implicit local override. The Inspector always shows the Contour
+Stroke Width field, with no separate Override toggle. World-width changes
+invalidate only inheriting Contour Meshes, while a local override invalidates
+only its Component's stroke mesh. Schema 40 and older Worlds migrate explicitly
+to 4 px.
 
 World schema 42 adds the Asset Inspector's atomic Scale Rebase. Finite, non-zero
 signed local Scale is baked around the unchanged Pivot into owned Points,
 resolved handles, Component Guides, or analytic primitive axes; local Scale
-becomes `(1, 1)` and Position/Rotation remain unchanged. Negative axes encode a
-transient Mirror reflection. Non-uniform Circles become analytic Ellipses.
-Zero/non-finite Scale, scaled References, and scaled Components with Children
-are explicit blockers with no partial fallback.
+becomes `(1, 1)`. Parent rebases compensate direct Child local transforms to
+preserve their visible world transforms, so Child Position, Rotation, or Scale
+may change. Negative axes encode a transient Mirror reflection. Non-uniform
+Circles become analytic Ellipses. Zero/non-finite Scale is an explicit blocker
+with no partial fallback. Asset References are excluded because their signed
+Scale is an instance placement transform rather than owned geometry Scale.
 
 Seeding consumes the complete accepted Sampling constraint set. Outer bounds
 the valid interior, Holes exclude regions, and Cuts are two-sided barriers with
@@ -131,17 +139,17 @@ The persistent `Export Runtime (N)` action automatically considers every visible
 Asset. Every visible Component must have one unique free-form `name`. Closed
 and primitive ordinary Components require a
 current Fill Mesh and current centered Contour Stroke Mesh. Open Contours
-require only that Stroke and export no Fill. Asset
-References instead export their local Component name
-plus the referenced Asset's derived `source_asset_key`; they do not duplicate
-the referenced geometry. The editor retains `source_asset_id` only as its
-internal link to the actual authored source Asset.
+require only that Stroke and export no Fill. Asset References instead export
+their local Component name, signed instance transform, and the referenced
+Asset's derived `source_asset_key`; they do not duplicate the referenced
+geometry. The editor retains `source_asset_id` only as its internal source link.
 The batch writes a versioned engine-neutral Manifest to
 the active World-local
 `res://worlds/<world_key>/PolyToolsRuntimeExports/<asset_key>/` directory and
-updates the World-root `catalog.json`. Packages are
-staged, verified, and replaced atomically per Asset; an invalid Asset retains
-its older package and no fallback geometry is generated.
+updates the World-root `catalog.json` with the currently valid Runtime set.
+Packages are staged, verified, and replaced atomically per Asset; an invalid
+Asset retains its older package and no fallback geometry is generated, but is
+excluded from that Catalog until it validates again.
 Runtime Manifest schema 4 exports `contour_stroke_mesh` independently from the
 unchanged Fill Mesh. It contains no UV, SDF, mask, or Carrier compatibility
 fields; schema-3 consumers must reject it.
@@ -182,7 +190,7 @@ closed export set, so consumers do not discover packages by directory listing.
 Component names are free-form and unique within each Asset. Runtime animation
 configs bind generic targets such as `target01` to these names per Asset.
 
-References classify the borrowed geometry locally: for example, Barde may use
+References classify borrowed geometry locally: for example, Barde may use
 the Orb Asset through its stable Asset ID in `source_asset_id` while assigning the local
 `name = "belly"`. Runtime export resolves that internal link to
 `source_asset_key = "orb"`. Duplicate maps the known pairs `eye_left` /

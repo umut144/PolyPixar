@@ -5,8 +5,10 @@ Scale is an authoring convenience; Rebase bakes it into owned source geometry
 and sets both local Scale axes exactly to `1`.
 
 The operation is atomic across the selected Asset and preserves each affected
-Component's Position, Rotation, Pivot, hierarchy, visibility, and animation
-document. For Bézier Components, Points and resolved cubic handles are
+Component's Pivot, hierarchy, visibility, animation document, and visible world
+transform. Rebasing a parent compensates its direct Child transforms as needed
+to preserve the Child subtree in world space; this can change a Child's local
+Position, Rotation, or Scale. For Bézier Components, Points and resolved cubic handles are
 transformed around the unchanged Pivot. Automatic handles become manual during
 the bake so anisotropic Scale cannot regenerate a different curve later.
 Component-scoped Guide Points and handles receive the same affine bake.
@@ -29,15 +31,16 @@ topology.
 
 The Asset Inspector lists every candidate and blocker. Its Rebase button is
 enabled only when at least one candidate exists and the complete operation is
-safe. Finite, non-zero signed Scale is accepted for owned leaf Components.
+safe. Finite, non-zero signed Scale is accepted for owned Components.
 Negative axes are a transient Mirror/authoring representation: their reflection
 is baked into the owned geometry before Scale becomes `(1, 1)`. Primitive
 centers receive the signed affine transform while their analytic axis diameters
-use the absolute axis factors. Zero or non-finite Scale is blocked. Scaled Asset
-References are blocked because they do not own their source geometry. A scaled
-Component with Child Components is also blocked: preserving those Children
-while forbidding Position/Rotation compensation is not generally possible,
-especially under anisotropic Scale. There is no partial or silent fallback.
+use the absolute axis factors. Zero or non-finite Scale is blocked. Asset
+References are source-Asset instances and are excluded from Rebase; their
+finite, non-zero signed Scale remains an instance placement transform. Scaled
+Components with Children are supported: Child local transforms are compensated
+so the visible Child subtree stays in place. There is no partial or silent
+fallback.
 
 Duplicate & Mirror with Flip Orientation uses a targeted atomic Rebase for the
 newly duplicated Component subtree. It preserves the subtree's world transforms

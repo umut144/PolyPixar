@@ -245,7 +245,7 @@ func _test_contour_stroke_mesh() -> void:
 	_expect(int(first.get("vertex_count", 0)) >= 8 and int(first.get("triangle_count", 0)) >= 4, "Contour Stroke should create centered segment quads and explicit joins.")
 	_expect(str(first.get("method", "")) == ContourMeshService.METHOD and JSON.stringify(first) == JSON.stringify(second), "Contour Stroke output must be deterministic.")
 	_expect(ContourMeshService.matches_source(first, contour), "Contour Stroke Mesh should match its source Component.")
-	_expect(is_equal_approx(float(first.get("parameters", {}).get("stroke_width_px", 0.0)), 4.0) and is_equal_approx(float(first.get("parameters", {}).get("stroke_width_meters", 0.0)), 0.03125), "Open Contours should use the fixed 4 px World default without a Component-local width.")
+	_expect(is_equal_approx(float(first.get("parameters", {}).get("stroke_width_px", 0.0)), 4.0) and is_equal_approx(float(first.get("parameters", {}).get("stroke_width_meters", 0.0)), 0.020833333333333332), "Open Contours should use the fixed 4 px World default without a Component-local width.")
 	_expect(str(first.get("parameters", {}).get("join", "")) == "miter" and str(first.get("parameters", {}).get("cap", "")) == "butt", "Open Contours should use the same Miter/Butt art-stroke semantics as closed contours.")
 	var interrupted_contour := contour.duplicate(true)
 	interrupted_contour["edges"][1]["render_outline"] = false
@@ -385,9 +385,9 @@ func _test_contour_stroke_service() -> void:
 	_expect(stroke == repeated, "Contour Stroke generation must be deterministic for identical authored topology.")
 	_expect(component == source_snapshot, "Contour Stroke generation must not mutate canonical Component topology.")
 	_expect(int(stroke.get("algorithm_version", 0)) == ContourStrokeService.ALGORITHM_VERSION, "Contour Stroke results should expose their algorithm version.")
-	_expect(is_equal_approx(float(stroke.get("reference_pixels_per_meter", 0.0)), 128.0), "Contour Stroke should use the fixed authored reference density of 128 px/m.")
-	_expect(is_equal_approx(float(stroke.get("stroke_width_px", 0.0)), 4.0) and is_equal_approx(float(stroke.get("stroke_width_meters", 0.0)), 0.03125), "The Slice-1 default should derive an exact 4 px / 0.03125 m stroke width.")
-	_expect(is_equal_approx(float(stroke.get("centerline_offset_meters", 0.0)), 0.015625), "The stroke mesh should extend exactly half its width to either side of the authored Boundary.")
+	_expect(is_equal_approx(float(stroke.get("reference_pixels_per_meter", 0.0)), 192.0), "Contour Stroke should use the fixed authored reference density of 192 px/m.")
+	_expect(is_equal_approx(float(stroke.get("stroke_width_px", 0.0)), 4.0) and is_equal_approx(float(stroke.get("stroke_width_meters", 0.0)), 0.020833333333333332), "The 192 px/m default should derive an exact 4 px / 0.0208333 m stroke width.")
+	_expect(is_equal_approx(float(stroke.get("centerline_offset_meters", 0.0)), 0.010416666666666666), "The stroke mesh should extend exactly half its width to either side of the authored Boundary.")
 	_expect(str(stroke.get("join", "")) == "miter" and is_equal_approx(float(stroke.get("miter_limit", 0.0)), 4.0) and str(stroke.get("cap", "")) == "butt", "Contour Stroke output should state the approved join, fallback limit, and cap semantics.")
 	var vertices: Array = stroke.get("vertices", [])
 	var indices: PackedInt32Array = stroke.get("indices", PackedInt32Array())
@@ -395,7 +395,7 @@ func _test_contour_stroke_service() -> void:
 	if vertices.size() >= 2:
 		var first_left := Vector2(vertices[0].get("position", Vector2.ZERO))
 		var first_right := Vector2(vertices[1].get("position", Vector2.ZERO))
-		_expect(is_equal_approx(first_left.distance_to(first_right) * ToolUnits.TO_METERS, 0.03125), "Each segment quad should remain centered at the exact authored width.")
+		_expect(is_equal_approx(first_left.distance_to(first_right) * ToolUnits.TO_METERS, 0.020833333333333332), "Each segment quad should remain centered at the exact authored width.")
 	var centerline: Array = stroke.get("centerline", [])
 	var analytic_maximum_distance := 0.0
 	for edge_data in component.get("edges", []):
@@ -469,8 +469,8 @@ func _test_contour_stroke_robust_geometry() -> void:
 	for vertex in concave_stroke.get("vertices", []):
 		var role := str(vertex.get("role", ""))
 		var position := Vector2(vertex.get("position", Vector2.ZERO))
-		found_outer_previous = found_outer_previous or (role == "join_outer_previous" and position.is_equal_approx(Vector2(10.0, -0.15625)))
-		found_outer_next = found_outer_next or (role == "join_outer_next" and position.is_equal_approx(Vector2(10.15625, 0.0)))
+		found_outer_previous = found_outer_previous or (role == "join_outer_previous" and position.is_equal_approx(Vector2(10.0, -0.10416666666666667)))
+		found_outer_next = found_outer_next or (role == "join_outer_next" and position.is_equal_approx(Vector2(10.104166666666666, 0.0)))
 	_expect(found_outer_previous and found_outer_next, "A positive turn must tessellate its exposed right-side corner, not add hidden overlap on the inner side.")
 	var concave_vertices: Array = concave_stroke.get("vertices", [])
 	var concave_indices: PackedInt32Array = concave_stroke.get("indices", PackedInt32Array())
@@ -528,14 +528,16 @@ func _test_contour_stroke_robust_geometry() -> void:
 
 func _test_world_contour_settings() -> void:
 	var defaults := WorldSettingsService.default_settings()
-	_expect(is_equal_approx(float(defaults.get("reference_pixels_per_meter", 0.0)), 128.0) and is_equal_approx(float(defaults.get("contour_stroke_width_px", 0.0)), 4.0), "New Worlds should start with the approved 128 px/m reference density and one 4 px Contour width for every Asset.")
+	_expect(is_equal_approx(float(defaults.get("reference_pixels_per_meter", 0.0)), 192.0) and is_equal_approx(float(defaults.get("contour_stroke_width_px", 0.0)), 4.0), "New Worlds should start with the approved 192 px/m reference density and one 4 px Contour width for every Asset.")
 	var migrated := WorldSettingsService.decode(null, 40)
 	_expect(bool(migrated.get("valid", false)) and bool(migrated.get("migrated", false)) and is_equal_approx(float(migrated.get("settings", {}).get("contour_stroke_width_px", 0.0)), 4.0), "Schema 40 and older Worlds must migrate explicitly to the 4 px World Contour default.")
 	_expect(not bool(WorldSettingsService.decode(null, 41).get("valid", true)), "Schema 41 must reject a missing world_settings record instead of silently applying a fallback.")
-	_expect(not bool(WorldSettingsService.decode({"reference_pixels_per_meter": "128", "contour_stroke_width_px": 4.0}, 41).get("valid", true)), "Schema-41 World Settings must reject stringly typed numeric fields.")
-	_expect(not bool(WorldSettingsService.decode({"reference_pixels_per_meter": 128.0, "contour_stroke_width_px": 0.0}, 41).get("valid", true)), "World Settings must reject a non-positive authored Contour width.")
-	var decoded := WorldSettingsService.decode({"reference_pixels_per_meter": 128.0, "contour_stroke_width_px": 6.0}, 41)
-	_expect(bool(decoded.get("valid", false)) and not bool(decoded.get("migrated", true)) and WorldSettingsService.encode(6.0) == decoded.get("settings", {}), "Schema-41 World Settings should round-trip a typed authored pixel width without migration.")
+	_expect(not bool(WorldSettingsService.decode({"reference_pixels_per_meter": "192", "contour_stroke_width_px": 4.0}, 46).get("valid", true)), "Schema-46 World Settings must reject stringly typed numeric fields.")
+	var migrated_density := WorldSettingsService.decode({"reference_pixels_per_meter": 128.0, "contour_stroke_width_px": 4.0}, 45)
+	_expect(bool(migrated_density.get("valid", false)) and bool(migrated_density.get("migrated", false)) and is_equal_approx(float(migrated_density.get("settings", {}).get("reference_pixels_per_meter", 0.0)), 192.0) and is_equal_approx(float(migrated_density.get("settings", {}).get("contour_stroke_width_px", 0.0)), 4.0), "Schema-45 Worlds must migrate to 192 px/m while retaining their authored Contour width.")
+	_expect(not bool(WorldSettingsService.decode({"reference_pixels_per_meter": 192.0, "contour_stroke_width_px": 0.0}, 46).get("valid", true)), "World Settings must reject a non-positive authored Contour width.")
+	var decoded := WorldSettingsService.decode({"reference_pixels_per_meter": 192.0, "contour_stroke_width_px": 6.0}, 46)
+	_expect(bool(decoded.get("valid", false)) and not bool(decoded.get("migrated", true)) and WorldSettingsService.encode(6.0) == decoded.get("settings", {}), "Schema-46 World Settings should round-trip a typed authored pixel width without migration.")
 
 	var contour := _component()
 	contour["id"] = "arm_line"
@@ -544,7 +546,7 @@ func _test_world_contour_settings() -> void:
 	BezierTopology.add_point(contour, Vector2(8.0, 0.0), "linear")
 	var four_px_mesh := ContourMeshService.generate(contour, 4.0)
 	var six_px_mesh := ContourMeshService.generate(contour, 6.0)
-	_expect(bool(four_px_mesh.get("valid", false)) and bool(six_px_mesh.get("valid", false)) and is_equal_approx(float(six_px_mesh.get("parameters", {}).get("stroke_width_meters", 0.0)), 0.046875), "Contour Mesh generation must derive the selected World width through the fixed 128 px/m density.")
+	_expect(bool(four_px_mesh.get("valid", false)) and bool(six_px_mesh.get("valid", false)) and is_equal_approx(float(six_px_mesh.get("parameters", {}).get("stroke_width_meters", 0.0)), 0.03125), "Contour Mesh generation must derive the selected World width through the fixed 192 px/m density.")
 	_expect(not ContourMeshService.matches_source(four_px_mesh, contour, 6.0) and ContourMeshService.matches_source(six_px_mesh, contour, 6.0), "Changing the World Contour width must invalidate every Mesh baked at the previous width.")
 	var four_vertices: Array = four_px_mesh.get("vertices", [])
 	var six_vertices: Array = six_px_mesh.get("vertices", [])
@@ -556,7 +558,7 @@ func _test_world_contour_settings() -> void:
 	_expect(is_equal_approx(float(application.world_contour_stroke_width_field.value), 4.0), "World Settings should show the 4 px default in its authored Contour width field.")
 	application.world_contour_stroke_width_px = 4.1
 	application._update_world_scale_popup()
-	_expect("Contour: 4.1 px = 0.03203 m" in application.world_scale_summary_label.text, "World Settings should show enough meter precision to distinguish fractional authored pixel widths.")
+	_expect("Contour: 4.1 px = 0.02135 m" in application.world_scale_summary_label.text, "World Settings should show enough meter precision to distinguish fractional authored pixel widths.")
 	_expect("1 Spiel-Tile = 100 cm (20 Grid-Boxen)" in application.world_scale_summary_label.text, "World Settings should expose the shared 1 m game Tile as twenty default 5 cm Grid Boxes.")
 	application.world_contour_stroke_width_px = 4.0
 	var four_px_signature: Dictionary = application._geometry_build_signature("", "", contour)
@@ -847,7 +849,7 @@ func _test_geometry_sampling_service() -> void:
 	_expect(not bool(GeometrySamplingService.generate(open_component).get("valid", true)), "An open contour should fail visibly at the mesh-pipeline Sampling boundary.")
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
-	_expect(application._has_supported_schema({"schema_version": 45}) and application._has_supported_schema({"schema_version": 44}) and not application._has_supported_schema({"schema_version": 46}), "Schema 45 should keep current and older World documents readable and reject unknown future schemas.")
+	_expect(application._has_supported_schema({"schema_version": 46}) and application._has_supported_schema({"schema_version": 45}) and not application._has_supported_schema({"schema_version": 47}), "Schema 46 should keep current and older World documents readable and reject unknown future schemas.")
 	_expect(application._normalize_component_draw_mode("ribbon", 39) == "contour" and application._normalize_component_draw_mode("contour", 42) == "contour", "Schema-42 loading must retain the explicit legacy Ribbon-to-Contour migration boundary.")
 	_expect(application._normalize_component_draw_mode("ribbon", 42) == "ribbon", "Current-schema Ribbon data must remain visibly invalid instead of receiving a silent backward fallback.")
 	var arranged_round_trip: Dictionary = application._normalize_sampling_bake(application._serialize_sampling_bake(arranged_result))
@@ -858,7 +860,7 @@ func _test_geometry_sampling_service() -> void:
 	baked_result["bake_id"] = "bake_test"
 	geometry_document["sampling"]["bakes"][GeometrySamplingService.ADAPTIVE] = baked_result
 	var serialized_geometry: Dictionary = application._serialize_geometry_document(geometry_document)
-	_expect(int(serialized_geometry.get("schema_version", 0)) == 45 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-45 JSON arrays.")
+	_expect(int(serialized_geometry.get("schema_version", 0)) == 46 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-46 JSON arrays.")
 	var normalized_geometry: Dictionary = application._normalize_geometry_document(serialized_geometry, "asset_1", "component_1")
 	_expect(normalized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Vector2, "Sampling bake loading should restore local sample positions as Vector2 values.")
 	_expect(normalized_geometry["sampling"]["bakes"].size() == 1, "Sampling should retain one Adaptive Bake.")
@@ -1704,7 +1706,7 @@ func _test_runtime_export_service() -> void:
 		"triangles": [{"vertex_ids": ["v0", "v1", "v2"]}]
 	}
 	var contour_stroke: Dictionary = mesh.duplicate(true)
-	contour_stroke.merge({"method": ContourMeshService.METHOD, "has_outline": true, "topology_role": "outer", "runs": [{"run_id": "boundary:run:0", "edge_ids": ["edge_0"], "closed": true, "start_cap": "none", "end_cap": "none", "vertex_offset": 0, "vertex_count": 3, "index_offset": 0, "index_count": 3}], "parameters": {"reference_pixels_per_meter": 128.0, "stroke_width_px": 4.0, "stroke_width_meters": 0.03125, "join": "miter", "miter_limit": 4.0, "cap": "butt"}}, true)
+	contour_stroke.merge({"method": ContourMeshService.METHOD, "has_outline": true, "topology_role": "outer", "runs": [{"run_id": "boundary:run:0", "edge_ids": ["edge_0"], "closed": true, "start_cap": "none", "end_cap": "none", "vertex_offset": 0, "vertex_count": 3, "index_offset": 0, "index_count": 3}], "parameters": {"reference_pixels_per_meter": 192.0, "stroke_width_px": 4.0, "stroke_width_meters": 0.020833333333333332, "join": "miter", "miter_limit": 4.0, "cap": "butt"}}, true)
 	var body := {"id": "component_b", "name": "body", "visibility": true, "z_index": 2, "parent_component_id": "", "transform": {"position": Vector2(10.0, 20.0), "pivot": Vector2(2.0, 3.0), "rotation": 90.0, "scale": Vector2.ONE}}
 	var eye := {"id": "component_a", "name": "eye_left", "visibility": true, "z_index": 2, "parent_component_id": "component_b", "transform": {"position": Vector2.ZERO, "pivot": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE}}
 	var asset := {"id": "wizard", "name": "Wizard", "asset_type": "character", "visibility": true, "asset_pivot": Vector2(5.0, 6.0), "components": [body, eye]}
@@ -1717,7 +1719,7 @@ func _test_runtime_export_service() -> void:
 	_expect(components[1].get("mesh", {}).get("vertices", []) == [[-0.2, -0.30000000000000004], [0.8, -0.30000000000000004], [-0.2, 0.7000000000000001]] and components[1].get("mesh", {}).get("indices", []) == [0, 1, 2], "Runtime Meshes should preserve accepted Vertex order, convert Tool units to meters, compact Triangle IDs, and be local to their Component pivot.")
 	_expect(not components[1].get("mesh", {}).has("uvs") and not components[1].has("contour_carrier") and not components[1].has("contour_mask"), "Schema 5 must remove UV, Carrier, and SDF fields rather than retaining a silent compatibility payload.")
 	var exported_stroke: Dictionary = components[1].get("contour_stroke_mesh", {})
-	_expect(str(exported_stroke.get("role", "")) == "centered_boundary_stroke" and bool(exported_stroke.get("has_outline", false)) and is_equal_approx(float(exported_stroke.get("stroke_width_px", 0.0)), 4.0) and is_equal_approx(float(exported_stroke.get("inner_offset_meters", 0.0)), 0.015625) and is_equal_approx(float(exported_stroke.get("outer_offset_meters", 0.0)), 0.015625), "Schema 5 should export the original Boundary as the centered metric Stroke with symmetric inner and outer offsets.")
+	_expect(str(exported_stroke.get("role", "")) == "centered_boundary_stroke" and bool(exported_stroke.get("has_outline", false)) and is_equal_approx(float(exported_stroke.get("stroke_width_px", 0.0)), 4.0) and is_equal_approx(float(exported_stroke.get("inner_offset_meters", 0.0)), 0.010416666666666666) and is_equal_approx(float(exported_stroke.get("outer_offset_meters", 0.0)), 0.010416666666666666), "Schema 6 should export the original Boundary as the centered metric Stroke with symmetric inner and outer offsets.")
 	var disabled_stroke: Dictionary = contour_stroke.duplicate(true)
 	disabled_stroke["has_outline"] = false
 	disabled_stroke["vertices"] = []
@@ -2367,7 +2369,7 @@ func _test_motion_act_evaluator() -> void:
 	var normalized: Dictionary = application._normalize_motion_act({"id": "act_7", "parameters": {"direction": [0.0, 2.0], "distance": 12.0}}, "fallback")
 	_expect(Vector2(normalized.get("parameters", {}).get("direction", Vector2.ZERO)) == Vector2(0.0, 2.0), "Persisted Slide direction arrays should normalize back to Vector2 values.")
 	var serialized: Dictionary = application._serialize_motion_act(normalized)
-	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 45, "Act persistence should serialize vectors as JSON arrays using schema 45.")
+	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 46, "Act persistence should serialize vectors as JSON arrays using schema 46.")
 	var normalized_jump: Dictionary = application._normalize_motion_act({"id": "act_8", "primitive": "jump", "parameters": {"direction": [1.0, 0.0], "distance": 7.0, "height": 2.5, "arc": "snappy"}}, "fallback")
 	var serialized_jump: Dictionary = application._serialize_motion_act(normalized_jump)
 	_expect(str(serialized_jump.get("primitive", "")) == MotionActEvaluator.JUMP and is_equal_approx(float(serialized_jump.get("parameters", {}).get("height", 0.0)), 2.5) and str(serialized_jump.get("parameters", {}).get("arc", "")) == MotionActEvaluator.JUMP_ARC_SNAPPY, "Jump-specific parameters should survive normalization and serialization.")

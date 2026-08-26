@@ -8,7 +8,7 @@ const EXPORT_SUBMODULES: Array[String] = []
 const MOTION_SUBMODULES := ["Animation", "Path", "Act", "Sequence"]
 const WORLDS_ROOT := "res://worlds"
 const CONFIG_PATH := "res://configs/app_config.json"
-const SCHEMA_VERSION := 44
+const SCHEMA_VERSION := 46
 const MAX_HISTORY_SIZE := 100
 const DRAW_MODES := ["closed_loop", "contour", "primitive"]
 const GRID_BOX_TOOL_UNITS := 0.5
@@ -122,6 +122,7 @@ var motion_last_marker := ""
 var selected_asset_id := ""
 var selected_component_id := ""
 var selected_component_ids: Array[String] = []
+var component_clipboard: Dictionary = {}
 var selected_group_id := ""
 var selected_guide_id := ""
 var selected_sampling_input_id := ""
@@ -407,6 +408,18 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			_redo()
 		else:
 			_undo()
+		get_viewport().set_input_as_handled()
+		return
+	if has_command_modifier and event.keycode in [KEY_C, KEY_V]:
+		var focus_owner := get_viewport().gui_get_focus_owner()
+		if focus_owner is LineEdit or focus_owner is TextEdit or focus_owner is SpinBox:
+			return
+		if event.keycode == KEY_C:
+			_copy_selected_component_subtrees()
+		elif selected_asset_id.is_empty():
+			return
+		else:
+			_paste_component_clipboard(selected_asset_id, selected_component_id)
 		get_viewport().set_input_as_handled()
 		return
 	if has_command_modifier and active_module == "Style" and active_style_submodule == "Weighting" and event.keycode == KEY_1:
@@ -1363,7 +1376,7 @@ func _create_world_scale_popup() -> void:
 	world_contour_stroke_width_field.value_changed.connect(_on_world_contour_stroke_width_changed)
 	content.add_child(world_contour_stroke_width_field)
 	var reference_density_label := Label.new()
-	reference_density_label.text = "Reference Density: 128 px/m · all Assets"
+	reference_density_label.text = "Reference Density: 192 px/m · all Assets"
 	reference_density_label.add_theme_color_override("font_color", Color("#9aa3b2"))
 	content.add_child(reference_density_label)
 	world_scale_summary_label = Label.new()
@@ -1682,6 +1695,9 @@ func _create_component_context_menu() -> void:
 	component_context_menu.add_item("Group", 4)
 	component_context_menu.add_item("Remove from Group", 5)
 	component_context_menu.add_separator()
+	component_context_menu.add_item("Copy Components", 6)
+	component_context_menu.add_item("Paste Components", 7)
+	component_context_menu.add_separator()
 	component_context_menu.add_item("Duplicate", 0)
 	component_context_menu.add_separator()
 	component_context_menu.add_item("Duplicate & Mirror Y · Keep Orientation", 1)
@@ -1982,7 +1998,41 @@ func _asset_name_validation_error(proposed_name: String, excluded_asset_id := ""
 
 
 func _asset_catalog_build() -> Dictionary:
-	return AssetCatalogService.build_catalog(world_name, world_title, assets)
+	# The Catalog is the closed Runtime export set.  An Asset with invalid or
+	# stale Runtime inputs must not prevent its exportable siblings from being
+	# published, nor may it remain advertised with a missing package.
+	var exportable_assets: Array[Dictionary] = []
+	for asset in assets:
+		if asset is Dictionary and bool(asset.get("visibility", true)) and bool(_runtime_export_build(asset).get("valid", false)):
+			exportable_assets.append(asset)
+	# References are Runtime dependencies.  Remove dependants whose source is
+	# itself not publishable, repeating for reference chains.
+	var exportable_ids: Dictionary = {}
+	for asset in exportable_assets:
+		exportable_ids[str(asset.get("id", ""))] = true
+	var removed_dependency := true
+	while removed_dependency:
+		removed_dependency = false
+		for index in range(exportable_assets.size() - 1, -1, -1):
+			var asset := exportable_assets[index]
+			var has_unexportable_reference := false
+			for component in asset.get("components", []):
+				if component is Dictionary and _effective_component_visibility(asset, component) and _is_reference_component(component) and not exportable_ids.has(str(component.get("source_asset_id", ""))):
+					has_unexportable_reference = true
+					break
+			if has_unexportable_reference:
+				exportable_ids.erase(str(asset.get("id", "")))
+				exportable_assets.remove_at(index)
+				removed_dependency = true
+	var build := AssetCatalogService.build_catalog(world_name, world_title, exportable_assets)
+	var global_errors := AssetCatalogService.validation_errors(assets)
+	if not global_errors.is_empty():
+		var errors: Array = build.get("errors", [])
+		errors.append_array(global_errors)
+		build["valid"] = false
+		build["errors"] = errors
+		build["catalog"] = {}
+	return build
 
 
 func _asset_catalog_path() -> String:
@@ -2105,7 +2155,7 @@ func _save_world() -> void:
 				"z_index": int(group.get("z_index", 0))
 			})
 		for component in asset["components"]:
-			asset_data["components"].append({
+			var serialized_component := {
 				"id": str(component["id"]),
 				"type": str(component.get("type", "component")),
 				"name": _normalized_component_name(component),
@@ -2123,7 +2173,10 @@ func _save_world() -> void:
 				"catch_parent_component_id": str(component.get("catch_parent_component_id", "")),
 				"show_point_numbers": bool(component.get("show_point_numbers", false)),
 				"primitive": _serialize_primitive(component.get("primitive", {}))
-			})
+			}
+			if _component_has_contour_stroke_width_override(component):
+				serialized_component["contour_stroke_width_px"] = float(component["contour_stroke_width_px"])
+			asset_data["components"].append(serialized_component)
 		for guide in asset.get("guides", []):
 			asset_data["guides"].append(_serialize_asset_guide(guide))
 		_write_json("%s/%s.json" % [asset_root, asset_storage_name], asset_data)
@@ -2456,7 +2509,7 @@ func _load_world(world_entry: String, persist_as_last := true) -> bool:
 				continue
 			var component_type := str(component_data.get("type", "component"))
 			var component_name := _migrated_component_name(component_data, used_component_names)
-			components.append({
+			var component := {
 				"id": str(component_data.get("id", "")),
 				"type": component_type,
 				"name": component_name,
@@ -2474,7 +2527,10 @@ func _load_world(world_entry: String, persist_as_last := true) -> bool:
 				"catch_parent_component_id": str(component_data.get("catch_parent_component_id", "")),
 				"show_point_numbers": bool(component_data.get("show_point_numbers", false)),
 				"primitive": _deserialize_primitive(component_data.get("primitive", {}))
-			})
+			}
+			if _serialized_component_contour_stroke_width_is_valid(component_data):
+				component["contour_stroke_width_px"] = float(component_data["contour_stroke_width_px"])
+			components.append(component)
 		for guide_data in asset_data.get("guides", []):
 			if not guide_data is Dictionary:
 				continue
@@ -3921,8 +3977,23 @@ func _contour_stroke_bake(asset_id: String, component_id: String) -> Dictionary:
 	return _geometry_meshing_bake(asset_id, component_id, ContourMeshService.METHOD)
 
 
+func _serialized_component_contour_stroke_width_is_valid(component: Dictionary) -> bool:
+	if not component.has("contour_stroke_width_px"):
+		return false
+	var width: Variant = component.get("contour_stroke_width_px")
+	return typeof(width) in [TYPE_INT, TYPE_FLOAT] and is_finite(float(width)) and float(width) > 0.0
+
+
+func _component_has_contour_stroke_width_override(component: Dictionary) -> bool:
+	return _serialized_component_contour_stroke_width_is_valid(component) and not is_equal_approx(float(component["contour_stroke_width_px"]), world_contour_stroke_width_px)
+
+
+func _effective_contour_stroke_width_px(component: Dictionary) -> float:
+	return float(component["contour_stroke_width_px"]) if _component_has_contour_stroke_width_override(component) else world_contour_stroke_width_px
+
+
 func _contour_stroke_bake_is_current(asset_id: String, component_id: String, component: Dictionary) -> bool:
-	return ContourMeshService.matches_source(_contour_stroke_bake(asset_id, component_id), component, world_contour_stroke_width_px)
+	return ContourMeshService.matches_source(_contour_stroke_bake(asset_id, component_id), component, _effective_contour_stroke_width_px(component))
 
 
 func _component_mesh_status(asset_id: String, component_id: String, component: Dictionary) -> String:
@@ -4013,11 +4084,12 @@ func _geometry_build_signature(asset_id: String, component_id: String, component
 	var cut_guides := _cut_guides_for_component(asset, component_id)
 	var hole_components := _geometry_sampling_hole_components(asset, component_id)
 	var resolved_recipes := recipes if not recipes.is_empty() else _geometry_build_recipes(asset_id, component_id, component, cut_guides, hole_components)
+	var stroke_width_px := _effective_contour_stroke_width_px(component)
 	if str(component.get("draw_mode", "")) == "contour":
-		resolved_recipes = {"contour": {"method": ContourMeshService.METHOD, "algorithm_version": ContourMeshService.ALGORITHM_VERSION, "stroke_width_px": world_contour_stroke_width_px}}
+		resolved_recipes = {"contour": {"method": ContourMeshService.METHOD, "algorithm_version": ContourMeshService.ALGORITHM_VERSION, "stroke_width_px": stroke_width_px}}
 	else:
 		resolved_recipes = resolved_recipes.duplicate(true)
-		resolved_recipes["contour_stroke"] = {"method": ContourMeshService.METHOD, "algorithm_version": ContourMeshService.ALGORITHM_VERSION, "stroke_width_px": world_contour_stroke_width_px}
+		resolved_recipes["contour_stroke"] = {"method": ContourMeshService.METHOD, "algorithm_version": ContourMeshService.ALGORITHM_VERSION, "stroke_width_px": stroke_width_px}
 	return GeometryAutoBuildService.source_signature(component, cut_guides, hole_components, resolved_recipes)
 
 
@@ -4029,11 +4101,12 @@ func _component_mesh_source_validation_issues(asset: Dictionary, component: Dict
 	if component.is_empty():
 		return ["Component source is missing."]
 	if _is_reference_component(component):
-		return ["Reference Components do not own a Component Mesh."]
+		return ["Reference Components use their source Asset Meshes."]
 	var draw_mode := str(component.get("draw_mode", "closed_loop"))
+	var stroke_width_px := _effective_contour_stroke_width_px(component)
 	if draw_mode == "contour":
 		var contour_issues: Array[String] = []
-		for issue in ContourMeshService.validation_issues(component, world_contour_stroke_width_px):
+		for issue in ContourMeshService.validation_issues(component, stroke_width_px):
 			contour_issues.append(str(issue))
 		return contour_issues
 	if draw_mode not in ["closed_loop", "primitive"]:
@@ -4046,7 +4119,7 @@ func _component_mesh_source_validation_issues(asset: Dictionary, component: Dict
 		_geometry_sampling_hole_components(asset, component_id)
 	):
 		sampling_issues.append(str(issue))
-	for issue in ContourMeshService.validation_issues(component, world_contour_stroke_width_px):
+	for issue in ContourMeshService.validation_issues(component, stroke_width_px):
 		sampling_issues.append(str(issue))
 	return sampling_issues
 
@@ -4380,7 +4453,7 @@ func _generate_component_mesh_build(asset_id: String, component_id: String) -> D
 	if not _component_is_meshable_source(asset, component):
 		return {"valid": false, "errors": ["Component source is not meshable."]}
 	if str(component.get("draw_mode", "")) == "contour":
-		var contour_mesh := ContourMeshService.generate(component, world_contour_stroke_width_px)
+		var contour_mesh := ContourMeshService.generate(component, _effective_contour_stroke_width_px(component))
 		if bool(contour_mesh.get("valid", false)):
 			contour_mesh["bake_id"] = "meshing_bake_%d" % ResourceUID.create_id()
 		return {
@@ -4391,7 +4464,7 @@ func _generate_component_mesh_build(asset_id: String, component_id: String) -> D
 			"source_signature": _geometry_build_signature(asset_id, component_id, component),
 			"attempts": 1
 		}
-	var contour_stroke := ContourMeshService.generate(component, world_contour_stroke_width_px)
+	var contour_stroke := ContourMeshService.generate(component, _effective_contour_stroke_width_px(component))
 	if not bool(contour_stroke.get("valid", false)):
 		return {
 			"valid": false,
@@ -4852,7 +4925,7 @@ func _on_runtime_export_pressed() -> void:
 			failed += 1
 	var catalog_updated := false
 	if catalog_requested or succeeded > 0:
-		if _all_runtime_package_candidates().is_empty() and _write_asset_catalog():
+		if not _has_pending_valid_runtime_packages() and _write_asset_catalog():
 			catalog_updated = true
 			_prune_uncataloged_runtime_packages()
 		elif catalog_requested:
@@ -4915,6 +4988,11 @@ func _prune_uncataloged_runtime_packages() -> void:
 	for entry in catalog_build.get("catalog", {}).get("assets", []):
 		if entry is Dictionary:
 			allowed_keys[str(entry.get("asset_key", ""))] = true
+	# Invalid visible Assets retain their last known-good package atomically.
+	# They are intentionally absent from the Catalog until they validate again.
+	for asset in assets:
+		if asset is Dictionary and bool(asset.get("visibility", true)):
+			allowed_keys[_asset_key(asset)] = true
 	var directory := DirAccess.open(export_root)
 	if directory == null:
 		return
@@ -5075,7 +5153,7 @@ func _geometry_meshing_result_matches(result: Dictionary, asset_id: String, comp
 	if result.is_empty() or not bool(result.get("valid", false)):
 		return false
 	if str(component.get("draw_mode", "")) == "contour":
-		return ContourMeshService.matches_source(result, component, world_contour_stroke_width_px)
+		return ContourMeshService.matches_source(result, component, _effective_contour_stroke_width_px(component))
 	var recipe := _geometry_meshing_recipe(asset_id, component_id)
 	if not _geometry_meshing_input_is_current(asset_id, component_id, component, recipe):
 		return false
@@ -5100,7 +5178,7 @@ func _geometry_meshing_status(asset_id: String, component_id: String, component:
 	if component.is_empty():
 		return "Invalid"
 	if str(component.get("draw_mode", "")) == "contour":
-		if not ContourMeshService.validation_issues(component, world_contour_stroke_width_px).is_empty():
+		if not ContourMeshService.validation_issues(component, _effective_contour_stroke_width_px(component)).is_empty():
 			return "Invalid"
 		var contour_key := _geometry_document_key(asset_id, component_id)
 		if geometry_meshing_preview_key == contour_key:
@@ -5109,7 +5187,7 @@ func _geometry_meshing_status(asset_id: String, component_id: String, component:
 			if geometry_meshing_preview_state == "ready" and _geometry_meshing_preview_matches(asset_id, component_id, component):
 				return "Preview Ready"
 		var contour_bake := _geometry_meshing_bake(asset_id, component_id, ContourMeshService.METHOD)
-		return "Ready to Preview" if contour_bake.is_empty() else "Baked" if ContourMeshService.matches_source(contour_bake, component, world_contour_stroke_width_px) else "Ready to Preview"
+		return "Ready to Preview" if contour_bake.is_empty() else "Baked" if ContourMeshService.matches_source(contour_bake, component, _effective_contour_stroke_width_px(component)) else "Ready to Preview"
 	if not _geometry_sampling_bake_is_current(asset_id, component_id, component):
 		return "Sampling Required"
 	if not _geometry_meshing_input_is_current(asset_id, component_id, component):
@@ -5139,7 +5217,7 @@ func _geometry_meshing_bake_is_current(asset_id: String, component_id: String, c
 	if bake.is_empty():
 		return false
 	if method == ContourMeshService.METHOD:
-		return ContourMeshService.matches_source(bake, component, world_contour_stroke_width_px)
+		return ContourMeshService.matches_source(bake, component, _effective_contour_stroke_width_px(component))
 	if method != GeometryMeshingService.CONSTRAINED_MESH or int(bake.get("algorithm_version", 0)) != GeometryMeshingService.ALGORITHM_VERSION:
 		return false
 	var recipe := GeometryMeshingService.normalize_recipe({"method": method, "parameters": bake.get("parameters", {})})
@@ -7862,7 +7940,7 @@ func _geometry_bake_status(method: String, bake: Dictionary, asset_id: String, c
 		return "Baked" if _geometry_sampling_bake_is_current(asset_id, component_id, component) else "Ready to Preview"
 	if active_geometry_submodule == "Meshing":
 		if method == ContourMeshService.METHOD:
-			return "Baked" if ContourMeshService.matches_source(bake, component, world_contour_stroke_width_px) else "Ready to Bake"
+			return "Baked" if ContourMeshService.matches_source(bake, component, _effective_contour_stroke_width_px(component)) else "Ready to Bake"
 		return _geometry_meshing_status(asset_id, component_id, component)
 	var sampling_bake := _geometry_sampling_bake(asset_id, component_id)
 	if sampling_bake.is_empty() or not _geometry_sampling_bake_is_current(asset_id, component_id, component):
@@ -8126,6 +8204,7 @@ func _render_asset_outliner_entry(asset: Dictionary, force_expand := false) -> v
 	asset_button.focus_mode = Control.FOCUS_NONE
 	_style_outliner_button(asset_button, asset_id == selected_asset_id and selected_component_id.is_empty() and selected_guide_id.is_empty())
 	asset_button.pressed.connect(_select_asset.bind(asset_id))
+	asset_button.gui_input.connect(_on_asset_outliner_gui_input.bind(asset_id, asset_button))
 	asset_header.add_child(asset_button)
 	var add_button := Button.new()
 	add_button.text = "Add"
@@ -8165,7 +8244,7 @@ func _render_asset_outliner_entry(asset: Dictionary, force_expand := false) -> v
 	asset_container.add_child(_create_outliner_child_group_label("References"))
 	references.sort_custom(_sort_named_documents)
 	for reference in references:
-		_render_component_outliner_tree(asset_container, asset, reference, 16, rendered_component_ids)
+		_render_component_outliner_tree(asset_container, asset, reference, 16, rendered_component_ids, true)
 	asset_container.add_child(_create_outliner_child_group_label("Guides"))
 	for guide in guides:
 		_render_component_guide_row(asset_container, asset, guide)
@@ -8229,6 +8308,24 @@ func _on_group_outliner_gui_input(event: InputEvent, asset_id: String, group_id:
 	component_context_menu.set_meta("group_id", group_id)
 	component_context_menu.set_item_disabled(component_context_menu.get_item_index(4), true)
 	component_context_menu.set_item_disabled(component_context_menu.get_item_index(5), true)
+	component_context_menu.set_item_disabled(component_context_menu.get_item_index(6), true)
+	component_context_menu.set_item_disabled(component_context_menu.get_item_index(7), true)
+	component_context_menu.position = Vector2i(button.global_position + event.position)
+	component_context_menu.popup()
+	get_viewport().set_input_as_handled()
+
+
+func _on_asset_outliner_gui_input(event: InputEvent, asset_id: String, button: Button) -> void:
+	if not event is InputEventMouseButton or event.button_index != MOUSE_BUTTON_RIGHT or not event.pressed or not is_instance_valid(component_context_menu):
+		return
+	_select_asset(asset_id)
+	component_context_menu.set_meta("asset_id", asset_id)
+	component_context_menu.set_meta("component_id", "")
+	component_context_menu.set_meta("group_id", "")
+	for action_id in [0, 1, 2, 3, 4, 5]:
+		component_context_menu.set_item_disabled(component_context_menu.get_item_index(action_id), true)
+	component_context_menu.set_item_disabled(component_context_menu.get_item_index(6), true)
+	component_context_menu.set_item_disabled(component_context_menu.get_item_index(7), component_clipboard.is_empty())
 	component_context_menu.position = Vector2i(button.global_position + event.position)
 	component_context_menu.popup()
 	get_viewport().set_input_as_handled()
@@ -8315,12 +8412,13 @@ func _set_component_parent_preserving_world(asset: Dictionary, component_id: Str
 	component["transform"] = ComponentHierarchy.local_transform_from_world_record(asset, component_id, world_record)
 
 
-func _render_component_outliner_tree(container: VBoxContainer, asset: Dictionary, component: Dictionary, indent: int, rendered_component_ids: Dictionary) -> void:
+func _render_component_outliner_tree(container: VBoxContainer, asset: Dictionary, component: Dictionary, indent: int, rendered_component_ids: Dictionary, reference_summary := false) -> void:
 	var asset_id := str(asset.get("id", ""))
 	var component_id := str(component.get("id", ""))
-	if component_id.is_empty() or rendered_component_ids.has(component_id):
+	if component_id.is_empty() or (not reference_summary and rendered_component_ids.has(component_id)):
 		return
-	rendered_component_ids[component_id] = true
+	if not reference_summary:
+		rendered_component_ids[component_id] = true
 	var component_row := HBoxContainer.new()
 	component_row.add_theme_constant_override("separation", 0)
 	container.add_child(component_row)
@@ -8329,12 +8427,14 @@ func _render_component_outliner_tree(container: VBoxContainer, asset: Dictionary
 	component_row.add_child(child_placeholder)
 	component_row.add_child(_create_visibility_checkbox(bool(component.get("visibility", true)), _on_component_visibility_entry_changed.bind(asset_id, component_id)))
 	var component_button := Button.new()
-	var component_name := _component_outliner_name(asset, component)
+	var component_name := _component_outliner_name(asset, component) if reference_summary else _component_tree_name(component)
 	component_button.text = component_name if bool(component.get("visibility", true)) else _strikethrough_text(component_name)
 	component_button.custom_minimum_size = Vector2(0, 30)
 	component_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	component_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	component_button.focus_mode = Control.FOCUS_NONE
+	if _is_reference_component(component):
+		component_button.tooltip_text = _reference_outliner_tooltip(asset, component)
 	_style_outliner_button(component_button, (component_id == selected_component_id or selected_component_ids.has(component_id)) and asset_id == selected_asset_id, str(component.get("topology_role", "outer")))
 	component_button.pressed.connect(_select_component.bind(asset_id, component_id, true))
 	component_button.gui_input.connect(_on_component_outliner_gui_input.bind(asset_id, component_id, component_button))
@@ -8367,12 +8467,16 @@ func _on_component_outliner_gui_input(event: InputEvent, asset_id: String, compo
 	component_context_menu.set_meta("asset_id", asset_id)
 	component_context_menu.set_meta("component_id", component_id)
 	component_context_menu.set_meta("group_id", "")
+	for action_id in [0, 1, 2]:
+		component_context_menu.set_item_disabled(component_context_menu.get_item_index(action_id), false)
 	component_context_menu.set_item_disabled(component_context_menu.get_item_index(4), false)
 	var component := _get_component(_get_asset(asset_id), component_id)
 	var effective_group_id := ComponentHierarchy.membership_group_id(_get_asset(asset_id), component_id)
 	component_context_menu.set_item_disabled(component_context_menu.get_item_index(5), effective_group_id.is_empty())
 	var detach_index := component_context_menu.get_item_index(3)
 	component_context_menu.set_item_disabled(detach_index, str(component.get("parent_component_id", "")).is_empty())
+	component_context_menu.set_item_disabled(component_context_menu.get_item_index(6), _selected_component_ids_for_clipboard(_get_asset(asset_id)).is_empty())
+	component_context_menu.set_item_disabled(component_context_menu.get_item_index(7), component_clipboard.is_empty())
 	component_context_menu.position = Vector2i(button.global_position + event.position)
 	component_context_menu.popup()
 	get_viewport().set_input_as_handled()
@@ -8769,6 +8873,13 @@ func _on_component_context_menu_selected(action_id: int) -> void:
 	var asset_id := str(component_context_menu.get_meta("asset_id", ""))
 	var component_id := str(component_context_menu.get_meta("component_id", ""))
 	var group_id := str(component_context_menu.get_meta("group_id", ""))
+	if action_id == 6:
+		_copy_selected_component_subtrees(asset_id)
+		return
+	if action_id == 7:
+		if group_id.is_empty():
+			_paste_component_clipboard(asset_id, component_id)
+		return
 	if action_id == 4:
 		_open_group_dialog(asset_id)
 		return
@@ -8801,6 +8912,126 @@ func _on_component_context_menu_selected(action_id: int) -> void:
 	var mirror_mode := "none" if action_id == 0 else "keep_orientation" if action_id == 1 else "flip_orientation"
 	if mirror_mode == "none" or mirror_mode == "keep_orientation" or mirror_mode == "flip_orientation":
 		_duplicate_component(asset_id, component_id, mirror_mode)
+
+
+func _selected_component_ids_for_clipboard(asset: Dictionary) -> Array[String]:
+	if asset.is_empty() or selected_asset_id != str(asset.get("id", "")):
+		return []
+	var selected_ids: Array[String] = []
+	for component_id_value in selected_component_ids:
+		var component_id := str(component_id_value)
+		if not component_id.is_empty() and not _get_component(asset, component_id).is_empty() and not selected_ids.has(component_id):
+			selected_ids.append(component_id)
+	if selected_ids.is_empty() and not selected_component_id.is_empty() and not _get_component(asset, selected_component_id).is_empty():
+		selected_ids.append(selected_component_id)
+	return selected_ids
+
+
+func _copy_selected_component_subtrees(source_asset_id := "") -> void:
+	var asset_id := source_asset_id if not source_asset_id.is_empty() else selected_asset_id
+	var asset := _get_asset(asset_id)
+	var selected_ids := _selected_component_ids_for_clipboard(asset)
+	if selected_ids.is_empty():
+		_show_status_message("Select one or more Components to copy.")
+		return
+	var selected_id_set: Dictionary = {}
+	for component_id in selected_ids:
+		selected_id_set[component_id] = true
+	var root_ids: Array[String] = []
+	for component_id in selected_ids:
+		var parent_id := str(_get_component(asset, component_id).get("parent_component_id", ""))
+		if not selected_id_set.has(parent_id):
+			root_ids.append(component_id)
+	var copied_components: Array[Dictionary] = []
+	var copied_id_set: Dictionary = {}
+	for root_id in root_ids:
+		var root := _get_component(asset, root_id)
+		copied_components.append(root.duplicate(true))
+		copied_id_set[root_id] = true
+		for descendant in ComponentHierarchy.descendants(asset, root_id):
+			var descendant_id := str(descendant.get("id", ""))
+			if not copied_id_set.has(descendant_id):
+				copied_components.append(descendant.duplicate(true))
+				copied_id_set[descendant_id] = true
+	var copied_guides: Array[Dictionary] = []
+	for guide in asset.get("guides", []):
+		if guide is Dictionary and copied_id_set.has(str(guide.get("scope", {}).get("component_id", ""))):
+			copied_guides.append(guide.duplicate(true))
+	component_clipboard = {
+		"source_asset_id": asset_id,
+		"root_ids": root_ids,
+		"components": copied_components,
+		"guides": copied_guides
+	}
+	_show_status_message("Copied %d Component%s." % [root_ids.size(), "" if root_ids.size() == 1 else "s"])
+
+
+func _paste_component_clipboard(target_asset_id: String, target_parent_id := "") -> void:
+	var target_asset := _get_asset(target_asset_id)
+	if target_asset.is_empty() or component_clipboard.is_empty():
+		return
+	if not target_parent_id.is_empty() and _get_component(target_asset, target_parent_id).is_empty():
+		_show_status_message("Paste target is no longer available.")
+		return
+	var source_components: Array = component_clipboard.get("components", [])
+	var source_root_ids: Array = component_clipboard.get("root_ids", [])
+	if source_components.is_empty() or source_root_ids.is_empty():
+		return
+	var source_id_set: Dictionary = {}
+	for source_component in source_components:
+		if source_component is Dictionary:
+			source_id_set[str(source_component.get("id", ""))] = true
+	var id_map: Dictionary = {}
+	_record_direct_change()
+	for source_component in source_components:
+		if not source_component is Dictionary:
+			continue
+		var new_id := "component_%d" % next_component_id
+		next_component_id += 1
+		id_map[str(source_component.get("id", ""))] = new_id
+	var pasted_root_ids: Array[String] = []
+	for source_component in source_components:
+		if not source_component is Dictionary:
+			continue
+		var source_id := str(source_component.get("id", ""))
+		var component_copy := _duplicate_component_record(source_component, target_asset, str(id_map[source_id]))
+		component_copy["name"] = _next_pasted_component_name(target_asset, str(source_component.get("name", "Component")))
+		component_copy["group_id"] = ""
+		var source_parent_id := str(source_component.get("parent_component_id", ""))
+		component_copy["parent_component_id"] = str(id_map.get(source_parent_id, target_parent_id)) if source_id_set.has(source_parent_id) else target_parent_id
+		target_asset["components"].append(component_copy)
+		if source_root_ids.has(source_id):
+			pasted_root_ids.append(str(component_copy.get("id", "")))
+	for source_guide in component_clipboard.get("guides", []):
+		if not source_guide is Dictionary:
+			continue
+		var source_component_id := str(source_guide.get("scope", {}).get("component_id", ""))
+		if not id_map.has(source_component_id):
+			continue
+		var guide_copy := _duplicate_guide_record(source_guide, target_asset)
+		var scope: Dictionary = guide_copy.get("scope", {}).duplicate(true)
+		scope["component_id"] = str(id_map[source_component_id])
+		guide_copy["scope"] = scope
+		guide_copy["ordinal"] = ComponentHierarchy.next_guide_ordinal(target_asset, str(id_map[source_component_id]), str(guide_copy.get("guide_type", AssetGuide.SAMPLE)))
+		target_asset["guides"].append(guide_copy)
+	selected_asset_id = target_asset_id
+	selected_component_ids = pasted_root_ids.duplicate()
+	selected_component_id = str(pasted_root_ids.back())
+	selected_group_id = ""
+	selected_guide_id = ""
+	active_state = ""
+	_set_outliner_asset_expanded(target_asset_id, true)
+	_show_status_message("Pasted %d Component%s." % [pasted_root_ids.size(), "" if pasted_root_ids.size() == 1 else "s"])
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _next_pasted_component_name(asset: Dictionary, source_name: String) -> String:
+	var candidate := source_name.strip_edges()
+	if candidate.is_empty():
+		candidate = "component"
+	return candidate if not _has_component_name(asset, candidate) else _next_duplicate_component_name(asset, candidate)
 
 
 func _duplicate_group(asset_id: String, group_id: String, mirror_mode := "none") -> void:
@@ -8863,7 +9094,14 @@ func _duplicate_group(asset_id: String, group_id: String, mirror_mode := "none")
 			duplicated_component["transform"] = ComponentHierarchy.local_transform_from_world_record(asset, duplicated_id, mirrored_world_records[duplicated_id])
 		var rebase_result := ComponentScaleRebaseService.rebase_components(asset, duplicated_component_ids)
 		if not bool(rebase_result.get("valid", false)):
-			_show_status_message("Mirrored Group created, but Scale Rebase was skipped: %s" % str(rebase_result.get("errors", ["Unknown error"])[0]))
+			for duplicated_id in duplicated_component_ids:
+				asset["components"].erase(ComponentHierarchy.component_by_id(asset, duplicated_id))
+			asset["groups"].erase(group_copy)
+			_show_status_message("Mirrored Group was not created: %s" % str(rebase_result.get("errors", ["Unknown error"])[0]))
+			_render_outliner()
+			_render_inspector()
+			_render_canvas_context()
+			return
 	selected_asset_id = asset_id
 	selected_group_id = new_group_id
 	selected_component_id = ""
@@ -8934,7 +9172,13 @@ func _duplicate_component(asset_id: String, component_id: String, mirror_mode :=
 	if mirror_mode == "flip_orientation":
 		var rebase_result := ComponentScaleRebaseService.rebase_components(asset, duplicated_component_ids)
 		if not bool(rebase_result.get("valid", false)):
-			_show_status_message("Mirrored Component created, but Scale Rebase was skipped: %s" % str(rebase_result.get("errors", ["Unknown error"])[0]))
+			for duplicated_id in duplicated_component_ids:
+				asset["components"].erase(ComponentHierarchy.component_by_id(asset, duplicated_id))
+			_show_status_message("Mirrored Component was not created: %s" % str(rebase_result.get("errors", ["Unknown error"])[0]))
+			_render_outliner()
+			_render_inspector()
+			_render_canvas_context()
+			return
 	selected_asset_id = asset_id
 	selected_component_id = str(duplicate_root.get("id", ""))
 	selected_guide_id = ""
@@ -9141,7 +9385,7 @@ func _confirm_component_creation() -> void:
 		# Local child position is the Parent-local point that maps to the Parent pivot.
 		component_transform["position"] = inherited_pivot
 		component_transform["pivot"] = inherited_pivot
-	asset["components"].append({
+	var component := {
 		"id": component_id,
 		"type": "reference" if is_reference else "component",
 		"name": component_name,
@@ -9160,7 +9404,8 @@ func _confirm_component_creation() -> void:
 		"primitive": {},
 		"catch_parent_component_id": "",
 		"show_point_numbers": false
-	})
+	}
+	asset["components"].append(component)
 	selected_asset_id = asset_id
 	selected_component_id = component_id
 	selected_guide_id = ""
@@ -10957,8 +11202,10 @@ func _render_geometry_meshing_inspector() -> void:
 func _render_contour_meshing_inspector(component: Dictionary) -> void:
 	inspector_content.add_child(_create_inspector_field_label(str(component.get("name", "Contour"))))
 	inspector_content.add_child(_create_inspector_section("Contour Stroke · Automatic"))
-	inspector_content.add_child(_create_inspector_field_label("Width: %.1f px (%.5f m) · World Settings · all Assets" % [world_contour_stroke_width_px, ContourStrokeService.stroke_width_meters(world_contour_stroke_width_px)]))
-	var issues := ContourMeshService.validation_issues(component, world_contour_stroke_width_px)
+	var stroke_width_px := _effective_contour_stroke_width_px(component)
+	var source_label := "Component override" if _component_has_contour_stroke_width_override(component) else "World Settings"
+	inspector_content.add_child(_create_inspector_field_label("Width: %.1f px (%.5f m) · %s" % [stroke_width_px, ContourStrokeService.stroke_width_meters(stroke_width_px), source_label]))
+	var issues := ContourMeshService.validation_issues(component, stroke_width_px)
 	var input_status := _create_inspector_field_label("Input: Ready" if issues.is_empty() else "Input: Draft · %s" % issues[0])
 	input_status.add_theme_color_override("font_color", Color("#75b88a") if issues.is_empty() else Color("#ef8354"))
 	inspector_content.add_child(input_status)
@@ -11080,7 +11327,7 @@ func _generate_geometry_meshing_preview() -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	if str(component.get("draw_mode", "")) == "contour":
 		geometry_meshing_preview_key = _geometry_document_key(selected_asset_id, selected_component_id)
-		geometry_meshing_preview = ContourMeshService.generate(component, world_contour_stroke_width_px)
+		geometry_meshing_preview = ContourMeshService.generate(component, _effective_contour_stroke_width_px(component))
 		geometry_meshing_preview_state = "ready" if bool(geometry_meshing_preview.get("valid", false)) else "invalid"
 		_show_status_message("Generated %d Contour Triangles." % int(geometry_meshing_preview.get("triangle_count", 0)) if bool(geometry_meshing_preview.get("valid", false)) else str(geometry_meshing_preview.get("errors", ["Contour Mesh could not be generated."])[0]))
 		_render_outliner()
@@ -11739,6 +11986,17 @@ func _render_inspector() -> void:
 	visibility_toggle.button_pressed = bool(component.get("visibility", true))
 	visibility_toggle.toggled.connect(_on_component_visibility_changed)
 	inspector_content.add_child(visibility_toggle)
+	if not _is_reference_component(component):
+		inspector_content.add_child(_create_inspector_field_label("Contour Stroke Width (px)"))
+		var contour_width_field := SpinBox.new()
+		contour_width_field.min_value = 0.1
+		contour_width_field.max_value = 1024.0
+		contour_width_field.step = 0.1
+		contour_width_field.value = _effective_contour_stroke_width_px(component)
+		contour_width_field.custom_minimum_size = Vector2(0, 26)
+		contour_width_field.add_theme_font_size_override("font_size", 11)
+		contour_width_field.value_changed.connect(_on_component_contour_stroke_width_changed)
+		inspector_content.add_child(contour_width_field)
 	var component_group := _component_group(asset, component)
 	if component_group.is_empty():
 		inspector_content.add_child(_create_inspector_field_label("Z Index"))
@@ -13653,6 +13911,28 @@ func _on_component_z_index_changed(value: float) -> void:
 		_render_canvas_context()
 
 
+func _on_component_contour_stroke_width_changed(value: float) -> void:
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if component.is_empty() or _is_reference_component(component) or not is_finite(value) or value <= 0.0:
+		return
+	if is_equal_approx(value, world_contour_stroke_width_px):
+		if not component.has("contour_stroke_width_px"):
+			return
+		_record_direct_change()
+		component.erase("contour_stroke_width_px")
+	elif _component_has_contour_stroke_width_override(component) and is_equal_approx(float(component["contour_stroke_width_px"]), value):
+		return
+	else:
+		_record_direct_change()
+		component["contour_stroke_width_px"] = value
+	geometry_meshing_preview = {}
+	geometry_meshing_preview_key = ""
+	geometry_meshing_preview_state = "idle"
+	geometry_meshing_preview_revision += 1
+	_render_inspector()
+	_render_canvas_context()
+
+
 func _rename_selected_asset(new_name: String) -> void:
 	var asset_name := new_name.strip_edges()
 	var asset := _get_asset(selected_asset_id)
@@ -14006,7 +14286,7 @@ func _run_export_runtime_stage(valid_only := false) -> Dictionary:
 			var errors: Array = build.get("errors", [])
 			export_log.append_text("  [color=#ef8354]✕ %s — %s[/color]\n" % [label, str(errors[0]) if not errors.is_empty() else "Runtime export failed."])
 	if catalog_requested or succeeded > 0:
-		if _all_runtime_package_candidates().is_empty() and _write_asset_catalog():
+		if not _has_pending_valid_runtime_packages() and _write_asset_catalog():
 			_prune_uncataloged_runtime_packages()
 			export_log.append_text("  [color=#75b88a]✓ World Catalog[/color]\n")
 		else:
@@ -14022,6 +14302,13 @@ func _all_valid_runtime_export_candidates() -> Array[Dictionary]:
 		if bool(build.get("valid", false)):
 			result.append(candidate)
 	return result
+
+
+func _has_pending_valid_runtime_packages() -> bool:
+	for candidate in _all_runtime_package_candidates():
+		if bool(candidate.get("build", {}).get("valid", false)):
+			return true
+	return false
 
 
 func _export_component_label(asset_id: String, component_id: String) -> String:
@@ -14320,14 +14607,28 @@ func _normalized_component_name(component: Dictionary) -> String:
 	return name if not name.is_empty() else "Component"
 
 
-func _component_outliner_name(asset: Dictionary, component: Dictionary) -> String:
+func _component_tree_name(component: Dictionary) -> String:
+	var component_name := _normalized_component_name(component)
+	return "R: %s" % component_name if _is_reference_component(component) else component_name
+
+
+func _component_outliner_name(_asset: Dictionary, component: Dictionary) -> String:
 	var component_name := _normalized_component_name(component)
 	if not _is_reference_component(component):
 		return component_name
-	var parent := _get_component(asset, str(component.get("parent_component_id", "")))
+	var source_asset := _get_asset(str(component.get("source_asset_id", "")))
+	var source_name := str(source_asset.get("name", "Missing asset"))
+	return "%s ← %s" % [component_name, source_name]
+
+
+func _reference_outliner_tooltip(asset: Dictionary, reference: Dictionary) -> String:
+	var source_asset := _get_asset(str(reference.get("source_asset_id", "")))
+	var source_name := str(source_asset.get("name", "Missing asset"))
+	var tooltip := "Referenced asset: %s" % source_name
+	var parent := _get_component(asset, str(reference.get("parent_component_id", "")))
 	if not parent.is_empty():
-		return "%s → %s" % [str(parent.get("name", "Component")), component_name]
-	return component_name
+		tooltip += "\nAttached to: %s" % _normalized_component_name(parent)
+	return tooltip
 
 
 func _reference_asset_shapes(target_asset: Dictionary, reference: Dictionary, emphasized_component_id: String) -> Array:
@@ -14530,9 +14831,6 @@ func _on_transform_changed(transform: Dictionary) -> void:
 			var field = transform_fields.get(property_name)
 			if is_instance_valid(field):
 				field.set_value_no_signal(float(values[property_name]))
-		# A moved Parent also changes every visible Child reference immediately.
-		# A selected Symbol Reference must remain visible while it is being dragged;
-		# excluding its own ID would remove exactly the shape being transformed.
 		var selected_reference_id := selected_component_id if _is_reference_component(component) else ""
 		var excluded_reference_id := "" if _is_reference_component(component) else selected_component_id
 		canvas_view.set_reference_shapes(_build_reference_shapes(asset, excluded_reference_id, selected_reference_id))

@@ -11,10 +11,12 @@
 		"asset_8",
 		"asset_9",
 		"asset_10",
-		"asset_11"
+		"asset_11",
+		"asset_12",
+		"asset_13"
 	],
 	"editor_state": {
-		"active_create_submodule": "Weapons",
+		"active_create_submodule": "Character",
 		"active_geometry_submodule": "Sampling",
 		"active_module": "Create",
 		"active_motion_submodule": "Animation",
@@ -41,45 +43,59 @@
 				],
 				"zoom": 137.218415769653
 			},
+			"asset_12": {
+				"position": [
+					0.173188447952271,
+					-0.327844053506851
+				],
+				"zoom": 474.861465493391
+			},
+			"asset_13": {
+				"position": [
+					0.510432183742523,
+					6.93667125701904
+				],
+				"zoom": 129.196365757051
+			},
 			"asset_2": {
 				"position": [
 					-0.138385653495789,
-					8.51191234588623
+					6.37521409988403
 				],
-				"zoom": 186.639766904885
+				"zoom": 214.720939919729
 			},
 			"asset_3": {
 				"position": [
-					-0.138385653495789,
-					8.37582206726074
+					-0.126418218016624,
+					3.77052736282349
 				],
-				"zoom": 59.3689270716945
+				"zoom": 92.3044867159853
 			},
 			"asset_4": {
 				"position": [
 					-0.138385653495789,
-					5.47760772705078
+					1.67112135887146
 				],
-				"zoom": 91.3553524570026
+				"zoom": 166.727188799311
 			},
 			"asset_5": {
 				"position": [
-					1.64032351970673,
-					11.7803268432617
+					-0.11192199587822,
+					3.72435355186462
 				],
-				"zoom": 216.605787264916
+				"zoom": 121.376380493405
 			},
 			"asset_6": {
 				"position": [
 					-0.138385653495789,
-					8.58401775360107
+					4.38588619232178
 				],
-				"zoom": 47.719232205119
+				"zoom": 77.9094080010093
 			},
 			"asset_7": {
 				"position": [
 					-0.138385653495789,
-					-0.0823748633265495
+					-0.327844053506851
 				],
 				"zoom": 185.351866661415
 			},
@@ -92,28 +108,30 @@
 			},
 			"asset_9": {
 				"position": [
-					0.588149785995483,
-					8.73740196228027
+					-0.00629360973834991,
+					6.15620231628418
 				],
-				"zoom": 88.8369942460776
+				"zoom": 107.921737907543
 			}
 		},
 		"expanded_assets": {
 			"asset_1": false,
 			"asset_10": true,
 			"asset_11": true,
+			"asset_12": false,
+			"asset_13": true,
 			"asset_2": false,
 			"asset_3": false,
 			"asset_4": false,
 			"asset_5": false,
 			"asset_6": false,
 			"asset_7": false,
-			"asset_8": false,
+			"asset_8": true,
 			"asset_9": false
 		},
-		"motion_act_preview_asset_id": "",
+		"motion_act_preview_asset_id": "asset_1",
 		"motion_act_preview_loop": true,
-		"motion_path_preview_asset_id": "",
+		"motion_path_preview_asset_id": "asset_1",
 		"motion_sequence_preview_loop": true,
 		"motion_sequence_view": "composition",
 		"outliner_asset_type_filters": {
@@ -124,8 +142,8 @@
 			"terrain": true,
 			"weapons": true
 		},
-		"selected_asset_id": "asset_11",
-		"selected_component_id": "",
+		"selected_asset_id": "asset_13",
+		"selected_component_id": "component_77",
 		"selected_edge_ids": [],
 		"selected_guide_id": "",
 		"selected_motion_act_id": "",
@@ -135,8 +153,8 @@
 		"selected_weighting_style_id": "",
 		"snap": {
 			"enabled": true,
-			"grid_step": 0.05,
-			"mode": "finer",
+			"grid_step": 0.01,
+			"mode": "ultra_fine",
 			"rotation_step": 15.0
 		},
 		"world_scale": {
@@ -146,11 +164,11 @@
 	},
 	"name": "world01",
 	"paths": [],
-	"schema_version": 44,
+	"schema_version": 46,
 	"sequences": [],
 	"world_name": "Secrets, Room's & Travels'",
 	"world_settings": {
-		"contour_stroke_width_px": 4.1,
-		"reference_pixels_per_meter": 128.0
+		"contour_stroke_width_px": 4.0,
+		"reference_pixels_per_meter": 192.0
 	}
 }

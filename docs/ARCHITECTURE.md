@@ -58,8 +58,8 @@ An Asset contains:
 - retained asset-local animation data.
 
 A Component contains its geometry source, hierarchy reference, local transform,
-visibility/layer settings, draw mode, widths, catch-parent reference, and point
-number display setting. It carries a free-form `name`, unique within its Asset.
+visibility/layer settings, draw mode, optional Contour stroke-width override,
+catch-parent reference, and point number display setting. It carries a free-form `name`, unique within its Asset.
 The name is the authored identity used by runtime animation bindings. It has
 no Material assignment.
 
@@ -135,11 +135,14 @@ state persists the active Create/Mesh/Style module and valid selection, but it
 does not restore disabled Motion as the active category.
 
 The World-root `catalog.json` is an independently versioned derived index, not
-an authored identity store. It lists visible Assets by the `asset_key`
-mechanically derived from each complete display name. The derivation cannot be
-overridden, and creation or rename rejects collisions across visible and hidden
-Assets. Internal stable Asset IDs remain in editor persistence only; neither the
-Catalog nor runtime manifests expose them.
+an authored identity store. It lists currently runtime-exportable visible Assets
+by the `asset_key` mechanically derived from each complete display name. A
+visible Asset blocked by Runtime validation is omitted, so it cannot prevent
+valid siblings from publishing; its retained package remains unadvertised until
+the Asset validates again. The derivation cannot be overridden, and creation or
+rename rejects collisions across visible and hidden Assets. Internal stable
+Asset IDs remain in editor persistence only; neither the Catalog nor runtime
+manifests expose them.
 
 Undo/Redo snapshots copy canonical documents and stable selections. Derived
 previews are transient and are recomputed after restoration.
@@ -233,31 +236,35 @@ Weapon Components use the namespaced keys `weapon_body`, `weapon_collar`,
 Schema 40 replaces the authored `ribbon` draw mode with the fill-less open
 `contour` mode. Loading schema 39 or older converts Ribbon centerline topology
 explicitly; current-schema Ribbon values are invalid and receive no fallback.
-Component-local Ribbon widths are discarded because Contours use the fixed
-World stroke setting. Legacy `ribbon_strip` Bakes remain readable records but
+Component-local Ribbon widths are discarded. Legacy `ribbon_strip` Bakes remain readable records but
 are never current for a Contour and must be rebuilt as `contour_stroke`.
 
 Schema 41 renames the toolbar surface to `World Settings` and introduces one
-typed authored Contour width shared by every Asset. The required
-`world_settings` record fixes reference density at `128 px/m` and stores a
+typed authored default Contour width shared by every Asset. The required
+`world_settings` record fixes reference density at `192 px/m` and stores a
 finite positive `contour_stroke_width_px`, defaulting to `4 px` for new Worlds.
 The World Settings summary expresses the shared `1 m` game Tile as `100 cm`,
 or twenty default `5 cm` Grid Boxes; Tile size does not alter Component
 geometry or the persisted World scale contract.
 Schema 40 and older Worlds migrate explicitly to that default; schema-41 data
-never receives a silent missing/invalid-value fallback. Width participates in
-Contour Mesh fingerprints and build signatures, so downstream Bakes become
-stale without changing Component topology.
+never receives a silent missing/invalid-value fallback. Schema 45 permits an
+optional finite positive `contour_stroke_width_px` on each non-reference
+Component. Its absence, or equality with the World default, inherits the World
+default; a differing value is an implicit local override. The Inspector always
+shows the width field, without a separate Override toggle. A World-width change
+affects only inheriting Components, while an override change affects only that
+Component. The effective width participates in Contour Mesh fingerprints and
+build signatures, so downstream Bakes become stale without changing Component topology.
 
 Schema 42 adds atomic Asset-level Component Scale Rebase and analytic Ellipses.
 The service bakes finite, non-zero signed Scale into owned Bézier geometry,
 resolved handles, Component-scoped Guides, or primitive axes around the
 unchanged Pivot before setting local Scale to `(1, 1)`. Negative axes preserve
 Mirror reflections in source geometry; analytic primitive diameters remain
-positive. Position, Rotation, hierarchy, and animation data remain untouched.
-Scaled References, zero/non-finite Scale, and scaled Components with Children
-block the whole operation rather than triggering a partial or compensating
-transform fallback. See
+positive. A parent Rebase compensates direct Child local transforms to preserve
+the Child subtree's visible world transform, so Child Position, Rotation, or
+Scale may change; hierarchy and animation data remain untouched. Zero/non-finite
+Scale blocks the whole operation. See
 [`SCALE_REBASE.md`](SCALE_REBASE.md).
 
 Sampling results carry their own algorithm version independently of the
@@ -276,8 +283,8 @@ accepted Fill and Contour Stroke Mesh Bakes. It rejects missing or stale inputs,
 invalid or duplicate Component Names, non-rebased Scale, unresolved
 Asset References, and incomplete or cyclic visible hierarchies. Ordinary
 Components never derive replacement geometry during export. References emit an
-`asset_reference` record containing the local `name` and actual
-`source_asset_key`, without copying geometry into the owner.
+`asset_reference` record containing the local `name`, signed placement
+transform, and actual `source_asset_key`, without copying geometry into the owner.
 
 The contract is engine-neutral: X points right, Y points up, lengths are meters,
 positive rotations are counter-clockwise radians, and one Tool unit equals

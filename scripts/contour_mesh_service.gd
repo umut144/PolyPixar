@@ -6,7 +6,7 @@ extends RefCounted
 ## derives or replaces Fill geometry.
 
 const METHOD := "contour_stroke"
-const ALGORITHM_VERSION := 3
+const ALGORITHM_VERSION := 4
 
 
 static func validation_issues(component: Dictionary, stroke_width_px := ContourStrokeService.DEFAULT_STROKE_WIDTH_PX) -> Array[String]:

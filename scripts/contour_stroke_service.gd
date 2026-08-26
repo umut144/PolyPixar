@@ -5,8 +5,8 @@ extends RefCounted
 ## deterministic centered mesh for the visible runs of one closed outer/hole
 ## Chain or one open Contour Chain without changing canonical topology.
 
-const ALGORITHM_VERSION := 3
-const REFERENCE_PIXELS_PER_METER := 128.0
+const ALGORITHM_VERSION := 4
+const REFERENCE_PIXELS_PER_METER := 192.0
 const DEFAULT_STROKE_WIDTH_PX := 4.0
 const MAX_DEVIATION_PX := 0.25
 const MITER_LIMIT := 4.0

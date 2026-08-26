@@ -124,9 +124,9 @@ the Fill Mesh and requires:
 | `role` | `"centered_boundary_stroke"` |
 | `has_outline` | boolean |
 | `vertices`, `indices` | indexed Mesh arrays |
-| `reference_pixels_per_meter` | `128.0` |
+| `reference_pixels_per_meter` | `192.0` |
 | `stroke_width_px` | finite positive effective authored value (Component override or World default) |
-| `stroke_width_meters` | `stroke_width_px / 128` |
+| `stroke_width_meters` | `stroke_width_px / 192` |
 | `centerline` | `"original_authored_boundary"` |
 | `inner_offset_meters` | `stroke_width_meters / 2` |
 | `outer_offset_meters` | `stroke_width_meters / 2` |
@@ -179,14 +179,14 @@ Closed Component:
   "contour_stroke_mesh": {
     "role": "centered_boundary_stroke",
     "has_outline": true,
-    "vertices": [[-0.015625,0],[0.015625,0],[1,0.015625]],
+    "vertices": [[-0.0104167,0],[0.0104167,0],[1,0.0104167]],
     "indices": [0,1,2],
-    "reference_pixels_per_meter": 128.0,
+    "reference_pixels_per_meter": 192.0,
     "stroke_width_px": 4.0,
-    "stroke_width_meters": 0.03125,
+    "stroke_width_meters": 0.0208333,
     "centerline": "original_authored_boundary",
-    "inner_offset_meters": 0.015625,
-    "outer_offset_meters": 0.015625,
+    "inner_offset_meters": 0.0104167,
+    "outer_offset_meters": 0.0104167,
     "join": {"type":"miter", "miter_limit":4.0, "fallback":"bevel"},
     "cap": "butt",
     "topology_role": "outer",
