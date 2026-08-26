@@ -265,6 +265,7 @@ var world_name_dialog: ConfirmationDialog
 var world_name_input: LineEdit
 var load_world_dialog: ConfirmationDialog
 var world_list: ItemList
+var reload_world_dialog: ConfirmationDialog
 var pending_save_after_new := false
 var undo_history: Array[Dictionary] = []
 var redo_history: Array[Dictionary] = []
@@ -753,6 +754,7 @@ func _build_ui() -> void:
 	world_popup.add_item("New")
 	world_popup.add_item("Save")
 	world_popup.add_item("Load")
+	world_popup.add_item("Reload Current World…")
 	world_popup.id_pressed.connect(_on_world_menu_id)
 	_create_world_scale_popup()
 	# Batch commands live in the Export module. Keep these detached controls for
@@ -1766,6 +1768,12 @@ func _create_world_dialogs() -> void:
 	world_list.item_activated.connect(_load_selected_world)
 	load_world_dialog.add_child(world_list)
 	add_child(load_world_dialog)
+	reload_world_dialog = ConfirmationDialog.new()
+	reload_world_dialog.title = "Reload Current World"
+	reload_world_dialog.ok_button_text = "Reload"
+	reload_world_dialog.size = Vector2i(440, 190)
+	reload_world_dialog.confirmed.connect(_reload_current_world)
+	add_child(reload_world_dialog)
 
 
 func _on_create_action_pressed() -> void:
@@ -1815,6 +1823,9 @@ func _on_world_menu_id(id: int) -> void:
 		_save_world()
 	elif id == 2:
 		_open_load_world_dialog()
+	elif id == 3 and not world_name.is_empty():
+		reload_world_dialog.dialog_text = "Reload '%s' from disk?\n\nUnsaved editor changes will be discarded. Use this after an external script changes World files." % world_name
+		reload_world_dialog.popup_centered()
 
 
 func _open_new_world_dialog(save_after_creation: bool) -> void:
@@ -1917,6 +1928,13 @@ func _load_selected_world(_index := -1) -> void:
 	var world_entry := str(world_list.get_item_metadata(index))
 	if _load_world(world_entry):
 		load_world_dialog.hide()
+
+
+func _reload_current_world() -> void:
+	if world_name.is_empty():
+		return
+	if _load_world(world_name):
+		_show_status_message("Reloaded World: %s" % world_name)
 
 
 func _list_world_names() -> Array[String]:
@@ -4605,6 +4623,8 @@ func _on_update_meshes_pressed() -> void:
 			_record_component_mesh_failure(asset_id, component_id, build)
 			failed += 1
 	mesh_batch_running = false
+	_save_world()
+	_refresh_export_preflight(true)
 	_show_status_message("Updated %d Mesh%s%s" % [succeeded, "" if succeeded == 1 else "es", " · %d need attention" % failed if failed > 0 else ""])
 	_render_outliner()
 	_render_inspector()
@@ -14185,7 +14205,7 @@ func _on_build_all_pressed() -> void:
 		_record_direct_change()
 	var mesh_result := await _run_export_mesh_stage(mesh_candidates)
 	mesh_batch_running = false
-	_invalidate_batch_status()
+	_save_world()
 	batch_status_snapshot = {}
 	export_preflight = _rebuild_batch_status_snapshot()
 	export_preflight_revision = batch_status_revision
