@@ -10,7 +10,7 @@ static func normalize_asset(asset: Dictionary) -> void:
 		if group is Dictionary:
 			group["name"] = str(group.get("name", "Group"))
 			group["visibility"] = bool(group.get("visibility", true))
-			group["z_index"] = int(group.get("z_index", 0))
+			group.erase("z_index") # Schema 48: Z order belongs exclusively to Components.
 			if not group.get("transform", {}) is Dictionary:
 				group["transform"] = {"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}
 			var candidate_group_id := str(group.get("id", ""))

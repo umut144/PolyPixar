@@ -60,7 +60,7 @@ Sampling, Seeding, Meshing, UV, and Weighting records are stored separately
 from source topology.
 
 Assets may also contain editor-only Component Groups. A Group owns a stable ID,
-a unique lower-snake-case name, visibility, a shared Z Index, a local transform,
+a unique lower-snake-case name, visibility, and a local transform,
 and an optional `parent_component_id`. Group membership (`group_id`) does not
 replace Component parentage: the Group's Parts remain ordinary Components, and
 a child inherits its ancestor's effective Group membership. A Group may be
@@ -68,8 +68,8 @@ parented below a Component only when that Component is an ancestor of every
 direct Part; its transform is then applied once after that Component. Moving a
 Component into or out of a Group, changing a Component parent, or reparenting a
 Group through the Outliner preserves every affected Component's world transform.
-Group visibility is effective for all members, while each Component retains its
-individual Z Index. Runtime export does not emit Group records; it resolves
+Group visibility is effective for all members. Each Component exclusively owns
+its individual Z Index. Runtime export does not emit Group records; it resolves
 Group transforms into ordinary Component exports.
 
 World schema 41 owns the default authored Contour stroke width in its typed

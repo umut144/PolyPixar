@@ -269,6 +269,10 @@ Scale may change; hierarchy and animation data remain untouched. Zero/non-finite
 Scale blocks the whole operation. See
 [`SCALE_REBASE.md`](SCALE_REBASE.md).
 
+Schema 48 removes `z_index` from editor-only Group records. Each Component is
+the sole owner of its integer `z_index`; legacy Group layer values are ignored
+on load and are not written again.
+
 Sampling results carry their own algorithm version independently of the
 World schema. The junction-aware version invalidates pre-arrangement flat
 Cut Bakes at Sampling, which in turn makes Seeding stale before Meshing can

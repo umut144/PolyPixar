@@ -8,7 +8,7 @@ const EXPORT_SUBMODULES: Array[String] = []
 const MOTION_SUBMODULES := ["Animation", "Path", "Act", "Sequence"]
 const WORLDS_ROOT := "res://worlds"
 const CONFIG_PATH := "res://configs/app_config.json"
-const SCHEMA_VERSION := 47
+const SCHEMA_VERSION := 48
 const MAX_HISTORY_SIZE := 100
 const DRAW_MODES := ["closed_loop", "contour", "primitive"]
 const GRID_BOX_TOOL_UNITS := 0.5
@@ -2152,8 +2152,7 @@ func _save_world() -> void:
 				"name": str(group.get("name", "Group")),
 				"parent_component_id": str(group.get("parent_component_id", "")),
 				"transform": _serialize_transform(group.get("transform", _default_component_transform())),
-				"visibility": bool(group.get("visibility", true)),
-				"z_index": int(group.get("z_index", 0))
+				"visibility": bool(group.get("visibility", true))
 			})
 		for component in asset["components"]:
 			var serialized_component := {
@@ -2495,8 +2494,7 @@ func _load_world(world_entry: String, persist_as_last := true) -> bool:
 				"name": str(group_data.get("name", "Group")),
 				"parent_component_id": str(group_data.get("parent_component_id", "")),
 				"transform": _deserialize_transform(group_data.get("transform", {})),
-				"visibility": bool(group_data.get("visibility", true)),
-				"z_index": int(group_data.get("z_index", 0))
+				"visibility": bool(group_data.get("visibility", true))
 			})
 		for component_data in asset_data.get("components", []):
 			if not component_data is Dictionary:
@@ -8859,8 +8857,7 @@ func _confirm_group_creation() -> void:
 		"id": group_id,
 		"name": group_name,
 		"transform": {"position": center, "rotation": 0.0, "scale": Vector2.ONE, "pivot": center},
-		"visibility": true,
-		"z_index": 0
+		"visibility": true
 	})
 	for component_id in component_ids:
 		var component := _get_component(asset, component_id)
@@ -8902,10 +8899,7 @@ func _effective_component_visibility(asset: Dictionary, component: Dictionary) -
 
 
 
-func _effective_component_z_index(asset: Dictionary, component: Dictionary) -> int:
-	var group := _component_group(asset, component)
-	if not group.is_empty():
-		return int(group.get("z_index", 0))
+func _effective_component_z_index(_asset: Dictionary, component: Dictionary) -> int:
 	return int(component.get("z_index", 0))
 
 func _place_selected_group_pivot_at_mouse() -> bool:
@@ -9792,18 +9786,6 @@ func _render_group_inspector(_asset: Dictionary, group: Dictionary) -> void:
 	visibility_toggle.button_pressed = bool(group.get("visibility", true))
 	visibility_toggle.toggled.connect(_on_group_visibility_changed)
 	inspector_content.add_child(visibility_toggle)
-	inspector_content.add_child(_create_inspector_section("Presentation / Layer"))
-	inspector_content.add_child(_create_inspector_field_label("Z Index applies to all Components in this Group."))
-	inspector_content.add_child(_create_inspector_field_label("Z Index"))
-	var z_index_field := SpinBox.new()
-	z_index_field.min_value = -10000
-	z_index_field.max_value = 10000
-	z_index_field.step = 1
-	z_index_field.value = int(group.get("z_index", 0))
-	z_index_field.custom_minimum_size = Vector2(0, 26)
-	z_index_field.add_theme_font_size_override("font_size", 11)
-	z_index_field.value_changed.connect(_on_group_z_index_changed)
-	inspector_content.add_child(z_index_field)
 
 
 func _rename_selected_group(new_name: String) -> void:
@@ -9889,18 +9871,6 @@ func _on_group_visibility_changed(visibility_enabled: bool) -> void:
 	_record_direct_change()
 	group["visibility"] = visibility_enabled
 	_render_outliner()
-	_render_canvas_context()
-
-
-func _on_group_z_index_changed(value: float) -> void:
-	var asset := _get_asset(selected_asset_id)
-	var group := ComponentHierarchy.group_by_id(asset, selected_group_id)
-	if group.is_empty():
-		return
-	_record_direct_change()
-	group["z_index"] = int(value)
-	_render_outliner()
-	_render_inspector()
 	_render_canvas_context()
 
 
@@ -12093,20 +12063,16 @@ func _render_inspector() -> void:
 		contour_width_field.add_theme_font_size_override("font_size", 11)
 		contour_width_field.value_changed.connect(_on_component_contour_stroke_width_changed)
 		inspector_content.add_child(contour_width_field)
-	var component_group := _component_group(asset, component)
-	if component_group.is_empty():
-		inspector_content.add_child(_create_inspector_field_label("Z Index"))
-		var z_index_field := SpinBox.new()
-		z_index_field.min_value = -10000
-		z_index_field.max_value = 10000
-		z_index_field.step = 1
-		z_index_field.value = int(component.get("z_index", 0))
-		z_index_field.custom_minimum_size = Vector2(0, 26)
-		z_index_field.add_theme_font_size_override("font_size", 11)
-		z_index_field.value_changed.connect(_on_component_z_index_changed)
-		inspector_content.add_child(z_index_field)
-	else:
-		inspector_content.add_child(_create_inspector_field_label("Z Index is controlled by Group: %s" % str(component_group.get("name", "Group"))))
+	inspector_content.add_child(_create_inspector_field_label("Z Index"))
+	var z_index_field := SpinBox.new()
+	z_index_field.min_value = -10000
+	z_index_field.max_value = 10000
+	z_index_field.step = 1
+	z_index_field.value = int(component.get("z_index", 0))
+	z_index_field.custom_minimum_size = Vector2(0, 26)
+	z_index_field.add_theme_font_size_override("font_size", 11)
+	z_index_field.value_changed.connect(_on_component_z_index_changed)
+	inspector_content.add_child(z_index_field)
 
 
 func _render_motion_inspector() -> void:
