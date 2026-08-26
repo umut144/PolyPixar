@@ -1,15 +1,15 @@
 # PolyTools Runtime Export Contract
 
 **Status:** Normative consumer contract for Asset Catalog schema `1` and
-runtime Manifest schema `4`.
+runtime Manifest schema `5`.
 
 This document is the sole field-level contract for PolyTools Runtime packages.
-Manifest schema 4 replaces schema 3. Consumers must reject schema 3; there is
+Manifest schema 6 replaces schema 5. Consumers must reject schema 5; there is
 no SDF/Carrier/UV compatibility fallback.
 
 ## Package boundary
 
-`Export Runtime` writes one atomic package per visible Asset:
+`Export Runtime` writes one atomic package per currently valid visible Asset:
 
 ```text
 res://worlds/<world_key>/
@@ -22,17 +22,20 @@ res://worlds/<world_key>/
 `asset_key` is the deterministic lower-snake-case derivation of the complete
 Asset display name. Internal editor Asset IDs never enter the contract.
 `catalog.json` schema 1 is the closed authoritative Asset set; consumers must
-not discover packages by enumerating directories. A failed validation or write
-keeps the previous complete package. All numbers must be finite.
+not discover packages by enumerating directories. An invalid visible Asset is
+excluded from the newly published Catalog so it cannot block valid siblings;
+its previous complete package is retained on disk but is not advertised until
+it validates again. A failed write keeps the previous complete package. All
+numbers must be finite.
 
 ## Compatibility policy
 
 Catalog `schema_version` must equal `1`; Manifest `schema_version` must equal
-`4`. Missing, non-integer, older, or newer versions are rejected as complete
+`5`. Missing, non-integer, older, or newer versions are rejected as complete
 packages. Missing required geometry is an error. Consumers must not synthesize
 Fill Meshes, strokes, Semantic Keys, hierarchy links, or referenced Assets.
 
-Schema 4 contains no UV, SDF, mask, contour-domain, padding, or Carrier field.
+Schema 5 contains no UV, SDF, mask, contour-domain, padding, or Carrier field.
 Those schema-3 concepts are not optional aliases and must not be inferred.
 
 ## Catalog
@@ -44,11 +47,11 @@ The Catalog requires `world_key`, `world_name`, and `assets`, sorted by
 
 ## Top-level Manifest
 
-Schema 4 requires:
+Schema 5 requires:
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `schema_version` | integer | Exactly `4`. |
+| `schema_version` | integer | Exactly `6`. |
 | `asset_key` | non-empty lower-snake-case string | Runtime identity. |
 | `display_name` | string | Informational authored name. |
 | `asset_type` | string | `character`, `props`, `weapons`, `terrain`, `icon`, or `symbols`. |
@@ -85,7 +88,7 @@ part of the contract.
 ## Common Component fields
 
 Every Component requires `component_id`, unique `name` in `lower_snake_case`, nullable
-`parent_component_id`, integer `z_index`, two-float `local_pivot`, and
+`parent_component_id`, integer `z_index`, two-float `component_pivot`, and
 `local_transform`:
 
 ```json
@@ -106,7 +109,7 @@ transform and require no geometry regeneration.
 An indexed Mesh contains `vertices`, an array of local-meter `[x,y]` pairs, and
 `indices`, a flat triangle list. Indices are in range, each triangle uses three
 distinct vertices, and a non-empty Mesh has a positive multiple of three
-indices. Schema 4 carries no UVs, normals, tangents, colors, or materials.
+indices. Schema 5 carries no UVs, normals, tangents, colors, or materials.
 
 Closed-loop and Primitive Components require `mesh` as their unchanged Fill
 Mesh. An open `contour` Component must not contain `mesh`.
@@ -122,7 +125,7 @@ the Fill Mesh and requires:
 | `has_outline` | boolean |
 | `vertices`, `indices` | indexed Mesh arrays |
 | `reference_pixels_per_meter` | `128.0` |
-| `stroke_width_px` | finite positive authored World value |
+| `stroke_width_px` | finite positive effective authored value (Component override or World default) |
 | `stroke_width_meters` | `stroke_width_px / 128` |
 | `centerline` | `"original_authored_boundary"` |
 | `inner_offset_meters` | `stroke_width_meters / 2` |
@@ -155,9 +158,10 @@ An Asset Reference adds `kind: "asset_reference"` and required
 `source_asset_key`. It contains neither `mesh` nor `contour_stroke_mesh`.
 `name` is its authored identity in the owner Asset and must use
 `lower_snake_case`; `source_asset_key`
-identifies the borrowed package. Consumers resolve References through the
-Catalog, retain the referenced Asset pivot/hierarchy, apply the Reference
-transform as placement, and reject missing packages or cross-Asset cycles.
+identifies the instanced source package. Consumers resolve References through
+the Catalog, retain the referenced Asset pivot/hierarchy, apply the complete
+signed Reference transform as placement, and reject missing packages or
+cross-Asset cycles.
 
 ## Minimal ordinary examples
 
@@ -169,7 +173,7 @@ Closed Component:
   "name": "body",
   "parent_component_id": null,
   "z_index": 0,
-  "local_pivot": [0.0, 0.0],
+  "component_pivot": [0.0, 0.0],
   "local_transform": {"position":[0,0], "rotation_radians":0, "scale":[1,1]},
   "mesh": {"vertices":[[0,0],[1,0],[0,1]], "indices":[0,1,2]},
   "contour_stroke_mesh": {

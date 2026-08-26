@@ -26,6 +26,7 @@ func _init() -> void:
 	_test_geometry_uv_mapping_service_and_ui()
 	_test_geometry_sdf_service_and_batch()
 	_test_component_names()
+	_test_component_clipboard()
 	_test_asset_catalog_service()
 	_test_runtime_export_service()
 	_test_weighting_service_and_ui()
@@ -62,7 +63,7 @@ func _runtime_export_world_transform(components_by_id: Dictionary, component_id:
 	var component: Dictionary = components_by_id.get(component_id, {})
 	var transform: Dictionary = component.get("local_transform", {})
 	var position_data: Array = transform.get("position", [])
-	var pivot_data: Array = component.get("local_pivot", [])
+	var pivot_data: Array = [0.0, 0.0]
 	var scale_data: Array = transform.get("scale", [])
 	var position := Vector2(float(position_data[0]), float(position_data[1]))
 	var pivot := Vector2(float(pivot_data[0]), float(pivot_data[1]))
@@ -562,6 +563,18 @@ func _test_world_contour_settings() -> void:
 	application.world_contour_stroke_width_px = 6.0
 	var six_px_signature: Dictionary = application._geometry_build_signature("", "", contour)
 	_expect(not GeometryAutoBuildService.signatures_match(four_px_signature, six_px_signature), "The World width must participate in the automatic build signature used by batch invalidation.")
+	var overridden_contour := contour.duplicate(true)
+	overridden_contour["contour_stroke_width_px"] = 9.5
+	var overridden_mesh := ContourMeshService.generate(overridden_contour, application._effective_contour_stroke_width_px(overridden_contour))
+	_expect(is_equal_approx(application._effective_contour_stroke_width_px(overridden_contour), 9.5) and bool(overridden_mesh.get("valid", false)) and is_equal_approx(float(overridden_mesh.get("parameters", {}).get("stroke_width_px", 0.0)), 9.5), "A Component-local Contour width override must resolve to its authored positive pixel value.")
+	var override_signature_before: Dictionary = application._geometry_build_signature("", "", overridden_contour)
+	application.world_contour_stroke_width_px = 10.0
+	var override_signature_after: Dictionary = application._geometry_build_signature("", "", overridden_contour)
+	_expect(GeometryAutoBuildService.signatures_match(override_signature_before, override_signature_after), "Changing the World width must not invalidate a Component with its own Contour width override.")
+	var inherited_explicit_width := contour.duplicate(true)
+	inherited_explicit_width["contour_stroke_width_px"] = application.world_contour_stroke_width_px
+	_expect(not application._component_has_contour_stroke_width_override(inherited_explicit_width) and is_equal_approx(application._effective_contour_stroke_width_px(inherited_explicit_width), application.world_contour_stroke_width_px), "A Component width equal to the World value must inherit it without requiring an explicit Override toggle.")
+	_expect(not application._component_has_contour_stroke_width_override({"contour_stroke_width_px": 0.0}) and not application._component_has_contour_stroke_width_override({"contour_stroke_width_px": "9.5"}), "Component Contour width overrides must be finite, positive numeric values.")
 	application.world_contour_stroke_width_px = 4.0
 	var history_snapshot: Dictionary = application._capture_history_snapshot()
 	application._on_world_contour_stroke_width_changed(6.0)
@@ -700,8 +713,16 @@ func _test_component_scale_rebase() -> void:
 	var blocked_asset := {"id": "blocked", "name": "Blocked", "components": [blocked_parent, child, negative, zero_axis, scaled_reference], "guides": []}
 	var blocked_snapshot := blocked_asset.duplicate(true)
 	var blocked_analysis := ComponentScaleRebaseService.analyze_asset(blocked_asset)
-	_expect(not bool(blocked_analysis.get("can_rebase", true)) and blocked_analysis.get("candidates", []).size() == 1 and blocked_analysis.get("blockers", []).size() == 3, "Signed leaf Scale must remain a candidate while zero Scale, scaled References, and a scaled Parent with Children block the atomic Rebase.")
+	_expect(not bool(blocked_analysis.get("can_rebase", true)) and blocked_analysis.get("candidates", []).size() == 2 and blocked_analysis.get("blockers", []).size() == 1, "Scale Rebase should support scaled Parents with Children while retaining zero-axis blockers and ignoring Reference instance Scale.")
 	_expect(not bool(ComponentScaleRebaseService.rebase_asset(blocked_asset).get("valid", true)) and blocked_asset == blocked_snapshot, "A blocked Asset Rebase must not partially mutate any Component.")
+
+	var child_rebase_asset := {"id": "child_rebase", "name": "Child Rebase", "components": [blocked_parent.duplicate(true), child.duplicate(true)], "guides": []}
+	var child_world_before := ComponentHierarchy.world_transform(child_rebase_asset, "child")
+	var child_rebase_result := ComponentScaleRebaseService.rebase_asset(child_rebase_asset)
+	var child_world_after := ComponentHierarchy.world_transform(child_rebase_asset, "child")
+	var rebased_child := ComponentHierarchy.component_by_id(child_rebase_asset, "child")
+	var child_world_preserved := child_world_after.origin.is_equal_approx(child_world_before.origin) and child_world_after.basis_xform(Vector2.RIGHT).is_equal_approx(child_world_before.basis_xform(Vector2.RIGHT)) and child_world_after.basis_xform(Vector2.DOWN).is_equal_approx(child_world_before.basis_xform(Vector2.DOWN))
+	_expect(bool(child_rebase_result.get("valid", false)) and child_rebase_result.get("rebased_component_ids", []).size() == 1 and Vector2(ComponentHierarchy.component_by_id(child_rebase_asset, "parent").get("transform", {}).get("scale", Vector2.ZERO)) == Vector2.ONE and child_world_preserved and not Vector2(rebased_child.get("transform", {}).get("position", Vector2.ZERO)).is_equal_approx(Vector2.ONE), "Rebasing a scaled Parent must compensate its Child local transform while preserving the Child's visible world transform.")
 
 	var ui_asset := {"id": "ui_rebase", "name": "UI Rebase", "asset_type": "character", "visibility": true, "asset_pivot": Vector2.ZERO, "components": [curved_source.duplicate(true)], "guides": [], "animation": MotionWorkspace.create_default_animation_document()}
 	ui_asset["components"][0]["id"] = "ui_component"
@@ -826,7 +847,7 @@ func _test_geometry_sampling_service() -> void:
 	_expect(not bool(GeometrySamplingService.generate(open_component).get("valid", true)), "An open contour should fail visibly at the mesh-pipeline Sampling boundary.")
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
-	_expect(application._has_supported_schema({"schema_version": 44}) and application._has_supported_schema({"schema_version": 43}) and not application._has_supported_schema({"schema_version": 45}), "Schema 44 should keep current and older World documents readable and reject unknown future schemas.")
+	_expect(application._has_supported_schema({"schema_version": 45}) and application._has_supported_schema({"schema_version": 44}) and not application._has_supported_schema({"schema_version": 46}), "Schema 45 should keep current and older World documents readable and reject unknown future schemas.")
 	_expect(application._normalize_component_draw_mode("ribbon", 39) == "contour" and application._normalize_component_draw_mode("contour", 42) == "contour", "Schema-42 loading must retain the explicit legacy Ribbon-to-Contour migration boundary.")
 	_expect(application._normalize_component_draw_mode("ribbon", 42) == "ribbon", "Current-schema Ribbon data must remain visibly invalid instead of receiving a silent backward fallback.")
 	var arranged_round_trip: Dictionary = application._normalize_sampling_bake(application._serialize_sampling_bake(arranged_result))
@@ -837,7 +858,7 @@ func _test_geometry_sampling_service() -> void:
 	baked_result["bake_id"] = "bake_test"
 	geometry_document["sampling"]["bakes"][GeometrySamplingService.ADAPTIVE] = baked_result
 	var serialized_geometry: Dictionary = application._serialize_geometry_document(geometry_document)
-	_expect(int(serialized_geometry.get("schema_version", 0)) == 44 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-44 JSON arrays.")
+	_expect(int(serialized_geometry.get("schema_version", 0)) == 45 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-45 JSON arrays.")
 	var normalized_geometry: Dictionary = application._normalize_geometry_document(serialized_geometry, "asset_1", "component_1")
 	_expect(normalized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Vector2, "Sampling bake loading should restore local sample positions as Vector2 values.")
 	_expect(normalized_geometry["sampling"]["bakes"].size() == 1, "Sampling should retain one Adaptive Bake.")
@@ -1590,7 +1611,7 @@ func _test_component_names() -> void:
 	var semantic_assets: Array[Dictionary] = [semantic_asset, symbol_asset]
 	application.assets = semantic_assets
 	application._build_ui()
-	_expect(application.component_context_menu.get_item_text(0) == "Group" and application.component_context_menu.get_item_text(3) == "Duplicate", "The Component context menu should expose Group above Duplicate with a separator.")
+	_expect(application.component_context_menu.get_item_text(0) == "Group" and application.component_context_menu.get_item_text(3) == "Copy Components" and application.component_context_menu.get_item_text(6) == "Duplicate", "The Component context menu should expose Component Clipboard actions above Duplicate with separators.")
 	_expect(not application.component_dialog.dialog_text.is_empty(), "Component creation should use a normal free-name input.")
 	application._duplicate_component("character", "component_1")
 	_expect(semantic_asset.get("components", []).size() == 2 and str(semantic_asset.get("components", [])[1].get("name", "")) == "body Copy", "Duplicating a Component should generate a unique free name automatically.")
@@ -1601,7 +1622,42 @@ func _test_component_names() -> void:
 	application.component_name_input.text = "reference"
 	application._confirm_component_creation()
 	var created_reference: Dictionary = semantic_asset.get("components", [])[2]
-	_expect(str(created_reference.get("type", "")) == "reference" and str(created_reference.get("name", "")) == "reference" and str(created_reference.get("source_asset_id", "")) == "orb", "Reference creation should use a local free name while retaining the source Asset ID.")
+	_expect(str(created_reference.get("type", "")) == "reference" and str(created_reference.get("name", "")) == "reference" and str(created_reference.get("source_asset_id", "")) == "orb" and created_reference.get("points", []).is_empty(), "Reference creation should retain the source Asset ID without copying its Component geometry.")
+	created_reference["parent_component_id"] = "component_1"
+	_expect(application._component_tree_name(created_reference) == "R: reference" and application._component_outliner_name(semantic_asset, created_reference) == "reference ← Orb" and application._reference_outliner_tooltip(semantic_asset, created_reference) == "Referenced asset: Orb\nAttached to: body", "The Component tree should mark References locally while the References overview names their source Asset and retains the Parent in the tooltip.")
+	application._duplicate_component("character", str(created_reference.get("id", "")), "flip_orientation")
+	var mirrored_reference: Dictionary = application._get_component(semantic_asset, application.selected_component_id)
+	_expect(str(mirrored_reference.get("type", "")) == "reference" and Vector2(mirrored_reference.get("transform", {}).get("scale", Vector2.ONE)).x < 0.0, "Duplicate & Mirror should preserve a Reference's signed instance Scale without attempting geometry Rebase.")
+	application.free()
+
+
+func _test_component_clipboard() -> void:
+	var application: Control = load("res://scripts/main.gd").new()
+	var component_transform := {"position": Vector2(2.0, -1.0), "rotation": 12.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}
+	var eye_left := {"id": "eye_left", "type": "component", "name": "eye_left", "draw_mode": "closed_loop", "parent_component_id": "", "group_id": "", "points": [], "edges": [], "chains": [], "transform": component_transform.duplicate(true)}
+	var eye_right := {"id": "eye_right", "type": "component", "name": "eye_right", "draw_mode": "closed_loop", "parent_component_id": "", "group_id": "", "points": [], "edges": [], "chains": [], "transform": {"position": Vector2(-2.0, -1.0), "rotation": -12.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}}
+	var mage := {"id": "mage", "name": "Mage", "asset_type": "character", "visibility": true, "components": [eye_left, eye_right], "guides": [AssetGuide.create("guide_1", "Eye Flow", AssetGuide.FLOW, "eye_left", 1)]}
+	var head := {"id": "chantres_head", "type": "component", "name": "head", "draw_mode": "closed_loop", "parent_component_id": "", "group_id": "", "points": [], "edges": [], "chains": [], "transform": {"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}}
+	var chantres := {"id": "chantres", "name": "Chantres", "asset_type": "character", "visibility": true, "components": [head], "guides": []}
+	var clipboard_assets: Array[Dictionary] = [mage, chantres]
+	application.assets = clipboard_assets
+	application.next_component_id = 100
+	application.next_guide_id = 10
+	application._build_ui()
+	application.selected_asset_id = "mage"
+	application.selected_component_id = "eye_right"
+	var copied_selection: Array[String] = ["eye_left", "eye_right"]
+	application.selected_component_ids = copied_selection
+	application._copy_selected_component_subtrees()
+	application._paste_component_clipboard("chantres", "chantres_head")
+	var pasted_asset: Dictionary = application._get_asset("chantres")
+	var pasted_left: Dictionary = application._get_component(pasted_asset, "component_100")
+	var pasted_right: Dictionary = application._get_component(pasted_asset, "component_101")
+	var pasted_guide: Dictionary = application._get_guide(pasted_asset, "guide_10")
+	_expect(pasted_asset.get("components", []).size() == 3 and str(pasted_left.get("parent_component_id", "")) == "chantres_head" and str(pasted_right.get("parent_component_id", "")) == "chantres_head" and str(pasted_left.get("name", "")) == "eye_left" and Vector2(pasted_left.get("transform", {}).get("position", Vector2.ZERO)).is_equal_approx(Vector2(2.0, -1.0)), "Pasting multiple Components onto a target Parent should preserve their local transforms and assign fresh Component IDs.")
+	_expect(str(pasted_guide.get("scope", {}).get("component_id", "")) == "component_100" and int(pasted_guide.get("ordinal", 0)) == 1, "Component-scoped Guides must paste with their copied Component and remapped scope ID.")
+	application._restore_history_snapshot(application.undo_history.back())
+	_expect(application.undo_history.size() == 1 and application._get_asset("chantres").get("components", []).size() == 1 and application._get_asset("chantres").get("guides", []).is_empty(), "Pasting Component Clipboard contents must capture one Undo snapshot.")
 	application.free()
 
 
@@ -1656,19 +1712,19 @@ func _test_runtime_export_service() -> void:
 	var result := RuntimeExportService.build_manifest(asset, {"component_a": source, "component_b": source})
 	var manifest: Dictionary = result.get("manifest", {})
 	var components: Array = manifest.get("components", [])
-	_expect(bool(result.get("valid", false)) and int(manifest.get("schema_version", 0)) == 5 and str(manifest.get("asset_key", "")) == "wizard" and not manifest.has("asset_id"), "Runtime export schema 5 should identify packages only by the Asset Key derived from their display name.")
+	_expect(bool(result.get("valid", false)) and int(manifest.get("schema_version", 0)) == 6 and str(manifest.get("asset_key", "")) == "wizard" and not manifest.has("asset_id"), "Runtime export schema 6 should identify packages only by the Asset Key derived from their display name.")
 	_expect(components.size() == 2 and str(components[0].get("component_id", "")) == "component_a" and str(components[1].get("component_id", "")) == "component_b", "Runtime Components should sort globally by ascending z_index and lexicographic Component ID.")
 	_expect(components[1].get("mesh", {}).get("vertices", []) == [[-0.2, -0.30000000000000004], [0.8, -0.30000000000000004], [-0.2, 0.7000000000000001]] and components[1].get("mesh", {}).get("indices", []) == [0, 1, 2], "Runtime Meshes should preserve accepted Vertex order, convert Tool units to meters, compact Triangle IDs, and be local to their Component pivot.")
-	_expect(not components[1].get("mesh", {}).has("uvs") and not components[1].has("contour_carrier") and not components[1].has("contour_mask"), "Schema 4 must remove UV, Carrier, and SDF fields rather than retaining a silent compatibility payload.")
+	_expect(not components[1].get("mesh", {}).has("uvs") and not components[1].has("contour_carrier") and not components[1].has("contour_mask"), "Schema 5 must remove UV, Carrier, and SDF fields rather than retaining a silent compatibility payload.")
 	var exported_stroke: Dictionary = components[1].get("contour_stroke_mesh", {})
-	_expect(str(exported_stroke.get("role", "")) == "centered_boundary_stroke" and bool(exported_stroke.get("has_outline", false)) and is_equal_approx(float(exported_stroke.get("stroke_width_px", 0.0)), 4.0) and is_equal_approx(float(exported_stroke.get("inner_offset_meters", 0.0)), 0.015625) and is_equal_approx(float(exported_stroke.get("outer_offset_meters", 0.0)), 0.015625), "Schema 4 should export the original Boundary as the centered metric Stroke with symmetric inner and outer offsets.")
+	_expect(str(exported_stroke.get("role", "")) == "centered_boundary_stroke" and bool(exported_stroke.get("has_outline", false)) and is_equal_approx(float(exported_stroke.get("stroke_width_px", 0.0)), 4.0) and is_equal_approx(float(exported_stroke.get("inner_offset_meters", 0.0)), 0.015625) and is_equal_approx(float(exported_stroke.get("outer_offset_meters", 0.0)), 0.015625), "Schema 5 should export the original Boundary as the centered metric Stroke with symmetric inner and outer offsets.")
 	var disabled_stroke: Dictionary = contour_stroke.duplicate(true)
 	disabled_stroke["has_outline"] = false
 	disabled_stroke["vertices"] = []
 	disabled_stroke["triangles"] = []
 	disabled_stroke["runs"] = []
 	var disabled_result := RuntimeExportService.build_manifest(asset, {"component_a": {"mesh": mesh, "contour_stroke": disabled_stroke}, "component_b": source})
-	_expect(bool(disabled_result.get("valid", false)) and not bool(disabled_result.get("manifest", {}).get("components", [])[0].get("contour_stroke_mesh", {}).get("has_outline", true)), "Schema 4 must preserve Render Outline off as an explicit empty Stroke without generating fallback art.")
+	_expect(bool(disabled_result.get("valid", false)) and not bool(disabled_result.get("manifest", {}).get("components", [])[0].get("contour_stroke_mesh", {}).get("has_outline", true)), "Schema 5 must preserve Render Outline off as an explicit empty Stroke without generating fallback art.")
 	_expect(components[1].get("local_transform", {}).get("position", []) == [1.0, 2.0] and is_equal_approx(float(components[1].get("local_transform", {}).get("rotation_radians", 0.0)), PI / 2.0), "Runtime transforms should preserve Y-up coordinates and publish positions in meters and CCW radians.")
 	_expect(not components[1].has("display_name") and str(components[1].get("name", "")) == "body" and not components[1].has("semantic_key"), "Runtime Components should expose their free Component name without a redundant display label or Semantic Key.")
 	var scaled_export_asset: Dictionary = asset.duplicate(true)
@@ -1680,7 +1736,7 @@ func _test_runtime_export_service() -> void:
 	var open_contour_asset := {"id": "contour_asset", "name": "Contour Asset", "asset_type": "character", "visibility": true, "asset_pivot": Vector2.ZERO, "components": [open_contour_component]}
 	var contour_export := RuntimeExportService.build_manifest(open_contour_asset, {"component_b": {"contour_stroke": contour_stroke}})
 	var exported_contour: Dictionary = contour_export.get("manifest", {}).get("components", [])[0]
-	_expect(bool(contour_export.get("valid", false)) and exported_contour.has("contour_stroke_mesh") and not exported_contour.has("mesh"), "Schema 4 must export an open Contour exclusively as its typed art Stroke without inventing Fill geometry.")
+	_expect(bool(contour_export.get("valid", false)) and exported_contour.has("contour_stroke_mesh") and not exported_contour.has("mesh"), "Schema 5 must export an open Contour exclusively as its typed art Stroke without inventing Fill geometry.")
 	var wizard_head := {"id": "head", "name": "head", "visibility": true, "parent_component_id": "", "transform": {"position": Vector2(0.0, 8.5), "pivot": Vector2(0.0, 8.5), "rotation": 0.0, "scale": Vector2.ONE}}
 	var wizard_eye := {"id": "eye", "name": "eye_left", "visibility": true, "parent_component_id": "head", "transform": {"position": Vector2(-0.3, 8.5), "pivot": Vector2(-0.3, 8.5), "rotation": 0.0, "scale": Vector2.ONE}}
 	var head_mesh: Dictionary = mesh.duplicate(true)
@@ -1700,15 +1756,17 @@ func _test_runtime_export_service() -> void:
 	var eye_vertex: Array = exported_eye.get("mesh", {}).get("vertices", [])[0]
 	var reconstructed_eye := _runtime_export_world_transform(nested_by_id, "eye") * Vector2(float(eye_vertex[0]), float(eye_vertex[1]))
 	var eye_local_position: Array = exported_eye.get("local_transform", {}).get("position", [])
-	_expect(bool(nested_result.get("valid", false)) and exported_eye.get("local_pivot", []) == [0.0, 0.0] and is_equal_approx(float(eye_local_position[0]), -0.03) and is_zero_approx(float(eye_local_position[1])) and reconstructed_eye.is_equal_approx(Vector2(-0.025, 0.85)), "Nested Wizard Head → Eye export should use child-local mesh/pivot data and reconstruct its intended asset-space world position exactly.")
-	var reference := {"id": "component_orb", "type": "reference", "name": "orb_reference", "source_asset_id": "orb", "visibility": true, "z_index": 3, "parent_component_id": "component_b", "transform": {"position": Vector2(3.0, 4.0), "pivot": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE}}
+	var exported_eye_pivot: Array = exported_eye.get("component_pivot", [])
+	_expect(bool(nested_result.get("valid", false)) and exported_eye_pivot.size() == 2 and is_equal_approx(float(exported_eye_pivot[0]), -0.03) and is_equal_approx(float(exported_eye_pivot[1]), 0.85) and is_equal_approx(float(eye_local_position[0]), -0.03) and is_zero_approx(float(eye_local_position[1])) and reconstructed_eye.is_equal_approx(Vector2(-0.025, 0.85)), "Nested Wizard Head → Eye export should publish the global component pivot and reconstruct its intended asset-space world position exactly.")
+	var reference := {"id": "component_orb", "type": "reference", "name": "orb_reference", "source_asset_id": "orb", "visibility": true, "z_index": 3, "parent_component_id": "component_b", "transform": {"position": Vector2(3.0, 4.0), "pivot": Vector2.ZERO, "rotation": 0.0, "scale": Vector2(-1.0, 1.0)}}
 	var referenced_asset: Dictionary = asset.duplicate(true)
 	referenced_asset["components"].append(reference)
 	var reference_source := {"owner_asset_id": "wizard", "source_asset_exists": true, "source_asset_key": "orb"}
 	var referenced_result := RuntimeExportService.build_manifest(referenced_asset, {"component_a": source, "component_b": source, "component_orb": reference_source})
 	var referenced_components: Array = referenced_result.get("manifest", {}).get("components", [])
 	var exported_reference: Dictionary = referenced_components[2] if referenced_components.size() == 3 else {}
-	_expect(bool(referenced_result.get("valid", false)) and str(exported_reference.get("kind", "")) == "asset_reference" and str(exported_reference.get("source_asset_key", "")) == "orb" and not exported_reference.has("source_asset_id") and str(exported_reference.get("name", "")) == "orb_reference" and not exported_reference.has("mesh"), "A local free Component name should classify a Reference while source_asset_key preserves the referenced runtime Asset identity.")
+	var exported_reference_scale: Array = exported_reference.get("local_transform", {}).get("scale", [])
+	_expect(bool(referenced_result.get("valid", false)) and str(exported_reference.get("kind", "")) == "asset_reference" and str(exported_reference.get("source_asset_key", "")) == "orb" and not exported_reference.has("source_asset_id") and str(exported_reference.get("name", "")) == "orb_reference" and not exported_reference.has("mesh") and exported_reference_scale.size() == 2 and float(exported_reference_scale[0]) * float(exported_reference_scale[1]) < 0.0, "A Reference should export its reflected instance transform and source Asset identity without duplicating source geometry.")
 	reference_source["source_asset_exists"] = false
 	_expect(not bool(RuntimeExportService.build_manifest(referenced_asset, {"component_a": source, "component_b": source, "component_orb": reference_source}).get("valid", true)), "Runtime export should reject a Reference whose actual source Asset cannot be resolved.")
 	var duplicate_role_asset: Dictionary = asset.duplicate(true)
@@ -2309,7 +2367,7 @@ func _test_motion_act_evaluator() -> void:
 	var normalized: Dictionary = application._normalize_motion_act({"id": "act_7", "parameters": {"direction": [0.0, 2.0], "distance": 12.0}}, "fallback")
 	_expect(Vector2(normalized.get("parameters", {}).get("direction", Vector2.ZERO)) == Vector2(0.0, 2.0), "Persisted Slide direction arrays should normalize back to Vector2 values.")
 	var serialized: Dictionary = application._serialize_motion_act(normalized)
-	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 44, "Act persistence should serialize vectors as JSON arrays using schema 44.")
+	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 45, "Act persistence should serialize vectors as JSON arrays using schema 45.")
 	var normalized_jump: Dictionary = application._normalize_motion_act({"id": "act_8", "primitive": "jump", "parameters": {"direction": [1.0, 0.0], "distance": 7.0, "height": 2.5, "arc": "snappy"}}, "fallback")
 	var serialized_jump: Dictionary = application._serialize_motion_act(normalized_jump)
 	_expect(str(serialized_jump.get("primitive", "")) == MotionActEvaluator.JUMP and is_equal_approx(float(serialized_jump.get("parameters", {}).get("height", 0.0)), 2.5) and str(serialized_jump.get("parameters", {}).get("arc", "")) == MotionActEvaluator.JUMP_ARC_SNAPPY, "Jump-specific parameters should survive normalization and serialization.")

@@ -1,7 +1,7 @@
 class_name RuntimeExportService
 extends RefCounted
 
-const MANIFEST_SCHEMA_VERSION := 5
+const MANIFEST_SCHEMA_VERSION := 6
 static func build_manifest(asset: Dictionary, sources: Dictionary) -> Dictionary:
 	var errors: Array[String] = []
 	var asset_id := str(asset.get("id", ""))
@@ -47,7 +47,7 @@ static func build_manifest(asset: Dictionary, sources: Dictionary) -> Dictionary
 		var authored_scale := Vector2.ONE
 		if authored_transform is Dictionary:
 			authored_scale = Vector2(authored_transform.get("scale", Vector2.ONE))
-		if not authored_scale.is_finite() or not authored_scale.is_equal_approx(Vector2.ONE):
+		if str(component.get("type", "component")) != "reference" and (not authored_scale.is_finite() or not authored_scale.is_equal_approx(Vector2.ONE)):
 			errors.append("%s: Component Scale must be rebased to (1, 1) before Runtime Export." % _component_label(component))
 	errors.append_array(_hierarchy_errors(visible_components))
 	var export_transforms := _canonical_export_transforms(asset, visible_components)
@@ -56,7 +56,8 @@ static func build_manifest(asset: Dictionary, sources: Dictionary) -> Dictionary
 		var component_id := str(component.get("id", ""))
 		var source: Dictionary = sources.get(component_id, {})
 		var export_transform: Dictionary = export_transforms.get(component_id, {})
-		var built := _build_reference_component(component, source, export_transform) if str(component.get("type", "component")) == "reference" else _build_component_v4(component, source, export_transform)
+		var component_pivot := _global_component_pivot(asset, component)
+		var built := _build_reference_component(component, source, export_transform, component_pivot) if str(component.get("type", "component")) == "reference" else _build_component_v4(component, source, export_transform, component_pivot)
 		errors.append_array(built.get("errors", []))
 		if bool(built.get("valid", false)):
 			manifest_components.append(built["component"])
@@ -92,7 +93,7 @@ static func build_manifest(asset: Dictionary, sources: Dictionary) -> Dictionary
 	return {"valid": true, "errors": [], "manifest": manifest}
 
 
-static func _build_component_v4(component: Dictionary, source: Dictionary, export_transform: Dictionary) -> Dictionary:
+static func _build_component_v4(component: Dictionary, source: Dictionary, export_transform: Dictionary, component_pivot: Vector2) -> Dictionary:
 	var errors: Array[String] = []
 	var label := _component_label(component)
 	var draw_mode := str(component.get("draw_mode", "closed_loop"))
@@ -143,7 +144,7 @@ static func _build_component_v4(component: Dictionary, source: Dictionary, expor
 		"name": str(component.get("name", "")).strip_edges(),
 		"parent_component_id": parent_component_id,
 		"z_index": int(component.get("z_index", 0)),
-		"local_pivot": [0.0, 0.0],
+		"component_pivot": _meters(component_pivot),
 		"local_transform": {"position": _meters(position), "rotation_radians": deg_to_rad(rotation), "scale": [scale.x, scale.y]},
 		"contour_stroke_mesh": {
 			"role": "centered_boundary_stroke",
@@ -251,7 +252,7 @@ static func _stroke_run_validation_issues(raw_runs: Array, has_outline: bool, ve
 	return errors
 
 
-static func _build_reference_component(component: Dictionary, source: Dictionary, export_transform: Dictionary) -> Dictionary:
+static func _build_reference_component(component: Dictionary, source: Dictionary, export_transform: Dictionary, component_pivot: Vector2) -> Dictionary:
 	var errors: Array[String] = []
 	var label := _component_label(component)
 	var source_asset_id := str(component.get("source_asset_id", ""))
@@ -268,6 +269,8 @@ static func _build_reference_component(component: Dictionary, source: Dictionary
 	var rotation := float(export_transform.get("rotation", 0.0))
 	if not position.is_finite() or not pivot.is_finite() or not scale.is_finite() or not is_finite(rotation):
 		errors.append("%s: Component transform is not finite." % label)
+	elif is_zero_approx(scale.x) or is_zero_approx(scale.y):
+		errors.append("%s: Reference Scale axes must be non-zero." % label)
 	if not errors.is_empty():
 		return {"valid": false, "errors": errors}
 	var parent_component_id: Variant = null
@@ -283,7 +286,7 @@ static func _build_reference_component(component: Dictionary, source: Dictionary
 			"source_asset_key": source_asset_key,
 			"parent_component_id": parent_component_id,
 			"z_index": int(component.get("z_index", 0)),
-			"local_pivot": _meters(pivot),
+			"component_pivot": _meters(component_pivot),
 			"local_transform": {
 				"position": _meters(position),
 				"rotation_radians": deg_to_rad(rotation),
@@ -314,6 +317,16 @@ static func _canonical_export_transforms(asset: Dictionary, components: Array[Di
 		var local_affine: Transform2D = parent_world.affine_inverse() * world_by_id.get(component_id, Transform2D.IDENTITY)
 		result[component_id] = ComponentHierarchy.transform_record_from_affine(local_affine, Vector2.ZERO)
 	return result
+
+
+static func _global_component_pivot(asset: Dictionary, component: Dictionary) -> Vector2:
+	var component_id := str(component.get("id", ""))
+	var authored_transform = component.get("transform", {})
+	if not authored_transform is Dictionary:
+		authored_transform = {}
+	var local_pivot := Vector2(authored_transform.get("pivot", Vector2.ZERO))
+	var global_position := ComponentHierarchy.world_transform(asset, component_id) * local_pivot
+	return global_position - Vector2(asset.get("asset_pivot", Vector2.ZERO))
 
 
 static func _hierarchy_errors(components: Array[Dictionary]) -> Array[String]:

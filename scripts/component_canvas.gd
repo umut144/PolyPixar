@@ -980,11 +980,8 @@ func _draw_grid_lines(step: float, line_color: Color, line_width: float) -> void
 func _draw_measurement_guides() -> void:
 	if not cursor_over_canvas or context_name.is_empty():
 		return
-	var origin_world := Vector2.ZERO
-	var cursor_position_world := cursor_world
-	if interaction_state.is_empty():
-		origin_world = component_transform.get("position", Vector2.ZERO)
-		cursor_position_world = _local_to_world(cursor_world)
+	var origin_world := asset_pivot
+	var cursor_position_world := cursor_world if interaction_state.is_empty() else _local_to_world(cursor_world)
 	var cursor_screen := _world_to_screen(cursor_position_world)
 	var measurement_guide_color := Color("#f2c94c")
 	var coordinate_lines: Array[String] = []
