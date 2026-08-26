@@ -13,6 +13,7 @@ const MAX_HISTORY_SIZE := 100
 const DRAW_MODES := ["closed_loop", "contour", "primitive"]
 const GRID_BOX_TOOL_UNITS := 0.5
 const GAME_TILE_CENTIMETERS := 100.0
+const EYE_COMPONENT_NAME_TOKEN := "eye"
 # Kept available for a later Outliner presentation, but processed outputs are
 # currently reached through the Import Preview instead of additional rows.
 const SHOW_PROCESSED_OUTLINER := false
@@ -266,6 +267,8 @@ var world_name_input: LineEdit
 var load_world_dialog: ConfirmationDialog
 var world_list: ItemList
 var reload_world_dialog: ConfirmationDialog
+var eye_contour_stroke_dialog: ConfirmationDialog
+var eye_contour_stroke_width_field: SpinBox
 var pending_save_after_new := false
 var undo_history: Array[Dictionary] = []
 var redo_history: Array[Dictionary] = []
@@ -755,6 +758,8 @@ func _build_ui() -> void:
 	world_popup.add_item("Save")
 	world_popup.add_item("Load")
 	world_popup.add_item("Reload Current World…")
+	world_popup.add_separator()
+	world_popup.add_item("Set Eye Contour Width…", 4)
 	world_popup.id_pressed.connect(_on_world_menu_id)
 	_create_world_scale_popup()
 	# Batch commands live in the Export module. Keep these detached controls for
@@ -1775,6 +1780,21 @@ func _create_world_dialogs() -> void:
 	reload_world_dialog.confirmed.connect(_reload_current_world)
 	add_child(reload_world_dialog)
 
+	eye_contour_stroke_dialog = ConfirmationDialog.new()
+	eye_contour_stroke_dialog.title = "Set Eye Contour Width"
+	eye_contour_stroke_dialog.dialog_text = "Set every non-reference Component whose name contains ‘eye’. Source Components are updated, so Asset References follow automatically."
+	eye_contour_stroke_dialog.ok_button_text = "Apply"
+	eye_contour_stroke_dialog.size = Vector2i(500, 210)
+	eye_contour_stroke_dialog.confirmed.connect(_apply_eye_contour_stroke_width)
+	eye_contour_stroke_width_field = SpinBox.new()
+	eye_contour_stroke_width_field.min_value = 0.1
+	eye_contour_stroke_width_field.max_value = 1024.0
+	eye_contour_stroke_width_field.step = 0.1
+	eye_contour_stroke_width_field.value = 3.0
+	eye_contour_stroke_width_field.custom_minimum_size = Vector2(320, 32)
+	eye_contour_stroke_dialog.add_child(eye_contour_stroke_width_field)
+	add_child(eye_contour_stroke_dialog)
+
 
 func _on_create_action_pressed() -> void:
 	if active_module == "Create" and active_create_submodule in CREATE_SUBMODULES:
@@ -1826,6 +1846,50 @@ func _on_world_menu_id(id: int) -> void:
 	elif id == 3 and not world_name.is_empty():
 		reload_world_dialog.dialog_text = "Reload '%s' from disk?\n\nUnsaved editor changes will be discarded. Use this after an external script changes World files." % world_name
 		reload_world_dialog.popup_centered()
+	elif id == 4 and not world_name.is_empty():
+		eye_contour_stroke_width_field.grab_focus()
+		eye_contour_stroke_dialog.popup_centered()
+
+
+func _apply_eye_contour_stroke_width() -> void:
+	if world_name.is_empty():
+		return
+	var width := float(eye_contour_stroke_width_field.value)
+	if not is_finite(width) or width <= 0.0:
+		return
+	var matching_components: Array[Dictionary] = []
+	for asset in assets:
+		if not asset is Dictionary:
+			continue
+		for component in asset.get("components", []):
+			if not component is Dictionary or _is_reference_component(component):
+				continue
+			if EYE_COMPONENT_NAME_TOKEN not in str(component.get("name", "")).to_lower():
+				continue
+			if is_equal_approx(_effective_contour_stroke_width_px(component), width):
+				continue
+			matching_components.append(component)
+	if matching_components.is_empty():
+		_show_status_message("Eye Contour Width already matches %s px." % _format_scale_value(width))
+		return
+	_record_direct_change()
+	for component in matching_components:
+		if is_equal_approx(width, world_contour_stroke_width_px):
+			component.erase("contour_stroke_width_px")
+		else:
+			component["contour_stroke_width_px"] = width
+	geometry_meshing_preview = {}
+	geometry_meshing_preview_key = ""
+	geometry_meshing_preview_state = "idle"
+	geometry_meshing_preview_revision += 1
+	_save_world()
+	_refresh_export_preflight(true)
+	_show_status_message("Set Eye Contour Width to %s px on %d Component%s." % [
+		_format_scale_value(width), matching_components.size(), "" if matching_components.size() == 1 else "s"
+	])
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
 
 
 func _open_new_world_dialog(save_after_creation: bool) -> void:
