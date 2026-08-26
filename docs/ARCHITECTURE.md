@@ -64,17 +64,19 @@ The name is the authored identity used by runtime animation bindings. It has
 no Material assignment.
 
 A Group is an Asset-local authoring container with a stable ID, a unique
-lower-snake-case name, visibility, and one shared transform/pivot. Components
-retain their own transforms, while the Group transform is applied as the outer
-transform of every member. Component parent/child
-hierarchy remains independent from Group membership; descendants inherit their
+lower-snake-case name, visibility, one shared transform/pivot, and an optional
+`parent_component_id`. Components retain their own transforms and `group_id`
+membership; they are not children of the Group. Descendants inherit their
 ancestor's effective Group membership unless explicitly assigned otherwise.
-For grouped Components, Group visibility is effective while each Component's
-individual Z Index remains authoritative.
-Outliner drag-and-drop preserves each affected Component's world transform when
-changing Group membership or Component parentage. Groups are editor-only
-containers: runtime export emits the ordinary Components and resolves the
-Group transform into their canonical exported transforms.
+When parented, a Group transform is local to its Component Parent and is applied
+once after that parent in every Part's Component chain. The parent must be an
+ancestor of every direct Part, so a Group cannot be placed beneath one of its
+own Parts. Group visibility is effective while each Component's individual Z
+Index remains authoritative. Outliner drag-and-drop preserves each affected
+Component's world transform when changing Group membership, Component
+parentage, or Group parentage. Groups are editor-only containers: runtime
+export emits ordinary Components and resolves the Group transform into their
+canonical exported transforms.
 
 Derived mesh documents are keyed by Asset and Component IDs. Sampling feeds
 Seeding, Seeding feeds Meshing, and accepted Bakes remain separate from source

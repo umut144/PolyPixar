@@ -849,7 +849,7 @@ func _test_geometry_sampling_service() -> void:
 	_expect(not bool(GeometrySamplingService.generate(open_component).get("valid", true)), "An open contour should fail visibly at the mesh-pipeline Sampling boundary.")
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
-	_expect(application._has_supported_schema({"schema_version": 46}) and application._has_supported_schema({"schema_version": 45}) and not application._has_supported_schema({"schema_version": 47}), "Schema 46 should keep current and older World documents readable and reject unknown future schemas.")
+	_expect(application._has_supported_schema({"schema_version": 47}) and application._has_supported_schema({"schema_version": 46}) and not application._has_supported_schema({"schema_version": 48}), "Schema 47 should keep current and older World documents readable and reject unknown future schemas.")
 	_expect(application._normalize_component_draw_mode("ribbon", 39) == "contour" and application._normalize_component_draw_mode("contour", 42) == "contour", "Schema-42 loading must retain the explicit legacy Ribbon-to-Contour migration boundary.")
 	_expect(application._normalize_component_draw_mode("ribbon", 42) == "ribbon", "Current-schema Ribbon data must remain visibly invalid instead of receiving a silent backward fallback.")
 	var arranged_round_trip: Dictionary = application._normalize_sampling_bake(application._serialize_sampling_bake(arranged_result))
@@ -860,7 +860,7 @@ func _test_geometry_sampling_service() -> void:
 	baked_result["bake_id"] = "bake_test"
 	geometry_document["sampling"]["bakes"][GeometrySamplingService.ADAPTIVE] = baked_result
 	var serialized_geometry: Dictionary = application._serialize_geometry_document(geometry_document)
-	_expect(int(serialized_geometry.get("schema_version", 0)) == 46 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-46 JSON arrays.")
+	_expect(int(serialized_geometry.get("schema_version", 0)) == 47 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-47 JSON arrays.")
 	var normalized_geometry: Dictionary = application._normalize_geometry_document(serialized_geometry, "asset_1", "component_1")
 	_expect(normalized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Vector2, "Sampling bake loading should restore local sample positions as Vector2 values.")
 	_expect(normalized_geometry["sampling"]["bakes"].size() == 1, "Sampling should retain one Adaptive Bake.")
@@ -1885,6 +1885,14 @@ func _test_component_hierarchy_model() -> void:
 	child["transform"] = ComponentHierarchy.local_transform_from_world_record(asset, "component_child", child_world_record)
 	_expect(ComponentHierarchy.world_transform(asset, "component_child").origin.is_equal_approx(Vector2(12.0, 0.0)), "Reparenting a Component under another Parent should preserve its visible world transform.")
 	_expect(ComponentHierarchy.can_parent(asset, "component_parent", "component_child") == false, "Component hierarchy validation should reject cycles.")
+	var forehead := {"id": "forehead", "name": "Forehead", "parent_component_id": "", "group_id": "", "transform": {"position": Vector2(20.0, 0.0), "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}}
+	var head_tip_part := {"id": "head_tip_part", "name": "Head Tip", "parent_component_id": "forehead", "group_id": "head_tip", "transform": {"position": Vector2(3.0, 0.0), "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}}
+	var head_tip_group := {"id": "head_tip", "name": "head_tip", "parent_component_id": "forehead", "transform": {"position": Vector2(10.0, 0.0), "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}, "visibility": true}
+	var grouped_asset := {"components": [forehead, head_tip_part], "groups": [head_tip_group], "guides": []}
+	ComponentHierarchy.normalize_asset(grouped_asset)
+	_expect(ComponentHierarchy.can_parent_group(grouped_asset, "head_tip", "forehead"), "A Group may be parented to a Component that is an ancestor of all of its direct Parts.")
+	_expect(ComponentHierarchy.group_world_transform(grouped_asset, "head_tip").origin.is_equal_approx(Vector2(30.0, 0.0)) and ComponentHierarchy.world_transform(grouped_asset, "head_tip_part").origin.is_equal_approx(Vector2(33.0, 0.0)), "A parented Group should compose once after its Component Parent, while its Parts remain ordinary Component children.")
+	_expect(not ComponentHierarchy.can_parent_group(grouped_asset, "head_tip", "head_tip_part"), "A Group cannot be parented beneath one of its Parts.")
 	_expect(str(flow_1.get("guide_type", "")) == AssetGuide.FLOW and int(flow_1.get("ordinal", 0)) == 1 and int(flow_2.get("ordinal", 0)) == 2, "Legacy Flow Guides should migrate to canonical types with stable per-Component ordinals.")
 	_expect(int(sample_1.get("ordinal", 0)) == 1 and int(child_sample.get("ordinal", 0)) == 1, "Guide numbering should be independent for every Component and Guide type.")
 	_expect(ComponentHierarchy.next_guide_ordinal(asset, "component_parent", AssetGuide.FLOW) == 3 and AssetGuide.outliner_name(child_sample, "Eyes") == "Eyes → Sample01", "Guide naming data should support stable dynamic Component-based labels.")
@@ -2369,7 +2377,7 @@ func _test_motion_act_evaluator() -> void:
 	var normalized: Dictionary = application._normalize_motion_act({"id": "act_7", "parameters": {"direction": [0.0, 2.0], "distance": 12.0}}, "fallback")
 	_expect(Vector2(normalized.get("parameters", {}).get("direction", Vector2.ZERO)) == Vector2(0.0, 2.0), "Persisted Slide direction arrays should normalize back to Vector2 values.")
 	var serialized: Dictionary = application._serialize_motion_act(normalized)
-	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 46, "Act persistence should serialize vectors as JSON arrays using schema 46.")
+	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 47, "Act persistence should serialize vectors as JSON arrays using schema 47.")
 	var normalized_jump: Dictionary = application._normalize_motion_act({"id": "act_8", "primitive": "jump", "parameters": {"direction": [1.0, 0.0], "distance": 7.0, "height": 2.5, "arc": "snappy"}}, "fallback")
 	var serialized_jump: Dictionary = application._serialize_motion_act(normalized_jump)
 	_expect(str(serialized_jump.get("primitive", "")) == MotionActEvaluator.JUMP and is_equal_approx(float(serialized_jump.get("parameters", {}).get("height", 0.0)), 2.5) and str(serialized_jump.get("parameters", {}).get("arc", "")) == MotionActEvaluator.JUMP_ARC_SNAPPY, "Jump-specific parameters should survive normalization and serialization.")

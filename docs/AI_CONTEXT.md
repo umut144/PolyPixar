@@ -60,21 +60,17 @@ Sampling, Seeding, Meshing, UV, and Weighting records are stored separately
 from source topology.
 
 Assets may also contain editor-only Component Groups. A Group owns a stable ID,
-a unique lower-snake-case name, visibility, a shared Z Index, and a shared
-world-level transform with a pivot initially placed at the world center. Group membership does not
-replace Component parentage: parent/child links remain independent, and a child
-inherits its ancestor's effective Group membership. Moving a Component into or
-out of a Group, or changing its parent through the Outliner, must preserve its
-<<<<<<< HEAD
-world transform. Group visibility is effective for all members, while each
-Component retains its individual Z Index;
-individual Component Z Index values are retained only for compatibility and
-are ignored while grouped. Runtime export does not emit Group records; it
-resolves Group transforms and layer values into ordinary Component exports.
-=======
-world transform. Runtime export does not emit Group records; it resolves Group
-transforms into the ordinary Component export transforms.
->>>>>>> parent of 87f83a9 (Document outline resolution contract)
+a unique lower-snake-case name, visibility, a shared Z Index, a local transform,
+and an optional `parent_component_id`. Group membership (`group_id`) does not
+replace Component parentage: the Group's Parts remain ordinary Components, and
+a child inherits its ancestor's effective Group membership. A Group may be
+parented below a Component only when that Component is an ancestor of every
+direct Part; its transform is then applied once after that Component. Moving a
+Component into or out of a Group, changing a Component parent, or reparenting a
+Group through the Outliner preserves every affected Component's world transform.
+Group visibility is effective for all members, while each Component retains its
+individual Z Index. Runtime export does not emit Group records; it resolves
+Group transforms into ordinary Component exports.
 
 World schema 41 owns the default authored Contour stroke width in its typed
 `world_settings` record. It defaults to `4 px` at the fixed `192 px/m`

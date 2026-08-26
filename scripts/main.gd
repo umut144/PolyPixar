@@ -8,7 +8,7 @@ const EXPORT_SUBMODULES: Array[String] = []
 const MOTION_SUBMODULES := ["Animation", "Path", "Act", "Sequence"]
 const WORLDS_ROOT := "res://worlds"
 const CONFIG_PATH := "res://configs/app_config.json"
-const SCHEMA_VERSION := 46
+const SCHEMA_VERSION := 47
 const MAX_HISTORY_SIZE := 100
 const DRAW_MODES := ["closed_loop", "contour", "primitive"]
 const GRID_BOX_TOOL_UNITS := 0.5
@@ -2150,6 +2150,7 @@ func _save_world() -> void:
 			asset_data["groups"].append({
 				"id": str(group.get("id", "")),
 				"name": str(group.get("name", "Group")),
+				"parent_component_id": str(group.get("parent_component_id", "")),
 				"transform": _serialize_transform(group.get("transform", _default_component_transform())),
 				"visibility": bool(group.get("visibility", true)),
 				"z_index": int(group.get("z_index", 0))
@@ -2492,6 +2493,7 @@ func _load_world(world_entry: String, persist_as_last := true) -> bool:
 			groups.append({
 				"id": str(group_data.get("id", "")),
 				"name": str(group_data.get("name", "Group")),
+				"parent_component_id": str(group_data.get("parent_component_id", "")),
 				"transform": _deserialize_transform(group_data.get("transform", {})),
 				"visibility": bool(group_data.get("visibility", true)),
 				"z_index": int(group_data.get("z_index", 0))
@@ -8230,30 +8232,33 @@ func _render_asset_outliner_entry(asset: Dictionary, force_expand := false) -> v
 	components_label.set_drag_forwarding(_outliner_get_drag_data.bind(str(asset.get("id", "")), "root"), _outliner_can_drop_data.bind(str(asset.get("id", "")), "root"), _outliner_drop_data.bind(str(asset.get("id", "")), "root"))
 	asset_container.add_child(components_label)
 	var rendered_component_ids: Dictionary = {}
+	var rendered_group_ids: Dictionary = {}
 	var groups: Array = asset.get("groups", []).duplicate(true)
 	groups.sort_custom(_sort_named_documents)
 	for group in groups:
-		_render_group_outliner_tree(asset_container, asset, group, 16, rendered_component_ids)
+		if str(group.get("parent_component_id", "")).is_empty():
+			_render_group_outliner_tree(asset_container, asset, group, 16, rendered_component_ids, rendered_group_ids)
 	for component in components:
 		if str(component.get("parent_component_id", "")).is_empty() and ComponentHierarchy.membership_group_id(asset, str(component.get("id", ""))).is_empty():
-			_render_component_outliner_tree(asset_container, asset, component, 16, rendered_component_ids)
+			_render_component_outliner_tree(asset_container, asset, component, 16, rendered_component_ids, false, rendered_group_ids)
 	# A malformed in-memory document should remain editable even before its next load migration.
 	for component in components:
 		if not rendered_component_ids.has(str(component.get("id", ""))):
-			_render_component_outliner_tree(asset_container, asset, component, 16, rendered_component_ids)
+			_render_component_outliner_tree(asset_container, asset, component, 16, rendered_component_ids, false, rendered_group_ids)
 	asset_container.add_child(_create_outliner_child_group_label("References"))
 	references.sort_custom(_sort_named_documents)
 	for reference in references:
-		_render_component_outliner_tree(asset_container, asset, reference, 16, rendered_component_ids, true)
+		_render_component_outliner_tree(asset_container, asset, reference, 16, rendered_component_ids, true, {})
 	asset_container.add_child(_create_outliner_child_group_label("Guides"))
 	for guide in guides:
 		_render_component_guide_row(asset_container, asset, guide)
 
 
-func _render_group_outliner_tree(container: VBoxContainer, asset: Dictionary, group: Dictionary, indent: int, rendered_component_ids: Dictionary) -> void:
+func _render_group_outliner_tree(container: VBoxContainer, asset: Dictionary, group: Dictionary, indent: int, rendered_component_ids: Dictionary, rendered_group_ids: Dictionary) -> void:
 	var group_id := str(group.get("id", ""))
-	if group_id.is_empty():
+	if group_id.is_empty() or rendered_group_ids.has(group_id):
 		return
+	rendered_group_ids[group_id] = true
 	var group_row := HBoxContainer.new()
 	group_row.add_theme_constant_override("separation", 0)
 	container.add_child(group_row)
@@ -8281,7 +8286,7 @@ func _render_group_outliner_tree(container: VBoxContainer, asset: Dictionary, gr
 			group_components.append(component)
 	group_components.sort_custom(_sort_named_documents)
 	for component in group_components:
-		_render_component_outliner_tree(container, asset, component, indent + 16, rendered_component_ids)
+		_render_component_outliner_tree(container, asset, component, indent + 16, rendered_component_ids, false, rendered_group_ids, true)
 
 
 func _select_group(asset_id: String, group_id: String) -> void:
@@ -8334,7 +8339,14 @@ func _on_asset_outliner_gui_input(event: InputEvent, asset_id: String, button: B
 func _outliner_get_drag_data(_at_position: Vector2, asset_id: String, target_id: String):
 	if target_id == "root":
 		return null
-	var component := _get_component(_get_asset(asset_id), target_id)
+	var asset := _get_asset(asset_id)
+	var group := ComponentHierarchy.group_by_id(asset, target_id)
+	if not group.is_empty():
+		var group_preview := Label.new()
+		group_preview.text = "G: %s" % str(group.get("name", "Group"))
+		set_drag_preview(group_preview)
+		return {"kind": "group", "asset_id": asset_id, "group_id": target_id}
+	var component := _get_component(asset, target_id)
 	if component.is_empty():
 		return null
 	var component_ids: Array[String] = []
@@ -8349,9 +8361,14 @@ func _outliner_get_drag_data(_at_position: Vector2, asset_id: String, target_id:
 
 
 func _outliner_can_drop_data(_at_position: Vector2, data, asset_id: String, target_id: String) -> bool:
-	if not data is Dictionary or str(data.get("kind", "")) != "components" or str(data.get("asset_id", "")) != asset_id:
+	if not data is Dictionary or str(data.get("asset_id", "")) != asset_id:
 		return false
 	var asset := _get_asset(asset_id)
+	if str(data.get("kind", "")) == "group":
+		var group_id := str(data.get("group_id", ""))
+		return ComponentHierarchy.can_parent_group(asset, group_id, "" if target_id == "root" else target_id)
+	if str(data.get("kind", "")) != "components":
+		return false
 	var component_ids: Array = data.get("component_ids", [])
 	if component_ids.is_empty():
 		return false
@@ -8371,6 +8388,19 @@ func _outliner_drop_data(_at_position: Vector2, data, asset_id: String, target_i
 	if not _outliner_can_drop_data(Vector2.ZERO, data, asset_id, target_id):
 		return
 	var asset := _get_asset(asset_id)
+	if str(data.get("kind", "")) == "group":
+		var group_id := str(data.get("group_id", ""))
+		_record_direct_change()
+		_set_group_parent_preserving_world(asset, group_id, "" if target_id == "root" else target_id)
+		selected_asset_id = asset_id
+		selected_group_id = group_id
+		selected_component_id = ""
+		selected_component_ids.clear()
+		_render_outliner()
+		_render_inspector()
+		_render_canvas_context()
+		_show_status_message("Removed Group from Parent." if target_id == "root" else "Parented Group under %s." % str(_get_component(asset, target_id).get("name", "Component")))
+		return
 	var component_ids: Array = data.get("component_ids", [])
 	_record_direct_change()
 	if target_id == "root":
@@ -8412,7 +8442,24 @@ func _set_component_parent_preserving_world(asset: Dictionary, component_id: Str
 	component["transform"] = ComponentHierarchy.local_transform_from_world_record(asset, component_id, world_record)
 
 
-func _render_component_outliner_tree(container: VBoxContainer, asset: Dictionary, component: Dictionary, indent: int, rendered_component_ids: Dictionary, reference_summary := false) -> void:
+func _set_group_parent_preserving_world(asset: Dictionary, group_id: String, parent_id: String) -> void:
+	var group := ComponentHierarchy.group_by_id(asset, group_id)
+	if group.is_empty() or not ComponentHierarchy.can_parent_group(asset, group_id, parent_id):
+		return
+	var member_world_records: Dictionary = {}
+	for member in asset.get("components", []):
+		if member is Dictionary and ComponentHierarchy.membership_group_id(asset, str(member.get("id", ""))) == group_id:
+			member_world_records[str(member.get("id", ""))] = ComponentHierarchy.world_transform_record(asset, str(member.get("id", "")))
+	var group_world_record := ComponentHierarchy.group_world_transform_record(asset, group_id)
+	group["parent_component_id"] = parent_id
+	group["transform"] = ComponentHierarchy.group_local_transform_from_world_record(asset, group_id, group_world_record)
+	for component_id in member_world_records:
+		var component := _get_component(asset, str(component_id))
+		if not component.is_empty():
+			component["transform"] = ComponentHierarchy.local_transform_from_world_record(asset, str(component_id), member_world_records[component_id])
+
+
+func _render_component_outliner_tree(container: VBoxContainer, asset: Dictionary, component: Dictionary, indent: int, rendered_component_ids: Dictionary, reference_summary := false, rendered_group_ids: Dictionary = {}, render_group_members := false) -> void:
 	var asset_id := str(asset.get("id", ""))
 	var component_id := str(component.get("id", ""))
 	if component_id.is_empty() or (not reference_summary and rendered_component_ids.has(component_id)):
@@ -8452,7 +8499,15 @@ func _render_component_outliner_tree(container: VBoxContainer, asset: Dictionary
 	var children := ComponentHierarchy.children(asset, component_id)
 	children.sort_custom(_sort_named_documents)
 	for child in children:
-		_render_component_outliner_tree(container, asset, child, indent + 16, rendered_component_ids)
+		if not render_group_members and not ComponentHierarchy.membership_group_id(asset, str(child.get("id", ""))).is_empty():
+			continue
+		_render_component_outliner_tree(container, asset, child, indent + 16, rendered_component_ids, false, rendered_group_ids, render_group_members)
+	if not render_group_members:
+		var child_groups: Array = asset.get("groups", []).duplicate(true)
+		child_groups.sort_custom(_sort_named_documents)
+		for group in child_groups:
+			if str(group.get("parent_component_id", "")) == component_id:
+				_render_group_outliner_tree(container, asset, group, indent + 16, rendered_component_ids, rendered_group_ids)
 
 
 func _on_component_outliner_gui_input(event: InputEvent, asset_id: String, component_id: String, button: Button) -> void:
@@ -8836,7 +8891,14 @@ func _component_group(asset: Dictionary, component: Dictionary) -> Dictionary:
 
 func _effective_component_visibility(asset: Dictionary, component: Dictionary) -> bool:
 	var group := _component_group(asset, component)
-	return bool(component.get("visibility", true)) and (group.is_empty() or bool(group.get("visibility", true)))
+	if component.is_empty() or not bool(component.get("visibility", true)):
+		return false
+	if group.is_empty():
+		return true
+	if not bool(group.get("visibility", true)):
+		return false
+	var group_parent_id := ComponentHierarchy.group_parent_id(group)
+	return group_parent_id.is_empty() or _effective_component_visibility(asset, _get_component(asset, group_parent_id))
 
 
 
@@ -9687,6 +9749,25 @@ func _render_group_inspector(_asset: Dictionary, group: Dictionary) -> void:
 	name_editor.text_submitted.connect(_rename_selected_group)
 	name_editor.focus_exited.connect(func() -> void: _rename_selected_group(name_editor.text))
 	inspector_content.add_child(name_editor)
+	inspector_content.add_child(_create_inspector_section("Hierarchy"))
+	inspector_content.add_child(_create_inspector_field_label("Parent Component"))
+	var parent_option := OptionButton.new()
+	parent_option.custom_minimum_size = Vector2(0, 26)
+	parent_option.add_item("Root")
+	parent_option.set_item_metadata(0, "")
+	for candidate in _asset.get("components", []):
+		var candidate_id := str(candidate.get("id", ""))
+		if not ComponentHierarchy.can_parent_group(_asset, str(group.get("id", "")), candidate_id):
+			continue
+		parent_option.add_item(str(candidate.get("name", "Component")))
+		parent_option.set_item_metadata(parent_option.item_count - 1, candidate_id)
+	var parent_component_id := ComponentHierarchy.group_parent_id(group)
+	for option_index in range(parent_option.item_count):
+		if str(parent_option.get_item_metadata(option_index)) == parent_component_id:
+			parent_option.select(option_index)
+			break
+	parent_option.item_selected.connect(_on_group_hierarchy_parent_selected.bind(parent_option))
+	inspector_content.add_child(parent_option)
 	inspector_content.add_child(_create_inspector_section("Group Transform"))
 	var transform_grid := GridContainer.new()
 	transform_grid.columns = 2
@@ -9818,6 +9899,21 @@ func _on_group_z_index_changed(value: float) -> void:
 		return
 	_record_direct_change()
 	group["z_index"] = int(value)
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _on_group_hierarchy_parent_selected(index: int, option: OptionButton) -> void:
+	var asset := _get_asset(selected_asset_id)
+	var group := ComponentHierarchy.group_by_id(asset, selected_group_id)
+	if group.is_empty() or index < 0:
+		return
+	var parent_id := str(option.get_item_metadata(index))
+	if ComponentHierarchy.group_parent_id(group) == parent_id or not ComponentHierarchy.can_parent_group(asset, selected_group_id, parent_id):
+		return
+	_record_direct_change()
+	_set_group_parent_preserving_world(asset, selected_group_id, parent_id)
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
@@ -14435,7 +14531,7 @@ func _render_canvas_context() -> void:
 			canvas_view.set_context(str(selected_group.get("name", "Group")))
 			canvas_view.set_interaction_state("")
 			canvas_view.set_tool_mode("")
-			canvas_view.set_component_transform(selected_group.get("transform", _default_component_transform()))
+			canvas_view.set_component_transform(ComponentHierarchy.group_world_transform_record(asset, selected_group_id))
 			canvas_view.set_reference_shapes(_build_reference_shapes(asset))
 			canvas_view.set_display_polygon([])
 			canvas_view.set_bezier_geometry([], [], [])
@@ -14785,7 +14881,17 @@ func _on_bezier_chain_closed() -> void:
 
 
 func _on_pivot_changed(pivot: Vector2) -> void:
-	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	var asset := _get_asset(selected_asset_id)
+	if not selected_group_id.is_empty():
+		var group := ComponentHierarchy.group_by_id(asset, selected_group_id)
+		if group.is_empty():
+			return
+		_record_coalesced_change()
+		var group_transform: Dictionary = group.get("transform", _default_component_transform())
+		group_transform["pivot"] = pivot
+		group["transform"] = group_transform
+		return
+	var component := _get_component(asset, selected_component_id)
 	if component.is_empty():
 		return
 	_record_coalesced_change()
@@ -14810,6 +14916,15 @@ func _on_asset_pivot_changed(pivot: Vector2) -> void:
 
 func _on_transform_changed(transform: Dictionary) -> void:
 	var asset := _get_asset(selected_asset_id)
+	if not selected_group_id.is_empty():
+		var group := ComponentHierarchy.group_by_id(asset, selected_group_id)
+		if group.is_empty():
+			return
+		_record_coalesced_change()
+		group["transform"] = ComponentHierarchy.group_local_transform_from_world_record(asset, selected_group_id, transform)
+		_render_inspector()
+		_render_canvas_context()
+		return
 	var component := _get_component(asset, selected_component_id)
 	if not component.is_empty():
 		_record_coalesced_change()

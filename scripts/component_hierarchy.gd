@@ -35,6 +35,7 @@ static func normalize_asset(asset: Dictionary) -> void:
 		var component_group_id := str(component_data.get("group_id", ""))
 		component_data["group_id"] = component_group_id if known_group_ids.has(component_group_id) else ""
 	_break_cycles(components)
+	_normalize_group_parents(asset, known_ids)
 	_normalize_guide_ordinals(asset)
 
 
@@ -54,6 +55,18 @@ static func group_by_id(asset: Dictionary, group_id: String) -> Dictionary:
 		if group is Dictionary and str(group.get("id", "")) == group_id:
 			return group
 	return {}
+
+
+static func group_parent_id(group: Dictionary) -> String:
+	return str(group.get("parent_component_id", ""))
+
+
+static func group_members(asset: Dictionary, group_id: String) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	for candidate in asset.get("components", []):
+		if candidate is Dictionary and str(candidate.get("type", "component")) != "guide" and str(candidate.get("group_id", "")) == group_id:
+			result.append(candidate)
+	return result
 
 
 static func membership_group_id(asset: Dictionary, component_id: String) -> String:
@@ -105,6 +118,23 @@ static func can_parent(asset: Dictionary, component_id: String, candidate_parent
 	return true
 
 
+static func can_parent_group(asset: Dictionary, group_id: String, candidate_parent_id: String) -> bool:
+	var group := group_by_id(asset, group_id)
+	if group.is_empty():
+		return false
+	if candidate_parent_id.is_empty():
+		return true
+	if component_by_id(asset, candidate_parent_id).is_empty() or not membership_group_id(asset, candidate_parent_id).is_empty():
+		return false
+	var members := group_members(asset, group_id)
+	if members.is_empty():
+		return false
+	for member in members:
+		if not _component_chain_contains(asset, str(member.get("id", "")), candidate_parent_id):
+			return false
+	return true
+
+
 static func next_guide_ordinal(asset: Dictionary, component_id: String, guide_type: String) -> int:
 	var highest := 0
 	for guide in asset.get("guides", []):
@@ -116,23 +146,23 @@ static func next_guide_ordinal(asset: Dictionary, component_id: String, guide_ty
 
 
 static func world_transform(asset: Dictionary, component_id: String) -> Transform2D:
-	var chain: Array[Dictionary] = []
-	var cursor := component_by_id(asset, component_id)
-	var visited: Dictionary = {}
-	while not cursor.is_empty():
-		var cursor_id := str(cursor.get("id", ""))
-		if visited.has(cursor_id):
-			break
-		visited[cursor_id] = true
-		chain.push_front(cursor)
-		cursor = component_by_id(asset, parent_id(cursor))
-	var result := Transform2D.IDENTITY
-	for chain_component in chain:
-		result = result * local_transform(chain_component.get("transform", {}))
-	var effective_group_id := membership_group_id(asset, component_id)
-	if not effective_group_id.is_empty():
-		result = local_transform(group_by_id(asset, effective_group_id).get("transform", {})) * result
-	return result
+	return _world_transform_for_chain(asset, _component_chain(asset, component_id), membership_group_id(asset, component_id))
+
+
+static func group_world_transform(asset: Dictionary, group_id: String) -> Transform2D:
+	var group := group_by_id(asset, group_id)
+	if group.is_empty():
+		return Transform2D.IDENTITY
+	var parent_component_id := group_parent_id(group)
+	var parent_world := world_transform(asset, parent_component_id) if not parent_component_id.is_empty() else Transform2D.IDENTITY
+	return parent_world * local_transform(group.get("transform", {}))
+
+
+static func group_world_transform_record(asset: Dictionary, group_id: String) -> Dictionary:
+	var group := group_by_id(asset, group_id)
+	if group.is_empty():
+		return _default_transform_record()
+	return transform_record_from_affine(group_world_transform(asset, group_id), _vector(group.get("transform", {}).get("pivot", Vector2.ZERO), Vector2.ZERO))
 
 
 static func world_transform_record(asset: Dictionary, component_id: String) -> Dictionary:
@@ -146,15 +176,23 @@ static func local_transform_from_world_record(asset: Dictionary, component_id: S
 	var current := component_by_id(asset, component_id)
 	if current.is_empty():
 		return _default_transform_record()
-	var parent_world := Transform2D.IDENTITY
-	var effective_group_id := membership_group_id(asset, component_id)
-	if not effective_group_id.is_empty():
-		parent_world = local_transform(group_by_id(asset, effective_group_id).get("transform", {}))
-	var current_parent_id := parent_id(current)
-	if not current_parent_id.is_empty():
-		parent_world = world_transform(asset, current_parent_id)
+	var chain := _component_chain(asset, component_id)
+	if not chain.is_empty():
+		chain.pop_back()
+	var parent_world := _world_transform_for_chain(asset, chain, membership_group_id(asset, component_id))
 	var local_affine := parent_world.affine_inverse() * local_transform(world_record)
 	var pivot := _vector(current.get("transform", {}).get("pivot", Vector2.ZERO), Vector2.ZERO)
+	return transform_record_from_affine(local_affine, pivot)
+
+
+static func group_local_transform_from_world_record(asset: Dictionary, group_id: String, world_record: Dictionary) -> Dictionary:
+	var group := group_by_id(asset, group_id)
+	if group.is_empty():
+		return _default_transform_record()
+	var parent_component_id := group_parent_id(group)
+	var parent_world := world_transform(asset, parent_component_id) if not parent_component_id.is_empty() else Transform2D.IDENTITY
+	var local_affine := parent_world.affine_inverse() * local_transform(world_record)
+	var pivot := _vector(group.get("transform", {}).get("pivot", Vector2.ZERO), Vector2.ZERO)
 	return transform_record_from_affine(local_affine, pivot)
 
 
@@ -193,6 +231,52 @@ static func _break_cycles(components: Array) -> void:
 				break
 			visited[cursor] = true
 			cursor = str(by_id[cursor].get("parent_component_id", ""))
+
+
+static func _normalize_group_parents(asset: Dictionary, known_component_ids: Dictionary) -> void:
+	for group in asset.get("groups", []):
+		if not group is Dictionary:
+			continue
+		var group_id := str(group.get("id", ""))
+		var candidate_parent_id := group_parent_id(group)
+		if candidate_parent_id.is_empty():
+			group["parent_component_id"] = ""
+			continue
+		if not known_component_ids.has(candidate_parent_id) or not can_parent_group(asset, group_id, candidate_parent_id):
+			group["parent_component_id"] = ""
+
+
+static func _component_chain(asset: Dictionary, component_id: String) -> Array[Dictionary]:
+	var chain: Array[Dictionary] = []
+	var cursor := component_by_id(asset, component_id)
+	var visited: Dictionary = {}
+	while not cursor.is_empty():
+		var cursor_id := str(cursor.get("id", ""))
+		if visited.has(cursor_id):
+			break
+		visited[cursor_id] = true
+		chain.push_front(cursor)
+		cursor = component_by_id(asset, parent_id(cursor))
+	return chain
+
+
+static func _world_transform_for_chain(asset: Dictionary, chain: Array[Dictionary], effective_group_id: String) -> Transform2D:
+	var group := group_by_id(asset, effective_group_id)
+	var group_parent_component_id := group_parent_id(group) if not group.is_empty() else ""
+	var group_transform := local_transform(group.get("transform", {})) if not group.is_empty() else Transform2D.IDENTITY
+	var result := group_transform if not group.is_empty() and group_parent_component_id.is_empty() else Transform2D.IDENTITY
+	for chain_component in chain:
+		result = result * local_transform(chain_component.get("transform", {}))
+		if not group.is_empty() and str(chain_component.get("id", "")) == group_parent_component_id:
+			result = result * group_transform
+	return result
+
+
+static func _component_chain_contains(asset: Dictionary, component_id: String, ancestor_id: String) -> bool:
+	for chain_component in _component_chain(asset, component_id):
+		if str(chain_component.get("id", "")) == ancestor_id:
+			return true
+	return false
 
 
 static func _normalize_guide_ordinals(asset: Dictionary) -> void:

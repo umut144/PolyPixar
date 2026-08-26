@@ -353,7 +353,7 @@ static func _component_less(a: Dictionary, b: Dictionary) -> bool:
 
 
 static func _effective_group(asset: Dictionary, component: Dictionary) -> Dictionary:
-	var group_id := str(component.get("group_id", ""))
+	var group_id := ComponentHierarchy.membership_group_id(asset, str(component.get("id", "")))
 	if group_id.is_empty():
 		return {}
 	for group in asset.get("groups", []):
@@ -364,7 +364,14 @@ static func _effective_group(asset: Dictionary, component: Dictionary) -> Dictio
 
 static func _effective_visibility(asset: Dictionary, component: Dictionary) -> bool:
 	var group := _effective_group(asset, component)
-	return bool(component.get("visibility", true)) and (group.is_empty() or bool(group.get("visibility", true)))
+	if component.is_empty() or not bool(component.get("visibility", true)):
+		return false
+	if group.is_empty():
+		return true
+	if not bool(group.get("visibility", true)):
+		return false
+	var parent_component_id := ComponentHierarchy.group_parent_id(group)
+	return parent_component_id.is_empty() or _effective_visibility(asset, ComponentHierarchy.component_by_id(asset, parent_component_id))
 
 
 static func _effective_z_index(_asset: Dictionary, component: Dictionary) -> int:
