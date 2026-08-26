@@ -200,9 +200,14 @@ static func mode_validation_issues(component: Dictionary, complete := true) -> A
 				errors.append("Closed Loop requires one closed Chain with at least three Points.")
 	elif draw_mode == "contour":
 		if chains.size() != 1:
-			errors.append("Contour requires one open Chain.")
-		elif bool(chains[0].get("closed", false)) or chains[0].get("point_ids", []).size() < 2:
-			errors.append("Contour requires one open Chain with at least two Points.")
+			errors.append("Contour requires one Chain.")
+		else:
+			var chain: Dictionary = chains[0]
+			if bool(chain.get("closed", false)):
+				if chain.get("point_ids", []).size() < 3:
+					errors.append("A closed Contour requires at least three Points.")
+			elif chain.get("point_ids", []).size() < 2:
+				errors.append("An open Contour requires at least two Points.")
 	else:
 		errors.append("Unknown Component draw mode.")
 	return errors

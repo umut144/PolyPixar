@@ -189,6 +189,10 @@ func _test_component_draw_modes_and_continuation() -> void:
 	_expect(not second_id.is_empty() and not prepended_id.is_empty(), "Contour drawing should continue from either selected endpoint.")
 	_expect(ribbon.get("chains", []).size() == 1 and BezierTopology.mode_validation_issues(ribbon, true).is_empty(), "Contour must validate as exactly one open Chain with at least two Points.")
 	_expect(BezierTopology.start_chain(ribbon, Vector2(20.0, 20.0), "linear").is_empty(), "A Contour must reject a second Chain.")
+	var closed_contour := ribbon.duplicate(true)
+	BezierTopology.add_point_from(closed_contour, second_id, Vector2(2.0, 2.0), "linear")
+	BezierTopology.close_active_chain(closed_contour)
+	_expect(BezierTopology.mode_validation_issues(closed_contour, true).is_empty(), "Contour must also accept one closed Chain with at least three Points.")
 	var closed := ribbon.duplicate(true)
 	closed["draw_mode"] = "closed_loop"
 	_expect(not BezierTopology.mode_validation_issues(closed, true).is_empty(), "Closed Loop must reject open topology.")
@@ -266,6 +270,10 @@ func _test_contour_stroke_mesh() -> void:
 	BezierTopology.close_active_chain(closed)
 	var closed_stroke := ContourMeshService.generate(closed)
 	_expect(bool(closed_stroke.get("valid", false)) and bool(closed_stroke.get("source_chain_closed", false)) and bool(closed_stroke.get("has_outline", false)), "Closed Fill Components must derive a separate centered Contour Stroke Bake from their authored Boundary.")
+	var closed_contour := closed.duplicate(true)
+	closed_contour["draw_mode"] = "contour"
+	var closed_contour_stroke := ContourMeshService.generate(closed_contour)
+	_expect(bool(closed_contour_stroke.get("valid", false)) and bool(closed_contour_stroke.get("source_chain_closed", false)) and bool(closed_contour_stroke.get("has_outline", false)), "Closed Contours must produce a closed Stroke without requiring Fill geometry.")
 	var ellipse := {"draw_mode": "primitive", "primitive": {"type": PrimitiveGeometryService.ELLIPSE, "center": Vector2(1.0, 2.0), "diameter_x_cm": 20.0, "diameter_y_cm": 5.0}, "points": [], "edges": [], "chains": []}
 	var ellipse_stroke := ContourMeshService.generate(ellipse)
 	_expect(bool(ellipse_stroke.get("valid", false)) and str(ellipse_stroke.get("source_draw_mode", "")) == "primitive" and int(ellipse_stroke.get("triangle_count", 0)) > 0 and ellipse_stroke == ContourMeshService.generate(ellipse), "Analytic Circles and Ellipses must derive deterministic centered Stroke Bakes without persisted polygon topology.")
@@ -849,7 +857,7 @@ func _test_geometry_sampling_service() -> void:
 	_expect(not bool(GeometrySamplingService.generate(open_component).get("valid", true)), "An open contour should fail visibly at the mesh-pipeline Sampling boundary.")
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
-	_expect(application._has_supported_schema({"schema_version": 48}) and application._has_supported_schema({"schema_version": 47}) and not application._has_supported_schema({"schema_version": 49}), "Schema 48 should keep current and older World documents readable and reject unknown future schemas.")
+	_expect(application._has_supported_schema({"schema_version": 49}) and application._has_supported_schema({"schema_version": 48}) and not application._has_supported_schema({"schema_version": 50}), "Schema 49 should keep current and older World documents readable and reject unknown future schemas.")
 	_expect(application._normalize_component_draw_mode("ribbon", 39) == "contour" and application._normalize_component_draw_mode("contour", 42) == "contour", "Schema-42 loading must retain the explicit legacy Ribbon-to-Contour migration boundary.")
 	_expect(application._normalize_component_draw_mode("ribbon", 42) == "ribbon", "Current-schema Ribbon data must remain visibly invalid instead of receiving a silent backward fallback.")
 	var arranged_round_trip: Dictionary = application._normalize_sampling_bake(application._serialize_sampling_bake(arranged_result))
@@ -860,7 +868,7 @@ func _test_geometry_sampling_service() -> void:
 	baked_result["bake_id"] = "bake_test"
 	geometry_document["sampling"]["bakes"][GeometrySamplingService.ADAPTIVE] = baked_result
 	var serialized_geometry: Dictionary = application._serialize_geometry_document(geometry_document)
-	_expect(int(serialized_geometry.get("schema_version", 0)) == 48 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-48 JSON arrays.")
+	_expect(int(serialized_geometry.get("schema_version", 0)) == 49 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-49 JSON arrays.")
 	var normalized_geometry: Dictionary = application._normalize_geometry_document(serialized_geometry, "asset_1", "component_1")
 	_expect(normalized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Vector2, "Sampling bake loading should restore local sample positions as Vector2 values.")
 	_expect(normalized_geometry["sampling"]["bakes"].size() == 1, "Sampling should retain one Adaptive Bake.")
@@ -2378,7 +2386,7 @@ func _test_motion_act_evaluator() -> void:
 	var normalized: Dictionary = application._normalize_motion_act({"id": "act_7", "parameters": {"direction": [0.0, 2.0], "distance": 12.0}}, "fallback")
 	_expect(Vector2(normalized.get("parameters", {}).get("direction", Vector2.ZERO)) == Vector2(0.0, 2.0), "Persisted Slide direction arrays should normalize back to Vector2 values.")
 	var serialized: Dictionary = application._serialize_motion_act(normalized)
-	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 48, "Act persistence should serialize vectors as JSON arrays using schema 48.")
+	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 49, "Act persistence should serialize vectors as JSON arrays using schema 49.")
 	var normalized_jump: Dictionary = application._normalize_motion_act({"id": "act_8", "primitive": "jump", "parameters": {"direction": [1.0, 0.0], "distance": 7.0, "height": 2.5, "arc": "snappy"}}, "fallback")
 	var serialized_jump: Dictionary = application._serialize_motion_act(normalized_jump)
 	_expect(str(serialized_jump.get("primitive", "")) == MotionActEvaluator.JUMP and is_equal_approx(float(serialized_jump.get("parameters", {}).get("height", 0.0)), 2.5) and str(serialized_jump.get("parameters", {}).get("arc", "")) == MotionActEvaluator.JUMP_ARC_SNAPPY, "Jump-specific parameters should survive normalization and serialization.")

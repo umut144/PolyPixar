@@ -51,7 +51,7 @@ source. A Primitive's center handle moves its `primitive.center`; its Component
 pivot remains an independent transform handle.
 
 Components support `closed_loop`, `contour`, and `primitive` draw modes. Contours
-are fill-less and are the sole visible open-curve Component form; simulation
+are fill-less and may use one open or closed Chain; simulation
 and construction
 paths are modeled as Guides. Primitive sampling evaluates analytic Circles and Ellipses at the selected Body's
 adaptive target edge length and scale-aware Curve Detail, so it has no fixed or

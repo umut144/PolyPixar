@@ -7,7 +7,8 @@ mutates Component `points`, `edges`, or `chains`.
 ## Slices 1–5: geometry and World-authored width
 
 `ContourStrokeService` derives a deterministic indexed triangle mesh from
-exactly one closed outer/hole Chain or one fill-less open Contour Chain.
+exactly one closed outer/hole Chain, whether it belongs to a Closed Loop or a
+fill-less Contour, or one fill-less open Contour Chain.
 Consecutive Edges with
 `render_outline = true` form one visible run. Hidden Edges split those runs and
 the adjacent visible centerlines end exactly at their authored Points with butt
@@ -17,7 +18,7 @@ with no stroke geometry.
 The authored `contour` draw mode is persisted in World schema 40. Its accepted
 `contour_stroke` Component Mesh is a derived Bake and does not become source
 topology. Runtime Manifest schema 4 exports this typed art-stroke role directly;
-open Contours omit Fill geometry.
+Contours omit Fill geometry whether their Chain is open or closed.
 
 World schema 41 adds the required typed `world_settings` record:
 

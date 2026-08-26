@@ -8,7 +8,7 @@ const EXPORT_SUBMODULES: Array[String] = []
 const MOTION_SUBMODULES := ["Animation", "Path", "Act", "Sequence"]
 const WORLDS_ROOT := "res://worlds"
 const CONFIG_PATH := "res://configs/app_config.json"
-const SCHEMA_VERSION := 48
+const SCHEMA_VERSION := 49
 const MAX_HISTORY_SIZE := 100
 const DRAW_MODES := ["closed_loop", "contour", "primitive"]
 const GRID_BOX_TOOL_UNITS := 0.5
@@ -14817,7 +14817,7 @@ func _on_bezier_point_added(world_position: Vector2, point_mode: String = "linea
 
 func _on_bezier_endpoint_connection_requested(anchor_point_id: String, target_point_id: String) -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	if component.is_empty() or str(component.get("draw_mode", "closed_loop")) != "closed_loop":
+	if component.is_empty() or str(component.get("draw_mode", "closed_loop")) not in ["closed_loop", "contour"]:
 		return
 	var anchor_chain := BezierTopology.chain_for_point(component.get("chains", []), anchor_point_id)
 	var target_chain := BezierTopology.chain_for_point(component.get("chains", []), target_point_id)
@@ -14836,7 +14836,7 @@ func _on_bezier_endpoint_connection_requested(anchor_point_id: String, target_po
 
 func _on_bezier_chain_closed() -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	if component.is_empty() or str(component.get("draw_mode", "closed_loop")) != "closed_loop":
+	if component.is_empty() or str(component.get("draw_mode", "closed_loop")) not in ["closed_loop", "contour"]:
 		return
 	var chains: Array = component.get("chains", [])
 	if chains.is_empty() or bool(chains.back().get("closed", false)) or chains.back().get("point_ids", []).size() < 3:

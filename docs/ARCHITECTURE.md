@@ -273,6 +273,10 @@ Schema 48 removes `z_index` from editor-only Group records. Each Component is
 the sole owner of its integer `z_index`; legacy Group layer values are ignored
 on load and are not written again.
 
+Schema 49 permits a fill-less `contour` Component to own either one open Chain
+or one closed Chain. Closed Contours derive only their centered Stroke and never
+request or export a Fill Mesh.
+
 Sampling results carry their own algorithm version independently of the
 World schema. The junction-aware version invalidates pre-arrangement flat
 Cut Bakes at Sampling, which in turn makes Seeding stale before Meshing can
@@ -300,7 +304,7 @@ global ascending `(z_index, component_id)` order from back to front. Group membe
 Mesh Vertex order is retained and Triangle Vertex IDs become compact indices.
 Every ordinary Component exports a separate centered `contour_stroke_mesh`;
 closed and Primitive Components additionally export their unchanged Fill Mesh,
-while open Contours do not invent one. Schema 4 contains no UV/SDF/Carrier
+while fill-less Contours do not invent one. Schema 4 contains no UV/SDF/Carrier
 fields and has no schema-3 fallback.
 
 Each visible Asset is exported to the active World-local

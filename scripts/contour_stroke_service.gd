@@ -136,12 +136,12 @@ static func validation_issues(component: Dictionary, stroke_width_px := DEFAULT_
 	var chain: Dictionary = chains[0]
 	var component_role := str(component.get("topology_role", "outer"))
 	var chain_role := str(chain.get("topology_role", "outer"))
-	if draw_mode == "closed_loop":
+	if bool(chain.get("closed", false)):
 		if component_role not in ["outer", "hole"] or chain_role not in ["outer", "hole"]:
 			errors.append("A closed Contour Stroke requires an outer or hole Chain.")
 		elif component_role != chain_role:
 			errors.append("Contour Stroke Component and Chain topology roles must match.")
-		if not bool(chain.get("closed", false)) or chain.get("point_ids", []).size() < 3:
+		if chain.get("point_ids", []).size() < 3:
 			errors.append("A closed Contour Stroke requires at least three Points.")
 	else:
 		if bool(chain.get("closed", false)) or chain.get("point_ids", []).size() < 2:

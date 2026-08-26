@@ -467,7 +467,7 @@ func _commit_draw_pointer() -> void:
 		bezier_endpoint_connection_requested.emit(anchor_id, target_id)
 	elif target_id == anchor_id and not target_id.is_empty():
 		pass
-	elif active_tool == "point" and component_draw_mode == "closed_loop" and _is_near_first_chain_point(pending_draw_position):
+	elif active_tool == "point" and component_draw_mode in ["closed_loop", "contour"] and _is_near_first_chain_point(pending_draw_position):
 		bezier_chain_closed.emit()
 	else:
 		bezier_point_added.emit(pending_draw_position, draw_point_mode, pending_draw_handle_out if pending_draw_has_handle else Vector2.ZERO)
@@ -1562,7 +1562,7 @@ func _draw_draw_preview() -> void:
 		return
 	_draw_draw_point_preview()
 	var preview_position := _world_to_screen(_local_to_world(cursor_world))
-	var close_to_first := active_tool == "point" and component_draw_mode == "closed_loop" and _is_near_first_chain_point(cursor_world)
+	var close_to_first := active_tool == "point" and component_draw_mode in ["closed_loop", "contour"] and _is_near_first_chain_point(cursor_world)
 	var preview_color := Color("#76e0a5") if close_to_first else guide_color if guide_style else Color("#f2c94c")
 	draw_circle(preview_position, 5.0, preview_color, false, 2.0)
 	if close_to_first:
@@ -1588,7 +1588,7 @@ func _draw_draw_point_preview() -> void:
 	var preview_chain: Dictionary = chain.duplicate(true)
 	var preview_point_ids: Array = preview_chain.get("point_ids", []).duplicate()
 	var candidate_position := pending_draw_position if draw_pointer_down else cursor_world
-	var closing_preview := active_tool == "point" and component_draw_mode == "closed_loop" and not draw_pointer_down and _is_near_first_chain_point(cursor_world)
+	var closing_preview := active_tool == "point" and component_draw_mode in ["closed_loop", "contour"] and not draw_pointer_down and _is_near_first_chain_point(cursor_world)
 	var preview_end_id := ""
 	if closing_preview and point_ids.size() >= 3:
 		preview_chain["closed"] = true
