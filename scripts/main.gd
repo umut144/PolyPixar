@@ -561,6 +561,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	elif not has_command_modifier and active_state == "edit" and active_edit_mode == "point" and event.keycode == KEY_3:
 		_activate_edit_point_state(false, true)
 		get_viewport().set_input_as_handled()
+	elif not has_command_modifier and active_state == "edit" and active_edit_mode == "point" and event.keycode == KEY_4:
+		_activate_fuse_point_state()
+		get_viewport().set_input_as_handled()
 
 
 func _can_nudge_selected_point() -> bool:
@@ -5612,10 +5615,11 @@ func _render_context_bar() -> void:
 	edit_point_menu.text = "⌘2  Edit Point  ▼"
 	edit_point_menu.custom_minimum_size = Vector2(138, 32)
 	edit_point_menu.focus_mode = Control.FOCUS_NONE
-	_style_context_command_button(edit_point_menu, _context_command_is("asset.edit_point"))
+	_style_context_command_button(edit_point_menu, _context_command_is("asset.edit_point") or _context_command_is("asset.fuse_point"))
 	edit_point_menu.get_popup().add_item("1: Select", 0)
 	edit_point_menu.get_popup().add_item("2: Bezier Handle", 1)
 	edit_point_menu.get_popup().add_item("3: Add Point", 2)
+	edit_point_menu.get_popup().add_item("4: Fuse Point", 3)
 	_style_popup_menu(edit_point_menu.get_popup())
 	edit_point_menu.get_popup().id_pressed.connect(_on_edit_menu_id)
 	context_bar.add_child(edit_point_menu)
@@ -6360,6 +6364,8 @@ func _on_edit_menu_id(id: int) -> void:
 		_activate_edit_point_state(true, false)
 	elif id == 2:
 		_activate_edit_point_state(false, true)
+	elif id == 3:
+		_activate_fuse_point_state()
 
 
 func _on_guide_edit_menu_id(id: int) -> void:
@@ -6502,6 +6508,38 @@ func _activate_edit_point_state(handle_editing := false, set_mode := false) -> v
 	_set_edit_mode("point")
 	canvas_view.set_edit_handles_enabled(edit_bezier_handles)
 	canvas_view.set_edit_point_set_enabled(edit_point_set_mode)
+
+
+func _activate_fuse_point_state() -> void:
+	_activate_edit_point_state(false, false)
+	_set_active_context_command("asset.fuse_point")
+	if selected_point_ids.size() == 1:
+		_fuse_selected_point(selected_point_ids[0])
+	else:
+		_show_status_message("Fuse Point · Select a Point to fuse with a nearby Point")
+	_render_context_bar()
+
+
+func _fuse_selected_point(point_id: String) -> void:
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if component.is_empty():
+		return
+	var preview := component.duplicate(true)
+	var preview_result := BezierTopology.fuse_point(preview, point_id)
+	if not bool(preview_result.get("fused", false)):
+		_show_status_message("Fuse Point · %s" % str(preview_result.get("reason", "No nearby Point found")))
+		return
+	_record_direct_change()
+	var result := BezierTopology.fuse_point(component, point_id)
+	if not bool(result.get("fused", false)):
+		return
+	var kept_id := str(result.get("kept_point_id", point_id))
+	selected_point_id = kept_id
+	selected_point_ids = [kept_id]
+	_refresh_component_geometry(component)
+	canvas_view.set_selected_point_id(kept_id)
+	_render_inspector()
+	_show_status_message("Fuse Point · Nearby Point fused")
 
 
 func _activate_edit_edge_state() -> void:
@@ -15280,6 +15318,8 @@ func _on_bezier_points_delete_requested(point_ids: Array) -> void:
 
 func _on_point_selection_changed(point_id: String) -> void:
 	selected_point_id = point_id
+	if active_context_command == "asset.fuse_point" and not point_id.is_empty():
+		_fuse_selected_point(point_id)
 	if active_edit_mode == "point":
 		selected_edge_id = ""
 		selected_edge_ids.clear()
@@ -15293,6 +15333,8 @@ func _on_point_selection_set_changed(point_ids: Array) -> void:
 		if not point_id.is_empty() and point_id not in selected_point_ids:
 			selected_point_ids.append(point_id)
 	selected_point_id = selected_point_ids[0] if selected_point_ids.size() == 1 else ""
+	if active_context_command == "asset.fuse_point" and selected_point_ids.size() == 1:
+		_fuse_selected_point(selected_point_ids[0])
 	if active_edit_mode == "point":
 		selected_edge_id = ""
 		selected_edge_ids.clear()

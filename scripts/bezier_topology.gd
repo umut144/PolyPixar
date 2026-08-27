@@ -3,6 +3,7 @@ extends RefCounted
 
 const VALID_POINT_MODES := ["linear", "aligned", "free", "mirrored", "corner"]
 const VALID_TOPOLOGY_ROLES := ["outer", "hole", "cut", "seam"]
+const FUSE_POINT_TOLERANCE := 0.0001
 
 
 static func next_id(items: Array, prefix: String) -> String:
@@ -391,6 +392,68 @@ static func delete_point(component: Dictionary, point_id: String) -> bool:
 	component["chains"] = chains
 	BezierGeometry.resolve_auto_handles(points, chains)
 	return true
+
+
+## Fuses a selected Point with the nearest other Point in this Component when
+## their authored positions are within the deliberately small tolerance. The
+## selected Point remains authoritative for handles and point settings.
+## Coincident endpoints of one open Chain become one closed Chain.
+static func fuse_point(component: Dictionary, point_id: String, tolerance := FUSE_POINT_TOLERANCE) -> Dictionary:
+	var points: Array = component.get("points", [])
+	var selected := point_by_id(points, point_id)
+	if selected.is_empty():
+		return {"fused": false, "reason": "Selected Point was not found."}
+	var selected_position: Vector2 = selected.get("position", Vector2.ZERO)
+	var nearest_id := ""
+	var nearest_distance := INF
+	for point_data in points:
+		if not point_data is Dictionary:
+			continue
+		var candidate_id := str(point_data.get("id", ""))
+		if candidate_id.is_empty() or candidate_id == point_id:
+			continue
+		var distance := selected_position.distance_to(Vector2(point_data.get("position", Vector2.ZERO)))
+		if distance <= tolerance and distance < nearest_distance:
+			nearest_id = candidate_id
+			nearest_distance = distance
+	if nearest_id.is_empty():
+		return {"fused": false, "reason": "No other Point found within the fuse tolerance."}
+
+	var selected_chain := chain_for_point(component.get("chains", []), point_id)
+	var nearest_chain := chain_for_point(component.get("chains", []), nearest_id)
+	if selected_chain.is_empty() or nearest_chain.is_empty():
+		return {"fused": false, "reason": "Both Points must belong to a Chain."}
+	var selected_chain_id := str(selected_chain.get("id", ""))
+	var nearest_chain_id := str(nearest_chain.get("id", ""))
+	var nearest_ids: Array = nearest_chain.get("point_ids", []).duplicate()
+	var nearest_index := nearest_ids.find(nearest_id)
+	if nearest_index < 0:
+		return {"fused": false, "reason": "The nearby Point is not ordered in its Chain."}
+
+	if selected_chain_id == nearest_chain_id:
+		var chain_ids: Array = selected_chain.get("point_ids", []).duplicate()
+		var selected_index := chain_ids.find(point_id)
+		var is_open_endpoint_pair := not bool(selected_chain.get("closed", false)) \
+			and selected_index >= 0 and nearest_index >= 0 \
+			and ((selected_index == 0 and nearest_index == chain_ids.size() - 1) \
+			or (nearest_index == 0 and selected_index == chain_ids.size() - 1))
+		chain_ids.remove_at(nearest_index)
+		selected_chain["point_ids"] = chain_ids
+		if is_open_endpoint_pair:
+			selected_chain["closed"] = true
+		BezierTopology.rebuild_chain_edges(component, selected_chain)
+	else:
+		nearest_ids[nearest_index] = point_id
+		nearest_chain["point_ids"] = nearest_ids
+		BezierTopology.rebuild_chain_edges(component, nearest_chain)
+
+	for point_index in range(points.size() - 1, -1, -1):
+		if str(points[point_index].get("id", "")) == nearest_id:
+			points.remove_at(point_index)
+			break
+	component["points"] = points
+	BezierGeometry.resolve_auto_handles(points, component.get("chains", []))
+	return {"fused": true, "kept_point_id": point_id, "removed_point_id": nearest_id, "closed_chain": selected_chain_id == nearest_chain_id and bool(selected_chain.get("closed", false))}
 
 
 static func delete_points(component: Dictionary, point_ids_to_delete: Array) -> Array[String]:

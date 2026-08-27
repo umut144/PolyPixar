@@ -6,6 +6,7 @@ var failures := 0
 func _init() -> void:
 	_test_add_close_and_validate()
 	_test_delete_exactly_one_point()
+	_test_fuse_point()
 	_test_delete_multiple_points_and_protect_closed_minimum()
 	_test_ids_are_not_reused()
 	_test_insert_preserves_curve()
@@ -116,6 +117,23 @@ func _test_delete_exactly_one_point() -> void:
 	_expect(not BezierTopology.point_by_id(component["points"], ids[3]).is_empty(), "The following point must survive deletion.")
 	_expect(str(BezierTopology.point_by_id(component["points"], ids[3]).get("mode", "")) == "aligned", "Surviving handle modes must be retained.")
 	_expect(BezierTopology.validate(component).is_empty(), "The bridged chain should remain valid.")
+
+
+func _test_fuse_point() -> void:
+	var component := _component()
+	component["draw_mode"] = "closed_loop"
+	var first_id := BezierTopology.add_point(component, Vector2(-2.5, 15.0), "corner")
+	BezierTopology.add_point(component, Vector2(0.0, 13.5), "corner")
+	BezierTopology.add_point(component, Vector2(2.5, 15.0), "corner")
+	var duplicate_id := BezierTopology.add_point(component, Vector2(-2.5, 15.0), "corner")
+	var result := BezierTopology.fuse_point(component, first_id)
+	_expect(bool(result.get("fused", false)) and str(result.get("removed_point_id", "")) == duplicate_id, "Fuse Point should remove the nearest coincident Point.")
+	_expect(component.get("points", []).size() == 3 and component.get("chains", []).size() == 1 and bool(component["chains"][0].get("closed", false)), "Fusing coincident open endpoints should close the Chain.")
+	_expect(BezierTopology.mode_validation_issues(component, true).is_empty(), "A fused Closed Loop should remain valid.")
+	var distant := _component()
+	var distant_id := BezierTopology.add_point(distant, Vector2.ZERO, "linear")
+	BezierTopology.add_point(distant, Vector2(0.001, 0.0), "linear")
+	_expect(not bool(BezierTopology.fuse_point(distant, distant_id).get("fused", false)), "Fuse Point must reject points outside its safe tolerance.")
 
 
 func _test_ids_are_not_reused() -> void:
