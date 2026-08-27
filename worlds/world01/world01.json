@@ -13,7 +13,8 @@
 		"asset_10",
 		"asset_11",
 		"asset_12",
-		"asset_13"
+		"asset_13",
+		"asset_14"
 	],
 	"editor_state": {
 		"active_create_submodule": "Character",
@@ -25,9 +26,9 @@
 			"asset_1": {
 				"position": [
 					-0.138385653495789,
-					4.37232875823975
+					6.83554983139038
 				],
-				"zoom": 89.0872946420389
+				"zoom": 77.9983278721739
 			},
 			"asset_10": {
 				"position": [
@@ -52,43 +53,50 @@
 			},
 			"asset_13": {
 				"position": [
-					0.510432183742523,
-					6.93667125701904
+					-0.648370146751404,
+					7.76128625869751
 				],
-				"zoom": 129.196365757051
+				"zoom": 122.244734193026
+			},
+			"asset_14": {
+				"position": [
+					1.81158709526062,
+					6.53562498092651
+				],
+				"zoom": 62.0552476510405
 			},
 			"asset_2": {
 				"position": [
 					-0.138385653495789,
-					6.37521409988403
+					3.1089780330658
 				],
-				"zoom": 214.720939919729
+				"zoom": 105.960474078763
 			},
 			"asset_3": {
 				"position": [
 					-0.126418218016624,
-					3.77052736282349
+					8.88415431976318
 				],
 				"zoom": 92.3044867159853
 			},
 			"asset_4": {
 				"position": [
 					-0.138385653495789,
-					1.67112135887146
+					2.55500316619873
 				],
 				"zoom": 166.727188799311
 			},
 			"asset_5": {
 				"position": [
 					-0.11192199587822,
-					3.72435355186462
+					7.70392751693726
 				],
-				"zoom": 121.376380493405
+				"zoom": 58.2620988117297
 			},
 			"asset_6": {
 				"position": [
 					-0.138385653495789,
-					4.38588619232178
+					7.87611675262451
 				],
 				"zoom": 77.9094080010093
 			},
@@ -108,30 +116,31 @@
 			},
 			"asset_9": {
 				"position": [
-					-0.00629360973834991,
-					6.15620231628418
+					0.447075188159943,
+					9.54303169250488
 				],
-				"zoom": 107.921737907543
+				"zoom": 226.113677086489
 			}
 		},
 		"expanded_assets": {
 			"asset_1": false,
 			"asset_10": true,
 			"asset_11": true,
-			"asset_12": false,
-			"asset_13": true,
+			"asset_12": true,
+			"asset_13": false,
+			"asset_14": false,
 			"asset_2": false,
 			"asset_3": false,
 			"asset_4": false,
 			"asset_5": false,
 			"asset_6": false,
 			"asset_7": false,
-			"asset_8": true,
-			"asset_9": false
+			"asset_8": false,
+			"asset_9": true
 		},
-		"motion_act_preview_asset_id": "asset_1",
+		"motion_act_preview_asset_id": "",
 		"motion_act_preview_loop": true,
-		"motion_path_preview_asset_id": "asset_1",
+		"motion_path_preview_asset_id": "",
 		"motion_sequence_preview_loop": true,
 		"motion_sequence_view": "composition",
 		"outliner_asset_type_filters": {
@@ -142,8 +151,8 @@
 			"terrain": true,
 			"weapons": true
 		},
-		"selected_asset_id": "asset_13",
-		"selected_component_id": "component_77",
+		"selected_asset_id": "asset_9",
+		"selected_component_id": "component_73",
 		"selected_edge_ids": [],
 		"selected_guide_id": "",
 		"selected_motion_act_id": "",
@@ -164,7 +173,7 @@
 	},
 	"name": "world01",
 	"paths": [],
-	"schema_version": 46,
+	"schema_version": 50,
 	"sequences": [],
 	"world_name": "Secrets, Room's & Travels'",
 	"world_settings": {
