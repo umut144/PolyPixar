@@ -54,18 +54,19 @@ The fixed technical semantics are:
 - new-World default width: `4 px` = `0.03125 m`;
 - centered offset: `stroke_width_px / 192 / 2` meters on each side;
 - adaptive Bezier sampling deviation: at most `0.25 px`;
-- joins: miter with limit `4.0`, then bevel;
+- joins: miter only at interior angles of at least `75°` and with limit `4.0`, then bevel;
 - caps: butt (an uninterrupted closed loop has no cap).
 
 Every centerline sample and derived mesh vertex retains stable `edge_id` and
 `curve_t` provenance. Hitting a sampling bound is an explicit validation
 failure, not a quality fallback.
 
-The version-3 stroke tessellator validates every emitted index and triangle for
+The stroke tessellator validates every emitted index and triangle for
 finite coordinates, positive area, in-range indices, and consistent winding.
 It places miter/bevel geometry on the exposed side of both convex and concave
-turns. The four-half-width miter limit remains an authored rule rather than a
-numeric recovery path.
+turns. An angle-aware fallback bevels interior angles below `75°` before their
+otherwise legal miters become visually dominant needles; broader corners still
+use the four-half-width miter limit as a second deterministic guard.
 
 Proper crossings in an open authored Contour remain renderable: they represent
 an intentional drawn-line crossing and are counted in typed geometry

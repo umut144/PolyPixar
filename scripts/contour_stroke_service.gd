@@ -5,11 +5,15 @@ extends RefCounted
 ## deterministic centered mesh for the visible runs of one closed outer/hole
 ## Chain or one open Contour Chain without changing canonical topology.
 
-const ALGORITHM_VERSION := 4
+const ALGORITHM_VERSION := 5
 const REFERENCE_PIXELS_PER_METER := 192.0
 const DEFAULT_STROKE_WIDTH_PX := 4.0
 const MAX_DEVIATION_PX := 0.25
 const MITER_LIMIT := 4.0
+## Miter length alone still permits visually dominant spikes at acute authored
+## corners. Keep miters only when the smaller interior angle is broad enough
+## to read as a corner rather than a needle.
+const MIN_MITER_INTERIOR_ANGLE_DEGREES := 75.0
 const JOIN_TYPE := "miter"
 const CAP_TYPE := "butt"
 const MAX_SAMPLE_DEPTH := 18
@@ -382,7 +386,12 @@ static func _build_stroke_mesh(centerline: Array, half_width: float, closed: boo
 		var outer_previous := position + normals[previous_index] * half_width * outer_sign
 		var outer_next := position + normals[join_index] * half_width * outer_sign
 		var intersection := _line_intersection(outer_previous, previous_direction, outer_next, next_direction)
-		var use_miter := bool(intersection.get("valid", false)) and position.distance_to(Vector2(intersection.get("position", position))) <= half_width * MITER_LIMIT + GEOMETRY_EPSILON
+		var turn_angle := absf(previous_direction.angle_to(next_direction))
+		var interior_angle := PI - turn_angle
+		var angle_allows_miter := interior_angle + GEOMETRY_EPSILON >= deg_to_rad(MIN_MITER_INTERIOR_ANGLE_DEGREES)
+		var use_miter := angle_allows_miter \
+			and bool(intersection.get("valid", false)) \
+			and position.distance_to(Vector2(intersection.get("position", position))) <= half_width * MITER_LIMIT + GEOMETRY_EPSILON
 		var base := vertices.size()
 		var provenance: Dictionary = centerline[join_index]
 		vertices.append(_mesh_vertex(position, "join_center", provenance))

@@ -6843,11 +6843,12 @@ func _render_info_bar() -> void:
 		], active_draw_point_mode)
 		_add_info_option("Enter: Pause open Chain · Esc: Leave")
 	elif active_state == "edit" and active_edit_mode == "point":
-		var active_edit_point_submode := "set" if edit_point_set_mode else "bezier_handle" if edit_bezier_handles else "select"
+		var active_edit_point_submode := "fuse_point" if active_context_command == "asset.fuse_point" else "set" if edit_point_set_mode else "bezier_handle" if edit_bezier_handles else "select"
 		_add_info_mode_group([
 			{"label": "1: Select", "id": "select"},
 			{"label": "2: Bezier Handle", "id": "bezier_handle"},
-			{"label": "3: Set", "id": "set"}
+			{"label": "3: Set", "id": "set"},
+			{"label": "4: Fuse Point", "id": "fuse_point"}
 		], active_edit_point_submode)
 	elif active_state == "edit" and active_edit_mode == "edge":
 		_add_info_option("Click: Select Edge")

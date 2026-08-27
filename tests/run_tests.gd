@@ -612,6 +612,7 @@ func _test_contour_stroke_robust_geometry() -> void:
 		BezierTopology.add_point(concave_contour, position, "linear")
 	var concave_stroke := ContourStrokeService.generate(concave_contour)
 	_expect(bool(concave_stroke.get("valid", false)), "A concave open turn should produce a robust centered stroke.")
+	_expect(int(concave_stroke.get("miter_join_count", 0)) == 1 and int(concave_stroke.get("bevel_join_count", -1)) == 0, "A regular 90-degree corner should retain its compact miter join.")
 	var found_outer_previous := false
 	var found_outer_next := false
 	for vertex in concave_stroke.get("vertices", []):
@@ -629,6 +630,13 @@ func _test_contour_stroke_robust_geometry() -> void:
 		var c := Vector2(concave_vertices[concave_indices[offset + 2]].get("position", Vector2.ZERO))
 		triangles_are_stable = triangles_are_stable and a.is_finite() and b.is_finite() and c.is_finite() and (b - a).cross(c - a) > ContourStrokeService.GEOMETRY_EPSILON
 	_expect(triangles_are_stable and str(concave_stroke.get("geometry_diagnostics", {}).get("triangle_validation", "")) == "complete", "Every emitted Contour Stroke triangle must be finite, non-degenerate, in range, and consistently wound.")
+
+	var shoulder_contour := _component()
+	shoulder_contour["draw_mode"] = "contour"
+	for position in [Vector2.ZERO, Vector2(-2.95, 9.5), Vector2(0.45, 9.5)]:
+		BezierTopology.add_point(shoulder_contour, position, "linear")
+	var shoulder_stroke := ContourStrokeService.generate(shoulder_contour)
+	_expect(bool(shoulder_stroke.get("valid", false)) and int(shoulder_stroke.get("miter_join_count", -1)) == 0 and int(shoulder_stroke.get("bevel_join_count", 0)) == 1, "A Warrior-shoulder-like acute corner should use the angle-aware bevel fallback before it forms a visible miter spike.")
 
 	var crossing_contour := _component()
 	crossing_contour["draw_mode"] = "contour"
