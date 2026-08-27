@@ -72,7 +72,14 @@
 					-0.644003391265869,
 					11.526349067688
 				],
-				"zoom": 132.863652260139
+				"zoom": 107.088237072938
+			},
+			"asset_16": {
+				"position": [
+					0.11108523607254,
+					9.7988862991333
+				],
+				"zoom": 318.136427414235
 			},
 			"asset_2": {
 				"position": [
@@ -104,7 +111,7 @@
 			},
 			"asset_6": {
 				"position": [
-					-1.04740810394287,
+					0.428853780031204,
 					11.0211420059204
 				],
 				"zoom": 90.0924129670337
@@ -133,12 +140,13 @@
 		},
 		"expanded_assets": {
 			"asset_1": false,
-			"asset_10": true,
-			"asset_11": true,
-			"asset_12": true,
+			"asset_10": false,
+			"asset_11": false,
+			"asset_12": false,
 			"asset_13": false,
 			"asset_14": false,
-			"asset_15": true,
+			"asset_15": false,
+			"asset_16": false,
 			"asset_2": false,
 			"asset_3": false,
 			"asset_4": false,
@@ -162,7 +170,7 @@
 			"weapons": true
 		},
 		"selected_asset_id": "asset_15",
-		"selected_component_id": "component_103",
+		"selected_component_id": "",
 		"selected_edge_ids": [],
 		"selected_guide_id": "",
 		"selected_motion_act_id": "",
@@ -171,9 +179,9 @@
 		"selected_motion_sequence_id": "",
 		"selected_weighting_style_id": "",
 		"snap": {
-			"enabled": true,
-			"grid_step": 0.01,
-			"mode": "ultra_fine",
+			"enabled": false,
+			"grid_step": 0.5,
+			"mode": "none",
 			"rotation_step": 15.0
 		},
 		"world_scale": {
