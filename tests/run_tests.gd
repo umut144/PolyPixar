@@ -19,6 +19,7 @@ func _init() -> void:
 	_test_contour_stroke_robust_geometry()
 	_test_world_contour_settings()
 	_test_component_scale_rebase()
+	_test_asset_authored_facing()
 	_test_geometry_sampling_service()
 	_test_geometry_auto_build_service()
 	_test_create_outliner_expansion_scope()
@@ -900,6 +901,34 @@ func _test_component_scale_rebase() -> void:
 	_expect(is_instance_valid(application.asset_scale_rebase_button) and not application.asset_scale_rebase_button.disabled and application.asset_scale_rebase_button.text.contains("(1)"), "The Asset Inspector should enable Rebase only when its compact candidate list is non-empty and unblocked.")
 	application._on_rebase_asset_scales_pressed()
 	_expect(Vector2(application._get_component(application._get_asset("ui_rebase"), "ui_component").get("transform", {}).get("scale", Vector2.ZERO)) == Vector2.ONE and application.asset_scale_rebase_button.disabled, "The Asset Inspector Rebase action should normalize the candidate and disable itself once no work remains.")
+	application.free()
+
+
+func _test_asset_authored_facing() -> void:
+	var serialized_values := ["left", "right", "neutral", "top", "down"]
+	for serialized_value in serialized_values:
+		var facing := AssetPresentation.deserialize_authored_facing(serialized_value)
+		_expect(AssetPresentation.serialize_authored_facing(facing) == serialized_value, "Authored Facing '%s' should round-trip through its typed enum representation." % serialized_value)
+	_expect(AssetPresentation.authored_facing({}) == AssetPresentation.AuthoredFacing.NEUTRAL, "An older Asset without authored_facing should load as Neutral.")
+	_expect(AssetPresentation.deserialize_authored_facing("unsupported") == AssetPresentation.AuthoredFacing.NEUTRAL, "An invalid legacy authored_facing value should normalize safely to Neutral.")
+
+	var application = load("res://scripts/main.gd").new()
+	application._build_ui()
+	application.history_coalesce_timer = Timer.new()
+	application.add_child(application.history_coalesce_timer)
+	var pose_assets: Array[Dictionary] = [{"id": "pose_asset", "name": "Pose Asset", "asset_type": "character", "visibility": true, "asset_pivot": Vector2.ZERO, "components": [], "groups": [], "guides": []}]
+	application.assets = pose_assets
+	application.selected_asset_id = "pose_asset"
+	application._render_inspector()
+	var inspector_text := _control_text(application.inspector_content)
+	_expect(inspector_text.contains("Initial Pose") and is_instance_valid(application.asset_authored_facing_option) and str(application.asset_authored_facing_option.get_item_metadata(application.asset_authored_facing_option.selected)) == "neutral", "The Asset Inspector should expose Initial Pose and select Neutral for an older Asset.")
+	var down_index := AssetPresentation.SERIALIZED_VALUES.find("down")
+	application._on_asset_authored_facing_selected(down_index, application.asset_authored_facing_option)
+	_expect(AssetPresentation.serialize_authored_facing(application._get_asset("pose_asset").get("authored_facing")) == "down" and application.undo_history.size() == 1, "Changing Authored Facing in the Inspector should store the selected value and capture one Undo snapshot.")
+	application._undo()
+	_expect(AssetPresentation.authored_facing(application._get_asset("pose_asset")) == AssetPresentation.AuthoredFacing.NEUTRAL, "Undo should restore the previous Asset-level Authored Facing.")
+	application._redo()
+	_expect(AssetPresentation.serialize_authored_facing(application._get_asset("pose_asset").get("authored_facing")) == "down", "Redo should restore the Inspector-authored facing value.")
 	application.free()
 
 
@@ -1864,12 +1893,17 @@ func _test_runtime_export_service() -> void:
 	contour_stroke.merge({"method": ContourMeshService.METHOD, "has_outline": true, "topology_role": "outer", "runs": [{"run_id": "boundary:run:0", "edge_ids": ["edge_0"], "closed": true, "start_cap": "none", "end_cap": "none", "vertex_offset": 0, "vertex_count": 3, "index_offset": 0, "index_count": 3}], "parameters": {"reference_pixels_per_meter": 192.0, "stroke_width_px": 4.0, "stroke_width_meters": 0.020833333333333332, "join": "miter", "miter_limit": 4.0, "cap": "butt"}}, true)
 	var body := {"id": "component_b", "name": "body", "visibility": true, "z_index": 2, "parent_component_id": "", "transform": {"position": Vector2(10.0, 20.0), "pivot": Vector2(2.0, 3.0), "rotation": 90.0, "scale": Vector2.ONE}}
 	var eye := {"id": "component_a", "name": "eye_left", "visibility": true, "z_index": 2, "parent_component_id": "component_b", "transform": {"position": Vector2.ZERO, "pivot": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE}}
-	var asset := {"id": "wizard", "name": "Wizard", "asset_type": "character", "visibility": true, "asset_pivot": Vector2(5.0, 6.0), "components": [body, eye]}
+	var asset := {"id": "wizard", "name": "Wizard", "asset_type": "character", "authored_facing": AssetPresentation.AuthoredFacing.RIGHT, "visibility": true, "asset_pivot": Vector2(5.0, 6.0), "components": [body, eye]}
 	var source := {"mesh": mesh, "contour_stroke": contour_stroke}
 	var result := RuntimeExportService.build_manifest(asset, {"component_a": source, "component_b": source})
 	var manifest: Dictionary = result.get("manifest", {})
 	var components: Array = manifest.get("components", [])
 	_expect(bool(result.get("valid", false)) and int(manifest.get("schema_version", 0)) == 8 and str(manifest.get("asset_key", "")) == "wizard" and not manifest.has("asset_id"), "Runtime export schema 8 should identify packages only by the Asset Key derived from their display name.")
+	_expect(str(manifest.get("presentation", {}).get("authored_facing", "")) == "right", "Runtime export schema 8 should publish the selected authored facing under presentation.authored_facing.")
+	var neutral_asset: Dictionary = asset.duplicate(true)
+	neutral_asset.erase("authored_facing")
+	var neutral_manifest: Dictionary = RuntimeExportService.build_manifest(neutral_asset, {"component_a": source, "component_b": source}).get("manifest", {})
+	_expect(str(neutral_manifest.get("presentation", {}).get("authored_facing", "")) == "neutral", "Runtime export schema 8 should explicitly publish neutral for an older Asset without authored_facing.")
 	var manifest_text := JSON.stringify(manifest, "\t")
 	_expect(application._runtime_manifest_text_matches(manifest_text, manifest_text), "Runtime staging should verify exact schema-8 JSON bytes without rejecting numeric JSON round-trip types.")
 	_expect(components.size() == 2 and str(components[0].get("component_id", "")) == "component_a" and str(components[1].get("component_id", "")) == "component_b", "Runtime Components should sort globally by ascending z_index and lexicographic Component ID.")

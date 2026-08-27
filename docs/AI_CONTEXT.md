@@ -24,6 +24,13 @@ Inspector implementation. An Asset stores one stable `asset_type` value:
 `character`, `props`, `weapons`, `terrain`, `icon`, or `symbols`. Create views filter the Outliner by
 that value. Documents without an `asset_type` normalize to `character`.
 
+The Asset-level `Initial Pose` Inspector group stores `authored_facing` as
+`left`, `right`, `neutral`, `top`, or `down`. It describes only the direction
+in which the artwork was originally drawn. Missing legacy values normalize to
+`neutral`, and every subsequent save writes the normalized value explicitly.
+This presentation metadata never mirrors geometry, changes the canvas, or
+modifies Component transforms.
+
 Mesh and Style show a shared multi-select Asset filter above the Outliner
 search field. Character, Props, Weapons, Terrain, Icon, and Symbols are checked by default;
 search text and checked types are combined. The filter is an editor-state
@@ -176,7 +183,7 @@ disabled.
 
 A World persists Assets plus the currently retained motion and derived
 mesh records. Assets own Components, Guides, reference-image settings, their
-Asset pivot and `asset_type`. World schema 40 retains the schema-39
+Asset pivot, `asset_type`, and `authored_facing` presentation metadata. World schema 40 retains the schema-39
 free-form Component names and replaces legacy Ribbons with open Contours. Names
 are unique within an Asset and are the authored runtime-target bindings. The World `name` is its stable technical
 key and owns its directory and main JSON filename. A separate persisted

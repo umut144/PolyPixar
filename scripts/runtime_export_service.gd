@@ -72,6 +72,9 @@ static func build_manifest(asset: Dictionary, sources: Dictionary) -> Dictionary
 		"asset_key": asset_key,
 		"display_name": str(asset.get("name", asset_id)),
 		"asset_type": str(asset.get("asset_type", "character")),
+		"presentation": {
+			"authored_facing": AssetPresentation.serialize_authored_facing(asset.get("authored_facing", AssetPresentation.AuthoredFacing.NEUTRAL))
+		},
 		"coordinate_system": {
 			"dimensions": 2,
 			"x_axis": "right",
@@ -278,6 +281,10 @@ static func manifest_validation_issues(manifest: Dictionary) -> Array[String]:
 	if str(manifest.get("asset_key", "")).is_empty() or not manifest.get("components", null) is Array:
 		errors.append("Runtime Manifest requires an Asset Key and Component array.")
 		return errors
+	var presentation = manifest.get("presentation")
+	if not presentation is Dictionary or presentation.keys() != ["authored_facing"] \
+		or str(presentation.get("authored_facing", "")) not in AssetPresentation.SERIALIZED_VALUES:
+		errors.append("Runtime Manifest presentation must contain exactly one valid authored_facing value.")
 	for raw_component in manifest.get("components", []):
 		if not raw_component is Dictionary:
 			errors.append("Runtime Manifest contains an invalid Component record.")

@@ -38,6 +38,10 @@ or referenced Assets.
 
 Schema 8 contains no UV, SDF, mask, contour-domain, padding, or Carrier field.
 Those schema-3 concepts are not optional aliases and must not be inferred.
+The required Asset-level `presentation.authored_facing` member is an additive
+schema-8 extension: existing schema-8 consumers that ignore unknown top-level
+metadata remain compatible, while consumers that validate a closed top-level
+field set must allow `presentation` and validate the value described below.
 
 ## Catalog
 
@@ -56,6 +60,7 @@ Schema 8 requires:
 | `asset_key` | non-empty lower-snake-case string | Runtime identity. |
 | `display_name` | string | Informational authored name. |
 | `asset_type` | string | `character`, `props`, `weapons`, `terrain`, `icon`, or `symbols`. |
+| `presentation` | object | Required Asset-level presentation metadata. |
 | `coordinate_system` | object | Exact convention below. |
 | `z_order` | object | Exact convention below. |
 | `asset_pivot` | two floats | Asset anchor in meters. |
@@ -80,6 +85,21 @@ Schema 8 requires:
   }
 }
 ```
+
+`presentation` contains exactly one field:
+
+```json
+{
+  "presentation": {
+    "authored_facing": "left"
+  }
+}
+```
+
+`authored_facing` is always one of `left`, `right`, `neutral`, `top`, or
+`down`. It records the direction in which the source artwork was originally
+drawn. PolyTools exports it explicitly, including `neutral`; consumers must not
+infer geometry mirroring, transform changes, or Canvas behavior from it.
 
 Components are already sorted by ascending `(z_index, component_id)`. Drawing
 in that order is the normative overlap rule. Components keep independent

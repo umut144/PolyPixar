@@ -1,0 +1,3077 @@
+{
+	"animation": {
+		"legacy_path_follow_motions": [],
+		"next_state_index": 4,
+		"simulation_contract": {
+			"next_parameter_index": 1,
+			"parameters": [
+				{
+					"id": "parameter_speed",
+					"name": "speed",
+					"type": "number"
+				},
+				{
+					"id": "parameter_grounded",
+					"name": "grounded",
+					"type": "bool"
+				}
+			],
+			"source": "Asset Animation"
+		},
+		"states": [
+			{
+				"cycle_duration": 1.0,
+				"id": "state_idle",
+				"markers": [
+					{
+						"event_id": "rustle",
+						"id": "marker_idle_01",
+						"kind": "sfx",
+						"phase": 0.52
+					}
+				],
+				"motions": [
+					{
+						"domain": "outer",
+						"enabled": true,
+						"guide_ids": [],
+						"id": "motion_idle_01",
+						"name": "Idle Bob",
+						"parameters": {
+							"cycles": 2.51,
+							"distance": 2.3
+						},
+						"phase_offset": 0.0,
+						"primitive": "bob",
+						"target_component_id": "",
+						"target_scope": "asset"
+					}
+				],
+				"name": "IDLE",
+				"next_marker_index": 2,
+				"next_motion_index": 2,
+				"next_transition_index": 2,
+				"transitions": [
+					{
+						"blend_duration": 0.15,
+						"entry_mode": "restart",
+						"exit_phase": 0.0,
+						"exit_policy": "any_phase",
+						"id": "transition_idle_01",
+						"next_rule_index": 2,
+						"rules": [
+							{
+								"id": "rule_idle_01",
+								"operator": "greater",
+								"parameter_id": "parameter_speed",
+								"value": 0.1
+							}
+						],
+						"target_state_id": "state_walk"
+					}
+				]
+			},
+			{
+				"cycle_duration": 1.0,
+				"id": "state_walk",
+				"markers": [
+					{
+						"event_id": "footstep",
+						"id": "marker_walk_01",
+						"kind": "sfx",
+						"phase": 0.25
+					}
+				],
+				"motions": [
+					{
+						"domain": "outer",
+						"enabled": true,
+						"guide_ids": [],
+						"id": "motion_walk_01",
+						"name": "Walk Bob",
+						"parameters": {
+							"cycles": 1.0,
+							"distance": 0.5
+						},
+						"phase_offset": 0.0,
+						"primitive": "bob",
+						"target_component_id": "",
+						"target_scope": "asset"
+					}
+				],
+				"name": "WALK",
+				"next_marker_index": 2,
+				"next_motion_index": 2,
+				"next_transition_index": 3,
+				"transitions": [
+					{
+						"blend_duration": 0.15,
+						"entry_mode": "restart",
+						"exit_phase": 0.0,
+						"exit_policy": "any_phase",
+						"id": "transition_walk_01",
+						"next_rule_index": 2,
+						"rules": [
+							{
+								"id": "rule_walk_idle_01",
+								"operator": "less_equal",
+								"parameter_id": "parameter_speed",
+								"value": 0.1
+							}
+						],
+						"target_state_id": "state_idle"
+					},
+					{
+						"blend_duration": 0.15,
+						"entry_mode": "preserve_phase",
+						"exit_phase": 0.0,
+						"exit_policy": "any_phase",
+						"id": "transition_walk_02",
+						"next_rule_index": 2,
+						"rules": [
+							{
+								"id": "rule_walk_run_01",
+								"operator": "greater",
+								"parameter_id": "parameter_speed",
+								"value": 0.65
+							}
+						],
+						"target_state_id": "state_run"
+					}
+				]
+			},
+			{
+				"cycle_duration": 1.0,
+				"id": "state_run",
+				"markers": [
+					{
+						"event_id": "footstep",
+						"id": "marker_run_01",
+						"kind": "sfx",
+						"phase": 0.18
+					}
+				],
+				"motions": [
+					{
+						"domain": "outer",
+						"enabled": true,
+						"guide_ids": [],
+						"id": "motion_run_01",
+						"name": "Run Bob",
+						"parameters": {
+							"cycles": 1.0,
+							"distance": 0.8
+						},
+						"phase_offset": 0.0,
+						"primitive": "bob",
+						"target_component_id": "",
+						"target_scope": "asset"
+					},
+					{
+						"domain": "inner",
+						"enabled": true,
+						"guide_ids": [],
+						"id": "motion_run_02",
+						"name": "Run Sway",
+						"parameters": {
+							"cycles": 1.0,
+							"strength": 0.5
+						},
+						"phase_offset": 0.0,
+						"primitive": "spine_sway",
+						"target_component_id": "",
+						"target_scope": "component"
+					}
+				],
+				"name": "RUN",
+				"next_marker_index": 2,
+				"next_motion_index": 3,
+				"next_transition_index": 2,
+				"transitions": [
+					{
+						"blend_duration": 0.15,
+						"entry_mode": "preserve_phase",
+						"exit_phase": 0.0,
+						"exit_policy": "any_phase",
+						"id": "transition_run_01",
+						"next_rule_index": 2,
+						"rules": [
+							{
+								"id": "rule_run_01",
+								"operator": "less_equal",
+								"parameter_id": "parameter_speed",
+								"value": 0.65
+							}
+						],
+						"target_state_id": "state_walk"
+					}
+				]
+			}
+		]
+	},
+	"asset_pivot": [
+		0.0,
+		0.0
+	],
+	"asset_type": "character",
+	"authored_facing": "right",
+	"components": [
+		{
+			"catch_parent_component_id": "",
+			"chains": [
+				{
+					"closed": true,
+					"edge_ids": [
+						"edge_5787103312869712088",
+						"edge_7518913017729218519",
+						"edge_1030824908965868278",
+						"edge_4391615137879055242",
+						"edge_5475656133831618955",
+						"edge_8215918254621863353",
+						"edge_1362313503734925180",
+						"edge_5316054837665638648",
+						"edge_4863573601835407909",
+						"edge_7441503232692694486",
+						"edge_5977342804834308038",
+						"edge_3503940814347627217",
+						"edge_5038725746737351780",
+						"edge_3442621407320705168",
+						"edge_7608546324262807924",
+						"edge_1856003419321339464",
+						"edge_5684555229618161487",
+						"edge_541801593026558281",
+						"edge_8355805533489257628",
+						"edge_536299975428881301",
+						"edge_5389229609703051178",
+						"edge_7109763169774718808",
+						"edge_7120902087607773341",
+						"edge_1600195025549177734",
+						"edge_317153001394745896",
+						"edge_8972905164546509734",
+						"edge_4298109842540970624"
+					],
+					"id": "chain_8613746652911698762",
+					"point_ids": [
+						"point_8725473141765850664",
+						"point_2286887216280894959",
+						"point_7555097605056952181",
+						"point_2114928357509430759",
+						"point_4243668536983928572",
+						"point_2981545172065990081",
+						"point_612742225289917826",
+						"point_5793643501814143115",
+						"point_6594001636920347394",
+						"point_847651125181899854",
+						"point_5778754787373853483",
+						"point_6846595787990542624",
+						"point_8853986692676188219",
+						"point_4949816674454368796",
+						"point_3750744865911776731",
+						"point_3819920176608239338",
+						"point_5274213064091573487",
+						"point_7925472819673994606",
+						"point_7234999320961468995",
+						"point_8985045312931604030",
+						"point_7018916145631448908",
+						"point_8672893409969600979",
+						"point_5205652490416074800",
+						"point_6712099531229213892",
+						"point_5321314113355136887",
+						"point_2163787112472732220",
+						"point_160386138067928635"
+					],
+					"topology_role": "outer"
+				}
+			],
+			"draw_mode": "closed_loop",
+			"edges": [
+				{
+					"end_point_id": "point_2286887216280894959",
+					"id": "edge_5787103312869712088",
+					"render_outline": true,
+					"start_point_id": "point_8725473141765850664"
+				},
+				{
+					"end_point_id": "point_7555097605056952181",
+					"id": "edge_7518913017729218519",
+					"render_outline": true,
+					"start_point_id": "point_2286887216280894959"
+				},
+				{
+					"end_point_id": "point_2114928357509430759",
+					"id": "edge_1030824908965868278",
+					"render_outline": true,
+					"start_point_id": "point_7555097605056952181"
+				},
+				{
+					"end_point_id": "point_4243668536983928572",
+					"id": "edge_4391615137879055242",
+					"render_outline": true,
+					"start_point_id": "point_2114928357509430759"
+				},
+				{
+					"end_point_id": "point_2981545172065990081",
+					"id": "edge_5475656133831618955",
+					"render_outline": true,
+					"start_point_id": "point_4243668536983928572"
+				},
+				{
+					"end_point_id": "point_612742225289917826",
+					"id": "edge_8215918254621863353",
+					"render_outline": true,
+					"start_point_id": "point_2981545172065990081"
+				},
+				{
+					"end_point_id": "point_5793643501814143115",
+					"id": "edge_1362313503734925180",
+					"render_outline": true,
+					"start_point_id": "point_612742225289917826"
+				},
+				{
+					"end_point_id": "point_6594001636920347394",
+					"id": "edge_5316054837665638648",
+					"render_outline": true,
+					"start_point_id": "point_5793643501814143115"
+				},
+				{
+					"end_point_id": "point_847651125181899854",
+					"id": "edge_4863573601835407909",
+					"render_outline": true,
+					"start_point_id": "point_6594001636920347394"
+				},
+				{
+					"end_point_id": "point_6846595787990542624",
+					"id": "edge_5977342804834308038",
+					"render_outline": true,
+					"start_point_id": "point_5778754787373853483"
+				},
+				{
+					"end_point_id": "point_8853986692676188219",
+					"id": "edge_3503940814347627217",
+					"render_outline": true,
+					"start_point_id": "point_6846595787990542624"
+				},
+				{
+					"end_point_id": "point_4949816674454368796",
+					"id": "edge_5038725746737351780",
+					"render_outline": true,
+					"start_point_id": "point_8853986692676188219"
+				},
+				{
+					"end_point_id": "point_3750744865911776731",
+					"id": "edge_3442621407320705168",
+					"render_outline": true,
+					"start_point_id": "point_4949816674454368796"
+				},
+				{
+					"end_point_id": "point_3819920176608239338",
+					"id": "edge_7608546324262807924",
+					"render_outline": true,
+					"start_point_id": "point_3750744865911776731"
+				},
+				{
+					"end_point_id": "point_5274213064091573487",
+					"id": "edge_1856003419321339464",
+					"render_outline": true,
+					"start_point_id": "point_3819920176608239338"
+				},
+				{
+					"end_point_id": "point_7925472819673994606",
+					"id": "edge_5684555229618161487",
+					"render_outline": true,
+					"start_point_id": "point_5274213064091573487"
+				},
+				{
+					"end_point_id": "point_7234999320961468995",
+					"id": "edge_541801593026558281",
+					"render_outline": true,
+					"start_point_id": "point_7925472819673994606"
+				},
+				{
+					"end_point_id": "point_8985045312931604030",
+					"id": "edge_8355805533489257628",
+					"render_outline": true,
+					"start_point_id": "point_7234999320961468995"
+				},
+				{
+					"end_point_id": "point_7018916145631448908",
+					"id": "edge_536299975428881301",
+					"render_outline": true,
+					"start_point_id": "point_8985045312931604030"
+				},
+				{
+					"end_point_id": "point_8672893409969600979",
+					"id": "edge_5389229609703051178",
+					"render_outline": true,
+					"start_point_id": "point_7018916145631448908"
+				},
+				{
+					"end_point_id": "point_5205652490416074800",
+					"id": "edge_7109763169774718808",
+					"render_outline": true,
+					"start_point_id": "point_8672893409969600979"
+				},
+				{
+					"end_point_id": "point_6712099531229213892",
+					"id": "edge_7120902087607773341",
+					"render_outline": true,
+					"start_point_id": "point_5205652490416074800"
+				},
+				{
+					"end_point_id": "point_5321314113355136887",
+					"id": "edge_1600195025549177734",
+					"render_outline": true,
+					"start_point_id": "point_6712099531229213892"
+				},
+				{
+					"end_point_id": "point_2163787112472732220",
+					"id": "edge_317153001394745896",
+					"render_outline": true,
+					"start_point_id": "point_5321314113355136887"
+				},
+				{
+					"end_point_id": "point_160386138067928635",
+					"id": "edge_8972905164546509734",
+					"render_outline": true,
+					"start_point_id": "point_2163787112472732220"
+				},
+				{
+					"end_point_id": "point_8725473141765850664",
+					"id": "edge_4298109842540970624",
+					"render_outline": true,
+					"start_point_id": "point_160386138067928635"
+				},
+				{
+					"end_point_id": "point_5778754787373853483",
+					"id": "edge_7441503232692694486",
+					"render_outline": true,
+					"start_point_id": "point_847651125181899854"
+				}
+			],
+			"group_id": "",
+			"id": "component_4",
+			"name": "hat",
+			"parent_component_id": "",
+			"points": [
+				{
+					"handle_in": [
+						0.0,
+						0.0
+					],
+					"handle_out": [
+						0.0,
+						0.0
+					],
+					"handle_source": "auto",
+					"id": "point_160386138067928635",
+					"mode": "linear",
+					"position": [
+						0.0,
+						8.5
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						0.333333343267441,
+						0.133333206176758
+					],
+					"handle_out": [
+						1.33333337306976,
+						0.0
+					],
+					"handle_source": "auto",
+					"id": "point_2163787112472732220",
+					"mode": "corner",
+					"position": [
+						-4.0,
+						8.5
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						0.291385799646378,
+						0.161881014704704
+					],
+					"handle_out": [
+						-0.31383204460144,
+						-0.174351140856743
+					],
+					"handle_source": "auto",
+					"id": "point_5321314113355136887",
+					"mode": "aligned",
+					"position": [
+						-3.0,
+						8.89999961853027
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.224764004349709,
+						0.259343087673187
+					],
+					"handle_out": [
+						-0.218310207128525,
+						-0.251896381378174
+					],
+					"handle_source": "auto",
+					"id": "point_6712099531229213892",
+					"mode": "aligned",
+					"position": [
+						-2.20000004768372,
+						9.5
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.0632455945014954,
+						0.189736768603325
+					],
+					"handle_out": [
+						-0.108525425195694,
+						-0.325576275587082
+					],
+					"handle_source": "auto",
+					"id": "point_5205652490416074800",
+					"mode": "aligned",
+					"position": [
+						-1.70000004768372,
+						10.3999996185303
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.0321108922362328,
+						0.176610037684441
+					],
+					"handle_out": [
+						0.0357770845293999,
+						-0.19677409529686
+					],
+					"handle_source": "auto",
+					"id": "point_8672893409969600979",
+					"mode": "aligned",
+					"position": [
+						-1.70000004768372,
+						11.0
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.127990320324898,
+						0.14627468585968
+					],
+					"handle_out": [
+						0.118205174803734,
+						-0.135091662406921
+					],
+					"handle_source": "auto",
+					"id": "point_7018916145631448908",
+					"mode": "aligned",
+					"position": [
+						-1.89999997615814,
+						11.5
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.192952737212181,
+						0.0526235029101372
+					],
+					"handle_out": [
+						0.187516450881958,
+						-0.0511408783495426
+					],
+					"handle_source": "auto",
+					"id": "point_8985045312931604030",
+					"mode": "aligned",
+					"position": [
+						-2.40000009536743,
+						11.8000001907349
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.21123494207859,
+						-0.074518509209156
+					],
+					"handle_out": [
+						0.188607841730118,
+						0.0665362179279327
+					],
+					"handle_source": "auto",
+					"id": "point_7234999320961468995",
+					"mode": "aligned",
+					"position": [
+						-3.0,
+						11.8000001907349
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.158779054880142,
+						-0.159587100148201
+					],
+					"handle_out": [
+						0.157985001802444,
+						0.15878900885582
+					],
+					"handle_source": "auto",
+					"id": "point_7925472819673994606",
+					"mode": "aligned",
+					"position": [
+						-3.53869557380676,
+						11.3982963562012
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.210387706756592,
+						-0.361363410949707
+					],
+					"handle_out": [
+						0.118592120707035,
+						0.20369465649128
+					],
+					"handle_source": "manual",
+					"id": "point_5274213064091573487",
+					"mode": "aligned",
+					"position": [
+						-3.94006776809692,
+						10.8551483154297
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.0768489390611649,
+						-0.176302045583725
+					],
+					"handle_out": [
+						0.0768836215138435,
+						0.1763816177845
+					],
+					"handle_source": "auto",
+					"id": "point_3819920176608239338",
+					"mode": "aligned",
+					"position": [
+						-4.20924663543701,
+						10.3445243835449
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.0,
+						0.199999809265137
+					],
+					"handle_out": [
+						0.0635844841599464,
+						0.18150806427002
+					],
+					"handle_source": "auto",
+					"id": "point_3750744865911776731",
+					"mode": "corner",
+					"position": [
+						-4.40000009536743,
+						9.80000019073486
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						0.0306143276393414,
+						0.241882801055908
+					],
+					"handle_out": [
+						-0.0251129865646362,
+						-0.198416888713837
+					],
+					"handle_source": "auto",
+					"id": "point_4949816674454368796",
+					"mode": "aligned",
+					"position": [
+						-4.40000009536743,
+						10.3999996185303
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.139085575938225,
+						0.326081722974777
+					],
+					"handle_out": [
+						-0.0956566482782364,
+						-0.224263980984688
+					],
+					"handle_source": "auto",
+					"id": "point_8853986692676188219",
+					"mode": "aligned",
+					"position": [
+						-4.23390293121338,
+						11.1123285293579
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.270588159561157,
+						0.349787831306458
+					],
+					"handle_out": [
+						-0.216910779476166,
+						-0.28039938211441
+					],
+					"handle_source": "auto",
+					"id": "point_6846595787990542624",
+					"mode": "aligned",
+					"position": [
+						-3.70308232307434,
+						12.0339012145996
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.272589474916458,
+						0.213518589735031
+					],
+					"handle_out": [
+						-0.348143815994263,
+						-0.272700101137161
+					],
+					"handle_source": "auto",
+					"id": "point_5778754787373853483",
+					"mode": "aligned",
+					"position": [
+						-2.78219819068909,
+						12.9889392852783
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.345373243093491,
+						0.0907328799366951
+					],
+					"handle_out": [
+						-0.486936926841736,
+						-0.127923011779785
+					],
+					"handle_source": "manual",
+					"id": "point_847651125181899854",
+					"mode": "aligned",
+					"position": [
+						-1.8639041185379,
+						13.4745244979858
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.23567770421505,
+						0.00340381753630936
+					],
+					"handle_out": [
+						-0.357055366039276,
+						-0.0051568360067904
+					],
+					"handle_source": "auto",
+					"id": "point_6594001636920347394",
+					"mode": "aligned",
+					"position": [
+						-0.800000011920929,
+						13.6000003814697
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.143818467855453,
+						-0.0392232425510883
+					],
+					"handle_out": [
+						-0.2273970246315,
+						0.0620174072682858
+					],
+					"handle_source": "auto",
+					"id": "point_5793643501814143115",
+					"mode": "aligned",
+					"position": [
+						-0.100000001490116,
+						13.5
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.194581836462021,
+						-0.172961682081223
+					],
+					"handle_out": [
+						-0.111417166888714,
+						0.0990375056862831
+					],
+					"handle_source": "auto",
+					"id": "point_612742225289917826",
+					"mode": "aligned",
+					"position": [
+						0.300000011920929,
+						13.3000001907349
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.268437713384628,
+						-0.447396129369736
+					],
+					"handle_out": [
+						-0.133944734930992,
+						0.223241224884987
+					],
+					"handle_source": "auto",
+					"id": "point_2981545172065990081",
+					"mode": "aligned",
+					"position": [
+						0.800000011920929,
+						12.6999998092651
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.149583622813225,
+						-0.32636421918869
+					],
+					"handle_out": [
+						-0.217389225959778,
+						0.474303692579269
+					],
+					"handle_source": "auto",
+					"id": "point_4243668536983928572",
+					"mode": "aligned",
+					"position": [
+						1.5,
+						11.3000001907349
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.127635478973389,
+						-0.226907551288605
+					],
+					"handle_out": [
+						-0.176009148359299,
+						0.312905192375183
+					],
+					"handle_source": "auto",
+					"id": "point_2114928357509430759",
+					"mode": "aligned",
+					"position": [
+						1.89999997615814,
+						10.3000001907349
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.199197128415108,
+						-0.205494865775108
+					],
+					"handle_out": [
+						-0.181202739477158,
+						0.186931580305099
+					],
+					"handle_source": "auto",
+					"id": "point_7555097605056952181",
+					"mode": "aligned",
+					"position": [
+						2.40000009536743,
+						9.69999980926514
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.305966377258301,
+						-0.229474753141403
+					],
+					"handle_out": [
+						-0.22895610332489,
+						0.171717047691345
+					],
+					"handle_source": "auto",
+					"id": "point_2286887216280894959",
+					"mode": "aligned",
+					"position": [
+						3.03827381134033,
+						9.12573909759521
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-1.33333337306976,
+						0.0
+					],
+					"handle_out": [
+						-0.320575386285782,
+						0.208579704165459
+					],
+					"handle_source": "auto",
+					"id": "point_8725473141765850664",
+					"mode": "corner",
+					"position": [
+						4.0,
+						8.5
+					],
+					"preserve_point": true
+				}
+			],
+			"primitive": {},
+			"show_point_numbers": true,
+			"source_asset_id": "",
+			"topology_role": "outer",
+			"transform": {
+				"pivot": [
+					0.0,
+					8.5
+				],
+				"position": [
+					0.0,
+					8.5
+				],
+				"rotation": 0.0,
+				"scale": [
+					1.0,
+					1.0
+				]
+			},
+			"type": "component",
+			"visibility": true,
+			"z_index": 4
+		},
+		{
+			"catch_parent_component_id": "",
+			"chains": [
+				{
+					"closed": true,
+					"edge_ids": [
+						"edge_5586157527166246208",
+						"edge_3254144220657610196",
+						"edge_8193268432844953305",
+						"edge_1870603754028736057",
+						"edge_7851763636164429091",
+						"edge_4279686651598875957",
+						"edge_3987070145134550204",
+						"edge_8462536189704772727",
+						"edge_1608352532238546979",
+						"edge_5180938254357268094",
+						"edge_7195150066661281228",
+						"edge_1393660356897401123",
+						"edge_6497573292713629417",
+						"edge_4786496336917366033",
+						"edge_217315144006765986",
+						"edge_3524581509273382662",
+						"edge_2675042865372904413",
+						"edge_3050386416439367475",
+						"edge_218103337006514395"
+					],
+					"id": "chain_1516379966837428628",
+					"point_ids": [
+						"point_7057143395255644538",
+						"point_6773369052690049390",
+						"point_3073634497605811001",
+						"point_70580565864324615",
+						"point_2082778486359173968",
+						"point_1476862464163465862",
+						"point_7666013404308377087",
+						"point_5034982405495111181",
+						"point_4642230294564329382",
+						"point_8100988573197905377",
+						"mirror_point_9004726170907308358",
+						"mirror_point_4631692723922952231",
+						"mirror_point_2894464226595724194",
+						"mirror_point_5812513441661268571",
+						"mirror_point_4460636026109672865",
+						"mirror_point_2200131653056048495",
+						"mirror_point_4585453974804700308",
+						"mirror_point_7608308830048869852",
+						"mirror_point_1761135336706333935"
+					],
+					"topology_role": "outer"
+				}
+			],
+			"draw_mode": "closed_loop",
+			"edges": [
+				{
+					"end_point_id": "point_6773369052690049390",
+					"id": "edge_5586157527166246208",
+					"render_outline": true,
+					"start_point_id": "point_7057143395255644538"
+				},
+				{
+					"end_point_id": "point_3073634497605811001",
+					"id": "edge_3254144220657610196",
+					"render_outline": true,
+					"start_point_id": "point_6773369052690049390"
+				},
+				{
+					"end_point_id": "point_70580565864324615",
+					"id": "edge_8193268432844953305",
+					"render_outline": true,
+					"start_point_id": "point_3073634497605811001"
+				},
+				{
+					"end_point_id": "point_2082778486359173968",
+					"id": "edge_1870603754028736057",
+					"render_outline": true,
+					"start_point_id": "point_70580565864324615"
+				},
+				{
+					"end_point_id": "point_1476862464163465862",
+					"id": "edge_7851763636164429091",
+					"render_outline": true,
+					"start_point_id": "point_2082778486359173968"
+				},
+				{
+					"end_point_id": "point_7666013404308377087",
+					"id": "edge_4279686651598875957",
+					"render_outline": true,
+					"start_point_id": "point_1476862464163465862"
+				},
+				{
+					"end_point_id": "point_5034982405495111181",
+					"id": "edge_3987070145134550204",
+					"render_outline": true,
+					"start_point_id": "point_7666013404308377087"
+				},
+				{
+					"end_point_id": "point_4642230294564329382",
+					"id": "edge_8462536189704772727",
+					"render_outline": true,
+					"start_point_id": "point_5034982405495111181"
+				},
+				{
+					"end_point_id": "point_8100988573197905377",
+					"id": "edge_1608352532238546979",
+					"render_outline": true,
+					"start_point_id": "point_4642230294564329382"
+				},
+				{
+					"end_point_id": "mirror_point_9004726170907308358",
+					"id": "edge_5180938254357268094",
+					"render_outline": true,
+					"start_point_id": "point_8100988573197905377"
+				},
+				{
+					"end_point_id": "mirror_point_4631692723922952231",
+					"id": "edge_7195150066661281228",
+					"render_outline": true,
+					"start_point_id": "mirror_point_9004726170907308358"
+				},
+				{
+					"end_point_id": "mirror_point_2894464226595724194",
+					"id": "edge_1393660356897401123",
+					"render_outline": true,
+					"start_point_id": "mirror_point_4631692723922952231"
+				},
+				{
+					"end_point_id": "mirror_point_5812513441661268571",
+					"id": "edge_6497573292713629417",
+					"render_outline": true,
+					"start_point_id": "mirror_point_2894464226595724194"
+				},
+				{
+					"end_point_id": "mirror_point_4460636026109672865",
+					"id": "edge_4786496336917366033",
+					"render_outline": true,
+					"start_point_id": "mirror_point_5812513441661268571"
+				},
+				{
+					"end_point_id": "mirror_point_2200131653056048495",
+					"id": "edge_217315144006765986",
+					"render_outline": true,
+					"start_point_id": "mirror_point_4460636026109672865"
+				},
+				{
+					"end_point_id": "mirror_point_4585453974804700308",
+					"id": "edge_3524581509273382662",
+					"render_outline": true,
+					"start_point_id": "mirror_point_2200131653056048495"
+				},
+				{
+					"end_point_id": "mirror_point_7608308830048869852",
+					"id": "edge_2675042865372904413",
+					"render_outline": true,
+					"start_point_id": "mirror_point_4585453974804700308"
+				},
+				{
+					"end_point_id": "mirror_point_1761135336706333935",
+					"id": "edge_3050386416439367475",
+					"render_outline": true,
+					"start_point_id": "mirror_point_7608308830048869852"
+				},
+				{
+					"end_point_id": "point_7057143395255644538",
+					"id": "edge_218103337006514395",
+					"render_outline": true,
+					"start_point_id": "mirror_point_1761135336706333935"
+				}
+			],
+			"group_id": "",
+			"id": "component_5",
+			"name": "head",
+			"parent_component_id": "",
+			"points": [
+				{
+					"handle_in": [
+						0.0,
+						0.0
+					],
+					"handle_out": [
+						0.0,
+						0.0
+					],
+					"handle_source": "manual",
+					"id": "point_7057143395255644538",
+					"mode": "linear",
+					"position": [
+						0.0,
+						8.5
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						0.0,
+						0.0
+					],
+					"handle_out": [
+						0.0,
+						0.0
+					],
+					"handle_source": "manual",
+					"id": "point_6773369052690049390",
+					"mode": "linear",
+					"position": [
+						-1.19899988174438,
+						8.5
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.011514282785356,
+						0.0118169784545898
+					],
+					"handle_out": [
+						-0.011514282785356,
+						-0.0118169784545898
+					],
+					"handle_source": "manual",
+					"id": "point_3073634497605811001",
+					"mode": "aligned",
+					"position": [
+						-1.28699994087219,
+						8.19999980926514
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.00619689701125026,
+						0.150227308273315
+					],
+					"handle_out": [
+						-0.00480913463979959,
+						-0.116584695875645
+					],
+					"handle_source": "manual",
+					"id": "point_70580565864324615",
+					"mode": "aligned",
+					"position": [
+						-1.32000005245209,
+						7.75
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.00984272733330727,
+						0.116322994232178
+					],
+					"handle_out": [
+						0.00855300482362509,
+						-0.10108083486557
+					],
+					"handle_source": "manual",
+					"id": "point_2082778486359173968",
+					"mode": "aligned",
+					"position": [
+						-1.32000005245209,
+						7.40000009536743
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.0270469598472118,
+						0.0983524993062019
+					],
+					"handle_out": [
+						0.0281220488250256,
+						-0.102261908352375
+					],
+					"handle_source": "manual",
+					"id": "point_1476862464163465862",
+					"mode": "aligned",
+					"position": [
+						-1.26499998569489,
+						7.09999990463257
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.0518544912338257,
+						0.0942808091640472
+					],
+					"handle_out": [
+						0.040994580835104,
+						-0.07453553378582
+					],
+					"handle_source": "manual",
+					"id": "point_7666013404308377087",
+					"mode": "aligned",
+					"position": [
+						-1.15499997138977,
+						6.80000019073486
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.068512462079525,
+						0.0553636252880096
+					],
+					"handle_out": [
+						0.0988101735711098,
+						-0.0798466354608536
+					],
+					"handle_source": "manual",
+					"id": "point_5034982405495111181",
+					"mode": "aligned",
+					"position": [
+						-0.990000009536743,
+						6.60000038146973
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.120035484433174,
+						0.0503645725548267
+					],
+					"handle_out": [
+						0.121184132993221,
+						-0.0508465208113194
+					],
+					"handle_source": "manual",
+					"id": "point_4642230294564329382",
+					"mode": "aligned",
+					"position": [
+						-0.660000026226044,
+						6.40000009536743
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.13255450129509,
+						0.014176937751472
+					],
+					"handle_out": [
+						0.182077616453171,
+						-0.019473522901535
+					],
+					"handle_source": "manual",
+					"id": "point_8100988573197905377",
+					"mode": "aligned",
+					"position": [
+						-0.275000005960464,
+						6.30000019073486
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.0,
+						0.0
+					],
+					"handle_out": [
+						0.0,
+						0.0
+					],
+					"handle_source": "manual",
+					"id": "mirror_point_1761135336706333935",
+					"mode": "linear",
+					"position": [
+						1.19899988174438,
+						8.5
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.011514282785356,
+						-0.0118169784545898
+					],
+					"handle_out": [
+						-0.011514282785356,
+						0.0118169784545898
+					],
+					"handle_source": "manual",
+					"id": "mirror_point_7608308830048869852",
+					"mode": "aligned",
+					"position": [
+						1.28699994087219,
+						8.19999980926514
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.00480913463979959,
+						-0.116584695875645
+					],
+					"handle_out": [
+						-0.00619689701125026,
+						0.150227308273315
+					],
+					"handle_source": "manual",
+					"id": "mirror_point_4585453974804700308",
+					"mode": "aligned",
+					"position": [
+						1.32000005245209,
+						7.75
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.00855300482362509,
+						-0.10108083486557
+					],
+					"handle_out": [
+						0.00984272733330727,
+						0.116322994232178
+					],
+					"handle_source": "manual",
+					"id": "mirror_point_2200131653056048495",
+					"mode": "aligned",
+					"position": [
+						1.32000005245209,
+						7.40000009536743
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.0281220488250256,
+						-0.102261908352375
+					],
+					"handle_out": [
+						0.0270469598472118,
+						0.0983524993062019
+					],
+					"handle_source": "manual",
+					"id": "mirror_point_4460636026109672865",
+					"mode": "aligned",
+					"position": [
+						1.26499998569489,
+						7.09999990463257
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.040994580835104,
+						-0.07453553378582
+					],
+					"handle_out": [
+						0.0518544912338257,
+						0.0942808091640472
+					],
+					"handle_source": "manual",
+					"id": "mirror_point_5812513441661268571",
+					"mode": "aligned",
+					"position": [
+						1.15499997138977,
+						6.80000019073486
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.0988101735711098,
+						-0.0798466354608536
+					],
+					"handle_out": [
+						0.068512462079525,
+						0.0553636252880096
+					],
+					"handle_source": "manual",
+					"id": "mirror_point_2894464226595724194",
+					"mode": "aligned",
+					"position": [
+						0.990000009536743,
+						6.60000038146973
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.121184132993221,
+						-0.0508465208113194
+					],
+					"handle_out": [
+						0.120035484433174,
+						0.0503645725548267
+					],
+					"handle_source": "manual",
+					"id": "mirror_point_4631692723922952231",
+					"mode": "aligned",
+					"position": [
+						0.660000026226044,
+						6.40000009536743
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.182077616453171,
+						-0.019473522901535
+					],
+					"handle_out": [
+						0.13255450129509,
+						0.014176937751472
+					],
+					"handle_source": "manual",
+					"id": "mirror_point_9004726170907308358",
+					"mode": "aligned",
+					"position": [
+						0.275000005960464,
+						6.30000019073486
+					],
+					"preserve_point": false
+				}
+			],
+			"primitive": {},
+			"show_point_numbers": false,
+			"source_asset_id": "",
+			"topology_role": "outer",
+			"transform": {
+				"pivot": [
+					0.0,
+					8.5
+				],
+				"position": [
+					0.0,
+					8.5
+				],
+				"rotation": 0.0,
+				"scale": [
+					1.0,
+					1.0
+				]
+			},
+			"type": "component",
+			"visibility": true,
+			"z_index": 2
+		},
+		{
+			"catch_parent_component_id": "",
+			"chains": [
+				{
+					"closed": true,
+					"edge_ids": [
+						"edge_8903702169699765037",
+						"edge_581930888490397765",
+						"edge_872842601371052388",
+						"edge_3639985393209580374",
+						"edge_2823147822062472314",
+						"edge_4663677000767066039",
+						"edge_4832328774907291328",
+						"edge_4873252161748185543",
+						"edge_7526489932220311600",
+						"edge_4390673339223841579",
+						"edge_3847941094746216575",
+						"edge_5231419872383899845",
+						"edge_2044944835782963869",
+						"edge_1690636621228574179",
+						"edge_5943117607222150103",
+						"edge_5305276681114327197",
+						"edge_6424379895026526202",
+						"edge_8723576632851466032",
+						"edge_7928446206678752280",
+						"edge_3499709420098479149"
+					],
+					"id": "chain_8196326417832416303",
+					"point_ids": [
+						"point_6580629776816037323",
+						"point_8279731001714707516",
+						"point_1463668256819248052",
+						"point_7932400062023742576",
+						"point_642890511810149835",
+						"point_932844178271113562",
+						"point_8039726297510593397",
+						"point_8594760453462304973",
+						"point_400847969225863991",
+						"point_5759982306202365063",
+						"point_4368470901147998257",
+						"point_2458674337118496219",
+						"mirror_point_2640964642062420346",
+						"mirror_point_4586964173821691258",
+						"mirror_point_8491343206432031719",
+						"mirror_point_469889402008129087",
+						"mirror_point_4217098071389807708",
+						"mirror_point_4424299132211285361",
+						"mirror_point_7238325317604644289",
+						"mirror_point_8787060870405258589"
+					],
+					"topology_role": "outer"
+				}
+			],
+			"draw_mode": "closed_loop",
+			"edges": [
+				{
+					"end_point_id": "point_8279731001714707516",
+					"id": "edge_8903702169699765037",
+					"render_outline": true,
+					"start_point_id": "point_6580629776816037323"
+				},
+				{
+					"end_point_id": "point_1463668256819248052",
+					"id": "edge_581930888490397765",
+					"render_outline": true,
+					"start_point_id": "point_8279731001714707516"
+				},
+				{
+					"end_point_id": "point_7932400062023742576",
+					"id": "edge_872842601371052388",
+					"render_outline": true,
+					"start_point_id": "point_1463668256819248052"
+				},
+				{
+					"end_point_id": "point_8039726297510593397",
+					"id": "edge_4663677000767066039",
+					"render_outline": true,
+					"start_point_id": "point_932844178271113562"
+				},
+				{
+					"end_point_id": "point_8594760453462304973",
+					"id": "edge_4832328774907291328",
+					"render_outline": true,
+					"start_point_id": "point_8039726297510593397"
+				},
+				{
+					"end_point_id": "point_400847969225863991",
+					"id": "edge_4873252161748185543",
+					"render_outline": true,
+					"start_point_id": "point_8594760453462304973"
+				},
+				{
+					"end_point_id": "point_5759982306202365063",
+					"id": "edge_7526489932220311600",
+					"render_outline": true,
+					"start_point_id": "point_400847969225863991"
+				},
+				{
+					"end_point_id": "point_4368470901147998257",
+					"id": "edge_4390673339223841579",
+					"render_outline": true,
+					"start_point_id": "point_5759982306202365063"
+				},
+				{
+					"end_point_id": "point_2458674337118496219",
+					"id": "edge_3847941094746216575",
+					"render_outline": true,
+					"start_point_id": "point_4368470901147998257"
+				},
+				{
+					"end_point_id": "mirror_point_2640964642062420346",
+					"id": "edge_5231419872383899845",
+					"render_outline": true,
+					"start_point_id": "point_2458674337118496219"
+				},
+				{
+					"end_point_id": "mirror_point_4586964173821691258",
+					"id": "edge_2044944835782963869",
+					"render_outline": true,
+					"start_point_id": "mirror_point_2640964642062420346"
+				},
+				{
+					"end_point_id": "mirror_point_8491343206432031719",
+					"id": "edge_1690636621228574179",
+					"render_outline": true,
+					"start_point_id": "mirror_point_4586964173821691258"
+				},
+				{
+					"end_point_id": "mirror_point_469889402008129087",
+					"id": "edge_5943117607222150103",
+					"render_outline": true,
+					"start_point_id": "mirror_point_8491343206432031719"
+				},
+				{
+					"end_point_id": "mirror_point_4217098071389807708",
+					"id": "edge_5305276681114327197",
+					"render_outline": true,
+					"start_point_id": "mirror_point_469889402008129087"
+				},
+				{
+					"end_point_id": "mirror_point_4424299132211285361",
+					"id": "edge_6424379895026526202",
+					"render_outline": true,
+					"start_point_id": "mirror_point_4217098071389807708"
+				},
+				{
+					"end_point_id": "mirror_point_7238325317604644289",
+					"id": "edge_8723576632851466032",
+					"render_outline": true,
+					"start_point_id": "mirror_point_4424299132211285361"
+				},
+				{
+					"end_point_id": "mirror_point_8787060870405258589",
+					"id": "edge_7928446206678752280",
+					"render_outline": true,
+					"start_point_id": "mirror_point_7238325317604644289"
+				},
+				{
+					"end_point_id": "point_6580629776816037323",
+					"id": "edge_3499709420098479149",
+					"render_outline": true,
+					"start_point_id": "mirror_point_8787060870405258589"
+				},
+				{
+					"end_point_id": "point_642890511810149835",
+					"id": "edge_3639985393209580374",
+					"render_outline": true,
+					"start_point_id": "point_7932400062023742576"
+				},
+				{
+					"end_point_id": "point_932844178271113562",
+					"id": "edge_2823147822062472314",
+					"render_outline": true,
+					"start_point_id": "point_642890511810149835"
+				}
+			],
+			"group_id": "",
+			"id": "component_6",
+			"name": "body",
+			"parent_component_id": "",
+			"points": [
+				{
+					"handle_in": [
+						-0.405517488718033,
+						0.0
+					],
+					"handle_out": [
+						0.405517488718033,
+						0.0
+					],
+					"handle_source": "auto",
+					"id": "point_2458674337118496219",
+					"mode": "mirrored",
+					"position": [
+						0.0,
+						6.69999980926514
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						-0.269064426422119,
+						-0.0991289615631104
+					],
+					"handle_out": [
+						0.380514562129974,
+						0.140189528465271
+					],
+					"handle_source": "auto",
+					"id": "point_4368470901147998257",
+					"mode": "aligned",
+					"position": [
+						-1.20000004768372,
+						6.5
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.137436851859093,
+						-0.137436851859093
+					],
+					"handle_out": [
+						0.202758729457855,
+						0.202758729457855
+					],
+					"handle_source": "auto",
+					"id": "point_5759982306202365063",
+					"mode": "aligned",
+					"position": [
+						-1.89999997615814,
+						6.0
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.0863159149885178,
+						-0.323684692382812
+					],
+					"handle_out": [
+						0.0500806123018265,
+						0.187802314758301
+					],
+					"handle_source": "auto",
+					"id": "point_400847969225863991",
+					"mode": "aligned",
+					"position": [
+						-2.20000004768372,
+						5.5
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.00873668771237135,
+						-0.366941213607788
+					],
+					"handle_out": [
+						0.00797382555902004,
+						0.334900975227356
+					],
+					"handle_source": "auto",
+					"id": "point_8594760453462304973",
+					"mode": "aligned",
+					"position": [
+						-2.29999995231628,
+						4.5
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.00578737258911133,
+						-0.345037460327148
+					],
+					"handle_out": [
+						-0.00608591549098492,
+						0.362836301326752
+					],
+					"handle_source": "manual",
+					"id": "point_8039726297510593397",
+					"mode": "aligned",
+					"position": [
+						-2.25,
+						3.40000009536743
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.0527675151824951,
+						-0.228913545608521
+					],
+					"handle_out": [
+						0.0555625334382057,
+						0.241038754582405
+					],
+					"handle_source": "manual",
+					"id": "point_932844178271113562",
+					"mode": "aligned",
+					"position": [
+						-2.39000010490417,
+						2.27999997138977
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.294414520263672,
+						-0.219185814261436
+					],
+					"handle_out": [
+						0.297145128250122,
+						0.221218705177307
+					],
+					"handle_source": "manual",
+					"id": "point_1463668256819248052",
+					"mode": "aligned",
+					"position": [
+						-3.5,
+						0.5
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.0,
+						0.0
+					],
+					"handle_out": [
+						0.0315330028533936,
+						0.0236811637878418
+					],
+					"handle_source": "manual",
+					"id": "point_8279731001714707516",
+					"mode": "corner",
+					"position": [
+						-4.44999980926514,
+						0.0
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						-0.380514562129974,
+						0.140189528465271
+					],
+					"handle_out": [
+						0.269064426422119,
+						-0.0991289615631104
+					],
+					"handle_source": "auto",
+					"id": "mirror_point_2640964642062420346",
+					"mode": "aligned",
+					"position": [
+						1.20000004768372,
+						6.5
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.202758729457855,
+						0.202758729457855
+					],
+					"handle_out": [
+						0.137436851859093,
+						-0.137436851859093
+					],
+					"handle_source": "auto",
+					"id": "mirror_point_4586964173821691258",
+					"mode": "aligned",
+					"position": [
+						1.89999997615814,
+						6.0
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.075732409954071,
+						0.179003864526749
+					],
+					"handle_out": [
+						0.108859293162823,
+						-0.257303774356842
+					],
+					"handle_source": "auto",
+					"id": "mirror_point_8491343206432031719",
+					"mode": "aligned",
+					"position": [
+						2.20000004768372,
+						5.5
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.0575560703873634,
+						0.273391425609589
+					],
+					"handle_out": [
+						0.0762362107634544,
+						-0.362122118473053
+					],
+					"handle_source": "auto",
+					"id": "mirror_point_469889402008129087",
+					"mode": "aligned",
+					"position": [
+						2.45000004768372,
+						4.69999980926514
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.0489084981381893,
+						0.366813778877258
+					],
+					"handle_out": [
+						0.0510918945074081,
+						-0.383189231157303
+					],
+					"handle_source": "auto",
+					"id": "mirror_point_4217098071389807708",
+					"mode": "aligned",
+					"position": [
+						2.59999990463257,
+						3.59999990463257
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.104233637452126,
+						0.372262984514236
+					],
+					"handle_out": [
+						0.131016612052917,
+						-0.467916458845139
+					],
+					"handle_source": "auto",
+					"id": "mirror_point_4424299132211285361",
+					"mode": "aligned",
+					"position": [
+						2.75,
+						2.45000004768372
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.22083292901516,
+						0.432832539081573
+					],
+					"handle_out": [
+						0.197518929839134,
+						-0.387137085199356
+					],
+					"handle_source": "auto",
+					"id": "mirror_point_7238325317604644289",
+					"mode": "aligned",
+					"position": [
+						3.29999995231628,
+						1.09999978542328
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.0315330028533936,
+						0.0236811637878418
+					],
+					"handle_out": [
+						0.0,
+						0.0
+					],
+					"handle_source": "manual",
+					"id": "mirror_point_8787060870405258589",
+					"mode": "corner",
+					"position": [
+						4.0,
+						0.0
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						0.0,
+						0.0
+					],
+					"handle_out": [
+						0.0,
+						0.0
+					],
+					"handle_source": "auto",
+					"id": "point_6580629776816037323",
+					"mode": "linear",
+					"position": [
+						0.0,
+						0.0
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						-0.188582420349121,
+						-0.290641188621521
+					],
+					"handle_out": [
+						0.167390584945679,
+						0.269444704055786
+					],
+					"handle_source": "manual",
+					"id": "point_7932400062023742576",
+					"mode": "free",
+					"position": [
+						-2.92000007629395,
+						1.0900000333786
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.0913255214691162,
+						-0.225632667541504
+					],
+					"handle_out": [
+						0.104886054992676,
+						0.259136199951172
+					],
+					"handle_source": "manual",
+					"id": "point_642890511810149835",
+					"mode": "free",
+					"position": [
+						-2.60999989509583,
+						1.64999997615814
+					],
+					"preserve_point": false
+				}
+			],
+			"primitive": {},
+			"show_point_numbers": false,
+			"source_asset_id": "",
+			"topology_role": "outer",
+			"transform": {
+				"pivot": [
+					0.0,
+					3.29999995231628
+				],
+				"position": [
+					0.0,
+					3.29999995231628
+				],
+				"rotation": 0.0,
+				"scale": [
+					1.0,
+					1.0
+				]
+			},
+			"type": "component",
+			"visibility": true,
+			"z_index": 0
+		},
+		{
+			"catch_parent_component_id": "",
+			"chains": [
+				{
+					"closed": true,
+					"edge_ids": [
+						"edge_4962211767906848654",
+						"edge_4403214777762096013",
+						"edge_3124862355061487524",
+						"edge_270170979132761384",
+						"edge_4743846012210428346",
+						"edge_5745582650942759372",
+						"edge_6662289646713520513",
+						"edge_3469724251653560178",
+						"edge_7512329403932937408",
+						"edge_8907848055372184801",
+						"edge_2074347343836047242",
+						"edge_9022962409467687875",
+						"edge_2793436458072908216"
+					],
+					"id": "chain_386158672313605253",
+					"point_ids": [
+						"point_7322010106834274423",
+						"point_4034331339714031438",
+						"point_2369242983408547139",
+						"point_7589304936309268211",
+						"point_46475439303541590",
+						"point_2452202741613480407",
+						"point_5627618501052297239",
+						"point_6257745494540524034",
+						"point_8575821686873634291",
+						"point_6224031372154534016",
+						"point_6432607365774173833",
+						"point_4929896108107969545",
+						"point_8625775874652517293"
+					],
+					"topology_role": "outer"
+				}
+			],
+			"contour_stroke_width_px": 2.0,
+			"draw_mode": "contour",
+			"edges": [
+				{
+					"end_point_id": "point_4034331339714031438",
+					"id": "edge_4962211767906848654",
+					"render_outline": true,
+					"start_point_id": "point_7322010106834274423"
+				},
+				{
+					"end_point_id": "point_2369242983408547139",
+					"id": "edge_4403214777762096013",
+					"render_outline": true,
+					"start_point_id": "point_4034331339714031438"
+				},
+				{
+					"end_point_id": "point_7589304936309268211",
+					"id": "edge_3124862355061487524",
+					"render_outline": true,
+					"start_point_id": "point_2369242983408547139"
+				},
+				{
+					"end_point_id": "point_46475439303541590",
+					"id": "edge_270170979132761384",
+					"render_outline": true,
+					"start_point_id": "point_7589304936309268211"
+				},
+				{
+					"end_point_id": "point_2452202741613480407",
+					"id": "edge_4743846012210428346",
+					"render_outline": true,
+					"start_point_id": "point_46475439303541590"
+				},
+				{
+					"end_point_id": "point_5627618501052297239",
+					"id": "edge_5745582650942759372",
+					"render_outline": true,
+					"start_point_id": "point_2452202741613480407"
+				},
+				{
+					"end_point_id": "point_6257745494540524034",
+					"id": "edge_6662289646713520513",
+					"render_outline": true,
+					"start_point_id": "point_5627618501052297239"
+				},
+				{
+					"end_point_id": "point_8575821686873634291",
+					"id": "edge_3469724251653560178",
+					"render_outline": true,
+					"start_point_id": "point_6257745494540524034"
+				},
+				{
+					"end_point_id": "point_6224031372154534016",
+					"id": "edge_7512329403932937408",
+					"render_outline": true,
+					"start_point_id": "point_8575821686873634291"
+				},
+				{
+					"end_point_id": "point_6432607365774173833",
+					"id": "edge_8907848055372184801",
+					"render_outline": true,
+					"start_point_id": "point_6224031372154534016"
+				},
+				{
+					"end_point_id": "point_4929896108107969545",
+					"id": "edge_2074347343836047242",
+					"render_outline": true,
+					"start_point_id": "point_6432607365774173833"
+				},
+				{
+					"end_point_id": "point_8625775874652517293",
+					"id": "edge_9022962409467687875",
+					"render_outline": true,
+					"start_point_id": "point_4929896108107969545"
+				},
+				{
+					"end_point_id": "point_7322010106834274423",
+					"id": "edge_2793436458072908216",
+					"render_outline": true,
+					"start_point_id": "point_8625775874652517293"
+				}
+			],
+			"group_id": "",
+			"id": "component_7",
+			"name": "eye_left",
+			"parent_component_id": "component_5",
+			"points": [
+				{
+					"handle_in": [
+						0.0,
+						0.0
+					],
+					"handle_out": [
+						0.0,
+						0.0
+					],
+					"handle_source": "manual",
+					"id": "point_8625775874652517293",
+					"mode": "linear",
+					"position": [
+						-0.245000034570694,
+						8.5
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						0.0183333158493042,
+						-0.0666666030883789
+					],
+					"handle_out": [
+						-0.0916666761040688,
+						0.0
+					],
+					"handle_source": "manual",
+					"id": "point_4929896108107969545",
+					"mode": "corner",
+					"position": [
+						0.0300000011920929,
+						8.5
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						0.00777818821370602,
+						-0.049497663974762
+					],
+					"handle_out": [
+						-0.0106900464743376,
+						0.0680277049541473
+					],
+					"handle_source": "manual",
+					"id": "point_6432607365774173833",
+					"mode": "aligned",
+					"position": [
+						0.0849999487400055,
+						8.30000019073486
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.0106900464743376,
+						-0.0680277049541473
+					],
+					"handle_out": [
+						0.00777818821370602,
+						0.049497663974762
+					],
+					"handle_source": "manual",
+					"id": "point_6224031372154534016",
+					"mode": "aligned",
+					"position": [
+						0.0849999487400055,
+						8.14999961853027
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.0231900420039892,
+						-0.0421636775135994
+					],
+					"handle_out": [
+						0.0338049829006195,
+						0.0614635571837425
+					],
+					"handle_source": "manual",
+					"id": "point_8575821686873634291",
+					"mode": "aligned",
+					"position": [
+						0.0300000011920929,
+						7.94999980926514
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.050022579729557,
+						-0.0218280125409365
+					],
+					"handle_out": [
+						0.0467480197548866,
+						0.0203991141170263
+					],
+					"handle_source": "manual",
+					"id": "point_6257745494540524034",
+					"mode": "aligned",
+					"position": [
+						-0.0800000131130219,
+						7.84999990463257
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.0,
+						0.0
+					],
+					"handle_out": [
+						0.0,
+						0.0
+					],
+					"handle_source": "manual",
+					"id": "point_5627618501052297239",
+					"mode": "linear",
+					"position": [
+						-0.245000034570694,
+						7.82999992370605
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.0,
+						0.0
+					],
+					"handle_out": [
+						0.0,
+						0.0
+					],
+					"handle_source": "manual",
+					"id": "point_2452202741613480407",
+					"mode": "linear",
+					"position": [
+						-0.355000019073486,
+						7.84999990463257
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.0,
+						0.0
+					],
+					"handle_out": [
+						0.0,
+						0.0
+					],
+					"handle_source": "manual",
+					"id": "point_46475439303541590",
+					"mode": "linear",
+					"position": [
+						-0.443000018596649,
+						7.90000009536743
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.0,
+						0.0
+					],
+					"handle_out": [
+						0.0,
+						0.0
+					],
+					"handle_source": "manual",
+					"id": "point_7589304936309268211",
+					"mode": "linear",
+					"position": [
+						-0.531000018119812,
+						7.98000001907349
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.0,
+						0.0
+					],
+					"handle_out": [
+						0.0,
+						0.0
+					],
+					"handle_source": "manual",
+					"id": "point_2369242983408547139",
+					"mode": "linear",
+					"position": [
+						-0.585999965667725,
+						8.09000015258789
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.0,
+						0.0
+					],
+					"handle_out": [
+						0.0,
+						0.0
+					],
+					"handle_source": "manual",
+					"id": "point_4034331339714031438",
+					"mode": "linear",
+					"position": [
+						-0.61900007724762,
+						8.25
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.128333330154419,
+						0.0
+					],
+					"handle_out": [
+						0.00366666330955923,
+						-0.0833333358168602
+					],
+					"handle_source": "manual",
+					"id": "point_7322010106834274423",
+					"mode": "corner",
+					"position": [
+						-0.629999995231628,
+						8.5
+					],
+					"preserve_point": true
+				}
+			],
+			"primitive": {},
+			"show_point_numbers": false,
+			"source_asset_id": "",
+			"topology_role": "outer",
+			"transform": {
+				"pivot": [
+					-0.300000011920929,
+					8.5
+				],
+				"position": [
+					-0.330000013113022,
+					8.5
+				],
+				"rotation": 0.0,
+				"scale": [
+					1.0,
+					1.0
+				]
+			},
+			"type": "component",
+			"visibility": true,
+			"z_index": 3
+		},
+		{
+			"catch_parent_component_id": "",
+			"chains": [
+				{
+					"closed": true,
+					"edge_ids": [
+						"edge_871392790180648482",
+						"edge_9063021912926921321",
+						"edge_6385258419675377501",
+						"edge_7781891790679086352",
+						"edge_5624228400216049377",
+						"edge_6079390583111633509",
+						"edge_8550606699095391236",
+						"edge_188895718921192390",
+						"edge_1282038290738953282",
+						"edge_4537235115081477976",
+						"edge_4087513141547469654",
+						"edge_54161934885786082",
+						"edge_7624490320668586984"
+					],
+					"id": "chain_8925958876195444518",
+					"point_ids": [
+						"point_6887310755834263382",
+						"point_17800011462851365",
+						"point_706745075199461354",
+						"point_587716987509961351",
+						"point_1372184390908599549",
+						"point_2493944985833013525",
+						"point_3346868514400700239",
+						"point_2690092183643723294",
+						"point_4932541894574923941",
+						"point_72012719616530061",
+						"point_7164180999417916753",
+						"point_5413258734058806224",
+						"point_8791740632125108741"
+					],
+					"topology_role": "outer"
+				}
+			],
+			"contour_stroke_width_px": 2.0,
+			"draw_mode": "contour",
+			"edges": [
+				{
+					"end_point_id": "point_17800011462851365",
+					"id": "edge_871392790180648482",
+					"render_outline": true,
+					"start_point_id": "point_6887310755834263382"
+				},
+				{
+					"end_point_id": "point_706745075199461354",
+					"id": "edge_9063021912926921321",
+					"render_outline": true,
+					"start_point_id": "point_17800011462851365"
+				},
+				{
+					"end_point_id": "point_587716987509961351",
+					"id": "edge_6385258419675377501",
+					"render_outline": true,
+					"start_point_id": "point_706745075199461354"
+				},
+				{
+					"end_point_id": "point_1372184390908599549",
+					"id": "edge_7781891790679086352",
+					"render_outline": true,
+					"start_point_id": "point_587716987509961351"
+				},
+				{
+					"end_point_id": "point_2493944985833013525",
+					"id": "edge_5624228400216049377",
+					"render_outline": true,
+					"start_point_id": "point_1372184390908599549"
+				},
+				{
+					"end_point_id": "point_3346868514400700239",
+					"id": "edge_6079390583111633509",
+					"render_outline": true,
+					"start_point_id": "point_2493944985833013525"
+				},
+				{
+					"end_point_id": "point_2690092183643723294",
+					"id": "edge_8550606699095391236",
+					"render_outline": true,
+					"start_point_id": "point_3346868514400700239"
+				},
+				{
+					"end_point_id": "point_4932541894574923941",
+					"id": "edge_188895718921192390",
+					"render_outline": true,
+					"start_point_id": "point_2690092183643723294"
+				},
+				{
+					"end_point_id": "point_72012719616530061",
+					"id": "edge_1282038290738953282",
+					"render_outline": true,
+					"start_point_id": "point_4932541894574923941"
+				},
+				{
+					"end_point_id": "point_7164180999417916753",
+					"id": "edge_4537235115081477976",
+					"render_outline": true,
+					"start_point_id": "point_72012719616530061"
+				},
+				{
+					"end_point_id": "point_5413258734058806224",
+					"id": "edge_4087513141547469654",
+					"render_outline": true,
+					"start_point_id": "point_7164180999417916753"
+				},
+				{
+					"end_point_id": "point_8791740632125108741",
+					"id": "edge_54161934885786082",
+					"render_outline": true,
+					"start_point_id": "point_5413258734058806224"
+				},
+				{
+					"end_point_id": "point_6887310755834263382",
+					"id": "edge_7624490320668586984",
+					"render_outline": true,
+					"start_point_id": "point_8791740632125108741"
+				}
+			],
+			"group_id": "",
+			"id": "component_8",
+			"name": "eye_right",
+			"parent_component_id": "component_5",
+			"points": [
+				{
+					"handle_in": [
+						0.0,
+						0.0
+					],
+					"handle_out": [
+						0.0,
+						0.0
+					],
+					"handle_source": "manual",
+					"id": "point_8791740632125108741",
+					"mode": "linear",
+					"position": [
+						-0.245000034570694,
+						8.5
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						0.0183333158493042,
+						-0.0666666030883789
+					],
+					"handle_out": [
+						-0.0916666761040688,
+						0.0
+					],
+					"handle_source": "manual",
+					"id": "point_5413258734058806224",
+					"mode": "corner",
+					"position": [
+						0.0300000011920929,
+						8.5
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						0.00777818821370602,
+						-0.049497663974762
+					],
+					"handle_out": [
+						-0.0106900464743376,
+						0.0680277049541473
+					],
+					"handle_source": "manual",
+					"id": "point_7164180999417916753",
+					"mode": "aligned",
+					"position": [
+						0.0849999487400055,
+						8.30000019073486
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.0106900464743376,
+						-0.0680277049541473
+					],
+					"handle_out": [
+						0.00777818821370602,
+						0.049497663974762
+					],
+					"handle_source": "manual",
+					"id": "point_72012719616530061",
+					"mode": "aligned",
+					"position": [
+						0.0849999487400055,
+						8.14999961853027
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.0231900420039892,
+						-0.0421636775135994
+					],
+					"handle_out": [
+						0.0338049829006195,
+						0.0614635571837425
+					],
+					"handle_source": "manual",
+					"id": "point_4932541894574923941",
+					"mode": "aligned",
+					"position": [
+						0.0300000011920929,
+						7.94999980926514
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.050022579729557,
+						-0.0218280125409365
+					],
+					"handle_out": [
+						0.0467480197548866,
+						0.0203991141170263
+					],
+					"handle_source": "manual",
+					"id": "point_2690092183643723294",
+					"mode": "aligned",
+					"position": [
+						-0.0800000131130219,
+						7.84999990463257
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.0,
+						0.0
+					],
+					"handle_out": [
+						0.0,
+						0.0
+					],
+					"handle_source": "manual",
+					"id": "point_3346868514400700239",
+					"mode": "linear",
+					"position": [
+						-0.245000034570694,
+						7.82999992370605
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.0,
+						0.0
+					],
+					"handle_out": [
+						0.0,
+						0.0
+					],
+					"handle_source": "manual",
+					"id": "point_2493944985833013525",
+					"mode": "linear",
+					"position": [
+						-0.355000019073486,
+						7.84999990463257
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.0,
+						0.0
+					],
+					"handle_out": [
+						0.0,
+						0.0
+					],
+					"handle_source": "manual",
+					"id": "point_1372184390908599549",
+					"mode": "linear",
+					"position": [
+						-0.443000018596649,
+						7.90000009536743
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.0,
+						0.0
+					],
+					"handle_out": [
+						0.0,
+						0.0
+					],
+					"handle_source": "manual",
+					"id": "point_587716987509961351",
+					"mode": "linear",
+					"position": [
+						-0.531000018119812,
+						7.98000001907349
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.0,
+						0.0
+					],
+					"handle_out": [
+						0.0,
+						0.0
+					],
+					"handle_source": "manual",
+					"id": "point_706745075199461354",
+					"mode": "linear",
+					"position": [
+						-0.585999965667725,
+						8.09000015258789
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.0,
+						0.0
+					],
+					"handle_out": [
+						0.0,
+						0.0
+					],
+					"handle_source": "manual",
+					"id": "point_17800011462851365",
+					"mode": "linear",
+					"position": [
+						-0.61900007724762,
+						8.25
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.128333330154419,
+						0.0
+					],
+					"handle_out": [
+						0.00366666330955923,
+						-0.0833333358168602
+					],
+					"handle_source": "manual",
+					"id": "point_6887310755834263382",
+					"mode": "corner",
+					"position": [
+						-0.629999995231628,
+						8.5
+					],
+					"preserve_point": true
+				}
+			],
+			"primitive": {},
+			"show_point_numbers": false,
+			"source_asset_id": "",
+			"topology_role": "outer",
+			"transform": {
+				"pivot": [
+					-0.300000011920929,
+					8.5
+				],
+				"position": [
+					0.384999960660934,
+					8.5
+				],
+				"rotation": 0.0,
+				"scale": [
+					1.0,
+					1.0
+				]
+			},
+			"type": "component",
+			"visibility": true,
+			"z_index": 3
+		},
+		{
+			"catch_parent_component_id": "",
+			"chains": [
+				{
+					"closed": false,
+					"edge_ids": [
+						"edge_2866698869981252977",
+						"edge_7644913508814218965",
+						"edge_8426776026384790134",
+						"edge_3350010594639193684",
+						"edge_4905662449486481279",
+						"edge_6624821550033142108"
+					],
+					"id": "chain_6639280114864562648",
+					"point_ids": [
+						"point_8914413935351456588",
+						"point_177561313565669657",
+						"point_6152523104464576149",
+						"point_6047059166541793598",
+						"point_6806131744902765576",
+						"point_6321395448616486472",
+						"point_569884312625214603"
+					],
+					"topology_role": "outer"
+				}
+			],
+			"draw_mode": "contour",
+			"edges": [
+				{
+					"end_point_id": "point_177561313565669657",
+					"id": "edge_2866698869981252977",
+					"render_outline": true,
+					"start_point_id": "point_8914413935351456588"
+				},
+				{
+					"end_point_id": "point_6152523104464576149",
+					"id": "edge_7644913508814218965",
+					"render_outline": true,
+					"start_point_id": "point_177561313565669657"
+				},
+				{
+					"end_point_id": "point_6047059166541793598",
+					"id": "edge_8426776026384790134",
+					"render_outline": true,
+					"start_point_id": "point_6152523104464576149"
+				},
+				{
+					"end_point_id": "point_6806131744902765576",
+					"id": "edge_3350010594639193684",
+					"render_outline": true,
+					"start_point_id": "point_6047059166541793598"
+				},
+				{
+					"end_point_id": "point_6321395448616486472",
+					"id": "edge_4905662449486481279",
+					"render_outline": true,
+					"start_point_id": "point_6806131744902765576"
+				},
+				{
+					"end_point_id": "point_569884312625214603",
+					"id": "edge_6624821550033142108",
+					"render_outline": true,
+					"start_point_id": "point_6321395448616486472"
+				}
+			],
+			"group_id": "",
+			"id": "component_9",
+			"name": "arm_line",
+			"parent_component_id": "component_6",
+			"points": [
+				{
+					"handle_in": [
+						-0.0833333358168602,
+						-0.149999931454659
+					],
+					"handle_out": [
+						0.0,
+						0.0
+					],
+					"handle_source": "auto",
+					"id": "point_569884312625214603",
+					"mode": "aligned",
+					"position": [
+						-1.25,
+						4.34999990463257
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.0675239041447639,
+						-0.160369247198105
+					],
+					"handle_out": [
+						0.0665881708264351,
+						0.158146888017654
+					],
+					"handle_source": "auto",
+					"id": "point_6321395448616486472",
+					"mode": "aligned",
+					"position": [
+						-1.5,
+						3.90000009536743
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.0384575091302395,
+						-0.230745002627373
+					],
+					"handle_out": [
+						0.0286062695086002,
+						0.17163759469986
+					],
+					"handle_source": "auto",
+					"id": "point_6806131744902765576",
+					"mode": "aligned",
+					"position": [
+						-1.64999997615814,
+						3.40000009536743
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.0348358415067196,
+						-0.252559810876846
+					],
+					"handle_out": [
+						0.0319632962346077,
+						0.231733843684196
+					],
+					"handle_source": "auto",
+					"id": "point_6047059166541793598",
+					"mode": "aligned",
+					"position": [
+						-1.70000004768372,
+						2.70000004768372
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.051337469369173,
+						-0.195868462324142
+					],
+					"handle_out": [
+						0.0553187131881714,
+						0.211058139801025
+					],
+					"handle_source": "manual",
+					"id": "point_6152523104464576149",
+					"mode": "aligned",
+					"position": [
+						-1.85000002384186,
+						1.95000004768372
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.0778914913535118,
+						-0.176224634051323
+					],
+					"handle_out": [
+						0.0778383016586304,
+						0.176104307174683
+					],
+					"handle_source": "manual",
+					"id": "point_177561313565669657",
+					"mode": "aligned",
+					"position": [
+						-2.04999995231628,
+						1.37999999523163
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.108766384422779,
+						-0.154200166463852
+					],
+					"handle_out": [
+						0.12052321434021,
+						0.170868039131165
+					],
+					"handle_source": "manual",
+					"id": "point_8914413935351456588",
+					"mode": "aligned",
+					"position": [
+						-2.34999990463257,
+						0.879999995231628
+					],
+					"preserve_point": false
+				}
+			],
+			"primitive": {},
+			"show_point_numbers": false,
+			"source_asset_id": "",
+			"topology_role": "outer",
+			"transform": {
+				"pivot": [
+					0.0,
+					3.34999990463257
+				],
+				"position": [
+					0.0,
+					3.34999990463257
+				],
+				"rotation": 0.0,
+				"scale": [
+					1.0,
+					1.0
+				]
+			},
+			"type": "component",
+			"visibility": true,
+			"z_index": 1
+		}
+	],
+	"groups": [],
+	"guides": [],
+	"id": "asset_1",
+	"name": "Wizard",
+	"reference_image": {
+		"file": "wizard_ref.png",
+		"opacity": 0.1,
+		"pivot_mode": "bottom_center",
+		"position": [
+			0.0,
+			0.0
+		],
+		"scale": 1.06,
+		"target_height_cm": 13.0,
+		"visible": true
+	},
+	"schema_version": 51,
+	"visibility": true
+}

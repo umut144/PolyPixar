@@ -136,6 +136,7 @@ var selected_point_id := ""
 var selected_point_ids: Array[String] = []
 var asset_pivot_fields: Dictionary = {}
 var asset_scale_rebase_button: Button
+var asset_authored_facing_option: OptionButton
 var bezier_point_move_start_positions: Dictionary = {}
 var bezier_point_move_component_id := ""
 var bezier_point_move_guide_id := ""
@@ -2223,6 +2224,7 @@ func _save_world() -> void:
 			"id": asset_id,
 			"name": str(asset["name"]),
 			"asset_type": _asset_type(asset),
+			"authored_facing": AssetPresentation.serialize_authored_facing(asset.get("authored_facing", AssetPresentation.AuthoredFacing.NEUTRAL)),
 			"visibility": bool(asset.get("visibility", true)),
 			"asset_pivot": _serialize_vector(_asset_pivot(asset)),
 			"reference_image": _serialize_reference_image(asset.get("reference_image", {})),
@@ -2628,6 +2630,7 @@ func _load_world(world_entry: String, persist_as_last := true) -> bool:
 			"id": str(asset_data.get("id", asset_id)),
 			"name": str(asset_data.get("name", asset_id)),
 			"asset_type": _normalize_asset_type(asset_data.get("asset_type", "character")),
+			"authored_facing": AssetPresentation.deserialize_authored_facing(asset_data.get("authored_facing", "neutral")),
 			"visibility": bool(asset_data.get("visibility", true)),
 			"asset_pivot": _deserialize_vector(asset_data.get("asset_pivot", [0.0, 0.0]), Vector2.ZERO),
 			"reference_image": _normalize_reference_image(asset_data.get("reference_image", {})),
@@ -6933,7 +6936,7 @@ func _confirm_asset_creation() -> void:
 	_record_direct_change()
 	var asset_id := "asset_%d" % next_asset_id
 	next_asset_id += 1
-	assets.append({"id": asset_id, "name": asset_name, "asset_type": _create_submodule_asset_type(active_create_submodule), "visibility": true, "asset_pivot": Vector2.ZERO, "reference_image": _default_reference_image(), "animation": MotionWorkspace.create_default_animation_document(), "components": [], "groups": [], "guides": []})
+	assets.append({"id": asset_id, "name": asset_name, "asset_type": _create_submodule_asset_type(active_create_submodule), "authored_facing": AssetPresentation.AuthoredFacing.NEUTRAL, "visibility": true, "asset_pivot": Vector2.ZERO, "reference_image": _default_reference_image(), "animation": MotionWorkspace.create_default_animation_document(), "components": [], "groups": [], "guides": []})
 	selected_asset_id = asset_id
 	selected_component_id = ""
 	selected_component_ids.clear()
@@ -11887,6 +11890,7 @@ func _render_inspector() -> void:
 	transform_fields.clear()
 	asset_pivot_fields.clear()
 	asset_scale_rebase_button = null
+	asset_authored_facing_option = null
 	if active_module == "Export":
 		return
 	if active_module == "Motion":
@@ -11933,6 +11937,20 @@ func _render_inspector() -> void:
 			_rename_selected_asset(asset_name_editor.text)
 		)
 		inspector_content.add_child(asset_name_editor)
+		inspector_content.add_child(_create_inspector_section("Initial Pose"))
+		inspector_content.add_child(_create_inspector_field_label("Authored Facing"))
+		asset_authored_facing_option = OptionButton.new()
+		asset_authored_facing_option.custom_minimum_size = Vector2(0, 26)
+		for facing in AssetPresentation.SERIALIZED_VALUES:
+			asset_authored_facing_option.add_item(AssetPresentation.display_name(facing))
+			asset_authored_facing_option.set_item_metadata(asset_authored_facing_option.item_count - 1, facing)
+		var authored_facing := AssetPresentation.serialize_authored_facing(asset.get("authored_facing", AssetPresentation.AuthoredFacing.NEUTRAL))
+		for facing_index in range(asset_authored_facing_option.item_count):
+			if str(asset_authored_facing_option.get_item_metadata(facing_index)) == authored_facing:
+				asset_authored_facing_option.select(facing_index)
+				break
+		asset_authored_facing_option.item_selected.connect(_on_asset_authored_facing_selected.bind(asset_authored_facing_option))
+		inspector_content.add_child(asset_authored_facing_option)
 		inspector_content.add_child(_create_inspector_section("Asset Transform"))
 		var asset_transform_grid := GridContainer.new()
 		asset_transform_grid.columns = 2
@@ -14113,6 +14131,18 @@ func _on_asset_visibility_changed(visibility_enabled: bool, asset_id: String) ->
 	asset["visibility"] = visibility_enabled
 	_render_outliner()
 	_render_canvas_context()
+
+
+func _on_asset_authored_facing_selected(index: int, option: OptionButton) -> void:
+	var asset := _get_asset(selected_asset_id)
+	if asset.is_empty() or index < 0 or index >= option.item_count:
+		return
+	var selected_facing := AssetPresentation.deserialize_authored_facing(option.get_item_metadata(index))
+	if AssetPresentation.authored_facing(asset) == selected_facing:
+		return
+	_record_direct_change()
+	asset["authored_facing"] = selected_facing
+	_render_inspector()
 
 
 func _on_component_visibility_entry_changed(visibility_enabled: bool, asset_id: String, component_id: String) -> void:

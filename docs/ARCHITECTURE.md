@@ -56,6 +56,8 @@ the source Symbol remains `outer`.
 An Asset contains:
 
 - stable ID, name, visibility, and `asset_type`;
+- typed Asset-level `authored_facing` presentation metadata (`left`, `right`,
+  `neutral`, `top`, or `down`);
 - Asset pivot and reference-image settings;
 - Components, Groups, and Guides;
 - retained asset-local animation data.
@@ -138,6 +140,14 @@ such as `assets/asset_1/asset.json` remain readable as a migration fallback;
 older Assets without `asset_type` load as `character`. Editor
 state persists the active Create/Mesh/Style module and valid selection, but it
 does not restore disabled Motion as the active category.
+
+`authored_facing` is edited only on the Asset root in the Inspector's `Initial
+Pose` group. The in-memory model uses the typed `AssetPresentation.AuthoredFacing`
+enum; Asset JSON serializes its stable lower-case value. Older Assets without
+the field load as `neutral`, while normal saves always write it explicitly.
+The existing whole-document history snapshots provide Dirty-state invalidation
+and Undo/Redo for this property. It has no geometry, Canvas, or transform
+behavior.
 
 The World-root `catalog.json` is an independently versioned derived index, not
 an authored identity store. It lists currently runtime-exportable visible Assets
@@ -305,6 +315,10 @@ Asset References, and incomplete or cyclic visible hierarchies. Ordinary
 Components never derive replacement geometry during export. References emit an
 `asset_reference` record containing the local `name`, signed placement
 transform, and actual `source_asset_key`, without copying geometry into the owner.
+
+Every schema-8 Manifest also exports the Asset-level presentation metadata as
+`presentation.authored_facing`, including an explicit `neutral`. This is an
+additive schema-8 field and does not alter geometry or Component transforms.
 
 The contract is engine-neutral: X points right, Y points up, lengths are meters,
 positive rotations are counter-clockwise radians, and one Tool unit equals
