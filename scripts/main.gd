@@ -8,7 +8,7 @@ const EXPORT_SUBMODULES: Array[String] = []
 const MOTION_SUBMODULES := ["Animation", "Path", "Act", "Sequence"]
 const WORLDS_ROOT := "res://worlds"
 const CONFIG_PATH := "res://configs/app_config.json"
-const SCHEMA_VERSION := 50
+const SCHEMA_VERSION := 51
 const MAX_HISTORY_SIZE := 100
 const DRAW_MODES := ["closed_loop", "contour", "primitive"]
 const GRID_BOX_TOOL_UNITS := 0.5
@@ -2256,6 +2256,8 @@ func _save_world() -> void:
 				"show_point_numbers": bool(component.get("show_point_numbers", false)),
 				"primitive": _serialize_primitive(component.get("primitive", {}))
 			}
+			if _is_reference_component(component):
+				serialized_component["reference_instance_scale"] = _serialize_vector(Vector2(component.get("reference_instance_scale", Vector2.ONE)))
 			if _component_has_contour_stroke_width_override(component):
 				serialized_component["contour_stroke_width_px"] = float(component["contour_stroke_width_px"])
 			asset_data["components"].append(serialized_component)
@@ -2610,6 +2612,8 @@ func _load_world(world_entry: String, persist_as_last := true) -> bool:
 				"show_point_numbers": bool(component_data.get("show_point_numbers", false)),
 				"primitive": _deserialize_primitive(component_data.get("primitive", {}))
 			}
+			if component_type == "reference":
+				component["reference_instance_scale"] = _deserialize_vector(component_data.get("reference_instance_scale", [1.0, 1.0]), Vector2.ONE)
 			if _serialized_component_contour_stroke_width_is_valid(component_data):
 				component["contour_stroke_width_px"] = float(component_data["contour_stroke_width_px"])
 			components.append(component)

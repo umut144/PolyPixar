@@ -14,8 +14,6 @@ static func analyze_asset(asset: Dictionary) -> Dictionary:
 	for component in asset.get("components", []):
 		if not component is Dictionary or str(component.get("type", "component")) == "guide":
 			continue
-		if str(component.get("type", "component")) == "reference":
-			continue
 		var scale := _component_scale(component)
 		if _is_unit_scale(scale):
 			continue
@@ -24,7 +22,7 @@ static func analyze_asset(asset: Dictionary) -> Dictionary:
 			"name": str(component.get("name", "Component")),
 			"scale": scale
 		}
-		var reason := _blocking_reason(asset, component, scale)
+		var reason := "" if str(component.get("type", "component")) == "reference" else _blocking_reason(asset, component, scale)
 		if reason.is_empty():
 			entry["result_primitive_type"] = _result_primitive_type(component, scale)
 			candidates.append(entry)
@@ -74,12 +72,10 @@ static func rebase_components(asset: Dictionary, component_ids: Array) -> Dictio
 	var blockers: Array[String] = []
 	for component_id in requested_ids:
 		var component := ComponentHierarchy.component_by_id(asset, component_id)
-		if str(component.get("type", "component")) == "reference":
-			continue
 		var scale := _component_scale(component)
 		if _is_unit_scale(scale):
 			continue
-		var reason := _target_blocking_reason(component, scale)
+		var reason := "" if str(component.get("type", "component")) == "reference" else _target_blocking_reason(component, scale)
 		if reason.is_empty():
 			candidates.append({"component_id": component_id, "scale": scale})
 		else:
@@ -101,6 +97,13 @@ static func rebase_components(asset: Dictionary, component_ids: Array) -> Dictio
 		var component_id := str(candidate.get("component_id", ""))
 		var component := ComponentHierarchy.component_by_id(working_asset, component_id)
 		var scale := _component_scale(component)
+		if str(component.get("type", "component")) == "reference":
+			component["reference_instance_scale"] = Vector2(component.get("reference_instance_scale", Vector2.ONE)) * scale
+			var reference_transform: Dictionary = component.get("transform", {}).duplicate(true)
+			reference_transform["scale"] = Vector2.ONE
+			component["transform"] = reference_transform
+			rebased_ids.append(component_id)
+			continue
 		var pivot := Vector2(component.get("transform", {}).get("pivot", Vector2.ZERO))
 		_bake_component_geometry(component, pivot, scale)
 		_bake_component_guides(working_asset, component_id, pivot, scale)

@@ -182,7 +182,12 @@ static func local_transform_from_world_record(asset: Dictionary, component_id: S
 	var parent_world := _world_transform_for_chain(asset, chain, membership_group_id(asset, component_id))
 	var local_affine := parent_world.affine_inverse() * local_transform(world_record)
 	var pivot := _vector(current.get("transform", {}).get("pivot", Vector2.ZERO), Vector2.ZERO)
-	return transform_record_from_affine(local_affine, pivot)
+	var record := transform_record_from_affine(local_affine, pivot)
+	if str(current.get("type", "component")) == "reference":
+		var instance_scale := _vector(current.get("reference_instance_scale", Vector2.ONE), Vector2.ONE)
+		if not is_zero_approx(instance_scale.x) and not is_zero_approx(instance_scale.y):
+			record["scale"] = Vector2(record.get("scale", Vector2.ONE)) / instance_scale
+	return record
 
 
 static func group_local_transform_from_world_record(asset: Dictionary, group_id: String, world_record: Dictionary) -> Dictionary:
@@ -213,6 +218,15 @@ static func local_transform(raw_transform) -> Transform2D:
 	var basis := Transform2D(deg_to_rad(float(data.get("rotation", 0.0))), scale, 0.0, Vector2.ZERO)
 	basis.origin = position - basis.basis_xform(pivot)
 	return basis
+
+
+static func component_local_transform(component: Dictionary) -> Transform2D:
+	var transform: Dictionary = component.get("transform", {}) if component.get("transform", {}) is Dictionary else {}
+	if str(component.get("type", "component")) != "reference":
+		return local_transform(transform)
+	var effective_transform := transform.duplicate(true)
+	effective_transform["scale"] = _vector(transform.get("scale", Vector2.ONE), Vector2.ONE) * _vector(component.get("reference_instance_scale", Vector2.ONE), Vector2.ONE)
+	return local_transform(effective_transform)
 
 
 static func _break_cycles(components: Array) -> void:
@@ -266,7 +280,7 @@ static func _world_transform_for_chain(asset: Dictionary, chain: Array[Dictionar
 	var group_transform := local_transform(group.get("transform", {})) if not group.is_empty() else Transform2D.IDENTITY
 	var result := group_transform if not group.is_empty() and group_parent_component_id.is_empty() else Transform2D.IDENTITY
 	for chain_component in chain:
-		result = result * local_transform(chain_component.get("transform", {}))
+		result = result * component_local_transform(chain_component)
 		if not group.is_empty() and str(chain_component.get("id", "")) == group_parent_component_id:
 			result = result * group_transform
 	return result
