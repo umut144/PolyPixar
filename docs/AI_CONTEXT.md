@@ -75,12 +75,14 @@ Group transforms into ordinary Component exports.
 World schema 41 owns the default authored Contour stroke width in its typed
 `world_settings` record. It defaults to `4 px` at the fixed `192 px/m`
 reference density. Schema 45 adds an optional finite positive
-`contour_stroke_width_px` to an ordinary Component. A Component inherits the
+`contour_stroke_width_px` to a Component. An ordinary Component inherits the
 World default when the field is absent or equal to that default; a different
 value is its implicit local override. The Inspector always shows the Contour
 Stroke Width field, with no separate Override toggle. World-width changes
 invalidate only inheriting Contour Meshes, while a local override invalidates
-only its Component's stroke mesh. Schema 40 and older Worlds migrate explicitly
+only its Component's stroke mesh. A Reference uses the same field as an
+instance-local override for every Contour part of its source Asset, without
+changing that source. Schema 40 and older Worlds migrate explicitly
 to 4 px.
 
 World schema 42 adds the Asset Inspector's atomic Scale Rebase. Finite, non-zero

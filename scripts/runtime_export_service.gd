@@ -1,7 +1,7 @@
 class_name RuntimeExportService
 extends RefCounted
 
-const MANIFEST_SCHEMA_VERSION := 6
+const MANIFEST_SCHEMA_VERSION := 7
 static func build_manifest(asset: Dictionary, sources: Dictionary) -> Dictionary:
 	var errors: Array[String] = []
 	var asset_id := str(asset.get("id", ""))
@@ -276,7 +276,7 @@ static func _build_reference_component(component: Dictionary, source: Dictionary
 	var parent_component_id: Variant = null
 	if not str(component.get("parent_component_id", "")).is_empty():
 		parent_component_id = str(component.get("parent_component_id", ""))
-	return {
+	var result := {
 		"valid": true,
 		"errors": [],
 		"component": {
@@ -294,6 +294,12 @@ static func _build_reference_component(component: Dictionary, source: Dictionary
 			}
 		}
 	}
+	if component.has("contour_stroke_width_px"):
+		var local_width = component.get("contour_stroke_width_px")
+		if typeof(local_width) not in [TYPE_INT, TYPE_FLOAT] or not is_finite(float(local_width)) or float(local_width) <= 0.0:
+			return {"valid": false, "errors": ["%s: Reference Contour Stroke Width must be finite and positive." % label]}
+		result["component"]["contour_stroke_width_override_px"] = float(local_width)
+	return result
 
 
 static func _canonical_export_transforms(asset: Dictionary, components: Array[Dictionary]) -> Dictionary:

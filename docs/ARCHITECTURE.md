@@ -250,11 +250,13 @@ or twenty default `5 cm` Grid Boxes; Tile size does not alter Component
 geometry or the persisted World scale contract.
 Schema 40 and older Worlds migrate explicitly to that default; schema-41 data
 never receives a silent missing/invalid-value fallback. Schema 45 permits an
-optional finite positive `contour_stroke_width_px` on each non-reference
-Component. Its absence, or equality with the World default, inherits the World
-default; a differing value is an implicit local override. The Inspector always
-shows the width field, without a separate Override toggle. A World-width change
-affects only inheriting Components, while an override change affects only that
+optional finite positive `contour_stroke_width_px` on each Component. An
+ordinary Component inherits the World default when the field is absent or
+equal; a differing value is its implicit local override. On an Asset Reference,
+the same field applies uniformly to every Contour part of its source Asset
+without changing the source. The Inspector always shows the width field,
+without a separate Override toggle. A World-width change affects only
+inheriting Components, while an ordinary override change affects only that
 Component. The effective width participates in Contour Mesh fingerprints and
 build signatures, so downstream Bakes become stale without changing Component topology.
 
@@ -288,7 +290,7 @@ The normative serialized package and consumer contract is
 [`RUNTIME_EXPORT_CONTRACT.md`](RUNTIME_EXPORT_CONTRACT.md). The summary below
 describes how the editor produces that contract.
 
-`RuntimeExportService` builds Manifest schema 5 exclusively from current
+`RuntimeExportService` builds Manifest schema 7 exclusively from current
 accepted Fill and Contour Stroke Mesh Bakes. It rejects missing or stale inputs,
 invalid or duplicate Component Names, non-rebased Scale, unresolved
 Asset References, and incomplete or cyclic visible hierarchies. Ordinary

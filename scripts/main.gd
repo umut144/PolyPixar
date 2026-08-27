@@ -8,7 +8,7 @@ const EXPORT_SUBMODULES: Array[String] = []
 const MOTION_SUBMODULES := ["Animation", "Path", "Act", "Sequence"]
 const WORLDS_ROOT := "res://worlds"
 const CONFIG_PATH := "res://configs/app_config.json"
-const SCHEMA_VERSION := 49
+const SCHEMA_VERSION := 50
 const MAX_HISTORY_SIZE := 100
 const DRAW_MODES := ["closed_loop", "contour", "primitive"]
 const GRID_BOX_TOOL_UNITS := 0.5
@@ -1782,7 +1782,7 @@ func _create_world_dialogs() -> void:
 
 	eye_contour_stroke_dialog = ConfirmationDialog.new()
 	eye_contour_stroke_dialog.title = "Set Eye Contour Width"
-	eye_contour_stroke_dialog.dialog_text = "Set every non-reference Component whose name contains ‘eye’. Source Components are updated, so Asset References follow automatically."
+	eye_contour_stroke_dialog.dialog_text = "Set every Component whose name contains ‘eye’. Reference overrides stay local and apply to all Contour parts of their source Asset."
 	eye_contour_stroke_dialog.ok_button_text = "Apply"
 	eye_contour_stroke_dialog.size = Vector2i(500, 210)
 	eye_contour_stroke_dialog.confirmed.connect(_apply_eye_contour_stroke_width)
@@ -1862,7 +1862,7 @@ func _apply_eye_contour_stroke_width() -> void:
 		if not asset is Dictionary:
 			continue
 		for component in asset.get("components", []):
-			if not component is Dictionary or _is_reference_component(component):
+			if not component is Dictionary:
 				continue
 			if EYE_COMPONENT_NAME_TOKEN not in str(component.get("name", "")).to_lower():
 				continue
@@ -12136,17 +12136,17 @@ func _render_inspector() -> void:
 	visibility_toggle.button_pressed = bool(component.get("visibility", true))
 	visibility_toggle.toggled.connect(_on_component_visibility_changed)
 	inspector_content.add_child(visibility_toggle)
-	if not _is_reference_component(component):
-		inspector_content.add_child(_create_inspector_field_label("Contour Stroke Width (px)"))
-		var contour_width_field := SpinBox.new()
-		contour_width_field.min_value = 0.1
-		contour_width_field.max_value = 1024.0
-		contour_width_field.step = 0.1
-		contour_width_field.value = _effective_contour_stroke_width_px(component)
-		contour_width_field.custom_minimum_size = Vector2(0, 26)
-		contour_width_field.add_theme_font_size_override("font_size", 11)
-		contour_width_field.value_changed.connect(_on_component_contour_stroke_width_changed)
-		inspector_content.add_child(contour_width_field)
+	inspector_content.add_child(_create_inspector_field_label("Contour Stroke Width (px)"))
+	var contour_width_field := SpinBox.new()
+	contour_width_field.min_value = 0.1
+	contour_width_field.max_value = 1024.0
+	contour_width_field.step = 0.1
+	contour_width_field.value = _effective_contour_stroke_width_px(component)
+	contour_width_field.custom_minimum_size = Vector2(0, 26)
+	contour_width_field.add_theme_font_size_override("font_size", 11)
+	contour_width_field.tooltip_text = "Overrides every Contour part of the referenced source Asset without changing that Asset." if _is_reference_component(component) else ""
+	contour_width_field.value_changed.connect(_on_component_contour_stroke_width_changed)
+	inspector_content.add_child(contour_width_field)
 	inspector_content.add_child(_create_inspector_field_label("Z Index"))
 	var z_index_field := SpinBox.new()
 	z_index_field.min_value = -10000
@@ -14059,7 +14059,7 @@ func _on_component_z_index_changed(value: float) -> void:
 
 func _on_component_contour_stroke_width_changed(value: float) -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	if component.is_empty() or _is_reference_component(component) or not is_finite(value) or value <= 0.0:
+	if component.is_empty() or not is_finite(value) or value <= 0.0:
 		return
 	if is_equal_approx(value, world_contour_stroke_width_px):
 		if not component.has("contour_stroke_width_px"):

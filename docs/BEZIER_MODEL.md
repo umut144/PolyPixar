@@ -69,7 +69,9 @@ or closed. Its derived `Contour Stroke` mesh is sampled deterministically in
 `Mesh → Meshing` using the same centered stroke construction as closed loops. World
 Settings own one width for all Assets, defaulting to 4 authored px (`0.0208333 m`
 at `192 px/m`), with Miter joins, a limit of `4.0`, Bevel fallback, and Butt
-caps. It has no Fill Mesh and no Component-local width.
+caps. An ordinary Component may store a local width override; an Asset
+Reference may store an instance-local override that applies to every Contour
+part of its source Asset without changing the source. It has no Fill Mesh.
 The derived mesh never modifies Points, Edges, or Chains. Robustness analysis
 keeps intentional open-Contour crossings and narrow coverage overlaps visible
 and diagnosed, while ambiguous collinear overlap, exact reversals, and

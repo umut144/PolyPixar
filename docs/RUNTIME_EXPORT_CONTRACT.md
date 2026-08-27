@@ -1,10 +1,10 @@
 # PolyTools Runtime Export Contract
 
 **Status:** Normative consumer contract for Asset Catalog schema `1` and
-runtime Manifest schema `5`.
+runtime Manifest schema `7`.
 
 This document is the sole field-level contract for PolyTools Runtime packages.
-Manifest schema 6 replaces schema 5. Consumers must reject schema 5; there is
+Manifest schema 7 replaces schema 6. Consumers must reject older schemas; there is
 no SDF/Carrier/UV compatibility fallback.
 
 ## Package boundary
@@ -31,7 +31,7 @@ numbers must be finite.
 ## Compatibility policy
 
 Catalog `schema_version` must equal `1`; Manifest `schema_version` must equal
-`5`. Missing, non-integer, older, or newer versions are rejected as complete
+`7`. Missing, non-integer, older, or newer versions are rejected as complete
 packages. Missing required geometry is an error. Consumers must not synthesize
 Fill Meshes, strokes, Semantic Keys, hierarchy links, or referenced Assets.
 
@@ -47,11 +47,11 @@ The Catalog requires `world_key`, `world_name`, and `assets`, sorted by
 
 ## Top-level Manifest
 
-Schema 5 requires:
+Schema 7 requires:
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `schema_version` | integer | Exactly `6`. |
+| `schema_version` | integer | Exactly `7`. |
 | `asset_key` | non-empty lower-snake-case string | Runtime identity. |
 | `display_name` | string | Informational authored name. |
 | `asset_type` | string | `character`, `props`, `weapons`, `terrain`, `icon`, or `symbols`. |
@@ -155,7 +155,10 @@ otherwise consumed identically.
 ## Asset References
 
 An Asset Reference adds `kind: "asset_reference"` and required
-`source_asset_key`. It contains neither `mesh` nor `contour_stroke_mesh`.
+`source_asset_key`. It contains neither `mesh` nor `contour_stroke_mesh`. An
+optional finite positive `contour_stroke_width_override_px` is local to the
+Reference and applies uniformly to every Contour part in its source Asset; it
+never modifies that source Asset.
 `name` is its authored identity in the owner Asset and must use
 `lower_snake_case`; `source_asset_key`
 identifies the instanced source package. Consumers resolve References through

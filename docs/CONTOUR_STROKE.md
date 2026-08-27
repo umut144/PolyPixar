@@ -30,7 +30,9 @@ World schema 41 adds the required typed `world_settings` record:
 ```
 
 The width is one World-authored value shared by every Asset and Component. A
-non-reference Component may store a finite positive `contour_stroke_width_px`;
+Component may store a finite positive `contour_stroke_width_px`; on an Asset
+Reference it is instance-local and applies to every Contour part of the source
+Asset without changing the source;
 it is an implicit local override only when it differs from the World value.
 The Inspector always exposes the width field and has no separate Override
 toggle. Schema 40 and older Worlds migrate explicitly to `4 px`. A schema-41
