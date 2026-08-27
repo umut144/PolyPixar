@@ -23,6 +23,55 @@ static func stroke_width_meters(stroke_width_px := DEFAULT_STROKE_WIDTH_PX) -> f
 	return stroke_width_px / REFERENCE_PIXELS_PER_METER
 
 
+static func sample_complete_boundary(component: Dictionary) -> Dictionary:
+	## Samples the ordered authored Chain with the exact adaptive criteria used
+	## by the visible stroke, but deliberately ignores render_outline. Runtime
+	## region geometry needs the complete geometric Boundary before visible-run
+	## splitting, width offsets, joins, or caps are applied.
+	var working_component := component.duplicate(true)
+	BezierGeometry.resolve_auto_handles(working_component.get("points", []), working_component.get("chains", []))
+	var chains: Array = working_component.get("chains", [])
+	if chains.size() != 1 or not bool(chains[0].get("closed", false)):
+		return {"valid": false, "errors": ["Closed contour region sampling requires exactly one closed Chain."], "samples": []}
+	var chain: Dictionary = chains[0]
+	var samples: Array = []
+	var errors: Array[String] = []
+	var maximum_flatness := 0.0
+	for edge_id_value in chain.get("edge_ids", []):
+		var edge_id := str(edge_id_value)
+		var edge := BezierTopology.edge_by_id(working_component.get("edges", []), edge_id)
+		var start_point := BezierTopology.point_by_id(working_component.get("points", []), str(edge.get("start_point_id", "")))
+		var end_point := BezierTopology.point_by_id(working_component.get("points", []), str(edge.get("end_point_id", "")))
+		if edge.is_empty() or start_point.is_empty() or end_point.is_empty():
+			errors.append("Closed contour region sampling contains an unresolved Edge.")
+			continue
+		var controls := BezierGeometry.cubic_controls(start_point, end_point)
+		var edge_samples: Array = [_centerline_sample(controls[0], edge_id, 0.0, str(edge.get("start_point_id", "")))]
+		var edge_stats := {"maximum_flatness": 0.0, "error": ""}
+		_sample_cubic(controls, edge_id, 0.0, 1.0, 0, edge_samples, edge_stats)
+		if not str(edge_stats.get("error", "")).is_empty():
+			errors.append(str(edge_stats["error"]).replace("Contour stroke", "Closed contour region"))
+			continue
+		maximum_flatness = maxf(maximum_flatness, float(edge_stats["maximum_flatness"]))
+		_append_edge_samples(samples, edge_samples)
+	if samples.size() > 1 and Vector2(samples.front().get("position", Vector2.ZERO)).is_equal_approx(Vector2(samples.back().get("position", Vector2.ZERO))):
+		samples.pop_back()
+	return {
+		"valid": errors.is_empty(),
+		"errors": errors,
+		"samples": samples,
+		"certified_max_deviation_tool_units": maximum_flatness
+	}
+
+
+static func closed_boundary_validation_issues(samples: Array) -> Array[String]:
+	var analysis := _analyze_centerline(samples, 0.0, true)
+	var errors: Array[String] = []
+	for issue in analysis.get("errors", []):
+		errors.append(str(issue).replace("Contour stroke centerline", "Closed contour region Boundary").replace("Contour stroke sampling", "Closed contour region Boundary"))
+	return errors
+
+
 static func generate(component: Dictionary, stroke_width_px := DEFAULT_STROKE_WIDTH_PX) -> Dictionary:
 	var errors := validation_issues(component, stroke_width_px)
 	if not errors.is_empty():

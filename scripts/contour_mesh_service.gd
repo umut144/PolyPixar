@@ -17,6 +17,9 @@ static func validation_issues(component: Dictionary, stroke_width_px := ContourS
 			errors.append("Contour stroke width must be a finite positive authored pixel value.")
 	else:
 		errors.append_array(ContourStrokeService.validation_issues(component, stroke_width_px))
+		var chains: Array = component.get("chains", [])
+		if errors.is_empty() and str(component.get("draw_mode", "")) == "contour" and chains.size() == 1 and bool(chains[0].get("closed", false)):
+			errors.append_array(ClosedRegionMeshService.validation_issues(component))
 	return errors
 
 
@@ -31,6 +34,12 @@ static func generate(component: Dictionary, stroke_width_px := ContourStrokeServ
 		if not bool(proxy.get("valid", false)):
 			return _failed_result(fingerprint, proxy.get("errors", []))
 		stroke_source = proxy["component"]
+	var closed_region := {}
+	var chains: Array = component.get("chains", [])
+	if str(component.get("draw_mode", "")) == "contour" and chains.size() == 1 and bool(chains[0].get("closed", false)):
+		closed_region = ClosedRegionMeshService.generate(component)
+		if not bool(closed_region.get("valid", false)):
+			return _failed_result(fingerprint, closed_region.get("errors", []))
 	var stroke := ContourStrokeService.generate(stroke_source, stroke_width_px)
 	if not bool(stroke.get("valid", false)):
 		return _failed_result(fingerprint, stroke.get("errors", []))
@@ -56,7 +65,7 @@ static func generate(component: Dictionary, stroke_width_px := ContourStrokeServ
 			"id": "triangle:contour:%d" % int(float(triangle_offset) / 3.0),
 			"vertex_ids": [vertex_ids[indices[triangle_offset]], vertex_ids[indices[triangle_offset + 1]], vertex_ids[indices[triangle_offset + 2]]]
 		})
-	return {
+	var result := {
 		"valid": true,
 		"errors": [],
 		"method": METHOD,
@@ -82,6 +91,9 @@ static func generate(component: Dictionary, stroke_width_px := ContourStrokeServ
 		"vertex_count": vertices.size(),
 		"triangle_count": triangles.size()
 	}
+	if not closed_region.is_empty():
+		result["closed_region"] = closed_region
+	return result
 
 
 static func _primitive_stroke_source(component: Dictionary) -> Dictionary:
@@ -152,13 +164,17 @@ static func source_fingerprint(component: Dictionary, stroke_width_px := Contour
 			outline_parts.append("%s:%d" % [str(edge.get("id", "")), int(bool(edge.get("render_outline", true)))])
 	var context := HashingContext.new()
 	context.start(HashingContext.HASH_SHA256)
-	context.update(("%s\ncontour_mesh|%d|stroke|%d|width_px|%.9f|outline|%s" % [
+	var fingerprint_text := "%s\ncontour_mesh|%d|stroke|%d|width_px|%.9f|outline|%s" % [
 		GeometrySamplingService.source_fingerprint(component),
 		ALGORITHM_VERSION,
 		ContourStrokeService.ALGORITHM_VERSION,
 		stroke_width_px,
 		",".join(outline_parts)
-	]).to_utf8_buffer())
+	]
+	var chains: Array = component.get("chains", [])
+	if str(component.get("draw_mode", "")) == "contour" and chains.size() == 1 and bool(chains[0].get("closed", false)):
+		fingerprint_text += "\nclosed_region|%d" % ClosedRegionMeshService.ALGORITHM_VERSION
+	context.update(fingerprint_text.to_utf8_buffer())
 	return context.finish().hex_encode()
 
 

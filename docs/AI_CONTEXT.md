@@ -59,6 +59,12 @@ user-editable sample count. Guides remain independent topology records scoped to
 Sampling, Seeding, Meshing, UV, and Weighting records are stored separately
 from source topology.
 
+A closed Contour additionally derives a deterministic triangulation of its
+complete authored Boundary for Runtime consumers. This
+`closed_region_mesh` is engine-neutral geometry without material, color,
+transparency, UV, rendering, or Fill semantics. It is not displayed by the
+Canvas, Preview, or Component Mesh and never becomes Component source data.
+
 Assets may also contain editor-only Component Groups. A Group owns a stable ID,
 a unique lower-snake-case name, visibility, and a local transform,
 and an optional `parent_component_id`. Group membership (`group_id`) does not
@@ -135,9 +141,11 @@ fields. PolyTools does not delete or silently reinterpret those records.
 
 The persistent `Export Runtime (N)` action automatically considers every visible
 Asset. Every visible Component must have one unique free-form `name`. Closed
-and primitive ordinary Components require a
-current Fill Mesh and current centered Contour Stroke Mesh. Open Contours
-require only that Stroke and export no Fill. Asset References instead export
+Loop and Primitive ordinary Components require a current Fill Mesh and current
+centered Contour Stroke Mesh. Open Contours require only that Stroke and export
+no Fill or closed region. Closed Contours require the current Stroke Bake plus
+its independent derived closed region, but still export no Fill Mesh. Asset
+References instead export
 their local Component name, signed instance transform, and the referenced
 Asset's derived `source_asset_key`; they do not duplicate the referenced
 geometry. The editor retains `source_asset_id` only as its internal source link.
@@ -148,9 +156,10 @@ updates the World-root `catalog.json` with the currently valid Runtime set.
 Packages are staged, verified, and replaced atomically per Asset; an invalid
 Asset retains its older package and no fallback geometry is generated, but is
 excluded from that Catalog until it validates again.
-Runtime Manifest schema 4 exports `contour_stroke_mesh` independently from the
-unchanged Fill Mesh. It contains no UV, SDF, mask, or Carrier compatibility
-fields; schema-3 consumers must reject it.
+Runtime Manifest schema 8 exports `contour_stroke_mesh` independently from the
+unchanged Fill Mesh and adds geometry-only `closed_region_mesh` to closed
+Contours. It contains no UV, SDF, mask, or Carrier compatibility fields;
+older consumers must reject it.
 The normative field-level package and consumer rules live in
 `docs/RUNTIME_EXPORT_CONTRACT.md`; other documents must not redefine them.
 

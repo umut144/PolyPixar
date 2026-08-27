@@ -23,6 +23,15 @@ geometry. A Mesh is derived Component-local data and is never synchronized
 back into Component topology. The selected Seeding Bake identifies its exact
 Sampling Bake, so Meshing never combines unrelated upstream results.
 
+Closed Contours remain outside the visible Fill-meshing pipeline. Their
+accepted Contour build keeps the centered Stroke as the only visible Component
+Mesh and separately derives a deterministic Runtime region triangulation from
+the complete adaptive, unoffset Boundary. That `closed_region_mesh` is
+engine-neutral geometry with no material, color, alpha, UV, rendering, or Fill
+semantics. It is invalidated by the same Point, handle, Chain, and Scale-Rebase
+source provenance as its Contour build, while Stroke visibility and width do
+not change the region geometry.
+
 ```text
 canonical Bézier topology → Sampling Bake → Seeding Bake → Constrained Mesh Bake
 ```

@@ -77,6 +77,14 @@ keeps intentional open-Contour crossings and narrow coverage overlaps visible
 and diagnosed, while ambiguous collinear overlap, exact reversals, and
 self-intersecting closed Chains fail explicitly without a topology fallback.
 
+A closed Contour's accepted build also derives a deterministic triangulated
+region from the complete ordered, unoffset Boundary using the Stroke service's
+adaptive centerline sampling before visibility splitting and width/join/cap
+construction. This region is exported only as engine-neutral Runtime geometry;
+it has no visible Fill, material, color, alpha, UV, or rendering semantics.
+Open Contours, Closed Loops, Primitives, and Asset References do not receive
+this additional field.
+
 ## Ownership
 
 `BezierTopology` creates IDs, adds and removes Points, splits Edges, closes

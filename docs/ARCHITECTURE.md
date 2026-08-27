@@ -29,6 +29,9 @@ category is disabled. Transform and Effects categories do not exist.
   resolution.
 - `PrimitiveGeometryService` owns typed primitive validation and deterministic
   derived contours. It does not create or own Bézier topology.
+- `ClosedRegionMeshService` owns validation and deterministic triangulation of
+  the complete adaptively sampled Boundary of a closed Contour. Its result is
+  derived Runtime geometry without rendering or Fill semantics.
 - `ComponentHierarchy` owns parent/child normalization and world/local
   transform conversion.
 - `ComponentCanvas` renders immutable copies and emits user intent.
@@ -276,8 +279,11 @@ the sole owner of its integer `z_index`; legacy Group layer values are ignored
 on load and are not written again.
 
 Schema 49 permits a fill-less `contour` Component to own either one open Chain
-or one closed Chain. Closed Contours derive only their centered Stroke and never
-request or export a Fill Mesh.
+or one closed Chain. Closed Contours retain only their centered Stroke as the
+visible Component Mesh and never request or export a Fill Mesh. Their accepted
+Contour build also carries a separate derived Boundary triangulation for
+Runtime `closed_region_mesh`; hidden Stroke runs do not remove any part of that
+complete region.
 
 Sampling results carry their own algorithm version independently of the
 World schema. The junction-aware version invalidates pre-arrangement flat
@@ -290,8 +296,10 @@ The normative serialized package and consumer contract is
 [`RUNTIME_EXPORT_CONTRACT.md`](RUNTIME_EXPORT_CONTRACT.md). The summary below
 describes how the editor produces that contract.
 
-`RuntimeExportService` builds Manifest schema 7 exclusively from current
-accepted Fill and Contour Stroke Mesh Bakes. It rejects missing or stale inputs,
+`RuntimeExportService` builds Manifest schema 8 exclusively from current
+accepted Fill and Contour Stroke Mesh Bakes. For a closed Contour, the current
+Stroke Bake must also contain its current complete-Boundary region
+triangulation. It rejects missing or stale inputs,
 invalid or duplicate Component Names, non-rebased Scale, unresolved
 Asset References, and incomplete or cyclic visible hierarchies. Ordinary
 Components never derive replacement geometry during export. References emit an
@@ -306,8 +314,11 @@ global ascending `(z_index, component_id)` order from back to front. Group membe
 Mesh Vertex order is retained and Triangle Vertex IDs become compact indices.
 Every ordinary Component exports a separate centered `contour_stroke_mesh`;
 closed and Primitive Components additionally export their unchanged Fill Mesh,
-while fill-less Contours do not invent one. Schema 4 contains no UV/SDF/Carrier
-fields and has no schema-3 fallback.
+while fill-less Contours do not invent one. A closed Contour additionally
+exports `closed_region_mesh` as local-meter vertices and triangle indices. That
+field is engine-neutral geometry only and has no material, color, alpha, UV,
+rendering, or Fill semantics. Open Contours and Asset References omit it.
+Schema 8 contains no UV/SDF/Carrier fields and has no older-schema fallback.
 
 Each visible Asset is exported to the active World-local
 `res://worlds/<world_key>/PolyToolsRuntimeExports/<asset_key>/` directory as

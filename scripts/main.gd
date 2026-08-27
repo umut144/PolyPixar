@@ -3635,6 +3635,30 @@ func _normalize_meshing_bake(raw_bake) -> Dictionary:
 		normalized_run["centerline"] = normalized_centerline
 		normalized_runs.append(normalized_run)
 	bake["runs"] = normalized_runs
+	var raw_closed_region = raw_bake.get("closed_region", {})
+	if raw_closed_region is Dictionary and not raw_closed_region.is_empty():
+		var normalized_closed_region: Dictionary = raw_closed_region.duplicate(true)
+		var normalized_region_vertices: Array = []
+		for raw_vertex in raw_closed_region.get("vertices", []):
+			if not raw_vertex is Dictionary:
+				continue
+			var normalized_vertex: Dictionary = raw_vertex.duplicate(true)
+			normalized_vertex["id"] = str(raw_vertex.get("id", ""))
+			normalized_vertex["position"] = _deserialize_vector(raw_vertex.get("position", [0.0, 0.0]), Vector2.ZERO)
+			normalized_vertex["edge_id"] = str(raw_vertex.get("edge_id", ""))
+			normalized_vertex["curve_t"] = float(raw_vertex.get("curve_t", 0.0))
+			normalized_region_vertices.append(normalized_vertex)
+		var normalized_region_triangles: Array = []
+		for raw_triangle in raw_closed_region.get("triangles", []):
+			if raw_triangle is Dictionary and raw_triangle.get("vertex_ids", []) is Array:
+				normalized_region_triangles.append({"id": str(raw_triangle.get("id", "")), "vertex_ids": raw_triangle.get("vertex_ids", []).duplicate()})
+		normalized_closed_region["vertices"] = normalized_region_vertices
+		normalized_closed_region["triangles"] = normalized_region_triangles
+		normalized_closed_region["vertex_count"] = normalized_region_vertices.size()
+		normalized_closed_region["triangle_count"] = normalized_region_triangles.size()
+		bake["closed_region"] = normalized_closed_region
+	else:
+		bake.erase("closed_region")
 	bake["boundary_constraints"] = raw_bake.get("boundary_constraints", []).duplicate(true)
 	bake["vertex_count"] = normalized_vertices.size()
 	bake["triangle_count"] = normalized_triangles.size()
@@ -3755,6 +3779,20 @@ func _serialize_meshing_bake(bake: Dictionary) -> Dictionary:
 		serialized_run["centerline"] = serialized_centerline
 		serialized_runs.append(serialized_run)
 	serialized_bake["runs"] = serialized_runs
+	var raw_closed_region = bake.get("closed_region", {})
+	if raw_closed_region is Dictionary and not raw_closed_region.is_empty():
+		var serialized_closed_region: Dictionary = raw_closed_region.duplicate(true)
+		var serialized_region_vertices: Array = []
+		for vertex in raw_closed_region.get("vertices", []):
+			if not vertex is Dictionary:
+				continue
+			var serialized_vertex: Dictionary = vertex.duplicate(true)
+			serialized_vertex["position"] = _serialize_vector(Vector2(vertex.get("position", Vector2.ZERO)))
+			serialized_region_vertices.append(serialized_vertex)
+		serialized_closed_region["vertices"] = serialized_region_vertices
+		serialized_bake["closed_region"] = serialized_closed_region
+	else:
+		serialized_bake.erase("closed_region")
 	var raw_optimization = bake.get("optimization", {})
 	if raw_optimization is Dictionary:
 		var optimization: Dictionary = raw_optimization.duplicate(true)
@@ -5064,7 +5102,10 @@ func _write_runtime_export_package(asset: Dictionary, build: Dictionary) -> bool
 
 
 func _runtime_manifest_text_matches(expected_text: String, staged_text: String) -> bool:
-	return not staged_text.is_empty() and JSON.parse_string(staged_text) is Dictionary and staged_text == expected_text
+	if staged_text.is_empty() or staged_text != expected_text:
+		return false
+	var parsed = JSON.parse_string(staged_text)
+	return parsed is Dictionary and RuntimeExportService.manifest_validation_issues(parsed).is_empty()
 
 
 func _prune_uncataloged_runtime_packages() -> void:

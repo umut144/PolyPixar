@@ -1,7 +1,7 @@
 class_name RuntimeExportService
 extends RefCounted
 
-const MANIFEST_SCHEMA_VERSION := 7
+const MANIFEST_SCHEMA_VERSION := 8
 static func build_manifest(asset: Dictionary, sources: Dictionary) -> Dictionary:
 	var errors: Array[String] = []
 	var asset_id := str(asset.get("id", ""))
@@ -57,7 +57,7 @@ static func build_manifest(asset: Dictionary, sources: Dictionary) -> Dictionary
 		var source: Dictionary = sources.get(component_id, {})
 		var export_transform: Dictionary = export_transforms.get(component_id, {})
 		var component_pivot := _global_component_pivot(asset, component)
-		var built := _build_reference_component(component, source, export_transform, component_pivot) if str(component.get("type", "component")) == "reference" else _build_component_v4(component, source, export_transform, component_pivot)
+		var built := _build_reference_component(component, source, export_transform, component_pivot) if str(component.get("type", "component")) == "reference" else _build_component_v8(component, source, export_transform, component_pivot)
 		errors.append_array(built.get("errors", []))
 		if bool(built.get("valid", false)):
 			manifest_components.append(built["component"])
@@ -90,10 +90,13 @@ static func build_manifest(asset: Dictionary, sources: Dictionary) -> Dictionary
 		"asset_pivot": _meters(asset_pivot),
 		"components": manifest_components
 	}
+	var manifest_issues := manifest_validation_issues(manifest)
+	if not manifest_issues.is_empty():
+		return {"valid": false, "errors": manifest_issues, "manifest": {}}
 	return {"valid": true, "errors": [], "manifest": manifest}
 
 
-static func _build_component_v4(component: Dictionary, source: Dictionary, export_transform: Dictionary, component_pivot: Vector2) -> Dictionary:
+static func _build_component_v8(component: Dictionary, source: Dictionary, export_transform: Dictionary, component_pivot: Vector2) -> Dictionary:
 	var errors: Array[String] = []
 	var label := _component_label(component)
 	var draw_mode := str(component.get("draw_mode", "closed_loop"))
@@ -129,6 +132,17 @@ static func _build_component_v4(component: Dictionary, source: Dictionary, expor
 			mesh = {}
 		fill_mesh = _serialize_indexed_mesh(mesh, authored_pivot, false, label, "Fill Mesh")
 		errors.append_array(fill_mesh.get("errors", []))
+	var closed_region_mesh := {}
+	var chains: Array = component.get("chains", [])
+	var requires_closed_region := draw_mode == "contour" and chains.size() == 1 and bool(chains[0].get("closed", false))
+	if requires_closed_region:
+		var closed_region = stroke.get("closed_region", {})
+		if not closed_region is Dictionary or not bool(closed_region.get("valid", false)) or int(closed_region.get("algorithm_version", 0)) != ClosedRegionMeshService.ALGORITHM_VERSION:
+			errors.append("%s: a current accepted Closed Contour Region Mesh is required." % label)
+			closed_region = {}
+		closed_region_mesh = _serialize_indexed_mesh(closed_region, authored_pivot, false, label, "Closed Contour Region Mesh")
+		errors.append_array(closed_region_mesh.get("errors", []))
+		errors.append_array(_triangle_geometry_validation_issues(closed_region_mesh.get("vertices", []), closed_region_mesh.get("indices", []), label, "Closed Contour Region Mesh"))
 	var position := Vector2(export_transform.get("position", Vector2.ZERO))
 	var scale := Vector2(export_transform.get("scale", Vector2.ONE))
 	var rotation := float(export_transform.get("rotation", 0.0))
@@ -165,6 +179,12 @@ static func _build_component_v4(component: Dictionary, source: Dictionary, expor
 	}
 	if draw_mode != "contour":
 		runtime_component["mesh"] = {"vertices": fill_mesh.get("vertices", []), "indices": fill_mesh.get("indices", [])}
+	if requires_closed_region:
+		runtime_component["closed_region_mesh"] = {
+			"role": "closed_contour_region",
+			"vertices": closed_region_mesh.get("vertices", []),
+			"indices": closed_region_mesh.get("indices", [])
+		}
 	return {"valid": true, "errors": [], "component": runtime_component}
 
 
@@ -205,6 +225,97 @@ static func _serialize_indexed_mesh(mesh: Dictionary, authored_pivot: Vector2, a
 	if allow_empty and (not vertices.is_empty() or not indices.is_empty()):
 		errors.append("%s: disabled Contour Stroke must not contain geometry." % label)
 	return {"valid": errors.is_empty(), "errors": errors, "vertices": vertices, "indices": indices}
+
+
+static func _triangle_geometry_validation_issues(vertices: Array, indices: Array, label: String, role: String) -> Array[String]:
+	var errors: Array[String] = []
+	if indices.is_empty() or indices.size() % 3 != 0:
+		errors.append("%s: %s requires a complete non-empty triangle index list." % [label, role])
+		return errors
+	for offset in range(0, indices.size(), 3):
+		var raw_first = indices[offset]
+		var raw_second = indices[offset + 1]
+		var raw_third = indices[offset + 2]
+		if typeof(raw_first) not in [TYPE_INT, TYPE_FLOAT] or typeof(raw_second) not in [TYPE_INT, TYPE_FLOAT] or typeof(raw_third) not in [TYPE_INT, TYPE_FLOAT] \
+			or not is_finite(float(raw_first)) or not is_finite(float(raw_second)) or not is_finite(float(raw_third)) \
+			or float(raw_first) != floorf(float(raw_first)) or float(raw_second) != floorf(float(raw_second)) or float(raw_third) != floorf(float(raw_third)):
+			errors.append("%s: %s contains a non-integer triangle index." % [label, role])
+			continue
+		var first := int(raw_first)
+		var second := int(raw_second)
+		var third := int(raw_third)
+		if first < 0 or second < 0 or third < 0 or first >= vertices.size() or second >= vertices.size() or third >= vertices.size():
+			errors.append("%s: %s contains an out-of-range triangle index." % [label, role])
+			continue
+		if first == second or second == third or first == third:
+			errors.append("%s: %s contains degenerate triangle indices." % [label, role])
+			continue
+		if not vertices[first] is Array or not vertices[second] is Array or not vertices[third] is Array:
+			errors.append("%s: %s triangle coordinates are malformed." % [label, role])
+			continue
+		var a_data: Array = vertices[first]
+		var b_data: Array = vertices[second]
+		var c_data: Array = vertices[third]
+		if a_data.size() != 2 or b_data.size() != 2 or c_data.size() != 2 \
+			or typeof(a_data[0]) not in [TYPE_INT, TYPE_FLOAT] or typeof(a_data[1]) not in [TYPE_INT, TYPE_FLOAT] \
+			or typeof(b_data[0]) not in [TYPE_INT, TYPE_FLOAT] or typeof(b_data[1]) not in [TYPE_INT, TYPE_FLOAT] \
+			or typeof(c_data[0]) not in [TYPE_INT, TYPE_FLOAT] or typeof(c_data[1]) not in [TYPE_INT, TYPE_FLOAT]:
+			errors.append("%s: %s triangle coordinates are malformed." % [label, role])
+			continue
+		var a := Vector2(float(a_data[0]), float(a_data[1]))
+		var b := Vector2(float(b_data[0]), float(b_data[1]))
+		var c := Vector2(float(c_data[0]), float(c_data[1]))
+		if not a.is_finite() or not b.is_finite() or not c.is_finite() or absf((b - a).cross(c - a)) <= ContourStrokeService.GEOMETRY_EPSILON * ToolUnits.TO_METERS * ToolUnits.TO_METERS:
+			errors.append("%s: %s contains a non-finite or degenerate triangle." % [label, role])
+	return errors
+
+
+static func manifest_validation_issues(manifest: Dictionary) -> Array[String]:
+	var errors: Array[String] = []
+	var schema_version = manifest.get("schema_version")
+	if typeof(schema_version) not in [TYPE_INT, TYPE_FLOAT] or not is_finite(float(schema_version)) or float(schema_version) != float(MANIFEST_SCHEMA_VERSION):
+		errors.append("Runtime Manifest schema_version must be the integer %d." % MANIFEST_SCHEMA_VERSION)
+	if str(manifest.get("asset_key", "")).is_empty() or not manifest.get("components", null) is Array:
+		errors.append("Runtime Manifest requires an Asset Key and Component array.")
+		return errors
+	for raw_component in manifest.get("components", []):
+		if not raw_component is Dictionary:
+			errors.append("Runtime Manifest contains an invalid Component record.")
+			continue
+		var component: Dictionary = raw_component
+		var label := str(component.get("name", component.get("component_id", "Component")))
+		if str(component.get("kind", "")) == "asset_reference":
+			if component.has("mesh") or component.has("contour_stroke_mesh") or component.has("closed_region_mesh"):
+				errors.append("%s: Asset References must not contain owned geometry meshes." % label)
+			continue
+		if not component.get("contour_stroke_mesh", null) is Dictionary:
+			errors.append("%s: ordinary Runtime Components require contour_stroke_mesh." % label)
+		if component.has("closed_region_mesh"):
+			var region = component.get("closed_region_mesh")
+			if not region is Dictionary:
+				errors.append("%s: closed_region_mesh must be an object." % label)
+				continue
+			var region_keys: Array = region.keys()
+			region_keys.sort()
+			if region_keys != ["indices", "role", "vertices"]:
+				errors.append("%s: closed_region_mesh may contain only role, vertices, and indices." % label)
+			if str(region.get("role", "")) != "closed_contour_region":
+				errors.append("%s: closed_region_mesh role must be closed_contour_region." % label)
+			var vertices = region.get("vertices", null)
+			var indices = region.get("indices", null)
+			if not vertices is Array or not indices is Array:
+				errors.append("%s: closed_region_mesh requires Vertex and index arrays." % label)
+			else:
+				for vertex in vertices:
+					if not vertex is Array or vertex.size() != 2 or typeof(vertex[0]) not in [TYPE_INT, TYPE_FLOAT] or typeof(vertex[1]) not in [TYPE_INT, TYPE_FLOAT] or not is_finite(float(vertex[0])) or not is_finite(float(vertex[1])):
+						errors.append("%s: closed_region_mesh vertices must be finite two-number arrays." % label)
+						break
+				for index in indices:
+					if typeof(index) not in [TYPE_INT, TYPE_FLOAT] or not is_finite(float(index)) or float(index) != floorf(float(index)):
+						errors.append("%s: closed_region_mesh indices must be integers." % label)
+						break
+				errors.append_array(_triangle_geometry_validation_issues(vertices, indices, label, "closed_region_mesh"))
+	return errors
 
 
 static func _serialize_stroke_runs(raw_runs: Array) -> Array:

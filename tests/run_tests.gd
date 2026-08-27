@@ -12,6 +12,7 @@ func _init() -> void:
 	_test_component_draw_modes_and_continuation()
 	_test_closed_loop_selection_mirror()
 	_test_contour_stroke_mesh()
+	_test_closed_contour_region_mesh()
 	_test_catch_parent_snapping()
 	_test_contour_stroke_service()
 	_test_contour_stroke_robust_geometry()
@@ -296,6 +297,127 @@ func _test_contour_stroke_mesh() -> void:
 	var restored_contour: Dictionary = contour_round_trip.get("meshing", {}).get("bakes", {}).get(ContourMeshService.METHOD, {})
 	_expect(restored_contour.get("vertices", [])[0].has("edge_id") and restored_contour.get("runs", [])[0].get("centerline", [])[0].get("position", null) is Vector2, "Contour Mesh JSON persistence must retain typed Edge/curve provenance and restore Run centerlines as vectors.")
 	_expect(str(restored_contour.get("geometry_diagnostics", {}).get("triangle_validation", "")) == "complete", "Contour Mesh persistence must retain robust geometry diagnostics as typed engine-neutral data.")
+	application.free()
+
+
+func _test_closed_contour_region_mesh() -> void:
+	var convex := _component()
+	convex.merge({"id": "convex_contour", "name": "convex_contour", "type": "component", "draw_mode": "contour", "visibility": true, "z_index": 0, "parent_component_id": "", "transform": {"position": Vector2.ZERO, "pivot": Vector2(2.0, 3.0), "rotation": 0.0, "scale": Vector2.ONE}})
+	for position in [Vector2.ZERO, Vector2(10.0, 0.0), Vector2(10.0, 10.0), Vector2(0.0, 10.0)]:
+		BezierTopology.add_point(convex, position, "linear")
+	BezierTopology.close_active_chain(convex)
+	var convex_bake := ContourMeshService.generate(convex)
+	var repeated_bake := ContourMeshService.generate(convex)
+	var convex_region: Dictionary = convex_bake.get("closed_region", {})
+	_expect(bool(convex_bake.get("valid", false)) and bool(convex_region.get("valid", false)) and int(convex_region.get("vertex_count", 0)) == 4 and int(convex_region.get("triangle_count", 0)) == 2, "A convex closed Contour should derive a non-empty two-triangle geometric region.")
+	_expect(convex_region == repeated_bake.get("closed_region", {}), "Closed Contour region triangulation must be deterministic for identical authored topology.")
+	var direct_stroke := ContourStrokeService.generate(convex)
+	_expect(convex_bake.get("vertices", []).size() == direct_stroke.get("vertices", []).size() and convex_bake.get("triangles", []).size() == int(direct_stroke.get("triangle_count", 0)), "The closed region must remain separate from and must not replace the visible Contour Stroke Mesh.")
+
+	var concave := _component()
+	concave["draw_mode"] = "contour"
+	for position in [Vector2.ZERO, Vector2(10.0, 0.0), Vector2(10.0, 10.0), Vector2(5.0, 4.0), Vector2(0.0, 10.0)]:
+		BezierTopology.add_point(concave, position, "linear")
+	BezierTopology.close_active_chain(concave)
+	var concave_region: Dictionary = ClosedRegionMeshService.generate(concave)
+	_expect(bool(concave_region.get("valid", false)) and int(concave_region.get("triangle_count", 0)) == 3 and is_equal_approx(float(concave_region.get("boundary_area_tool_units_squared", 0.0)), 70.0), "A concave simple closed Contour should triangulate completely without a convex fallback.")
+
+	var hidden := convex.duplicate(true)
+	hidden["edges"][1]["render_outline"] = false
+	var hidden_bake := ContourMeshService.generate(hidden)
+	var fully_hidden := convex.duplicate(true)
+	for edge in fully_hidden["edges"]:
+		edge["render_outline"] = false
+	var fully_hidden_bake := ContourMeshService.generate(fully_hidden)
+	_expect(bool(hidden_bake.get("valid", false)) and hidden_bake.get("closed_region", {}) == convex_region and fully_hidden_bake.get("closed_region", {}) == convex_region, "Hidden Stroke sections must not alter the complete authored closed region.")
+	_expect(not bool(fully_hidden_bake.get("has_outline", true)) and fully_hidden_bake.get("vertices", []).is_empty(), "A fully hidden Stroke must stay visibly empty while its independent closed region remains available for Runtime export.")
+
+	var open_contour := _component()
+	open_contour["draw_mode"] = "contour"
+	for position in [Vector2.ZERO, Vector2(10.0, 0.0), Vector2(10.0, 10.0), Vector2(0.0, 10.0)]:
+		BezierTopology.add_point(open_contour, position, "linear")
+	var open_bake := ContourMeshService.generate(open_contour)
+	_expect(bool(open_bake.get("valid", false)) and not open_bake.has("closed_region"), "An open Contour must not derive a closed region.")
+
+	var crossing := _component()
+	crossing["draw_mode"] = "contour"
+	for position in [Vector2.ZERO, Vector2(10.0, 10.0), Vector2(0.0, 10.0), Vector2(10.0, 0.0)]:
+		BezierTopology.add_point(crossing, position, "linear")
+	BezierTopology.close_active_chain(crossing)
+	var crossing_bake := ContourMeshService.generate(crossing)
+	_expect(not bool(crossing_bake.get("valid", true)) and "simple loops" in " ".join(crossing_bake.get("errors", [])), "A self-intersecting closed Contour must block region and Stroke baking with a concrete validation error.")
+	var repeated_points := _component()
+	repeated_points["draw_mode"] = "contour"
+	for position in [Vector2.ZERO, Vector2.ZERO, Vector2(10.0, 0.0)]:
+		BezierTopology.add_point(repeated_points, position, "linear")
+	BezierTopology.close_active_chain(repeated_points)
+	_expect("at least three unique points" in " ".join(ClosedRegionMeshService.generate(repeated_points).get("errors", [])), "A closed region with fewer than three unique Boundary points must fail explicitly.")
+	var area_less := _component()
+	area_less["draw_mode"] = "contour"
+	for position in [Vector2.ZERO, Vector2(10.0, 0.0), Vector2(20.0, 0.0)]:
+		BezierTopology.add_point(area_less, position, "linear")
+	BezierTopology.close_active_chain(area_less)
+	_expect("area-less" in " ".join(ClosedRegionMeshService.generate(area_less).get("errors", [])), "A practically area-less closed Boundary must fail explicitly.")
+	var non_finite := convex.duplicate(true)
+	non_finite["points"][0]["position"] = Vector2(INF, 0.0)
+	_expect("non-finite" in " ".join(ClosedRegionMeshService.generate(non_finite).get("errors", [])), "Non-finite closed Boundary coordinates must fail before adaptive sampling or triangulation.")
+
+	var stale_source := convex_bake.duplicate(true)
+	convex["points"][0]["handle_source"] = "manual"
+	convex["points"][0]["handle_out"] = Vector2(1.0, 0.5)
+	_expect(not ContourMeshService.matches_source(stale_source, convex), "Point and Bezier-handle changes must stale the accepted closed region through Contour build provenance.")
+
+	var export_component := convex.duplicate(true)
+	export_component["points"][0]["handle_source"] = "auto"
+	export_component["points"][0]["handle_out"] = Vector2.ZERO
+	var export_bake := ContourMeshService.generate(export_component)
+	var export_asset := {"id": "region_asset", "name": "Region Asset", "asset_type": "character", "visibility": true, "asset_pivot": Vector2.ZERO, "components": [export_component], "guides": []}
+	var export_result := RuntimeExportService.build_manifest(export_asset, {"convex_contour": {"contour_stroke": export_bake}})
+	var exported_component: Dictionary = export_result.get("manifest", {}).get("components", [])[0] if bool(export_result.get("valid", false)) else {}
+	var exported_region: Dictionary = exported_component.get("closed_region_mesh", {})
+	_expect(bool(export_result.get("valid", false)) and int(export_result.get("manifest", {}).get("schema_version", 0)) == 8 and str(exported_region.get("role", "")) == "closed_contour_region" and not exported_region.get("indices", []).is_empty(), "Schema 8 must export a non-empty closed_region_mesh for a valid closed Contour.")
+	_expect(exported_region.keys().size() == 3 and exported_region.has("role") and exported_region.has("vertices") and exported_region.has("indices") and not exported_region.has("material") and not exported_component.has("mesh"), "closed_region_mesh must contain only engine-neutral geometry and must not introduce a Contour Fill Mesh.")
+	_expect(exported_region.get("vertices", [])[0] == [-0.2, -0.30000000000000004], "Closed region vertices must subtract the authored Component pivot and convert Tool units to meters.")
+	_expect(RuntimeExportService.manifest_validation_issues(export_result.get("manifest", {})).is_empty(), "A generated schema-8 Runtime Manifest must pass strict validation.")
+	var old_schema_manifest: Dictionary = export_result.get("manifest", {}).duplicate(true)
+	old_schema_manifest["schema_version"] = 7
+	_expect(not RuntimeExportService.manifest_validation_issues(old_schema_manifest).is_empty(), "Runtime validation must strictly reject schema 7 after the schema-8 contract change.")
+	var styled_manifest: Dictionary = export_result.get("manifest", {}).duplicate(true)
+	styled_manifest["components"][0]["closed_region_mesh"]["material"] = "forbidden"
+	_expect(not RuntimeExportService.manifest_validation_issues(styled_manifest).is_empty(), "Runtime validation must reject render or material fields in closed_region_mesh.")
+	var degenerate_manifest: Dictionary = export_result.get("manifest", {}).duplicate(true)
+	degenerate_manifest["components"][0]["closed_region_mesh"]["indices"] = [0, 0, 1]
+	_expect("degenerate triangle indices" in " ".join(RuntimeExportService.manifest_validation_issues(degenerate_manifest)), "Runtime validation must reject degenerate closed-region triangle indices.")
+	var missing_region_bake: Dictionary = export_bake.duplicate(true)
+	missing_region_bake.erase("closed_region")
+	var missing_region_export := RuntimeExportService.build_manifest(export_asset, {"convex_contour": {"contour_stroke": missing_region_bake}})
+	_expect(not bool(missing_region_export.get("valid", true)) and "Closed Contour Region Mesh is required" in " ".join(missing_region_export.get("errors", [])), "A closed Contour with missing derived region geometry must explicitly block Runtime export.")
+
+	var rebased := _component()
+	rebased.merge({"id": "rebased_contour", "name": "rebased_contour", "type": "component", "draw_mode": "contour", "visibility": true, "z_index": 0, "parent_component_id": "", "transform": {"position": Vector2.ZERO, "pivot": Vector2.ZERO, "rotation": 0.0, "scale": Vector2(2.0, 0.5)}})
+	for position in [Vector2.ZERO, Vector2(10.0, 0.0), Vector2(10.0, 10.0), Vector2(0.0, 10.0)]:
+		BezierTopology.add_point(rebased, position, "linear")
+	BezierTopology.close_active_chain(rebased)
+	var rebased_asset := {"id": "rebased_region_asset", "name": "Rebased Region Asset", "asset_type": "character", "visibility": true, "asset_pivot": Vector2.ZERO, "components": [rebased], "guides": []}
+	var rebase_result := ComponentScaleRebaseService.rebase_asset(rebased_asset)
+	var normalized_rebased := ComponentHierarchy.component_by_id(rebased_asset, "rebased_contour")
+	var rebased_bake := ContourMeshService.generate(normalized_rebased)
+	var rebased_export := RuntimeExportService.build_manifest(rebased_asset, {"rebased_contour": {"contour_stroke": rebased_bake}})
+	var rebased_vertices: Array = rebased_export.get("manifest", {}).get("components", [])[0].get("closed_region_mesh", {}).get("vertices", []) if bool(rebased_export.get("valid", false)) else []
+	var rebased_max := Vector2.ZERO
+	for vertex in rebased_vertices:
+		rebased_max.x = maxf(rebased_max.x, float(vertex[0]))
+		rebased_max.y = maxf(rebased_max.y, float(vertex[1]))
+	_expect(bool(rebase_result.get("valid", false)) and bool(rebased_export.get("valid", false)) and rebased_max.is_equal_approx(Vector2(2.0, 0.5)), "Scale Rebase must be reflected exactly in the exported closed region while normalized Component Scale stays one.")
+
+	var application = load("res://scripts/main.gd").new()
+	var runtime_manifest_text := JSON.stringify(export_result.get("manifest", {}), "\t")
+	_expect(application._runtime_manifest_text_matches(runtime_manifest_text, runtime_manifest_text), "Runtime package staging must strictly accept the generated schema-8 closed-region payload after JSON round-trip.")
+	var document: Dictionary = application._default_geometry_document("region_asset", "convex_contour")
+	export_bake["bake_id"] = "closed_region_bake"
+	document["meshing"]["bakes"] = {ContourMeshService.METHOD: export_bake}
+	var restored: Dictionary = application._normalize_geometry_document(application._serialize_geometry_document(document), "region_asset", "convex_contour").get("meshing", {}).get("bakes", {}).get(ContourMeshService.METHOD, {})
+	_expect(restored.get("closed_region", {}).get("vertices", [])[0].get("position", null) is Vector2 and restored.get("closed_region", {}).get("triangles", []).size() == export_bake.get("closed_region", {}).get("triangles", []).size(), "Closed region Bake geometry and provenance must survive Geometry document persistence.")
 	application.free()
 
 
@@ -1699,11 +1821,10 @@ func _test_runtime_export_service() -> void:
 	application.world_name = "world01"
 	application.world_title = "Secrets, Room's & Travels'"
 	_expect(application._runtime_export_root() == ProjectSettings.globalize_path("res://worlds/world01/PolyToolsRuntimeExports"), "Runtime packages should be written to the ignored PolyToolsRuntimeExports directory owned by the active World.")
-	var numeric_manifest := {"schema_version": 1, "values": [0, 1.0, 0.25]}
+	var numeric_manifest := {"schema_version": 7, "values": [0, 1.0, 0.25]}
 	var numeric_manifest_text := JSON.stringify(numeric_manifest, "\t")
-	_expect(application._runtime_manifest_text_matches(numeric_manifest_text, numeric_manifest_text), "Runtime staging should verify the exact valid JSON bytes without rejecting Godot's numeric JSON round-trip types.")
+	_expect(not application._runtime_manifest_text_matches(numeric_manifest_text, numeric_manifest_text), "Runtime staging must reject a byte-stable Manifest from an obsolete schema.")
 	_expect(not application._runtime_manifest_text_matches(numeric_manifest_text, numeric_manifest_text + " "), "Runtime staging should reject Manifest bytes that differ from the expected package.")
-	application.free()
 	var mesh := {
 		"valid": true,
 		"vertices": [
@@ -1722,9 +1843,11 @@ func _test_runtime_export_service() -> void:
 	var result := RuntimeExportService.build_manifest(asset, {"component_a": source, "component_b": source})
 	var manifest: Dictionary = result.get("manifest", {})
 	var components: Array = manifest.get("components", [])
-	_expect(bool(result.get("valid", false)) and int(manifest.get("schema_version", 0)) == 7 and str(manifest.get("asset_key", "")) == "wizard" and not manifest.has("asset_id"), "Runtime export schema 7 should identify packages only by the Asset Key derived from their display name.")
+	_expect(bool(result.get("valid", false)) and int(manifest.get("schema_version", 0)) == 8 and str(manifest.get("asset_key", "")) == "wizard" and not manifest.has("asset_id"), "Runtime export schema 8 should identify packages only by the Asset Key derived from their display name.")
+	var manifest_text := JSON.stringify(manifest, "\t")
+	_expect(application._runtime_manifest_text_matches(manifest_text, manifest_text), "Runtime staging should verify exact schema-8 JSON bytes without rejecting numeric JSON round-trip types.")
 	_expect(components.size() == 2 and str(components[0].get("component_id", "")) == "component_a" and str(components[1].get("component_id", "")) == "component_b", "Runtime Components should sort globally by ascending z_index and lexicographic Component ID.")
-	_expect(components[1].get("mesh", {}).get("vertices", []) == [[-0.2, -0.30000000000000004], [0.8, -0.30000000000000004], [-0.2, 0.7000000000000001]] and components[1].get("mesh", {}).get("indices", []) == [0, 1, 2], "Runtime Meshes should preserve accepted Vertex order, convert Tool units to meters, compact Triangle IDs, and be local to their Component pivot.")
+	_expect(components[1].get("mesh", {}).get("vertices", []) == [[-0.2, -0.30000000000000004], [0.8, -0.30000000000000004], [-0.2, 0.7000000000000001]] and components[1].get("mesh", {}).get("indices", []) == [0, 1, 2] and not components[1].has("closed_region_mesh"), "Runtime Meshes should preserve accepted Vertex order, convert Tool units to meters, compact Triangle IDs, and remain unchanged for non-Contour Components.")
 	_expect(not components[1].get("mesh", {}).has("uvs") and not components[1].has("contour_carrier") and not components[1].has("contour_mask"), "Schema 5 must remove UV, Carrier, and SDF fields rather than retaining a silent compatibility payload.")
 	var exported_stroke: Dictionary = components[1].get("contour_stroke_mesh", {})
 	_expect(str(exported_stroke.get("role", "")) == "centered_boundary_stroke" and bool(exported_stroke.get("has_outline", false)) and is_equal_approx(float(exported_stroke.get("stroke_width_px", 0.0)), 4.0) and is_equal_approx(float(exported_stroke.get("inner_offset_meters", 0.0)), 0.010416666666666666) and is_equal_approx(float(exported_stroke.get("outer_offset_meters", 0.0)), 0.010416666666666666), "Schema 6 should export the original Boundary as the centered metric Stroke with symmetric inner and outer offsets.")
@@ -1746,7 +1869,7 @@ func _test_runtime_export_service() -> void:
 	var open_contour_asset := {"id": "contour_asset", "name": "Contour Asset", "asset_type": "character", "visibility": true, "asset_pivot": Vector2.ZERO, "components": [open_contour_component]}
 	var contour_export := RuntimeExportService.build_manifest(open_contour_asset, {"component_b": {"contour_stroke": contour_stroke}})
 	var exported_contour: Dictionary = contour_export.get("manifest", {}).get("components", [])[0]
-	_expect(bool(contour_export.get("valid", false)) and exported_contour.has("contour_stroke_mesh") and not exported_contour.has("mesh"), "Schema 5 must export an open Contour exclusively as its typed art Stroke without inventing Fill geometry.")
+	_expect(bool(contour_export.get("valid", false)) and exported_contour.has("contour_stroke_mesh") and not exported_contour.has("mesh") and not exported_contour.has("closed_region_mesh"), "Schema 8 must export an open Contour exclusively as its typed art Stroke without inventing Fill or closed-region geometry.")
 	var wizard_head := {"id": "head", "name": "head", "visibility": true, "parent_component_id": "", "transform": {"position": Vector2(0.0, 8.5), "pivot": Vector2(0.0, 8.5), "rotation": 0.0, "scale": Vector2.ONE}}
 	var wizard_eye := {"id": "eye", "name": "eye_left", "visibility": true, "parent_component_id": "head", "transform": {"position": Vector2(-0.3, 8.5), "pivot": Vector2(-0.3, 8.5), "rotation": 0.0, "scale": Vector2.ONE}}
 	var head_mesh: Dictionary = mesh.duplicate(true)
@@ -1777,7 +1900,7 @@ func _test_runtime_export_service() -> void:
 	var referenced_components: Array = referenced_result.get("manifest", {}).get("components", [])
 	var exported_reference: Dictionary = referenced_components[2] if referenced_components.size() == 3 else {}
 	var exported_reference_scale: Array = exported_reference.get("local_transform", {}).get("scale", [])
-	_expect(bool(referenced_result.get("valid", false)) and str(exported_reference.get("kind", "")) == "asset_reference" and str(exported_reference.get("source_asset_key", "")) == "orb" and is_equal_approx(float(exported_reference.get("contour_stroke_width_override_px", 0.0)), 3.0) and not exported_reference.has("source_asset_id") and str(exported_reference.get("name", "")) == "orb_reference" and not exported_reference.has("mesh") and exported_reference_scale.size() == 2 and float(exported_reference_scale[0]) * float(exported_reference_scale[1]) < 0.0, "A Reference should export its local Stroke-width override without duplicating source geometry.")
+	_expect(bool(referenced_result.get("valid", false)) and str(exported_reference.get("kind", "")) == "asset_reference" and str(exported_reference.get("source_asset_key", "")) == "orb" and is_equal_approx(float(exported_reference.get("contour_stroke_width_override_px", 0.0)), 3.0) and not exported_reference.has("source_asset_id") and str(exported_reference.get("name", "")) == "orb_reference" and not exported_reference.has("mesh") and not exported_reference.has("closed_region_mesh") and exported_reference_scale.size() == 2 and float(exported_reference_scale[0]) * float(exported_reference_scale[1]) < 0.0, "A Reference should export its local Stroke-width override without duplicating source geometry.")
 	reference_source["source_asset_exists"] = false
 	_expect(not bool(RuntimeExportService.build_manifest(referenced_asset, {"component_a": source, "component_b": source, "component_orb": reference_source}).get("valid", true)), "Runtime export should reject a Reference whose actual source Asset cannot be resolved.")
 	var duplicate_role_asset: Dictionary = asset.duplicate(true)
@@ -1789,6 +1912,7 @@ func _test_runtime_export_service() -> void:
 	var invalid_name_asset: Dictionary = asset.duplicate(true)
 	invalid_name_asset["components"][0]["name"] = "Body"
 	_expect(not bool(RuntimeExportService.build_manifest(invalid_name_asset, {"component_a": source, "component_b": source}).get("valid", true)), "Runtime export should reject Component Names outside lower_snake_case.")
+	application.free()
 
 
 func _test_weighting_service_and_ui() -> void:
