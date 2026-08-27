@@ -19,7 +19,7 @@
 	"editor_state": {
 		"active_create_submodule": "Character",
 		"active_geometry_submodule": "Sampling",
-		"active_module": "Create",
+		"active_module": "Export",
 		"active_motion_submodule": "Animation",
 		"active_style_submodule": "Weighting",
 		"asset_cameras": {
@@ -82,9 +82,9 @@
 			"asset_4": {
 				"position": [
 					-0.138385653495789,
-					2.55500316619873
+					2.80151462554932
 				],
-				"zoom": 166.727188799311
+				"zoom": 207.696858537802
 			},
 			"asset_5": {
 				"position": [
@@ -95,10 +95,10 @@
 			},
 			"asset_6": {
 				"position": [
-					-0.138385653495789,
-					7.87611675262451
+					-1.04740810394287,
+					11.0211420059204
 				],
-				"zoom": 77.9094080010093
+				"zoom": 90.0924129670337
 			},
 			"asset_7": {
 				"position": [
@@ -133,10 +133,10 @@
 			"asset_3": false,
 			"asset_4": false,
 			"asset_5": false,
-			"asset_6": false,
+			"asset_6": true,
 			"asset_7": false,
 			"asset_8": false,
-			"asset_9": true
+			"asset_9": false
 		},
 		"motion_act_preview_asset_id": "",
 		"motion_act_preview_loop": true,
@@ -151,8 +151,8 @@
 			"terrain": true,
 			"weapons": true
 		},
-		"selected_asset_id": "asset_9",
-		"selected_component_id": "component_73",
+		"selected_asset_id": "asset_6",
+		"selected_component_id": "",
 		"selected_edge_ids": [],
 		"selected_guide_id": "",
 		"selected_motion_act_id": "",
@@ -173,7 +173,7 @@
 	},
 	"name": "world01",
 	"paths": [],
-	"schema_version": 50,
+	"schema_version": 51,
 	"sequences": [],
 	"world_name": "Secrets, Room's & Travels'",
 	"world_settings": {
