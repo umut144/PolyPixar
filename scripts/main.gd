@@ -8995,15 +8995,15 @@ func _selected_component_ids_for_group(asset: Dictionary) -> Array[String]:
 
 
 func _group_name_validation_error(asset: Dictionary, raw_name: String, excluded_group_id := "") -> String:
-	var name := raw_name.strip_edges()
-	if name.is_empty():
+	var group_name := raw_name.strip_edges()
+	if group_name.is_empty():
 		return "Enter a Group name."
-	if not _component_name_validation_error(name, {"components": []}).is_empty():
+	if not _component_name_validation_error(group_name, {"components": []}).is_empty():
 		return "Use lower_snake_case for the Group name."
 	for group in asset.get("groups", []):
 		if str(group.get("id", "")) == excluded_group_id:
 			continue
-		if str(group.get("name", "")).to_lower() == name.to_lower():
+		if str(group.get("name", "")).to_lower() == group_name.to_lower():
 			return "Group name must be unique within the Asset."
 	return ""
 
@@ -9355,14 +9355,14 @@ func _next_duplicate_group_name(asset: Dictionary, source_name: String) -> Strin
 
 func _mirrored_group_transform(raw_transform: Dictionary, mirror_mode: String) -> Dictionary:
 	var transform := _deserialize_transform(raw_transform).duplicate(true)
-	var position: Vector2 = transform.get("position", Vector2.ZERO)
-	position.x = -position.x
-	transform["position"] = position
+	var mirrored_position: Vector2 = transform.get("position", Vector2.ZERO)
+	mirrored_position.x = -mirrored_position.x
+	transform["position"] = mirrored_position
 	if mirror_mode == "flip_orientation":
 		transform["rotation"] = -float(transform.get("rotation", 0.0))
-		var scale: Vector2 = transform.get("scale", Vector2.ONE)
-		scale.x = -scale.x
-		transform["scale"] = scale
+		var mirrored_scale: Vector2 = transform.get("scale", Vector2.ONE)
+		mirrored_scale.x = -mirrored_scale.x
+		transform["scale"] = mirrored_scale
 	return transform
 
 
@@ -9962,15 +9962,15 @@ func _render_group_inspector(_asset: Dictionary, group: Dictionary) -> void:
 func _rename_selected_group(new_name: String) -> void:
 	var asset := _get_asset(selected_asset_id)
 	var group := ComponentHierarchy.group_by_id(asset, selected_group_id)
-	var name := new_name.strip_edges()
-	var name_error := _group_name_validation_error(asset, name, selected_group_id)
+	var group_name := new_name.strip_edges()
+	var name_error := _group_name_validation_error(asset, group_name, selected_group_id)
 	if group.is_empty() or not name_error.is_empty():
 		_show_status_message(name_error)
 		return
-	if name == str(group.get("name", "")):
+	if group_name == str(group.get("name", "")):
 		return
 	_record_direct_change()
-	group["name"] = name
+	group["name"] = group_name
 	_render_outliner()
 	_render_inspector()
 
@@ -12215,10 +12215,10 @@ func _render_inspector() -> void:
 	var pivot: Vector2 = transform.get("pivot", Vector2.ZERO)
 	if show_global_transform:
 		var displayed_transform: Dictionary = ComponentHierarchy.world_transform_record(asset, selected_component_id)
-		var global_position: Vector2 = displayed_transform.get("position", Vector2.ZERO)
+		var displayed_position: Vector2 = displayed_transform.get("position", Vector2.ZERO)
 		var global_scale: Vector2 = displayed_transform.get("scale", Vector2.ONE)
-		_add_global_transform_field(transform_grid, "Position X (cm)", _editor_units_to_world(global_position.x), "position_x", 0.01)
-		_add_global_transform_field(transform_grid, "Position Y (cm)", _editor_units_to_world(global_position.y), "position_y", 0.01)
+		_add_global_transform_field(transform_grid, "Position X (cm)", _editor_units_to_world(displayed_position.x), "position_x", 0.01)
+		_add_global_transform_field(transform_grid, "Position Y (cm)", _editor_units_to_world(displayed_position.y), "position_y", 0.01)
 		_add_global_transform_field(transform_grid, "Rotation", float(displayed_transform.get("rotation", 0.0)), "rotation", 1.0)
 		_add_global_transform_field(transform_grid, "Scale X", global_scale.x, "scale_x", 0.01)
 		_add_global_transform_field(transform_grid, "Scale Y", global_scale.y, "scale_y", 0.01)
@@ -14218,19 +14218,19 @@ func _rename_selected_asset(new_name: String) -> void:
 func _rename_selected_component(new_name: String) -> void:
 	var asset := _get_asset(selected_asset_id)
 	var component := _get_component(asset, selected_component_id)
-	var name := new_name.strip_edges()
+	var component_name := new_name.strip_edges()
 	if component.is_empty():
 		return
-	var name_error := _component_name_validation_error(name, asset, selected_component_id)
+	var name_error := _component_name_validation_error(component_name, asset, selected_component_id)
 	if not name_error.is_empty():
 		if is_instance_valid(component_name_editor):
 			component_name_editor.text = _normalized_component_name(component)
 		_show_status_message(name_error)
 		return
-	if name == str(component.get("name", "")):
+	if component_name == str(component.get("name", "")):
 		return
 	_record_direct_change()
-	component["name"] = name
+	component["name"] = component_name
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
@@ -14863,8 +14863,8 @@ func _is_reference_component(component: Dictionary) -> bool:
 
 
 func _normalized_component_name(component: Dictionary) -> String:
-	var name := str(component.get("name", "")).strip_edges()
-	return name if not name.is_empty() else "Component"
+	var normalized_name := str(component.get("name", "")).strip_edges()
+	return normalized_name if not normalized_name.is_empty() else "Component"
 
 
 func _component_tree_name(component: Dictionary) -> String:
