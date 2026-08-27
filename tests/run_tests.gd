@@ -20,6 +20,7 @@ func _init() -> void:
 	_test_world_contour_settings()
 	_test_component_scale_rebase()
 	_test_asset_authored_facing()
+	_test_multi_component_inspector()
 	_test_geometry_sampling_service()
 	_test_geometry_auto_build_service()
 	_test_create_outliner_expansion_scope()
@@ -929,6 +930,47 @@ func _test_asset_authored_facing() -> void:
 	_expect(AssetPresentation.authored_facing(application._get_asset("pose_asset")) == AssetPresentation.AuthoredFacing.NEUTRAL, "Undo should restore the previous Asset-level Authored Facing.")
 	application._redo()
 	_expect(AssetPresentation.serialize_authored_facing(application._get_asset("pose_asset").get("authored_facing")) == "down", "Redo should restore the Inspector-authored facing value.")
+	application.free()
+
+
+func _find_named_control(root: Node, target_name: String) -> Control:
+	if root is Control and str(root.name) == target_name:
+		return root
+	for child in root.get_children():
+		var found := _find_named_control(child, target_name)
+		if is_instance_valid(found):
+			return found
+	return null
+
+
+func _test_multi_component_inspector() -> void:
+	var first := _component()
+	first.merge({"id": "first", "name": "first", "visibility": true, "z_index": 1, "transform": {"position": Vector2(5.0, 10.0), "pivot": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE}})
+	var second := _component()
+	second.merge({"id": "second", "name": "second", "visibility": false, "z_index": 2, "transform": {"position": Vector2(15.0, 20.0), "pivot": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE}})
+	var asset := {"id": "multi_asset", "name": "Multi Asset", "asset_type": "character", "visibility": true, "asset_pivot": Vector2(1.0, 2.0), "components": [first, second], "groups": [], "guides": []}
+	var application = load("res://scripts/main.gd").new()
+	application._build_ui()
+	var multi_assets: Array[Dictionary] = [asset]
+	application.assets = multi_assets
+	application.selected_asset_id = "multi_asset"
+	application.selected_component_id = "first"
+	var multi_selection: Array[String] = ["first", "second"]
+	application.selected_component_ids = multi_selection
+	application._render_inspector()
+	var inspector_text := _control_text(application.inspector_content)
+	_expect(inspector_text.contains("2 Components") and inspector_text.contains("Multi-Edit") and inspector_text.contains("Mixed"), "Selecting multiple Components should render a dedicated Multi-Edit Inspector with mixed-value hints.")
+	var z_field := _find_named_control(application.inspector_content, "MultiZIndex") as LineEdit
+	var x_field := _find_named_control(application.inspector_content, "MultiPositionX") as LineEdit
+	_expect(is_instance_valid(z_field) and z_field.placeholder_text == "Mixed" and is_instance_valid(x_field) and x_field.placeholder_text == "Mixed", "Mixed Z Index and asset-relative Position fields should be exposed explicitly.")
+	application._on_multi_component_z_index_changed(7.0)
+	_expect(int(application._get_component(asset, "first").get("z_index", 0)) == 7 and int(application._get_component(asset, "second").get("z_index", 0)) == 7 and application.undo_history.size() == 1, "A shared Z Index edit should update all selected Components in one undo step.")
+	application._on_multi_component_position_changed(30.0, "position_x")
+	var first_world := ComponentHierarchy.world_transform_record(asset, "first")
+	var second_world := ComponentHierarchy.world_transform_record(asset, "second")
+	_expect(is_equal_approx(float(first_world.get("position", Vector2.ZERO).x), 4.0) and is_equal_approx(float(second_world.get("position", Vector2.ZERO).x), 4.0), "A shared Position X edit should use the Asset pivot as the (0, 0) origin.")
+	application._on_multi_component_visibility_selected(0)
+	_expect(bool(application._get_component(asset, "first").get("visibility", false)) and bool(application._get_component(asset, "second").get("visibility", false)), "A shared Visibility edit should update every selected Component.")
 	application.free()
 
 

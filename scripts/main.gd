@@ -11929,6 +11929,10 @@ func _render_inspector() -> void:
 	if not selected_group_id.is_empty():
 		_render_group_inspector(asset, ComponentHierarchy.group_by_id(asset, selected_group_id))
 		return
+	var inspector_components := _selected_components_for_inspector(asset)
+	if inspector_components.size() > 1:
+		_render_multi_component_inspector(asset, inspector_components)
+		return
 	if selected_component_id.is_empty():
 		inspector_content.add_child(_create_inspector_field_label("Name"))
 		asset_name_editor = _create_name_editor(str(asset["name"]), "Asset name")
@@ -12259,6 +12263,135 @@ func _render_inspector() -> void:
 	z_index_field.add_theme_font_size_override("font_size", 11)
 	z_index_field.value_changed.connect(_on_component_z_index_changed)
 	inspector_content.add_child(z_index_field)
+
+
+func _selected_components_for_inspector(asset: Dictionary) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	var candidates: Array[String] = selected_component_ids.duplicate()
+	if candidates.is_empty() and not selected_component_id.is_empty():
+		candidates.append(selected_component_id)
+	if not selected_component_id.is_empty() and not candidates.has(selected_component_id):
+		candidates.append(selected_component_id)
+	var seen := {}
+	for component_id in candidates:
+		if seen.has(component_id):
+			continue
+		var component := _get_component(asset, component_id)
+		if component.is_empty():
+			continue
+		seen[component_id] = true
+		result.append(component)
+	return result
+
+
+func _multi_component_line_edit(label_text: String, value_text: String, is_mixed: bool, name: String, axis: String, integer_only := false) -> LineEdit:
+	inspector_content.add_child(_create_inspector_field_label(label_text))
+	var field := LineEdit.new()
+	field.name = name
+	field.custom_minimum_size = Vector2(0, 26)
+	field.text = "" if is_mixed else value_text
+	field.placeholder_text = "Mixed" if is_mixed else ""
+	field.tooltip_text = "Leave unchanged for mixed values; enter a value to apply it to all selected Components."
+	field.add_theme_font_size_override("font_size", 11)
+	field.text_submitted.connect(_on_multi_component_field_submitted.bind(field, axis, integer_only))
+	field.focus_exited.connect(_on_multi_component_field_focus_exited.bind(field, axis, integer_only))
+	inspector_content.add_child(field)
+	return field
+
+
+func _render_multi_component_inspector(asset: Dictionary, components: Array[Dictionary]) -> void:
+	inspector_content.add_child(_create_inspector_field_label("%d Components" % components.size()))
+	inspector_content.add_child(_create_inspector_section("Multi-Edit"))
+	var positions: Array[Vector2] = []
+	for component in components:
+		var component_id := str(component.get("id", ""))
+		var world_record := ComponentHierarchy.world_transform_record(asset, component_id)
+		positions.append(Vector2(world_record.get("position", Vector2.ZERO)) - _asset_pivot(asset))
+	var position_grid := GridContainer.new()
+	position_grid.columns = 2
+	position_grid.add_theme_constant_override("h_separation", 8)
+	position_grid.add_theme_constant_override("v_separation", 4)
+	var position_x := _editor_units_to_world(positions[0].x)
+	var position_y := _editor_units_to_world(positions[0].y)
+	var x_mixed := false
+	var y_mixed := false
+	for position in positions.slice(1):
+		x_mixed = x_mixed or not is_equal_approx(position.x, positions[0].x)
+		y_mixed = y_mixed or not is_equal_approx(position.y, positions[0].y)
+	_add_multi_component_position_field(position_grid, "Position X (cm) · Asset", position_x, x_mixed, "position_x")
+	_add_multi_component_position_field(position_grid, "Position Y (cm) · Asset", position_y, y_mixed, "position_y")
+	inspector_content.add_child(position_grid)
+
+	var visibility_values: Array[bool] = []
+	var z_values: Array[int] = []
+	var width_values: Array[float] = []
+	for component in components:
+		visibility_values.append(bool(component.get("visibility", true)))
+		z_values.append(int(component.get("z_index", 0)))
+		width_values.append(_effective_contour_stroke_width_px(component))
+	var visibility_option := OptionButton.new()
+	visibility_option.name = "MultiVisibility"
+	visibility_option.custom_minimum_size = Vector2(0, 26)
+	visibility_option.add_item("Visible")
+	visibility_option.set_item_metadata(0, true)
+	visibility_option.add_item("Hidden")
+	visibility_option.set_item_metadata(1, false)
+	visibility_option.add_item("Mixed")
+	visibility_option.set_item_metadata(2, null)
+	var visibility_mixed := false
+	for value in visibility_values.slice(1):
+		visibility_mixed = visibility_mixed or value != visibility_values[0]
+	visibility_option.select(2 if visibility_mixed else (0 if visibility_values[0] else 1))
+	visibility_option.item_selected.connect(_on_multi_component_visibility_selected)
+	inspector_content.add_child(_create_inspector_field_label("Visibility"))
+	inspector_content.add_child(visibility_option)
+
+	var z_mixed := false
+	for value in z_values.slice(1):
+		z_mixed = z_mixed or value != z_values[0]
+	_multi_component_line_edit("Z Index", str(z_values[0]), z_mixed, "MultiZIndex", "z_index", true)
+	var width_mixed := false
+	for value in width_values.slice(1):
+		width_mixed = width_mixed or not is_equal_approx(value, width_values[0])
+	_multi_component_line_edit("Contour Stroke Width (px)", str(width_values[0]), width_mixed, "MultiContourWidth", "contour_width", false)
+
+
+func _add_multi_component_position_field(grid: GridContainer, label_text: String, value: float, mixed: bool, axis: String) -> void:
+	grid.add_child(_create_inspector_field_label(label_text))
+	var field := LineEdit.new()
+	field.name = "MultiPositionX" if axis == "position_x" else "MultiPositionY"
+	field.custom_minimum_size = Vector2(0, 26)
+	field.text = "" if mixed else str(value)
+	field.placeholder_text = "Mixed" if mixed else ""
+	field.tooltip_text = "Asset-relative position from the Asset pivot (0, 0)."
+	field.add_theme_font_size_override("font_size", 11)
+	field.text_submitted.connect(_on_multi_component_field_submitted.bind(field, axis, false))
+	field.focus_exited.connect(_on_multi_component_field_focus_exited.bind(field, axis, false))
+	grid.add_child(field)
+
+
+func _on_multi_component_field_submitted(raw_value: String, _field: LineEdit, property_name: String, integer_only: bool) -> void:
+	var value_text := raw_value.strip_edges()
+	if value_text.is_empty():
+		_render_inspector()
+		return
+	var value := value_text.to_float()
+	if integer_only and not is_equal_approx(value, round(value)):
+		_render_inspector()
+		return
+	if not is_finite(value):
+		_render_inspector()
+		return
+	if property_name == "position_x" or property_name == "position_y":
+		_on_multi_component_position_changed(value, property_name)
+	elif property_name == "z_index":
+		_on_multi_component_z_index_changed(value)
+	elif property_name == "contour_width":
+		_on_multi_component_contour_width_changed(value)
+
+
+func _on_multi_component_field_focus_exited(field: LineEdit, property_name: String, integer_only: bool) -> void:
+	_on_multi_component_field_submitted(field.text, field, property_name, integer_only)
 
 
 func _render_motion_inspector() -> void:
@@ -14029,6 +14162,29 @@ func _on_component_visibility_changed(visibility_enabled: bool) -> void:
 		_render_canvas_context()
 
 
+func _on_multi_component_visibility_selected(index: int) -> void:
+	if index < 0 or index > 1:
+		return
+	var asset := _get_asset(selected_asset_id)
+	var components := _selected_components_for_inspector(asset)
+	if asset.is_empty() or components.size() < 2:
+		return
+	var visibility_enabled := index == 0
+	var changed := false
+	for component in components:
+		if bool(component.get("visibility", true)) != visibility_enabled:
+			changed = true
+			break
+	if not changed:
+		return
+	_record_direct_change()
+	for component in components:
+		component["visibility"] = visibility_enabled
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
 func _on_circle_primitive_diameter_changed(value: float) -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	if not PrimitiveGeometryService.has_circle(component):
@@ -14171,6 +14327,61 @@ func _on_component_z_index_changed(value: float) -> void:
 		_render_canvas_context()
 
 
+func _on_multi_component_position_changed(value: float, property_name: String) -> void:
+	var asset := _get_asset(selected_asset_id)
+	var components := _selected_components_for_inspector(asset)
+	if asset.is_empty() or components.size() < 2 or property_name not in ["position_x", "position_y"]:
+		return
+	var desired_axis := _world_to_editor_units(value)
+	var asset_pivot := _asset_pivot(asset)
+	var targets: Array[Dictionary] = []
+	for component in components:
+		var component_id := str(component.get("id", ""))
+		var world_record := ComponentHierarchy.world_transform_record(asset, component_id)
+		var world_position: Vector2 = world_record.get("position", Vector2.ZERO)
+		var relative := world_position - asset_pivot
+		if property_name == "position_x":
+			relative.x = desired_axis
+		else:
+			relative.y = desired_axis
+		world_record["position"] = asset_pivot + relative
+		targets.append({"id": component_id, "world": world_record})
+	var ordered_targets := targets.duplicate()
+	ordered_targets.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return _component_hierarchy_depth(asset, str(a.get("id", ""))) < _component_hierarchy_depth(asset, str(b.get("id", "")))
+	)
+	var changed := false
+	for target in ordered_targets:
+		var current_world := ComponentHierarchy.world_transform_record(asset, str(target.get("id", "")))
+		if not Vector2(current_world.get("position", Vector2.ZERO)).is_equal_approx(Vector2(target.get("world", {}).get("position", Vector2.ZERO))):
+			changed = true
+			break
+	if not changed:
+		return
+	_record_direct_change()
+	for target in ordered_targets:
+		var component := _get_component(asset, str(target.get("id", "")))
+		var next_transform: Dictionary = ComponentHierarchy.local_transform_from_world_record(asset, str(target.get("id", "")), target.get("world", {}))
+		component["transform"] = next_transform
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _component_hierarchy_depth(asset: Dictionary, component_id: String) -> int:
+	var depth := 0
+	var current_id := component_id
+	var visited := {}
+	while not current_id.is_empty() and not visited.has(current_id):
+		visited[current_id] = true
+		var component := _get_component(asset, current_id)
+		if component.is_empty():
+			break
+		current_id = str(component.get("parent_component_id", ""))
+		if not current_id.is_empty():
+			depth += 1
+	return depth
+
+
 func _on_component_contour_stroke_width_changed(value: float) -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	if component.is_empty() or not is_finite(value) or value <= 0.0:
@@ -14185,6 +14396,57 @@ func _on_component_contour_stroke_width_changed(value: float) -> void:
 	else:
 		_record_direct_change()
 		component["contour_stroke_width_px"] = value
+	geometry_meshing_preview = {}
+	geometry_meshing_preview_key = ""
+	geometry_meshing_preview_state = "idle"
+	geometry_meshing_preview_revision += 1
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _on_multi_component_z_index_changed(value: float) -> void:
+	var asset := _get_asset(selected_asset_id)
+	var components := _selected_components_for_inspector(asset)
+	if asset.is_empty() or components.size() < 2 or not is_finite(value):
+		return
+	var z_index := int(value)
+	var changed := false
+	for component in components:
+		if int(component.get("z_index", 0)) != z_index:
+			changed = true
+			break
+	if not changed:
+		return
+	_record_direct_change()
+	for component in components:
+		component["z_index"] = z_index
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _on_multi_component_contour_width_changed(value: float) -> void:
+	var asset := _get_asset(selected_asset_id)
+	var components := _selected_components_for_inspector(asset)
+	if asset.is_empty() or components.size() < 2 or not is_finite(value) or value <= 0.0:
+		return
+	var use_default := is_equal_approx(value, world_contour_stroke_width_px)
+	var changed := false
+	for component in components:
+		if use_default:
+			if component.has("contour_stroke_width_px"):
+				changed = true
+				break
+		elif not _component_has_contour_stroke_width_override(component) or not is_equal_approx(float(component.get("contour_stroke_width_px", 0.0)), value):
+			changed = true
+			break
+	if not changed:
+		return
+	_record_direct_change()
+	for component in components:
+		if use_default:
+			component.erase("contour_stroke_width_px")
+		else:
+			component["contour_stroke_width_px"] = value
 	geometry_meshing_preview = {}
 	geometry_meshing_preview_key = ""
 	geometry_meshing_preview_state = "idle"
