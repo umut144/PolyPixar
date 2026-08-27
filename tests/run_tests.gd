@@ -342,6 +342,10 @@ func _test_closed_contour_region_mesh() -> void:
 	BezierTopology.close_active_chain(concave)
 	var concave_region: Dictionary = ClosedRegionMeshService.generate(concave)
 	_expect(bool(concave_region.get("valid", false)) and int(concave_region.get("triangle_count", 0)) == 3 and is_equal_approx(float(concave_region.get("boundary_area_tool_units_squared", 0.0)), 70.0), "A concave simple closed Contour should triangulate completely without a convex fallback.")
+	var monk_eye_area_twice := 0.999040603637696
+	var monk_eye_rounding_difference_twice := 0.000001915614120662212
+	var monk_eye_tolerance := ClosedRegionMeshService._area_tolerance(monk_eye_area_twice, 22)
+	_expect(monk_eye_tolerance >= monk_eye_rounding_difference_twice and monk_eye_tolerance < 0.0001, "Closed-region area certification should accept the measured Monk-eye triangulation rounding error while retaining a tightly bounded tolerance.")
 
 	var hidden := convex.duplicate(true)
 	hidden["edges"][1]["render_outline"] = false

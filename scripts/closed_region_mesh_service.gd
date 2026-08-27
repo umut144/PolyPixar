@@ -5,8 +5,9 @@ extends RefCounted
 ## authored Boundary. This data has no material, color, alpha, UV, rendering,
 ## or visible-fill semantics.
 
-const ALGORITHM_VERSION := 1
+const ALGORITHM_VERSION := 2
 const GEOMETRY_EPSILON := ContourStrokeService.GEOMETRY_EPSILON
+const AREA_RELATIVE_TOLERANCE := 0.00001
 
 
 static func validation_issues(component: Dictionary) -> Array[String]:
@@ -102,7 +103,7 @@ static func _derive(component: Dictionary, include_mesh: bool) -> Dictionary:
 		canonical_triangles.append(_rotate_triangle_to_smallest(first, second, third))
 	if not errors.is_empty():
 		return _failed(errors)
-	var area_tolerance := maxf(GEOMETRY_EPSILON, absf(signed_area_twice) * 0.000001)
+	var area_tolerance := _area_tolerance(signed_area_twice, positions.size())
 	if absf(triangulated_area_twice - absf(signed_area_twice)) > area_tolerance:
 		return _failed(["Closed contour region triangulation is incomplete; triangle area does not cover the authored Boundary."])
 	canonical_triangles.sort_custom(_triangle_less)
@@ -142,6 +143,16 @@ static func _signed_area_twice(positions: PackedVector2Array) -> float:
 	for index in range(positions.size()):
 		result += positions[index].cross(positions[(index + 1) % positions.size()])
 	return result
+
+
+static func _area_tolerance(signed_area_twice: float, boundary_sample_count: int) -> float:
+	# Polygon and triangle areas sum the same coordinates in different orders.
+	# Allow one geometry epsilon per sampled Boundary vertex, plus a small
+	# relative budget, while structural and self-intersection checks stay exact.
+	return maxf(
+		GEOMETRY_EPSILON * maxi(boundary_sample_count, 1),
+		absf(signed_area_twice) * AREA_RELATIVE_TOLERANCE
+	)
 
 
 static func _rotate_triangle_to_smallest(first: int, second: int, third: int) -> Array:
