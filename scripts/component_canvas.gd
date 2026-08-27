@@ -116,6 +116,7 @@ var reference_image_position := Vector2.ZERO
 var reference_image_scale := 1.0
 var navigation_locked := false
 var command_shortcut_active := false
+var navigation_keys_pressed: Dictionary = {}
 var pivot_dragging := false
 var asset_pivot_dragging := false
 var transform_drag_axis := ""
@@ -135,6 +136,7 @@ func _ready() -> void:
 	focus_mode = Control.FOCUS_ALL
 	mouse_entered.connect(_on_mouse_entered)
 	mouse_exited.connect(_on_mouse_exited)
+	focus_exited.connect(_clear_navigation_input)
 	queue_redraw()
 
 
@@ -154,8 +156,10 @@ func set_camera_state(camera_position: Vector2, saved_zoom: float) -> void:
 
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventKey:
+		_update_navigation_input(event)
 		if event.meta_pressed or event.ctrl_pressed:
 			command_shortcut_active = true
+			_clear_navigation_input()
 		elif not event.pressed and event.keycode in [KEY_META, KEY_CTRL]:
 			command_shortcut_active = false
 	if event is InputEventMouseButton and event.pressed:
@@ -708,10 +712,43 @@ func set_reference_image(texture: Texture2D, image_visible := true, image_opacit
 
 func set_navigation_locked(locked: bool) -> void:
 	navigation_locked = locked
+	if navigation_locked:
+		_clear_navigation_input()
 
 
 func set_command_shortcut_active(active: bool) -> void:
 	command_shortcut_active = active
+	if command_shortcut_active:
+		_clear_navigation_input()
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT:
+		_clear_navigation_input()
+
+
+func _update_navigation_input(event: InputEventKey) -> void:
+	if event.keycode not in [KEY_W, KEY_A, KEY_S, KEY_D, KEY_Q, KEY_E]:
+		return
+	if not event.pressed:
+		navigation_keys_pressed.erase(event.keycode)
+		return
+	if event.meta_pressed or event.ctrl_pressed or event.alt_pressed:
+		_clear_navigation_input()
+		return
+	navigation_keys_pressed[event.keycode] = true
+
+
+func _clear_navigation_input() -> void:
+	navigation_keys_pressed.clear()
+
+
+func _navigation_input_vector() -> Vector3:
+	return Vector3(
+		float(navigation_keys_pressed.has(KEY_D)) - float(navigation_keys_pressed.has(KEY_A)),
+		float(navigation_keys_pressed.has(KEY_W)) - float(navigation_keys_pressed.has(KEY_S)),
+		float(navigation_keys_pressed.has(KEY_E)) - float(navigation_keys_pressed.has(KEY_Q))
+	)
 
 
 func _local_to_world(local_point: Vector2) -> Vector2:
@@ -873,17 +910,11 @@ func set_guide_color(color: Color) -> void:
 func _process(delta: float) -> void:
 	if navigation_locked or command_shortcut_active or not has_focus():
 		return
-	var command_modifier: bool = Input.is_key_pressed(KEY_META) or Input.is_key_pressed(KEY_CTRL)
-	if command_modifier:
-		queue_redraw()
-		return
-	var pan_input := Vector2(
-		float(Input.is_key_pressed(KEY_D)) - float(Input.is_key_pressed(KEY_A)),
-		float(Input.is_key_pressed(KEY_W)) - float(Input.is_key_pressed(KEY_S))
-	)
+	var navigation_input := _navigation_input_vector()
+	var pan_input := Vector2(navigation_input.x, navigation_input.y)
 	if pan_input.length_squared() > 0.0:
 		view_center += pan_input.normalized() * PAN_SPEED / zoom * delta
-	var zoom_input := float(Input.is_key_pressed(KEY_E)) - float(Input.is_key_pressed(KEY_Q))
+	var zoom_input := navigation_input.z
 	if not is_zero_approx(zoom_input):
 		zoom = clampf(zoom * pow(ZOOM_RATE, zoom_input * delta), MIN_ZOOM, MAX_ZOOM)
 	queue_redraw()

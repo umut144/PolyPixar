@@ -15,6 +15,7 @@ func _init() -> void:
 	_test_contour_stroke_mesh()
 	_test_closed_contour_region_mesh()
 	_test_catch_parent_snapping()
+	_test_canvas_navigation_key_reset()
 	_test_contour_stroke_service()
 	_test_contour_stroke_robust_geometry()
 	_test_world_contour_settings()
@@ -456,6 +457,30 @@ func _test_catch_parent_snapping() -> void:
 	}])
 	canvas.set_catch_parent_component("parent")
 	_expect(canvas._snap_to_catch_parent(Vector2(5.0, 0.2)).distance_to(Vector2(5.0, 0.0)) < 0.01, "Catch Parent should snap drawing to a referenced Bézier segment.")
+	canvas.free()
+
+
+func _test_canvas_navigation_key_reset() -> void:
+	var canvas := ComponentCanvas.new()
+	var press_s := InputEventKey.new()
+	press_s.keycode = KEY_S
+	press_s.pressed = true
+	canvas._update_navigation_input(press_s)
+	_expect(canvas._navigation_input_vector() == Vector3(0.0, -1.0, 0.0), "Holding S should pan downward through the Canvas-owned navigation state.")
+	canvas._clear_navigation_input()
+	_expect(canvas._navigation_input_vector() == Vector3.ZERO, "Losing Canvas focus must clear a held navigation key so panning cannot continue automatically.")
+	var press_w := InputEventKey.new()
+	press_w.keycode = KEY_W
+	press_w.pressed = true
+	canvas._update_navigation_input(press_w)
+	var release_w := InputEventKey.new()
+	release_w.keycode = KEY_W
+	release_w.pressed = false
+	canvas._update_navigation_input(release_w)
+	_expect(canvas._navigation_input_vector() == Vector3.ZERO, "A navigation Key-Up event must stop Canvas movement immediately.")
+	canvas._update_navigation_input(press_s)
+	canvas.set_navigation_locked(true)
+	_expect(canvas._navigation_input_vector() == Vector3.ZERO, "Locking Canvas navigation must discard any held navigation keys.")
 	canvas.free()
 
 
