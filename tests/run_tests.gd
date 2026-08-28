@@ -20,6 +20,7 @@ func _init() -> void:
 	_test_contour_stroke_robust_geometry()
 	_test_world_contour_settings()
 	_test_component_scale_rebase()
+	_test_asset_scale_rebase()
 	_test_asset_authored_facing()
 	_test_multi_component_inspector()
 	_test_geometry_sampling_service()
@@ -934,6 +935,77 @@ func _test_component_scale_rebase() -> void:
 	application.free()
 
 
+func _test_asset_scale_rebase() -> void:
+	var component := _component()
+	component.merge({"id": "head", "name": "head", "visibility": true, "parent_component_id": "", "group_id": "hammer_group", "transform": {"position": Vector2(4.0, 3.0), "rotation": 20.0, "scale": Vector2.ONE, "pivot": Vector2(1.0, 2.0)}})
+	BezierTopology.add_point(component, Vector2(2.0, 1.0), "free", Vector2(0.5, -0.25))
+	var region := _component()
+	region.merge({"id": "attack_region", "type": "region", "region_type": "attack", "name": "attack_region", "visibility": true, "parent_component_id": "head", "group_id": "", "transform": {"position": Vector2(3.0, -1.0), "rotation": -10.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}})
+	BezierTopology.add_point(region, Vector2(1.0, 2.0), "linear")
+	var circle := {"id": "pommel", "name": "pommel", "visibility": true, "parent_component_id": "", "group_id": "", "draw_mode": "primitive", "geometry_source": "primitive", "primitive": {"type": "circle", "center": Vector2(1.0, -2.0), "diameter_cm": 5.0}, "points": [], "edges": [], "chains": [], "transform": {"position": Vector2(8.0, 9.0), "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}}
+	var reference := {"id": "reference", "name": "reference", "type": "reference", "source_asset_id": "source", "visibility": true, "parent_component_id": "", "group_id": "", "reference_instance_scale": Vector2(1.25, 0.75), "transform": {"position": Vector2(-2.0, 6.0), "rotation": 15.0, "scale": Vector2.ONE, "pivot": Vector2(2.0, -1.0)}}
+	var spine := AssetGuide.create("spine", "Spine", AssetGuide.SAMPLER_SPINE, "head")
+	BezierTopology.add_point(spine, Vector2(0.5, 1.5), "aligned")
+	var weapon_frame := AssetGuide.create_weapon_frame("grip", AssetGuide.GRIP_PRIMARY, "group", "hammer_group")
+	weapon_frame["transform"]["position"] = Vector2(3.0, 4.0)
+	weapon_frame["transform"]["rotation"] = 35.0
+	var asset := {
+		"id": "root_scale", "name": "Root Scale", "asset_type": "weapon", "visibility": true,
+		"asset_pivot": Vector2(5.0, 7.0), "root_scale": 3.6,
+		"groups": [{"id": "hammer_group", "name": "Hammer Group", "visibility": true, "parent_component_id": "", "transform": {"position": Vector2(10.0, 2.0), "rotation": -12.0, "scale": Vector2.ONE, "pivot": Vector2(1.0, 1.0)}}],
+		"components": [component, region, circle, reference], "guides": [spine, weapon_frame],
+		"animation": MotionWorkspace.create_default_animation_document()
+	}
+	var preview := AssetScaleRebaseService.root_transform(asset)
+	var component_point_before := ComponentHierarchy.world_transform(asset, "head") * Vector2(component["points"][0]["position"])
+	var region_point_before := ComponentHierarchy.world_transform(asset, "attack_region") * Vector2(region["points"][0]["position"])
+	var reference_point_before := ComponentHierarchy.world_transform(asset, "reference") * Vector2(9.0, -4.0)
+	var spine_point_before := ComponentHierarchy.world_transform(asset, "head") * Vector2(spine["points"][0]["position"])
+	var frame_before := ComponentHierarchy.group_world_transform(asset, "hammer_group") * ComponentHierarchy.local_transform(weapon_frame["transform"])
+	var result := AssetScaleRebaseService.rebase_asset(asset)
+	var rebased_component := ComponentHierarchy.component_by_id(asset, "head")
+	var rebased_region := ComponentHierarchy.component_by_id(asset, "attack_region")
+	var rebased_circle := ComponentHierarchy.component_by_id(asset, "pommel")
+	var rebased_reference := ComponentHierarchy.component_by_id(asset, "reference")
+	var component_point_after := ComponentHierarchy.world_transform(asset, "head") * Vector2(rebased_component["points"][0]["position"])
+	var region_point_after := ComponentHierarchy.world_transform(asset, "attack_region") * Vector2(rebased_region["points"][0]["position"])
+	var reference_point_after := ComponentHierarchy.world_transform(asset, "reference") * Vector2(9.0, -4.0)
+	var spine_point_after := ComponentHierarchy.world_transform(asset, "head") * Vector2(asset["guides"][0]["points"][0]["position"])
+	var frame_after := ComponentHierarchy.group_world_transform(asset, "hammer_group") * ComponentHierarchy.local_transform(asset["guides"][1]["transform"])
+	_expect(bool(result.get("valid", false)) and is_equal_approx(float(asset.get("root_scale", 0.0)), 1.0) and Vector2(asset.get("asset_pivot", Vector2.ZERO)) == Vector2(5.0, 7.0), "Root Scale Rebase should succeed atomically, normalize Scale to 1, and preserve the Asset Pivot.")
+	_expect(component_point_after.is_equal_approx(preview * component_point_before) and region_point_after.is_equal_approx(preview * region_point_before), "Root Scale Rebase should preserve the previewed world geometry of nested Components and semantic Regions.")
+	_expect(PrimitiveGeometryService.center(rebased_circle).is_equal_approx(Vector2(3.6, -7.2)) and is_equal_approx(float(rebased_circle.get("primitive", {}).get("diameter_cm", 0.0)), 18.0), "Root Scale Rebase should bake the same uniform factor into analytic primitive centers and diameters.")
+	_expect(reference_point_after.is_equal_approx(preview * reference_point_before) and Vector2(rebased_reference.get("reference_instance_scale", Vector2.ZERO)).is_equal_approx(Vector2(4.5, 2.7)) and Vector2(rebased_reference.get("transform", {}).get("pivot", Vector2.ZERO)) == Vector2(2.0, -1.0), "Root Scale Rebase should scale Reference instances without double-scaling their pivots.")
+	_expect(spine_point_after.is_equal_approx(preview * spine_point_before) and frame_after.origin.is_equal_approx(preview * frame_before.origin) and is_equal_approx(frame_after.get_rotation(), frame_before.get_rotation()), "Root Scale Rebase should preserve previewed Spine points and oriented Weapon frames.")
+	_expect(Vector2(rebased_component.get("transform", {}).get("scale", Vector2.ZERO)) == Vector2.ONE, "Root Scale Rebase should remain independent from Component Scale Rebase.")
+
+	var blocked := asset.duplicate(true)
+	blocked["root_scale"] = 2.0
+	blocked["animation"]["states"][0]["cycle_duration"] = 9.0
+	var blocked_snapshot := blocked.duplicate(true)
+	_expect(not bool(AssetScaleRebaseService.rebase_asset(blocked).get("valid", true)) and blocked == blocked_snapshot, "Non-default authored Motion should block Root Scale Rebase without partially mutating the Asset.")
+
+	var application = load("res://scripts/main.gd").new()
+	application._build_ui()
+	application.history_coalesce_timer = Timer.new()
+	application.add_child(application.history_coalesce_timer)
+	var ui_asset := asset.duplicate(true)
+	ui_asset["root_scale"] = 3.6
+	var ui_assets: Array[Dictionary] = [ui_asset]
+	application.assets = ui_assets
+	application.selected_asset_id = "root_scale"
+	application.selected_component_id = ""
+	application._render_inspector()
+	_expect(is_instance_valid(application.asset_root_scale_field) and is_equal_approx(application.asset_root_scale_field.value, 3.6) and is_instance_valid(application.asset_root_scale_rebase_button) and not application.asset_root_scale_rebase_button.disabled, "The Root Asset Inspector should expose Scale 3.6 and enable its dedicated Rebase action.")
+	application._on_rebase_asset_root_scale_pressed()
+	_expect(is_equal_approx(float(application._get_asset("root_scale").get("root_scale", 0.0)), 1.0) and application.asset_root_scale_rebase_button.disabled, "The Root Asset Inspector Rebase action should bake Scale 3.6 and return the field to 1.")
+	application._undo()
+	_expect(is_equal_approx(float(application._get_asset("root_scale").get("root_scale", 0.0)), 3.6), "Undo should restore the complete pre-Rebase Root Scale authoring state.")
+	application._redo()
+	_expect(is_equal_approx(float(application._get_asset("root_scale").get("root_scale", 0.0)), 1.0), "Redo should restore the atomically rebased Root Scale state.")
+	application.free()
+
+
 func _test_asset_authored_facing() -> void:
 	var serialized_values := ["left", "right", "neutral", "top", "down"]
 	for serialized_value in serialized_values:
@@ -1105,7 +1177,7 @@ func _test_geometry_sampling_service() -> void:
 	_expect(not bool(GeometrySamplingService.generate(open_component).get("valid", true)), "An open contour should fail visibly at the mesh-pipeline Sampling boundary.")
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
-	_expect(application._has_supported_schema({"schema_version": 52}) and application._has_supported_schema({"schema_version": 51}) and not application._has_supported_schema({"schema_version": 53}), "Schema 52 should keep current and older World documents readable and reject unknown future schemas.")
+	_expect(application._has_supported_schema({"schema_version": 53}) and application._has_supported_schema({"schema_version": 52}) and not application._has_supported_schema({"schema_version": 54}), "Schema 53 should keep current and older World documents readable and reject unknown future schemas.")
 	_expect(application._normalize_component_draw_mode("ribbon", 39) == "contour" and application._normalize_component_draw_mode("contour", 42) == "contour", "Schema-42 loading must retain the explicit legacy Ribbon-to-Contour migration boundary.")
 	_expect(application._normalize_component_draw_mode("ribbon", 42) == "ribbon", "Current-schema Ribbon data must remain visibly invalid instead of receiving a silent backward fallback.")
 	var arranged_round_trip: Dictionary = application._normalize_sampling_bake(application._serialize_sampling_bake(arranged_result))
@@ -1116,7 +1188,7 @@ func _test_geometry_sampling_service() -> void:
 	baked_result["bake_id"] = "bake_test"
 	geometry_document["sampling"]["bakes"][GeometrySamplingService.ADAPTIVE] = baked_result
 	var serialized_geometry: Dictionary = application._serialize_geometry_document(geometry_document)
-	_expect(int(serialized_geometry.get("schema_version", 0)) == 52 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-52 JSON arrays.")
+	_expect(int(serialized_geometry.get("schema_version", 0)) == 53 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-53 JSON arrays.")
 	var normalized_geometry: Dictionary = application._normalize_geometry_document(serialized_geometry, "asset_1", "component_1")
 	_expect(normalized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Vector2, "Sampling bake loading should restore local sample positions as Vector2 values.")
 	_expect(normalized_geometry["sampling"]["bakes"].size() == 1, "Sampling should retain one Adaptive Bake.")
@@ -2009,6 +2081,10 @@ func _test_runtime_export_service() -> void:
 	scaled_export_asset["components"][0]["transform"]["scale"] = Vector2(2.0, 1.0)
 	var scaled_export_result := RuntimeExportService.build_manifest(scaled_export_asset, {"component_a": source, "component_b": source})
 	_expect(not bool(scaled_export_result.get("valid", true)) and str(scaled_export_result.get("errors", [])).contains("Component Scale must be rebased to (1, 1) before Runtime Export."), "Runtime export must explicitly reject non-rebased authored Component Scale without a fallback.")
+	var root_scaled_export_asset: Dictionary = asset.duplicate(true)
+	root_scaled_export_asset["root_scale"] = 3.6
+	var root_scaled_export_result := RuntimeExportService.build_manifest(root_scaled_export_asset, {"component_a": source, "component_b": source})
+	_expect(not bool(root_scaled_export_result.get("valid", true)) and str(root_scaled_export_result.get("errors", [])).contains("Root Asset Scale must be rebased to 1 before Runtime Export."), "Runtime export must explicitly reject a non-rebased Root Asset Scale without silently changing package dimensions.")
 	var open_contour_component: Dictionary = body.duplicate(true)
 	open_contour_component["draw_mode"] = "contour"
 	var open_contour_asset := {"id": "contour_asset", "name": "Contour Asset", "asset_type": "character", "visibility": true, "asset_pivot": Vector2.ZERO, "components": [open_contour_component]}
@@ -2677,7 +2753,7 @@ func _test_motion_act_evaluator() -> void:
 	var normalized: Dictionary = application._normalize_motion_act({"id": "act_7", "parameters": {"direction": [0.0, 2.0], "distance": 12.0}}, "fallback")
 	_expect(Vector2(normalized.get("parameters", {}).get("direction", Vector2.ZERO)) == Vector2(0.0, 2.0), "Persisted Slide direction arrays should normalize back to Vector2 values.")
 	var serialized: Dictionary = application._serialize_motion_act(normalized)
-	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 52, "Act persistence should serialize vectors as JSON arrays using schema 52.")
+	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 53, "Act persistence should serialize vectors as JSON arrays using schema 53.")
 	var normalized_jump: Dictionary = application._normalize_motion_act({"id": "act_8", "primitive": "jump", "parameters": {"direction": [1.0, 0.0], "distance": 7.0, "height": 2.5, "arc": "snappy"}}, "fallback")
 	var serialized_jump: Dictionary = application._serialize_motion_act(normalized_jump)
 	_expect(str(serialized_jump.get("primitive", "")) == MotionActEvaluator.JUMP and is_equal_approx(float(serialized_jump.get("parameters", {}).get("height", 0.0)), 2.5) and str(serialized_jump.get("parameters", {}).get("arc", "")) == MotionActEvaluator.JUMP_ARC_SNAPPY, "Jump-specific parameters should survive normalization and serialization.")

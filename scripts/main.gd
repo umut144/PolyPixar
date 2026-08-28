@@ -8,7 +8,7 @@ const EXPORT_SUBMODULES: Array[String] = []
 const MOTION_SUBMODULES := ["Animation", "Path", "Act", "Sequence"]
 const WORLDS_ROOT := "res://worlds"
 const CONFIG_PATH := "res://configs/app_config.json"
-const SCHEMA_VERSION := 52
+const SCHEMA_VERSION := 53
 const REGION_TYPES := ["attack", "hurt", "collision"]
 const REGION_COLOR := Color("#ef6c78")
 const MAX_HISTORY_SIZE := 100
@@ -137,6 +137,8 @@ var selected_edge_ids: Array[String] = []
 var selected_point_id := ""
 var selected_point_ids: Array[String] = []
 var asset_pivot_fields: Dictionary = {}
+var asset_root_scale_field: SpinBox
+var asset_root_scale_rebase_button: Button
 var asset_scale_rebase_button: Button
 var asset_authored_facing_option: OptionButton
 var bezier_point_move_start_positions: Dictionary = {}
@@ -2286,6 +2288,7 @@ func _save_world() -> void:
 			"authored_facing": AssetPresentation.serialize_authored_facing(asset.get("authored_facing", AssetPresentation.AuthoredFacing.NEUTRAL)),
 			"visibility": bool(asset.get("visibility", true)),
 			"asset_pivot": _serialize_vector(_asset_pivot(asset)),
+			"root_scale": AssetScaleRebaseService.root_scale(asset),
 			"reference_image": _serialize_reference_image(asset.get("reference_image", {})),
 			"animation": MotionWorkspace.normalize_animation_document(asset.get("animation", {})).duplicate(true),
 			"components": [],
@@ -2696,6 +2699,7 @@ func _load_world(world_entry: String, persist_as_last := true) -> bool:
 			"authored_facing": AssetPresentation.deserialize_authored_facing(asset_data.get("authored_facing", "neutral")),
 			"visibility": bool(asset_data.get("visibility", true)),
 			"asset_pivot": _deserialize_vector(asset_data.get("asset_pivot", [0.0, 0.0]), Vector2.ZERO),
+			"root_scale": _deserialize_asset_root_scale(asset_data.get("root_scale", 1.0)),
 			"reference_image": _normalize_reference_image(asset_data.get("reference_image", {})),
 			"animation": MotionWorkspace.normalize_animation_document(asset_data.get("animation", {})),
 			"components": components,
@@ -3178,6 +3182,13 @@ func _default_component_transform() -> Dictionary:
 
 func _asset_pivot(asset: Dictionary) -> Vector2:
 	return _deserialize_vector(asset.get("asset_pivot", [0.0, 0.0]), Vector2.ZERO)
+
+
+func _deserialize_asset_root_scale(value) -> float:
+	if typeof(value) not in [TYPE_INT, TYPE_FLOAT]:
+		return 1.0
+	var scale := float(value)
+	return scale if is_finite(scale) and scale > AssetScaleRebaseService.SCALE_EPSILON else 1.0
 
 
 func _serialize_transform(transform: Dictionary) -> Dictionary:
@@ -7020,7 +7031,7 @@ func _confirm_asset_creation() -> void:
 	_record_direct_change()
 	var asset_id := "asset_%d" % next_asset_id
 	next_asset_id += 1
-	assets.append({"id": asset_id, "name": asset_name, "asset_type": _create_submodule_asset_type(active_create_submodule), "authored_facing": AssetPresentation.AuthoredFacing.NEUTRAL, "visibility": true, "asset_pivot": Vector2.ZERO, "reference_image": _default_reference_image(), "animation": MotionWorkspace.create_default_animation_document(), "components": [], "groups": [], "guides": []})
+	assets.append({"id": asset_id, "name": asset_name, "asset_type": _create_submodule_asset_type(active_create_submodule), "authored_facing": AssetPresentation.AuthoredFacing.NEUTRAL, "visibility": true, "asset_pivot": Vector2.ZERO, "root_scale": 1.0, "reference_image": _default_reference_image(), "animation": MotionWorkspace.create_default_animation_document(), "components": [], "groups": [], "guides": []})
 	selected_asset_id = asset_id
 	selected_component_id = ""
 	selected_component_ids.clear()
@@ -12223,6 +12234,8 @@ func _render_inspector() -> void:
 	_clear(inspector_content)
 	transform_fields.clear()
 	asset_pivot_fields.clear()
+	asset_root_scale_field = null
+	asset_root_scale_rebase_button = null
 	asset_scale_rebase_button = null
 	asset_authored_facing_option = null
 	if active_module == "Export":
@@ -12297,7 +12310,9 @@ func _render_inspector() -> void:
 		var asset_pivot := _asset_pivot(asset)
 		_add_asset_pivot_field(asset_transform_grid, "Pivot X (cm)", _editor_units_to_world(asset_pivot.x), "pivot_x")
 		_add_asset_pivot_field(asset_transform_grid, "Pivot Y (cm)", _editor_units_to_world(asset_pivot.y), "pivot_y")
+		_add_asset_root_scale_field(asset_transform_grid, AssetScaleRebaseService.root_scale(asset))
 		inspector_content.add_child(asset_transform_grid)
+		_render_asset_root_scale_rebase_inspector(asset)
 		_render_asset_scale_rebase_inspector(asset)
 		var reference_image := _normalize_reference_image(asset.get("reference_image", {}))
 		inspector_content.add_child(_create_inspector_section("Reference Image"))
@@ -14311,6 +14326,26 @@ func _add_asset_pivot_field(grid: GridContainer, label_text: String, value: floa
 	grid.add_child(field)
 
 
+func _add_asset_root_scale_field(grid: GridContainer, value: float) -> void:
+	var label := Label.new()
+	label.text = "Scale"
+	label.add_theme_font_size_override("font_size", 10)
+	label.add_theme_color_override("font_color", Color("#7f8a9b"))
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	grid.add_child(label)
+	asset_root_scale_field = SpinBox.new()
+	asset_root_scale_field.min_value = 0.01
+	asset_root_scale_field.max_value = 100.0
+	asset_root_scale_field.step = 0.01
+	asset_root_scale_field.custom_arrow_step = 0.1
+	asset_root_scale_field.set_value_no_signal(value)
+	asset_root_scale_field.custom_minimum_size = Vector2(96, 26)
+	asset_root_scale_field.add_theme_font_size_override("font_size", 11)
+	asset_root_scale_field.tooltip_text = "Positive uniform preview Scale around the Asset Pivot. Rebase before Runtime Export."
+	asset_root_scale_field.value_changed.connect(_on_asset_root_scale_changed)
+	grid.add_child(asset_root_scale_field)
+
+
 func _add_transform_field(grid: GridContainer, label_text: String, value: float, property_name: String, step: float) -> void:
 	var label := Label.new()
 	label.text = label_text
@@ -14551,8 +14586,30 @@ func _on_ellipse_primitive_diameter_changed(value: float, property_name: String)
 	_render_canvas_context()
 
 
+func _render_asset_root_scale_rebase_inspector(asset: Dictionary) -> void:
+	inspector_content.add_child(_create_inspector_section("Asset Scale Rebase"))
+	var analysis := AssetScaleRebaseService.analyze_asset(asset)
+	var blockers: Array = analysis.get("blockers", [])
+	if bool(analysis.get("required", false)):
+		inspector_content.add_child(_create_inspector_field_label("Root Scale %s → 1" % _format_scale_value(float(analysis.get("scale", 1.0)))))
+	else:
+		inspector_content.add_child(_create_inspector_field_label("Root Scale is normalized (1)."))
+	for blocker in blockers:
+		var blocker_label := _create_inspector_field_label("• Blocked: %s" % str(blocker))
+		blocker_label.add_theme_color_override("font_color", Color("#ef8354"))
+		inspector_content.add_child(blocker_label)
+	asset_root_scale_rebase_button = Button.new()
+	asset_root_scale_rebase_button.text = "Rebase Asset Scale"
+	asset_root_scale_rebase_button.custom_minimum_size = Vector2(0, 28)
+	asset_root_scale_rebase_button.focus_mode = Control.FOCUS_NONE
+	asset_root_scale_rebase_button.disabled = not bool(analysis.get("can_rebase", false))
+	asset_root_scale_rebase_button.tooltip_text = "Bake uniform Root Scale into Components, Groups, References, Guides, Weapon Frames, and Regions." if blockers.is_empty() else str(blockers[0])
+	asset_root_scale_rebase_button.pressed.connect(_on_rebase_asset_root_scale_pressed)
+	inspector_content.add_child(asset_root_scale_rebase_button)
+
+
 func _render_asset_scale_rebase_inspector(asset: Dictionary) -> void:
-	inspector_content.add_child(_create_inspector_section("Scale Rebase"))
+	inspector_content.add_child(_create_inspector_section("Component Scale Rebase"))
 	var analysis := ComponentScaleRebaseService.analyze_asset(asset)
 	var candidates: Array = analysis.get("candidates", [])
 	var blockers: Array = analysis.get("blockers", [])
@@ -14608,6 +14665,55 @@ func _on_rebase_asset_scales_pressed() -> void:
 	weighting_preview = {}
 	weighting_preview_key = ""
 	_show_status_message("Rebased %d Component scale(s) in %s." % [result.get("rebased_component_ids", []).size(), str(asset.get("name", "Asset"))])
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _on_asset_root_scale_changed(value: float) -> void:
+	var asset := _get_asset(selected_asset_id)
+	if asset.is_empty() or not is_finite(value) or value <= AssetScaleRebaseService.SCALE_EPSILON:
+		return
+	if is_equal_approx(AssetScaleRebaseService.root_scale(asset), value):
+		return
+	_record_coalesced_change()
+	asset["root_scale"] = value
+	_invalidate_batch_status()
+	if is_instance_valid(asset_root_scale_rebase_button):
+		var analysis := AssetScaleRebaseService.analyze_asset(asset)
+		asset_root_scale_rebase_button.disabled = not bool(analysis.get("can_rebase", false))
+		asset_root_scale_rebase_button.tooltip_text = "Bake uniform Root Scale into Components, Groups, References, Guides, Weapon Frames, and Regions." if analysis.get("blockers", []).is_empty() else str(analysis.get("blockers", [""])[0])
+	_render_canvas_context()
+
+
+func _on_rebase_asset_root_scale_pressed() -> void:
+	var asset := _get_asset(selected_asset_id)
+	var analysis := AssetScaleRebaseService.analyze_asset(asset)
+	if asset.is_empty() or not bool(analysis.get("can_rebase", false)):
+		return
+	_record_direct_change()
+	var result := AssetScaleRebaseService.rebase_asset(asset)
+	if not bool(result.get("valid", false)):
+		_show_status_message(str(result.get("errors", ["Asset Scale Rebase failed."])[0]))
+		return
+	geometry_sampling_preview = {}
+	geometry_sampling_preview_key = ""
+	geometry_sampling_preview_state = "idle"
+	geometry_sampling_preview_revision += 1
+	geometry_seeding_preview = {}
+	geometry_seeding_preview_key = ""
+	geometry_seeding_preview_state = "idle"
+	geometry_seeding_preview_revision += 1
+	geometry_meshing_preview = {}
+	geometry_meshing_preview_key = ""
+	geometry_meshing_preview_state = "idle"
+	geometry_meshing_preview_revision += 1
+	geometry_uv_mapping_preview = {}
+	geometry_uv_mapping_preview_key = ""
+	weighting_preview = {}
+	weighting_preview_key = ""
+	_invalidate_batch_status()
+	_show_status_message("Rebased Root Scale %s in %s." % [_format_scale_value(float(analysis.get("scale", 1.0))), str(asset.get("name", "Asset"))])
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
@@ -15295,7 +15401,7 @@ func _render_canvas_context() -> void:
 			canvas_view.set_context(str(selected_group.get("name", "Group")))
 			canvas_view.set_interaction_state("")
 			canvas_view.set_tool_mode("")
-			canvas_view.set_component_transform(ComponentHierarchy.group_world_transform_record(asset, selected_group_id))
+			canvas_view.set_component_transform(_asset_preview_world_record(asset, ComponentHierarchy.group_world_transform_record(asset, selected_group_id)))
 			canvas_view.set_reference_shapes(_build_reference_shapes(asset))
 			canvas_view.set_display_polygon([])
 			canvas_view.set_bezier_geometry([], [], [])
@@ -15330,7 +15436,7 @@ func _render_canvas_context() -> void:
 		canvas_view.set_context(str(component.get("name", "Reference")))
 		canvas_view.set_interaction_state("transform")
 		canvas_view.set_tool_mode("")
-		canvas_view.set_component_transform(ComponentHierarchy.world_transform_record(asset, selected_component_id))
+		canvas_view.set_component_transform(_asset_preview_world_record(asset, ComponentHierarchy.world_transform_record(asset, selected_component_id)))
 		canvas_view.set_reference_shapes(_build_reference_shapes(asset))
 		canvas_view.set_display_polygon([])
 		canvas_view.set_bezier_geometry([], [], [])
@@ -15350,7 +15456,7 @@ func _render_canvas_context() -> void:
 		canvas_view.set_draw_point_mode(active_draw_point_mode)
 	else:
 		canvas_view.set_tool_mode("")
-	var component_transform := ComponentHierarchy.world_transform_record(asset, selected_component_id)
+	var component_transform := _asset_preview_world_record(asset, ComponentHierarchy.world_transform_record(asset, selected_component_id))
 	component_transform["visibility"] = bool(asset.get("visibility", true)) and _effective_component_visibility(asset, component)
 	component_transform["z_index"] = _effective_component_z_index(asset, component)
 	canvas_view.set_component_transform(component_transform)
@@ -15387,7 +15493,7 @@ func _render_spine_canvas(asset: Dictionary, guide: Dictionary, drawing: bool) -
 	if target_component.is_empty():
 		canvas_view.set_component_transform(_default_component_transform())
 	else:
-		var target_transform := ComponentHierarchy.world_transform_record(asset, target_component_id)
+		var target_transform := _asset_preview_world_record(asset, ComponentHierarchy.world_transform_record(asset, target_component_id))
 		target_transform["visibility"] = bool(asset.get("visibility", true)) and bool(guide.get("visibility", true))
 		canvas_view.set_component_transform(target_transform)
 	if drawing:
@@ -15417,7 +15523,19 @@ func _weapon_guide_scope_world_transform(asset: Dictionary, guide: Dictionary) -
 
 func _weapon_guide_world_transform_record(asset: Dictionary, guide: Dictionary) -> Dictionary:
 	var affine := _weapon_guide_scope_world_transform(asset, guide) * ComponentHierarchy.local_transform(guide.get("transform", {}))
-	return ComponentHierarchy.transform_record_from_affine(affine, Vector2.ZERO)
+	return _asset_preview_world_record(asset, ComponentHierarchy.transform_record_from_affine(affine, Vector2.ZERO))
+
+
+func _asset_preview_world_record(asset: Dictionary, record: Dictionary) -> Dictionary:
+	var pivot := Vector2(record.get("pivot", Vector2.ZERO))
+	var affine := AssetScaleRebaseService.root_transform(asset) * ComponentHierarchy.local_transform(record)
+	return ComponentHierarchy.transform_record_from_affine(affine, pivot)
+
+
+func _asset_unpreview_world_record(asset: Dictionary, record: Dictionary) -> Dictionary:
+	var pivot := Vector2(record.get("pivot", Vector2.ZERO))
+	var affine := AssetScaleRebaseService.root_transform(asset).affine_inverse() * ComponentHierarchy.local_transform(record)
+	return ComponentHierarchy.transform_record_from_affine(affine, pivot)
 
 
 func _render_weapon_guide_canvas(asset: Dictionary, guide: Dictionary) -> void:
@@ -15479,7 +15597,7 @@ func _build_reference_shapes(asset: Dictionary, excluded_component_id := "", emp
 			"edges": component.get("edges", []).duplicate(true),
 			"chains": component.get("chains", []).duplicate(true),
 			"closed": primitive_component or BezierTopology.outer_chain_closed(component),
-			"transform": ComponentHierarchy.world_transform_record(asset, str(component.get("id", ""))),
+			"transform": _asset_preview_world_record(asset, ComponentHierarchy.world_transform_record(asset, str(component.get("id", "")))),
 			"visibility": asset_is_visible and _effective_component_visibility(asset, component),
 			"z_index": _effective_component_z_index(asset, component),
 			"emphasized": str(component["id"]) == emphasized_component_id,
@@ -15528,12 +15646,12 @@ func _reference_asset_shapes(target_asset: Dictionary, reference: Dictionary, em
 	var source_asset := _get_asset(str(reference.get("source_asset_id", "")))
 	if source_asset.is_empty() or source_asset == target_asset:
 		return result
-	var reference_transform := ComponentHierarchy.world_transform_record(target_asset, str(reference.get("id", "")))
+	var reference_transform := _asset_preview_world_record(target_asset, ComponentHierarchy.world_transform_record(target_asset, str(reference.get("id", ""))))
 	for source_component in source_asset.get("components", []):
 		if _is_reference_component(source_component) or not bool(source_component.get("visibility", true)):
 			continue
 		var points: Array[Vector2] = []
-		var source_transform := ComponentHierarchy.world_transform_record(source_asset, str(source_component.get("id", "")))
+		var source_transform := _asset_preview_world_record(source_asset, ComponentHierarchy.world_transform_record(source_asset, str(source_component.get("id", ""))))
 		var contour := PrimitiveGeometryService.contour(source_component) if PrimitiveGeometryService.has_analytic_shape(source_component) else BezierTopology.outer_control_polygon(source_component)
 		for point in contour:
 			points.append(_transform_point(_transform_point(Vector2(point), source_transform), reference_transform))
@@ -15712,12 +15830,13 @@ func _on_asset_pivot_changed(pivot: Vector2) -> void:
 
 func _on_transform_changed(transform: Dictionary) -> void:
 	var asset := _get_asset(selected_asset_id)
+	var authored_world_transform := _asset_unpreview_world_record(asset, transform)
 	if not selected_guide_id.is_empty():
 		var guide := _get_guide(asset, selected_guide_id)
 		if guide.is_empty() or not AssetGuide.is_weapon_frame(str(guide.get("guide_type", ""))):
 			return
 		_record_coalesced_change()
-		var local_affine := _weapon_guide_scope_world_transform(asset, guide).affine_inverse() * ComponentHierarchy.local_transform(transform)
+		var local_affine := _weapon_guide_scope_world_transform(asset, guide).affine_inverse() * ComponentHierarchy.local_transform(authored_world_transform)
 		var local_record := ComponentHierarchy.transform_record_from_affine(local_affine, Vector2.ZERO)
 		local_record["scale"] = Vector2.ONE
 		local_record["pivot"] = Vector2.ZERO
@@ -15729,14 +15848,14 @@ func _on_transform_changed(transform: Dictionary) -> void:
 		if group.is_empty():
 			return
 		_record_coalesced_change()
-		group["transform"] = ComponentHierarchy.group_local_transform_from_world_record(asset, selected_group_id, transform)
+		group["transform"] = ComponentHierarchy.group_local_transform_from_world_record(asset, selected_group_id, authored_world_transform)
 		_render_inspector()
 		_render_canvas_context()
 		return
 	var component := _get_component(asset, selected_component_id)
 	if not component.is_empty():
 		_record_coalesced_change()
-		var local_transform := ComponentHierarchy.local_transform_from_world_record(asset, selected_component_id, transform)
+		var local_transform := ComponentHierarchy.local_transform_from_world_record(asset, selected_component_id, authored_world_transform)
 		component["transform"] = local_transform
 		var transform_position: Vector2 = local_transform.get("position", Vector2.ZERO)
 		var transform_scale: Vector2 = local_transform.get("scale", Vector2.ONE)
@@ -15850,7 +15969,7 @@ func _on_bezier_points_moved(point_ids: Array, world_delta: Vector2) -> void:
 	if bezier_point_move_component_id != selected_component_id or bezier_point_move_guide_id != selected_guide_id or bezier_point_move_start_positions.is_empty():
 		_on_bezier_points_move_started(point_ids)
 	var transform_component_id := str(guide.get("scope", {}).get("component_id", "")) if not guide.is_empty() else selected_component_id
-	var transform := ComponentHierarchy.world_transform_record(asset, transform_component_id)
+	var transform := _asset_preview_world_record(asset, ComponentHierarchy.world_transform_record(asset, transform_component_id))
 	var transform_rotation := deg_to_rad(float(transform.get("rotation", 0.0)))
 	var transform_scale: Vector2 = transform.get("scale", Vector2.ONE)
 	var local_delta := world_delta.rotated(-transform_rotation)

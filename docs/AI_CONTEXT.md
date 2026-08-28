@@ -207,6 +207,15 @@ Component hierarchy. Region rows use a red semantic highlight, and the active
 Region's Bézier boundary, Points, selection, and handles use the same red color
 family instead of the cyan visual-geometry color.
 
+World schema 53 adds a positive uniform `root_scale` to the Asset root's
+`Asset Transform` Inspector. It previews the complete Asset around the
+unchanged Asset Pivot, including Components, Groups, References, Guides,
+Weapon frames, and Regions. `Rebase Asset Scale` atomically bakes that factor
+into canonical local coordinates and Reference instance scale, then resets the
+field to exactly `1`. Default Motion is supported; authored non-default Motion
+blocks the operation until a dedicated scale conversion exists. Runtime Export
+also blocks while `root_scale` is not `1`; it never applies the factor silently.
+
 `catalog.json` has its own schema version and is derived automatically from
 visible Assets. Each `asset_key` is the lower-snake-case derivation of the full
 Asset display name and is never authored independently. Creation and rename

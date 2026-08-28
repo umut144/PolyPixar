@@ -28,6 +28,11 @@ its previous complete package is retained on disk but is not advertised until
 it validates again. A failed write keeps the previous complete package. All
 numbers must be finite.
 
+The editor's schema-53 `root_scale` is authoring state only and is never part
+of a Runtime Manifest. It must be rebased to exactly `1` before export;
+Runtime Export rejects a pending Root Scale instead of silently changing the
+package dimensions.
+
 ## Compatibility policy
 
 Catalog `schema_version` must equal `1`; Manifest `schema_version` must equal

@@ -308,6 +308,19 @@ visual tree placement. Region selection and Canvas Bézier presentation use the
 shared red semantic-region color family, while ordinary geometry retains its
 cyan/yellow editing language.
 
+World schema 53 adds an authoring-only, positive uniform Asset-root Scale.
+Canvas presentation prefixes every Asset-space transform with a scale around
+the unchanged Asset Pivot, while inspector fields continue to expose canonical
+source coordinates. The atomic Root Scale Rebase multiplies each local
+translation, owned Bézier coordinate/handle, primitive axis, Guide coordinate,
+and Weapon-frame translation exactly once. Root placements are scaled around
+the Asset Pivot; nested placements are scaled around their local origin.
+Reference geometry uses its instance scale, so its transform Pivot remains
+unchanged during the bake. Component Scale is not modified, keeping schema
+42's independent Component Scale Rebase valid before or after this operation.
+Non-default Motion is an explicit blocker. Accepted derived data is not
+rewritten and becomes stale through its existing source fingerprints.
+
 Sampling results carry their own algorithm version independently of the
 World schema. The junction-aware version invalidates pre-arrangement flat
 Cut Bakes at Sampling, which in turn makes Seeding stale before Meshing can

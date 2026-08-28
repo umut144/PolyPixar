@@ -1,4 +1,28 @@
-# Component Scale Rebase
+# Scale Rebase
+
+## Asset Root Scale
+
+World schema 53 adds `Scale` to the root Asset Inspector. It is one positive
+uniform factor (for example, `3.6` means 3.6 times the current size), previewed
+around the unchanged Asset Pivot across the complete Asset: Components,
+Groups, References, Guides, Weapon frames, and semantic Regions.
+
+`Rebase Asset Scale` atomically bakes the preview into canonical authoring
+data and resets Root Scale to exactly `1`. Local positions, Bézier Points and
+handles, primitive centers and diameters, Guide positions, and Weapon-frame
+positions are multiplied exactly once. Root placements are scaled around the
+Asset Pivot; nested placements use their local origin. References multiply
+their instance scale while preserving their transform Pivot. Component Scale
+is deliberately unchanged, so the Component workflow below can be used before
+or after Root Rebase.
+
+Default Motion documents are safe. Any authored non-default Motion blocks the
+whole Root Rebase because its spatial values do not yet have an exact scale
+conversion. Runtime Export likewise rejects a Root Scale other than `1`.
+Accepted derived geometry is not rewritten; existing fingerprints make it
+stale for an explicit rebuild.
+
+## Component Scale
 
 World schema 42 adds an explicit Asset-level Scale Rebase workflow. Component
 Scale is an authoring convenience; Rebase bakes it into owned source geometry
