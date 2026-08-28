@@ -11,7 +11,11 @@ const CONFIG_PATH := "res://configs/app_config.json"
 const SCHEMA_VERSION := 56
 const DEFAULT_PROJECTION_DEPTH_CM := 10.0
 const REGION_TYPES := ["attack", "hurt", "collision"]
-const REGION_COLOR := Color("#ef6c78")
+const REGION_COLORS := {
+	"attack": Color("#ef6c78"),
+	"hurt": Color("#68d391"),
+	"collision": Color("#f2994a")
+}
 const MAX_HISTORY_SIZE := 100
 const DRAW_MODES := ["closed_loop", "contour", "primitive"]
 const GRID_BOX_TOOL_UNITS := 0.5
@@ -8898,7 +8902,7 @@ func _render_region_outliner_row(container: VBoxContainer, asset: Dictionary, re
 	region_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	region_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	region_button.focus_mode = Control.FOCUS_NONE
-	_style_region_outliner_button(region_button, asset_id == selected_asset_id and region_id == selected_component_id)
+	_style_region_outliner_button(region_button, asset_id == selected_asset_id and region_id == selected_component_id, str(region.get("region_type", "attack")))
 	region_button.pressed.connect(_select_component.bind(asset_id, region_id, true))
 	region_row.add_child(region_button)
 
@@ -10211,21 +10215,26 @@ func _style_guide_outliner_button(button: Button, selected: bool, guide_type := 
 	button.add_theme_color_override("font_focus_color", selected_text_color if selected else guide_color.lightened(0.35))
 
 
-func _style_region_outliner_button(button: Button, selected: bool) -> void:
+func _region_color(region_type: String) -> Color:
+	return REGION_COLORS.get(region_type, REGION_COLORS["attack"])
+
+
+func _style_region_outliner_button(button: Button, selected: bool, region_type := "attack") -> void:
+	var region_color := _region_color(region_type)
 	var normal := StyleBoxFlat.new()
-	normal.bg_color = REGION_COLOR if selected else REGION_COLOR.darkened(0.68)
-	normal.border_color = REGION_COLOR.lightened(0.18) if selected else REGION_COLOR.darkened(0.42)
+	normal.bg_color = region_color if selected else region_color.darkened(0.68)
+	normal.border_color = region_color.lightened(0.18) if selected else region_color.darkened(0.42)
 	normal.set_border_width_all(1)
 	var hover := normal.duplicate()
-	hover.bg_color = REGION_COLOR.lightened(0.12) if selected else REGION_COLOR.darkened(0.52)
+	hover.bg_color = region_color.lightened(0.12) if selected else region_color.darkened(0.52)
 	var pressed := normal.duplicate()
-	pressed.bg_color = REGION_COLOR.darkened(0.08) if selected else REGION_COLOR.darkened(0.4)
+	pressed.bg_color = region_color.darkened(0.08) if selected else region_color.darkened(0.4)
 	button.add_theme_stylebox_override("normal", normal)
 	button.add_theme_stylebox_override("hover", hover)
 	button.add_theme_stylebox_override("pressed", pressed)
 	button.add_theme_stylebox_override("focus", normal)
 	var text_color := Color("#f4f7ff")
-	button.add_theme_color_override("font_color", text_color if selected else REGION_COLOR.lightened(0.38))
+	button.add_theme_color_override("font_color", text_color if selected else region_color.lightened(0.38))
 	button.add_theme_color_override("font_hover_color", text_color)
 	button.add_theme_color_override("font_pressed_color", text_color)
 	button.add_theme_color_override("font_focus_color", text_color)
@@ -15527,7 +15536,7 @@ func _render_canvas_context() -> void:
 	canvas_view.set_component_transform(component_transform)
 	canvas_view.set_reference_shapes(_build_reference_shapes(asset, selected_component_id))
 	if _is_region(component):
-		canvas_view.set_bezier_color_override(REGION_COLOR)
+		canvas_view.set_bezier_color_override(_region_color(str(component.get("region_type", "attack"))))
 	canvas_view.set_component_draw_mode(str(component.get("draw_mode", "closed_loop")))
 	canvas_view.set_point_numbers_visible(bool(component.get("show_point_numbers", false)))
 	var catch_parent_id := str(component.get("parent_component_id", ""))

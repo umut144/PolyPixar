@@ -318,9 +318,9 @@ canonical Closed Loop Bézier topology. Regions are excluded from visual Mesh
 batch candidates and are triangulated only for validation and Runtime Export.
 The Create Outliner projects them into a dedicated flat `Regions` category;
 their authored Component-or-Group scope remains document data rather than
-visual tree placement. Region selection and Canvas Bézier presentation use the
-shared red semantic-region color family, while ordinary geometry retains its
-cyan/yellow editing language.
+visual tree placement. Region selection and Canvas Bézier presentation use a
+role-specific semantic palette—red Attack, green Hurt, and orange Collision—
+while ordinary geometry retains its cyan/yellow editing language.
 
 World schema 53 adds an authoring-only, positive uniform Asset-root Scale.
 Canvas presentation prefixes every Asset-space transform with a scale around

@@ -2427,16 +2427,24 @@ func _test_asset_guides() -> void:
 	application._create_region("asset_1", "component", "component_1", "attack")
 	var attack_region: Dictionary = application._get_component(application._get_asset("asset_1"), application.selected_component_id)
 	var region_outliner_text := _control_text(application.outliner_list)
-	_expect(region_outliner_text.contains("Regions") and region_outliner_text.contains("body → attack_region") and application.canvas_view.bezier_color_override == application.REGION_COLOR, "Regions should render in their own Outliner category and use the dedicated red Canvas Bezier color.")
+	_expect(region_outliner_text.contains("Regions") and region_outliner_text.contains("body → attack_region") and application.canvas_view.bezier_color_override == application._region_color("attack"), "Attack Regions should render in their own Outliner category and use the dedicated red Canvas Bezier color.")
 	var region_style_button := Button.new()
-	application._style_region_outliner_button(region_style_button, true)
+	application._style_region_outliner_button(region_style_button, true, "attack")
 	var selected_region_style := region_style_button.get_theme_stylebox("normal") as StyleBoxFlat
-	_expect(is_instance_valid(selected_region_style) and selected_region_style.bg_color == application.REGION_COLOR, "A selected Region should use the dedicated red Outliner highlight instead of the Component yellow.")
+	_expect(is_instance_valid(selected_region_style) and selected_region_style.bg_color == application._region_color("attack"), "A selected Attack Region should use its dedicated red Outliner highlight instead of the Component yellow.")
 	region_style_button.free()
 	for region_position in [Vector2.ZERO, Vector2(4.0, 0.0), Vector2(2.0, 3.0)]:
 		application._on_bezier_point_added(region_position, "linear", Vector2.ZERO)
 	application._on_bezier_chain_closed()
 	_expect(str(attack_region.get("type", "")) == "region" and str(attack_region.get("region_type", "")) == "attack" and ClosedRegionMeshService.validation_issues({"draw_mode": "contour", "points": attack_region.get("points", []), "edges": attack_region.get("edges", []), "chains": attack_region.get("chains", [])}).is_empty(), "Attack Regions should reuse one valid closed Bezier boundary instead of storing an unrelated polygon model.")
+	application._create_region("asset_1", "component", "component_1", "hurt")
+	var hurt_color: Color = application._region_color("hurt")
+	_expect(hurt_color != application._region_color("attack") and application.canvas_view.bezier_color_override == hurt_color, "Hurt Regions should use their own green Canvas Bezier color instead of the Attack Region red.")
+	var hurt_style_button := Button.new()
+	application._style_region_outliner_button(hurt_style_button, true, "hurt")
+	var selected_hurt_style := hurt_style_button.get_theme_stylebox("normal") as StyleBoxFlat
+	_expect(is_instance_valid(selected_hurt_style) and selected_hurt_style.bg_color == hurt_color, "A selected Hurt Region should use its dedicated green Outliner highlight.")
+	hurt_style_button.free()
 	parent_component["transform"] = {"position": Vector2(-3.0, 2.0), "rotation": 20.0, "scale": Vector2(1.0, 1.5), "pivot": Vector2.ZERO}
 	parent_component["name"] = "eyebrow_left"
 	child_component["name"] = "eye_left"
