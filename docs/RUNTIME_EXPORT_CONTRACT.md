@@ -254,7 +254,8 @@ field. Asset References also omit it.
 
 An Asset Reference adds `kind: "asset_reference"` and required
 `source_asset_key`. It contains neither `mesh`, `contour_stroke_mesh`, nor
-`closed_region_mesh`. An
+`closed_region_mesh`, but retains its local `projection_depth_meters` value.
+An
 optional finite positive `contour_stroke_width_override_px` is local to the
 Reference and applies uniformly to every Contour part in its source Asset; it
 never modifies that source Asset.

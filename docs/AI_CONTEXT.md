@@ -236,6 +236,13 @@ weapon while the character-owned `weapon_socket_primary` remains fixed.
 Runtime Manifest schema 11 exports this fifth optional Attachment Frame role
 and strictly replaces schema 10.
 
+World schema 56 adds Component-local `projection_depth_cm` for visible
+Components. It is shown only in the Component Inspector beside Contour Stroke
+Width and Z Order, defaults to `10 cm`, and is independent of Component/Asset
+Scale, Rebase, Z Order, and Contour Stroke Width. Runtime Manifest schema 12
+exports the corresponding `projection_depth_meters` value for presentation
+consumers.
+
 Plain `P` places the selected Asset, Group, or Component Pivot at the Canvas
 pointer. The shortcut is routed before focused Inspector controls can consume
 the printable key, but only while the pointer is inside the visible Canvas, so

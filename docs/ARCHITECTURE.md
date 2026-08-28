@@ -348,6 +348,12 @@ carried `grip_primary`, and the maximum endpoint `reach_limit_primary`.
 Runtime Manifest schema 11 exports this fifth optional Attachment Frame role
 and rejects schema 10.
 
+Schema 56 adds a visible-Component-only `projection_depth_cm` authoring field.
+It defaults to `10 cm`, is persisted and exported independently of Component
+and Asset Scale, and is not owned by Groups or the Asset root. Runtime Manifest
+schema 12 carries the metric `projection_depth_meters` value for presentation
+consumers.
+
 Sampling results carry their own algorithm version independently of the
 World schema. The junction-aware version invalidates pre-arrangement flat
 Cut Bakes at Sampling, which in turn makes Seeding stale before Meshing can
