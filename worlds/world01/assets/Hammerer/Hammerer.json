@@ -2466,7 +2466,7 @@
 				{
 					"handle_in": [
 						0.0,
-						1.00000035762787
+						0.866666495800018
 					],
 					"handle_out": [
 						-1.46666669845581,
@@ -2488,14 +2488,14 @@
 					],
 					"handle_out": [
 						0.0,
-						-1.00000035762787
+						-0.866666495800018
 					],
 					"handle_source": "auto",
 					"id": "point_8134515734511500930",
 					"mode": "corner",
 					"position": [
 						-2.5,
-						17.9000015258789
+						17.5
 					],
 					"preserve_point": true
 				},
@@ -2513,7 +2513,7 @@
 					"mode": "linear",
 					"position": [
 						0.0,
-						17.9000015258789
+						17.5
 					],
 					"preserve_point": false
 				},
@@ -2560,7 +2560,7 @@
 					],
 					"handle_out": [
 						0.0,
-						1.00000035762787
+						0.866666495800018
 					],
 					"handle_source": "auto",
 					"id": "mirror_point_130224240852891458",
@@ -2574,7 +2574,7 @@
 				{
 					"handle_in": [
 						0.0,
-						-1.00000035762787
+						-0.866666495800018
 					],
 					"handle_out": [
 						-0.833333313465118,
@@ -2585,7 +2585,7 @@
 					"mode": "corner",
 					"position": [
 						2.5,
-						17.9000015258789
+						17.5
 					],
 					"preserve_point": true
 				}
@@ -2615,7 +2615,38 @@
 		}
 	],
 	"groups": [],
-	"guides": [],
+	"guides": [
+		{
+			"chains": [],
+			"edges": [],
+			"guide_type": "weapon_socket_primary",
+			"id": "guide_4",
+			"name": "weapon_socket_primary",
+			"ordinal": 1,
+			"points": [],
+			"scope": {
+				"component_id": "component_46",
+				"kind": "component"
+			},
+			"transform": {
+				"pivot": [
+					0.0,
+					0.0
+				],
+				"position": [
+					0.0,
+					8.69999980926514
+				],
+				"rotation": 0.0,
+				"scale": [
+					1.0,
+					1.0
+				]
+			},
+			"type": "guide",
+			"visibility": true
+		}
+	],
 	"id": "asset_6",
 	"name": "Hammerer",
 	"reference_image": {
@@ -2630,6 +2661,7 @@
 		"target_height_cm": 179.0,
 		"visible": false
 	},
-	"schema_version": 51,
+	"root_scale": 1.0,
+	"schema_version": 55,
 	"visibility": true
 }

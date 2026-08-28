@@ -19,9 +19,9 @@
 		"asset_16"
 	],
 	"editor_state": {
-		"active_create_submodule": "Character",
+		"active_create_submodule": "Weapons",
 		"active_geometry_submodule": "Sampling",
-		"active_module": "Export",
+		"active_module": "Create",
 		"active_motion_submodule": "Animation",
 		"active_style_submodule": "Weighting",
 		"asset_cameras": {
@@ -41,10 +41,10 @@
 			},
 			"asset_11": {
 				"position": [
-					0.430205196142197,
-					3.86307406425476
+					0.0696506947278976,
+					14.7362909317017
 				],
-				"zoom": 137.218415769653
+				"zoom": 30.6656669988078
 			},
 			"asset_12": {
 				"position": [
@@ -111,10 +111,10 @@
 			},
 			"asset_6": {
 				"position": [
-					0.428853780031204,
-					11.0211420059204
+					-0.970782220363617,
+					6.92442512512207
 				],
-				"zoom": 90.0924129670337
+				"zoom": 31.9112216728468
 			},
 			"asset_7": {
 				"position": [
@@ -139,9 +139,9 @@
 			}
 		},
 		"expanded_assets": {
-			"asset_1": false,
+			"asset_1": true,
 			"asset_10": false,
-			"asset_11": false,
+			"asset_11": true,
 			"asset_12": false,
 			"asset_13": false,
 			"asset_14": false,
@@ -152,7 +152,7 @@
 			"asset_4": false,
 			"asset_5": false,
 			"asset_6": false,
-			"asset_7": false,
+			"asset_7": true,
 			"asset_8": false,
 			"asset_9": false
 		},
@@ -169,19 +169,19 @@
 			"terrain": true,
 			"weapons": true
 		},
-		"selected_asset_id": "asset_15",
+		"selected_asset_id": "asset_11",
 		"selected_component_id": "",
 		"selected_edge_ids": [],
-		"selected_guide_id": "",
+		"selected_guide_id": "guide_8",
 		"selected_motion_act_id": "",
 		"selected_motion_path_id": "",
 		"selected_motion_sequence_entry_id": "",
 		"selected_motion_sequence_id": "",
 		"selected_weighting_style_id": "",
 		"snap": {
-			"enabled": false,
-			"grid_step": 0.5,
-			"mode": "none",
+			"enabled": true,
+			"grid_step": 0.1,
+			"mode": "fine",
 			"rotation_step": 15.0
 		},
 		"world_scale": {
@@ -191,7 +191,7 @@
 	},
 	"name": "world01",
 	"paths": [],
-	"schema_version": 51,
+	"schema_version": 55,
 	"sequences": [],
 	"world_name": "Secrets, Room's & Travels'",
 	"world_settings": {
