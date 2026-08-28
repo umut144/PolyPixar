@@ -1,10 +1,10 @@
 # PolyTools Runtime Export Contract
 
 **Status:** Normative consumer contract for Asset Catalog schema `1` and
-runtime Manifest schema `10`.
+runtime Manifest schema `11`.
 
 This document is the sole field-level contract for PolyTools Runtime packages.
-Manifest schema 10 replaces schema 9. Consumers must reject older schemas; there is
+Manifest schema 11 replaces schema 10. Consumers must reject older schemas; there is
 no SDF/Carrier/UV compatibility fallback.
 
 ## Package boundary
@@ -36,15 +36,15 @@ package dimensions.
 ## Compatibility policy
 
 Catalog `schema_version` must equal `1`; Manifest `schema_version` must equal
-`10`. Missing, non-integer, older, or newer versions are rejected as complete
+`11`. Missing, non-integer, older, or newer versions are rejected as complete
 packages. Missing required geometry is an error. Consumers must not synthesize
 Fill Meshes, strokes, closed Contour regions, Semantic Keys, hierarchy links,
 or referenced Assets.
 
-Schema 10 contains no UV, SDF, mask, contour-domain, padding, or Carrier field.
+Schema 11 contains no UV, SDF, mask, contour-domain, padding, or Carrier field.
 Those schema-3 concepts are not optional aliases and must not be inferred.
-Schema 10 retains the schema-9 visual, Attachment Frame, and semantic Region
-payload and adds the optional `reach_limit_primary` Attachment Frame role.
+Schema 11 retains the schema-10 visual, Attachment Frame, and semantic Region
+payload and adds the optional `grip_secondary` Attachment Frame role.
 
 ## Catalog
 
@@ -55,11 +55,11 @@ The Catalog requires `world_key`, `world_name`, and `assets`, sorted by
 
 ## Top-level Manifest
 
-Schema 10 requires:
+Schema 11 requires:
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `schema_version` | integer | Exactly `10`. |
+| `schema_version` | integer | Exactly `11`. |
 | `asset_key` | non-empty lower-snake-case string | Runtime identity. |
 | `display_name` | string | Informational authored name. |
 | `asset_type` | string | `character`, `props`, `weapons`, `terrain`, `icon`, or `symbols`. |
@@ -122,8 +122,10 @@ part of the contract.
 `attachment_frames` contains transform Guides authored through
 `Guide → Weapon`. Each record contains exactly `frame_id`, `role`, and
 `asset_transform`. `role` is one of `weapon_socket_primary`, `grip_primary`,
-`attack_point_primary`, or `reach_limit_primary` and may occur at most once per
-Asset. `reach_limit_primary` marks an authored maximum reach endpoint;
+`grip_secondary`, `attack_point_primary`, or `reach_limit_primary` and may occur
+at most once per Asset. `grip_secondary` marks a second weapon-local hand
+contact for an attack regrip; it remains distinct from the character-owned
+socket and carried primary grip. `reach_limit_primary` marks an authored maximum reach endpoint;
 consumers must not infer it from visual Component names or pivots.
 `asset_transform`
 contains a two-float meter `position` and counter-clockwise
@@ -165,7 +167,7 @@ the same complete transform and require no geometry regeneration.
 An indexed Mesh contains `vertices`, an array of local-meter `[x,y]` pairs, and
 `indices`, a flat triangle list. Indices are in range, each triangle uses three
 distinct vertices, and a non-empty Mesh has a positive multiple of three
-indices. Schema 10 carries no UVs, normals, tangents, colors, or materials.
+indices. Schema 11 carries no UVs, normals, tangents, colors, or materials.
 
 Closed-loop and Primitive Components require `mesh` as their unchanged Fill
 Mesh. An open `contour` Component must not contain `mesh`.

@@ -7,13 +7,14 @@ const MOTION := "motion"
 const CUT := "cut"
 const WEAPON_SOCKET_PRIMARY := "weapon_socket_primary"
 const GRIP_PRIMARY := "grip_primary"
+const GRIP_SECONDARY := "grip_secondary"
 const ATTACK_POINT_PRIMARY := "attack_point_primary"
 const REACH_LIMIT_PRIMARY := "reach_limit_primary"
 const BODY_FLOW := FLOW
 const SAMPLER_SPINE := SAMPLE
 const ANIMATION_SPINE := MOTION
-const WEAPON_TYPES := [WEAPON_SOCKET_PRIMARY, GRIP_PRIMARY, ATTACK_POINT_PRIMARY, REACH_LIMIT_PRIMARY]
-const VALID_TYPES := [FLOW, SAMPLE, MOTION, CUT, WEAPON_SOCKET_PRIMARY, GRIP_PRIMARY, ATTACK_POINT_PRIMARY, REACH_LIMIT_PRIMARY]
+const WEAPON_TYPES := [WEAPON_SOCKET_PRIMARY, GRIP_PRIMARY, GRIP_SECONDARY, ATTACK_POINT_PRIMARY, REACH_LIMIT_PRIMARY]
+const VALID_TYPES := [FLOW, SAMPLE, MOTION, CUT, WEAPON_SOCKET_PRIMARY, GRIP_PRIMARY, GRIP_SECONDARY, ATTACK_POINT_PRIMARY, REACH_LIMIT_PRIMARY]
 const FLOW_COLOR := Color("#4267b2")
 const SAMPLE_COLOR := Color("#f2c94c")
 const MOTION_COLOR := Color("#c084fc")
@@ -114,6 +115,8 @@ static func display_name(guide_type: String) -> String:
 		return "Weapon Socket Primary"
 	if normalized_type == GRIP_PRIMARY:
 		return "Grip Primary"
+	if normalized_type == GRIP_SECONDARY:
+		return "Grip Secondary"
 	if normalized_type == ATTACK_POINT_PRIMARY:
 		return "Attack Point Primary"
 	if normalized_type == REACH_LIMIT_PRIMARY:
@@ -129,7 +132,7 @@ static func canonical_type(guide_type: String) -> String:
 			return MOTION
 		CUT:
 			return CUT
-		WEAPON_SOCKET_PRIMARY, GRIP_PRIMARY, ATTACK_POINT_PRIMARY, REACH_LIMIT_PRIMARY:
+		WEAPON_SOCKET_PRIMARY, GRIP_PRIMARY, GRIP_SECONDARY, ATTACK_POINT_PRIMARY, REACH_LIMIT_PRIMARY:
 			return guide_type
 		SAMPLE, "sampler_spine":
 			return SAMPLE
@@ -148,7 +151,7 @@ static func color(guide_type: String) -> Color:
 			return MOTION_COLOR
 		CUT:
 			return Color("#ef6c78")
-		WEAPON_SOCKET_PRIMARY, GRIP_PRIMARY, ATTACK_POINT_PRIMARY, REACH_LIMIT_PRIMARY:
+		WEAPON_SOCKET_PRIMARY, GRIP_PRIMARY, GRIP_SECONDARY, ATTACK_POINT_PRIMARY, REACH_LIMIT_PRIMARY:
 			return Color("#f2994a")
 	return SAMPLE_COLOR
 

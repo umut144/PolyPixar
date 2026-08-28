@@ -1,7 +1,7 @@
 class_name RuntimeExportService
 extends RefCounted
 
-const MANIFEST_SCHEMA_VERSION := 10
+const MANIFEST_SCHEMA_VERSION := 11
 static func build_manifest(asset: Dictionary, sources: Dictionary) -> Dictionary:
 	var errors: Array[String] = []
 	var asset_id := str(asset.get("id", ""))
@@ -383,7 +383,7 @@ static func manifest_validation_issues(manifest: Dictionary) -> Array[String]:
 		errors.append("Runtime Manifest requires an Asset Key and Component array.")
 		return errors
 	if not manifest.get("attachment_frames", null) is Array or not manifest.get("regions", null) is Array:
-		errors.append("Runtime Manifest schema 10 requires attachment_frames and regions arrays.")
+		errors.append("Runtime Manifest schema 11 requires attachment_frames and regions arrays.")
 		return errors
 	var presentation = manifest.get("presentation")
 	if not presentation is Dictionary or presentation.keys() != ["authored_facing"] \
