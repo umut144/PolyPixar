@@ -216,6 +216,12 @@ field to exactly `1`. Default Motion is supported; authored non-default Motion
 blocks the operation until a dedicated scale conversion exists. Runtime Export
 also blocks while `root_scale` is not `1`; it never applies the factor silently.
 
+Plain `P` places the selected Asset, Group, or Component Pivot at the Canvas
+pointer. The shortcut is routed before focused Inspector controls can consume
+the printable key, but only while the pointer is inside the visible Canvas, so
+text entry elsewhere remains unaffected. It remains available in Component
+Transform and Bézier Edit states and is disabled during Draw.
+
 `catalog.json` has its own schema version and is derived automatically from
 visible Assets. Each `asset_key` is the lower-snake-case derivation of the full
 Asset display name and is never authored independently. Creation and rename

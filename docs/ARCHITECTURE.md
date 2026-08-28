@@ -38,6 +38,13 @@ category is disabled. Transform and Effects categories do not exist.
 - `main.gd` applies intent to the selected World document and records
   history.
 
+Pointer-based `P` Pivot placement is intercepted by `main.gd` during the early
+input phase because focused Inspector controls may consume printable keys
+before unhandled input. Routing requires the pointer inside the visible Canvas
+and a selected Asset, Group, or Component. `ComponentCanvas` converts the
+pointer to the appropriate snapped coordinate and emits intent; Draw state and
+Guide selection reject the command.
+
 Each Component declares a geometry source. Bézier sources contain only
 `points`, `edges`, and `chains`; primitive sources contain one typed primitive
 definition: authored `circle` with `center` and `diameter_cm`, or an `ellipse`

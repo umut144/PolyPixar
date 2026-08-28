@@ -16,6 +16,7 @@ func _init() -> void:
 	_test_closed_contour_region_mesh()
 	_test_catch_parent_snapping()
 	_test_canvas_navigation_key_reset()
+	_test_pivot_shortcut_robustness()
 	_test_contour_stroke_service()
 	_test_contour_stroke_robust_geometry()
 	_test_world_contour_settings()
@@ -487,6 +488,34 @@ func _test_canvas_navigation_key_reset() -> void:
 	canvas.set_navigation_locked(true)
 	_expect(canvas._navigation_input_vector() == Vector3.ZERO, "Locking Canvas navigation must discard any held navigation keys.")
 	canvas.free()
+
+
+func _test_pivot_shortcut_robustness() -> void:
+	var canvas := ComponentCanvas.new()
+	canvas.size = Vector2(400.0, 400.0)
+	canvas.set_context("Body")
+	canvas.set_component_transform({"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2(50.0, 50.0)})
+	canvas.set_interaction_state("transform")
+	_expect(canvas._place_pivot_at_screen_position(Vector2(200.0, 200.0)), "P should set a selected Component Pivot while the Transform state is active.")
+	canvas.set_interaction_state("edit")
+	_expect(canvas._place_pivot_at_screen_position(Vector2(220.0, 180.0)), "P should set a selected Component Pivot while Bézier Edit is active.")
+	canvas.set_interaction_state("draw")
+	_expect(not canvas._place_pivot_at_screen_position(Vector2(200.0, 200.0)), "P must not interrupt an active drawing gesture.")
+	canvas.set_interaction_state("asset")
+	_expect(canvas._place_asset_pivot_at_screen_position(Vector2(240.0, 160.0)), "P should set the Asset Root Pivot when no Component or Group is selected.")
+	canvas.free()
+
+	var application = load("res://scripts/main.gd").new()
+	var key_p := InputEventKey.new()
+	key_p.keycode = KEY_P
+	key_p.pressed = true
+	_expect(application._is_plain_pivot_shortcut(key_p), "The Pivot shortcut should recognize a non-repeating plain P before focused GUI fields consume it.")
+	key_p.echo = true
+	_expect(not application._is_plain_pivot_shortcut(key_p), "Key repeat must not create multiple Pivot history changes from one held P key.")
+	key_p.echo = false
+	key_p.ctrl_pressed = true
+	_expect(not application._is_plain_pivot_shortcut(key_p), "Command-modified P must remain available to other editor commands.")
+	application.free()
 
 
 func _test_create_outliner_expansion_scope() -> void:

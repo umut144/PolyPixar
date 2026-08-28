@@ -362,6 +362,12 @@ func _input(event: InputEvent) -> void:
 	# so intercept them before Godot moves focus to an unrelated control.
 	if not event is InputEventKey or not event.pressed:
 		return
+	# Route the pointer-based Pivot shortcut before focused LineEdit/SpinBox
+	# controls can consume the printable P key. Requiring the pointer to be over
+	# the Canvas keeps ordinary text entry unaffected.
+	if _is_plain_pivot_shortcut(event) and _try_place_selected_pivot_at_mouse():
+		get_viewport().set_input_as_handled()
+		return
 	if not event.meta_pressed and not event.ctrl_pressed and event.keycode in [KEY_UP, KEY_DOWN] and _outliner_component_navigation_has_focus():
 		_navigate_outliner_component(-1 if event.keycode == KEY_UP else 1)
 		get_viewport().set_input_as_handled()
@@ -390,16 +396,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if event.echo and not _can_nudge_selected_point():
 		return
 	var has_command_modifier: bool = event.meta_pressed or event.ctrl_pressed
-	if not has_command_modifier and event.keycode == KEY_P and active_state.is_empty() and is_instance_valid(canvas_view):
-		if not selected_group_id.is_empty() and _place_selected_group_pivot_at_mouse():
-			outliner_component_navigation_active = false
-			canvas_view.grab_focus()
-			get_viewport().set_input_as_handled()
-			return
-		if not selected_component_id.is_empty() and canvas_view.place_pivot_at_mouse():
-			outliner_component_navigation_active = false
-			canvas_view.grab_focus()
-			get_viewport().set_input_as_handled()
+	if _is_plain_pivot_shortcut(event) and _try_place_selected_pivot_at_mouse():
+		get_viewport().set_input_as_handled()
 		return
 	if has_command_modifier and event.keycode == KEY_Q:
 		get_viewport().set_input_as_handled()
@@ -607,6 +605,32 @@ func _nudge_selected_point(direction: Vector2) -> void:
 	_refresh_component_geometry(component)
 	_render_inspector()
 	_render_canvas_context()
+
+
+func _is_plain_pivot_shortcut(event: InputEventKey) -> bool:
+	return event.pressed and not event.echo \
+		and not event.meta_pressed and not event.ctrl_pressed and not event.alt_pressed and not event.shift_pressed \
+		and (event.keycode == KEY_P or event.physical_keycode == KEY_P)
+
+
+func _try_place_selected_pivot_at_mouse() -> bool:
+	if not is_instance_valid(canvas_view) or not canvas_view.is_visible_in_tree() or not canvas_view.is_pointer_over_canvas():
+		return false
+	if active_state == "draw" or not selected_guide_id.is_empty():
+		return false
+	var placed := false
+	if not selected_group_id.is_empty():
+		placed = _place_selected_group_pivot_at_mouse()
+	elif not selected_component_id.is_empty():
+		placed = canvas_view.place_pivot_at_mouse()
+	elif not selected_asset_id.is_empty():
+		placed = canvas_view.place_asset_pivot_at_mouse()
+	if not placed:
+		return false
+	outliner_component_navigation_active = false
+	canvas_view.grab_focus()
+	_show_status_message("Pivot set at pointer.")
+	return true
 
 
 func _reset_to_default_state() -> void:

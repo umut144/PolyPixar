@@ -496,6 +496,10 @@ func _on_mouse_exited() -> void:
 	queue_redraw()
 
 
+func is_pointer_over_canvas() -> bool:
+	return cursor_over_canvas and Rect2(Vector2.ZERO, size).has_point(get_local_mouse_position())
+
+
 func set_tool_mode(tool_name: String) -> void:
 	active_tool = tool_name
 	if tool_name not in ["point", "spine"]:
@@ -853,10 +857,14 @@ func set_selected_point_ids(point_ids: Array) -> void:
 
 
 func place_pivot_at_mouse() -> bool:
-	if context_name.is_empty() or interaction_state != "":
+	return _place_pivot_at_screen_position(get_local_mouse_position())
+
+
+func _place_pivot_at_screen_position(screen_position: Vector2) -> bool:
+	if context_name.is_empty() or interaction_state not in ["", "edit", "transform"]:
 		return false
 	var old_pivot: Vector2 = component_transform.get("pivot", Vector2.ZERO)
-	var new_pivot := _snap_to_grid(_world_to_local(_screen_to_world(get_local_mouse_position())))
+	var new_pivot := _snap_to_grid(_world_to_local(_screen_to_world(screen_position)))
 	var transform_scale: Vector2 = component_transform.get("scale", Vector2.ONE)
 	var transform_rotation := deg_to_rad(float(component_transform.get("rotation", 0.0)))
 	var transform_position: Vector2 = component_transform.get("position", Vector2.ZERO)
@@ -865,6 +873,19 @@ func place_pivot_at_mouse() -> bool:
 	component_transform["position"] = transform_position
 	pivot_changed.emit(new_pivot)
 	transform_changed.emit(component_transform.duplicate(true))
+	queue_redraw()
+	return true
+
+
+func place_asset_pivot_at_mouse() -> bool:
+	return _place_asset_pivot_at_screen_position(get_local_mouse_position())
+
+
+func _place_asset_pivot_at_screen_position(screen_position: Vector2) -> bool:
+	if context_name.is_empty() or interaction_state != "asset":
+		return false
+	asset_pivot = _snap_to_grid(_screen_to_world(screen_position))
+	asset_pivot_changed.emit(asset_pivot)
 	queue_redraw()
 	return true
 
