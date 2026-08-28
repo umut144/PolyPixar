@@ -169,7 +169,7 @@ updates the World-root `catalog.json` with the currently valid Runtime set.
 Packages are staged, verified, and replaced atomically per Asset; an invalid
 Asset retains its older package and no fallback geometry is generated, but is
 excluded from that Catalog until it validates again.
-Runtime Manifest schema 9 exports `contour_stroke_mesh` independently from the
+Runtime Manifest schema 10 exports `contour_stroke_mesh` independently from the
 unchanged Fill Mesh and adds geometry-only `closed_region_mesh` to closed
 Contours. It also exports Asset-local Weapon Attachment Frames and triangulated
 Attack/Hurt/Collision Regions as simulation metadata outside visual Components.
@@ -204,7 +204,8 @@ is retired; runtime export is a batch operation over accepted derived data.
 World schema 52 adds transform-based Weapon Guides and semantic Regions.
 Component and Group outliner rows both expose `+`; their shared add menu
 contains `Guide → Weapon → weapon_socket_primary | grip_primary |
-attack_point_primary` and `Region → Attack | Hurt | Collision`. The same
+attack_point_primary | reach_limit_primary` and `Region → Attack | Hurt |
+Collision`. The same
 Weapon and Region submenus are available from the row context menu. Weapon
 Guides may use Component or Group scope and author position plus rotation only.
 Regions use the standard Closed Loop Bézier drawing/editing workflow. They are
@@ -221,6 +222,13 @@ into canonical local coordinates and Reference instance scale, then resets the
 field to exactly `1`. Default Motion is supported; authored non-default Motion
 blocks the operation until a dedicated scale conversion exists. Runtime Export
 also blocks while `root_scale` is not `1`; it never applies the factor silently.
+
+World schema 54 adds the transform-based Weapon Guide role
+`reach_limit_primary`. It is authored through the same Component/Group `+` and
+context-menu paths as the existing Weapon frames and marks an Asset-local
+maximum reach endpoint independently from visual Component names or pivots.
+Runtime Manifest schema 10 exports the additional optional Attachment Frame
+role and strictly replaces schema 9.
 
 Plain `P` places the selected Asset, Group, or Component Pivot at the Canvas
 pointer. The shortcut is routed before focused Inspector controls can consume

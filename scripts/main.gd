@@ -8,7 +8,7 @@ const EXPORT_SUBMODULES: Array[String] = []
 const MOTION_SUBMODULES := ["Animation", "Path", "Act", "Sequence"]
 const WORLDS_ROOT := "res://worlds"
 const CONFIG_PATH := "res://configs/app_config.json"
-const SCHEMA_VERSION := 53
+const SCHEMA_VERSION := 54
 const REGION_TYPES := ["attack", "hurt", "collision"]
 const REGION_COLOR := Color("#ef6c78")
 const MAX_HISTORY_SIZE := 100
@@ -1723,6 +1723,7 @@ func _create_component_add_menu() -> void:
 	component_add_weapon_guide_menu.add_item("weapon_socket_primary", 0)
 	component_add_weapon_guide_menu.add_item("grip_primary", 1)
 	component_add_weapon_guide_menu.add_item("attack_point_primary", 2)
+	component_add_weapon_guide_menu.add_item("reach_limit_primary", 3)
 	component_add_weapon_guide_menu.id_pressed.connect(_on_component_add_weapon_guide_selected)
 	component_add_guide_menu.add_child(component_add_weapon_guide_menu)
 	component_add_guide_menu.add_separator()
@@ -1759,6 +1760,7 @@ func _create_component_context_menu() -> void:
 	component_context_weapon_menu.add_item("weapon_socket_primary", 0)
 	component_context_weapon_menu.add_item("grip_primary", 1)
 	component_context_weapon_menu.add_item("attack_point_primary", 2)
+	component_context_weapon_menu.add_item("reach_limit_primary", 3)
 	component_context_weapon_menu.id_pressed.connect(_on_context_weapon_guide_selected)
 	component_context_menu.add_child(component_context_weapon_menu)
 	component_context_region_menu = PopupMenu.new()
@@ -1791,7 +1793,7 @@ func _create_component_context_menu() -> void:
 
 
 func _on_context_weapon_guide_selected(index: int) -> void:
-	var guide_types := [AssetGuide.WEAPON_SOCKET_PRIMARY, AssetGuide.GRIP_PRIMARY, AssetGuide.ATTACK_POINT_PRIMARY]
+	var guide_types := [AssetGuide.WEAPON_SOCKET_PRIMARY, AssetGuide.GRIP_PRIMARY, AssetGuide.ATTACK_POINT_PRIMARY, AssetGuide.REACH_LIMIT_PRIMARY]
 	if index < 0 or index >= guide_types.size():
 		return
 	var group_id := str(component_context_menu.get_meta("group_id", ""))
@@ -8990,7 +8992,7 @@ func _on_component_add_guide_selected(index: int) -> void:
 
 
 func _on_component_add_weapon_guide_selected(index: int) -> void:
-	var guide_types := [AssetGuide.WEAPON_SOCKET_PRIMARY, AssetGuide.GRIP_PRIMARY, AssetGuide.ATTACK_POINT_PRIMARY]
+	var guide_types := [AssetGuide.WEAPON_SOCKET_PRIMARY, AssetGuide.GRIP_PRIMARY, AssetGuide.ATTACK_POINT_PRIMARY, AssetGuide.REACH_LIMIT_PRIMARY]
 	if index < 0 or index >= guide_types.size():
 		return
 	_create_weapon_guide(

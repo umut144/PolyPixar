@@ -17,7 +17,7 @@ with no stroke geometry.
 
 The authored `contour` draw mode is persisted in World schema 40. Its accepted
 `contour_stroke` Component Mesh is a derived Bake and does not become source
-topology. Runtime Manifest schema 9 exports this typed art-stroke role directly;
+topology. Runtime Manifest schema 10 exports this typed art-stroke role directly;
 Contours omit Fill geometry whether their Chain is open or closed.
 
 For a closed Contour, the same accepted build separately samples every authored
@@ -89,7 +89,7 @@ Closed outer and Hole chains use the same validation and tessellation rules.
 Wizard-like tips, small eye-scale returns, holes, and visually adjacent lines
 are regression fixtures for this contract. Slice 7 stores a current Contour
 Stroke Bake beside the Fill Bake for Closed Loop and Primitive Components.
-Runtime schema 9 exports the centered stroke with typed width, join/cap, run, and
+Runtime schema 10 exports the centered stroke with typed width, join/cap, run, and
 symmetric offset metadata. UV/SDF/Carrier data is not part of that contract.
 Schema 39 and older Ribbons
 migrate explicitly to open Contours; their legacy strip Bakes never qualify as

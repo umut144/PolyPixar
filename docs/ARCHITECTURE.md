@@ -335,6 +335,12 @@ unchanged during the bake. Component Scale is not modified, keeping schema
 Non-default Motion is an explicit blocker. Accepted derived data is not
 rewritten and becomes stale through its existing source fingerprints.
 
+World schema 54 extends transform-based Weapon Guides with
+`reach_limit_primary`. It shares the existing frame data, scope inheritance,
+Canvas gizmo, Inspector, history, Scale Rebase, and persistence paths; it does
+not infer its position from a visual Component. Runtime Manifest schema 10
+exports this fourth optional Attachment Frame role and rejects schema 9.
+
 Sampling results carry their own algorithm version independently of the
 World schema. The junction-aware version invalidates pre-arrangement flat
 Cut Bakes at Sampling, which in turn makes Seeding stale before Meshing can
@@ -346,7 +352,7 @@ The normative serialized package and consumer contract is
 [`RUNTIME_EXPORT_CONTRACT.md`](RUNTIME_EXPORT_CONTRACT.md). The summary below
 describes how the editor produces that contract.
 
-`RuntimeExportService` builds Manifest schema 9 exclusively from current
+`RuntimeExportService` builds Manifest schema 10 exclusively from current
 accepted Fill and Contour Stroke Mesh Bakes. For a closed Contour, the current
 Stroke Bake must also contain its current complete-Boundary region
 triangulation. It rejects missing or stale inputs,
@@ -356,7 +362,7 @@ Components never derive replacement geometry during export. References emit an
 `asset_reference` record containing the local `name`, signed placement
 transform, and actual `source_asset_key`, without copying geometry into the owner.
 
-Every schema-9 Manifest also exports the Asset-level presentation metadata as
+Every schema-10 Manifest also exports the Asset-level presentation metadata as
 `presentation.authored_facing`, oriented Asset-local Weapon Attachment Frames,
 and triangulated Asset-local semantic Regions. Regions remain outside visual
 Components and therefore cannot become rendering authority.
@@ -376,7 +382,7 @@ while fill-less Contours do not invent one. A closed Contour additionally
 exports `closed_region_mesh` as local-meter vertices and triangle indices. That
 field is engine-neutral geometry only and has no material, color, alpha, UV,
 rendering, or Fill semantics. Open Contours and Asset References omit it.
-Schema 9 contains no UV/SDF/Carrier fields and has no older-schema fallback.
+Schema 10 contains no UV/SDF/Carrier fields and has no older-schema fallback.
 
 Each visible Asset is exported to the active World-local
 `res://worlds/<world_key>/PolyToolsRuntimeExports/<asset_key>/` directory as
