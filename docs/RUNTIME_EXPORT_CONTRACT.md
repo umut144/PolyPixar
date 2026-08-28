@@ -41,9 +41,9 @@ packages. Missing required geometry is an error. Consumers must not synthesize
 Fill Meshes, strokes, closed Contour regions, Semantic Keys, hierarchy links,
 or referenced Assets.
 
-Schema 11 contains no UV, SDF, mask, contour-domain, padding, or Carrier field.
+Schema 12 contains no UV, SDF, mask, contour-domain, padding, or Carrier field.
 Those schema-3 concepts are not optional aliases and must not be inferred.
-Schema 11 retains the schema-10 visual, Attachment Frame, and semantic Region
+Schema 12 retains the schema-10 visual, Attachment Frame, and semantic Region
 payload and adds the optional `grip_secondary` Attachment Frame role.
 
 ## Catalog
@@ -55,11 +55,11 @@ The Catalog requires `world_key`, `world_name`, and `assets`, sorted by
 
 ## Top-level Manifest
 
-Schema 11 requires:
+Schema 12 requires:
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `schema_version` | integer | Exactly `11`. |
+| `schema_version` | integer | Exactly `12`. |
 | `asset_key` | non-empty lower-snake-case string | Runtime identity. |
 | `display_name` | string | Informational authored name. |
 | `asset_type` | string | `character`, `props`, `weapons`, `terrain`, `icon`, or `symbols`. |
@@ -146,8 +146,8 @@ in the visual `components` array.
 ## Common Component fields
 
 Every Component requires `component_id`, unique `name` in `lower_snake_case`, nullable
-`parent_component_id`, integer `z_index`, two-float `component_pivot`, and
-`local_transform`:
+`parent_component_id`, integer `z_index`, finite non-negative
+`projection_depth_meters`, two-float `component_pivot`, and `local_transform`:
 
 ```json
 {

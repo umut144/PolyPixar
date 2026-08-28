@@ -8,7 +8,8 @@ const EXPORT_SUBMODULES: Array[String] = []
 const MOTION_SUBMODULES := ["Animation", "Path", "Act", "Sequence"]
 const WORLDS_ROOT := "res://worlds"
 const CONFIG_PATH := "res://configs/app_config.json"
-const SCHEMA_VERSION := 55
+const SCHEMA_VERSION := 56
+const DEFAULT_PROJECTION_DEPTH_CM := 10.0
 const REGION_TYPES := ["attack", "hurt", "collision"]
 const REGION_COLOR := Color("#ef6c78")
 const MAX_HISTORY_SIZE := 100
@@ -2345,6 +2346,7 @@ func _save_world() -> void:
 				"transform": _serialize_transform(component.get("transform", {})),
 				"visibility": bool(component.get("visibility", true)),
 				"z_index": int(component.get("z_index", 0)),
+				"projection_depth_cm": float(component.get("projection_depth_cm", DEFAULT_PROJECTION_DEPTH_CM)),
 				"draw_mode": str(component.get("draw_mode", "closed_loop")),
 				"topology_role": str(component.get("topology_role", "outer")) if str(component.get("topology_role", "outer")) in ["outer", "hole"] else "outer",
 				"catch_parent_component_id": str(component.get("catch_parent_component_id", "")),
@@ -2703,6 +2705,7 @@ func _load_world(world_entry: String, persist_as_last := true) -> bool:
 				"transform": _deserialize_transform(component_data.get("transform", {})),
 				"visibility": bool(component_data.get("visibility", true)),
 				"z_index": int(component_data.get("z_index", 0)),
+				"projection_depth_cm": _deserialize_projection_depth_cm(component_data.get("projection_depth_cm", DEFAULT_PROJECTION_DEPTH_CM)),
 				"draw_mode": _normalize_component_draw_mode(component_data.get("draw_mode", "closed_loop"), int(asset_data.get("schema_version", 0))),
 				"topology_role": str(component_data.get("topology_role", "outer")) if str(component_data.get("topology_role", "outer")) in ["outer", "hole"] else "outer",
 				"catch_parent_component_id": str(component_data.get("catch_parent_component_id", "")),
@@ -4227,6 +4230,14 @@ func _component_has_contour_stroke_width_override(component: Dictionary) -> bool
 
 func _effective_contour_stroke_width_px(component: Dictionary) -> float:
 	return float(component["contour_stroke_width_px"]) if _component_has_contour_stroke_width_override(component) else world_contour_stroke_width_px
+
+func _deserialize_projection_depth_cm(value: Variant) -> float:
+	if typeof(value) not in [TYPE_INT, TYPE_FLOAT] or not is_finite(float(value)) or float(value) < 0.0:
+		return DEFAULT_PROJECTION_DEPTH_CM
+	return float(value)
+
+func _component_projection_depth_cm(component: Dictionary) -> float:
+	return _deserialize_projection_depth_cm(component.get("projection_depth_cm", DEFAULT_PROJECTION_DEPTH_CM))
 
 
 func _contour_stroke_bake_is_current(asset_id: String, component_id: String, component: Dictionary) -> bool:
@@ -9920,6 +9931,7 @@ func _confirm_component_creation() -> void:
 		"transform": component_transform,
 		"visibility": true,
 		"z_index": 0,
+		"projection_depth_cm": DEFAULT_PROJECTION_DEPTH_CM,
 		"draw_mode": draw_mode if draw_mode in DRAW_MODES else "closed_loop",
 		"topology_role": "outer",
 		"geometry_source": "primitive" if draw_mode == "primitive" else "bezier",
@@ -12630,6 +12642,17 @@ func _render_inspector() -> void:
 	contour_width_field.tooltip_text = "Overrides every Contour part of the referenced source Asset without changing that Asset." if _is_reference_component(component) else ""
 	contour_width_field.value_changed.connect(_on_component_contour_stroke_width_changed)
 	inspector_content.add_child(contour_width_field)
+	inspector_content.add_child(_create_inspector_field_label("Projection Depth (cm)"))
+	var projection_depth_field := SpinBox.new()
+	projection_depth_field.min_value = 0.0
+	projection_depth_field.max_value = 1000.0
+	projection_depth_field.step = 0.1
+	projection_depth_field.value = _component_projection_depth_cm(component)
+	projection_depth_field.custom_minimum_size = Vector2(0, 26)
+	projection_depth_field.add_theme_font_size_override("font_size", 11)
+	projection_depth_field.tooltip_text = "Visible component depth used by runtime presentation; independent of Scale, Z Order, and Contour Stroke Width."
+	projection_depth_field.value_changed.connect(_on_component_projection_depth_changed)
+	inspector_content.add_child(projection_depth_field)
 	var z_order_label := _create_inspector_field_label("Z Order (Asset-local)")
 	z_order_label.tooltip_text = "Orders Components only inside this Asset; Runtime consumers choose the Asset's contextual game layer."
 	inspector_content.add_child(z_order_label)
@@ -14796,6 +14819,17 @@ func _on_component_z_index_changed(value: float) -> void:
 		_record_direct_change()
 		component["z_index"] = int(value)
 		_render_canvas_context()
+
+func _on_component_projection_depth_changed(value: float) -> void:
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if component.is_empty() or not is_finite(value) or value < 0.0:
+		return
+	var depth := snappedf(value, 0.1)
+	if is_equal_approx(_component_projection_depth_cm(component), depth):
+		return
+	_record_direct_change()
+	component["projection_depth_cm"] = depth
+	_render_canvas_context()
 
 
 func _on_multi_component_position_changed(value: float, property_name: String) -> void:

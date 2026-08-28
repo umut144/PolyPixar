@@ -389,7 +389,7 @@ while fill-less Contours do not invent one. A closed Contour additionally
 exports `closed_region_mesh` as local-meter vertices and triangle indices. That
 field is engine-neutral geometry only and has no material, color, alpha, UV,
 rendering, or Fill semantics. Open Contours and Asset References omit it.
-Schema 11 contains no UV/SDF/Carrier fields and has no older-schema fallback.
+Schema 12 contains no UV/SDF/Carrier fields and has no older-schema fallback.
 
 Each visible Asset is exported to the active World-local
 `res://worlds/<world_key>/PolyToolsRuntimeExports/<asset_key>/` directory as

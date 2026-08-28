@@ -1,7 +1,8 @@
 class_name RuntimeExportService
 extends RefCounted
 
-const MANIFEST_SCHEMA_VERSION := 11
+const MANIFEST_SCHEMA_VERSION := 12
+const DEFAULT_PROJECTION_DEPTH_CM := 10.0
 static func build_manifest(asset: Dictionary, sources: Dictionary) -> Dictionary:
 	var errors: Array[String] = []
 	var asset_id := str(asset.get("id", ""))
@@ -262,6 +263,7 @@ static func _build_component_v8(component: Dictionary, source: Dictionary, expor
 		"name": str(component.get("name", "")).strip_edges(),
 		"parent_component_id": parent_component_id,
 		"z_index": int(component.get("z_index", 0)),
+		"projection_depth_meters": maxf(0.0, float(component.get("projection_depth_cm", DEFAULT_PROJECTION_DEPTH_CM))) * 0.01,
 		"component_pivot": _meters(component_pivot),
 		"local_transform": {"position": _meters(position), "rotation_radians": deg_to_rad(rotation), "scale": [scale.x, scale.y]},
 		"contour_stroke_mesh": {
@@ -533,6 +535,7 @@ static func _build_reference_component(component: Dictionary, source: Dictionary
 			"source_asset_key": source_asset_key,
 			"parent_component_id": parent_component_id,
 			"z_index": int(component.get("z_index", 0)),
+			"projection_depth_meters": maxf(0.0, float(component.get("projection_depth_cm", DEFAULT_PROJECTION_DEPTH_CM))) * 0.01,
 			"component_pivot": _meters(component_pivot),
 			"local_transform": {
 				"position": _meters(position),
