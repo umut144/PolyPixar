@@ -201,7 +201,11 @@ contains `Guide → Weapon → weapon_socket_primary | grip_primary |
 attack_point_primary` and `Region → Attack | Hurt | Collision`. The same
 Weapon and Region submenus are available from the row context menu. Weapon
 Guides may use Component or Group scope and author position plus rotation only.
-Regions use the standard Closed Loop Bézier drawing/editing workflow.
+Regions use the standard Closed Loop Bézier drawing/editing workflow. They are
+listed in their own `Regions` Outliner category rather than inside the visual
+Component hierarchy. Region rows use a red semantic highlight, and the active
+Region's Bézier boundary, Points, selection, and handles use the same red color
+family instead of the cyan visual-geometry color.
 
 `catalog.json` has its own schema version and is derived automatically from
 visible Assets. Each `asset_key` is the lower-snake-case derivation of the full

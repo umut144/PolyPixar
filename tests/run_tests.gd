@@ -2308,6 +2308,13 @@ func _test_asset_guides() -> void:
 	_expect(str(attack_point_guide.get("scope", {}).get("kind", "")) == "group" and str(attack_point_guide.get("scope", {}).get("group_id", "")) == "group_head", "Weapon Guides should support direct Group scope from the Group + menu.")
 	application._create_region("asset_1", "component", "component_1", "attack")
 	var attack_region: Dictionary = application._get_component(application._get_asset("asset_1"), application.selected_component_id)
+	var region_outliner_text := _control_text(application.outliner_list)
+	_expect(region_outliner_text.contains("Regions") and region_outliner_text.contains("body → attack_region") and application.canvas_view.bezier_color_override == application.REGION_COLOR, "Regions should render in their own Outliner category and use the dedicated red Canvas Bezier color.")
+	var region_style_button := Button.new()
+	application._style_region_outliner_button(region_style_button, true)
+	var selected_region_style := region_style_button.get_theme_stylebox("normal") as StyleBoxFlat
+	_expect(is_instance_valid(selected_region_style) and selected_region_style.bg_color == application.REGION_COLOR, "A selected Region should use the dedicated red Outliner highlight instead of the Component yellow.")
+	region_style_button.free()
 	for region_position in [Vector2.ZERO, Vector2(4.0, 0.0), Vector2(2.0, 3.0)]:
 		application._on_bezier_point_added(region_position, "linear", Vector2.ZERO)
 	application._on_bezier_chain_closed()

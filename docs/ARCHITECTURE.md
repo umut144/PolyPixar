@@ -302,6 +302,11 @@ non-uniform scale is inherited from its scope and is never authored on the
 frame. A Region stores its semantic role on a nonvisual record backed by the
 canonical Closed Loop Bézier topology. Regions are excluded from visual Mesh
 batch candidates and are triangulated only for validation and Runtime Export.
+The Create Outliner projects them into a dedicated flat `Regions` category;
+their authored Component-or-Group scope remains document data rather than
+visual tree placement. Region selection and Canvas Bézier presentation use the
+shared red semantic-region color family, while ordinary geometry retains its
+cyan/yellow editing language.
 
 Sampling results carry their own algorithm version independently of the
 World schema. The junction-aware version invalidates pre-arrangement flat

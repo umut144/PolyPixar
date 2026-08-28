@@ -66,6 +66,7 @@ var selection_mirror_preview_points: Array[Dictionary] = []
 var selection_mirror_preview_edges: Array[Dictionary] = []
 var guide_style := false
 var guide_color := Color("#f2c94c")
+var bezier_color_override := Color.TRANSPARENT
 var draw_point_mode := "linear"
 var reference_shapes: Array[Dictionary] = []
 var catch_parent_component_id := ""
@@ -907,6 +908,11 @@ func set_guide_color(color: Color) -> void:
 	queue_redraw()
 
 
+func set_bezier_color_override(color: Color) -> void:
+	bezier_color_override = color
+	queue_redraw()
+
+
 func _process(delta: float) -> void:
 	if navigation_locked or command_shortcut_active or not has_focus():
 		return
@@ -1303,12 +1309,15 @@ func _draw_bezier_geometry() -> void:
 	var edges_by_id: Dictionary = {}
 	for edge_data in bezier_edges:
 		edges_by_id[str(edge_data.get("id", ""))] = edge_data
-	var shape_color := guide_color if guide_style else Color("#55c7d9")
-	var point_mode_highlight := Color("#f2c94c") if interaction_state == "edit" and edit_mode in ["point", "face"] else shape_color
-	var edge_mode_highlight := Color("#f2c94c") if interaction_state == "edit" and edit_mode in ["edge", "face"] else shape_color
-	var selection_color := guide_color if guide_style else Color("#8fd8f8")
+	var has_color_override := bezier_color_override.a > 0.0
+	var shape_color := bezier_color_override if has_color_override else guide_color if guide_style else Color("#55c7d9")
+	var edit_highlight := shape_color.lightened(0.18) if has_color_override else Color("#f2c94c")
+	var point_mode_highlight := edit_highlight if interaction_state == "edit" and edit_mode in ["point", "face"] else shape_color
+	var edge_mode_highlight := edit_highlight if interaction_state == "edit" and edit_mode in ["edge", "face"] else shape_color
+	var selection_color := shape_color.lightened(0.28) if has_color_override else guide_color if guide_style else Color("#8fd8f8")
 	if interaction_state == "edit" and edit_mode == "face" and face_selected and display_polygon_closed and display_polygon.size() >= 3:
-		draw_colored_polygon(PackedVector2Array(display_polygon.map(func(point: Vector2) -> Vector2: return _world_to_screen(_local_to_world(point)))), Color("#8fd8f833"))
+		var face_color := Color(shape_color, 0.2) if has_color_override else Color("#8fd8f833")
+		draw_colored_polygon(PackedVector2Array(display_polygon.map(func(point: Vector2) -> Vector2: return _world_to_screen(_local_to_world(point)))), face_color)
 	for chain_data in bezier_chains:
 		for edge_id_value in chain_data.get("edge_ids", []):
 			var edge_id := str(edge_id_value)
@@ -1546,13 +1555,13 @@ func _draw_bezier_handle_preview(point_data: Dictionary) -> void:
 	var point_screen := _world_to_screen(_local_to_world(point_position))
 	if not is_zero_approx(handle_in.length_squared()):
 		var handle_in_screen := _world_to_screen(_local_to_world(point_position + handle_in))
-		var handle_in_color := Color("#c084fc")
+		var handle_in_color := bezier_color_override.darkened(0.12) if bezier_color_override.a > 0.0 else Color("#c084fc")
 		draw_line(point_screen, handle_in_screen, handle_in_color, 1.5)
 		draw_circle(handle_in_screen, 5.0, handle_in_color, false, 1.5)
 		draw_string(ThemeDB.fallback_font, handle_in_screen + Vector2(7.0, -6.0), "In", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, handle_in_color)
 	if not is_zero_approx(handle_out.length_squared()):
 		var handle_out_screen := _world_to_screen(_local_to_world(point_position + handle_out))
-		var handle_out_color := Color("#38bdf8")
+		var handle_out_color := bezier_color_override.lightened(0.2) if bezier_color_override.a > 0.0 else Color("#38bdf8")
 		draw_line(point_screen, handle_out_screen, handle_out_color, 1.5)
 		draw_circle(handle_out_screen, 5.0, handle_out_color, false, 1.5)
 		draw_string(ThemeDB.fallback_font, handle_out_screen + Vector2(7.0, -6.0), "Out", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, handle_out_color)
@@ -1594,7 +1603,7 @@ func _draw_draw_preview() -> void:
 	_draw_draw_point_preview()
 	var preview_position := _world_to_screen(_local_to_world(cursor_world))
 	var close_to_first := active_tool == "point" and component_draw_mode in ["closed_loop", "contour"] and _is_near_first_chain_point(cursor_world)
-	var preview_color := Color("#76e0a5") if close_to_first else guide_color if guide_style else Color("#f2c94c")
+	var preview_color := Color("#76e0a5") if close_to_first else bezier_color_override.lightened(0.18) if bezier_color_override.a > 0.0 else guide_color if guide_style else Color("#f2c94c")
 	draw_circle(preview_position, 5.0, preview_color, false, 2.0)
 	if close_to_first:
 		draw_circle(preview_position, 8.0, preview_color, false, 2.0)
@@ -1683,7 +1692,7 @@ func _draw_draw_point_preview() -> void:
 			continue
 		_draw_dashed_polyline(
 			_bezier_curve_screen_points(points_by_id[segment_start_id], points_by_id[segment_end_id]),
-			Color("#f2c94caa"),
+			Color(bezier_color_override.lightened(0.18), 0.8) if bezier_color_override.a > 0.0 else Color("#f2c94caa"),
 			1.5
 		)
 
@@ -1703,7 +1712,8 @@ func _draw_anchored_point_preview(anchor_id: String) -> void:
 		"mode": draw_point_mode, "handle_in": Vector2.ZERO,
 		"handle_out": pending_draw_handle_out if draw_pointer_down and pending_draw_has_handle else Vector2.ZERO
 	}
-	_draw_dashed_polyline(_bezier_curve_screen_points(anchor, target), Color("#f2c94caa"), 1.5)
+	var preview_color := Color(bezier_color_override.lightened(0.18), 0.8) if bezier_color_override.a > 0.0 else Color("#f2c94caa")
+	_draw_dashed_polyline(_bezier_curve_screen_points(anchor, target), preview_color, 1.5)
 
 
 func _draw_dashed_polyline(points: PackedVector2Array, line_color: Color, line_width: float) -> void:
