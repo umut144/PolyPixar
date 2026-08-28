@@ -21,7 +21,7 @@
 	"editor_state": {
 		"active_create_submodule": "Weapons",
 		"active_geometry_submodule": "Sampling",
-		"active_module": "Create",
+		"active_module": "Export",
 		"active_motion_submodule": "Animation",
 		"active_style_submodule": "Weighting",
 		"asset_cameras": {
@@ -41,10 +41,10 @@
 			},
 			"asset_11": {
 				"position": [
-					0.0696506947278976,
-					14.7362909317017
+					0.906406283378601,
+					22.0905361175537
 				],
-				"zoom": 30.6656669988078
+				"zoom": 55.3995406065393
 			},
 			"asset_12": {
 				"position": [
@@ -139,7 +139,7 @@
 			}
 		},
 		"expanded_assets": {
-			"asset_1": true,
+			"asset_1": false,
 			"asset_10": false,
 			"asset_11": true,
 			"asset_12": false,
@@ -170,9 +170,9 @@
 			"weapons": true
 		},
 		"selected_asset_id": "asset_11",
-		"selected_component_id": "",
+		"selected_component_id": "component_61",
 		"selected_edge_ids": [],
-		"selected_guide_id": "guide_8",
+		"selected_guide_id": "",
 		"selected_motion_act_id": "",
 		"selected_motion_path_id": "",
 		"selected_motion_sequence_entry_id": "",
@@ -180,8 +180,8 @@
 		"selected_weighting_style_id": "",
 		"snap": {
 			"enabled": true,
-			"grid_step": 0.1,
-			"mode": "fine",
+			"grid_step": 0.01,
+			"mode": "ultra_fine",
 			"rotation_step": 15.0
 		},
 		"world_scale": {
@@ -191,7 +191,7 @@
 	},
 	"name": "world01",
 	"paths": [],
-	"schema_version": 55,
+	"schema_version": 56,
 	"sequences": [],
 	"world_name": "Secrets, Room's & Travels'",
 	"world_settings": {
