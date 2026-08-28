@@ -4570,7 +4570,7 @@ func _mesh_batch_summary(candidates: Array[Dictionary]) -> Dictionary:
 			continue
 		var asset_id := str(asset.get("id", ""))
 		for component in asset.get("components", []):
-			if not component is Dictionary or not bool(component.get("visibility", true)) or _is_reference_component(component):
+			if not component is Dictionary or not bool(component.get("visibility", true)) or _is_reference_component(component) or _is_region(component):
 				continue
 			var issues := _component_mesh_source_validation_issues(asset, component)
 			var error_message := str(_component_mesh_reference(asset_id, str(component.get("id", ""))).get("last_error", ""))

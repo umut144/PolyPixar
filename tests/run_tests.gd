@@ -1161,14 +1161,16 @@ func _test_geometry_auto_build_service() -> void:
 	var other_component: Dictionary = component.duplicate(true)
 	other_component["id"] = "auto_symbol_body"
 	other_component["name"] = "Symbol Body"
+	var attack_region := {"id": "auto_attack_region", "type": "region", "region_type": "attack", "name": "Attack Region", "visibility": true, "points": [], "edges": [], "chains": []}
 	var test_assets: Array[Dictionary] = [
-		{"id": "auto_asset", "name": "Auto Asset", "asset_type": "character", "visibility": true, "components": [component], "guides": []},
+		{"id": "auto_asset", "name": "Auto Asset", "asset_type": "character", "visibility": true, "components": [component, attack_region], "guides": []},
 		{"id": "auto_symbol", "name": "Auto Symbol", "asset_type": "symbols", "visibility": true, "components": [other_component], "guides": []}
 	]
 	application.assets = test_assets
 	application.selected_asset_id = "auto_asset"
 	_expect(application._mesh_update_candidates("auto_asset") == ["auto_body"], "A valid unmeshed Component should appear exactly once in Update Meshes.")
 	_expect(application._all_mesh_update_candidates() == [{"asset_id": "auto_asset", "component_id": "auto_body"}, {"asset_id": "auto_symbol", "component_id": "auto_symbol_body"}], "Update Meshes should collect stable candidates globally across every Create Asset type, independent of the selected Asset.")
+	_expect((application._mesh_batch_summary(application._all_mesh_update_candidates()).get("attention", PackedStringArray()) as PackedStringArray).is_empty(), "Semantic Regions should stay outside Mesh batch attention as well as Mesh candidate collection.")
 	var build: Dictionary = application._generate_component_mesh_build("auto_asset", "auto_body")
 	_expect(bool(build.get("valid", false)) and int(build.get("meshing", {}).get("triangle_count", 0)) > 0 and int(build.get("contour_stroke", {}).get("triangle_count", 0)) > 0, "The automatic batch runner should atomically complete the Fill pipeline and the independent centered Contour Stroke Bake.")
 	application._commit_component_mesh_build("auto_asset", "auto_body", build)
