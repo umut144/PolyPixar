@@ -5,6 +5,13 @@ truth: ordered Bézier topology stored in `points`, `edges`, and `chains`.
 Primitive draw mode is a separate source model and is documented below; it
 does not serialize generated Bézier topology.
 
+Semantic Attack, Hurt, and Collision Regions reuse this same canonical
+`points`/`edges`/`chains` representation but are not visual Components. Each
+Region permits exactly one closed, valid, non-degenerate boundary; its sampled
+polygon and triangulation are derived only for validation and Runtime Export.
+Weapon Guides are instead oriented transform frames and intentionally contain
+no Bézier topology.
+
 ## Point
 
 ```text

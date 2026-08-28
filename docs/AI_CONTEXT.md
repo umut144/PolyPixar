@@ -163,9 +163,11 @@ updates the World-root `catalog.json` with the currently valid Runtime set.
 Packages are staged, verified, and replaced atomically per Asset; an invalid
 Asset retains its older package and no fallback geometry is generated, but is
 excluded from that Catalog until it validates again.
-Runtime Manifest schema 8 exports `contour_stroke_mesh` independently from the
+Runtime Manifest schema 9 exports `contour_stroke_mesh` independently from the
 unchanged Fill Mesh and adds geometry-only `closed_region_mesh` to closed
-Contours. It contains no UV, SDF, mask, or Carrier compatibility fields;
+Contours. It also exports Asset-local Weapon Attachment Frames and triangulated
+Attack/Hurt/Collision Regions as simulation metadata outside visual Components.
+It contains no UV, SDF, mask, or Carrier compatibility fields;
 older consumers must reject it.
 The normative field-level package and consumer rules live in
 `docs/RUNTIME_EXPORT_CONTRACT.md`; other documents must not redefine them.
@@ -182,7 +184,8 @@ disabled.
 ## World and export
 
 A World persists Assets plus the currently retained motion and derived
-mesh records. Assets own Components, Guides, reference-image settings, their
+mesh records. Assets own Components, transform and spine Guides, semantic
+Regions, reference-image settings, their
 Asset pivot, `asset_type`, and `authored_facing` presentation metadata. World schema 40 retains the schema-39
 free-form Component names and replaces legacy Ribbons with open Contours. Names
 are unique within an Asset and are the authored runtime-target bindings. The World `name` is its stable technical
@@ -191,6 +194,14 @@ key and owns its directory and main JSON filename. A separate persisted
 the current UI. New persistence must not add display polygons or reverse
 synchronization into Component topology. The former Godot-scene Export module
 is retired; runtime export is a batch operation over accepted derived data.
+
+World schema 52 adds transform-based Weapon Guides and semantic Regions.
+Component and Group outliner rows both expose `+`; their shared add menu
+contains `Guide → Weapon → weapon_socket_primary | grip_primary |
+attack_point_primary` and `Region → Attack | Hurt | Collision`. The same
+Weapon and Region submenus are available from the row context menu. Weapon
+Guides may use Component or Group scope and author position plus rotation only.
+Regions use the standard Closed Loop Bézier drawing/editing workflow.
 
 `catalog.json` has its own schema version and is derived automatically from
 visible Assets. Each `asset_key` is the lower-snake-case derivation of the full

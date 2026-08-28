@@ -8,7 +8,8 @@ const EXPORT_SUBMODULES: Array[String] = []
 const MOTION_SUBMODULES := ["Animation", "Path", "Act", "Sequence"]
 const WORLDS_ROOT := "res://worlds"
 const CONFIG_PATH := "res://configs/app_config.json"
-const SCHEMA_VERSION := 51
+const SCHEMA_VERSION := 52
+const REGION_TYPES := ["attack", "hurt", "collision"]
 const MAX_HISTORY_SIZE := 100
 const DRAW_MODES := ["closed_loop", "contour", "primitive"]
 const GRID_BOX_TOOL_UNITS := 0.5
@@ -160,8 +161,12 @@ var component_draw_mode_menu: PopupMenu
 var component_add_menu: PopupMenu
 var component_add_child_menu: PopupMenu
 var component_add_guide_menu: PopupMenu
+var component_add_weapon_guide_menu: PopupMenu
+var component_add_region_menu: PopupMenu
 var component_add_reference_menu: PopupMenu
 var component_context_menu: PopupMenu
+var component_context_weapon_menu: PopupMenu
+var component_context_region_menu: PopupMenu
 var group_dialog: ConfirmationDialog
 var group_name_input: LineEdit
 var guide_dialog: ConfirmationDialog
@@ -1686,16 +1691,35 @@ func _create_component_add_menu() -> void:
 	component_add_guide_menu.add_item("Cut", 3)
 	component_add_guide_menu.id_pressed.connect(_on_component_add_guide_selected)
 	component_add_menu.add_child(component_add_guide_menu)
+	component_add_weapon_guide_menu = PopupMenu.new()
+	component_add_weapon_guide_menu.name = "WeaponGuideTypes"
+	component_add_weapon_guide_menu.add_item("weapon_socket_primary", 0)
+	component_add_weapon_guide_menu.add_item("grip_primary", 1)
+	component_add_weapon_guide_menu.add_item("attack_point_primary", 2)
+	component_add_weapon_guide_menu.id_pressed.connect(_on_component_add_weapon_guide_selected)
+	component_add_guide_menu.add_child(component_add_weapon_guide_menu)
+	component_add_guide_menu.add_separator()
+	component_add_guide_menu.add_submenu_item("Weapon", "WeaponGuideTypes")
+	component_add_region_menu = PopupMenu.new()
+	component_add_region_menu.name = "RegionTypes"
+	component_add_region_menu.add_item("Attack Region", 0)
+	component_add_region_menu.add_item("Hurt Region", 1)
+	component_add_region_menu.add_item("Collision Region", 2)
+	component_add_region_menu.id_pressed.connect(_on_component_add_region_selected)
+	component_add_menu.add_child(component_add_region_menu)
 	component_add_reference_menu = PopupMenu.new()
 	component_add_reference_menu.name = "ReferenceSymbols"
 	component_add_reference_menu.id_pressed.connect(_on_component_add_reference_selected)
 	component_add_menu.add_child(component_add_reference_menu)
 	component_add_menu.add_submenu_item("Child", "ChildTypes")
 	component_add_menu.add_submenu_item("Guide", "GuideTypes")
+	component_add_menu.add_submenu_item("Region", "RegionTypes")
 	component_add_menu.add_submenu_item("Reference", "ReferenceSymbols")
 	_style_popup_menu(component_add_menu)
 	_style_popup_menu(component_add_child_menu)
 	_style_popup_menu(component_add_guide_menu)
+	_style_popup_menu(component_add_weapon_guide_menu)
+	_style_popup_menu(component_add_region_menu)
 	_style_popup_menu(component_add_reference_menu)
 	add_child(component_add_menu)
 
@@ -1703,6 +1727,23 @@ func _create_component_add_menu() -> void:
 func _create_component_context_menu() -> void:
 	component_context_menu = PopupMenu.new()
 	component_context_menu.name = "ComponentContextMenu"
+	component_context_weapon_menu = PopupMenu.new()
+	component_context_weapon_menu.name = "ContextWeaponGuideTypes"
+	component_context_weapon_menu.add_item("weapon_socket_primary", 0)
+	component_context_weapon_menu.add_item("grip_primary", 1)
+	component_context_weapon_menu.add_item("attack_point_primary", 2)
+	component_context_weapon_menu.id_pressed.connect(_on_context_weapon_guide_selected)
+	component_context_menu.add_child(component_context_weapon_menu)
+	component_context_region_menu = PopupMenu.new()
+	component_context_region_menu.name = "ContextRegionTypes"
+	component_context_region_menu.add_item("Attack Region", 0)
+	component_context_region_menu.add_item("Hurt Region", 1)
+	component_context_region_menu.add_item("Collision Region", 2)
+	component_context_region_menu.id_pressed.connect(_on_context_region_selected)
+	component_context_menu.add_child(component_context_region_menu)
+	component_context_menu.add_submenu_item("Guide → Weapon", "ContextWeaponGuideTypes", 100)
+	component_context_menu.add_submenu_item("Region", "ContextRegionTypes", 101)
+	component_context_menu.add_separator()
 	component_context_menu.add_item("Group", 4)
 	component_context_menu.add_item("Remove from Group", 5)
 	component_context_menu.add_separator()
@@ -1716,8 +1757,25 @@ func _create_component_context_menu() -> void:
 	component_context_menu.add_separator()
 	component_context_menu.add_item("Detach from Parent", 3)
 	_style_popup_menu(component_context_menu)
+	_style_popup_menu(component_context_weapon_menu)
+	_style_popup_menu(component_context_region_menu)
 	component_context_menu.id_pressed.connect(_on_component_context_menu_selected)
 	add_child(component_context_menu)
+
+
+func _on_context_weapon_guide_selected(index: int) -> void:
+	var guide_types := [AssetGuide.WEAPON_SOCKET_PRIMARY, AssetGuide.GRIP_PRIMARY, AssetGuide.ATTACK_POINT_PRIMARY]
+	if index < 0 or index >= guide_types.size():
+		return
+	var group_id := str(component_context_menu.get_meta("group_id", ""))
+	_create_weapon_guide(str(component_context_menu.get_meta("asset_id", "")), "group" if not group_id.is_empty() else "component", group_id if not group_id.is_empty() else str(component_context_menu.get_meta("component_id", "")), guide_types[index])
+
+
+func _on_context_region_selected(index: int) -> void:
+	if index < 0 or index >= REGION_TYPES.size():
+		return
+	var group_id := str(component_context_menu.get_meta("group_id", ""))
+	_create_region(str(component_context_menu.get_meta("asset_id", "")), "group" if not group_id.is_empty() else "component", group_id if not group_id.is_empty() else str(component_context_menu.get_meta("component_id", "")), REGION_TYPES[index])
 
 
 func _create_guide_dialog() -> void:
@@ -2261,6 +2319,8 @@ func _save_world() -> void:
 				"show_point_numbers": bool(component.get("show_point_numbers", false)),
 				"primitive": _serialize_primitive(component.get("primitive", {}))
 			}
+			if _is_region(component):
+				serialized_component["region_type"] = str(component.get("region_type", "attack"))
 			if _is_reference_component(component):
 				serialized_component["reference_instance_scale"] = _serialize_vector(Vector2(component.get("reference_instance_scale", Vector2.ONE)))
 			if _component_has_contour_stroke_width_override(component):
@@ -2617,6 +2677,8 @@ func _load_world(world_entry: String, persist_as_last := true) -> bool:
 				"show_point_numbers": bool(component_data.get("show_point_numbers", false)),
 				"primitive": _deserialize_primitive(component_data.get("primitive", {}))
 			}
+			if component_type == "region":
+				component["region_type"] = str(component_data.get("region_type", "attack")) if str(component_data.get("region_type", "attack")) in REGION_TYPES else "attack"
 			if component_type == "reference":
 				component["reference_instance_scale"] = _deserialize_vector(component_data.get("reference_instance_scale", [1.0, 1.0]), Vector2.ONE)
 			if _serialized_component_contour_stroke_width_is_valid(component_data):
@@ -3251,7 +3313,7 @@ func _deserialize_primitive(raw_primitive) -> Dictionary:
 
 func _serialize_asset_guide(raw_guide: Dictionary) -> Dictionary:
 	var guide := AssetGuide.normalize(raw_guide)
-	return {
+	var serialized := {
 		"id": str(guide.get("id", "")),
 		"type": "guide",
 		"guide_type": str(guide.get("guide_type", AssetGuide.SAMPLER_SPINE)),
@@ -3263,6 +3325,9 @@ func _serialize_asset_guide(raw_guide: Dictionary) -> Dictionary:
 		"edges": _serialize_edges(guide.get("edges", [])),
 		"chains": _serialize_chains(guide.get("chains", []))
 	}
+	if AssetGuide.is_weapon_frame(str(guide.get("guide_type", ""))):
+		serialized["transform"] = _serialize_transform(guide.get("transform", _default_component_transform()))
+	return serialized
 
 
 func _deserialize_asset_guide(raw_guide: Dictionary) -> Dictionary:
@@ -3271,6 +3336,8 @@ func _deserialize_asset_guide(raw_guide: Dictionary) -> Dictionary:
 	guide["points"] = topology["points"]
 	guide["edges"] = topology["edges"]
 	guide["chains"] = topology["chains"]
+	if AssetGuide.is_weapon_frame(str(guide.get("guide_type", ""))):
+		guide["transform"] = _deserialize_transform(raw_guide.get("transform", {}))
 	return AssetGuide.normalize(guide)
 
 
@@ -4149,7 +4216,7 @@ func _geometry_asset_mesh_overview(asset_id: String) -> Dictionary:
 	var mesh_component_count := 0
 	var asset_is_visible := bool(asset.get("visibility", true))
 	for component in asset.get("components", []):
-		if not component is Dictionary or str(component.get("type", "component")) == "guide" or _is_reference_component(component):
+		if not component is Dictionary or str(component.get("type", "component")) in ["guide", "region"] or _is_reference_component(component):
 			continue
 		if not asset_is_visible or not bool(component.get("visibility", true)):
 			continue
@@ -4232,6 +4299,8 @@ func _component_mesh_source_validation_issues(asset: Dictionary, component: Dict
 		return ["Component source is missing."]
 	if _is_reference_component(component):
 		return ["Reference Components use their source Asset Meshes."]
+	if _is_region(component):
+		return ["Semantic Regions are simulation metadata and do not enter the visual Mesh pipeline."]
 	var draw_mode := str(component.get("draw_mode", "closed_loop"))
 	var stroke_width_px := _effective_contour_stroke_width_px(component)
 	if draw_mode == "contour":
@@ -4929,6 +4998,8 @@ func _runtime_export_build(asset: Dictionary) -> Dictionary:
 	for component in asset.get("components", []):
 		if not component is Dictionary or not bool(component.get("visibility", true)):
 			continue
+		if _is_region(component):
+			continue
 		var component_id := str(component.get("id", ""))
 		if _is_reference_component(component):
 			var source_asset_id := str(component.get("source_asset_id", ""))
@@ -5547,6 +5618,18 @@ func _render_context_bar() -> void:
 		_render_info_bar()
 		return
 	if not selected_guide_id.is_empty():
+		var selected_guide := _get_guide(_get_asset(selected_asset_id), selected_guide_id)
+		if AssetGuide.is_weapon_frame(str(selected_guide.get("guide_type", ""))):
+			var move_button := Button.new()
+			move_button.text = "⌘1  Move Frame"
+			move_button.pressed.connect(func() -> void: _set_transform_mode("transform"))
+			context_bar.add_child(move_button)
+			var rotate_button := Button.new()
+			rotate_button.text = "⌘2  Rotate Frame"
+			rotate_button.pressed.connect(func() -> void: _set_transform_mode("rotate"))
+			context_bar.add_child(rotate_button)
+			_render_info_bar()
+			return
 		var draw_guide_menu := MenuButton.new()
 		draw_guide_menu.text = "⌘1  Draw Guide Point  ▼"
 		draw_guide_menu.custom_minimum_size = Vector2(204, 32)
@@ -8446,6 +8529,13 @@ func _render_group_outliner_tree(container: VBoxContainer, asset: Dictionary, gr
 	group_button.gui_input.connect(_on_group_outliner_gui_input.bind(str(asset.get("id", "")), group_id, group_button))
 	group_button.set_drag_forwarding(_outliner_get_drag_data.bind(str(asset.get("id", "")), group_id), _outliner_can_drop_data.bind(str(asset.get("id", "")), group_id), _outliner_drop_data.bind(str(asset.get("id", "")), group_id))
 	group_row.add_child(group_button)
+	var add_button := Button.new()
+	add_button.text = "+"
+	add_button.custom_minimum_size = Vector2(28, 30)
+	add_button.focus_mode = Control.FOCUS_NONE
+	add_button.tooltip_text = "Add Child, Guide, or Region to Group"
+	add_button.pressed.connect(_open_group_add_menu.bind(str(asset.get("id", "")), group_id, add_button))
+	group_row.add_child(add_button)
 	var group_components: Array = []
 	for component in asset.get("components", []):
 		if str(component.get("group_id", "")) != group_id:
@@ -8662,7 +8752,7 @@ func _render_component_outliner_tree(container: VBoxContainer, asset: Dictionary
 	add_button.text = "+"
 	add_button.custom_minimum_size = Vector2(28, 30)
 	add_button.focus_mode = Control.FOCUS_NONE
-	add_button.tooltip_text = "Add Child or Guide"
+	add_button.tooltip_text = "Add Child, Guide, or Region"
 	add_button.pressed.connect(_open_component_add_menu.bind(asset_id, component_id, add_button))
 	component_row.add_child(add_button)
 	var children := ComponentHierarchy.children(asset, component_id)
@@ -8729,9 +8819,12 @@ func _render_component_guide_row(container: VBoxContainer, asset: Dictionary, gu
 
 
 func _guide_display_name(asset: Dictionary, guide: Dictionary) -> String:
-	var target_component := _get_component(asset, str(guide.get("scope", {}).get("component_id", "")))
-	var component_name := str(target_component.get("name", "Unassigned"))
-	return AssetGuide.outliner_name(guide, component_name)
+	var scope: Dictionary = guide.get("scope", {})
+	var scope_record := ComponentHierarchy.group_by_id(asset, str(scope.get("group_id", ""))) if str(scope.get("kind", "component")) == "group" else _get_component(asset, str(scope.get("component_id", "")))
+	var scope_name := str(scope_record.get("name", "Unassigned"))
+	if AssetGuide.is_weapon_frame(str(guide.get("guide_type", ""))):
+		return "%s → %s" % [scope_name, str(guide.get("guide_type", ""))]
+	return AssetGuide.outliner_name(guide, scope_name)
 
 
 func _strikethrough_text(text: String) -> String:
@@ -8781,6 +8874,8 @@ func _open_component_add_menu(asset_id: String, parent_component_id: String, anc
 		return
 	component_add_menu.set_meta("asset_id", asset_id)
 	component_add_menu.set_meta("parent_component_id", parent_component_id)
+	component_add_menu.set_meta("scope_kind", "component")
+	component_add_menu.set_meta("scope_id", parent_component_id)
 	component_add_reference_menu.clear()
 	for source_asset in assets:
 		if _asset_type(source_asset) != "symbols" or str(source_asset.get("id", "")) == asset_id:
@@ -8791,10 +8886,22 @@ func _open_component_add_menu(asset_id: String, parent_component_id: String, anc
 	component_add_menu.popup()
 
 
+func _open_group_add_menu(asset_id: String, group_id: String, anchor: Control) -> void:
+	if ComponentHierarchy.group_by_id(_get_asset(asset_id), group_id).is_empty():
+		return
+	component_add_menu.set_meta("asset_id", asset_id)
+	component_add_menu.set_meta("parent_component_id", "")
+	component_add_menu.set_meta("scope_kind", "group")
+	component_add_menu.set_meta("scope_id", group_id)
+	component_add_reference_menu.clear()
+	component_add_menu.position = Vector2i(anchor.global_position + Vector2(0.0, anchor.size.y))
+	component_add_menu.popup()
+
+
 func _on_component_add_child_selected(index: int) -> void:
 	if index < 0 or index >= DRAW_MODES.size():
 		return
-	_open_component_name_dialog(str(component_add_menu.get_meta("asset_id", "")), str(component_add_menu.get_meta("parent_component_id", "")), DRAW_MODES[index])
+	_open_component_name_dialog(str(component_add_menu.get_meta("asset_id", "")), str(component_add_menu.get_meta("parent_component_id", "")), DRAW_MODES[index], "", str(component_add_menu.get_meta("scope_id", "")) if str(component_add_menu.get_meta("scope_kind", "component")) == "group" else "")
 
 
 func _on_component_add_guide_selected(index: int) -> void:
@@ -8802,6 +8909,29 @@ func _on_component_add_guide_selected(index: int) -> void:
 	if index < 0 or index >= guide_types.size():
 		return
 	_create_guide(str(component_add_menu.get_meta("asset_id", "")), str(component_add_menu.get_meta("parent_component_id", "")), str(guide_types[index]))
+
+
+func _on_component_add_weapon_guide_selected(index: int) -> void:
+	var guide_types := [AssetGuide.WEAPON_SOCKET_PRIMARY, AssetGuide.GRIP_PRIMARY, AssetGuide.ATTACK_POINT_PRIMARY]
+	if index < 0 or index >= guide_types.size():
+		return
+	_create_weapon_guide(
+		str(component_add_menu.get_meta("asset_id", "")),
+		str(component_add_menu.get_meta("scope_kind", "component")),
+		str(component_add_menu.get_meta("scope_id", "")),
+		str(guide_types[index])
+	)
+
+
+func _on_component_add_region_selected(index: int) -> void:
+	if index < 0 or index >= REGION_TYPES.size():
+		return
+	_create_region(
+		str(component_add_menu.get_meta("asset_id", "")),
+		str(component_add_menu.get_meta("scope_kind", "component")),
+		str(component_add_menu.get_meta("scope_id", "")),
+		REGION_TYPES[index]
+	)
 
 
 func _on_component_add_reference_selected(index: int) -> void:
@@ -8836,7 +8966,7 @@ func _normalize_component_draw_mode(raw_mode, source_schema_version: int) -> Str
 	return draw_mode if draw_mode in DRAW_MODES else "closed_loop"
 
 
-func _open_component_name_dialog(asset_id: String, parent_component_id: String, draw_mode: String, source_asset_id := "") -> void:
+func _open_component_name_dialog(asset_id: String, parent_component_id: String, draw_mode: String, source_asset_id := "", group_id := "") -> void:
 	var asset := _get_asset(asset_id)
 	if asset.is_empty():
 		return
@@ -8844,6 +8974,7 @@ func _open_component_name_dialog(asset_id: String, parent_component_id: String, 
 	component_dialog.set_meta("parent_component_id", parent_component_id)
 	component_dialog.set_meta("draw_mode", draw_mode)
 	component_dialog.set_meta("source_asset_id", source_asset_id)
+	component_dialog.set_meta("group_id", group_id)
 	component_dialog.title = "Add %s" % ("Symbol Reference" if draw_mode == "reference" else "%s Component" % _draw_mode_display_name(draw_mode))
 	component_name_input.text = ""
 	_update_component_name_dialog_validation()
@@ -8929,6 +9060,85 @@ func _create_guide(asset_id: String, component_id: String, guide_type: String, l
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
+
+
+func _create_weapon_guide(asset_id: String, scope_kind: String, scope_id: String, guide_type: String) -> void:
+	var asset := _get_asset(asset_id)
+	var valid_scope := not ComponentHierarchy.group_by_id(asset, scope_id).is_empty() if scope_kind == "group" else not _get_component(asset, scope_id).is_empty()
+	if asset.is_empty() or not valid_scope or not AssetGuide.is_weapon_frame(guide_type):
+		return
+	for existing in asset.get("guides", []):
+		if str(existing.get("guide_type", "")) == guide_type:
+			_show_status_message("%s already exists on this Asset." % guide_type)
+			return
+	_record_direct_change()
+	var guide_id := "guide_%d" % next_guide_id
+	next_guide_id += 1
+	asset["guides"].append(AssetGuide.create_weapon_frame(guide_id, guide_type, scope_kind, scope_id))
+	selected_asset_id = asset_id
+	selected_component_id = ""
+	selected_component_ids.clear()
+	selected_group_id = ""
+	selected_guide_id = guide_id
+	active_state = "transform"
+	active_draw_tool = ""
+	_set_outliner_asset_expanded(asset_id, true)
+	_show_status_message("Created %s." % guide_type)
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _create_region(asset_id: String, scope_kind: String, scope_id: String, region_type: String) -> void:
+	var asset := _get_asset(asset_id)
+	var valid_scope := not ComponentHierarchy.group_by_id(asset, scope_id).is_empty() if scope_kind == "group" else not _get_component(asset, scope_id).is_empty()
+	if asset.is_empty() or not valid_scope or region_type not in REGION_TYPES:
+		return
+	_record_direct_change()
+	var component_id := "component_%d" % next_component_id
+	next_component_id += 1
+	var base_name := "%s_region" % region_type
+	var region_name := base_name
+	var suffix := 2
+	while _has_component_name(asset, region_name):
+		region_name = "%s_%d" % [base_name, suffix]
+		suffix += 1
+	var region := {
+		"id": component_id,
+		"type": "region",
+		"region_type": region_type,
+		"name": region_name,
+		"source_asset_id": "",
+		"parent_component_id": scope_id if scope_kind == "component" else "",
+		"group_id": scope_id if scope_kind == "group" else "",
+		"points": [], "edges": [], "chains": [],
+		"transform": _default_component_transform(),
+		"visibility": true,
+		"z_index": 0,
+		"draw_mode": "closed_loop",
+		"topology_role": "outer",
+		"geometry_source": "bezier",
+		"primitive": {},
+		"catch_parent_component_id": "",
+		"show_point_numbers": false
+	}
+	asset["components"].append(region)
+	selected_asset_id = asset_id
+	selected_component_id = component_id
+	selected_component_ids = [component_id]
+	selected_group_id = ""
+	selected_guide_id = ""
+	active_state = "draw"
+	active_draw_tool = "point"
+	_set_outliner_asset_expanded(asset_id, true)
+	_show_status_message("Created %s Region · draw and close its boundary." % region_type.capitalize())
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _is_region(component: Dictionary) -> bool:
+	return str(component.get("type", "component")) == "region"
 
 
 func _component_local_visual_center(component: Dictionary) -> Vector2:
@@ -9602,6 +9812,9 @@ func _confirm_component_creation() -> void:
 	var draw_mode := str(component_dialog.get_meta("draw_mode", "closed_loop"))
 	var is_reference := draw_mode == "reference"
 	var parent_component_id := str(component_dialog.get_meta("parent_component_id", ""))
+	var target_group_id := str(component_dialog.get_meta("group_id", ""))
+	if not target_group_id.is_empty() and ComponentHierarchy.group_by_id(asset, target_group_id).is_empty():
+		target_group_id = ""
 	if not parent_component_id.is_empty() and _get_component(asset, parent_component_id).is_empty():
 		parent_component_id = ""
 	var component_transform := _default_component_transform()
@@ -9618,7 +9831,7 @@ func _confirm_component_creation() -> void:
 		"name": component_name,
 		"source_asset_id": str(component_dialog.get_meta("source_asset_id", "")) if is_reference else "",
 		"parent_component_id": parent_component_id,
-		"group_id": "",
+		"group_id": target_group_id,
 		"points": [],
 		"edges": [],
 		"chains": [],
@@ -10065,6 +10278,9 @@ func _render_guide_inspector(asset: Dictionary, guide: Dictionary) -> void:
 	if guide.is_empty():
 		inspector_content.add_child(_create_inspector_field_label("Guide not found."))
 		return
+	if AssetGuide.is_weapon_frame(str(guide.get("guide_type", ""))):
+		_render_weapon_guide_inspector(asset, guide)
+		return
 	inspector_content.add_child(_create_inspector_field_label("Name"))
 	inspector_content.add_child(_create_inspector_field_label(_guide_display_name(asset, guide)))
 	inspector_content.add_child(_create_inspector_field_label("Type"))
@@ -10107,6 +10323,61 @@ func _render_guide_inspector(asset: Dictionary, guide: Dictionary) -> void:
 	delete_button.focus_mode = Control.FOCUS_NONE
 	delete_button.pressed.connect(_delete_selected_guide)
 	inspector_content.add_child(delete_button)
+
+
+func _render_weapon_guide_inspector(asset: Dictionary, guide: Dictionary) -> void:
+	inspector_content.add_child(_create_inspector_field_label(str(guide.get("guide_type", ""))))
+	var scope: Dictionary = guide.get("scope", {})
+	var scope_kind := str(scope.get("kind", "component"))
+	var scope_id := str(scope.get("group_id", "")) if scope_kind == "group" else str(scope.get("component_id", ""))
+	var scope_record := ComponentHierarchy.group_by_id(asset, scope_id) if scope_kind == "group" else _get_component(asset, scope_id)
+	inspector_content.add_child(_create_inspector_field_label("Parent %s: %s" % [scope_kind.capitalize(), str(scope_record.get("name", "Missing"))]))
+	inspector_content.add_child(_create_inspector_section("Local Frame"))
+	var transform: Dictionary = guide.get("transform", _default_component_transform())
+	var grid := GridContainer.new()
+	grid.columns = 2
+	_add_weapon_frame_field(grid, "Position X (cm)", _editor_units_to_world(Vector2(transform.get("position", Vector2.ZERO)).x), "position_x")
+	_add_weapon_frame_field(grid, "Position Y (cm)", _editor_units_to_world(Vector2(transform.get("position", Vector2.ZERO)).y), "position_y")
+	_add_weapon_frame_field(grid, "Rotation (deg)", float(transform.get("rotation", 0.0)), "rotation")
+	inspector_content.add_child(grid)
+	var status := _create_inspector_field_label("Frame: Valid" if AssetGuide.validation_issues(guide).is_empty() and not scope_record.is_empty() else "Frame: Invalid or unassigned")
+	status.add_theme_color_override("font_color", Color("#75b88a") if AssetGuide.validation_issues(guide).is_empty() and not scope_record.is_empty() else Color("#ef6c78"))
+	inspector_content.add_child(status)
+	var delete_button := Button.new()
+	delete_button.text = "Delete Weapon Guide"
+	delete_button.pressed.connect(_delete_selected_guide)
+	inspector_content.add_child(delete_button)
+
+
+func _add_weapon_frame_field(grid: GridContainer, label_text: String, value: float, property_name: String) -> void:
+	grid.add_child(_create_inspector_field_label(label_text))
+	var field := SpinBox.new()
+	field.min_value = -100000.0
+	field.max_value = 100000.0
+	field.step = 0.1
+	field.set_value_no_signal(value)
+	field.value_changed.connect(_on_weapon_frame_value_changed.bind(property_name))
+	grid.add_child(field)
+
+
+func _on_weapon_frame_value_changed(value: float, property_name: String) -> void:
+	var guide := _get_guide(_get_asset(selected_asset_id), selected_guide_id)
+	if guide.is_empty() or not AssetGuide.is_weapon_frame(str(guide.get("guide_type", ""))):
+		return
+	_record_coalesced_change()
+	var transform: Dictionary = guide.get("transform", _default_component_transform())
+	var position := Vector2(transform.get("position", Vector2.ZERO))
+	if property_name == "position_x":
+		position.x = _world_to_editor_units(value)
+	elif property_name == "position_y":
+		position.y = _world_to_editor_units(value)
+	elif property_name == "rotation":
+		transform["rotation"] = value
+	transform["position"] = position
+	transform["scale"] = Vector2.ONE
+	transform["pivot"] = Vector2.ZERO
+	guide["transform"] = transform
+	_render_canvas_context()
 
 
 func _render_weighting_inspector() -> void:
@@ -14948,6 +15219,9 @@ func _render_canvas_context() -> void:
 	if not selected_guide_id.is_empty():
 		var selected_guide := _get_guide(asset, selected_guide_id)
 		if not selected_guide.is_empty():
+			if AssetGuide.is_weapon_frame(str(selected_guide.get("guide_type", ""))):
+				_render_weapon_guide_canvas(asset, selected_guide)
+				return
 			_render_spine_canvas(asset, selected_guide, active_state == "draw" and active_draw_tool == "spine")
 			return
 	if not selected_group_id.is_empty():
@@ -15068,6 +15342,34 @@ func _render_spine_canvas(asset: Dictionary, guide: Dictionary, drawing: bool) -
 	canvas_view.call_deferred("grab_focus")
 
 
+func _weapon_guide_scope_world_transform(asset: Dictionary, guide: Dictionary) -> Transform2D:
+	var scope: Dictionary = guide.get("scope", {})
+	if str(scope.get("kind", "component")) == "group":
+		return ComponentHierarchy.group_world_transform(asset, str(scope.get("group_id", "")))
+	return ComponentHierarchy.world_transform(asset, str(scope.get("component_id", "")))
+
+
+func _weapon_guide_world_transform_record(asset: Dictionary, guide: Dictionary) -> Dictionary:
+	var affine := _weapon_guide_scope_world_transform(asset, guide) * ComponentHierarchy.local_transform(guide.get("transform", {}))
+	return ComponentHierarchy.transform_record_from_affine(affine, Vector2.ZERO)
+
+
+func _render_weapon_guide_canvas(asset: Dictionary, guide: Dictionary) -> void:
+	var guide_type := str(guide.get("guide_type", ""))
+	canvas_context_label.text = "Weapon Guide: %s" % guide_type
+	canvas_view.set_context(guide_type)
+	canvas_view.set_guide_style(true)
+	canvas_view.set_guide_color(AssetGuide.color(guide_type))
+	canvas_view.set_reference_shapes(_build_reference_shapes(asset))
+	canvas_view.set_display_polygon([])
+	canvas_view.set_bezier_geometry([], [], [])
+	canvas_view.set_component_transform(_weapon_guide_world_transform_record(asset, guide))
+	canvas_view.set_interaction_state("transform")
+	canvas_view.set_transform_mode(active_transform_mode if active_transform_mode in ["transform", "rotate"] else "transform")
+	canvas_view.set_tool_mode("")
+	canvas_view.call_deferred("grab_focus")
+
+
 func _set_reference_image_canvas(asset: Dictionary) -> void:
 	var reference_image := _normalize_reference_image(asset.get("reference_image", {}))
 	var reference_path := _reference_image_path(asset)
@@ -15131,6 +15433,8 @@ func _normalized_component_name(component: Dictionary) -> String:
 
 func _component_tree_name(component: Dictionary) -> String:
 	var component_name := _normalized_component_name(component)
+	if _is_region(component):
+		return "%s Region: %s" % [str(component.get("region_type", "attack")).capitalize(), component_name]
 	return "R: %s" % component_name if _is_reference_component(component) else component_name
 
 
@@ -15342,6 +15646,18 @@ func _on_asset_pivot_changed(pivot: Vector2) -> void:
 
 func _on_transform_changed(transform: Dictionary) -> void:
 	var asset := _get_asset(selected_asset_id)
+	if not selected_guide_id.is_empty():
+		var guide := _get_guide(asset, selected_guide_id)
+		if guide.is_empty() or not AssetGuide.is_weapon_frame(str(guide.get("guide_type", ""))):
+			return
+		_record_coalesced_change()
+		var local_affine := _weapon_guide_scope_world_transform(asset, guide).affine_inverse() * ComponentHierarchy.local_transform(transform)
+		var local_record := ComponentHierarchy.transform_record_from_affine(local_affine, Vector2.ZERO)
+		local_record["scale"] = Vector2.ONE
+		local_record["pivot"] = Vector2.ZERO
+		guide["transform"] = local_record
+		_render_inspector()
+		return
 	if not selected_group_id.is_empty():
 		var group := ComponentHierarchy.group_by_id(asset, selected_group_id)
 		if group.is_empty():

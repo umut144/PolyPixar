@@ -1,10 +1,10 @@
 # PolyTools Runtime Export Contract
 
 **Status:** Normative consumer contract for Asset Catalog schema `1` and
-runtime Manifest schema `8`.
+runtime Manifest schema `9`.
 
 This document is the sole field-level contract for PolyTools Runtime packages.
-Manifest schema 8 replaces schema 7. Consumers must reject older schemas; there is
+Manifest schema 9 replaces schema 8. Consumers must reject older schemas; there is
 no SDF/Carrier/UV compatibility fallback.
 
 ## Package boundary
@@ -31,17 +31,15 @@ numbers must be finite.
 ## Compatibility policy
 
 Catalog `schema_version` must equal `1`; Manifest `schema_version` must equal
-`8`. Missing, non-integer, older, or newer versions are rejected as complete
+`9`. Missing, non-integer, older, or newer versions are rejected as complete
 packages. Missing required geometry is an error. Consumers must not synthesize
 Fill Meshes, strokes, closed Contour regions, Semantic Keys, hierarchy links,
 or referenced Assets.
 
-Schema 8 contains no UV, SDF, mask, contour-domain, padding, or Carrier field.
+Schema 9 contains no UV, SDF, mask, contour-domain, padding, or Carrier field.
 Those schema-3 concepts are not optional aliases and must not be inferred.
-The required Asset-level `presentation.authored_facing` member is an additive
-schema-8 extension: existing schema-8 consumers that ignore unknown top-level
-metadata remain compatible, while consumers that validate a closed top-level
-field set must allow `presentation` and validate the value described below.
+Schema 9 adds authored Attachment Frames and semantic Regions to the established
+schema-8 visual-component payload.
 
 ## Catalog
 
@@ -52,11 +50,11 @@ The Catalog requires `world_key`, `world_name`, and `assets`, sorted by
 
 ## Top-level Manifest
 
-Schema 8 requires:
+Schema 9 requires:
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `schema_version` | integer | Exactly `8`. |
+| `schema_version` | integer | Exactly `9`. |
 | `asset_key` | non-empty lower-snake-case string | Runtime identity. |
 | `display_name` | string | Informational authored name. |
 | `asset_type` | string | `character`, `props`, `weapons`, `terrain`, `icon`, or `symbols`. |
@@ -65,6 +63,8 @@ Schema 8 requires:
 | `z_order` | object | Exact convention below. |
 | `asset_pivot` | two floats | Asset anchor in meters. |
 | `components` | array | Sorted ordinary Components and References. |
+| `attachment_frames` | array | Oriented Asset-local Weapon attachment frames. |
+| `regions` | array | Triangulated semantic gameplay regions in Asset-local meter coordinates. |
 
 ```json
 {
@@ -106,6 +106,27 @@ in that order is the normative overlap rule. Components keep independent
 Boundaries; no cross-Component shared-edge merge or epsilon deduplication is
 part of the contract.
 
+## Attachment Frames
+
+`attachment_frames` contains transform Guides authored through
+`Guide → Weapon`. Each record contains exactly `frame_id`, `role`, and
+`asset_transform`. `role` is one of `weapon_socket_primary`, `grip_primary`, or
+`attack_point_primary` and may occur at most once per Asset. `asset_transform`
+contains a two-float meter `position` and counter-clockwise
+`rotation_radians`. Component- and Group-scoped editor transforms are resolved
+to Asset space during export; scale is inherited while authoring but is not an
+independent Frame property.
+
+## Semantic Regions
+
+`regions` contains records with `region_id`, `name`, `role`, `vertices`, and
+`indices`. `role` is `attack`, `hurt`, or `collision`. A Region must contain
+exactly one valid, closed, non-degenerate Bézier boundary. Export samples and
+triangulates that boundary with the same certified closed-region geometry
+service used elsewhere, resolves Component or Group scope to Asset space, and
+converts vertices to meters. Regions are simulation metadata and never appear
+in the visual `components` array.
+
 ## Common Component fields
 
 Every Component requires `component_id`, unique `name` in `lower_snake_case`, nullable
@@ -130,7 +151,7 @@ the same complete transform and require no geometry regeneration.
 An indexed Mesh contains `vertices`, an array of local-meter `[x,y]` pairs, and
 `indices`, a flat triangle list. Indices are in range, each triangle uses three
 distinct vertices, and a non-empty Mesh has a positive multiple of three
-indices. Schema 8 carries no UVs, normals, tangents, colors, or materials.
+indices. Schema 9 carries no UVs, normals, tangents, colors, or materials.
 
 Closed-loop and Primitive Components require `mesh` as their unchanged Fill
 Mesh. An open `contour` Component must not contain `mesh`.

@@ -295,6 +295,14 @@ Contour build also carries a separate derived Boundary triangulation for
 Runtime `closed_region_mesh`; hidden Stroke runs do not remove any part of that
 complete region.
 
+World schema 52 distinguishes visual Components, curve-based spine Guides,
+transform-based Weapon Guides, and semantic Regions. A Weapon Guide stores a
+stable role, Component-or-Group scope, and a local position/rotation frame;
+non-uniform scale is inherited from its scope and is never authored on the
+frame. A Region stores its semantic role on a nonvisual record backed by the
+canonical Closed Loop Bézier topology. Regions are excluded from visual Mesh
+batch candidates and are triangulated only for validation and Runtime Export.
+
 Sampling results carry their own algorithm version independently of the
 World schema. The junction-aware version invalidates pre-arrangement flat
 Cut Bakes at Sampling, which in turn makes Seeding stale before Meshing can
@@ -306,7 +314,7 @@ The normative serialized package and consumer contract is
 [`RUNTIME_EXPORT_CONTRACT.md`](RUNTIME_EXPORT_CONTRACT.md). The summary below
 describes how the editor produces that contract.
 
-`RuntimeExportService` builds Manifest schema 8 exclusively from current
+`RuntimeExportService` builds Manifest schema 9 exclusively from current
 accepted Fill and Contour Stroke Mesh Bakes. For a closed Contour, the current
 Stroke Bake must also contain its current complete-Boundary region
 triangulation. It rejects missing or stale inputs,
@@ -316,9 +324,10 @@ Components never derive replacement geometry during export. References emit an
 `asset_reference` record containing the local `name`, signed placement
 transform, and actual `source_asset_key`, without copying geometry into the owner.
 
-Every schema-8 Manifest also exports the Asset-level presentation metadata as
-`presentation.authored_facing`, including an explicit `neutral`. This is an
-additive schema-8 field and does not alter geometry or Component transforms.
+Every schema-9 Manifest also exports the Asset-level presentation metadata as
+`presentation.authored_facing`, oriented Asset-local Weapon Attachment Frames,
+and triangulated Asset-local semantic Regions. Regions remain outside visual
+Components and therefore cannot become rendering authority.
 
 The contract is engine-neutral: X points right, Y points up, lengths are meters,
 positive rotations are counter-clockwise radians, and one Tool unit equals
@@ -332,7 +341,7 @@ while fill-less Contours do not invent one. A closed Contour additionally
 exports `closed_region_mesh` as local-meter vertices and triangle indices. That
 field is engine-neutral geometry only and has no material, color, alpha, UV,
 rendering, or Fill semantics. Open Contours and Asset References omit it.
-Schema 8 contains no UV/SDF/Carrier fields and has no older-schema fallback.
+Schema 9 contains no UV/SDF/Carrier fields and has no older-schema fallback.
 
 Each visible Asset is exported to the active World-local
 `res://worlds/<world_key>/PolyToolsRuntimeExports/<asset_key>/` directory as
