@@ -12626,7 +12626,9 @@ func _render_inspector() -> void:
 	contour_width_field.tooltip_text = "Overrides every Contour part of the referenced source Asset without changing that Asset." if _is_reference_component(component) else ""
 	contour_width_field.value_changed.connect(_on_component_contour_stroke_width_changed)
 	inspector_content.add_child(contour_width_field)
-	inspector_content.add_child(_create_inspector_field_label("Z Index"))
+	var z_order_label := _create_inspector_field_label("Z Order (Asset-local)")
+	z_order_label.tooltip_text = "Orders Components only inside this Asset; Runtime consumers choose the Asset's contextual game layer."
+	inspector_content.add_child(z_order_label)
 	var z_index_field := SpinBox.new()
 	z_index_field.min_value = -10000
 	z_index_field.max_value = 10000
@@ -12634,6 +12636,7 @@ func _render_inspector() -> void:
 	z_index_field.value = int(component.get("z_index", 0))
 	z_index_field.custom_minimum_size = Vector2(0, 26)
 	z_index_field.add_theme_font_size_override("font_size", 11)
+	z_index_field.tooltip_text = z_order_label.tooltip_text
 	z_index_field.value_changed.connect(_on_component_z_index_changed)
 	inspector_content.add_child(z_index_field)
 
@@ -12722,7 +12725,7 @@ func _render_multi_component_inspector(asset: Dictionary, components: Array[Dict
 	var z_mixed := false
 	for value in z_values.slice(1):
 		z_mixed = z_mixed or value != z_values[0]
-	_multi_component_line_edit("Z Index", str(z_values[0]), z_mixed, "MultiZIndex", "z_index", true)
+	_multi_component_line_edit("Z Order (Asset-local)", str(z_values[0]), z_mixed, "MultiZIndex", "z_index", true)
 	var width_mixed := false
 	for value in width_values.slice(1):
 		width_mixed = width_mixed or not is_equal_approx(value, width_values[0])

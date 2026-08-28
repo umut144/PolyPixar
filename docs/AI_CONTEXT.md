@@ -85,6 +85,12 @@ Group visibility is effective for all members. Each Component exclusively owns
 its individual Z Index. Runtime export does not emit Group records; it resolves
 Group transforms into ordinary Component exports.
 
+Component Z Index is an asset-local semantic ordering value. It establishes
+the back-to-front relationship among all visual parts of one Asset but is not
+an absolute game-world depth. Runtime consumers preserve the ordering while
+mapping the Asset into their own contextual presentation range; independently
+authored Assets may therefore be placed wholly before or behind one another.
+
 World schema 41 owns the default authored Contour stroke width in its typed
 `world_settings` record. It defaults to `4 px` at the fixed `192 px/m`
 reference density. Schema 45 adds an optional finite positive

@@ -90,6 +90,13 @@ parentage, or Group parentage. Groups are editor-only containers: runtime
 export emits ordinary Components and resolves the Group transform into their
 canonical exported transforms.
 
+`z_index` is authoritative only as an asset-local semantic order across the
+complete Component set. Runtime Manifest `z_order.scope = "global"` means
+global within that Asset, not global across a consuming game scene. Consumers
+may use any strictly monotonic local depth spacing and position the complete
+Asset range contextually relative to other Assets without rewriting its
+internal order.
+
 Derived mesh documents are keyed by Asset and Component IDs. Sampling feeds
 Seeding, Seeding feeds Meshing, and accepted Bakes remain separate from source
 Component geometry. Weighting styles reference accepted mesh data without
@@ -358,7 +365,10 @@ The contract is engine-neutral: X points right, Y points up, lengths are meters,
 positive rotations are counter-clockwise radians, and one Tool unit equals
 0.1 m. Component local transforms mean
 `T(position) * R(rotation) * S(scale) * T(-pivot)`. Components are listed in
-global ascending `(z_index, component_id)` order from back to front. Group membership does not override a Component's individual `z_index`; the Group Transform and visibility still apply to its members. Accepted
+Asset-global ascending `(z_index, component_id)` order from back to front. This
+is an asset-local semantic order rather than an absolute consumer Z coordinate.
+Group membership does not override a Component's individual `z_index`; the
+Group Transform and visibility still apply to its members. Accepted
 Mesh Vertex order is retained and Triangle Vertex IDs become compact indices.
 Every ordinary Component exports a separate centered `contour_stroke_mesh`;
 closed and Primitive Components additionally export their unchanged Fill Mesh,

@@ -107,7 +107,13 @@ drawn. PolyTools exports it explicitly, including `neutral`; consumers must not
 infer geometry mirroring, transform changes, or Canvas behavior from it.
 
 Components are already sorted by ascending `(z_index, component_id)`. Drawing
-in that order is the normative overlap rule. Components keep independent
+in that order is the normative overlap rule within this Asset. `z_index` is an
+asset-local semantic ordinal, not an absolute engine or game-world depth. The
+`z_order.scope = "global"` value means that the order spans all Components in
+this one Manifest rather than resetting per hierarchy branch. A consumer may
+map adjacent values into a contextual local range, such as `1.00`, `1.01`, and
+`1.02`, and place that complete range before or behind another Asset as long as
+the authored internal order is preserved. Components keep independent
 Boundaries; no cross-Component shared-edge merge or epsilon deduplication is
 part of the contract.
 
