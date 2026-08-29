@@ -310,17 +310,13 @@ Runtime `closed_region_mesh`; hidden Stroke runs do not remove any part of that
 complete region.
 
 World schema 52 distinguishes visual Components, curve-based spine Guides,
-transform-based Weapon Guides, and semantic Regions. A Weapon Guide stores a
+transform-based Weapon Guides. A Weapon Guide stores a
 stable role, Component-or-Group scope, and a local position/rotation frame;
 non-uniform scale is inherited from its scope and is never authored on the
 frame. A Region stores its semantic role on a nonvisual record backed by the
-canonical Closed Loop Bézier topology. Regions are excluded from visual Mesh
-batch candidates and are triangulated only for validation and Runtime Export.
-The Create Outliner projects them into a dedicated flat `Regions` category;
-their authored Component-or-Group scope remains document data rather than
-visual tree placement. Region selection and Canvas Bézier presentation use a
-role-specific semantic palette—red Attack, green Hurt, and orange Collision—
-while ordinary geometry retains its cyan/yellow editing language.
+canonical transform frame. Gameplay semantics are assigned to ordinary
+Component geometry by the consuming game's design data rather than authored as
+separate PolyTools records.
 
 World schema 53 adds an authoring-only, positive uniform Asset-root Scale.
 Canvas presentation prefixes every Asset-space transform with a scale around
@@ -351,8 +347,11 @@ and rejects schema 10.
 Schema 56 adds a visible-Component-only `projection_depth_cm` authoring field.
 It defaults to `10 cm`, is persisted and exported independently of Component
 and Asset Scale, and is not owned by Groups or the Asset root. Runtime Manifest
-schema 12 carries the metric `projection_depth_meters` value for presentation
+schema 13 carries the metric `projection_depth_meters` value for presentation
 consumers.
+
+World schema 57 removes semantic gameplay Region records. Gameplay meaning is
+assigned by the consuming game to ordinary Component geometry.
 
 Sampling results carry their own algorithm version independently of the
 World schema. The junction-aware version invalidates pre-arrangement flat
@@ -365,7 +364,7 @@ The normative serialized package and consumer contract is
 [`RUNTIME_EXPORT_CONTRACT.md`](RUNTIME_EXPORT_CONTRACT.md). The summary below
 describes how the editor produces that contract.
 
-`RuntimeExportService` builds Manifest schema 11 exclusively from current
+`RuntimeExportService` builds Manifest schema 13 exclusively from current
 accepted Fill and Contour Stroke Mesh Bakes. For a closed Contour, the current
 Stroke Bake must also contain its current complete-Boundary region
 triangulation. It rejects missing or stale inputs,
@@ -375,10 +374,10 @@ Components never derive replacement geometry during export. References emit an
 `asset_reference` record containing the local `name`, signed placement
 transform, and actual `source_asset_key`, without copying geometry into the owner.
 
-Every schema-11 Manifest also exports the Asset-level presentation metadata as
+Every schema-13 Manifest also exports the Asset-level presentation metadata as
 `presentation.authored_facing`, oriented Asset-local Weapon Attachment Frames,
-and triangulated Asset-local semantic Regions. Regions remain outside visual
-Components and therefore cannot become rendering authority.
+and geometry-only closed Contour boundaries. Gameplay semantics remain outside
+PolyTools and are assigned by the consuming game.
 
 The contract is engine-neutral: X points right, Y points up, lengths are meters,
 positive rotations are counter-clockwise radians, and one Tool unit equals
@@ -395,7 +394,8 @@ while fill-less Contours do not invent one. A closed Contour additionally
 exports `closed_region_mesh` as local-meter vertices and triangle indices. That
 field is engine-neutral geometry only and has no material, color, alpha, UV,
 rendering, or Fill semantics. Open Contours and Asset References omit it.
-Schema 12 contains no UV/SDF/Carrier fields and has no older-schema fallback.
+Schema 13 contains no UV/SDF/Carrier or semantic gameplay Region fields and has
+no older-schema fallback.
 
 Each visible Asset is exported to the active World-local
 `res://worlds/<world_key>/PolyToolsRuntimeExports/<asset_key>/` directory as

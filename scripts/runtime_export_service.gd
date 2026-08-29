@@ -1,7 +1,7 @@
 class_name RuntimeExportService
 extends RefCounted
 
-const MANIFEST_SCHEMA_VERSION := 12
+const MANIFEST_SCHEMA_VERSION := 13
 const DEFAULT_PROJECTION_DEPTH_CM := 10.0
 static func build_manifest(asset: Dictionary, sources: Dictionary) -> Dictionary:
 	var errors: Array[String] = []
@@ -21,7 +21,7 @@ static func build_manifest(asset: Dictionary, sources: Dictionary) -> Dictionary
 	var ids: Dictionary = {}
 	var names: Dictionary = {}
 	for raw_component in asset.get("components", []):
-		if not raw_component is Dictionary or str(raw_component.get("type", "component")) == "region" or not _effective_visibility(asset, raw_component):
+		if not raw_component is Dictionary or not _effective_visibility(asset, raw_component):
 			continue
 		var component: Dictionary = raw_component.duplicate(true)
 		component["z_index"] = _effective_z_index(asset, component)
@@ -72,9 +72,7 @@ static func build_manifest(asset: Dictionary, sources: Dictionary) -> Dictionary
 	if not errors.is_empty():
 		return {"valid": false, "errors": errors, "manifest": {}}
 	var attachment_frames_build := _build_attachment_frames(asset)
-	var regions_build := _build_regions(asset)
 	errors.append_array(attachment_frames_build.get("errors", []))
-	errors.append_array(regions_build.get("errors", []))
 	if not errors.is_empty():
 		return {"valid": false, "errors": errors, "manifest": {}}
 	var manifest := {
@@ -102,8 +100,7 @@ static func build_manifest(asset: Dictionary, sources: Dictionary) -> Dictionary
 		},
 		"asset_pivot": _meters(asset_pivot),
 		"components": manifest_components,
-		"attachment_frames": attachment_frames_build.get("items", []),
-		"regions": regions_build.get("items", [])
+		"attachment_frames": attachment_frames_build.get("items", [])
 	}
 	var manifest_issues := manifest_validation_issues(manifest)
 	if not manifest_issues.is_empty():
@@ -149,55 +146,6 @@ static func _build_attachment_frames(asset: Dictionary) -> Dictionary:
 			}
 		})
 	items.sort_custom(func(left: Dictionary, right: Dictionary) -> bool: return str(left.get("role", "")) < str(right.get("role", "")))
-	return {"items": items, "errors": errors}
-
-
-static func _build_regions(asset: Dictionary) -> Dictionary:
-	var items: Array = []
-	var errors: Array[String] = []
-	var region_ids: Dictionary = {}
-	for raw_region in asset.get("components", []):
-		if not raw_region is Dictionary or str(raw_region.get("type", "component")) != "region":
-			continue
-		var region: Dictionary = raw_region
-		var region_id := str(region.get("id", ""))
-		var region_name := str(region.get("name", "")).strip_edges()
-		if region_id.is_empty() or region_ids.has(region_id) or not _is_lower_snake_case(region_name):
-			errors.append("Every Region requires a unique stable ID and lower_snake_case name.")
-			continue
-		region_ids[region_id] = true
-		var role := str(region.get("region_type", ""))
-		if role not in ["attack", "hurt", "collision"]:
-			errors.append("Region '%s' has an unknown role." % str(region.get("name", region.get("id", ""))))
-			continue
-		var mesh := ClosedRegionMeshService.generate({
-			"draw_mode": "contour",
-			"points": region.get("points", []),
-			"edges": region.get("edges", []),
-			"chains": region.get("chains", [])
-		})
-		if not bool(mesh.get("valid", false)):
-			var mesh_errors: Array = mesh.get("errors", [])
-			errors.append("Region '%s': %s" % [str(region.get("name", region.get("id", ""))), str(mesh_errors[0]) if not mesh_errors.is_empty() else "invalid closed boundary"])
-			continue
-		var world := ComponentHierarchy.world_transform(asset, region_id)
-		var vertices: Array = []
-		var vertex_indices: Dictionary = {}
-		for raw_vertex in mesh.get("vertices", []):
-			vertex_indices[str(raw_vertex.get("id", ""))] = vertices.size()
-			vertices.append(_meters(world * Vector2(raw_vertex.get("position", Vector2.ZERO))))
-		var indices: Array[int] = []
-		for triangle in mesh.get("triangles", []):
-			for vertex_id in triangle.get("vertex_ids", []):
-				indices.append(int(vertex_indices.get(str(vertex_id), -1)))
-		items.append({
-			"region_id": region_id,
-			"name": region_name,
-			"role": role,
-			"vertices": vertices,
-			"indices": indices
-		})
-	items.sort_custom(func(left: Dictionary, right: Dictionary) -> bool: return str(left.get("region_id", "")) < str(right.get("region_id", "")))
 	return {"items": items, "errors": errors}
 
 
@@ -384,8 +332,8 @@ static func manifest_validation_issues(manifest: Dictionary) -> Array[String]:
 	if str(manifest.get("asset_key", "")).is_empty() or not manifest.get("components", null) is Array:
 		errors.append("Runtime Manifest requires an Asset Key and Component array.")
 		return errors
-	if not manifest.get("attachment_frames", null) is Array or not manifest.get("regions", null) is Array:
-		errors.append("Runtime Manifest schema 11 requires attachment_frames and regions arrays.")
+	if not manifest.get("attachment_frames", null) is Array:
+		errors.append("Runtime Manifest schema 13 requires an attachment_frames array.")
 		return errors
 	var presentation = manifest.get("presentation")
 	if not presentation is Dictionary or presentation.keys() != ["authored_facing"] \
@@ -443,16 +391,6 @@ static func manifest_validation_issues(manifest: Dictionary) -> Array[String]:
 		var frame_transform = raw_frame.get("asset_transform")
 		if not frame_transform is Dictionary or not frame_transform.get("position", null) is Array or frame_transform.get("position", []).size() != 2 or typeof(frame_transform.get("rotation_radians", null)) not in [TYPE_INT, TYPE_FLOAT]:
 			errors.append("Attachment Frame asset_transform is invalid.")
-	for raw_region in manifest.get("regions", []):
-		if not raw_region is Dictionary or str(raw_region.get("role", "")) not in ["attack", "hurt", "collision"]:
-			errors.append("Runtime Manifest contains an invalid Region record.")
-			continue
-		var region_vertices = raw_region.get("vertices", null)
-		var region_indices = raw_region.get("indices", null)
-		if not region_vertices is Array or not region_indices is Array:
-			errors.append("Runtime Region requires vertices and indices arrays.")
-		else:
-			errors.append_array(_triangle_geometry_validation_issues(region_vertices, region_indices, str(raw_region.get("name", raw_region.get("region_id", "Region"))), "Region"))
 	return errors
 
 

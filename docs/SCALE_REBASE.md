@@ -5,7 +5,7 @@
 World schema 53 adds `Scale` to the root Asset Inspector. It is one positive
 uniform factor (for example, `3.6` means 3.6 times the current size), previewed
 around the unchanged Asset Pivot across the complete Asset: Components,
-Groups, References, Guides, Weapon frames, and semantic Regions.
+Groups, References, Guides, and Weapon frames.
 
 `Rebase Asset Scale` atomically bakes the preview into canonical authoring
 data and resets Root Scale to exactly `1`. Local positions, Bézier Points and

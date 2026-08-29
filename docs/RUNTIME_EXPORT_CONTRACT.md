@@ -1,10 +1,10 @@
 # PolyTools Runtime Export Contract
 
 **Status:** Normative consumer contract for Asset Catalog schema `1` and
-runtime Manifest schema `11`.
+runtime Manifest schema `13`.
 
 This document is the sole field-level contract for PolyTools Runtime packages.
-Manifest schema 11 replaces schema 10. Consumers must reject older schemas; there is
+Manifest schema 13 replaces schema 12. Consumers must reject older schemas; there is
 no SDF/Carrier/UV compatibility fallback.
 
 ## Package boundary
@@ -36,15 +36,14 @@ package dimensions.
 ## Compatibility policy
 
 Catalog `schema_version` must equal `1`; Manifest `schema_version` must equal
-`11`. Missing, non-integer, older, or newer versions are rejected as complete
+`13`. Missing, non-integer, older, or newer versions are rejected as complete
 packages. Missing required geometry is an error. Consumers must not synthesize
 Fill Meshes, strokes, closed Contour regions, Semantic Keys, hierarchy links,
 or referenced Assets.
 
-Schema 12 contains no UV, SDF, mask, contour-domain, padding, or Carrier field.
-Those schema-3 concepts are not optional aliases and must not be inferred.
-Schema 12 retains the schema-10 visual, Attachment Frame, and semantic Region
-payload and adds the optional `grip_secondary` Attachment Frame role.
+Schema 13 contains no UV, SDF, mask, contour-domain, padding, Carrier, or
+semantic gameplay Region field. Gameplay roles are assigned by the consuming
+game to ordinary Components; they must not be inferred by PolyTools consumers.
 
 ## Catalog
 
@@ -55,11 +54,11 @@ The Catalog requires `world_key`, `world_name`, and `assets`, sorted by
 
 ## Top-level Manifest
 
-Schema 12 requires:
+Schema 13 requires:
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `schema_version` | integer | Exactly `12`. |
+| `schema_version` | integer | Exactly `13`. |
 | `asset_key` | non-empty lower-snake-case string | Runtime identity. |
 | `display_name` | string | Informational authored name. |
 | `asset_type` | string | `character`, `props`, `weapons`, `terrain`, `icon`, or `symbols`. |
@@ -69,7 +68,6 @@ Schema 12 requires:
 | `asset_pivot` | two floats | Asset anchor in meters. |
 | `components` | array | Sorted ordinary Components and References. |
 | `attachment_frames` | array | Oriented Asset-local Weapon attachment frames. |
-| `regions` | array | Triangulated semantic gameplay regions in Asset-local meter coordinates. |
 
 ```json
 {
@@ -132,16 +130,6 @@ contains a two-float meter `position` and counter-clockwise
 `rotation_radians`. Component- and Group-scoped editor transforms are resolved
 to Asset space during export; scale is inherited while authoring but is not an
 independent Frame property.
-
-## Semantic Regions
-
-`regions` contains records with `region_id`, `name`, `role`, `vertices`, and
-`indices`. `role` is `attack`, `hurt`, or `collision`. A Region must contain
-exactly one valid, closed, non-degenerate Bézier boundary. Export samples and
-triangulates that boundary with the same certified closed-region geometry
-service used elsewhere, resolves Component or Group scope to Asset space, and
-converts vertices to meters. Regions are simulation metadata and never appear
-in the visual `components` array.
 
 ## Common Component fields
 

@@ -402,13 +402,13 @@ func _test_closed_contour_region_mesh() -> void:
 	var export_result := RuntimeExportService.build_manifest(export_asset, {"convex_contour": {"contour_stroke": export_bake}})
 	var exported_component: Dictionary = export_result.get("manifest", {}).get("components", [])[0] if bool(export_result.get("valid", false)) else {}
 	var exported_region: Dictionary = exported_component.get("closed_region_mesh", {})
-	_expect(bool(export_result.get("valid", false)) and int(export_result.get("manifest", {}).get("schema_version", 0)) == 12 and str(exported_region.get("role", "")) == "closed_contour_region" and not exported_region.get("indices", []).is_empty(), "Schema 12 must export a non-empty closed_region_mesh for a valid closed Contour.")
+	_expect(bool(export_result.get("valid", false)) and int(export_result.get("manifest", {}).get("schema_version", 0)) == 13 and str(exported_region.get("role", "")) == "closed_contour_region" and not exported_region.get("indices", []).is_empty(), "Schema 13 must export a non-empty closed_region_mesh for a valid closed Contour.")
 	_expect(exported_region.keys().size() == 3 and exported_region.has("role") and exported_region.has("vertices") and exported_region.has("indices") and not exported_region.has("material") and not exported_component.has("mesh"), "closed_region_mesh must contain only engine-neutral geometry and must not introduce a Contour Fill Mesh.")
 	_expect(exported_region.get("vertices", [])[0] == [-0.2, -0.30000000000000004], "Closed region vertices must subtract the authored Component pivot and convert Tool units to meters.")
-	_expect(RuntimeExportService.manifest_validation_issues(export_result.get("manifest", {})).is_empty(), "A generated schema-11 Runtime Manifest must pass strict validation.")
+	_expect(RuntimeExportService.manifest_validation_issues(export_result.get("manifest", {})).is_empty(), "A generated schema-13 Runtime Manifest must pass strict validation.")
 	var old_schema_manifest: Dictionary = export_result.get("manifest", {}).duplicate(true)
 	old_schema_manifest["schema_version"] = 10
-	_expect(not RuntimeExportService.manifest_validation_issues(old_schema_manifest).is_empty(), "Runtime validation must strictly reject schema 10 after the schema-11 contract change.")
+	_expect(not RuntimeExportService.manifest_validation_issues(old_schema_manifest).is_empty(), "Runtime validation must strictly reject an older Runtime Manifest schema.")
 	var styled_manifest: Dictionary = export_result.get("manifest", {}).duplicate(true)
 	styled_manifest["components"][0]["closed_region_mesh"]["material"] = "forbidden"
 	_expect(not RuntimeExportService.manifest_validation_issues(styled_manifest).is_empty(), "Runtime validation must reject render or material fields in closed_region_mesh.")
@@ -439,7 +439,7 @@ func _test_closed_contour_region_mesh() -> void:
 
 	var application = load("res://scripts/main.gd").new()
 	var runtime_manifest_text := JSON.stringify(export_result.get("manifest", {}), "\t")
-	_expect(application._runtime_manifest_text_matches(runtime_manifest_text, runtime_manifest_text), "Runtime package staging must strictly accept the generated schema-11 closed-region payload after JSON round-trip.")
+	_expect(application._runtime_manifest_text_matches(runtime_manifest_text, runtime_manifest_text), "Runtime package staging must strictly accept the generated schema-13 closed-region payload after JSON round-trip.")
 	var document: Dictionary = application._default_geometry_document("region_asset", "convex_contour")
 	export_bake["bake_id"] = "closed_region_bake"
 	document["meshing"]["bakes"] = {ContourMeshService.METHOD: export_bake}
@@ -968,9 +968,6 @@ func _test_asset_scale_rebase() -> void:
 	var component := _component()
 	component.merge({"id": "head", "name": "head", "visibility": true, "parent_component_id": "", "group_id": "hammer_group", "transform": {"position": Vector2(4.0, 3.0), "rotation": 20.0, "scale": Vector2.ONE, "pivot": Vector2(1.0, 2.0)}})
 	BezierTopology.add_point(component, Vector2(2.0, 1.0), "free", Vector2(0.5, -0.25))
-	var region := _component()
-	region.merge({"id": "attack_region", "type": "region", "region_type": "attack", "name": "attack_region", "visibility": true, "parent_component_id": "head", "group_id": "", "transform": {"position": Vector2(3.0, -1.0), "rotation": -10.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}})
-	BezierTopology.add_point(region, Vector2(1.0, 2.0), "linear")
 	var circle := {"id": "pommel", "name": "pommel", "visibility": true, "parent_component_id": "", "group_id": "", "draw_mode": "primitive", "geometry_source": "primitive", "primitive": {"type": "circle", "center": Vector2(1.0, -2.0), "diameter_cm": 5.0}, "points": [], "edges": [], "chains": [], "transform": {"position": Vector2(8.0, 9.0), "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}}
 	var reference := {"id": "reference", "name": "reference", "type": "reference", "source_asset_id": "source", "visibility": true, "parent_component_id": "", "group_id": "", "reference_instance_scale": Vector2(1.25, 0.75), "transform": {"position": Vector2(-2.0, 6.0), "rotation": 15.0, "scale": Vector2.ONE, "pivot": Vector2(2.0, -1.0)}}
 	var spine := AssetGuide.create("spine", "Spine", AssetGuide.SAMPLER_SPINE, "head")
@@ -982,27 +979,24 @@ func _test_asset_scale_rebase() -> void:
 		"id": "root_scale", "name": "Root Scale", "asset_type": "weapon", "visibility": true,
 		"asset_pivot": Vector2(5.0, 7.0), "root_scale": 3.6,
 		"groups": [{"id": "hammer_group", "name": "Hammer Group", "visibility": true, "parent_component_id": "", "transform": {"position": Vector2(10.0, 2.0), "rotation": -12.0, "scale": Vector2.ONE, "pivot": Vector2(1.0, 1.0)}}],
-		"components": [component, region, circle, reference], "guides": [spine, weapon_frame],
+		"components": [component, circle, reference], "guides": [spine, weapon_frame],
 		"animation": MotionWorkspace.create_default_animation_document()
 	}
 	var preview := AssetScaleRebaseService.root_transform(asset)
 	var component_point_before := ComponentHierarchy.world_transform(asset, "head") * Vector2(component["points"][0]["position"])
-	var region_point_before := ComponentHierarchy.world_transform(asset, "attack_region") * Vector2(region["points"][0]["position"])
 	var reference_point_before := ComponentHierarchy.world_transform(asset, "reference") * Vector2(9.0, -4.0)
 	var spine_point_before := ComponentHierarchy.world_transform(asset, "head") * Vector2(spine["points"][0]["position"])
 	var frame_before := ComponentHierarchy.group_world_transform(asset, "hammer_group") * ComponentHierarchy.local_transform(weapon_frame["transform"])
 	var result := AssetScaleRebaseService.rebase_asset(asset)
 	var rebased_component := ComponentHierarchy.component_by_id(asset, "head")
-	var rebased_region := ComponentHierarchy.component_by_id(asset, "attack_region")
 	var rebased_circle := ComponentHierarchy.component_by_id(asset, "pommel")
 	var rebased_reference := ComponentHierarchy.component_by_id(asset, "reference")
 	var component_point_after := ComponentHierarchy.world_transform(asset, "head") * Vector2(rebased_component["points"][0]["position"])
-	var region_point_after := ComponentHierarchy.world_transform(asset, "attack_region") * Vector2(rebased_region["points"][0]["position"])
 	var reference_point_after := ComponentHierarchy.world_transform(asset, "reference") * Vector2(9.0, -4.0)
 	var spine_point_after := ComponentHierarchy.world_transform(asset, "head") * Vector2(asset["guides"][0]["points"][0]["position"])
 	var frame_after := ComponentHierarchy.group_world_transform(asset, "hammer_group") * ComponentHierarchy.local_transform(asset["guides"][1]["transform"])
 	_expect(bool(result.get("valid", false)) and is_equal_approx(float(asset.get("root_scale", 0.0)), 1.0) and Vector2(asset.get("asset_pivot", Vector2.ZERO)) == Vector2(5.0, 7.0), "Root Scale Rebase should succeed atomically, normalize Scale to 1, and preserve the Asset Pivot.")
-	_expect(component_point_after.is_equal_approx(preview * component_point_before) and region_point_after.is_equal_approx(preview * region_point_before), "Root Scale Rebase should preserve the previewed world geometry of nested Components and semantic Regions.")
+	_expect(component_point_after.is_equal_approx(preview * component_point_before), "Root Scale Rebase should preserve the previewed world geometry of nested Components.")
 	_expect(PrimitiveGeometryService.center(rebased_circle).is_equal_approx(Vector2(3.6, -7.2)) and is_equal_approx(float(rebased_circle.get("primitive", {}).get("diameter_cm", 0.0)), 18.0), "Root Scale Rebase should bake the same uniform factor into analytic primitive centers and diameters.")
 	_expect(reference_point_after.is_equal_approx(preview * reference_point_before) and Vector2(rebased_reference.get("reference_instance_scale", Vector2.ZERO)).is_equal_approx(Vector2(4.5, 2.7)) and Vector2(rebased_reference.get("transform", {}).get("pivot", Vector2.ZERO)) == Vector2(2.0, -1.0), "Root Scale Rebase should scale Reference instances without double-scaling their pivots.")
 	_expect(spine_point_after.is_equal_approx(preview * spine_point_before) and frame_after.origin.is_equal_approx(preview * frame_before.origin) and is_equal_approx(frame_after.get_rotation(), frame_before.get_rotation()), "Root Scale Rebase should preserve previewed Spine points and oriented Weapon frames.")
@@ -1206,7 +1200,7 @@ func _test_geometry_sampling_service() -> void:
 	_expect(not bool(GeometrySamplingService.generate(open_component).get("valid", true)), "An open contour should fail visibly at the mesh-pipeline Sampling boundary.")
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
-	_expect(application._has_supported_schema({"schema_version": 56}) and application._has_supported_schema({"schema_version": 55}) and not application._has_supported_schema({"schema_version": 57}), "Schema 56 should keep current and older World documents readable and reject unknown future schemas.")
+	_expect(application._has_supported_schema({"schema_version": 57}) and application._has_supported_schema({"schema_version": 56}) and not application._has_supported_schema({"schema_version": 58}), "Schema 57 should keep current and older World documents readable and reject unknown future schemas.")
 	_expect(application._normalize_component_draw_mode("ribbon", 39) == "contour" and application._normalize_component_draw_mode("contour", 42) == "contour", "Schema-42 loading must retain the explicit legacy Ribbon-to-Contour migration boundary.")
 	_expect(application._normalize_component_draw_mode("ribbon", 42) == "ribbon", "Current-schema Ribbon data must remain visibly invalid instead of receiving a silent backward fallback.")
 	var arranged_round_trip: Dictionary = application._normalize_sampling_bake(application._serialize_sampling_bake(arranged_result))
@@ -1217,7 +1211,7 @@ func _test_geometry_sampling_service() -> void:
 	baked_result["bake_id"] = "bake_test"
 	geometry_document["sampling"]["bakes"][GeometrySamplingService.ADAPTIVE] = baked_result
 	var serialized_geometry: Dictionary = application._serialize_geometry_document(geometry_document)
-	_expect(int(serialized_geometry.get("schema_version", 0)) == 56 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-56 JSON arrays.")
+	_expect(int(serialized_geometry.get("schema_version", 0)) == 57 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-57 JSON arrays.")
 	var normalized_geometry: Dictionary = application._normalize_geometry_document(serialized_geometry, "asset_1", "component_1")
 	_expect(normalized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Vector2, "Sampling bake loading should restore local sample positions as Vector2 values.")
 	_expect(normalized_geometry["sampling"]["bakes"].size() == 1, "Sampling should retain one Adaptive Bake.")
@@ -1262,16 +1256,15 @@ func _test_geometry_auto_build_service() -> void:
 	var other_component: Dictionary = component.duplicate(true)
 	other_component["id"] = "auto_symbol_body"
 	other_component["name"] = "Symbol Body"
-	var attack_region := {"id": "auto_attack_region", "type": "region", "region_type": "attack", "name": "Attack Region", "visibility": true, "points": [], "edges": [], "chains": []}
 	var test_assets: Array[Dictionary] = [
-		{"id": "auto_asset", "name": "Auto Asset", "asset_type": "character", "visibility": true, "components": [component, attack_region], "guides": []},
+		{"id": "auto_asset", "name": "Auto Asset", "asset_type": "character", "visibility": true, "components": [component], "guides": []},
 		{"id": "auto_symbol", "name": "Auto Symbol", "asset_type": "symbols", "visibility": true, "components": [other_component], "guides": []}
 	]
 	application.assets = test_assets
 	application.selected_asset_id = "auto_asset"
 	_expect(application._mesh_update_candidates("auto_asset") == ["auto_body"], "A valid unmeshed Component should appear exactly once in Update Meshes.")
 	_expect(application._all_mesh_update_candidates() == [{"asset_id": "auto_asset", "component_id": "auto_body"}, {"asset_id": "auto_symbol", "component_id": "auto_symbol_body"}], "Update Meshes should collect stable candidates globally across every Create Asset type, independent of the selected Asset.")
-	_expect((application._mesh_batch_summary(application._all_mesh_update_candidates()).get("attention", PackedStringArray()) as PackedStringArray).is_empty(), "Semantic Regions should stay outside Mesh batch attention as well as Mesh candidate collection.")
+	_expect((application._mesh_batch_summary(application._all_mesh_update_candidates()).get("attention", PackedStringArray()) as PackedStringArray).is_empty(), "All Components should be evaluated by Mesh batch attention and candidate collection.")
 	var build: Dictionary = application._generate_component_mesh_build("auto_asset", "auto_body")
 	_expect(bool(build.get("valid", false)) and int(build.get("meshing", {}).get("triangle_count", 0)) > 0 and int(build.get("contour_stroke", {}).get("triangle_count", 0)) > 0, "The automatic batch runner should atomically complete the Fill pipeline and the independent centered Contour Stroke Bake.")
 	application._commit_component_mesh_build("auto_asset", "auto_body", build)
@@ -2072,12 +2065,12 @@ func _test_runtime_export_service() -> void:
 	var result := RuntimeExportService.build_manifest(asset, {"component_a": source, "component_b": source})
 	var manifest: Dictionary = result.get("manifest", {})
 	var components: Array = manifest.get("components", [])
-	_expect(bool(result.get("valid", false)) and int(manifest.get("schema_version", 0)) == 12 and str(manifest.get("asset_key", "")) == "wizard" and not manifest.has("asset_id"), "Runtime export schema 12 should identify packages only by the Asset Key derived from their display name.")
-	_expect(str(manifest.get("presentation", {}).get("authored_facing", "")) == "right", "Runtime export schema 11 should publish the selected authored facing under presentation.authored_facing.")
+	_expect(bool(result.get("valid", false)) and int(manifest.get("schema_version", 0)) == 13 and str(manifest.get("asset_key", "")) == "wizard" and not manifest.has("asset_id"), "Runtime export schema 13 should identify packages only by the Asset Key derived from their display name.")
+	_expect(str(manifest.get("presentation", {}).get("authored_facing", "")) == "right", "Runtime export schema 13 should publish the selected authored facing under presentation.authored_facing.")
 	var neutral_asset: Dictionary = asset.duplicate(true)
 	neutral_asset.erase("authored_facing")
 	var neutral_manifest: Dictionary = RuntimeExportService.build_manifest(neutral_asset, {"component_a": source, "component_b": source}).get("manifest", {})
-	_expect(str(neutral_manifest.get("presentation", {}).get("authored_facing", "")) == "neutral", "Runtime export schema 11 should explicitly publish neutral for an older Asset without authored_facing.")
+	_expect(str(neutral_manifest.get("presentation", {}).get("authored_facing", "")) == "neutral", "Runtime export schema 13 should explicitly publish neutral for an older Asset without authored_facing.")
 	var manifest_text := JSON.stringify(manifest, "\t")
 	_expect(application._runtime_manifest_text_matches(manifest_text, manifest_text), "Runtime staging should verify exact schema-11 JSON bytes without rejecting numeric JSON round-trip types.")
 	_expect(components.size() == 2 and str(components[0].get("component_id", "")) == "component_a" and str(components[1].get("component_id", "")) == "component_b", "Runtime Components should sort globally by ascending z_index and lexicographic Component ID.")
@@ -2087,17 +2080,12 @@ func _test_runtime_export_service() -> void:
 	reach_limit["transform"]["position"] = Vector2(0.0, -2.0)
 	var secondary_grip := AssetGuide.create_weapon_frame("guide_secondary_grip", AssetGuide.GRIP_SECONDARY, "component", "component_b")
 	secondary_grip["transform"]["position"] = Vector2(0.0, 1.0)
-	var attack_region := {"id": "component_region", "type": "region", "region_type": "attack", "name": "attack_region", "visibility": true, "parent_component_id": "component_b", "group_id": "", "transform": {"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}, "points": [], "edges": [], "chains": []}
-	for position in [Vector2.ZERO, Vector2(2.0, 0.0), Vector2(1.0, 2.0)]:
-		BezierTopology.add_point(attack_region, position, "linear")
-	BezierTopology.close_active_chain(attack_region)
 	var combat_asset: Dictionary = asset.duplicate(true)
 	combat_asset["guides"] = [socket, secondary_grip, reach_limit]
-	combat_asset["components"].append(attack_region)
 	var combat_result := RuntimeExportService.build_manifest(combat_asset, {"component_a": source, "component_b": source})
 	var combat_manifest: Dictionary = combat_result.get("manifest", {})
 	var exported_frame_roles: Array = combat_manifest.get("attachment_frames", []).map(func(frame: Dictionary): return str(frame.get("role", "")))
-	_expect(bool(combat_result.get("valid", false)) and combat_manifest.get("attachment_frames", []).size() == 3 and AssetGuide.WEAPON_SOCKET_PRIMARY in exported_frame_roles and AssetGuide.GRIP_SECONDARY in exported_frame_roles and AssetGuide.REACH_LIMIT_PRIMARY in exported_frame_roles and combat_manifest.get("regions", []).size() == 1 and str(combat_manifest.get("regions", [])[0].get("role", "")) == "attack", "Schema 12 should export every oriented Weapon Guide, including grip_secondary and reach_limit_primary, and semantic Regions outside the visual Component list.")
+	_expect(bool(combat_result.get("valid", false)) and int(combat_manifest.get("schema_version", 0)) == 13 and combat_manifest.get("attachment_frames", []).size() == 3 and AssetGuide.WEAPON_SOCKET_PRIMARY in exported_frame_roles and AssetGuide.GRIP_SECONDARY in exported_frame_roles and AssetGuide.REACH_LIMIT_PRIMARY in exported_frame_roles and not combat_manifest.has("regions"), "Schema 13 should export every oriented Weapon Guide and omit semantic Regions from the visual Component manifest.")
 	_expect(components[1].get("mesh", {}).get("vertices", []) == [[-0.2, -0.30000000000000004], [0.8, -0.30000000000000004], [-0.2, 0.7000000000000001]] and components[1].get("mesh", {}).get("indices", []) == [0, 1, 2] and not components[1].has("closed_region_mesh"), "Runtime Meshes should preserve accepted Vertex order, convert Tool units to meters, compact Triangle IDs, and remain unchanged for non-Contour Components.")
 	_expect(not components[1].get("mesh", {}).has("uvs") and not components[1].has("contour_carrier") and not components[1].has("contour_mask"), "Schema 5 must remove UV, Carrier, and SDF fields rather than retaining a silent compatibility payload.")
 	var exported_stroke: Dictionary = components[1].get("contour_stroke_mesh", {})
@@ -2409,7 +2397,10 @@ func _test_asset_guides() -> void:
 	application._activate_guide_draw_state()
 	application._on_bezier_point_added(Vector2(15.0, 5.0), "aligned", Vector2.ZERO)
 	_expect(application.active_state == "draw" and Vector2(flow_guide.get("points", [])[0].get("position", Vector2.ZERO)).is_equal_approx(Vector2(10.0, 5.0)), "Flow Guides should catch Draw Guide Points on their parent Component contour just like Sample Guides.")
-	_expect(application.component_add_child_menu.item_count == 3 and application.component_add_guide_menu.item_count >= 4 and application.component_add_weapon_guide_menu.item_count == 5 and application.component_add_region_menu.item_count == 3, "Every scoped add menu should expose Child, base Guide, all five Weapon Guides, and Region types.")
+	var add_menu_labels := PackedStringArray()
+	for menu_index in application.component_add_menu.item_count:
+		add_menu_labels.append(application.component_add_menu.get_item_text(menu_index))
+	_expect(application.component_add_child_menu.item_count == 3 and application.component_add_guide_menu.item_count >= 4 and application.component_add_weapon_guide_menu.item_count == 5 and not add_menu_labels.has("Region"), "Every scoped add menu should expose Child and Guide types without a semantic Region submenu.")
 	test_asset = application._get_asset("asset_1")
 	test_asset["groups"] = [{"id": "group_head", "name": "head", "parent_component_id": "component_1", "transform": {"position": Vector2(2.0, 3.0), "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}, "visibility": true}]
 	application._create_weapon_guide("asset_1", "component", "component_1", AssetGuide.WEAPON_SOCKET_PRIMARY)
@@ -2424,27 +2415,6 @@ func _test_asset_guides() -> void:
 	application._create_weapon_guide("asset_1", "component", "component_1", AssetGuide.GRIP_SECONDARY)
 	var secondary_grip_guide: Dictionary = application._get_guide(application._get_asset("asset_1"), application.selected_guide_id)
 	_expect(str(secondary_grip_guide.get("guide_type", "")) == AssetGuide.GRIP_SECONDARY and AssetGuide.validation_issues(secondary_grip_guide).is_empty(), "Grip Secondary should be a valid transform-based Weapon Guide.")
-	application._create_region("asset_1", "component", "component_1", "attack")
-	var attack_region: Dictionary = application._get_component(application._get_asset("asset_1"), application.selected_component_id)
-	var region_outliner_text := _control_text(application.outliner_list)
-	_expect(region_outliner_text.contains("Regions") and region_outliner_text.contains("body → attack_region") and application.canvas_view.bezier_color_override == application._region_color("attack"), "Attack Regions should render in their own Outliner category and use the dedicated red Canvas Bezier color.")
-	var region_style_button := Button.new()
-	application._style_region_outliner_button(region_style_button, true, "attack")
-	var selected_region_style := region_style_button.get_theme_stylebox("normal") as StyleBoxFlat
-	_expect(is_instance_valid(selected_region_style) and selected_region_style.bg_color == application._region_color("attack"), "A selected Attack Region should use its dedicated red Outliner highlight instead of the Component yellow.")
-	region_style_button.free()
-	for region_position in [Vector2.ZERO, Vector2(4.0, 0.0), Vector2(2.0, 3.0)]:
-		application._on_bezier_point_added(region_position, "linear", Vector2.ZERO)
-	application._on_bezier_chain_closed()
-	_expect(str(attack_region.get("type", "")) == "region" and str(attack_region.get("region_type", "")) == "attack" and ClosedRegionMeshService.validation_issues({"draw_mode": "contour", "points": attack_region.get("points", []), "edges": attack_region.get("edges", []), "chains": attack_region.get("chains", [])}).is_empty(), "Attack Regions should reuse one valid closed Bezier boundary instead of storing an unrelated polygon model.")
-	application._create_region("asset_1", "component", "component_1", "hurt")
-	var hurt_color: Color = application._region_color("hurt")
-	_expect(hurt_color != application._region_color("attack") and application.canvas_view.bezier_color_override == hurt_color, "Hurt Regions should use their own green Canvas Bezier color instead of the Attack Region red.")
-	var hurt_style_button := Button.new()
-	application._style_region_outliner_button(hurt_style_button, true, "hurt")
-	var selected_hurt_style := hurt_style_button.get_theme_stylebox("normal") as StyleBoxFlat
-	_expect(is_instance_valid(selected_hurt_style) and selected_hurt_style.bg_color == hurt_color, "A selected Hurt Region should use its dedicated green Outliner highlight.")
-	hurt_style_button.free()
 	parent_component["transform"] = {"position": Vector2(-3.0, 2.0), "rotation": 20.0, "scale": Vector2(1.0, 1.5), "pivot": Vector2.ZERO}
 	parent_component["name"] = "eyebrow_left"
 	child_component["name"] = "eye_left"
@@ -2801,7 +2771,7 @@ func _test_motion_act_evaluator() -> void:
 	var normalized: Dictionary = application._normalize_motion_act({"id": "act_7", "parameters": {"direction": [0.0, 2.0], "distance": 12.0}}, "fallback")
 	_expect(Vector2(normalized.get("parameters", {}).get("direction", Vector2.ZERO)) == Vector2(0.0, 2.0), "Persisted Slide direction arrays should normalize back to Vector2 values.")
 	var serialized: Dictionary = application._serialize_motion_act(normalized)
-	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 56, "Act persistence should serialize vectors as JSON arrays using schema 56.")
+	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 57, "Act persistence should serialize vectors as JSON arrays using schema 57.")
 	var normalized_jump: Dictionary = application._normalize_motion_act({"id": "act_8", "primitive": "jump", "parameters": {"direction": [1.0, 0.0], "distance": 7.0, "height": 2.5, "arc": "snappy"}}, "fallback")
 	var serialized_jump: Dictionary = application._serialize_motion_act(normalized_jump)
 	_expect(str(serialized_jump.get("primitive", "")) == MotionActEvaluator.JUMP and is_equal_approx(float(serialized_jump.get("parameters", {}).get("height", 0.0)), 2.5) and str(serialized_jump.get("parameters", {}).get("arc", "")) == MotionActEvaluator.JUMP_ARC_SNAPPY, "Jump-specific parameters should survive normalization and serialization.")
