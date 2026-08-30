@@ -169,6 +169,15 @@ updates the World-root `catalog.json` with the currently valid Runtime set.
 Packages are staged, verified, and replaced atomically per Asset; an invalid
 Asset retains its older package and no fallback geometry is generated, but is
 excluded from that Catalog until it validates again.
+The separate `Sync Consumers` action beside `Export All Valid` runs PolyTools'
+owned `scripts/sync_world01_consumers.sh` workflow against the currently
+published Catalog. It updates SceneMaker from that Catalog, re-exports
+SceneMaker's current `world01` scene, then updates world01's runtime content and
+imported map. The Export workspace retains the last Consumer Sync result and
+includes command output on failure. Export and synchronization are deliberately
+separate actions: a downstream failure does not alter the already published
+PolyTools Runtime packages, and each consumer script remains responsible for
+its own atomic target update.
 Runtime Manifest schema 14 exports `contour_stroke_mesh` independently from the
 unchanged Fill Mesh and adds geometry-only `closed_region_mesh` to closed
 Contours. It also exports Asset-local Weapon Attachment Frames and the ordered

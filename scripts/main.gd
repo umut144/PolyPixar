@@ -8,6 +8,7 @@ const EXPORT_SUBMODULES: Array[String] = []
 const MOTION_SUBMODULES := ["Animation", "Path", "Act", "Sequence"]
 const WORLDS_ROOT := "res://worlds"
 const CONFIG_PATH := "res://configs/app_config.json"
+const CONSUMER_SYNC_SCRIPT := "res://scripts/sync_world01_consumers.sh"
 const SCHEMA_VERSION := 59
 const DEFAULT_PROJECTION_DEPTH_CM := 10.0
 const MAX_HISTORY_SIZE := 100
@@ -73,9 +74,11 @@ var batch_status_snapshot_build_count := 0
 var batch_status_refresh_timer: Timer
 var export_workspace: VBoxContainer
 var export_summary_label: Label
+var export_consumer_sync_label: Label
 var export_log: RichTextLabel
 var export_run_button: Button
 var export_valid_button: Button
+var export_sync_button: Button
 var export_preflight: Dictionary = {}
 var export_preflight_revision := -1
 var export_running := false
@@ -786,6 +789,15 @@ func _build_ui() -> void:
 	export_valid_button.disabled = true
 	export_valid_button.pressed.connect(_on_export_all_valid_pressed)
 	toolbar.add_child(export_valid_button)
+	export_sync_button = Button.new()
+	export_sync_button.text = "Sync Consumers"
+	export_sync_button.custom_minimum_size = Vector2(154, 32)
+	export_sync_button.focus_mode = Control.FOCUS_NONE
+	export_sync_button.visible = false
+	export_sync_button.disabled = true
+	export_sync_button.tooltip_text = "Sync the published catalog to SceneMaker and world01."
+	export_sync_button.pressed.connect(_on_sync_consumers_pressed)
+	toolbar.add_child(export_sync_button)
 	snap_button = Button.new()
 	snap_button.text = "Snap: %s  ▼" % _snap_mode_label()
 	snap_button.custom_minimum_size = Vector2(128, 32)
@@ -15162,6 +15174,12 @@ func _create_export_workspace(parent: Control) -> void:
 	export_summary_label.add_theme_font_size_override("font_size", 12)
 	export_summary_label.add_theme_color_override("font_color", Color("#aeb8c8"))
 	export_workspace.add_child(export_summary_label)
+	export_consumer_sync_label = Label.new()
+	export_consumer_sync_label.text = "Consumer Sync · noch nicht ausgeführt"
+	export_consumer_sync_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	export_consumer_sync_label.add_theme_font_size_override("font_size", 12)
+	export_consumer_sync_label.add_theme_color_override("font_color", Color("#9aa3b2"))
+	export_workspace.add_child(export_consumer_sync_label)
 	var separator := HSeparator.new()
 	export_workspace.add_child(separator)
 	export_log = RichTextLabel.new()
@@ -15207,11 +15225,12 @@ func _export_attention_count(status: Dictionary) -> int:
 
 
 func _update_export_toolbar_buttons() -> void:
-	if not is_instance_valid(export_run_button) or not is_instance_valid(export_valid_button):
+	if not is_instance_valid(export_run_button) or not is_instance_valid(export_valid_button) or not is_instance_valid(export_sync_button):
 		return
 	var export_active := active_module == "Export"
 	export_run_button.visible = export_active
 	export_valid_button.visible = export_active
+	export_sync_button.visible = export_active
 	if not export_active:
 		return
 	var preflight_current := export_preflight_revision == batch_status_revision
@@ -15221,6 +15240,7 @@ func _update_export_toolbar_buttons() -> void:
 	export_valid_button.text = "Export All Valid (%d)" % valid_export_count
 	export_run_button.disabled = export_running or not preflight_current or build_count == 0
 	export_valid_button.disabled = export_running or not preflight_current or valid_export_count == 0
+	export_sync_button.disabled = export_running or not _consumer_sync_available()
 
 
 func _export_build_count() -> int:
@@ -15261,6 +15281,7 @@ func _on_build_all_pressed() -> void:
 	mesh_batch_running = true
 	export_run_button.disabled = true
 	export_valid_button.disabled = true
+	export_sync_button.disabled = true
 	export_log.clear()
 	export_log.append_text("[b]Build All[/b]\n")
 	export_log.append_text("[color=#9aa3b2]Verarbeite alle validen Einträge. Fehlerhafte Einträge werden übersprungen; Export wird nicht gestartet.[/color]\n")
@@ -15302,6 +15323,7 @@ func _on_export_all_valid_pressed() -> void:
 	runtime_export_batch_running = true
 	export_run_button.disabled = true
 	export_valid_button.disabled = true
+	export_sync_button.disabled = true
 	export_log.clear()
 	export_log.append_text("[b]Export All Valid[/b]\n")
 	export_log.append_text("[color=#9aa3b2]Exportiere nur aktuell valide Runtime-Pakete. Auffällige Einträge bleiben ausgeschlossen.[/color]\n")
@@ -15440,6 +15462,73 @@ func _run_export_runtime_stage(valid_only := false) -> Dictionary:
 			failed += 1
 			export_log.append_text("  [color=#ef8354]✕ World Catalog — catalog.json could not be updated.[/color]\n")
 	return {"succeeded": succeeded, "failed": failed}
+
+
+func _consumer_sync_script_path() -> String:
+	return ProjectSettings.globalize_path(CONSUMER_SYNC_SCRIPT)
+
+
+func _consumer_sync_available() -> bool:
+	var catalog_path := _asset_catalog_path()
+	return not catalog_path.is_empty() and FileAccess.file_exists(catalog_path) and FileAccess.file_exists(_consumer_sync_script_path())
+
+
+func _on_sync_consumers_pressed() -> void:
+	if export_running or not _consumer_sync_available():
+		return
+	export_running = true
+	_update_export_toolbar_buttons()
+	export_log.clear()
+	export_log.append_text("[b]Sync Consumers[/b]\n[color=#9aa3b2]Verteile den publizierten PolyTools-Katalog an SceneMaker und world01.[/color]\n")
+	var result := await _run_consumer_sync()
+	var success := bool(result.get("success", false))
+	export_summary_label.text = "Consumer Sync abgeschlossen · SceneMaker und world01 sind aktuell" if success else "Consumer Sync fehlgeschlagen · PolyTools Runtime Export bleibt erhalten"
+	_show_status_message("Consumer Sync erfolgreich" if success else "Consumer Sync fehlgeschlagen · Details im Export-Arbeitsbereich")
+	export_running = false
+	_update_export_toolbar_buttons()
+
+
+func _run_consumer_sync() -> Dictionary:
+	var script_path := _consumer_sync_script_path()
+	if not FileAccess.file_exists(script_path):
+		var missing_result := {"success": false, "exit_code": -1, "output": "Sync script not found: %s" % script_path}
+		_present_consumer_sync_result(missing_result)
+		return missing_result
+	if is_instance_valid(export_consumer_sync_label):
+		export_consumer_sync_label.text = "Consumer Sync · läuft …"
+		export_consumer_sync_label.add_theme_color_override("font_color", Color("#e3b341"))
+	if is_instance_valid(export_log):
+		export_log.append_text("\n[b]Consumer Sync[/b]\n[color=#9aa3b2]Aktualisiere SceneMaker und world01 …[/color]\n")
+	_show_status_message("Consumer Sync läuft …")
+	await get_tree().process_frame
+	var output: Array = []
+	var exit_code := OS.execute("/bin/bash", [script_path], output, true)
+	var output_lines := PackedStringArray()
+	for line in output:
+		output_lines.append(str(line))
+	var result := {
+		"success": exit_code == 0,
+		"exit_code": exit_code,
+		"output": "\n".join(output_lines).strip_edges()
+	}
+	_present_consumer_sync_result(result)
+	return result
+
+
+func _present_consumer_sync_result(result: Dictionary) -> void:
+	var success := bool(result.get("success", false))
+	var output_text := str(result.get("output", "")).strip_edges()
+	if is_instance_valid(export_consumer_sync_label):
+		export_consumer_sync_label.text = "Consumer Sync · erfolgreich · SceneMaker und world01 sind aktuell" if success else "Consumer Sync · fehlgeschlagen · Details im Export-Protokoll"
+		export_consumer_sync_label.add_theme_color_override("font_color", Color("#75b88a") if success else Color("#ef8354"))
+	if not is_instance_valid(export_log):
+		return
+	if not output_text.is_empty():
+		export_log.append_text("[code]%s[/code]\n" % output_text.replace("[", "[lb]"))
+	if success:
+		export_log.append_text("[color=#75b88a]✓ SceneMaker und world01 wurden synchronisiert.[/color]\n")
+	else:
+		export_log.append_text("[color=#ef8354]✕ Consumer Sync fehlgeschlagen (Exit %d). Der PolyTools Runtime Export bleibt erhalten.[/color]\n" % int(result.get("exit_code", -1)))
 
 
 func _all_valid_runtime_export_candidates() -> Array[Dictionary]:
