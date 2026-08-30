@@ -37,6 +37,7 @@ const CLOSE_DISTANCE_PIXELS := 14.0
 const GIZMO_AXIS_LENGTH := 42.0
 const HANDLE_HIT_RADIUS := 12.0
 const FREE_HANDLE_RADIUS := 10.0
+const DRAW_HANDLE_DRAG_THRESHOLD_PIXELS := 6.0
 const MEASUREMENT_DASH_LENGTH := 7.0
 const MEASUREMENT_GAP_LENGTH := 5.0
 const MEASUREMENT_FONT_SIZE := 14
@@ -96,6 +97,7 @@ var selection_gizmo_drag_axis := ""
 var selection_gizmo_drag_start_world := Vector2.ZERO
 var draw_pointer_down := false
 var pending_draw_position := Vector2.ZERO
+var pending_draw_pointer_screen_position := Vector2.ZERO
 var pending_draw_connection_target_id := ""
 var pending_draw_handle_out := Vector2.ZERO
 var pending_draw_has_handle := false
@@ -295,6 +297,7 @@ func _gui_input(event: InputEvent) -> void:
 				reference_component_selected.emit(component_id)
 	if event is InputEventMouseButton and not event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		if draw_pointer_down and interaction_state == "draw" and active_tool in ["point", "spine"]:
+			_update_pending_draw_handle(event.position)
 			_commit_draw_pointer()
 			queue_redraw()
 			return
@@ -365,10 +368,7 @@ func _gui_input(event: InputEvent) -> void:
 			queue_redraw()
 			return
 		if draw_pointer_down and interaction_state == "draw" and active_tool == "point" and draw_point_mode != "linear":
-			var raw_draw_handle := _world_to_local(_screen_to_world(event.position)) - pending_draw_position
-			if raw_draw_handle.length() * zoom >= 3.0:
-				pending_draw_handle_out = raw_draw_handle
-				pending_draw_has_handle = true
+			_update_pending_draw_handle(event.position)
 			queue_redraw()
 			return
 		if pivot_dragging:
@@ -462,10 +462,20 @@ func _gui_input(event: InputEvent) -> void:
 
 func _begin_draw_pointer(screen_position: Vector2) -> void:
 	draw_pointer_down = true
+	pending_draw_pointer_screen_position = screen_position
 	pending_draw_connection_target_id = _draw_connection_target_id(screen_position) if active_tool == "point" else ""
 	pending_draw_position = constrain_draw_position(_snap_to_canvas_position(_world_to_local(_screen_to_world(screen_position))))
 	pending_draw_handle_out = Vector2.ZERO
 	pending_draw_has_handle = false
+
+
+func _update_pending_draw_handle(screen_position: Vector2) -> void:
+	if not draw_pointer_down or active_tool != "point" or draw_point_mode == "linear":
+		pending_draw_handle_out = Vector2.ZERO
+		pending_draw_has_handle = false
+		return
+	pending_draw_has_handle = screen_position.distance_to(pending_draw_pointer_screen_position) >= DRAW_HANDLE_DRAG_THRESHOLD_PIXELS
+	pending_draw_handle_out = _world_to_local(_screen_to_world(screen_position)) - pending_draw_position if pending_draw_has_handle else Vector2.ZERO
 
 
 func _commit_draw_pointer() -> void:
@@ -480,6 +490,7 @@ func _commit_draw_pointer() -> void:
 	else:
 		bezier_point_added.emit(pending_draw_position, draw_point_mode, pending_draw_handle_out if pending_draw_has_handle else Vector2.ZERO)
 	draw_pointer_down = false
+	pending_draw_pointer_screen_position = Vector2.ZERO
 	pending_draw_connection_target_id = ""
 	pending_draw_has_handle = false
 
@@ -685,8 +696,8 @@ func set_snap_settings(enabled: bool, new_grid_step: float, new_rotation_step: f
 	queue_redraw()
 
 
-func set_frame_guide(visible: bool, half_extent: Vector2, offset: Vector2) -> void:
-	frame_visible = visible
+func set_frame_guide(frame_enabled: bool, half_extent: Vector2, offset: Vector2) -> void:
+	frame_visible = frame_enabled
 	frame_half_extent = Vector2(maxf(half_extent.x, 0.0), maxf(half_extent.y, 0.0))
 	frame_offset = offset
 	queue_redraw()

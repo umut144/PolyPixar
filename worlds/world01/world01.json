@@ -21,9 +21,9 @@
 		"asset_18"
 	],
 	"editor_state": {
-		"active_create_submodule": "Terrain",
+		"active_create_submodule": "Props",
 		"active_geometry_submodule": "Sampling",
-		"active_module": "Create",
+		"active_module": "Export",
 		"active_motion_submodule": "Animation",
 		"active_style_submodule": "Weighting",
 		"asset_cameras": {
@@ -36,10 +36,10 @@
 			},
 			"asset_10": {
 				"position": [
-					-0.138385653495789,
-					19.9986572265625
+					1.1197190284729,
+					17.8673210144043
 				],
-				"zoom": 11.9465613388049
+				"zoom": 17.8861947607352
 			},
 			"asset_11": {
 				"position": [
@@ -92,10 +92,10 @@
 			},
 			"asset_18": {
 				"position": [
-					0.12059885263443,
-					9.50876140594482
+					-0.228413760662079,
+					-0.200724631547928
 				],
-				"zoom": 392.406356516353
+				"zoom": 149.596873675432
 			},
 			"asset_2": {
 				"position": [
@@ -155,29 +155,29 @@
 			}
 		},
 		"expanded_assets": {
-			"asset_1": true,
-			"asset_10": false,
-			"asset_11": true,
+			"asset_1": false,
+			"asset_10": true,
+			"asset_11": false,
 			"asset_12": false,
 			"asset_13": false,
 			"asset_14": false,
 			"asset_15": false,
 			"asset_16": false,
-			"asset_17": true,
+			"asset_17": false,
 			"asset_18": true,
 			"asset_2": false,
 			"asset_3": false,
 			"asset_4": false,
 			"asset_5": false,
 			"asset_6": false,
-			"asset_7": true,
+			"asset_7": false,
 			"asset_8": false,
 			"asset_9": false
 		},
 		"frame": {
 			"half_extent": [
-				1.0,
-				1.0
+				2.5,
+				2.5
 			],
 			"offset": [
 				0.0,
@@ -185,21 +185,21 @@
 			],
 			"visible": false
 		},
-		"motion_act_preview_asset_id": "",
+		"motion_act_preview_asset_id": "asset_1",
 		"motion_act_preview_loop": true,
-		"motion_path_preview_asset_id": "",
+		"motion_path_preview_asset_id": "asset_1",
 		"motion_sequence_preview_loop": true,
 		"motion_sequence_view": "composition",
 		"outliner_asset_type_filters": {
-			"character": true,
+			"character": false,
 			"icon": true,
 			"props": true,
 			"symbols": true,
-			"terrain": true,
-			"weapons": true
+			"terrain": false,
+			"weapons": false
 		},
-		"selected_asset_id": "asset_18",
-		"selected_component_id": "",
+		"selected_asset_id": "asset_10",
+		"selected_component_id": "component_142",
 		"selected_edge_ids": [],
 		"selected_guide_id": "",
 		"selected_motion_act_id": "",
@@ -209,8 +209,8 @@
 		"selected_weighting_style_id": "",
 		"snap": {
 			"enabled": true,
-			"grid_step": 0.05,
-			"mode": "finer",
+			"grid_step": 0.5,
+			"mode": "coarse",
 			"rotation_step": 15.0
 		},
 		"world_scale": {

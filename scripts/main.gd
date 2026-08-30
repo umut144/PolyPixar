@@ -85,7 +85,7 @@ var export_running := false
 var outliner_panel: Control
 var inspector_panel: Control
 var context_bar_panel: Control
-var draw_mode_status: Label
+var draw_mode_status: MenuButton
 var weighting_preview: Dictionary = {}
 var weighting_preview_key := ""
 var geometry_seeding_edit_active := false
@@ -507,6 +507,14 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			_on_bezier_points_delete_requested(selected_point_ids.duplicate())
 		get_viewport().set_input_as_handled()
 		return
+	if not has_command_modifier and (event.keycode == KEY_BACKSPACE or event.keycode == KEY_DELETE) and active_state == "edit" and active_edit_mode == "edge":
+		var edge_ids_to_delete := selected_edge_ids.duplicate()
+		if edge_ids_to_delete.is_empty() and not selected_edge_id.is_empty():
+			edge_ids_to_delete.append(selected_edge_id)
+		if not edge_ids_to_delete.is_empty():
+			_on_bezier_edges_delete_requested(edge_ids_to_delete)
+			get_viewport().set_input_as_handled()
+			return
 	if not has_command_modifier and _can_nudge_selected_point() and event.keycode in [KEY_LEFT, KEY_RIGHT, KEY_UP, KEY_DOWN]:
 		var nudge_delta := Vector2.ZERO
 		match event.keycode:
@@ -766,12 +774,19 @@ func _build_ui() -> void:
 	create_action_button.focus_mode = Control.FOCUS_NONE
 	create_action_button.pressed.connect(_on_create_action_pressed)
 	toolbar.add_child(create_action_button)
-	draw_mode_status = Label.new()
+	draw_mode_status = MenuButton.new()
 	draw_mode_status.name = "DrawModeStatus"
-	draw_mode_status.text = "Draw Mode: —"
-	draw_mode_status.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	draw_mode_status.text = "Draw Mode: —  ▾"
+	draw_mode_status.flat = true
+	draw_mode_status.focus_mode = Control.FOCUS_NONE
+	draw_mode_status.disabled = true
+	draw_mode_status.tooltip_text = "Select a Component to change how its geometry is authored."
 	draw_mode_status.add_theme_font_size_override("font_size", 11)
 	draw_mode_status.add_theme_color_override("font_color", Color("#9aa3b2"))
+	for draw_mode_index in range(DRAW_MODES.size()):
+		draw_mode_status.get_popup().add_radio_check_item(_draw_mode_display_name(DRAW_MODES[draw_mode_index]), draw_mode_index)
+	_style_popup_menu(draw_mode_status.get_popup())
+	draw_mode_status.get_popup().id_pressed.connect(_on_draw_mode_status_selected)
 	toolbar.add_child(draw_mode_status)
 	export_run_button = Button.new()
 	export_run_button.text = "Build All (0)"
@@ -1477,8 +1492,8 @@ func _toggle_frame_popup() -> void:
 	frame_popup.popup(Rect2(popup_position, frame_popup.size))
 
 
-func _on_frame_visible_toggled(visible: bool) -> void:
-	frame_visible = visible
+func _on_frame_visible_toggled(frame_enabled: bool) -> void:
+	frame_visible = frame_enabled
 	_apply_frame_to_canvas()
 	_update_frame_popup()
 
@@ -5776,10 +5791,7 @@ func _render_context_bar() -> void:
 	if active_module == "Export":
 		_clear_context_bar()
 		return
-	var draw_mode_label := find_child("DrawModeStatus", true, false) as Label
-	if draw_mode_label != null:
-		var current_component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-		draw_mode_label.text = "Draw Mode: %s" % _draw_mode_display_name(str(current_component.get("draw_mode", "closed_loop"))) if not current_component.is_empty() else "Draw Mode: —"
+	_update_draw_mode_status()
 	_update_context_action_button()
 	_clear_context_bar()
 	if active_module == "Motion":
@@ -7463,16 +7475,16 @@ func _on_asset_root_position_changed(value: float, property_name: String) -> voi
 	var asset := _get_asset(selected_asset_id)
 	if asset.is_empty() or not selected_component_id.is_empty() or not is_finite(value):
 		return
-	var position := AssetScaleRebaseService.root_position(asset)
+	var root_position := AssetScaleRebaseService.root_position(asset)
 	var editor_value := _world_to_editor_units(value)
 	if property_name == "position_x":
-		position.x = editor_value
+		root_position.x = editor_value
 	else:
-		position.y = editor_value
-	if position.is_equal_approx(AssetScaleRebaseService.root_position(asset)):
+		root_position.y = editor_value
+	if root_position.is_equal_approx(AssetScaleRebaseService.root_position(asset)):
 		return
 	_record_coalesced_change()
-	asset["root_position"] = position
+	asset["root_position"] = root_position
 	_invalidate_batch_status()
 	if is_instance_valid(asset_root_scale_rebase_button):
 		var analysis := AssetScaleRebaseService.analyze_asset(asset)
@@ -9183,6 +9195,97 @@ func _draw_mode_display_name(draw_mode: String) -> String:
 	return "Closed Loop"
 
 
+func _draw_mode_change_issue(component: Dictionary, target_mode: String) -> String:
+	if component.is_empty() or target_mode not in DRAW_MODES:
+		return "Select a Component first."
+	if _is_reference_component(component):
+		return "Symbol References inherit their source geometry and cannot change Draw Mode."
+	var current_mode := str(component.get("draw_mode", "closed_loop"))
+	if current_mode == target_mode:
+		return ""
+	var crosses_geometry_source := (current_mode == "primitive") != (target_mode == "primitive")
+	if not crosses_geometry_source:
+		return ""
+	var primitive = component.get("primitive", {})
+	var has_primitive: bool = primitive is Dictionary and not primitive.is_empty()
+	var has_bezier_topology: bool = not component.get("points", []).is_empty() or not component.get("edges", []).is_empty() or not component.get("chains", []).is_empty()
+	if has_primitive or has_bezier_topology:
+		return "Primitive uses a different geometry source. Clear or create a new empty Component instead of converting authored geometry."
+	return ""
+
+
+func _apply_component_draw_mode(component: Dictionary, target_mode: String) -> bool:
+	if not _draw_mode_change_issue(component, target_mode).is_empty():
+		return false
+	var current_mode := str(component.get("draw_mode", "closed_loop"))
+	if current_mode == target_mode:
+		return false
+	component["draw_mode"] = target_mode
+	if target_mode == "primitive":
+		component["geometry_source"] = "primitive"
+		component["primitive"] = {}
+		component["points"] = []
+		component["edges"] = []
+		component["chains"] = []
+	else:
+		component["geometry_source"] = "bezier"
+		component.erase("primitive")
+		if not component.get("points", null) is Array:
+			component["points"] = []
+		if not component.get("edges", null) is Array:
+			component["edges"] = []
+		if not component.get("chains", null) is Array:
+			component["chains"] = []
+	return true
+
+
+func _update_draw_mode_status() -> void:
+	if not is_instance_valid(draw_mode_status):
+		return
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	var has_editable_component := active_module == "Create" and not component.is_empty() and not _is_reference_component(component)
+	var current_mode := str(component.get("draw_mode", "closed_loop")) if not component.is_empty() else ""
+	draw_mode_status.text = "Draw Mode: %s  ▾" % _draw_mode_display_name(current_mode) if not current_mode.is_empty() else "Draw Mode: —  ▾"
+	draw_mode_status.disabled = not has_editable_component
+	draw_mode_status.tooltip_text = "Closed Loop and Contour preserve Bezier topology. Primitive is available only while the Component is empty." if has_editable_component else ("Symbol References inherit their source Draw Mode." if _is_reference_component(component) else "Select a Component in Create to change Draw Mode.")
+	var popup := draw_mode_status.get_popup()
+	for draw_mode_index in range(DRAW_MODES.size()):
+		var target_mode: String = DRAW_MODES[draw_mode_index]
+		popup.set_item_checked(draw_mode_index, target_mode == current_mode)
+		popup.set_item_disabled(draw_mode_index, not has_editable_component or not _draw_mode_change_issue(component, target_mode).is_empty())
+
+
+func _on_draw_mode_status_selected(index: int) -> void:
+	if index < 0 or index >= DRAW_MODES.size():
+		return
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	var target_mode: String = DRAW_MODES[index]
+	var issue := _draw_mode_change_issue(component, target_mode)
+	if not issue.is_empty():
+		_show_status_message(issue)
+		_update_draw_mode_status()
+		return
+	if str(component.get("draw_mode", "closed_loop")) == target_mode:
+		return
+	_record_direct_change()
+	if not _apply_component_draw_mode(component, target_mode):
+		return
+	active_state = ""
+	active_draw_tool = ""
+	active_context_command = ""
+	canvas_view.set_primitive_preview_active(false)
+	canvas_view.set_interaction_state("")
+	selected_point_id = ""
+	selected_point_ids.clear()
+	selected_edge_id = ""
+	selected_edge_ids.clear()
+	canvas_view.clear_selection()
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+	_show_status_message("Draw Mode changed to %s." % _draw_mode_display_name(target_mode))
+
+
 func _normalize_component_draw_mode(raw_mode, source_schema_version: int) -> String:
 	var draw_mode := str(raw_mode)
 	if draw_mode == "ribbon" and source_schema_version < 40:
@@ -10541,14 +10644,14 @@ func _on_weapon_frame_value_changed(value: float, property_name: String) -> void
 		return
 	_record_coalesced_change()
 	var transform: Dictionary = guide.get("transform", _default_component_transform())
-	var position := Vector2(transform.get("position", Vector2.ZERO))
+	var frame_position := Vector2(transform.get("position", Vector2.ZERO))
 	if property_name == "position_x":
-		position.x = _world_to_editor_units(value)
+		frame_position.x = _world_to_editor_units(value)
 	elif property_name == "position_y":
-		position.y = _world_to_editor_units(value)
+		frame_position.y = _world_to_editor_units(value)
 	elif property_name == "rotation":
 		transform["rotation"] = value
-	transform["position"] = position
+	transform["position"] = frame_position
 	transform["scale"] = Vector2.ONE
 	transform["pivot"] = Vector2.ZERO
 	guide["transform"] = transform
@@ -12753,10 +12856,10 @@ func _selected_components_for_inspector(asset: Dictionary) -> Array[Dictionary]:
 	return result
 
 
-func _multi_component_line_edit(label_text: String, value_text: String, is_mixed: bool, name: String, axis: String, integer_only := false) -> LineEdit:
+func _multi_component_line_edit(label_text: String, value_text: String, is_mixed: bool, field_name: String, axis: String, integer_only := false) -> LineEdit:
 	inspector_content.add_child(_create_inspector_field_label(label_text))
 	var field := LineEdit.new()
-	field.name = name
+	field.name = field_name
 	field.custom_minimum_size = Vector2(0, 26)
 	field.text = "" if is_mixed else value_text
 	field.placeholder_text = "Mixed" if is_mixed else ""
@@ -12784,9 +12887,9 @@ func _render_multi_component_inspector(asset: Dictionary, components: Array[Dict
 	var position_y := _editor_units_to_world(positions[0].y)
 	var x_mixed := false
 	var y_mixed := false
-	for position in positions.slice(1):
-		x_mixed = x_mixed or not is_equal_approx(position.x, positions[0].x)
-		y_mixed = y_mixed or not is_equal_approx(position.y, positions[0].y)
+	for candidate_position in positions.slice(1):
+		x_mixed = x_mixed or not is_equal_approx(candidate_position.x, positions[0].x)
+		y_mixed = y_mixed or not is_equal_approx(candidate_position.y, positions[0].y)
 	_add_multi_component_position_field(position_grid, "Position X (cm) · Asset", position_x, x_mixed, "position_x")
 	_add_multi_component_position_field(position_grid, "Position Y (cm) · Asset", position_y, y_mixed, "position_y")
 	inspector_content.add_child(position_grid)
@@ -14748,10 +14851,10 @@ func _render_asset_root_scale_rebase_inspector(asset: Dictionary) -> void:
 	var analysis := AssetScaleRebaseService.analyze_asset(asset)
 	var blockers: Array = analysis.get("blockers", [])
 	if bool(analysis.get("required", false)):
-		var position := Vector2(analysis.get("position", Vector2.ZERO))
-		inspector_content.add_child(_create_inspector_field_label("Position %s × %s cm → 0 × 0 cm" % [_format_scale_value(_editor_units_to_world(position.x)), _format_scale_value(_editor_units_to_world(position.y))]))
-		var scale := Vector2(analysis.get("scale", Vector2.ONE))
-		inspector_content.add_child(_create_inspector_field_label("Scale %s × %s → 1 × 1" % [_format_scale_value(scale.x), _format_scale_value(scale.y)]))
+		var root_position := Vector2(analysis.get("position", Vector2.ZERO))
+		inspector_content.add_child(_create_inspector_field_label("Position %s × %s cm → 0 × 0 cm" % [_format_scale_value(_editor_units_to_world(root_position.x)), _format_scale_value(_editor_units_to_world(root_position.y))]))
+		var root_scale := Vector2(analysis.get("scale", Vector2.ONE))
+		inspector_content.add_child(_create_inspector_field_label("Scale %s × %s → 1 × 1" % [_format_scale_value(root_scale.x), _format_scale_value(root_scale.y)]))
 	else:
 		inspector_content.add_child(_create_inspector_field_label("Root Position and Scale are normalized."))
 	for blocker in blockers:
@@ -14834,16 +14937,16 @@ func _on_asset_root_scale_changed(value: float, property_name: String) -> void:
 	var asset := _get_asset(selected_asset_id)
 	if asset.is_empty() or property_name not in ["scale_x", "scale_y"] or not is_finite(value) or value <= AssetScaleRebaseService.SCALE_EPSILON:
 		return
-	var scale := AssetScaleRebaseService.root_scale(asset)
-	var previous_scale := scale
+	var root_scale_value := AssetScaleRebaseService.root_scale(asset)
+	var previous_scale := root_scale_value
 	if property_name == "scale_x":
-		scale.x = value
+		root_scale_value.x = value
 	else:
-		scale.y = value
-	if scale.is_equal_approx(previous_scale):
+		root_scale_value.y = value
+	if root_scale_value.is_equal_approx(previous_scale):
 		return
 	_record_coalesced_change()
-	asset["root_scale"] = scale
+	asset["root_scale"] = root_scale_value
 	_invalidate_batch_status()
 	if is_instance_valid(asset_root_scale_rebase_button):
 		var analysis := AssetScaleRebaseService.analyze_asset(asset)
@@ -15026,17 +15129,17 @@ func _on_multi_component_z_index_changed(value: float) -> void:
 	var components := _selected_components_for_inspector(asset)
 	if asset.is_empty() or components.size() < 2 or not is_finite(value):
 		return
-	var z_index := int(value)
+	var layer_z_index := int(value)
 	var changed := false
 	for component in components:
-		if int(component.get("z_index", 0)) != z_index:
+		if int(component.get("z_index", 0)) != layer_z_index:
 			changed = true
 			break
 	if not changed:
 		return
 	_record_direct_change()
 	for component in components:
-		component["z_index"] = z_index
+		component["z_index"] = layer_z_index
 	_render_inspector()
 	_render_canvas_context()
 
@@ -16383,6 +16486,43 @@ func _on_bezier_points_delete_requested(point_ids: Array) -> void:
 	else:
 		canvas_view.set_bezier_geometry(subject.get("points", []), subject.get("edges", []), subject.get("chains", []))
 	_render_inspector()
+
+
+func _on_bezier_edges_delete_requested(edge_ids: Array) -> void:
+	if edge_ids.is_empty():
+		return
+	var subject := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if subject.is_empty() or str(subject.get("draw_mode", "closed_loop")) == "primitive":
+		return
+	var valid_edge_ids: Array[String] = []
+	for edge_id_value in edge_ids:
+		var edge_id := str(edge_id_value)
+		if not edge_id.is_empty() and not BezierTopology.edge_by_id(subject.get("edges", []), edge_id).is_empty() and edge_id not in valid_edge_ids:
+			valid_edge_ids.append(edge_id)
+	if valid_edge_ids.is_empty():
+		return
+	var can_delete := false
+	for edge_id in valid_edge_ids:
+		var edge_chain := BezierTopology.chain_for_edge(subject.get("chains", []), edge_id)
+		if not edge_chain.is_empty() and bool(edge_chain.get("closed", false)):
+			can_delete = true
+			break
+	if not can_delete:
+		return
+	_record_direct_change()
+	var deleted_edge_ids := BezierTopology.delete_edges(subject, valid_edge_ids)
+	if deleted_edge_ids.is_empty():
+		return
+	if str(subject.get("draw_mode", "closed_loop")) == "closed_loop":
+		subject["draw_mode"] = "contour"
+	selected_edge_id = ""
+	selected_edge_ids.clear()
+	selected_point_id = ""
+	selected_point_ids.clear()
+	_refresh_component_geometry(subject)
+	canvas_view.clear_selection()
+	_render_inspector()
+	_render_canvas_context()
 
 
 func _on_point_selection_changed(point_id: String) -> void:

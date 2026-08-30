@@ -5,12 +5,14 @@ var failures := 0
 
 func _init() -> void:
 	_test_add_close_and_validate()
+	_test_delete_edge_opens_contour()
 	_test_delete_exactly_one_point()
 	_test_fuse_point()
 	_test_delete_multiple_points_and_protect_closed_minimum()
 	_test_ids_are_not_reused()
 	_test_insert_preserves_curve()
 	_test_component_draw_modes_and_continuation()
+	_test_drawn_handle_direction_and_dead_zone()
 	_test_closed_loop_selection_mirror()
 	_test_contour_stroke_mesh()
 	_test_closed_contour_region_mesh()
@@ -111,6 +113,23 @@ func _test_add_close_and_validate() -> void:
 	var duplicate_point_chain := component.duplicate(true)
 	duplicate_point_chain["chains"][0]["point_ids"][1] = duplicate_point_chain["chains"][0]["point_ids"][0]
 	_expect(not BezierTopology.validate(duplicate_point_chain).is_empty(), "A Chain with a duplicate Point ID must be invalid.")
+
+
+func _test_delete_edge_opens_contour() -> void:
+	var component := _component()
+	component["draw_mode"] = "contour"
+	for position in [Vector2.ZERO, Vector2(4.0, 0.0), Vector2(4.0, 4.0), Vector2(0.0, 4.0)]:
+		BezierTopology.add_point(component, position, "corner")
+	BezierTopology.close_active_chain(component)
+	var chain: Dictionary = component["chains"][0]
+	var removed_edge_id := str(chain["edge_ids"][2])
+	var point_ids_before: Array = chain["point_ids"].duplicate()
+	var deleted := BezierTopology.delete_edges(component, [removed_edge_id])
+	var opened_chain: Dictionary = component["chains"][0]
+	_expect(deleted == [removed_edge_id], "Deleting a selected closed-chain Edge should report that Edge as deleted.")
+	_expect(not bool(opened_chain.get("closed", true)) and opened_chain.get("point_ids", []).size() == point_ids_before.size(), "Deleting a closed-chain Edge should open the Chain without deleting Points.")
+	_expect(component.get("edges", []).size() == point_ids_before.size() - 1 and opened_chain.get("edge_ids", []).size() == point_ids_before.size() - 1, "An opened Chain should retain every non-deleted Edge.")
+	_expect(BezierTopology.mode_validation_issues(component, true).is_empty(), "An opened Contour should remain valid after Edge deletion.")
 
 
 func _test_delete_exactly_one_point() -> void:
@@ -223,6 +242,59 @@ func _test_component_draw_modes_and_continuation() -> void:
 	closed["draw_mode"] = "closed_loop"
 	_expect(not BezierTopology.mode_validation_issues(closed, true).is_empty(), "Closed Loop must reject open topology.")
 	_expect(BezierTopology.mode_validation_issues(ribbon, true).is_empty(), "Contour must accept one complete open Chain.")
+	var application = load("res://scripts/main.gd").new()
+	var preserved_topology := closed_contour.duplicate(true)
+	var original_points: Array = preserved_topology.get("points", []).duplicate(true)
+	var original_edges: Array = preserved_topology.get("edges", []).duplicate(true)
+	var original_chains: Array = preserved_topology.get("chains", []).duplicate(true)
+	_expect(application._apply_component_draw_mode(preserved_topology, "closed_loop") and preserved_topology.get("points", []) == original_points and preserved_topology.get("edges", []) == original_edges and preserved_topology.get("chains", []) == original_chains, "The Draw Mode menu should switch Contour and Closed Loop without rewriting Bezier topology.")
+	_expect(not application._apply_component_draw_mode(preserved_topology, "primitive") and str(preserved_topology.get("draw_mode", "")) == "closed_loop", "The Draw Mode menu must reject implicit conversion of authored Bezier topology to a Primitive.")
+	var empty_component := _component()
+	empty_component["draw_mode"] = "contour"
+	_expect(application._apply_component_draw_mode(empty_component, "primitive") and str(empty_component.get("geometry_source", "")) == "primitive" and empty_component.get("primitive", null) is Dictionary, "An empty Bezier Component should switch safely to an empty Primitive source.")
+	_expect(application._apply_component_draw_mode(empty_component, "contour") and str(empty_component.get("geometry_source", "")) == "bezier" and not empty_component.has("primitive"), "An empty Primitive Component should switch safely back to a Bezier source.")
+	var authored_primitive := {"draw_mode": "primitive", "geometry_source": "primitive", "primitive": {"type": "circle", "center": Vector2.ZERO, "diameter_cm": 5.0}, "points": [], "edges": [], "chains": []}
+	_expect(not application._apply_component_draw_mode(authored_primitive, "contour") and str(authored_primitive.get("draw_mode", "")) == "primitive", "The Draw Mode menu must preserve authored analytic Primitive geometry instead of silently discarding it.")
+	application.free()
+
+
+func _test_drawn_handle_direction_and_dead_zone() -> void:
+	var contour := _component()
+	contour["draw_mode"] = "contour"
+	BezierTopology.add_point(contour, Vector2(-15.2, 41.65), "aligned")
+	var first_id := BezierTopology.add_point(contour, Vector2(-14.2, 42.8), "aligned")
+	var second_id := BezierTopology.add_point_from(contour, first_id, Vector2(-13.1, 43.6), "aligned", Vector2(-0.035749, -0.021011))
+	var second := BezierTopology.point_by_id(contour.get("points", []), second_id)
+	_expect(str(second.get("handle_source", "")) == "manual" and Vector2(second.get("handle_in", Vector2.ZERO)).dot(Vector2(-14.2, 42.8) - Vector2(-13.1, 43.6)) > 0.0 and Vector2(second.get("handle_out", Vector2.ZERO)).dot(Vector2(-13.1, 43.6) - Vector2(-14.2, 42.8)) > 0.0, "Drawing an Aligned Point must orient its incoming and outgoing Handles with the authored Chain direction instead of creating a local reversal.")
+	BezierTopology.add_point_from(contour, second_id, Vector2(-11.9, 43.9), "aligned")
+	var stroke := ContourStrokeService.generate(contour)
+	_expect(bool(stroke.get("valid", false)), "The Crown-like reversed placement gesture must be normalized before it can create overlapping Contour Stroke centerline segments.")
+
+	var prepended := _component()
+	prepended["draw_mode"] = "contour"
+	BezierTopology.add_point(prepended, Vector2.ZERO, "aligned")
+	BezierTopology.add_point(prepended, Vector2(10.0, 0.0), "aligned")
+	var prepended_id := BezierTopology.add_point_from(prepended, str(prepended.get("chains", [])[0].get("point_ids", [])[0]), Vector2(-10.0, 0.0), "mirrored", Vector2(-2.0, 0.0))
+	var prepended_point := BezierTopology.point_by_id(prepended.get("points", []), prepended_id)
+	_expect(Vector2(prepended_point.get("handle_out", Vector2.ZERO)).x > 0.0 and Vector2(prepended_point.get("handle_in", Vector2.ZERO)).x < 0.0, "Prepending a drawn Mirrored Point must orient its outgoing Handle toward the existing Chain.")
+	var free_contour := _component()
+	BezierTopology.add_point(free_contour, Vector2.ZERO, "free")
+	var free_id := BezierTopology.add_point(free_contour, Vector2(10.0, 0.0), "free", Vector2(-2.0, 1.0))
+	var free_point := BezierTopology.point_by_id(free_contour.get("points", []), free_id)
+	_expect(Vector2(free_point.get("handle_out", Vector2.ZERO)) == Vector2(-2.0, 1.0), "Intentional Free Handle placement must retain its exact authored direction instead of applying Smooth-point normalization.")
+
+	var canvas := ComponentCanvas.new()
+	canvas.size = Vector2(400.0, 400.0)
+	canvas.set_camera_state(Vector2.ZERO, 20.0)
+	canvas.set_component_transform({"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO})
+	canvas.active_tool = "point"
+	canvas.draw_point_mode = "aligned"
+	canvas._begin_draw_pointer(Vector2(100.0, 100.0))
+	canvas._update_pending_draw_handle(Vector2(107.0, 100.0))
+	_expect(canvas.pending_draw_has_handle, "An intentional Point drag beyond the release dead zone should author manual Handles.")
+	canvas._update_pending_draw_handle(Vector2(102.0, 100.0))
+	_expect(not canvas.pending_draw_has_handle and canvas.pending_draw_handle_out == Vector2.ZERO, "Returning inside the release dead zone must cancel a briefly crossed Handle drag instead of latching an accidental manual Handle.")
+	canvas.free()
 
 
 func _test_closed_loop_selection_mirror() -> void:
@@ -1370,11 +1442,15 @@ func _test_geometry_sampling_ui_shell() -> void:
 	_expect(every_category_expanded, "Every visible category should remain expanded.")
 	var test_assets: Array[Dictionary] = [{"id": "asset_1", "name": "Wizard", "visibility": true, "components": [component]}]
 	application.assets = test_assets
-	application.active_module = "Mesh"
-	application.active_geometry_submodule = "Sampling"
 	application.selected_asset_id = "asset_1"
 	application.selected_component_id = "component_1"
 	application.expanded_assets["asset_1"] = true
+	application._render_canvas_context()
+	var draw_mode_popup: PopupMenu = application.draw_mode_status.get_popup()
+	_expect(not application.draw_mode_status.disabled and application.draw_mode_status.text.contains("Closed Loop") and draw_mode_popup.item_count == 3 and draw_mode_popup.is_item_checked(0), "The toolbar Draw Mode status should be a clickable, checked menu for the selected Create Component.")
+	_expect(not draw_mode_popup.is_item_disabled(1) and draw_mode_popup.is_item_disabled(2), "Authored Bezier geometry should switch losslessly to Contour while disabling destructive implicit Primitive conversion.")
+	application.active_module = "Mesh"
+	application.active_geometry_submodule = "Sampling"
 	application._render_outliner()
 	application._render_inspector()
 	application._render_canvas_context()

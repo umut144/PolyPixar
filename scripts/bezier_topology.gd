@@ -115,6 +115,10 @@ static func add_point(component: Dictionary, position: Vector2, requested_mode: 
 	component["chains"] = chains
 	BezierGeometry.resolve_auto_handles(points, chains)
 	if mode != "linear" and not is_zero_approx(drawn_handle_out.length_squared()):
+		if mode in ["aligned", "mirrored"] and point_ids.size() >= 2:
+			var previous_point := point_by_id(points, str(point_ids[point_ids.size() - 2]))
+			if not previous_point.is_empty():
+				drawn_handle_out = _oriented_drawn_handle_out(drawn_handle_out, position - Vector2(previous_point.get("position", position)))
 		new_point["handle_source"] = "manual"
 		new_point["handle_out"] = drawn_handle_out
 		var automatic_in: Vector2 = new_point.get("handle_in", Vector2.ZERO)
@@ -162,7 +166,8 @@ static func add_point_from(component: Dictionary, anchor_point_id: String, posit
 	}
 	points.append(new_point)
 	var point_ids: Array = chain.get("point_ids", [])
-	if anchor_point_id == str(point_ids.front()):
+	var prepending := anchor_point_id == str(point_ids.front())
+	if prepending:
 		point_ids.push_front(point_id)
 	else:
 		point_ids.append(point_id)
@@ -171,11 +176,23 @@ static func add_point_from(component: Dictionary, anchor_point_id: String, posit
 	rebuild_chain_edges(component, chain)
 	BezierGeometry.resolve_auto_handles(points, component.get("chains", []))
 	if mode != "linear" and not is_zero_approx(drawn_handle_out.length_squared()):
+		var anchor_point := point_by_id(points, anchor_point_id)
+		if mode in ["aligned", "mirrored"] and not anchor_point.is_empty():
+			var expected_out_direction := Vector2(anchor_point.get("position", position)) - position
+			if not prepending:
+				expected_out_direction = -expected_out_direction
+			drawn_handle_out = _oriented_drawn_handle_out(drawn_handle_out, expected_out_direction)
 		new_point["handle_source"] = "manual"
 		new_point["handle_out"] = drawn_handle_out
 		if mode in ["mirrored", "aligned"]:
 			new_point["handle_in"] = -drawn_handle_out
 	return point_id
+
+
+static func _oriented_drawn_handle_out(drawn_handle_out: Vector2, expected_out_direction: Vector2) -> Vector2:
+	if is_zero_approx(drawn_handle_out.length_squared()) or is_zero_approx(expected_out_direction.length_squared()):
+		return drawn_handle_out
+	return -drawn_handle_out if drawn_handle_out.dot(expected_out_direction) < 0.0 else drawn_handle_out
 
 
 static func mode_validation_issues(component: Dictionary, complete := true) -> Array[String]:
@@ -392,6 +409,55 @@ static func delete_point(component: Dictionary, point_id: String) -> bool:
 	component["chains"] = chains
 	BezierGeometry.resolve_auto_handles(points, chains)
 	return true
+
+
+## Removes one or more authored Edges. Removing an Edge from a closed Chain
+## opens that Chain at the removed segment, preserving every Point and every
+## remaining Edge. This is the inverse of close_chain for the common edit-edge
+## workflow: the resulting Chain is ordered from the old Edge end to its start.
+static func delete_edges(component: Dictionary, edge_ids_to_delete: Array) -> Array[String]:
+	var deleted: Array[String] = []
+	for edge_id_value in edge_ids_to_delete:
+		var edge_id := str(edge_id_value)
+		if edge_id.is_empty() or edge_id in deleted:
+			continue
+		var edges: Array = component.get("edges", [])
+		var edge := edge_by_id(edges, edge_id)
+		var chain := chain_for_edge(component.get("chains", []), edge_id)
+		if edge.is_empty() or chain.is_empty():
+			continue
+		var chain_edge_ids: Array = chain.get("edge_ids", [])
+		var edge_index := chain_edge_ids.find(edge_id)
+		if edge_index < 0:
+			continue
+		if bool(chain.get("closed", false)):
+			var point_ids: Array = chain.get("point_ids", []).duplicate()
+			if point_ids.size() < 3 or chain_edge_ids.size() != point_ids.size():
+				continue
+			# Rotate the closed ring so the new open Chain starts at the
+			# removed Edge's end point and finishes at its start point.
+			var rotated_points: Array = []
+			var rotated_edges: Array = []
+			for offset in range(1, point_ids.size()):
+				rotated_points.append(point_ids[(edge_index + offset) % point_ids.size()])
+				rotated_edges.append(chain_edge_ids[(edge_index + offset) % chain_edge_ids.size()])
+			rotated_points.append(point_ids[edge_index])
+			chain["point_ids"] = rotated_points
+			chain["edge_ids"] = rotated_edges
+			chain["closed"] = false
+		else:
+			# An open Chain cannot retain a hole in its ordered edge list. For
+			# now, reject that ambiguous operation rather than corrupting the
+			# canonical topology; closed-contour opening remains fully supported.
+			continue
+		for edge_array_index in range(edges.size() - 1, -1, -1):
+			if str(edges[edge_array_index].get("id", "")) == edge_id:
+				edges.remove_at(edge_array_index)
+				break
+		deleted.append(edge_id)
+	component["edges"] = component.get("edges", [])
+	BezierGeometry.resolve_auto_handles(component.get("points", []), component.get("chains", []))
+	return deleted
 
 
 ## Fuses a selected Point with the nearest other Point in this Component when
