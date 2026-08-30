@@ -30,6 +30,7 @@ func _init() -> void:
 	_test_multi_component_inspector()
 	_test_geometry_sampling_service()
 	_test_geometry_auto_build_service()
+	_test_geometry_auto_build_regression_corpus()
 	_test_create_outliner_expansion_scope()
 	_test_geometry_sampling_ui_shell()
 	_test_geometry_seeding_service()
@@ -1368,8 +1369,47 @@ func _test_geometry_auto_build_service() -> void:
 	for point in large_component.get("points", []):
 		point["position"] = Vector2(point.get("position", Vector2.ZERO)) * Vector2(2.0, 5.0)
 	var large_recipes := GeometryAutoBuildService.automatic_recipes(large_component)
-	_expect(is_equal_approx(float(large_recipes.get("sampling", {}).get("parameters", {}).get("spacing", 0.0)), 1.0) and is_equal_approx(float(large_recipes.get("seeding", {}).get("parameters", {}).get("spacing", 0.0)), 1.0), "Automatic Mesh recipes should bound interior density for a 20x50 Component instead of generating thousands of avoidable Seeds.")
+	var expected_large_boundary_spacing := 0.55 * sqrt(140.0 / 60.0)
+	var expected_large_seed_spacing := sqrt(1000.0 / 750.0)
+	_expect(is_equal_approx(float(large_recipes.get("sampling", {}).get("parameters", {}).get("spacing", 0.0)), expected_large_boundary_spacing), "Large automatic Components should scale Boundary Spacing from the Barde reference range without coupling it to interior area.")
+	_expect(is_equal_approx(float(large_recipes.get("seeding", {}).get("parameters", {}).get("spacing", 0.0)), expected_large_seed_spacing) and expected_large_seed_spacing > expected_large_boundary_spacing, "Large automatic Components should use a separate area-aware Seed Spacing to bound interior density.")
+	var tiny_component := component.duplicate(true)
+	for point in tiny_component.get("points", []):
+		point["position"] = Vector2(point.get("position", Vector2.ZERO)) * 0.1
+	var tiny_recipes := GeometryAutoBuildService.automatic_recipes(tiny_component)
+	_expect(is_equal_approx(float(tiny_recipes.get("sampling", {}).get("parameters", {}).get("spacing", 0.0)), 0.5) and is_equal_approx(float(tiny_recipes.get("seeding", {}).get("parameters", {}).get("spacing", 0.0)), 0.5), "Small Symbols should retain the existing minimum boundary-sample behavior instead of being coarsened by the large-Component model.")
+	_expect(bool(recipes.get("automatic", false)) and int(recipes.get("auto_recipe_version", 0)) == GeometryAutoBuildService.AUTO_RECIPE_VERSION, "Automatic Mesh recipes should identify their versioned calibration model.")
+	var seed_retry := GeometryAutoBuildService.automatic_retry_recipes(recipes, 1, "seed")
+	_expect(is_equal_approx(float(seed_retry.get("sampling", {}).get("parameters", {}).get("spacing", 0.0)), 0.55) and is_equal_approx(float(seed_retry.get("sampling", {}).get("parameters", {}).get("feature_detail", 0.0)), 0.55) and is_equal_approx(float(seed_retry.get("seeding", {}).get("parameters", {}).get("spacing", 0.0)), 0.55 * 1.25), "An automatic Seed retry must reduce only interior density and preserve the accepted Boundary silhouette recipe.")
+	var boundary_retry := GeometryAutoBuildService.automatic_retry_recipes(recipes, 1, "boundary")
+	_expect(is_equal_approx(float(boundary_retry.get("sampling", {}).get("parameters", {}).get("spacing", 0.0)), 0.55 * 1.25) and is_equal_approx(float(boundary_retry.get("sampling", {}).get("parameters", {}).get("feature_detail", 0.0)), 0.55 * 1.25) and is_equal_approx(float(boundary_retry.get("seeding", {}).get("parameters", {}).get("spacing", 0.0)), 0.55 * 1.25), "A Boundary retry may coarsen Boundary criteria only after the automatic Boundary budget is the diagnosed limit.")
+	var seed_after_boundary_retry := GeometryAutoBuildService.automatic_retry_recipes(recipes, 2, "seed", 1)
+	_expect(is_equal_approx(float(seed_after_boundary_retry.get("sampling", {}).get("parameters", {}).get("spacing", 0.0)), 0.55 * 1.25) and is_equal_approx(float(seed_after_boundary_retry.get("seeding", {}).get("parameters", {}).get("spacing", 0.0)), 0.55 * pow(1.25, 2)), "A later Seed retry must retain an already required Boundary relaxation without coarsening that Boundary a second time.")
+	var accepted_assessment := GeometryAutoBuildService.automatic_build_assessment(
+		{"valid": true, "sample_count": 100},
+		{"valid": true, "seed_count": 200},
+		{"valid": true, "triangle_count": 500, "constraints_valid": true, "degenerate_triangle_count": 0, "minimum_angle": 12.0, "mean_quality": 0.7, "worst_aspect_ratio": 4.0}
+	)
+	var seed_limited_assessment := GeometryAutoBuildService.automatic_build_assessment(
+		{"valid": true, "sample_count": 100},
+		{"valid": true, "seed_count": GeometryAutoBuildService.MAX_AUTOMATIC_SEEDS + 1}
+	)
+	var boundary_limited_assessment := GeometryAutoBuildService.automatic_build_assessment(
+		{"valid": true, "sample_count": GeometryAutoBuildService.MAX_AUTOMATIC_BOUNDARY_SAMPLES + 1}
+	)
+	var invalid_quality_assessment := GeometryAutoBuildService.automatic_build_assessment(
+		{"valid": true, "sample_count": 100},
+		{"valid": true, "seed_count": 200},
+		{"valid": true, "triangle_count": 500, "constraints_valid": false, "degenerate_triangle_count": 1}
+	)
+	_expect(bool(accepted_assessment.get("accepted", false)) and is_equal_approx(float(accepted_assessment.get("minimum_angle", 0.0)), 12.0), "Automatic acceptance should retain fixed complexity and reported quality diagnostics for a valid Build.")
+	_expect(not bool(seed_limited_assessment.get("accepted", true)) and str(seed_limited_assessment.get("retry_scope", "")) == "seed", "Excessive automatic interior complexity should request a Seed-only retry.")
+	_expect(not bool(boundary_limited_assessment.get("accepted", true)) and str(boundary_limited_assessment.get("retry_scope", "")) == "boundary", "Only excessive Boundary complexity should request a Boundary retry.")
+	_expect(not bool(invalid_quality_assessment.get("accepted", true)) and str(invalid_quality_assessment.get("retry_scope", "")) == "seed" and invalid_quality_assessment.get("issues", []).size() == 2, "Automatic acceptance must reject degenerate or Constraint-invalid Mesh quality without relaxing the Boundary first.")
 	var baked_signature := GeometryAutoBuildService.source_signature(component, [], [], recipes)
+	var previous_auto_model := recipes.duplicate(true)
+	previous_auto_model["auto_recipe_version"] = GeometryAutoBuildService.AUTO_RECIPE_VERSION - 1
+	_expect(not GeometryAutoBuildService.signatures_match(GeometryAutoBuildService.source_signature(component, [], [], previous_auto_model), baked_signature), "A newer automatic retry policy should invalidate older automatic provenance without forcing manual recipes to change.")
 	var jittered := component.duplicate(true)
 	jittered["points"][0]["position"] += Vector2(0.0003, 0.0)
 	_expect(GeometryAutoBuildService.signatures_match(GeometryAutoBuildService.source_signature(jittered, [], [], recipes), baked_signature), "Sub-tolerance point jitter should not request the long Mesh pipeline again.")
@@ -1402,7 +1442,49 @@ func _test_geometry_auto_build_service() -> void:
 	_expect(application._mesh_update_candidates("auto_asset").is_empty(), "A successfully committed automatic Mesh should become clean without a mutable dirty flag.")
 	_expect(application._all_mesh_update_candidates() == [{"asset_id": "auto_symbol", "component_id": "auto_symbol_body"}], "A committed Mesh should leave only dirty Components from other Assets in the global batch.")
 	var round_trip: Dictionary = application._normalize_geometry_document(application._serialize_geometry_document(application.geometry_documents["auto_asset/auto_body"]), "auto_asset", "auto_body")
-	_expect(not round_trip.get("component_mesh", {}).get("build_provenance", {}).get("source_signature", {}).is_empty() and round_trip.get("meshing", {}).get("bakes", {}).has(ContourMeshService.METHOD), "Fill provenance and the separate Contour Stroke Bake should survive Geometry JSON persistence.")
+	var automatic_provenance: Dictionary = round_trip.get("component_mesh", {}).get("build_provenance", {})
+	_expect(not automatic_provenance.get("source_signature", {}).is_empty() and round_trip.get("meshing", {}).get("bakes", {}).has(ContourMeshService.METHOD), "Fill provenance and the separate Contour Stroke Bake should survive Geometry JSON persistence.")
+	_expect(str(automatic_provenance.get("recipe_mode", "")) == "automatic" and int(automatic_provenance.get("auto_recipe_version", 0)) == GeometryAutoBuildService.AUTO_RECIPE_VERSION and not str(automatic_provenance.get("pipeline_recipe_hash", "")).is_empty(), "Automatic Mesh provenance should retain recipe ownership so later model versions can migrate safely.")
+	var persisted_auto_diagnostics: Dictionary = automatic_provenance.get("automatic_diagnostics", {})
+	_expect(int(persisted_auto_diagnostics.get("version", 0)) == 1 and persisted_auto_diagnostics.get("limits", {}) == GeometryAutoBuildService.automatic_complexity_limits() and str(persisted_auto_diagnostics.get("attempts", [])[0].get("outcome", "")) == "accepted", "Successful automatic provenance should persist its attempt history, quality readings, and fixed complexity limits.")
+	var automatic_diagnostic_text := "\n".join(application._component_mesh_build_diagnostic_lines("auto_asset", "auto_body"))
+	_expect(automatic_diagnostic_text.contains("Recipe Ownership: Automatic · Model v%d" % GeometryAutoBuildService.AUTO_RECIPE_VERSION) and automatic_diagnostic_text.contains("Current Spacing: Boundary 0.550 · Seed 0.550") and automatic_diagnostic_text.contains("Geometry: Area 100.00 · Perimeter 40.00 · Feature 10.00") and automatic_diagnostic_text.contains("Last Build: Samples") and automatic_diagnostic_text.contains("Attempt 1: Initial · Accepted") and automatic_diagnostic_text.contains("Quality: Min"), "Auto Build diagnostics should explain ownership, geometry metrics, effective spacing, budget use, attempts, and quality without changing the Mesh.")
+	var stored_automatic_recipes: Dictionary = application._geometry_build_recipes("auto_asset", "auto_body", component, [], [])
+	_expect(bool(stored_automatic_recipes.get("automatic", false)), "An unchanged automatically committed recipe should remain owned by the Auto Mesh pipeline.")
+	application.geometry_documents["auto_asset/auto_body"]["sampling"]["recipe"]["parameters"]["spacing"] = 0.8
+	var manually_edited_recipes: Dictionary = application._geometry_build_recipes("auto_asset", "auto_body", component, [], [])
+	_expect(not bool(manually_edited_recipes.get("automatic", true)) and is_equal_approx(float(manually_edited_recipes.get("sampling", {}).get("parameters", {}).get("spacing", 0.0)), 0.8), "Editing an automatic recipe should transfer ownership to the manual settings instead of letting Auto Mesh overwrite it.")
+	var manual_diagnostic_text := "\n".join(application._component_mesh_build_diagnostic_lines("auto_asset", "auto_body"))
+	_expect(manual_diagnostic_text.contains("Recipe Ownership: Manual · Changed after Auto Build") and manual_diagnostic_text.contains("Auto Budgets: Not applied"), "Inspector diagnostics should immediately explain when a recipe edit transfers ownership from Auto Build to manual settings.")
+	var manual_build: Dictionary = application._generate_component_mesh_build("auto_asset", "auto_body")
+	_expect(bool(manual_build.get("valid", false)) and str(manual_build.get("recipe_mode", "")) == "manual" and int(manual_build.get("attempts", 0)) == 1 and manual_build.get("auto_build_diagnostics", {}).is_empty(), "A manually owned recipe should run exactly once and remain outside automatic fallback or budget rewriting.")
+	var legacy_component := large_component.duplicate(true)
+	legacy_component["id"] = "legacy_large"
+	application.assets.append({"id": "legacy_asset", "name": "Legacy Asset", "asset_type": "prop", "visibility": true, "components": [legacy_component], "guides": []})
+	var legacy_document: Dictionary = application._default_geometry_document("legacy_asset", "legacy_large")
+	legacy_document["sampling"]["recipe"] = GeometrySamplingService.normalize_recipe({"method": GeometrySamplingService.ADAPTIVE, "parameters": {"spacing": 0.55, "feature_detail": 0.55, "boundary_refinements": {}}})
+	legacy_document["seeding"]["recipe"] = GeometrySeedingService.normalize_recipe({"method": GeometrySeedingService.POISSON_FILL, "parameters": {"spacing": 0.55, "constraint_clearance_factor": GeometrySeedingService.DEFAULT_CONSTRAINT_CLEARANCE_FACTOR, "seed": GeometrySeedingService.DEFAULT_SEED}})
+	legacy_document["meshing"]["recipe"] = GeometryMeshingService.normalize_recipe({"method": GeometryMeshingService.CONSTRAINED_MESH, "parameters": {"seeding_method": GeometrySeedingService.POISSON_FILL, "mesh_character": GeometryMeshingService.DEFAULT_MESH_CHARACTER, "optimize_mesh": true}})
+	legacy_document["component_mesh"]["build_provenance"] = {"source_signature": {"version": 1}}
+	application.geometry_documents["legacy_asset/legacy_large"] = legacy_document
+	var migrated_legacy_recipes: Dictionary = application._geometry_build_recipes("legacy_asset", "legacy_large", legacy_component, [], [])
+	_expect(bool(migrated_legacy_recipes.get("automatic", false)) and is_equal_approx(float(migrated_legacy_recipes.get("sampling", {}).get("parameters", {}).get("spacing", 0.0)), expected_large_boundary_spacing) and is_equal_approx(float(migrated_legacy_recipes.get("seeding", {}).get("parameters", {}).get("spacing", 0.0)), expected_large_seed_spacing), "A legacy default Auto Mesh recipe should migrate to the separated Boundary and Seed calibration.")
+	var legacy_default_component := large_component.duplicate(true)
+	legacy_default_component["id"] = "legacy_default_large"
+	application.assets.append({"id": "legacy_default_asset", "name": "Legacy Default Asset", "asset_type": "prop", "visibility": true, "components": [legacy_default_component], "guides": []})
+	var legacy_default_document: Dictionary = application._default_geometry_document("legacy_default_asset", "legacy_default_large")
+	legacy_default_document["component_mesh"]["build_provenance"] = {"source_signature": {"version": 1}}
+	application.geometry_documents["legacy_default_asset/legacy_default_large"] = legacy_default_document
+	var migrated_default_recipes: Dictionary = application._geometry_build_recipes("legacy_default_asset", "legacy_default_large", legacy_default_component, [], [])
+	_expect(bool(migrated_default_recipes.get("automatic", false)) and is_equal_approx(float(migrated_default_recipes.get("sampling", {}).get("parameters", {}).get("spacing", 0.0)), expected_large_boundary_spacing), "An oversized Component with untouched legacy UI defaults should enter the automatic calibration, covering old Tree-like Crown documents.")
+	var legacy_default_small := tiny_component.duplicate(true)
+	legacy_default_small["id"] = "legacy_default_small"
+	application.assets.append({"id": "legacy_default_small_asset", "name": "Legacy Default Small Asset", "asset_type": "symbols", "visibility": true, "components": [legacy_default_small], "guides": []})
+	var legacy_default_small_document: Dictionary = application._default_geometry_document("legacy_default_small_asset", "legacy_default_small")
+	legacy_default_small_document["component_mesh"]["build_provenance"] = {"source_signature": {"version": 1}}
+	application.geometry_documents["legacy_default_small_asset/legacy_default_small"] = legacy_default_small_document
+	var preserved_default_small: Dictionary = application._geometry_build_recipes("legacy_default_small_asset", "legacy_default_small", legacy_default_small, [], [])
+	_expect(not bool(preserved_default_small.get("automatic", true)) and is_equal_approx(float(preserved_default_small.get("sampling", {}).get("parameters", {}).get("spacing", 0.0)), GeometrySamplingService.DEFAULT_SPACING), "Legacy default recipes on small Symbols should stay untouched rather than being swept into the large-Component migration.")
 	application.free()
 	var contour_component := _component()
 	contour_component.merge({"id": "auto_arm_line", "name": "Arm Line", "draw_mode": "contour", "visibility": true, "transform": {"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}})
@@ -1419,6 +1501,78 @@ func _test_geometry_auto_build_service() -> void:
 	contour_component["edges"][0]["render_outline"] = false
 	_expect(contour_application._mesh_update_candidates("contour_asset") == ["auto_arm_line"], "Changing Render Outline must make Contour build provenance actionable again.")
 	contour_application.free()
+
+
+func _test_geometry_auto_build_regression_corpus() -> void:
+	var tiny_symbol := _closed_linear_fixture("corpus_tiny", "Tiny Symbol", [Vector2.ZERO, Vector2(1.0, 0.0), Vector2(1.0, 1.0), Vector2(0.0, 1.0)])
+	var barde_body := _closed_linear_fixture("corpus_barde", "Barde Body", [Vector2.ZERO, Vector2(7.8, 0.0), Vector2(7.8, 6.8), Vector2(0.0, 6.8)])
+	var tree_trunk := _closed_linear_fixture("corpus_trunk", "Tree Trunk", [Vector2.ZERO, Vector2(22.4, 0.0), Vector2(22.4, 33.6), Vector2(0.0, 33.6)])
+	var concave_crown := _closed_linear_fixture("corpus_crown", "Concave Crown", [
+		Vector2(0.0, -34.0), Vector2(8.0, -19.0), Vector2(24.0, -24.0), Vector2(19.0, -8.0),
+		Vector2(32.0, 0.0), Vector2(19.0, 8.0), Vector2(24.0, 24.0), Vector2(8.0, 19.0),
+		Vector2(0.0, 34.0), Vector2(-8.0, 19.0), Vector2(-24.0, 24.0), Vector2(-19.0, 8.0),
+		Vector2(-32.0, 0.0), Vector2(-19.0, -8.0), Vector2(-24.0, -24.0), Vector2(-8.0, -19.0)
+	])
+	var tiny_result := _run_auto_mesh_fixture(tiny_symbol)
+	var barde_result := _run_auto_mesh_fixture(barde_body)
+	var trunk_result := _run_auto_mesh_fixture(tree_trunk)
+	var crown_result := _run_auto_mesh_fixture(concave_crown)
+	for fixture_result in [tiny_result, barde_result, trunk_result, crown_result]:
+		var fixture_name := str(fixture_result.get("fixture_name", "Fixture"))
+		var assessment: Dictionary = fixture_result.get("assessment", {})
+		var mesh: Dictionary = fixture_result.get("meshing", {})
+		_expect(bool(fixture_result.get("valid", false)) and bool(assessment.get("accepted", false)) and bool(mesh.get("constraints_valid", false)) and int(mesh.get("degenerate_triangle_count", -1)) == 0, "%s should satisfy the same Constraint and non-degenerate quality gates as production Auto Mesh builds." % fixture_name)
+		_expect(int(assessment.get("sample_count", 0)) <= GeometryAutoBuildService.MAX_AUTOMATIC_BOUNDARY_SAMPLES and int(assessment.get("seed_count", 0)) <= GeometryAutoBuildService.MAX_AUTOMATIC_SEEDS and int(assessment.get("triangle_count", 0)) <= GeometryAutoBuildService.MAX_AUTOMATIC_TRIANGLES, "%s should remain inside the versioned automatic complexity budgets." % fixture_name)
+	_expect(is_equal_approx(float(tiny_result.get("boundary_spacing", 0.0)), 0.5) and is_equal_approx(float(tiny_result.get("seed_spacing", 0.0)), 0.5), "The corpus should lock the existing tiny-Symbol boundary-sample behavior.")
+	_expect(is_equal_approx(float(barde_result.get("boundary_spacing", 0.0)), 0.55) and is_equal_approx(float(barde_result.get("seed_spacing", 0.0)), 0.55), "The corpus should lock the Barde-scale 0.55 reference calibration.")
+	_expect(float(trunk_result.get("boundary_spacing", 0.0)) > 0.7 and float(trunk_result.get("seed_spacing", 0.0)) > float(trunk_result.get("boundary_spacing", 0.0)) and int(trunk_result.get("meshing", {}).get("triangle_count", 0)) < 2000, "The corpus should keep Tree-Trunk density bounded while retaining a finer Boundary than interior Seed spacing.")
+	_expect(float(crown_result.get("boundary_spacing", 0.0)) > 0.9 and float(crown_result.get("seed_spacing", 0.0)) >= float(crown_result.get("boundary_spacing", 0.0)) and int(crown_result.get("meshing", {}).get("triangle_count", 0)) < 5000, "The corpus should keep a large concave Crown valid and within a broad non-fragile Triangle range.")
+	var constrained_body := _closed_linear_fixture("corpus_constraints", "Hole and Cut", [Vector2.ZERO, Vector2(20.0, 0.0), Vector2(20.0, 20.0), Vector2(0.0, 20.0)])
+	var hole := _closed_linear_fixture("corpus_hole", "Hole", [Vector2(8.0, 8.0), Vector2(8.0, 12.0), Vector2(12.0, 12.0), Vector2(12.0, 8.0)])
+	hole["sampling_input_id"] = "corpus_hole_input"
+	hole["topology_role"] = "hole"
+	hole["chains"][0]["topology_role"] = "hole"
+	var cut := AssetGuide.create("corpus_cut", "Cut", AssetGuide.CUT, "corpus_constraints")
+	BezierTopology.add_point(cut, Vector2(10.0, 0.0), "linear")
+	BezierTopology.add_point(cut, Vector2(10.0, 20.0), "linear")
+	var constrained_result := _run_auto_mesh_fixture(constrained_body, [cut], [hole])
+	var constrained_sampling: Dictionary = constrained_result.get("sampling", {})
+	var constrained_mesh: Dictionary = constrained_result.get("meshing", {})
+	_expect(bool(constrained_result.get("valid", false)) and int(constrained_sampling.get("hole_count", 0)) == 1 and constrained_sampling.get("cuts", []).size() == 1 and int(constrained_mesh.get("cut_seam_vertex_count", 0)) > 0 and int(constrained_mesh.get("diagnostics", {}).get("domain", {}).get("final_constraint_issue_count", -1)) == 0, "The synthetic corpus should cover Hole exclusion plus a two-sided Cut seam without relying on mutable World data.")
+
+
+func _closed_linear_fixture(component_id: String, component_name: String, positions: Array) -> Dictionary:
+	var component := _component()
+	component.merge({"id": component_id, "name": component_name, "draw_mode": "closed_loop", "visibility": true, "transform": {"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}})
+	for position in positions:
+		BezierTopology.add_point(component, Vector2(position), "linear")
+	BezierTopology.close_active_chain(component)
+	return component
+
+
+func _run_auto_mesh_fixture(component: Dictionary, cut_guides: Array = [], hole_components: Array = []) -> Dictionary:
+	var recipes := GeometryAutoBuildService.automatic_recipes(component, cut_guides, hole_components)
+	var sampling := GeometrySamplingService.generate(component, recipes.get("sampling", {}), cut_guides, hole_components)
+	if not bool(sampling.get("valid", false)):
+		return {"valid": false, "fixture_name": str(component.get("name", "Fixture")), "recipes": recipes, "sampling": sampling, "assessment": GeometryAutoBuildService.automatic_build_assessment(sampling)}
+	sampling["bake_id"] = "corpus_sampling"
+	var seeding := GeometrySeedingService.generate(sampling, recipes.get("seeding", {}))
+	if not bool(seeding.get("valid", false)):
+		return {"valid": false, "fixture_name": str(component.get("name", "Fixture")), "recipes": recipes, "sampling": sampling, "seeding": seeding, "assessment": GeometryAutoBuildService.automatic_build_assessment(sampling, seeding)}
+	seeding["bake_id"] = "corpus_seeding"
+	var meshing := GeometryMeshingService.generate(sampling, seeding, recipes.get("meshing", {}))
+	var assessment := GeometryAutoBuildService.automatic_build_assessment(sampling, seeding, meshing)
+	return {
+		"valid": bool(meshing.get("valid", false)) and bool(assessment.get("accepted", false)),
+		"fixture_name": str(component.get("name", "Fixture")),
+		"boundary_spacing": float(recipes.get("sampling", {}).get("parameters", {}).get("spacing", 0.0)),
+		"seed_spacing": float(recipes.get("seeding", {}).get("parameters", {}).get("spacing", 0.0)),
+		"recipes": recipes,
+		"sampling": sampling,
+		"seeding": seeding,
+		"meshing": meshing,
+		"assessment": assessment
+	}
 
 
 func _test_geometry_sampling_ui_shell() -> void:
@@ -1764,9 +1918,26 @@ func _test_geometry_meshing_service_and_ui() -> void:
 	var cdt := GeometryMeshingService.generate(sampling, seeding, cdt_recipe)
 	var repeated := GeometryMeshingService.generate(sampling, seeding, cdt_recipe)
 	_expect(bool(cdt.get("valid", false)) and int(cdt.get("vertex_count", 0)) > int(seeding.get("seed_count", 0)) and int(cdt.get("triangle_count", 0)) > 0, "Structured Constrained Mesh should generate a derived Mesh from sampled boundaries and Seeds.")
+	_expect(int(cdt.get("algorithm_version", 0)) == 5 and int(cdt.get("diagnostics", {}).get("domain", {}).get("final_constraint_issue_count", -1)) == 0, "Constrained Mesh must classify final domain faces topologically and report zero final Constraint coverage issues.")
 	_expect(cdt == repeated, "Meshing must be deterministic for identical Sampling, Seeding, and recipe inputs.")
 	var pslg_diagnostics := GeometryMeshingService._pslg_validation_issues(PackedVector2Array([Vector2.ZERO, Vector2(2.0, 0.0), Vector2(1.0, 0.0)]), [[0, 1]], [{"topology_role": "cut", "chain_id": "cut:test", "fragment_index": 0, "segment_index": 10}])
 	_expect(not pslg_diagnostics.is_empty() and str(pslg_diagnostics[0]).contains("Cut fragment 1, segment 11") and str(pslg_diagnostics[0]).contains("shared sampled junction"), "PSLG diagnostics should identify the exact Cut fragment and local segment that passes through an unsplit vertex.")
+	var complete_constraint_issues := GeometryMeshingService._final_constraint_issues([[0, 1, 2]], [[0, 1], [1, 2], [2, 0]], [
+		{"topology_role": "outer", "chain_id": "outer:test", "segment_index": 0},
+		{"topology_role": "outer", "chain_id": "outer:test", "segment_index": 1},
+		{"topology_role": "outer", "chain_id": "outer:test", "segment_index": 2}
+	])
+	var missing_constraint_issues := GeometryMeshingService._final_constraint_issues([[0, 1, 2]], [[0, 3]], [{"topology_role": "outer", "chain_id": "outer:test", "segment_index": 7}])
+	var one_sided_cut_issues := GeometryMeshingService._final_constraint_issues([[0, 1, 2]], [[0, 1]], [{"topology_role": "cut", "chain_id": "cut:test", "fragment_index": 1, "segment_index": 2}])
+	_expect(complete_constraint_issues.is_empty() and missing_constraint_issues.size() == 1 and str(missing_constraint_issues[0]).contains("Outer segment 8") and str(missing_constraint_issues[0]).contains("0 Triangles"), "Final Mesh validation must reject an Outer Constraint that disappeared during domain classification and identify its exact segment.")
+	_expect(one_sided_cut_issues.size() == 1 and str(one_sided_cut_issues[0]).contains("Cut fragment 2, segment 3") and str(one_sided_cut_issues[0]).contains("expected 2"), "Final Mesh validation must reject a Cut Constraint without two-sided Triangle coverage.")
+	var concave_positions := PackedVector2Array([Vector2.ZERO, Vector2(4.0, 0.0), Vector2(4.0, 4.0), Vector2(2.0, 2.0), Vector2(0.0, 4.0)])
+	var concave_constraints: Array = [[0, 1], [1, 2], [2, 3], [3, 4], [4, 0]]
+	var concave_constraint_data: Array = []
+	for segment_index in range(concave_constraints.size()):
+		concave_constraint_data.append({"topology_role": "outer", "chain_id": "outer:concave", "segment_index": segment_index})
+	var concave_domain := GeometryMeshingService._select_domain_triangles([[0, 1, 3], [1, 2, 3], [0, 3, 4], [2, 4, 3]], concave_positions, concave_constraints, concave_constraint_data)
+	_expect(bool(concave_domain.get("valid", false)) and concave_domain.get("triangles", []).size() == 3 and int(concave_domain.get("diagnostics", {}).get("final_constraint_issue_count", -1)) == 0, "Topology-based domain classification must retain every interior face of a concave Outer while excluding the convex-hull face outside its Constraint barrier.")
 	_expect(str(cdt.get("sampling_bake_id", "")) == "sampling_mesh_test" and str(cdt.get("seeding_bake_id", "")) == "seeding_mesh_test", "A Mesh result must retain both exact upstream Bake dependencies.")
 	var holed_component := _component()
 	for position in [Vector2.ZERO, Vector2(12.0, 0.0), Vector2(12.0, 12.0), Vector2(0.0, 12.0)]:
@@ -1781,7 +1952,7 @@ func _test_geometry_meshing_service_and_ui() -> void:
 	var holed_seeding := GeometrySeedingService.generate(holed_sampling, {"method": GeometrySeedingService.POISSON_FILL, "parameters": {"spacing": 2.5, "seed": 3}})
 	holed_seeding["bake_id"] = "seeding_hole_test"
 	var holed_mesh := GeometryMeshingService.generate(holed_sampling, holed_seeding, cdt_recipe)
-	_expect(bool(holed_mesh.get("valid", false)) and int(holed_mesh.get("triangle_count", 0)) > 0, "Constrained Delaunay should recover sampled constraints around holes.")
+	_expect(bool(holed_mesh.get("valid", false)) and bool(holed_mesh.get("constraints_valid", false)) and int(holed_mesh.get("triangle_count", 0)) > 0 and int(holed_mesh.get("diagnostics", {}).get("domain", {}).get("final_constraint_issue_count", -1)) == 0, "Constrained Delaunay should recover every final sampled Constraint around holes.")
 	var holed_positions: Dictionary = {}
 	for vertex in holed_mesh.get("vertices", []):
 		holed_positions[str(vertex.get("id", ""))] = Vector2(vertex.get("position", Vector2.ZERO))
@@ -1875,7 +2046,7 @@ func _test_geometry_meshing_service_and_ui() -> void:
 	_expect(application.geometry_meshing_workspace.visible and application.inspector_content.get_child_count() >= 10, "Geometry Meshing should expose its dedicated Workspace and compact Inspector.")
 	var meshing_inspector_text := _control_text(application.inspector_content)
 	var meshing_outliner_text := _control_text(application.outliner_list)
-	_expect(meshing_inspector_text.contains("Constrained Mesh · Automatic") and meshing_inspector_text.contains("Mesh Character") and meshing_inspector_text.contains("Optimize Mesh") and meshing_inspector_text.contains("Advanced Optimization") and meshing_inspector_text.contains("Optimization") and meshing_inspector_text.contains("Quality") and not meshing_inspector_text.contains("Use as Component Mesh"), "Meshing should expose one Artistic Constrained Mesh workflow, explicit optimization control, and both diagnostic views without a separate Component Mesh action.")
+	_expect(meshing_inspector_text.contains("Constrained Mesh · Automatic") and meshing_inspector_text.contains("Mesh Character") and meshing_inspector_text.contains("Optimize Mesh") and meshing_inspector_text.contains("Advanced Optimization") and meshing_inspector_text.contains("Optimization") and meshing_inspector_text.contains("Quality") and meshing_inspector_text.contains("Auto Build Diagnostics") and meshing_inspector_text.contains("Recipe Ownership: Manual · Legacy / unclassified recipe") and not meshing_inspector_text.contains("Use as Component Mesh"), "Meshing should expose one Artistic Constrained Mesh workflow, explicit optimization control, read-only build provenance, and both diagnostic views without a separate Component Mesh action.")
 	_expect(meshing_outliner_text.contains("Sampling · Adaptive") and meshing_outliner_text.contains("Seeding · Poisson Fill") and meshing_outliner_text.contains("Constraints · Outer Preserved") and meshing_outliner_text.contains("Mesh · Constrained Mesh"), "Meshing Outliner should expose its complete nested pipeline dependencies.")
 	var current_sampling_bake: Dictionary = normalized["sampling"]["bakes"][GeometrySamplingService.ADAPTIVE]
 	var current_sampling_version := int(current_sampling_bake.get("algorithm_version", 0))

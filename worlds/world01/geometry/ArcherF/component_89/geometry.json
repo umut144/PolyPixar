@@ -2,26 +2,68 @@
 	"asset_id": "asset_14",
 	"component_id": "component_89",
 	"component_mesh": {
-		"bake_id": "meshing_bake_2019184141057855922",
+		"bake_id": "meshing_bake_291067209024898942",
 		"build_provenance": {
-			"attempts": 1.0,
-			"exact_input_hash": "b4bb8bb325074d09d0e490ee0c397a61bf50bde357dafc229acb9ec2020cbd95",
-			"schema_version": 1.0,
+			"attempts": 1,
+			"auto_recipe_version": 3,
+			"automatic_diagnostics": {
+				"accepted": {
+					"accepted": true,
+					"issues": [],
+					"limits": {
+						"boundary_samples": 4096,
+						"seeds": 2500,
+						"triangles": 12000
+					},
+					"mean_quality": 0.753740644255558,
+					"minimum_angle": 14.065224472635,
+					"retry_scope": "none",
+					"sample_count": 32,
+					"seed_count": 4,
+					"triangle_count": 38,
+					"worst_aspect_ratio": 5.13957902476335
+				},
+				"attempts": [
+					{
+						"attempt": 1,
+						"boundary_spacing": 0.55,
+						"issues": [],
+						"mean_quality": 0.753740644255558,
+						"minimum_angle": 14.065224472635,
+						"outcome": "accepted",
+						"sample_count": 32,
+						"scope": "initial",
+						"seed_count": 4,
+						"seed_spacing": 0.55,
+						"triangle_count": 38
+					}
+				],
+				"limits": {
+					"boundary_samples": 4096,
+					"seeds": 2500,
+					"triangles": 12000
+				},
+				"version": 1
+			},
+			"exact_input_hash": "c69b189a2e902495bfd47a8dcb7b4e977aa0ff5ff0db052036a9accc17b1bf5a",
+			"pipeline_recipe_hash": "ad0fd0d4f889505d271f8850b7a5458e031ba8b47344d2b0e60b8feac845bcaf",
+			"recipe_mode": "automatic",
+			"schema_version": 1,
 			"source_signature": {
 				"geometry_tolerance": 0.00055,
-				"meshing_algorithm": 4.0,
-				"recipe_hash": "87eeb257509e25ae64bf3291b35035fa3235372ab470a2ea84024a585d37d477",
-				"recipe_version": 1.0,
-				"sampling_algorithm": 3.0,
+				"meshing_algorithm": 5,
+				"recipe_hash": "fb341cd0e875ef64595355796a77a972e1acb6a4d50033a352852e53243229cb",
+				"recipe_version": 2,
+				"sampling_algorithm": 3,
 				"scalars": [
 					1.0,
 					1.0
 				],
-				"seeding_algorithm": 2.0,
+				"seeding_algorithm": 2,
 				"topology_hash": "5c991d7e83d88afab4b697bf07363d83a8b994658c8edc239e784387a778fc92",
 				"vectors": [
 					[
-						-0.00000001655519099,
+						-0.0000000165551909958594,
 						11.25
 					],
 					[
@@ -177,23 +219,23 @@
 						0.0
 					]
 				],
-				"version": 1.0
+				"version": 1
 			}
 		},
 		"last_error": "",
 		"last_failure_signature": {},
-		"mesh_fingerprint": "9142d48ea7d522868a280c16e98266782412af19b038a46db06585a268e69446",
+		"mesh_fingerprint": "e48f3a414b5dffcc3089aafd8aa7f631bad3885855606ffbe2011b4e2f9e4728",
 		"method": "constrained_mesh"
 	},
 	"meshing": {
 		"bakes": {
 			"constrained_mesh": {
-				"algorithm_version": 4,
-				"bake_id": "meshing_bake_2019184141057855922",
+				"algorithm_version": 5,
+				"bake_id": "meshing_bake_291067209024898942",
 				"boundary_constraints": [
 					{
 						"chain_id": "chain_7058412169981039967",
-						"segment_index": 0.0,
+						"segment_index": 0,
 						"topology_role": "outer",
 						"vertex_ids": [
 							"vertex:boundary:sample:edge_8138426767228753077:point_6519430110483304828",
@@ -202,7 +244,7 @@
 					},
 					{
 						"chain_id": "chain_7058412169981039967",
-						"segment_index": 1.0,
+						"segment_index": 1,
 						"topology_role": "outer",
 						"vertex_ids": [
 							"vertex:boundary:sample:edge_8138426767228753077:0.500000000",
@@ -211,7 +253,7 @@
 					},
 					{
 						"chain_id": "chain_7058412169981039967",
-						"segment_index": 2.0,
+						"segment_index": 2,
 						"topology_role": "outer",
 						"vertex_ids": [
 							"vertex:boundary:sample:edge_8138426767228753077:point_2332227285726173192",
@@ -220,7 +262,7 @@
 					},
 					{
 						"chain_id": "chain_7058412169981039967",
-						"segment_index": 3.0,
+						"segment_index": 3,
 						"topology_role": "outer",
 						"vertex_ids": [
 							"vertex:boundary:sample:edge_8424969100609966483:0.250000000",
@@ -229,7 +271,7 @@
 					},
 					{
 						"chain_id": "chain_7058412169981039967",
-						"segment_index": 4.0,
+						"segment_index": 4,
 						"topology_role": "outer",
 						"vertex_ids": [
 							"vertex:boundary:sample:edge_8424969100609966483:0.500000000",
@@ -238,7 +280,7 @@
 					},
 					{
 						"chain_id": "chain_7058412169981039967",
-						"segment_index": 5.0,
+						"segment_index": 5,
 						"topology_role": "outer",
 						"vertex_ids": [
 							"vertex:boundary:sample:edge_8424969100609966483:point_8462482721324943754",
@@ -247,7 +289,7 @@
 					},
 					{
 						"chain_id": "chain_7058412169981039967",
-						"segment_index": 6.0,
+						"segment_index": 6,
 						"topology_role": "outer",
 						"vertex_ids": [
 							"vertex:boundary:sample:edge_1638588563843984500:0.500000000",
@@ -256,7 +298,7 @@
 					},
 					{
 						"chain_id": "chain_7058412169981039967",
-						"segment_index": 7.0,
+						"segment_index": 7,
 						"topology_role": "outer",
 						"vertex_ids": [
 							"vertex:boundary:sample:edge_1638588563843984500:0.750000000",
@@ -265,7 +307,7 @@
 					},
 					{
 						"chain_id": "chain_7058412169981039967",
-						"segment_index": 8.0,
+						"segment_index": 8,
 						"topology_role": "outer",
 						"vertex_ids": [
 							"vertex:boundary:sample:edge_1638588563843984500:point_5113273122613318342",
@@ -274,7 +316,7 @@
 					},
 					{
 						"chain_id": "chain_7058412169981039967",
-						"segment_index": 9.0,
+						"segment_index": 9,
 						"topology_role": "outer",
 						"vertex_ids": [
 							"vertex:boundary:sample:edge_7524268507677801148:0.250000000",
@@ -283,7 +325,7 @@
 					},
 					{
 						"chain_id": "chain_7058412169981039967",
-						"segment_index": 10.0,
+						"segment_index": 10,
 						"topology_role": "outer",
 						"vertex_ids": [
 							"vertex:boundary:sample:edge_7524268507677801148:0.500000000",
@@ -292,7 +334,7 @@
 					},
 					{
 						"chain_id": "chain_7058412169981039967",
-						"segment_index": 11.0,
+						"segment_index": 11,
 						"topology_role": "outer",
 						"vertex_ids": [
 							"vertex:boundary:sample:edge_7524268507677801148:point_2216084676024011270",
@@ -301,7 +343,7 @@
 					},
 					{
 						"chain_id": "chain_7058412169981039967",
-						"segment_index": 12.0,
+						"segment_index": 12,
 						"topology_role": "outer",
 						"vertex_ids": [
 							"vertex:boundary:sample:edge_1570614955725280173:0.250000000",
@@ -310,7 +352,7 @@
 					},
 					{
 						"chain_id": "chain_7058412169981039967",
-						"segment_index": 13.0,
+						"segment_index": 13,
 						"topology_role": "outer",
 						"vertex_ids": [
 							"vertex:boundary:sample:edge_1570614955725280173:0.500000000",
@@ -319,7 +361,7 @@
 					},
 					{
 						"chain_id": "chain_7058412169981039967",
-						"segment_index": 14.0,
+						"segment_index": 14,
 						"topology_role": "outer",
 						"vertex_ids": [
 							"vertex:boundary:sample:edge_1570614955725280173:0.750000000",
@@ -328,7 +370,7 @@
 					},
 					{
 						"chain_id": "chain_7058412169981039967",
-						"segment_index": 15.0,
+						"segment_index": 15,
 						"topology_role": "outer",
 						"vertex_ids": [
 							"vertex:boundary:sample:edge_1570614955725280173:point_7433807277451939725",
@@ -337,7 +379,7 @@
 					},
 					{
 						"chain_id": "chain_7058412169981039967",
-						"segment_index": 16.0,
+						"segment_index": 16,
 						"topology_role": "outer",
 						"vertex_ids": [
 							"vertex:boundary:sample:edge_8163193444340500401:0.500000000",
@@ -346,7 +388,7 @@
 					},
 					{
 						"chain_id": "chain_7058412169981039967",
-						"segment_index": 17.0,
+						"segment_index": 17,
 						"topology_role": "outer",
 						"vertex_ids": [
 							"vertex:boundary:sample:edge_8163193444340500401:0.750000000",
@@ -355,7 +397,7 @@
 					},
 					{
 						"chain_id": "chain_7058412169981039967",
-						"segment_index": 18.0,
+						"segment_index": 18,
 						"topology_role": "outer",
 						"vertex_ids": [
 							"vertex:boundary:sample:edge_8163193444340500401:point_2544691219103929027",
@@ -364,7 +406,7 @@
 					},
 					{
 						"chain_id": "chain_7058412169981039967",
-						"segment_index": 19.0,
+						"segment_index": 19,
 						"topology_role": "outer",
 						"vertex_ids": [
 							"vertex:boundary:sample:edge_3229773029112757435:0.500000000",
@@ -373,7 +415,7 @@
 					},
 					{
 						"chain_id": "chain_7058412169981039967",
-						"segment_index": 20.0,
+						"segment_index": 20,
 						"topology_role": "outer",
 						"vertex_ids": [
 							"vertex:boundary:sample:edge_3229773029112757435:0.750000000",
@@ -382,7 +424,7 @@
 					},
 					{
 						"chain_id": "chain_7058412169981039967",
-						"segment_index": 21.0,
+						"segment_index": 21,
 						"topology_role": "outer",
 						"vertex_ids": [
 							"vertex:boundary:sample:edge_3229773029112757435:point_927252039692045516",
@@ -391,7 +433,7 @@
 					},
 					{
 						"chain_id": "chain_7058412169981039967",
-						"segment_index": 22.0,
+						"segment_index": 22,
 						"topology_role": "outer",
 						"vertex_ids": [
 							"vertex:boundary:sample:edge_2027050260305373375:0.250000000",
@@ -400,7 +442,7 @@
 					},
 					{
 						"chain_id": "chain_7058412169981039967",
-						"segment_index": 23.0,
+						"segment_index": 23,
 						"topology_role": "outer",
 						"vertex_ids": [
 							"vertex:boundary:sample:edge_2027050260305373375:0.500000000",
@@ -409,7 +451,7 @@
 					},
 					{
 						"chain_id": "chain_7058412169981039967",
-						"segment_index": 24.0,
+						"segment_index": 24,
 						"topology_role": "outer",
 						"vertex_ids": [
 							"vertex:boundary:sample:edge_2027050260305373375:point_5660544136738900138",
@@ -418,7 +460,7 @@
 					},
 					{
 						"chain_id": "chain_7058412169981039967",
-						"segment_index": 25.0,
+						"segment_index": 25,
 						"topology_role": "outer",
 						"vertex_ids": [
 							"vertex:boundary:sample:edge_1036751688517235136:0.500000000",
@@ -427,7 +469,7 @@
 					},
 					{
 						"chain_id": "chain_7058412169981039967",
-						"segment_index": 26.0,
+						"segment_index": 26,
 						"topology_role": "outer",
 						"vertex_ids": [
 							"vertex:boundary:sample:edge_1036751688517235136:point_7806740223523708597",
@@ -436,7 +478,7 @@
 					},
 					{
 						"chain_id": "chain_7058412169981039967",
-						"segment_index": 27.0,
+						"segment_index": 27,
 						"topology_role": "outer",
 						"vertex_ids": [
 							"vertex:boundary:sample:edge_8083746498619296273:0.500000000",
@@ -445,7 +487,7 @@
 					},
 					{
 						"chain_id": "chain_7058412169981039967",
-						"segment_index": 28.0,
+						"segment_index": 28,
 						"topology_role": "outer",
 						"vertex_ids": [
 							"vertex:boundary:sample:edge_8083746498619296273:point_8801279710476285266",
@@ -454,7 +496,7 @@
 					},
 					{
 						"chain_id": "chain_7058412169981039967",
-						"segment_index": 29.0,
+						"segment_index": 29,
 						"topology_role": "outer",
 						"vertex_ids": [
 							"vertex:boundary:sample:edge_5914677956307444114:0.500000000",
@@ -463,7 +505,7 @@
 					},
 					{
 						"chain_id": "chain_7058412169981039967",
-						"segment_index": 30.0,
+						"segment_index": 30,
 						"topology_role": "outer",
 						"vertex_ids": [
 							"vertex:boundary:sample:edge_5914677956307444114:point_8979004250844583238",
@@ -472,7 +514,7 @@
 					},
 					{
 						"chain_id": "chain_7058412169981039967",
-						"segment_index": 31.0,
+						"segment_index": 31,
 						"topology_role": "outer",
 						"vertex_ids": [
 							"vertex:boundary:sample:edge_4774366312047990825:0.500000000",
@@ -480,17 +522,24 @@
 						]
 					}
 				],
-				"constraint_count": 32.0,
+				"constraint_count": 32,
 				"constraints_valid": true,
-				"cut_seam_vertex_count": 0.0,
-				"degenerate_triangle_count": 0.0,
+				"cut_seam_vertex_count": 0,
+				"degenerate_triangle_count": 0,
 				"diagnostics": {
-					"input_constraint_count": 32.0,
+					"domain": {
+						"boundary_seed_count": 29,
+						"candidate_triangle_count": 48,
+						"final_constraint_issue_count": 0,
+						"raw_triangle_count": 48,
+						"selected_triangle_count": 38
+					},
+					"input_constraint_count": 32,
 					"native": {
-						"fixed_edge_count": 32.0,
-						"input_constraint_count": 32.0,
-						"input_vertex_count": 36.0,
-						"triangle_count": 48.0
+						"fixed_edge_count": 32,
+						"input_constraint_count": 32,
+						"input_vertex_count": 36,
+						"triangle_count": 48
 					},
 					"stage": "complete"
 				},
@@ -499,9 +548,9 @@
 				"method": "constrained_mesh",
 				"minimum_angle": 14.065224472635,
 				"optimization": {
-					"accepted_passes": 3.0,
+					"accepted_passes": 3,
 					"applied": true,
-					"attempted_passes": 3.0,
+					"attempted_passes": 3,
 					"baseline_triangles": [
 						{
 							"vertex_ids": [
@@ -771,7 +820,7 @@
 						}
 					],
 					"enabled": true,
-					"moved_seed_count": 4.0,
+					"moved_seed_count": 4,
 					"movements": [
 						{
 							"distance": 0.116822317242622,
@@ -823,18 +872,18 @@
 						}
 					],
 					"quality_after": {
-						"degenerate_triangle_count": 0.0,
+						"degenerate_triangle_count": 0,
 						"mean_quality": 0.753740644255558,
 						"minimum_angle": 14.065224472635,
 						"worst_aspect_ratio": 5.13957902476335
 					},
 					"quality_before": {
-						"degenerate_triangle_count": 0.0,
+						"degenerate_triangle_count": 0,
 						"mean_quality": 0.746457390974079,
 						"minimum_angle": 12.424623150313,
 						"worst_aspect_ratio": 4.82942376486289
 					},
-					"removed_seed_count": 0.0
+					"removed_seed_count": 0
 				},
 				"parameters": {
 					"mesh_character": 0.64,
@@ -846,10 +895,10 @@
 					"seeding_method": "poisson_fill"
 				},
 				"runs": [],
-				"sampling_bake_id": "bake_2532943868665107453",
-				"sampling_fingerprint": "d86a85a9994eb4a8cbacfc682b19b97dad66b2f8e657f451159b5fe2269b58ea",
-				"seeding_bake_id": "seeding_bake_5229814302636947046",
-				"seeding_fingerprint": "967d7e02b2abd7412368a0bde968330c49cd769d38026d8f81ebfcb1dc16ecd0",
+				"sampling_bake_id": "bake_1429849424924228392",
+				"sampling_fingerprint": "3516476031572a278b432d6fdc9f10403107138eb549b0365549722e3db12c59",
+				"seeding_bake_id": "seeding_bake_539915626197909690",
+				"seeding_fingerprint": "70b9a1a25c9236c05e26ae1bf478b130bc75eaeae87e4ec562ee6973001894e4",
 				"triangle_count": 38,
 				"triangles": [
 					{
@@ -1488,13 +1537,13 @@
 			},
 			"contour_stroke": {
 				"algorithm_version": 5,
-				"bake_id": "contour_stroke_bake_3789198311864897015",
+				"bake_id": "contour_stroke_bake_6550428857422008466",
 				"boundary_constraints": [],
 				"errors": [],
 				"geometry_diagnostics": {
 					"minimum_nonadjacent_clearance_meters": 0.0132213056087494,
-					"narrow_overlap_pair_count": 0.0,
-					"self_intersection_count": 0.0,
+					"narrow_overlap_pair_count": 0,
+					"self_intersection_count": 0,
 					"triangle_validation": "complete"
 				},
 				"has_outline": true,
@@ -1515,7 +1564,7 @@
 				},
 				"runs": [
 					{
-						"bevel_join_count": 1.0,
+						"bevel_join_count": 1,
 						"centerline": [
 							{
 								"curve_t": 0.0,
@@ -1733,19 +1782,19 @@
 						],
 						"end_cap": "none",
 						"geometry_diagnostics": {
-							"centerline_segment_count": 22.0,
+							"centerline_segment_count": 22,
 							"minimum_nonadjacent_clearance_tool_units": 0.132213056087494,
-							"narrow_overlap_pair_count": 0.0,
-							"self_intersection_count": 0.0
+							"narrow_overlap_pair_count": 0,
+							"self_intersection_count": 0
 						},
-						"index_count": 255.0,
-						"index_offset": 0.0,
-						"miter_join_count": 20.0,
+						"index_count": 255,
+						"index_offset": 0,
+						"miter_join_count": 20,
 						"run_id": "chain_7058412169981039967:run:0",
 						"start_cap": "none",
-						"triangle_count": 85.0,
-						"vertex_count": 171.0,
-						"vertex_offset": 0.0
+						"triangle_count": 85,
+						"vertex_count": 171,
+						"vertex_offset": 0
 					}
 				],
 				"source_chain_closed": true,
@@ -4511,7 +4560,7 @@
 		"bakes": {
 			"adaptive": {
 				"algorithm_version": 3,
-				"bake_id": "bake_2532943868665107453",
+				"bake_id": "bake_1429849424924228392",
 				"boundary_stats": [
 					{
 						"effective_spacing": 0.55,
@@ -4897,19 +4946,19 @@
 				"sample_count": 32,
 				"semantic_source_signature": {
 					"geometry_tolerance": 0.00055,
-					"meshing_algorithm": 4.0,
+					"meshing_algorithm": 5,
 					"recipe_hash": "83b3bb413e898ca18e00478db3e3a3d09c454bb845c409777d399d470a3b5ee4",
-					"recipe_version": 1.0,
-					"sampling_algorithm": 3.0,
+					"recipe_version": 2,
+					"sampling_algorithm": 3,
 					"scalars": [
 						1.0,
 						1.0
 					],
-					"seeding_algorithm": 2.0,
+					"seeding_algorithm": 2,
 					"topology_hash": "5c991d7e83d88afab4b697bf07363d83a8b994658c8edc239e784387a778fc92",
 					"vectors": [
 						[
-							-0.00000001655519099,
+							-0.0000000165551909958594,
 							11.25
 						],
 						[
@@ -5065,7 +5114,7 @@
 							0.0
 						]
 					],
-					"version": 1.0
+					"version": 1
 				},
 				"source_fingerprint": "4ba9468668404f4f158120f38631a9155dd86e066f4dbde70dab16537dc8710a",
 				"valid": true
@@ -5096,12 +5145,12 @@
 	"seeding": {
 		"bakes": {
 			"poisson_fill": {
-				"algorithm_version": 2.0,
-				"bake_id": "seeding_bake_5229814302636947046",
+				"algorithm_version": 2,
+				"bake_id": "seeding_bake_539915626197909690",
 				"edited": false,
 				"errors": [],
-				"flow_seed_count": 0.0,
-				"gap_seed_count": 0.0,
+				"flow_seed_count": 0,
+				"gap_seed_count": 0,
 				"guide_fingerprint": "",
 				"guide_id": "",
 				"guide_ids": [],
@@ -5113,8 +5162,8 @@
 					"seed": 1,
 					"spacing": 0.55
 				},
-				"sampling_bake_id": "bake_2532943868665107453",
-				"sampling_fingerprint": "d86a85a9994eb4a8cbacfc682b19b97dad66b2f8e657f451159b5fe2269b58ea",
+				"sampling_bake_id": "bake_1429849424924228392",
+				"sampling_fingerprint": "3516476031572a278b432d6fdc9f10403107138eb549b0365549722e3db12c59",
 				"seed_count": 4,
 				"seeds": [
 					{
@@ -5126,7 +5175,7 @@
 							12.6114797592163
 						],
 						"provenance": {
-							"generation_index": 0.0,
+							"generation_index": 0,
 							"placement": "poisson"
 						}
 					},
@@ -5139,7 +5188,7 @@
 							11.7666301727295
 						],
 						"provenance": {
-							"generation_index": 1.0,
+							"generation_index": 1,
 							"placement": "poisson"
 						}
 					},
@@ -5152,7 +5201,7 @@
 							13.1729564666748
 						],
 						"provenance": {
-							"generation_index": 2.0,
+							"generation_index": 2,
 							"placement": "poisson"
 						}
 					},
@@ -5165,7 +5214,7 @@
 							12.4080600738525
 						],
 						"provenance": {
-							"generation_index": 3.0,
+							"generation_index": 3,
 							"placement": "poisson"
 						}
 					}

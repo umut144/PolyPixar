@@ -2,16 +2,19 @@
 	"asset_id": "asset_6",
 	"component_id": "component_50",
 	"component_mesh": {
-		"bake_id": "meshing_bake_1324477753466139935",
+		"bake_id": "meshing_bake_7970092380269010830",
 		"build_provenance": {
 			"attempts": 1.0,
-			"exact_input_hash": "a86123063b1de57023624e648164c22fbce2cd659f3b05751b8c5fe96a8aaee1",
+			"auto_recipe_version": 0.0,
+			"exact_input_hash": "610df77152fbbf7ab3e578c44d7edd0ef3f06ee5a5c1bf8fd7b6f777a4fcba61",
+			"pipeline_recipe_hash": "",
+			"recipe_mode": "derived",
 			"schema_version": 1.0,
 			"source_signature": {
 				"geometry_tolerance": 0.00055,
-				"meshing_algorithm": 4.0,
+				"meshing_algorithm": 5.0,
 				"recipe_hash": "2c30257f45b853df6132e66414444fdc44c7a0252903b4946f02ee0b27977c84",
-				"recipe_version": 1.0,
+				"recipe_version": 2.0,
 				"sampling_algorithm": 3.0,
 				"scalars": [
 					4.0,
@@ -88,14 +91,14 @@
 		},
 		"last_error": "",
 		"last_failure_signature": {},
-		"mesh_fingerprint": "8b73c23c3af5340acf52d035cfcaf76ddc5e98c0e51c4b664da2ee90cd520467",
+		"mesh_fingerprint": "9ea27d0ee2e1df526a4b64a13197dc6277757a403a4f7c3b993a368518bab97a",
 		"method": "contour_stroke"
 	},
 	"meshing": {
 		"bakes": {
 			"contour_stroke": {
 				"algorithm_version": 5,
-				"bake_id": "meshing_bake_1324477753466139935",
+				"bake_id": "meshing_bake_7970092380269010830",
 				"boundary_constraints": [],
 				"closed_region": {
 					"algorithm_version": 2.0,

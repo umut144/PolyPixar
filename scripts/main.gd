@@ -4384,6 +4384,94 @@ func _component_mesh_reference(asset_id: String, component_id: String) -> Dictio
 	return document.get("component_mesh", {}) if not document.is_empty() else {}
 
 
+func _component_mesh_build_diagnostic_lines(asset_id: String, component_id: String) -> PackedStringArray:
+	var lines := PackedStringArray()
+	var asset := _get_asset(asset_id)
+	var component := _get_component(asset, component_id)
+	if component.is_empty() or str(component.get("draw_mode", "closed_loop")) == "contour":
+		return lines
+	var reference := _component_mesh_reference(asset_id, component_id)
+	var provenance: Dictionary = reference.get("build_provenance", {}) if reference.get("build_provenance", {}) is Dictionary else {}
+	var provenance_mode := str(provenance.get("recipe_mode", ""))
+	var recipes := _geometry_build_recipes(
+		asset_id,
+		component_id,
+		component,
+		_cut_guides_for_component(asset, component_id),
+		_geometry_sampling_hole_components(asset, component_id)
+	)
+	var recipes_are_automatic := bool(recipes.get("automatic", false))
+	if recipes_are_automatic:
+		var model_version := int(recipes.get("auto_recipe_version", GeometryAutoBuildService.AUTO_RECIPE_VERSION))
+		var ownership := "Recipe Ownership: Automatic · Model v%d" % model_version
+		if provenance_mode.is_empty():
+			ownership += " · Migration / first build pending"
+		elif model_version < GeometryAutoBuildService.AUTO_RECIPE_VERSION:
+			ownership += " → v%d pending" % GeometryAutoBuildService.AUTO_RECIPE_VERSION
+		lines.append(ownership)
+	else:
+		var ownership_detail := "Exact recipe"
+		if provenance_mode == "automatic":
+			ownership_detail = "Changed after Auto Build"
+		elif provenance_mode.is_empty():
+			ownership_detail = "Legacy / unclassified recipe"
+		lines.append("Recipe Ownership: Manual · %s" % ownership_detail)
+	var sampling_recipe: Dictionary = recipes.get("sampling", {})
+	var seeding_recipe: Dictionary = recipes.get("seeding", {})
+	lines.append("Current Spacing: Boundary %.3f · Seed %.3f" % [
+		float(sampling_recipe.get("parameters", {}).get("spacing", 0.0)),
+		float(seeding_recipe.get("parameters", {}).get("spacing", 0.0))
+	])
+	var metrics: Dictionary = recipes.get("metrics", GeometryAutoBuildService.analyze(component))
+	lines.append("Geometry: Area %.2f · Perimeter %.2f · Feature %.2f" % [
+		float(metrics.get("area", 0.0)),
+		float(metrics.get("perimeter", 0.0)),
+		float(metrics.get("feature_size", 0.0))
+	])
+	if not recipes_are_automatic:
+		lines.append("Auto Budgets: Not applied")
+		return lines
+	var diagnostics: Dictionary = provenance.get("automatic_diagnostics", {}) if provenance.get("automatic_diagnostics", {}) is Dictionary else {}
+	var limits: Dictionary = diagnostics.get("limits", GeometryAutoBuildService.automatic_complexity_limits())
+	lines.append("Auto Budgets: Samples %d · Seeds %d · Triangles %d" % [
+		int(limits.get("boundary_samples", GeometryAutoBuildService.MAX_AUTOMATIC_BOUNDARY_SAMPLES)),
+		int(limits.get("seeds", GeometryAutoBuildService.MAX_AUTOMATIC_SEEDS)),
+		int(limits.get("triangles", GeometryAutoBuildService.MAX_AUTOMATIC_TRIANGLES))
+	])
+	var attempts: Array = diagnostics.get("attempts", []) if diagnostics.get("attempts", []) is Array else []
+	if attempts.is_empty():
+		lines.append("Attempts: Available after Update Meshes")
+		return lines
+	var final_attempt: Dictionary = attempts.back() if attempts.back() is Dictionary else {}
+	lines.append("Last Build: Samples %d/%d · Seeds %d/%d · Triangles %d/%d" % [
+		int(final_attempt.get("sample_count", 0)), int(limits.get("boundary_samples", GeometryAutoBuildService.MAX_AUTOMATIC_BOUNDARY_SAMPLES)),
+		int(final_attempt.get("seed_count", 0)), int(limits.get("seeds", GeometryAutoBuildService.MAX_AUTOMATIC_SEEDS)),
+		int(final_attempt.get("triangle_count", 0)), int(limits.get("triangles", GeometryAutoBuildService.MAX_AUTOMATIC_TRIANGLES))
+	])
+	for attempt_variant in attempts:
+		if not attempt_variant is Dictionary:
+			continue
+		var attempt: Dictionary = attempt_variant
+		var scope := str(attempt.get("scope", "initial")).capitalize()
+		var outcome := str(attempt.get("outcome", "failed")).capitalize()
+		var attempt_line := "Attempt %d: %s · %s" % [int(attempt.get("attempt", 0)), scope, outcome]
+		var next_scope := str(attempt.get("next_retry_scope", ""))
+		if outcome == "Retry" and not next_scope.is_empty() and next_scope != "none":
+			attempt_line += " %s" % next_scope.capitalize()
+		lines.append(attempt_line)
+		var issues: Array = attempt.get("issues", []) if attempt.get("issues", []) is Array else []
+		if not issues.is_empty():
+			lines.append("Reason: %s" % str(issues[0]))
+	var accepted: Dictionary = diagnostics.get("accepted", {}) if diagnostics.get("accepted", {}) is Dictionary else {}
+	if not accepted.is_empty():
+		lines.append("Quality: Min %.1f° · Mean %.3f · Aspect %.2f" % [
+			float(accepted.get("minimum_angle", 0.0)),
+			float(accepted.get("mean_quality", 0.0)),
+			float(accepted.get("worst_aspect_ratio", 0.0))
+		])
+	return lines
+
+
 func _component_mesh_bake(asset_id: String, component_id: String) -> Dictionary:
 	var reference := _component_mesh_reference(asset_id, component_id)
 	var method := str(reference.get("method", ""))
@@ -4500,12 +4588,29 @@ func _geometry_build_recipes(asset_id: String, component_id: String, component: 
 	var key := _geometry_document_key(asset_id, component_id)
 	if not geometry_documents.has(key):
 		return GeometryAutoBuildService.automatic_recipes(component, cut_guides, hole_components)
-	return {
+	var stored_recipes := {
 		"sampling": _geometry_sampling_recipe(asset_id, component_id),
 		"seeding": _geometry_seeding_recipe(asset_id, component_id),
 		"meshing": _geometry_meshing_recipe(asset_id, component_id),
 		"metrics": GeometryAutoBuildService.analyze(component)
 	}
+	var document: Dictionary = geometry_documents.get(key, {})
+	var component_mesh: Dictionary = document.get("component_mesh", {}) if document.get("component_mesh", {}) is Dictionary else {}
+	var provenance: Dictionary = component_mesh.get("build_provenance", {}) if component_mesh.get("build_provenance", {}) is Dictionary else {}
+	var recipe_mode := str(provenance.get("recipe_mode", ""))
+	var stored_recipe_hash := GeometryAutoBuildService.pipeline_recipe_hash(stored_recipes)
+	var provenance_recipe_hash := str(provenance.get("pipeline_recipe_hash", ""))
+	if recipe_mode == "automatic" and not provenance_recipe_hash.is_empty() and stored_recipe_hash == provenance_recipe_hash:
+		stored_recipes["automatic"] = true
+		stored_recipes["auto_recipe_version"] = int(provenance.get("auto_recipe_version", 0))
+		return stored_recipes
+	var baked_signature = provenance.get("source_signature", {})
+	if recipe_mode.is_empty() and baked_signature is Dictionary and not baked_signature.is_empty() \
+		and GeometryAutoBuildService.recipes_match_legacy_automatic(component, cut_guides, hole_components, stored_recipes):
+		return GeometryAutoBuildService.automatic_recipes(component, cut_guides, hole_components)
+	stored_recipes["automatic"] = false
+	stored_recipes["auto_recipe_version"] = 0
+	return stored_recipes
 
 
 func _geometry_build_signature(asset_id: String, component_id: String, component: Dictionary, recipes: Dictionary = {}) -> Dictionary:
@@ -4866,16 +4971,6 @@ func _sdf_update_candidates_tooltip(candidates: Array[Dictionary]) -> String:
 	return _batch_summary_tooltip(_sdf_batch_summary(candidates), "All SDFs current")
 
 
-func _scaled_automatic_recipes(base: Dictionary, factor: float) -> Dictionary:
-	var result := base.duplicate(true)
-	result["sampling"]["parameters"]["spacing"] = float(result["sampling"]["parameters"].get("spacing", GeometrySamplingService.DEFAULT_SPACING)) * factor
-	result["seeding"]["parameters"]["spacing"] = float(result["seeding"]["parameters"].get("spacing", GeometrySeedingService.DEFAULT_SPACING)) * factor
-	result["sampling"] = GeometrySamplingService.normalize_recipe(result["sampling"])
-	result["seeding"] = GeometrySeedingService.normalize_recipe(result["seeding"])
-	result["meshing"] = GeometryMeshingService.normalize_recipe(result["meshing"])
-	return result
-
-
 func _generate_component_mesh_build(asset_id: String, component_id: String) -> Dictionary:
 	var asset := _get_asset(asset_id)
 	var component := _get_component(asset, component_id)
@@ -4891,6 +4986,8 @@ func _generate_component_mesh_build(asset_id: String, component_id: String) -> D
 			"recipes": {},
 			"meshing": contour_mesh,
 			"source_signature": _geometry_build_signature(asset_id, component_id, component),
+			"recipe_mode": "derived",
+			"auto_recipe_version": 0,
 			"attempts": 1
 		}
 	var contour_stroke := ContourMeshService.generate(component, _effective_contour_stroke_width_px(component))
@@ -4900,30 +4997,100 @@ func _generate_component_mesh_build(asset_id: String, component_id: String) -> D
 			"errors": contour_stroke.get("errors", []).duplicate(),
 			"recipes": {},
 			"source_signature": _geometry_build_signature(asset_id, component_id, component),
+			"recipe_mode": "automatic",
+			"auto_recipe_version": GeometryAutoBuildService.AUTO_RECIPE_VERSION,
 			"attempts": 1
 		}
 	contour_stroke["bake_id"] = "contour_stroke_bake_%d" % ResourceUID.create_id()
 	var cut_guides := _cut_guides_for_component(asset, component_id)
 	var hole_components := _geometry_sampling_hole_components(asset, component_id)
-	var has_existing_recipe := geometry_documents.has(_geometry_document_key(asset_id, component_id))
 	var base_recipes := _geometry_build_recipes(asset_id, component_id, component, cut_guides, hole_components)
-	var maximum_attempts := 1 if has_existing_recipe else 4
+	var recipes_are_automatic := bool(base_recipes.get("automatic", false))
+	if recipes_are_automatic:
+		base_recipes = GeometryAutoBuildService.automatic_recipes(component, cut_guides, hole_components)
+	var maximum_attempts := GeometryAutoBuildService.MAX_AUTOMATIC_ATTEMPTS if recipes_are_automatic else 1
 	var last_errors: Array = []
+	var retry_scope := "seed"
+	var retained_boundary_retry_index := 0
+	var attempt_history: Array[Dictionary] = []
 	for attempt_index in range(maximum_attempts):
-		var recipes := base_recipes if attempt_index == 0 else _scaled_automatic_recipes(base_recipes, pow(1.25, attempt_index))
+		var attempt_scope := "initial" if attempt_index == 0 else retry_scope
+		var recipes := base_recipes if attempt_index == 0 else GeometryAutoBuildService.automatic_retry_recipes(base_recipes, attempt_index, retry_scope, retained_boundary_retry_index)
+		var attempt_diagnostic := {
+			"attempt": attempt_index + 1,
+			"scope": attempt_scope,
+			"boundary_spacing": float(recipes["sampling"]["parameters"].get("spacing", 0.0)),
+			"seed_spacing": float(recipes["seeding"]["parameters"].get("spacing", 0.0)),
+			"sample_count": 0,
+			"seed_count": 0,
+			"triangle_count": 0,
+			"outcome": "failed",
+			"issues": []
+		}
 		var sampling := GeometrySamplingService.generate(component, recipes["sampling"], cut_guides, hole_components)
+		attempt_diagnostic["sample_count"] = int(sampling.get("sample_count", 0))
 		if not bool(sampling.get("valid", false)):
 			last_errors = sampling.get("errors", []).duplicate()
-			continue
+			attempt_diagnostic["issues"] = last_errors.duplicate()
+			if recipes_are_automatic:
+				var sampling_failure := GeometryAutoBuildService.automatic_build_assessment(sampling)
+				var next_scope := str(sampling_failure.get("retry_scope", "none"))
+				var can_retry := next_scope != "none" and attempt_index + 1 < maximum_attempts
+				attempt_diagnostic["outcome"] = "retry" if can_retry else "failed"
+				attempt_diagnostic["next_retry_scope"] = next_scope
+				attempt_history.append(attempt_diagnostic)
+				if can_retry:
+					retry_scope = next_scope
+					if next_scope == "boundary":
+						retained_boundary_retry_index = attempt_index + 1
+					continue
+			else:
+				attempt_history.append(attempt_diagnostic)
+			break
+		if recipes_are_automatic:
+			var sampling_assessment := GeometryAutoBuildService.automatic_build_assessment(sampling)
+			if not bool(sampling_assessment.get("accepted", false)):
+				last_errors = sampling_assessment.get("issues", []).duplicate()
+				var next_scope := str(sampling_assessment.get("retry_scope", "none"))
+				var can_retry := next_scope != "none" and attempt_index + 1 < maximum_attempts
+				attempt_diagnostic["issues"] = last_errors.duplicate()
+				attempt_diagnostic["outcome"] = "retry" if can_retry else "failed"
+				attempt_diagnostic["next_retry_scope"] = next_scope
+				attempt_history.append(attempt_diagnostic)
+				if can_retry:
+					retry_scope = next_scope
+					if next_scope == "boundary":
+						retained_boundary_retry_index = attempt_index + 1
+					continue
+				break
 		sampling["bake_id"] = "bake_%d" % ResourceUID.create_id()
 		sampling["semantic_source_signature"] = GeometryAutoBuildService.source_signature(component, cut_guides, hole_components, {"sampling": recipes["sampling"]})
 		var seed_guides: Array = []
 		if str(recipes["seeding"].get("method", "")) == GeometrySeedingService.SPINE_FLOW:
 			seed_guides = _geometry_seeding_sampler_spines(asset_id, component_id, recipes["seeding"])
 		var seeding := GeometrySeedingService.generate(sampling, recipes["seeding"], seed_guides)
+		attempt_diagnostic["seed_count"] = int(seeding.get("seed_count", 0))
 		if not bool(seeding.get("valid", false)):
 			last_errors = seeding.get("errors", []).duplicate()
-			continue
+			attempt_diagnostic["issues"] = last_errors.duplicate()
+			attempt_history.append(attempt_diagnostic)
+			break
+		if recipes_are_automatic:
+			var seeding_assessment := GeometryAutoBuildService.automatic_build_assessment(sampling, seeding)
+			if not bool(seeding_assessment.get("accepted", false)):
+				last_errors = seeding_assessment.get("issues", []).duplicate()
+				var next_scope := str(seeding_assessment.get("retry_scope", "none"))
+				var can_retry := next_scope != "none" and attempt_index + 1 < maximum_attempts
+				attempt_diagnostic["issues"] = last_errors.duplicate()
+				attempt_diagnostic["outcome"] = "retry" if can_retry else "failed"
+				attempt_diagnostic["next_retry_scope"] = next_scope
+				attempt_history.append(attempt_diagnostic)
+				if can_retry:
+					retry_scope = next_scope
+					if next_scope == "boundary":
+						retained_boundary_retry_index = attempt_index + 1
+					continue
+				break
 		seeding["bake_id"] = "seeding_bake_%d" % ResourceUID.create_id()
 		seeding["edited"] = false
 		var meshing_recipe: Dictionary = recipes["meshing"].duplicate(true)
@@ -4931,11 +5098,34 @@ func _generate_component_mesh_build(asset_id: String, component_id: String) -> D
 		meshing_recipe = GeometryMeshingService.normalize_recipe(meshing_recipe)
 		recipes["meshing"] = meshing_recipe
 		var meshing := GeometryMeshingService.generate(sampling, seeding, meshing_recipe)
-		if not bool(meshing.get("valid", false)) or int(meshing.get("triangle_count", 0)) <= 0 \
-			or int(meshing.get("degenerate_triangle_count", 0)) > 0 or not bool(meshing.get("constraints_valid", false)):
-			last_errors = meshing.get("errors", ["Final Mesh validation failed."]).duplicate()
-			continue
+		attempt_diagnostic["triangle_count"] = int(meshing.get("triangle_count", 0))
+		var meshing_is_valid := bool(meshing.get("valid", false)) and int(meshing.get("triangle_count", 0)) > 0 \
+			and int(meshing.get("degenerate_triangle_count", 0)) == 0 and bool(meshing.get("constraints_valid", false))
+		var final_assessment: Dictionary = GeometryAutoBuildService.automatic_build_assessment(sampling, seeding, meshing) if recipes_are_automatic else {}
+		if not meshing_is_valid or (recipes_are_automatic and not bool(final_assessment.get("accepted", false))):
+			last_errors = final_assessment.get("issues", []).duplicate() if recipes_are_automatic else meshing.get("errors", ["Final Mesh validation failed."]).duplicate()
+			if last_errors.is_empty():
+				last_errors = ["Final Mesh validation failed."]
+			attempt_diagnostic["issues"] = last_errors.duplicate()
+			if recipes_are_automatic:
+				var next_scope := str(final_assessment.get("retry_scope", "none"))
+				var can_retry := next_scope != "none" and attempt_index + 1 < maximum_attempts
+				attempt_diagnostic["outcome"] = "retry" if can_retry else "failed"
+				attempt_diagnostic["next_retry_scope"] = next_scope
+				attempt_history.append(attempt_diagnostic)
+				if can_retry:
+					retry_scope = next_scope
+					if next_scope == "boundary":
+						retained_boundary_retry_index = attempt_index + 1
+					continue
+			else:
+				attempt_history.append(attempt_diagnostic)
+			break
 		meshing["bake_id"] = "meshing_bake_%d" % ResourceUID.create_id()
+		attempt_diagnostic["outcome"] = "accepted"
+		attempt_diagnostic["minimum_angle"] = float(meshing.get("minimum_angle", 0.0))
+		attempt_diagnostic["mean_quality"] = float(meshing.get("mean_quality", 0.0))
+		attempt_history.append(attempt_diagnostic)
 		return {
 			"valid": true,
 			"errors": [],
@@ -4945,9 +5135,12 @@ func _generate_component_mesh_build(asset_id: String, component_id: String) -> D
 			"meshing": meshing,
 			"contour_stroke": contour_stroke,
 			"source_signature": _geometry_build_signature(asset_id, component_id, component, recipes),
+			"recipe_mode": "automatic" if recipes_are_automatic else "manual",
+			"auto_recipe_version": GeometryAutoBuildService.AUTO_RECIPE_VERSION if recipes_are_automatic else 0,
+			"auto_build_diagnostics": {"version": 1, "limits": GeometryAutoBuildService.automatic_complexity_limits(), "attempts": attempt_history, "accepted": final_assessment} if recipes_are_automatic else {},
 			"attempts": attempt_index + 1
 		}
-	return {"valid": false, "errors": last_errors if not last_errors.is_empty() else ["Automatic Mesh generation failed."], "recipes": base_recipes, "source_signature": _geometry_build_signature(asset_id, component_id, component, base_recipes), "attempts": maximum_attempts}
+	return {"valid": false, "errors": last_errors if not last_errors.is_empty() else ["Automatic Mesh generation failed."], "recipes": base_recipes, "source_signature": _geometry_build_signature(asset_id, component_id, component, base_recipes), "recipe_mode": "automatic" if recipes_are_automatic else "manual", "auto_recipe_version": GeometryAutoBuildService.AUTO_RECIPE_VERSION if recipes_are_automatic else 0, "auto_build_diagnostics": {"version": 1, "limits": GeometryAutoBuildService.automatic_complexity_limits(), "attempts": attempt_history} if recipes_are_automatic else {}, "attempts": attempt_history.size()}
 
 
 func _commit_component_mesh_build(asset_id: String, component_id: String, build: Dictionary) -> void:
@@ -4974,6 +5167,10 @@ func _commit_component_mesh_build(asset_id: String, component_id: String, build:
 			"schema_version": GeometryAutoBuildService.SIGNATURE_VERSION,
 			"source_signature": build.get("source_signature", {}).duplicate(true),
 			"exact_input_hash": GeometryAutoBuildService.exact_signature_hash(build.get("source_signature", {})),
+			"recipe_mode": str(build.get("recipe_mode", "manual")),
+			"auto_recipe_version": int(build.get("auto_recipe_version", 0)),
+			"pipeline_recipe_hash": GeometryAutoBuildService.pipeline_recipe_hash(build.get("recipes", {})) if not build.get("recipes", {}).is_empty() else "",
+			"automatic_diagnostics": build.get("auto_build_diagnostics", {}).duplicate(true),
 			"attempts": int(build.get("attempts", 1))
 		},
 		"last_error": "",
@@ -4990,6 +5187,12 @@ func _record_component_mesh_failure(asset_id: String, component_id: String, buil
 		document["meshing"]["recipe"] = recipes.get("meshing", document["meshing"]["recipe"]).duplicate(true)
 	var reference: Dictionary = document.get("component_mesh", {}).duplicate(true)
 	var errors: Array = build.get("errors", [])
+	var provenance: Dictionary = reference.get("build_provenance", {}).duplicate(true) if reference.get("build_provenance", {}) is Dictionary else {}
+	provenance["recipe_mode"] = str(build.get("recipe_mode", "manual"))
+	provenance["auto_recipe_version"] = int(build.get("auto_recipe_version", 0))
+	provenance["pipeline_recipe_hash"] = GeometryAutoBuildService.pipeline_recipe_hash(recipes) if recipes is Dictionary and not recipes.is_empty() else ""
+	provenance["automatic_diagnostics"] = build.get("auto_build_diagnostics", {}).duplicate(true)
+	reference["build_provenance"] = provenance
 	reference["last_error"] = str(errors[0]) if not errors.is_empty() else "Automatic Mesh generation failed."
 	reference["last_failure_signature"] = build.get("source_signature", {}).duplicate(true)
 	document["component_mesh"] = reference
@@ -11950,6 +12153,11 @@ func _render_geometry_meshing_inspector() -> void:
 			view_toggle.button_pressed = bool(view_option["value"])
 			view_toggle.toggled.connect(_on_geometry_meshing_view_option_changed.bind(str(view_option["key"])))
 			inspector_content.add_child(view_toggle)
+	var build_diagnostic_lines := _component_mesh_build_diagnostic_lines(selected_asset_id, selected_component_id)
+	if not build_diagnostic_lines.is_empty():
+		inspector_content.add_child(_create_inspector_section("Auto Build Diagnostics"))
+		for diagnostic_line in build_diagnostic_lines:
+			inspector_content.add_child(_create_inspector_field_label(diagnostic_line))
 	var status := _geometry_meshing_status(selected_asset_id, selected_component_id, component)
 	inspector_content.add_child(_create_inspector_section("Result"))
 	inspector_content.add_child(_create_inspector_field_label("Status: %s" % status))
@@ -12173,6 +12381,9 @@ func _bake_geometry_meshing_preview() -> void:
 			"schema_version": GeometryAutoBuildService.SIGNATURE_VERSION,
 			"source_signature": source_signature,
 			"exact_input_hash": GeometryAutoBuildService.exact_signature_hash(source_signature),
+			"recipe_mode": "manual",
+			"auto_recipe_version": 0,
+			"pipeline_recipe_hash": GeometryAutoBuildService.pipeline_recipe_hash(recipes),
 			"attempts": 1
 		},
 		"last_error": "",

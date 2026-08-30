@@ -131,11 +131,15 @@ Character` derives the relaxation strength and pass count along a Structured to
 Organic continuum. `Optimize Mesh` gates existing-point relocation as an exact
 raw-CDT A/B comparison; optional Advanced Optimization overrides preserve exact
 legacy or technical control. The service triangulates Sampling boundaries plus
-Seeding vertices, recovers Outer/Hole/Cut constraints, and accepts a relocation
-pass only when measured quality improves without a material minimum-angle
+Seeding vertices, recovers Outer/Hole/Cut constraints, classifies retained faces
+by flooding from the oriented Outer interior without crossing closed Outer/Hole
+barriers, and accepts a relocation pass only when measured quality improves
+without a material minimum-angle
 regression. It retriangulates after each candidate and only then duplicates the
-Cut seam. Boundary vertices never move and this phase neither adds nor removes
-vertices. Meshing uses the same debounced transient Preview and exact Preview
+Cut seam. Final validation requires one retained Triangle on every Outer/Hole
+constraint and two retained Triangles on every Cut constraint before seam
+duplication. Boundary vertices never move and this phase neither adds nor
+removes vertices. Meshing uses the same debounced transient Preview and exact Preview
 Bake contract as Sampling and Seeding. Accepting the Preview atomically replaces
 the single Constrained Mesh Bake and records it as the Component Mesh, so no
 separate `Use as Component Mesh` action exists.
@@ -208,10 +212,39 @@ Schema 35 stores semantic Component Mesh build provenance in the derived
 Geometry document. The persistent `Update Meshes (N)` action rebuilds only
 meshable Components across all Create Asset types whose effective geometry,
 constraints, or recipes differ meaningfully from their last successful build.
-New automatic recipes retain the calibrated `0.55` spacing for normal contours
-but scale it upward when Component area would exceed the automatic interior
-density budget. This keeps large simple Assets responsive without rewriting an
-existing manual recipe.
+Automatic recipe version 3 retains version 2's Barde-derived Boundary and Seed
+Spacing at `0.55` through the measured normal Character/Symbol range. Beyond
+perimeter `60`, Boundary Spacing scales by `sqrt(perimeter / 60)`; Seed Spacing
+is independent and is at least `sqrt(area / 750)`, subject to a narrow-feature
+cap. The existing 8-to-512 boundary-sample guards still protect very small and
+very large contours. This reduces avoidable interior density on Tree-scale
+geometry without coarsening smaller Assets.
+
+Automatic acceptance budgets at most 4096 total boundary/constraint Samples,
+2500 interior Seeds, and 12000 Triangles. A rejected attempt first increases
+only Seed Spacing. Boundary Spacing and Curve Detail may increase only after
+Sampling exceeds its hard safety limit or automatic Boundary budget. Complete
+final Constraint coverage and zero degenerate Triangles remain hard quality
+gates; minimum angle, mean quality, and worst aspect ratio are recorded for
+diagnostics rather than imposing a shape-dependent global threshold. Every
+attempt and effective recipe is retained in automatic build provenance. Manual
+recipes are evaluated exactly once and never use these fallback adjustments.
+
+The Meshing Inspector derives `Auto Build Diagnostics` directly from the current
+recipe resolution and stored provenance. It shows automatic/manual ownership,
+pending model migration, Area/Perimeter/Feature metrics, current effective
+spacings, fixed limits and last
+usage, per-attempt scope/outcome/reason, and accepted quality metrics. This is a
+read-only projection and introduces no second source of pipeline state.
+Regression coverage uses canonical synthetic Components and broad invariant or
+range checks rather than exact mesh snapshots or documents below `worlds/`.
+
+Build provenance records `recipe_mode`, automatic recipe version, and a hash of
+the normalized Sampling/Seeding/Meshing recipes. Matching automatic recipes can
+be recalibrated; any later recipe edit breaks that hash and transfers ownership
+to exact manual settings. Legacy calibrated profiles migrate automatically.
+Untouched legacy UI defaults migrate only when both perimeter and area place a
+Component clearly beyond the normal Asset range, leaving small defaults intact.
 Numeric geometry is compared
 with a scale-aware tolerance against that accepted snapshot; topology,
 constraints, recipes, and algorithm versions remain exact. Failed Components

@@ -139,14 +139,40 @@ Meshes in Asset space; missing or stale Component Meshes are simply omitted.
 
 The persistent toolbar action `Update Meshes (N)` runs Adaptive Sampling,
 Poisson Seeding, Constrained Mesh, Optimization, and validation for valid
-out-of-date Components across every Create Asset type. It derives calibrated
-recipes for Components without existing pipeline settings, preserves manual
-recipes, commits successful results atomically per Component, and never lets
-one failure replace an older valid Mesh. Its count comes from semantic build
-provenance rather than a mutable dirty flag, so selection and sub-tolerance
-pointer jitter do not trigger the batch pipeline. Components rejected before
-the batch expose their concrete source-validation issue in the Meshing
-Inspector without inflating the actionable count.
+out-of-date Components across every Create Asset type. Automatic recipe version
+3 retains the Barde-scale density calibration introduced by version 2:
+Boundary and Seed Spacing remain `0.55` for ordinary Character/Symbol contours.
+Above that range, Boundary Spacing grows sublinearly with perimeter, while Seed
+Spacing separately grows with area to bound unnecessary interior density. Small
+contours retain the existing minimum-boundary-sample behavior.
+
+Build provenance records automatic versus manual recipe ownership plus the
+effective pipeline-recipe hash. An unchanged automatic recipe may be
+recalibrated after geometry or model changes; editing any stored recipe makes it
+manual and preserves it exactly. Legacy automatic profiles migrate, as do
+untouched UI-default profiles only for clearly oversized Components. Small
+legacy defaults remain untouched. Automatic builds may retry conservatively at
+coarser density. Seed retries never change Boundary Spacing or Curve Detail;
+only a Sampling safety failure or the automatic 4096-Sample Boundary budget can
+request a Boundary retry. Automatic acceptance also caps interior Seeds at 2500
+and Triangles at 12000, while retaining the hard zero-degenerate and complete
+Constraint-coverage requirements. Provenance records every attempt's effective
+spacings, counts, outcome, and Mesh quality readings. Manual builds run their
+exact recipe once. Successful results commit atomically per Component, and one
+failure never replaces an older valid Mesh. The actionable count comes from
+semantic build provenance rather than a mutable dirty flag, so selection and
+sub-tolerance pointer jitter do not trigger the batch pipeline. Components
+rejected before the batch expose their concrete source-validation issue in the
+Meshing Inspector without inflating the count.
+
+The Meshing Inspector's read-only `Auto Build Diagnostics` section explains the
+resolved recipe ownership, model version, and geometry metrics before a build,
+then reports effective Boundary/Seed Spacing, fixed budget usage, every automatic attempt
+and retry reason, plus the accepted minimum angle, mean quality, and worst
+aspect ratio. It reads build provenance only and never changes a recipe or Mesh.
+Geometry regression tests use synthetic tiny-Symbol, Barde-scale, Tree-scale,
+concave, Hole, and Cut fixtures with invariant/range assertions; files under
+`worlds/` remain user data and are not test fixtures.
 
 UV and SDF services and their existing derived records remain readable Legacy
 data. They are not active batch stages, Runtime dependencies, or schema-4

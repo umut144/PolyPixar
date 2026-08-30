@@ -111,6 +111,56 @@ Schema 30 migrates the former Spine Flow `guide_id` into an ordered
 `spine_inputs` list. Older Seeding Bakes remain readable but are stale until
 regenerated with the constraint-aware algorithm version.
 
+## Automatic density calibration
+
+`Update Meshes` automatic recipe version 3 retains the version-2 Barde geometry
+calibration as its stable reference range. Up to perimeter `60`, Boundary
+Spacing and Poisson Seed Spacing retain `0.55`, apart from the existing
+8-to-512 boundary-sample guards for very small or extreme contours. Larger
+boundaries scale sublinearly:
+
+`boundary_spacing = 0.55 × sqrt(perimeter / 60)`
+
+Interior density is modeled independently. Seed Spacing is never smaller than
+Boundary Spacing and grows to `sqrt(area / 750)` when area would otherwise
+create excessive interior Seeds. A feature-size cap retains at least three
+interior spans across ordinary narrow geometry. This separation lets a large
+simple trunk use a coarser interior without forcing the Crown boundary to use
+the same value.
+
+Automatic ownership is explicit build provenance, not an Asset-type switch. A
+stored automatic recipe remains automatic only while its normalized pipeline
+hash matches the successful build. Editing Sampling, Seeding, or Meshing makes
+that recipe manual and prevents recalibration or fallback retries from changing
+it. Legacy `0.55` automatic profiles migrate to version 2. Untouched legacy UI
+defaults migrate only for clearly oversized Components (perimeter at least `75`
+and area at least `250`); smaller Character and Symbol defaults remain exact.
+
+Automatic complexity is bounded at 4096 total sampled Constraint points, 2500
+interior Seeds, and 12000 final Triangles. When a Build exceeds the interior or
+Triangle budget, the next attempt increases only Seed Spacing by `1.25ⁿ` and
+reuses the exact Boundary recipe. Boundary Spacing and Curve Detail scale only
+when Sampling itself exceeds its hard safety limit or the 4096-Sample automatic
+Boundary budget. At most four automatic attempts are allowed. Complete final
+Constraint coverage and zero degenerate Triangles remain mandatory; minimum
+angle, mean quality, and worst aspect ratio are recorded with the attempt
+history for diagnosis. Manually owned recipes receive one exact attempt and no
+automatic density adjustment.
+
+`Mesh → Meshing → Auto Build Diagnostics` presents this state without mutating
+it. Before the first build it shows resolved ownership, model version,
+Area/Perimeter/Feature metrics, current Boundary/Seed Spacing, and budgets.
+After `Update Meshes`, it additionally shows
+budget usage, each attempt's Initial/Seed/Boundary scope and retry reason, plus
+the accepted quality readings. A recipe edit is immediately labeled Manual and
+the automatic budgets are shown as not applied.
+
+The automatic regression corpus is synthetic: tiny Symbol, Barde-scale body,
+Tree-scale trunk, large concave Crown, and a Body combining a Hole with a Cut.
+Assertions protect topology, complete Constraint coverage, density transitions,
+and broad complexity ranges without pinning exact Triangle layouts or reading
+mutable World documents.
+
 ## Constrained Meshing
 
 `Mesh → Meshing` consumes the complete accepted Sampling and Seeding chain and
@@ -153,6 +203,14 @@ CDT backend.
 Schema 33 and Meshing algorithm version 4 persist the optimizer switch plus
 compact movement and quality diagnostics. The optimizer moves only existing
 Interior Seeds and accepts only measured quality improvements.
+
+Meshing algorithm version 5 replaces centroid and edge-midpoint domain
+filtering with topology-based face classification. Sampled Outer and Hole
+constraints form closed flood barriers, while Cut constraints remain traversable
+for domain membership and are retained as two-sided seams. After classification,
+every Outer and Hole segment must bound exactly one retained Triangle and every
+Cut segment must have two-sided Triangle coverage. A missing final constraint is
+an invalid Mesh result rather than a successful Bake with an open boundary.
 
 Junction-aware Sampling Bakes identify Sampling algorithm version 2. Older
 flat Cut Bakes remain readable for inspection but become stale upstream, so the

@@ -7,7 +7,7 @@ const ORGANIC_RELAXED := "organic_relaxed" # Legacy schema <= 30.
 const RIBBON_STRIP := "ribbon_strip" # Legacy schema <= 39.
 const CONTOUR_STROKE := "contour_stroke"
 const VALID_METHODS := [CONSTRAINED_MESH, CONTOUR_STROKE]
-const ALGORITHM_VERSION := 4
+const ALGORITHM_VERSION := 5
 const DEFAULT_MESH_CHARACTER := 0.64
 const DEFAULT_OPTIMIZE_MESH := true
 const DEFAULT_RELAXATION := 0.35
@@ -84,7 +84,7 @@ static func generate(sampling_bake: Dictionary, seeding_bake: Dictionary, raw_re
 		return _failed_result(sampling_bake, seeding_bake, recipe, errors)
 	var vertices := _source_vertices(sampling_bake, seeding_bake)
 	var constraints := _boundary_constraints(sampling_bake)
-	var triangulation := _triangulate(vertices, constraints, sampling_bake)
+	var triangulation := _triangulate(vertices, constraints)
 	if not bool(triangulation.get("valid", false)):
 		return _failed_result(sampling_bake, seeding_bake, recipe, triangulation.get("errors", []))
 	var triangles: Array = triangulation.get("triangles", [])
@@ -105,7 +105,7 @@ static func generate(sampling_bake: Dictionary, seeding_bake: Dictionary, raw_re
 			for _attempt in range(4):
 				var candidate_vertices: Array = vertices.duplicate(true)
 				_relax_interior_vertices(candidate_vertices, triangles, sampling_bake, trial_strength)
-				var candidate_triangulation := _triangulate(candidate_vertices, constraints, sampling_bake)
+				var candidate_triangulation := _triangulate(candidate_vertices, constraints)
 				if bool(candidate_triangulation.get("valid", false)):
 					var candidate_triangles: Array = candidate_triangulation.get("triangles", [])
 					var current_quality := _quality_metrics(vertices, triangles)
@@ -318,7 +318,7 @@ static func _duplicate_cut_seam_vertices(vertices: Array, triangles: Array, cons
 			triangle["vertex_ids"] = triangle_ids
 
 
-static func _triangulate(vertices: Array, constraints: Array, sampling_bake: Dictionary) -> Dictionary:
+static func _triangulate(vertices: Array, constraints: Array) -> Dictionary:
 	var positions := PackedVector2Array()
 	var id_to_index: Dictionary = {}
 	for vertex_index in range(vertices.size()):
@@ -363,19 +363,23 @@ static func _triangulate(vertices: Array, constraints: Array, sampling_bake: Dic
 	var native_triangles: PackedInt32Array = native_result.get("triangles", PackedInt32Array())
 	for raw_index in range(0, native_triangles.size(), 3):
 		raw_triangles.append([int(native_triangles[raw_index]), int(native_triangles[raw_index + 1]), int(native_triangles[raw_index + 2])])
+	var domain_result := _select_domain_triangles(raw_triangles, positions, constraint_indices, constraints)
+	if not bool(domain_result.get("valid", false)):
+		return {
+			"valid": false,
+			"errors": domain_result.get("errors", []),
+			"diagnostics": {
+				"stage": "domain_classification",
+				"native": native_result.get("diagnostics", {}),
+				"domain": domain_result.get("diagnostics", {})
+			}
+		}
 	var triangles: Array = []
-	for raw_triangle in raw_triangles:
-		var indices: Array = raw_triangle.duplicate()
+	for domain_triangle in domain_result.get("triangles", []):
+		var indices: Array = domain_triangle.duplicate()
 		var a := positions[indices[0]]
 		var b := positions[indices[1]]
 		var c := positions[indices[2]]
-		if absf((b - a).cross(c - a)) <= EPSILON:
-			continue
-		var centroid := (a + b + c) / 3.0
-		if not GeometrySeedingService.point_is_inside(sampling_bake, centroid):
-			continue
-		if not _triangle_respects_boundary(indices, positions, constraint_indices, sampling_bake):
-			continue
 		if (b - a).cross(c - a) < 0.0:
 			var swap: int = indices[1]
 			indices[1] = indices[2]
@@ -386,7 +390,148 @@ static func _triangulate(vertices: Array, constraints: Array, sampling_bake: Dic
 	triangles.sort_custom(func(first: Dictionary, second: Dictionary) -> bool:
 		return ",".join(first.get("vertex_ids", [])) < ",".join(second.get("vertex_ids", []))
 	)
-	return {"valid": true, "errors": [], "triangles": triangles, "diagnostics": {"stage": "complete", "native": native_result.get("diagnostics", {}), "input_constraint_count": constraint_indices.size()}}
+	return {"valid": true, "errors": [], "triangles": triangles, "diagnostics": {"stage": "complete", "native": native_result.get("diagnostics", {}), "domain": domain_result.get("diagnostics", {}), "input_constraint_count": constraint_indices.size()}}
+
+
+static func _select_domain_triangles(raw_triangles: Array, positions: PackedVector2Array, constraint_indices: Array, constraints: Array) -> Dictionary:
+	var candidates: Array = []
+	var edge_to_triangles: Dictionary = {}
+	for raw_triangle in raw_triangles:
+		if not raw_triangle is Array or raw_triangle.size() != 3:
+			continue
+		var indices: Array = raw_triangle.duplicate()
+		var a := positions[int(indices[0])]
+		var b := positions[int(indices[1])]
+		var c := positions[int(indices[2])]
+		if absf((b - a).cross(c - a)) <= EPSILON:
+			continue
+		var triangle_index := candidates.size()
+		candidates.append(indices)
+		for edge_slot in range(3):
+			var edge_key := _edge_key(int(indices[edge_slot]), int(indices[(edge_slot + 1) % 3]))
+			if not edge_to_triangles.has(edge_key):
+				edge_to_triangles[edge_key] = []
+			edge_to_triangles[edge_key].append(triangle_index)
+	if candidates.is_empty():
+		return {"valid": false, "errors": ["No non-degenerate CDT Triangles are available for domain classification."], "triangles": [], "diagnostics": {"raw_triangle_count": raw_triangles.size(), "candidate_triangle_count": 0}}
+
+	var boundary_edge_keys: Dictionary = {}
+	var outer_orientation_by_chain: Dictionary = {}
+	for constraint_index in range(constraint_indices.size()):
+		var role := str(constraints[constraint_index].get("topology_role", "outer"))
+		if role not in ["outer", "hole"]:
+			continue
+		var edge: Array = constraint_indices[constraint_index]
+		var first := int(edge[0])
+		var second := int(edge[1])
+		boundary_edge_keys[_edge_key(first, second)] = true
+		if role == "outer":
+			var chain_id := str(constraints[constraint_index].get("chain_id", ""))
+			outer_orientation_by_chain[chain_id] = float(outer_orientation_by_chain.get(chain_id, 0.0)) + positions[first].cross(positions[second])
+
+	var selected: Dictionary = {}
+	var pending: Array[int] = []
+	for constraint_index in range(constraint_indices.size()):
+		if str(constraints[constraint_index].get("topology_role", "outer")) != "outer":
+			continue
+		var edge: Array = constraint_indices[constraint_index]
+		var first := int(edge[0])
+		var second := int(edge[1])
+		var chain_id := str(constraints[constraint_index].get("chain_id", ""))
+		var orientation := signf(float(outer_orientation_by_chain.get(chain_id, 0.0)))
+		if is_zero_approx(orientation):
+			return {"valid": false, "errors": ["Outer Chain %s has no stable winding for domain classification." % chain_id], "triangles": [], "diagnostics": {"raw_triangle_count": raw_triangles.size(), "candidate_triangle_count": candidates.size()}}
+		for triangle_index in edge_to_triangles.get(_edge_key(first, second), []):
+			var triangle: Array = candidates[int(triangle_index)]
+			var third := _triangle_third_vertex(triangle, first, second)
+			if third < 0:
+				continue
+			var side := (positions[second] - positions[first]).cross(positions[third] - positions[first])
+			if side * orientation > 0.0 and not selected.has(int(triangle_index)):
+				selected[int(triangle_index)] = true
+				pending.append(int(triangle_index))
+	if pending.is_empty():
+		return {"valid": false, "errors": ["No CDT face lies on the interior side of the sampled Outer boundary."], "triangles": [], "diagnostics": {"raw_triangle_count": raw_triangles.size(), "candidate_triangle_count": candidates.size()}}
+
+	var boundary_seed_count := pending.size()
+	var pending_index := 0
+	while pending_index < pending.size():
+		var triangle_index := pending[pending_index]
+		pending_index += 1
+		var triangle: Array = candidates[triangle_index]
+		for edge_slot in range(3):
+			var edge_key := _edge_key(int(triangle[edge_slot]), int(triangle[(edge_slot + 1) % 3]))
+			if boundary_edge_keys.has(edge_key):
+				continue
+			for neighbor_index in edge_to_triangles.get(edge_key, []):
+				var neighbor := int(neighbor_index)
+				if not selected.has(neighbor):
+					selected[neighbor] = true
+					pending.append(neighbor)
+
+	var selected_indices: Array = selected.keys()
+	selected_indices.sort()
+	var domain_triangles: Array = []
+	for triangle_index in selected_indices:
+		domain_triangles.append(candidates[int(triangle_index)].duplicate())
+	var constraint_issues := _final_constraint_issues(domain_triangles, constraint_indices, constraints)
+	if not constraint_issues.is_empty():
+		return {
+			"valid": false,
+			"errors": constraint_issues,
+			"triangles": [],
+			"diagnostics": {
+				"raw_triangle_count": raw_triangles.size(),
+				"candidate_triangle_count": candidates.size(),
+				"selected_triangle_count": domain_triangles.size(),
+				"boundary_seed_count": boundary_seed_count,
+				"final_constraint_issue_count": constraint_issues.size()
+			}
+		}
+	return {
+		"valid": true,
+		"errors": [],
+		"triangles": domain_triangles,
+		"diagnostics": {
+			"raw_triangle_count": raw_triangles.size(),
+			"candidate_triangle_count": candidates.size(),
+			"selected_triangle_count": domain_triangles.size(),
+			"boundary_seed_count": boundary_seed_count,
+			"final_constraint_issue_count": 0
+		}
+	}
+
+
+static func _triangle_third_vertex(triangle: Array, first: int, second: int) -> int:
+	for vertex_index in triangle:
+		var candidate := int(vertex_index)
+		if candidate != first and candidate != second:
+			return candidate
+	return -1
+
+
+static func _final_constraint_issues(triangles: Array, constraint_indices: Array, constraints: Array) -> Array[String]:
+	var edge_use_count: Dictionary = {}
+	for triangle in triangles:
+		if not triangle is Array or triangle.size() != 3:
+			continue
+		for edge_slot in range(3):
+			var key := _edge_key(int(triangle[edge_slot]), int(triangle[(edge_slot + 1) % 3]))
+			edge_use_count[key] = int(edge_use_count.get(key, 0)) + 1
+	var errors: Array[String] = []
+	for constraint_index in range(constraint_indices.size()):
+		var edge: Array = constraint_indices[constraint_index]
+		var actual_count := int(edge_use_count.get(_edge_key(int(edge[0]), int(edge[1])), 0))
+		var role := str(constraints[constraint_index].get("topology_role", "outer"))
+		var expected_count := 2 if role == "cut" else 1
+		if actual_count != expected_count:
+			errors.append("Final Mesh uses %s in %d Triangle%s; expected %d." % [
+				_constraint_label(constraints[constraint_index], constraint_index),
+				actual_count,
+				"" if actual_count == 1 else "s",
+				expected_count
+			])
+	return errors
 
 
 static func _pslg_validation_issues(positions: PackedVector2Array, constraint_indices: Array, constraints: Array) -> Array[String]:
@@ -454,39 +599,6 @@ static func _point_on_segment(point: Vector2, start: Vector2, end: Vector2) -> b
 
 static func _edge_key(first: int, second: int) -> String:
 	return "%d:%d" % [mini(first, second), maxi(first, second)]
-
-
-static func _triangle_respects_boundary(indices: Array, positions: PackedVector2Array, constraints: Array, sampling_bake: Dictionary) -> bool:
-	for edge_slot in range(3):
-		var first := int(indices[edge_slot])
-		var second := int(indices[(edge_slot + 1) % 3])
-		var midpoint := (positions[first] + positions[second]) * 0.5
-		if not GeometrySeedingService.point_is_inside(sampling_bake, midpoint) and not _point_on_any_constraint(midpoint, positions, constraints):
-			return false
-		for constraint in constraints:
-			var c_first := int(constraint[0])
-			var c_second := int(constraint[1])
-			if first in [c_first, c_second] or second in [c_first, c_second]:
-				continue
-			if _segments_properly_intersect(positions[first], positions[second], positions[c_first], positions[c_second]):
-				return false
-	return true
-
-
-static func _point_on_any_constraint(position: Vector2, positions: PackedVector2Array, constraints: Array) -> bool:
-	for constraint in constraints:
-		var closest := Geometry2D.get_closest_point_to_segment(position, positions[int(constraint[0])], positions[int(constraint[1])])
-		if closest.distance_squared_to(position) <= EPSILON * EPSILON:
-			return true
-	return false
-
-
-static func _segments_properly_intersect(a: Vector2, b: Vector2, c: Vector2, d: Vector2) -> bool:
-	var ab_c := (b - a).cross(c - a)
-	var ab_d := (b - a).cross(d - a)
-	var cd_a := (d - c).cross(a - c)
-	var cd_b := (d - c).cross(b - c)
-	return ab_c * ab_d < -EPSILON and cd_a * cd_b < -EPSILON
 
 
 static func _relax_interior_vertices(vertices: Array, triangles: Array, sampling_bake: Dictionary, strength: float) -> void:
