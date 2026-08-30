@@ -169,9 +169,11 @@ updates the World-root `catalog.json` with the currently valid Runtime set.
 Packages are staged, verified, and replaced atomically per Asset; an invalid
 Asset retains its older package and no fallback geometry is generated, but is
 excluded from that Catalog until it validates again.
-Runtime Manifest schema 13 exports `contour_stroke_mesh` independently from the
+Runtime Manifest schema 14 exports `contour_stroke_mesh` independently from the
 unchanged Fill Mesh and adds geometry-only `closed_region_mesh` to closed
-Contours. It also exports Asset-local Weapon Attachment Frames. Gameplay
+Contours. It also exports Asset-local Weapon Attachment Frames and the ordered
+local-meter positions of authored `corner` points as `projection_depth_corners`.
+Gameplay
 systems assign meaning to ordinary Component geometry outside PolyTools.
 It contains no UV, SDF, mask, or Carrier compatibility fields;
 older consumers must reject it.
@@ -231,9 +233,9 @@ and strictly replaces schema 10.
 World schema 56 adds Component-local `projection_depth_cm` for visible
 Components. It is shown only in the Component Inspector beside Contour Stroke
 Width and Z Order, defaults to `10 cm`, and is independent of Component/Asset
-Scale, Rebase, Z Order, and Contour Stroke Width. Runtime Manifest schema 13
-exports the corresponding `projection_depth_meters` value for presentation
-consumers.
+Scale, Rebase, Z Order, and Contour Stroke Width. Runtime Manifest schema 14
+exports the corresponding `projection_depth_meters` value and authored `corner`
+point positions for projection-depth contour edges.
 
 World schema 57 removes semantic gameplay Region records. Gameplay meaning is
 assigned by the consuming game to ordinary Component geometry.

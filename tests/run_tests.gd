@@ -402,10 +402,10 @@ func _test_closed_contour_region_mesh() -> void:
 	var export_result := RuntimeExportService.build_manifest(export_asset, {"convex_contour": {"contour_stroke": export_bake}})
 	var exported_component: Dictionary = export_result.get("manifest", {}).get("components", [])[0] if bool(export_result.get("valid", false)) else {}
 	var exported_region: Dictionary = exported_component.get("closed_region_mesh", {})
-	_expect(bool(export_result.get("valid", false)) and int(export_result.get("manifest", {}).get("schema_version", 0)) == 13 and str(exported_region.get("role", "")) == "closed_contour_region" and not exported_region.get("indices", []).is_empty(), "Schema 13 must export a non-empty closed_region_mesh for a valid closed Contour.")
+	_expect(bool(export_result.get("valid", false)) and int(export_result.get("manifest", {}).get("schema_version", 0)) == 14 and str(exported_region.get("role", "")) == "closed_contour_region" and not exported_region.get("indices", []).is_empty(), "Schema 14 must export a non-empty closed_region_mesh for a valid closed Contour.")
 	_expect(exported_region.keys().size() == 3 and exported_region.has("role") and exported_region.has("vertices") and exported_region.has("indices") and not exported_region.has("material") and not exported_component.has("mesh"), "closed_region_mesh must contain only engine-neutral geometry and must not introduce a Contour Fill Mesh.")
 	_expect(exported_region.get("vertices", [])[0] == [-0.2, -0.30000000000000004], "Closed region vertices must subtract the authored Component pivot and convert Tool units to meters.")
-	_expect(RuntimeExportService.manifest_validation_issues(export_result.get("manifest", {})).is_empty(), "A generated schema-13 Runtime Manifest must pass strict validation.")
+	_expect(RuntimeExportService.manifest_validation_issues(export_result.get("manifest", {})).is_empty(), "A generated schema-14 Runtime Manifest must pass strict validation.")
 	var old_schema_manifest: Dictionary = export_result.get("manifest", {}).duplicate(true)
 	old_schema_manifest["schema_version"] = 10
 	_expect(not RuntimeExportService.manifest_validation_issues(old_schema_manifest).is_empty(), "Runtime validation must strictly reject an older Runtime Manifest schema.")
@@ -439,7 +439,7 @@ func _test_closed_contour_region_mesh() -> void:
 
 	var application = load("res://scripts/main.gd").new()
 	var runtime_manifest_text := JSON.stringify(export_result.get("manifest", {}), "\t")
-	_expect(application._runtime_manifest_text_matches(runtime_manifest_text, runtime_manifest_text), "Runtime package staging must strictly accept the generated schema-13 closed-region payload after JSON round-trip.")
+	_expect(application._runtime_manifest_text_matches(runtime_manifest_text, runtime_manifest_text), "Runtime package staging must strictly accept the generated schema-14 closed-region payload after JSON round-trip.")
 	var document: Dictionary = application._default_geometry_document("region_asset", "convex_contour")
 	export_bake["bake_id"] = "closed_region_bake"
 	document["meshing"]["bakes"] = {ContourMeshService.METHOD: export_bake}
@@ -2058,19 +2058,19 @@ func _test_runtime_export_service() -> void:
 	}
 	var contour_stroke: Dictionary = mesh.duplicate(true)
 	contour_stroke.merge({"method": ContourMeshService.METHOD, "has_outline": true, "topology_role": "outer", "runs": [{"run_id": "boundary:run:0", "edge_ids": ["edge_0"], "closed": true, "start_cap": "none", "end_cap": "none", "vertex_offset": 0, "vertex_count": 3, "index_offset": 0, "index_count": 3}], "parameters": {"reference_pixels_per_meter": 192.0, "stroke_width_px": 4.0, "stroke_width_meters": 0.020833333333333332, "join": "miter", "miter_limit": 4.0, "cap": "butt"}}, true)
-	var body := {"id": "component_b", "name": "body", "visibility": true, "z_index": 2, "parent_component_id": "", "transform": {"position": Vector2(10.0, 20.0), "pivot": Vector2(2.0, 3.0), "rotation": 90.0, "scale": Vector2.ONE}}
+	var body := {"id": "component_b", "name": "body", "visibility": true, "z_index": 2, "parent_component_id": "", "transform": {"position": Vector2(10.0, 20.0), "pivot": Vector2(2.0, 3.0), "rotation": 90.0, "scale": Vector2.ONE}, "points": [{"id": "point_corner", "position": Vector2(4.0, 5.0), "mode": "corner"}, {"id": "point_aligned", "position": Vector2(6.0, 7.0), "mode": "aligned"}]}
 	var eye := {"id": "component_a", "name": "eye_left", "visibility": true, "z_index": 2, "parent_component_id": "component_b", "transform": {"position": Vector2.ZERO, "pivot": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE}}
 	var asset := {"id": "wizard", "name": "Wizard", "asset_type": "character", "authored_facing": AssetPresentation.AuthoredFacing.RIGHT, "visibility": true, "asset_pivot": Vector2(5.0, 6.0), "components": [body, eye]}
 	var source := {"mesh": mesh, "contour_stroke": contour_stroke}
 	var result := RuntimeExportService.build_manifest(asset, {"component_a": source, "component_b": source})
 	var manifest: Dictionary = result.get("manifest", {})
 	var components: Array = manifest.get("components", [])
-	_expect(bool(result.get("valid", false)) and int(manifest.get("schema_version", 0)) == 13 and str(manifest.get("asset_key", "")) == "wizard" and not manifest.has("asset_id"), "Runtime export schema 13 should identify packages only by the Asset Key derived from their display name.")
-	_expect(str(manifest.get("presentation", {}).get("authored_facing", "")) == "right", "Runtime export schema 13 should publish the selected authored facing under presentation.authored_facing.")
+	_expect(bool(result.get("valid", false)) and int(manifest.get("schema_version", 0)) == 14 and str(manifest.get("asset_key", "")) == "wizard" and not manifest.has("asset_id"), "Runtime export schema 14 should identify packages only by the Asset Key derived from their display name.")
+	_expect(str(manifest.get("presentation", {}).get("authored_facing", "")) == "right", "Runtime export schema 14 should publish the selected authored facing under presentation.authored_facing.")
 	var neutral_asset: Dictionary = asset.duplicate(true)
 	neutral_asset.erase("authored_facing")
 	var neutral_manifest: Dictionary = RuntimeExportService.build_manifest(neutral_asset, {"component_a": source, "component_b": source}).get("manifest", {})
-	_expect(str(neutral_manifest.get("presentation", {}).get("authored_facing", "")) == "neutral", "Runtime export schema 13 should explicitly publish neutral for an older Asset without authored_facing.")
+	_expect(str(neutral_manifest.get("presentation", {}).get("authored_facing", "")) == "neutral", "Runtime export schema 14 should explicitly publish neutral for an older Asset without authored_facing.")
 	var manifest_text := JSON.stringify(manifest, "\t")
 	_expect(application._runtime_manifest_text_matches(manifest_text, manifest_text), "Runtime staging should verify exact schema-11 JSON bytes without rejecting numeric JSON round-trip types.")
 	_expect(components.size() == 2 and str(components[0].get("component_id", "")) == "component_a" and str(components[1].get("component_id", "")) == "component_b", "Runtime Components should sort globally by ascending z_index and lexicographic Component ID.")
@@ -2085,7 +2085,7 @@ func _test_runtime_export_service() -> void:
 	var combat_result := RuntimeExportService.build_manifest(combat_asset, {"component_a": source, "component_b": source})
 	var combat_manifest: Dictionary = combat_result.get("manifest", {})
 	var exported_frame_roles: Array = combat_manifest.get("attachment_frames", []).map(func(frame: Dictionary): return str(frame.get("role", "")))
-	_expect(bool(combat_result.get("valid", false)) and int(combat_manifest.get("schema_version", 0)) == 13 and combat_manifest.get("attachment_frames", []).size() == 3 and AssetGuide.WEAPON_SOCKET_PRIMARY in exported_frame_roles and AssetGuide.GRIP_SECONDARY in exported_frame_roles and AssetGuide.REACH_LIMIT_PRIMARY in exported_frame_roles and not combat_manifest.has("regions"), "Schema 13 should export every oriented Weapon Guide and omit semantic Regions from the visual Component manifest.")
+	_expect(bool(combat_result.get("valid", false)) and int(combat_manifest.get("schema_version", 0)) == 14 and combat_manifest.get("attachment_frames", []).size() == 3 and AssetGuide.WEAPON_SOCKET_PRIMARY in exported_frame_roles and AssetGuide.GRIP_SECONDARY in exported_frame_roles and AssetGuide.REACH_LIMIT_PRIMARY in exported_frame_roles and not combat_manifest.has("regions"), "Schema 14 should export every oriented Weapon Guide and omit semantic Regions from the visual Component manifest.")
 	_expect(components[1].get("mesh", {}).get("vertices", []) == [[-0.2, -0.30000000000000004], [0.8, -0.30000000000000004], [-0.2, 0.7000000000000001]] and components[1].get("mesh", {}).get("indices", []) == [0, 1, 2] and not components[1].has("closed_region_mesh"), "Runtime Meshes should preserve accepted Vertex order, convert Tool units to meters, compact Triangle IDs, and remain unchanged for non-Contour Components.")
 	_expect(not components[1].get("mesh", {}).has("uvs") and not components[1].has("contour_carrier") and not components[1].has("contour_mask"), "Schema 5 must remove UV, Carrier, and SDF fields rather than retaining a silent compatibility payload.")
 	var exported_stroke: Dictionary = components[1].get("contour_stroke_mesh", {})
@@ -2099,6 +2099,14 @@ func _test_runtime_export_service() -> void:
 	_expect(bool(disabled_result.get("valid", false)) and not bool(disabled_result.get("manifest", {}).get("components", [])[0].get("contour_stroke_mesh", {}).get("has_outline", true)), "Schema 5 must preserve Render Outline off as an explicit empty Stroke without generating fallback art.")
 	_expect(components[1].get("local_transform", {}).get("position", []) == [1.0, 2.0] and is_equal_approx(float(components[1].get("local_transform", {}).get("rotation_radians", 0.0)), PI / 2.0), "Runtime transforms should preserve Y-up coordinates and publish positions in meters and CCW radians.")
 	_expect(not components[1].has("display_name") and str(components[1].get("name", "")) == "body" and not components[1].has("semantic_key"), "Runtime Components should expose their free Component name without a redundant display label or Semantic Key.")
+	var exported_corners: Array = components[1].get("projection_depth_corners", [])
+	_expect(exported_corners == [{"point_id": "point_corner", "position": [0.2, 0.2]}] and components[0].get("projection_depth_corners", []) == [], "Only authored Corner points must export as local-meter projection-depth corners.")
+	var missing_corners_manifest: Dictionary = manifest.duplicate(true)
+	missing_corners_manifest["components"][1].erase("projection_depth_corners")
+	_expect(not RuntimeExportService.manifest_validation_issues(missing_corners_manifest).is_empty(), "Runtime validation must reject an ordinary Component without projection_depth_corners.")
+	var duplicate_corners_manifest: Dictionary = manifest.duplicate(true)
+	duplicate_corners_manifest["components"][1]["projection_depth_corners"].append({"point_id": "point_corner", "position": [0.0, 0.0]})
+	_expect(not RuntimeExportService.manifest_validation_issues(duplicate_corners_manifest).is_empty(), "Runtime validation must reject duplicate projection-depth Corner Point IDs.")
 	var scaled_export_asset: Dictionary = asset.duplicate(true)
 	scaled_export_asset["components"][0]["transform"]["scale"] = Vector2(2.0, 1.0)
 	var scaled_export_result := RuntimeExportService.build_manifest(scaled_export_asset, {"component_a": source, "component_b": source})

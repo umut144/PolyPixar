@@ -1,7 +1,7 @@
 class_name RuntimeExportService
 extends RefCounted
 
-const MANIFEST_SCHEMA_VERSION := 13
+const MANIFEST_SCHEMA_VERSION := 14
 const DEFAULT_PROJECTION_DEPTH_CM := 10.0
 static func build_manifest(asset: Dictionary, sources: Dictionary) -> Dictionary:
 	var errors: Array[String] = []
@@ -157,6 +157,8 @@ static func _build_component_v8(component: Dictionary, source: Dictionary, expor
 	if not authored_transform is Dictionary:
 		authored_transform = {}
 	var authored_pivot := Vector2(authored_transform.get("pivot", Vector2.ZERO))
+	var projection_depth_corners := _serialize_projection_depth_corners(component.get("points", []), authored_pivot, label)
+	errors.append_array(projection_depth_corners.get("errors", []))
 	var stroke = source.get("contour_stroke", {})
 	if not stroke is Dictionary or not bool(stroke.get("valid", false)) or str(stroke.get("method", "")) != ContourMeshService.METHOD:
 		errors.append("%s: a current accepted Contour Stroke Mesh is required." % label)
@@ -212,6 +214,7 @@ static func _build_component_v8(component: Dictionary, source: Dictionary, expor
 		"parent_component_id": parent_component_id,
 		"z_index": int(component.get("z_index", 0)),
 		"projection_depth_meters": maxf(0.0, float(component.get("projection_depth_cm", DEFAULT_PROJECTION_DEPTH_CM))) * 0.01,
+		"projection_depth_corners": projection_depth_corners.get("items", []),
 		"component_pivot": _meters(component_pivot),
 		"local_transform": {"position": _meters(position), "rotation_radians": deg_to_rad(rotation), "scale": [scale.x, scale.y]},
 		"contour_stroke_mesh": {
@@ -333,7 +336,7 @@ static func manifest_validation_issues(manifest: Dictionary) -> Array[String]:
 		errors.append("Runtime Manifest requires an Asset Key and Component array.")
 		return errors
 	if not manifest.get("attachment_frames", null) is Array:
-		errors.append("Runtime Manifest schema 13 requires an attachment_frames array.")
+		errors.append("Runtime Manifest schema 14 requires an attachment_frames array.")
 		return errors
 	var presentation = manifest.get("presentation")
 	if not presentation is Dictionary or presentation.keys() != ["authored_facing"] \
@@ -346,11 +349,12 @@ static func manifest_validation_issues(manifest: Dictionary) -> Array[String]:
 		var component: Dictionary = raw_component
 		var label := str(component.get("name", component.get("component_id", "Component")))
 		if str(component.get("kind", "")) == "asset_reference":
-			if component.has("mesh") or component.has("contour_stroke_mesh") or component.has("closed_region_mesh"):
+			if component.has("mesh") or component.has("contour_stroke_mesh") or component.has("closed_region_mesh") or component.has("projection_depth_corners"):
 				errors.append("%s: Asset References must not contain owned geometry meshes." % label)
 			continue
 		if not component.get("contour_stroke_mesh", null) is Dictionary:
 			errors.append("%s: ordinary Runtime Components require contour_stroke_mesh." % label)
+		errors.append_array(_projection_depth_corner_validation_issues(component.get("projection_depth_corners", null), label))
 		if component.has("closed_region_mesh"):
 			var region = component.get("closed_region_mesh")
 			if not region is Dictionary:
@@ -391,6 +395,55 @@ static func manifest_validation_issues(manifest: Dictionary) -> Array[String]:
 		var frame_transform = raw_frame.get("asset_transform")
 		if not frame_transform is Dictionary or not frame_transform.get("position", null) is Array or frame_transform.get("position", []).size() != 2 or typeof(frame_transform.get("rotation_radians", null)) not in [TYPE_INT, TYPE_FLOAT]:
 			errors.append("Attachment Frame asset_transform is invalid.")
+	return errors
+
+
+static func _serialize_projection_depth_corners(raw_points: Array, authored_pivot: Vector2, label: String) -> Dictionary:
+	var items: Array = []
+	var errors: Array[String] = []
+	var seen_ids: Dictionary = {}
+	for raw_point in raw_points:
+		if not raw_point is Dictionary or str(raw_point.get("mode", "")) != "corner":
+			continue
+		var point: Dictionary = raw_point
+		var point_id := str(point.get("id", ""))
+		var position := Vector2(point.get("position", Vector2.INF))
+		if point_id.is_empty() or seen_ids.has(point_id):
+			errors.append("%s: projection-depth Corner Point IDs must be unique and non-empty." % label)
+			continue
+		if not position.is_finite():
+			errors.append("%s: projection-depth Corner Point positions must be finite." % label)
+			continue
+		seen_ids[point_id] = true
+		items.append({"point_id": point_id, "position": _meters(position - authored_pivot)})
+	return {"items": items, "errors": errors}
+
+
+static func _projection_depth_corner_validation_issues(raw_corners, label: String) -> Array[String]:
+	var errors: Array[String] = []
+	if not raw_corners is Array:
+		errors.append("%s: ordinary Runtime Components require a projection_depth_corners array." % label)
+		return errors
+	var ids: Dictionary = {}
+	for raw_corner in raw_corners:
+		if not raw_corner is Dictionary:
+			errors.append("%s: projection_depth_corners contains an invalid Corner Point record." % label)
+			continue
+		var corner: Dictionary = raw_corner
+		var keys: Array = corner.keys()
+		keys.sort()
+		if keys != ["point_id", "position"]:
+			errors.append("%s: every projection-depth Corner Point requires exactly point_id and position." % label)
+			continue
+		var point_id := str(corner.get("point_id", ""))
+		var position = corner.get("position", null)
+		if point_id.is_empty() or ids.has(point_id):
+			errors.append("%s: projection-depth Corner Point IDs must be unique and non-empty." % label)
+			continue
+		if not position is Array or position.size() != 2 or typeof(position[0]) not in [TYPE_INT, TYPE_FLOAT] or typeof(position[1]) not in [TYPE_INT, TYPE_FLOAT] or not is_finite(float(position[0])) or not is_finite(float(position[1])):
+			errors.append("%s: projection-depth Corner Point positions must be finite two-number arrays." % label)
+			continue
+		ids[point_id] = true
 	return errors
 
 

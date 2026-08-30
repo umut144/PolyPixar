@@ -1,10 +1,10 @@
 # PolyTools Runtime Export Contract
 
 **Status:** Normative consumer contract for Asset Catalog schema `1` and
-runtime Manifest schema `13`.
+runtime Manifest schema `14`.
 
 This document is the sole field-level contract for PolyTools Runtime packages.
-Manifest schema 13 replaces schema 12. Consumers must reject older schemas; there is
+Manifest schema 14 replaces schema 13. Consumers must reject older schemas; there is
 no SDF/Carrier/UV compatibility fallback.
 
 ## Package boundary
@@ -54,11 +54,11 @@ The Catalog requires `world_key`, `world_name`, and `assets`, sorted by
 
 ## Top-level Manifest
 
-Schema 13 requires:
+Schema 14 requires:
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `schema_version` | integer | Exactly `13`. |
+| `schema_version` | integer | Exactly `14`. |
 | `asset_key` | non-empty lower-snake-case string | Runtime identity. |
 | `display_name` | string | Informational authored name. |
 | `asset_type` | string | `character`, `props`, `weapons`, `terrain`, `icon`, or `symbols`. |
@@ -133,9 +133,10 @@ independent Frame property.
 
 ## Common Component fields
 
-Every Component requires `component_id`, unique `name` in `lower_snake_case`, nullable
+Every ordinary Component requires `component_id`, unique `name` in `lower_snake_case`, nullable
 `parent_component_id`, integer `z_index`, finite non-negative
-`projection_depth_meters`, two-float `component_pivot`, and `local_transform`:
+`projection_depth_meters`, `projection_depth_corners`, two-float
+`component_pivot`, and `local_transform`:
 
 ```json
 {
@@ -149,6 +150,26 @@ Exported authored Component Scale is always `[1,1]`; PolyTools rejects a
 non-rebased Asset. Runtime animation may subsequently apply translate, rotate,
 or scale to the Component hierarchy. Fill, stroke, and closed region receive
 the same complete transform and require no geometry regeneration.
+
+## Projection Depth Corners
+
+`projection_depth_corners` is an ordered array of authored Bézier Points whose
+handle mode is `corner`:
+
+```json
+"projection_depth_corners": [
+  {"point_id":"point_123", "position":[0.25,-0.10]}
+]
+```
+
+Each item contains exactly a non-empty stable `point_id` and a finite local-meter
+`position`. Positions use the same authored-Pivot subtraction as Component Mesh
+vertices. The array follows authored Chain order and may be empty. No point in
+another handle mode (`linear`, `aligned`, `free`, or `mirrored`) appears in this
+field. It expresses only where a consumer may draw a contour edge through a
+Component's authored projection depth; it does not define a mesh, material,
+rendering policy, or gameplay geometry. Asset References omit this field and
+resolve any such data from their source package.
 
 ## Indexed Mesh
 
