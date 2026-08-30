@@ -1,0 +1,290 @@
+{
+	"asset_id": "asset_12",
+	"component_id": "component_69",
+	"component_mesh": {
+		"bake_id": "meshing_bake_7814232577017560661",
+		"build_provenance": {
+			"attempts": 1.0,
+			"exact_input_hash": "3a52099a92c2a31bc7b1a2cec22344fcc5c4235becc896e7b4cdb5b795b6dddc",
+			"schema_version": 1.0,
+			"source_signature": {
+				"geometry_tolerance": 0.00055,
+				"meshing_algorithm": 4.0,
+				"recipe_hash": "6b53ff04e86070f1066163d86cd975e192458d017ed0973dec63db4e63faeb7c",
+				"recipe_version": 1.0,
+				"sampling_algorithm": 3.0,
+				"scalars": [
+					4.0,
+					5.0,
+					1.0,
+					1.0
+				],
+				"seeding_algorithm": 2.0,
+				"topology_hash": "7e4683f24bc11211426f018d81823a15bc8894a7a8841e65ceb3e2b4f110a607",
+				"vectors": [
+					[
+						0.0,
+						-0.300000011920929
+					],
+					[
+						0.0,
+						0.0
+					],
+					[
+						0.0,
+						0.0
+					],
+					[
+						0.0,
+						0.300000011920929
+					],
+					[
+						0.0,
+						0.0
+					],
+					[
+						0.0,
+						0.0
+					],
+					[
+						1.0,
+						0.0
+					],
+					[
+						0.0,
+						1.0
+					],
+					[
+						0.0,
+						0.0
+					]
+				],
+				"version": 1.0
+			}
+		},
+		"last_error": "",
+		"last_failure_signature": {},
+		"mesh_fingerprint": "313886cfe00b32d0ca1ed59815d5c17403d4012431eeb2f82da895b483b7a9d2",
+		"method": "contour_stroke"
+	},
+	"meshing": {
+		"bakes": {
+			"contour_stroke": {
+				"algorithm_version": 5,
+				"bake_id": "meshing_bake_7814232577017560661",
+				"boundary_constraints": [],
+				"errors": [],
+				"geometry_diagnostics": {
+					"minimum_nonadjacent_clearance_meters": null,
+					"narrow_overlap_pair_count": 0.0,
+					"self_intersection_count": 0.0,
+					"triangle_validation": "complete"
+				},
+				"has_outline": true,
+				"mean_quality": 0.0,
+				"method": "contour_stroke",
+				"minimum_angle": 0.0,
+				"optimization": {
+					"baseline_triangles": [],
+					"movements": []
+				},
+				"parameters": {
+					"cap": "butt",
+					"join": "miter",
+					"miter_limit": 4.0,
+					"reference_pixels_per_meter": 192.0,
+					"stroke_width_meters": 0.0208333333333333,
+					"stroke_width_px": 4.0
+				},
+				"runs": [
+					{
+						"bevel_join_count": 0.0,
+						"centerline": [
+							{
+								"curve_t": 0.0,
+								"edge_id": "edge_2900255558076538475",
+								"position": [
+									0.0,
+									0.300000011920929
+								],
+								"source_point_id": "point_336891876250206397"
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "edge_2900255558076538475",
+								"position": [
+									0.0,
+									-0.300000011920929
+								],
+								"source_point_id": ""
+							}
+						],
+						"closed": false,
+						"edge_ids": [
+							"edge_2900255558076538475"
+						],
+						"end_cap": "butt",
+						"geometry_diagnostics": {
+							"centerline_segment_count": 1.0,
+							"minimum_nonadjacent_clearance_tool_units": null,
+							"narrow_overlap_pair_count": 0.0,
+							"self_intersection_count": 0.0
+						},
+						"index_count": 6.0,
+						"index_offset": 0.0,
+						"miter_join_count": 0.0,
+						"run_id": "chain_3055785181632684594:run:0",
+						"start_cap": "butt",
+						"triangle_count": 2.0,
+						"vertex_count": 4.0,
+						"vertex_offset": 0.0
+					}
+				],
+				"source_chain_closed": false,
+				"source_draw_mode": "contour",
+				"source_fingerprint": "14c1f045eb018d8d680d496257f0f4743f69e200ff391e1092520385533a5e1f",
+				"topology_role": "outer",
+				"triangle_count": 2,
+				"triangles": [
+					{
+						"id": "triangle:contour:0",
+						"vertex_ids": [
+							"vertex:contour:0",
+							"vertex:contour:1",
+							"vertex:contour:2"
+						]
+					},
+					{
+						"id": "triangle:contour:1",
+						"vertex_ids": [
+							"vertex:contour:2",
+							"vertex:contour:1",
+							"vertex:contour:3"
+						]
+					}
+				],
+				"valid": true,
+				"vertex_count": 4,
+				"vertices": [
+					{
+						"curve_t": 0.0,
+						"edge_id": "edge_2900255558076538475",
+						"id": "vertex:contour:0",
+						"origin": "segment_left",
+						"position": [
+							0.10416666418314,
+							0.300000011920929
+						],
+						"preserved": false,
+						"source_id": "edge_2900255558076538475@0.000000000"
+					},
+					{
+						"curve_t": 0.0,
+						"edge_id": "edge_2900255558076538475",
+						"id": "vertex:contour:1",
+						"origin": "segment_right",
+						"position": [
+							-0.10416666418314,
+							0.300000011920929
+						],
+						"preserved": false,
+						"source_id": "edge_2900255558076538475@0.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_2900255558076538475",
+						"id": "vertex:contour:2",
+						"origin": "segment_left",
+						"position": [
+							0.10416666418314,
+							-0.300000011920929
+						],
+						"preserved": false,
+						"source_id": "edge_2900255558076538475@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_2900255558076538475",
+						"id": "vertex:contour:3",
+						"origin": "segment_right",
+						"position": [
+							-0.10416666418314,
+							-0.300000011920929
+						],
+						"preserved": false,
+						"source_id": "edge_2900255558076538475@1.000000000"
+					}
+				],
+				"worst_aspect_ratio": 0.0
+			}
+		},
+		"recipe": {
+			"method": "constrained_mesh",
+			"parameters": {
+				"mesh_character": 0.64,
+				"optimize_mesh": true,
+				"passes": 3,
+				"passes_override": false,
+				"relaxation": 0.402,
+				"relaxation_override": false,
+				"seeding_method": "poisson_fill"
+			}
+		}
+	},
+	"sampling": {
+		"bakes": {},
+		"recipe": {
+			"method": "adaptive",
+			"parameters": {
+				"boundary_refinements": {},
+				"feature_detail": 0.5,
+				"spacing": 1.0
+			}
+		}
+	},
+	"schema_version": 59,
+	"sdf": {
+		"bake": {},
+		"last_error": "",
+		"last_failure_fingerprint": "",
+		"recipe": {
+			"method": "single_channel_sdf",
+			"parameters": {
+				"resolution": 256,
+				"spread_px": 16.0
+			}
+		}
+	},
+	"seeding": {
+		"bakes": {},
+		"recipe": {
+			"method": "poisson_fill",
+			"parameters": {
+				"constraint_clearance_factor": 0.5,
+				"seed": 1,
+				"spacing": 2.0
+			}
+		}
+	},
+	"uv_mapping": {
+		"bakes": {},
+		"last_error": "",
+		"last_failure_fingerprint": "",
+		"recipe": {
+			"method": "bounds_planar",
+			"parameters": {
+				"mesh_method": "constrained_mesh",
+				"offset_u": 0.0,
+				"offset_v": 0.0,
+				"padding": 0.0625,
+				"preserve_aspect": true,
+				"rotation": 0.0,
+				"scale": 1.0
+			}
+		}
+	},
+	"weighting": {
+		"next_style_index": 1,
+		"styles": []
+	}
+}

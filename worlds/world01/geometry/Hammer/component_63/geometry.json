@@ -1,0 +1,158 @@
+{
+	"asset_id": "asset_11",
+	"component_id": "component_63",
+	"component_mesh": {
+		"bake_id": "",
+		"build_provenance": {},
+		"last_error": "Closed Contour stroke centerline segments 3 and 5 intersect; closed outer and Hole boundaries must remain simple loops.",
+		"last_failure_signature": {
+			"geometry_tolerance": 0.000481189037185686,
+			"meshing_algorithm": 4,
+			"recipe_hash": "b551557d46fe25a5daea96883a8de942525550484da516ded6ad04c19b9410e5",
+			"recipe_version": 1,
+			"sampling_algorithm": 3,
+			"scalars": [
+				-1.0,
+				1.0
+			],
+			"seeding_algorithm": 2,
+			"topology_hash": "f9bbb93fcd779ac38513abbfedd7f03df2798740c9e072441981f29d1c4682ea",
+			"vectors": [
+				[
+					-1.5,
+					6.90000009536743
+				],
+				[
+					0.0,
+					0.0
+				],
+				[
+					-0.024282693862915,
+					-0.000174045562744141
+				],
+				[
+					-1.79999995231628,
+					6.59999990463257
+				],
+				[
+					0.0,
+					-0.39999994635582
+				],
+				[
+					0.0999999865889549,
+					0.100000061094761
+				],
+				[
+					-1.79999995231628,
+					5.40000009536743
+				],
+				[
+					0.0999999865889549,
+					-0.100000061094761
+				],
+				[
+					0.0,
+					0.39999994635582
+				],
+				[
+					-1.5,
+					5.09999990463257
+				],
+				[
+					0.0,
+					0.600000083446503
+				],
+				[
+					-0.0999999865889549,
+					0.100000061094761
+				],
+				[
+					1.0,
+					0.0
+				],
+				[
+					0.0,
+					1.0
+				],
+				[
+					0.0,
+					0.0
+				]
+			],
+			"version": 1
+		},
+		"mesh_fingerprint": "",
+		"method": ""
+	},
+	"meshing": {
+		"bakes": {},
+		"recipe": {
+			"method": "constrained_mesh",
+			"parameters": {
+				"mesh_character": 0.64,
+				"optimize_mesh": true,
+				"passes": 3,
+				"passes_override": false,
+				"relaxation": 0.402,
+				"relaxation_override": false,
+				"seeding_method": "poisson_fill"
+			}
+		}
+	},
+	"sampling": {
+		"bakes": {},
+		"recipe": {
+			"method": "adaptive",
+			"parameters": {
+				"boundary_refinements": {},
+				"feature_detail": 0.5,
+				"spacing": 1.0
+			}
+		}
+	},
+	"schema_version": 44,
+	"sdf": {
+		"bake": {},
+		"last_error": "",
+		"last_failure_fingerprint": "",
+		"recipe": {
+			"method": "single_channel_sdf",
+			"parameters": {
+				"resolution": 256,
+				"spread_px": 16.0
+			}
+		}
+	},
+	"seeding": {
+		"bakes": {},
+		"recipe": {
+			"method": "poisson_fill",
+			"parameters": {
+				"constraint_clearance_factor": 0.5,
+				"seed": 1,
+				"spacing": 2.0
+			}
+		}
+	},
+	"uv_mapping": {
+		"bakes": {},
+		"last_error": "",
+		"last_failure_fingerprint": "",
+		"recipe": {
+			"method": "bounds_planar",
+			"parameters": {
+				"mesh_method": "constrained_mesh",
+				"offset_u": 0.0,
+				"offset_v": 0.0,
+				"padding": 0.0625,
+				"preserve_aspect": true,
+				"rotation": 0.0,
+				"scale": 1.0
+			}
+		}
+	},
+	"weighting": {
+		"next_style_index": 1,
+		"styles": []
+	}
+}

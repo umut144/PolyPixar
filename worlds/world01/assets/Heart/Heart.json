@@ -1,0 +1,968 @@
+{
+	"animation": {
+		"legacy_path_follow_motions": [],
+		"next_state_index": 4,
+		"simulation_contract": {
+			"next_parameter_index": 1,
+			"parameters": [
+				{
+					"id": "parameter_speed",
+					"name": "speed",
+					"type": "number"
+				},
+				{
+					"id": "parameter_grounded",
+					"name": "grounded",
+					"type": "bool"
+				}
+			],
+			"source": "Asset Animation"
+		},
+		"states": [
+			{
+				"cycle_duration": 1.0,
+				"id": "state_idle",
+				"markers": [
+					{
+						"event_id": "rustle",
+						"id": "marker_idle_01",
+						"kind": "sfx",
+						"phase": 0.52
+					}
+				],
+				"motions": [
+					{
+						"domain": "outer",
+						"enabled": true,
+						"guide_ids": [],
+						"id": "motion_idle_01",
+						"name": "Idle Bob",
+						"parameters": {
+							"cycles": 1.0,
+							"distance": 0.25
+						},
+						"phase_offset": 0.0,
+						"primitive": "bob",
+						"target_component_id": "",
+						"target_scope": "asset"
+					}
+				],
+				"name": "IDLE",
+				"next_marker_index": 2,
+				"next_motion_index": 2,
+				"next_transition_index": 2,
+				"transitions": [
+					{
+						"blend_duration": 0.15,
+						"entry_mode": "restart",
+						"exit_phase": 0.0,
+						"exit_policy": "any_phase",
+						"id": "transition_idle_01",
+						"next_rule_index": 2,
+						"rules": [
+							{
+								"id": "rule_idle_01",
+								"operator": "greater",
+								"parameter_id": "parameter_speed",
+								"value": 0.1
+							}
+						],
+						"target_state_id": "state_walk"
+					}
+				]
+			},
+			{
+				"cycle_duration": 1.0,
+				"id": "state_walk",
+				"markers": [
+					{
+						"event_id": "footstep",
+						"id": "marker_walk_01",
+						"kind": "sfx",
+						"phase": 0.25
+					}
+				],
+				"motions": [
+					{
+						"domain": "outer",
+						"enabled": true,
+						"guide_ids": [],
+						"id": "motion_walk_01",
+						"name": "Walk Bob",
+						"parameters": {
+							"cycles": 1.0,
+							"distance": 0.5
+						},
+						"phase_offset": 0.0,
+						"primitive": "bob",
+						"target_component_id": "",
+						"target_scope": "asset"
+					}
+				],
+				"name": "WALK",
+				"next_marker_index": 2,
+				"next_motion_index": 2,
+				"next_transition_index": 3,
+				"transitions": [
+					{
+						"blend_duration": 0.15,
+						"entry_mode": "restart",
+						"exit_phase": 0.0,
+						"exit_policy": "any_phase",
+						"id": "transition_walk_01",
+						"next_rule_index": 2,
+						"rules": [
+							{
+								"id": "rule_walk_idle_01",
+								"operator": "less_equal",
+								"parameter_id": "parameter_speed",
+								"value": 0.1
+							}
+						],
+						"target_state_id": "state_idle"
+					},
+					{
+						"blend_duration": 0.15,
+						"entry_mode": "preserve_phase",
+						"exit_phase": 0.0,
+						"exit_policy": "any_phase",
+						"id": "transition_walk_02",
+						"next_rule_index": 2,
+						"rules": [
+							{
+								"id": "rule_walk_run_01",
+								"operator": "greater",
+								"parameter_id": "parameter_speed",
+								"value": 0.65
+							}
+						],
+						"target_state_id": "state_run"
+					}
+				]
+			},
+			{
+				"cycle_duration": 1.0,
+				"id": "state_run",
+				"markers": [
+					{
+						"event_id": "footstep",
+						"id": "marker_run_01",
+						"kind": "sfx",
+						"phase": 0.18
+					}
+				],
+				"motions": [
+					{
+						"domain": "outer",
+						"enabled": true,
+						"guide_ids": [],
+						"id": "motion_run_01",
+						"name": "Run Bob",
+						"parameters": {
+							"cycles": 1.0,
+							"distance": 0.8
+						},
+						"phase_offset": 0.0,
+						"primitive": "bob",
+						"target_component_id": "",
+						"target_scope": "asset"
+					},
+					{
+						"domain": "inner",
+						"enabled": true,
+						"guide_ids": [],
+						"id": "motion_run_02",
+						"name": "Run Sway",
+						"parameters": {
+							"cycles": 1.0,
+							"strength": 0.5
+						},
+						"phase_offset": 0.0,
+						"primitive": "spine_sway",
+						"target_component_id": "",
+						"target_scope": "component"
+					}
+				],
+				"name": "RUN",
+				"next_marker_index": 2,
+				"next_motion_index": 3,
+				"next_transition_index": 2,
+				"transitions": [
+					{
+						"blend_duration": 0.15,
+						"entry_mode": "preserve_phase",
+						"exit_phase": 0.0,
+						"exit_policy": "any_phase",
+						"id": "transition_run_01",
+						"next_rule_index": 2,
+						"rules": [
+							{
+								"id": "rule_run_01",
+								"operator": "less_equal",
+								"parameter_id": "parameter_speed",
+								"value": 0.65
+							}
+						],
+						"target_state_id": "state_walk"
+					}
+				]
+			}
+		]
+	},
+	"asset_pivot": [
+		0.0,
+		0.0
+	],
+	"asset_type": "symbols",
+	"authored_facing": "neutral",
+	"components": [
+		{
+			"catch_parent_component_id": "",
+			"chains": [
+				{
+					"closed": true,
+					"edge_ids": [
+						"edge_6212386200871992847",
+						"edge_7903937689421076265",
+						"edge_8139075817488485770",
+						"edge_1303245344362520883",
+						"edge_1033547379880939931",
+						"edge_4847401532542391749",
+						"edge_7640812770974730328",
+						"edge_6432795154494900125",
+						"edge_6795786490064723495",
+						"edge_3555984247484742977",
+						"edge_4354594848870190152",
+						"edge_305006667086078487",
+						"edge_7695767564761944220",
+						"edge_3160984431483355930",
+						"edge_1095362398778567008",
+						"edge_5627154199155377731",
+						"edge_572205080137733772",
+						"edge_1823592570135966306",
+						"edge_687946959274494369",
+						"edge_4236555298889221307",
+						"edge_5246992354736243412",
+						"edge_4510318206754226081",
+						"edge_755533409116570060",
+						"edge_6769933357836377115",
+						"edge_8105511035036811367",
+						"edge_6232100682172536264"
+					],
+					"id": "chain_7286595175316575198",
+					"point_ids": [
+						"point_2459239942217104146",
+						"mirror_point_1839094766911643766",
+						"mirror_point_8627112472550264757",
+						"mirror_point_4489367980848823348",
+						"mirror_point_5539293428168280638",
+						"mirror_point_4753491096822838500",
+						"mirror_point_1758204569235915100",
+						"mirror_point_9215001371365701954",
+						"mirror_point_5902724778160182845",
+						"mirror_point_5223381334571563524",
+						"mirror_point_8668096347215675397",
+						"mirror_point_3758149472709373603",
+						"mirror_point_2588261505795460360",
+						"mirror_point_4785538755420035555",
+						"mirror_point_6690685293539016762",
+						"mirror_point_1394284557687704933",
+						"mirror_point_1509912741655347228",
+						"mirror_point_2391131093401901824",
+						"mirror_point_7623401141342874635",
+						"mirror_point_2909026762262141300",
+						"mirror_point_4382707429913923339",
+						"mirror_point_8578685407185111170",
+						"mirror_point_420614741685428914",
+						"mirror_point_604039401946013154",
+						"mirror_point_1594808124340108104",
+						"mirror_point_2348851224749530609"
+					],
+					"topology_role": "outer"
+				}
+			],
+			"draw_mode": "closed_loop",
+			"edges": [
+				{
+					"end_point_id": "mirror_point_1839094766911643766",
+					"id": "edge_6212386200871992847",
+					"render_outline": true,
+					"start_point_id": "point_2459239942217104146"
+				},
+				{
+					"end_point_id": "mirror_point_8627112472550264757",
+					"id": "edge_7903937689421076265",
+					"render_outline": true,
+					"start_point_id": "mirror_point_1839094766911643766"
+				},
+				{
+					"end_point_id": "mirror_point_4489367980848823348",
+					"id": "edge_8139075817488485770",
+					"render_outline": true,
+					"start_point_id": "mirror_point_8627112472550264757"
+				},
+				{
+					"end_point_id": "mirror_point_5539293428168280638",
+					"id": "edge_1303245344362520883",
+					"render_outline": true,
+					"start_point_id": "mirror_point_4489367980848823348"
+				},
+				{
+					"end_point_id": "mirror_point_4753491096822838500",
+					"id": "edge_1033547379880939931",
+					"render_outline": true,
+					"start_point_id": "mirror_point_5539293428168280638"
+				},
+				{
+					"end_point_id": "mirror_point_1758204569235915100",
+					"id": "edge_4847401532542391749",
+					"render_outline": true,
+					"start_point_id": "mirror_point_4753491096822838500"
+				},
+				{
+					"end_point_id": "mirror_point_9215001371365701954",
+					"id": "edge_7640812770974730328",
+					"render_outline": true,
+					"start_point_id": "mirror_point_1758204569235915100"
+				},
+				{
+					"end_point_id": "mirror_point_5902724778160182845",
+					"id": "edge_6432795154494900125",
+					"render_outline": true,
+					"start_point_id": "mirror_point_9215001371365701954"
+				},
+				{
+					"end_point_id": "mirror_point_5223381334571563524",
+					"id": "edge_6795786490064723495",
+					"render_outline": true,
+					"start_point_id": "mirror_point_5902724778160182845"
+				},
+				{
+					"end_point_id": "mirror_point_8668096347215675397",
+					"id": "edge_3555984247484742977",
+					"render_outline": true,
+					"start_point_id": "mirror_point_5223381334571563524"
+				},
+				{
+					"end_point_id": "mirror_point_3758149472709373603",
+					"id": "edge_4354594848870190152",
+					"render_outline": true,
+					"start_point_id": "mirror_point_8668096347215675397"
+				},
+				{
+					"end_point_id": "mirror_point_2588261505795460360",
+					"id": "edge_305006667086078487",
+					"render_outline": true,
+					"start_point_id": "mirror_point_3758149472709373603"
+				},
+				{
+					"end_point_id": "mirror_point_4785538755420035555",
+					"id": "edge_7695767564761944220",
+					"render_outline": true,
+					"start_point_id": "mirror_point_2588261505795460360"
+				},
+				{
+					"end_point_id": "mirror_point_6690685293539016762",
+					"id": "edge_3160984431483355930",
+					"render_outline": true,
+					"start_point_id": "mirror_point_4785538755420035555"
+				},
+				{
+					"end_point_id": "mirror_point_1394284557687704933",
+					"id": "edge_1095362398778567008",
+					"render_outline": true,
+					"start_point_id": "mirror_point_6690685293539016762"
+				},
+				{
+					"end_point_id": "mirror_point_1509912741655347228",
+					"id": "edge_5627154199155377731",
+					"render_outline": true,
+					"start_point_id": "mirror_point_1394284557687704933"
+				},
+				{
+					"end_point_id": "mirror_point_2391131093401901824",
+					"id": "edge_572205080137733772",
+					"render_outline": true,
+					"start_point_id": "mirror_point_1509912741655347228"
+				},
+				{
+					"end_point_id": "mirror_point_7623401141342874635",
+					"id": "edge_1823592570135966306",
+					"render_outline": true,
+					"start_point_id": "mirror_point_2391131093401901824"
+				},
+				{
+					"end_point_id": "mirror_point_2909026762262141300",
+					"id": "edge_687946959274494369",
+					"render_outline": true,
+					"start_point_id": "mirror_point_7623401141342874635"
+				},
+				{
+					"end_point_id": "mirror_point_4382707429913923339",
+					"id": "edge_4236555298889221307",
+					"render_outline": true,
+					"start_point_id": "mirror_point_2909026762262141300"
+				},
+				{
+					"end_point_id": "mirror_point_8578685407185111170",
+					"id": "edge_5246992354736243412",
+					"render_outline": true,
+					"start_point_id": "mirror_point_4382707429913923339"
+				},
+				{
+					"end_point_id": "mirror_point_420614741685428914",
+					"id": "edge_4510318206754226081",
+					"render_outline": true,
+					"start_point_id": "mirror_point_8578685407185111170"
+				},
+				{
+					"end_point_id": "mirror_point_604039401946013154",
+					"id": "edge_755533409116570060",
+					"render_outline": true,
+					"start_point_id": "mirror_point_420614741685428914"
+				},
+				{
+					"end_point_id": "mirror_point_1594808124340108104",
+					"id": "edge_6769933357836377115",
+					"render_outline": true,
+					"start_point_id": "mirror_point_604039401946013154"
+				},
+				{
+					"end_point_id": "mirror_point_2348851224749530609",
+					"id": "edge_8105511035036811367",
+					"render_outline": true,
+					"start_point_id": "mirror_point_1594808124340108104"
+				},
+				{
+					"end_point_id": "point_2459239942217104146",
+					"id": "edge_6232100682172536264",
+					"render_outline": true,
+					"start_point_id": "mirror_point_2348851224749530609"
+				}
+			],
+			"group_id": "",
+			"id": "component_54",
+			"name": "body",
+			"parent_component_id": "",
+			"points": [
+				{
+					"handle_in": [
+						-0.0366666652262211,
+						0.0299999918788671
+					],
+					"handle_out": [
+						0.0366666652262211,
+						0.0299999918788671
+					],
+					"handle_source": "auto",
+					"id": "point_2459239942217104146",
+					"mode": "corner",
+					"position": [
+						0.0,
+						-0.519999980926514
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						0.00333333318121731,
+						0.0366666465997696
+					],
+					"handle_out": [
+						-0.00333333318121731,
+						0.0366666465997696
+					],
+					"handle_source": "auto",
+					"id": "mirror_point_4785538755420035555",
+					"mode": "corner",
+					"position": [
+						0.0,
+						0.209999993443489
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						0.0112604377791286,
+						0.0450417511165142
+					],
+					"handle_out": [
+						-0.00892964098602533,
+						-0.0357185639441013
+					],
+					"handle_source": "auto",
+					"id": "mirror_point_2588261505795460360",
+					"mode": "aligned",
+					"position": [
+						0.00999999977648258,
+						0.319999933242798
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.027150085195899,
+						0.0339376144111156
+					],
+					"handle_out": [
+						-0.0290033221244812,
+						-0.0362541638314724
+					],
+					"handle_source": "auto",
+					"id": "mirror_point_3758149472709373603",
+					"mode": "aligned",
+					"position": [
+						0.0599999986588955,
+						0.449999988079071
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.0454936847090721,
+						0.0109184850007296
+					],
+					"handle_out": [
+						-0.0422612614929676,
+						-0.0101427035406232
+					],
+					"handle_source": "auto",
+					"id": "mirror_point_8668096347215675397",
+					"mode": "aligned",
+					"position": [
+						0.170000001788139,
+						0.519999980926514
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.0386005155742168,
+						-0.0128668360412121
+					],
+					"handle_out": [
+						-0.0443846844136715,
+						0.0147948917001486
+					],
+					"handle_source": "auto",
+					"id": "mirror_point_5223381334571563524",
+					"mode": "aligned",
+					"position": [
+						0.310000002384186,
+						0.509999990463257
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.0234720185399055,
+						-0.0250368192791939
+					],
+					"handle_out": [
+						-0.0278285481035709,
+						0.0296837855130434
+					],
+					"handle_source": "auto",
+					"id": "mirror_point_5902724778160182845",
+					"mode": "aligned",
+					"position": [
+						0.409999996423721,
+						0.439999997615814
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.012311433441937,
+						-0.0351755321025848
+					],
+					"handle_out": [
+						-0.011337217874825,
+						0.0323920585215092
+					],
+					"handle_source": "auto",
+					"id": "mirror_point_9215001371365701954",
+					"mode": "aligned",
+					"position": [
+						0.46000000834465,
+						0.349999994039536
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.00359863368794322,
+						-0.0431836508214474
+					],
+					"handle_out": [
+						-0.00309491972438991,
+						0.0371390767395496
+					],
+					"handle_source": "auto",
+					"id": "mirror_point_1758204569235915100",
+					"mode": "aligned",
+					"position": [
+						0.479999989271164,
+						0.23999996483326
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.00689400220289826,
+						-0.0448110178112984
+					],
+					"handle_out": [
+						0.00658914400264621,
+						0.0428294390439987
+					],
+					"handle_source": "auto",
+					"id": "mirror_point_4753491096822838500",
+					"mode": "aligned",
+					"position": [
+						0.479999989271164,
+						0.109999969601631
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.0141421379521489,
+						-0.0377123616635799
+					],
+					"handle_out": [
+						0.0159193146973848,
+						0.0424515008926392
+					],
+					"handle_source": "auto",
+					"id": "mirror_point_5539293428168280638",
+					"mode": "aligned",
+					"position": [
+						0.439999997615814,
+						-0.0199999921023846
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.03249591588974,
+						-0.0528058670461178
+					],
+					"handle_out": [
+						0.021108977496624,
+						0.0343020930886269
+					],
+					"handle_source": "auto",
+					"id": "mirror_point_4489367980848823348",
+					"mode": "aligned",
+					"position": [
+						0.389999985694885,
+						-0.129999995231628
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.0342646837234497,
+						-0.037936594337225
+					],
+					"handle_out": [
+						0.0395461320877075,
+						0.0437840223312378
+					],
+					"handle_source": "manual",
+					"id": "mirror_point_8627112472550264757",
+					"mode": "aligned",
+					"position": [
+						0.280000001192093,
+						-0.280000001192093
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.0374434888362885,
+						-0.0290246531367302
+					],
+					"handle_out": [
+						0.0583983510732651,
+						0.0452679991722107
+					],
+					"handle_source": "manual",
+					"id": "mirror_point_1839094766911643766",
+					"mode": "aligned",
+					"position": [
+						0.109999999403954,
+						-0.430000007152557
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.00892964098602533,
+						-0.0357185639441013
+					],
+					"handle_out": [
+						-0.0112604377791286,
+						0.0450417511165142
+					],
+					"handle_source": "auto",
+					"id": "mirror_point_6690685293539016762",
+					"mode": "aligned",
+					"position": [
+						-0.00999999977648258,
+						0.319999933242798
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.0290033221244812,
+						-0.0362541638314724
+					],
+					"handle_out": [
+						-0.027150085195899,
+						0.0339376144111156
+					],
+					"handle_source": "auto",
+					"id": "mirror_point_1394284557687704933",
+					"mode": "aligned",
+					"position": [
+						-0.0599999986588955,
+						0.449999988079071
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.0422612614929676,
+						-0.0101427035406232
+					],
+					"handle_out": [
+						-0.0454936847090721,
+						0.0109184850007296
+					],
+					"handle_source": "auto",
+					"id": "mirror_point_1509912741655347228",
+					"mode": "aligned",
+					"position": [
+						-0.170000001788139,
+						0.519999980926514
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.0443846844136715,
+						0.0147948917001486
+					],
+					"handle_out": [
+						-0.0386005155742168,
+						-0.0128668360412121
+					],
+					"handle_source": "auto",
+					"id": "mirror_point_2391131093401901824",
+					"mode": "aligned",
+					"position": [
+						-0.310000002384186,
+						0.509999990463257
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.0278285481035709,
+						0.0296837855130434
+					],
+					"handle_out": [
+						-0.0234720185399055,
+						-0.0250368192791939
+					],
+					"handle_source": "auto",
+					"id": "mirror_point_7623401141342874635",
+					"mode": "aligned",
+					"position": [
+						-0.409999996423721,
+						0.439999997615814
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.011337217874825,
+						0.0323920585215092
+					],
+					"handle_out": [
+						-0.012311433441937,
+						-0.0351755321025848
+					],
+					"handle_source": "auto",
+					"id": "mirror_point_2909026762262141300",
+					"mode": "aligned",
+					"position": [
+						-0.46000000834465,
+						0.349999994039536
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.00309491972438991,
+						0.0371390767395496
+					],
+					"handle_out": [
+						-0.00359863368794322,
+						-0.0431836508214474
+					],
+					"handle_source": "auto",
+					"id": "mirror_point_4382707429913923339",
+					"mode": "aligned",
+					"position": [
+						-0.479999989271164,
+						0.23999996483326
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.00658914400264621,
+						0.0428294390439987
+					],
+					"handle_out": [
+						0.00689400220289826,
+						-0.0448110178112984
+					],
+					"handle_source": "auto",
+					"id": "mirror_point_8578685407185111170",
+					"mode": "aligned",
+					"position": [
+						-0.479999989271164,
+						0.109999969601631
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.0159193146973848,
+						0.0424515008926392
+					],
+					"handle_out": [
+						0.0141421379521489,
+						-0.0377123616635799
+					],
+					"handle_source": "auto",
+					"id": "mirror_point_420614741685428914",
+					"mode": "aligned",
+					"position": [
+						-0.439999997615814,
+						-0.0199999921023846
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.021108977496624,
+						0.0343020930886269
+					],
+					"handle_out": [
+						0.03249591588974,
+						-0.0528058670461178
+					],
+					"handle_source": "auto",
+					"id": "mirror_point_604039401946013154",
+					"mode": "aligned",
+					"position": [
+						-0.389999985694885,
+						-0.129999995231628
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.0344570279121399,
+						0.0366373211145401
+					],
+					"handle_out": [
+						0.0350222513079643,
+						-0.0372383072972298
+					],
+					"handle_source": "manual",
+					"id": "mirror_point_1594808124340108104",
+					"mode": "aligned",
+					"position": [
+						-0.280000001192093,
+						-0.280000001192093
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.0583983510732651,
+						0.0452679991722107
+					],
+					"handle_out": [
+						0.0374434888362885,
+						-0.0290246531367302
+					],
+					"handle_source": "manual",
+					"id": "mirror_point_2348851224749530609",
+					"mode": "aligned",
+					"position": [
+						-0.109999999403954,
+						-0.430000007152557
+					],
+					"preserve_point": false
+				}
+			],
+			"primitive": {},
+			"projection_depth_cm": 10.0,
+			"show_point_numbers": false,
+			"source_asset_id": "",
+			"topology_role": "outer",
+			"transform": {
+				"pivot": [
+					0.0,
+					0.0
+				],
+				"position": [
+					0.0,
+					0.0
+				],
+				"rotation": 0.0,
+				"scale": [
+					1.0,
+					1.0
+				]
+			},
+			"type": "component",
+			"visibility": true,
+			"z_index": 0
+		}
+	],
+	"groups": [],
+	"guides": [],
+	"id": "asset_8",
+	"name": "Heart",
+	"reference_image": {
+		"file": "heart_ref.png",
+		"opacity": 0.5,
+		"pivot_mode": "center",
+		"position": [
+			0.0299999993294477,
+			0.0
+		],
+		"scale": 1.0,
+		"target_height_cm": 12.0,
+		"visible": true
+	},
+	"root_position": [
+		0.0,
+		0.0
+	],
+	"root_scale": [
+		1.0,
+		1.0
+	],
+	"schema_version": 59,
+	"visibility": true
+}

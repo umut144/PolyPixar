@@ -3,14 +3,9 @@
 .mono/
 .export/
 exports/
-worlds/*/PolyToolsRuntimeExports/
 *.import
 *.jpg
 *.jpeg
-!worlds/**/*.jpg
-!worlds/**/*.jpeg
-worlds/*/geometry/**/geometry.json
-worlds/*/assets/*/*.json
 
 # macOS
 .DS_Store
