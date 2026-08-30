@@ -28,20 +28,21 @@ its previous complete package is retained on disk but is not advertised until
 it validates again. A failed write keeps the previous complete package. All
 numbers must be finite.
 
-The editor's schema-53 `root_scale` is authoring state only and is never part
-of a Runtime Manifest. It must be rebased to exactly `1` before export;
-Runtime Export rejects a pending Root Scale instead of silently changing the
-package dimensions.
+The editor's schema-53 `root_scale` (two axes; legacy scalar values are
+normalized to equal axes) and schema-58 `root_position` are authoring state
+only and are never part of a Runtime Manifest. They must be rebased to
+exactly `1` and `(0, 0)` before export; Runtime Export rejects either pending
+Root Transform instead of silently changing package placement or dimensions.
 
 ## Compatibility policy
 
 Catalog `schema_version` must equal `1`; Manifest `schema_version` must equal
-`13`. Missing, non-integer, older, or newer versions are rejected as complete
+`14`. Missing, non-integer, older, or newer versions are rejected as complete
 packages. Missing required geometry is an error. Consumers must not synthesize
 Fill Meshes, strokes, closed Contour regions, Semantic Keys, hierarchy links,
 or referenced Assets.
 
-Schema 13 contains no UV, SDF, mask, contour-domain, padding, Carrier, or
+Schema 14 contains no UV, SDF, mask, contour-domain, padding, Carrier, or
 semantic gameplay Region field. Gameplay roles are assigned by the consuming
 game to ordinary Components; they must not be inferred by PolyTools consumers.
 

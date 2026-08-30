@@ -1,14 +1,17 @@
 # Scale Rebase
 
-## Asset Root Scale
+## Asset Root Transform
 
-World schema 53 adds `Scale` to the root Asset Inspector. It is one positive
-uniform factor (for example, `3.6` means 3.6 times the current size), previewed
-around the unchanged Asset Pivot across the complete Asset: Components,
-Groups, References, Guides, and Weapon frames.
+World schema 53 adds `Scale X` and `Scale Y` to the root Asset Inspector.
+World schema 58 adds `Position X/Y`. Position translates the complete Asset,
+while the two positive Scale axes preview independent horizontal and vertical
+size changes around the unchanged Asset Pivot. Both fields affect Components,
+Groups, References, Guides, and Weapon frames. Legacy scalar Scale values are
+read as equal X/Y values.
 
-`Rebase Asset Scale` atomically bakes the preview into canonical authoring
-data and resets Root Scale to exactly `1`. Local positions, Bézier Points and
+`Rebase Asset Transform` atomically bakes the preview into canonical authoring
+data and resets Root Position to `(0, 0)` and Root Scale to exactly `(1, 1)`. Root
+translation is applied exactly once to root-scoped placements. Local positions, Bézier Points and
 handles, primitive centers and diameters, Guide positions, and Weapon-frame
 positions are multiplied exactly once. Root placements are scaled around the
 Asset Pivot; nested placements use their local origin. References multiply
@@ -17,8 +20,9 @@ is deliberately unchanged, so the Component workflow below can be used before
 or after Root Rebase.
 
 Default Motion documents are safe. Any authored non-default Motion blocks the
-whole Root Rebase because its spatial values do not yet have an exact scale
-conversion. Runtime Export likewise rejects a Root Scale other than `1`.
+whole Root Rebase because its spatial values do not yet have an exact root
+transform conversion. Runtime Export likewise rejects a Root Position other
+than `(0, 0)` or either Root Scale axis other than `1`.
 Accepted derived geometry is not rewritten; existing fingerprints make it
 stale for an explicit rebuild.
 

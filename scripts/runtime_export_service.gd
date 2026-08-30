@@ -14,9 +14,12 @@ static func build_manifest(asset: Dictionary, sources: Dictionary) -> Dictionary
 	var asset_pivot := Vector2(asset.get("asset_pivot", Vector2.ZERO))
 	if not asset_pivot.is_finite():
 		errors.append("Asset pivot is not finite.")
-	var root_scale := float(asset.get("root_scale", 1.0))
-	if not is_finite(root_scale) or not is_equal_approx(root_scale, 1.0):
+	var root_scale := AssetScaleRebaseService.root_scale(asset)
+	if not AssetScaleRebaseService.is_valid_root_scale(asset) or not root_scale.is_equal_approx(Vector2.ONE):
 		errors.append("Root Asset Scale must be rebased to 1 before Runtime Export.")
+	var root_position := Vector2(asset.get("root_position", Vector2.ZERO))
+	if not root_position.is_finite() or not root_position.is_zero_approx():
+		errors.append("Root Asset Position must be rebased to (0, 0) before Runtime Export.")
 	var visible_components: Array[Dictionary] = []
 	var ids: Dictionary = {}
 	var names: Dictionary = {}

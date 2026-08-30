@@ -21,6 +21,11 @@ internal `geometry_*` identifiers remain technical names, while UI copy uses
 Mesh. Style currently contains only Weighting. Motion code is retained but its
 category is disabled. Transform and Effects categories do not exist.
 
+The Create toolbar's optional `Frame` guide is editor-only canvas state. It
+stores `visible`, `half_extent`, and `offset` under `editor_state`, draws around
+the canvas origin, and never enters Asset topology, derived geometry, or Runtime
+export data.
+
 ## Ownership boundaries
 
 - `BezierTopology` owns changes to points, edges, chains, IDs, ordering, and
@@ -318,18 +323,27 @@ canonical transform frame. Gameplay semantics are assigned to ordinary
 Component geometry by the consuming game's design data rather than authored as
 separate PolyTools records.
 
-World schema 53 adds an authoring-only, positive uniform Asset-root Scale.
-Canvas presentation prefixes every Asset-space transform with a scale around
-the unchanged Asset Pivot, while inspector fields continue to expose canonical
+World schema 53 adds an authoring-only, positive Asset-root Scale. Its X and Y
+axes are independent (legacy scalar values are read as equal axes). Canvas
+presentation prefixes every Asset-space transform with that scale around the
+unchanged Asset Pivot, while inspector fields continue to expose canonical
 source coordinates. The atomic Root Scale Rebase multiplies each local
 translation, owned Bézier coordinate/handle, primitive axis, Guide coordinate,
-and Weapon-frame translation exactly once. Root placements are scaled around
-the Asset Pivot; nested placements are scaled around their local origin.
+and Weapon-frame translation exactly once per axis. Root placements are scaled
+around the Asset Pivot; nested placements are scaled around their local origin.
 Reference geometry uses its instance scale, so its transform Pivot remains
 unchanged during the bake. Component Scale is not modified, keeping schema
 42's independent Component Scale Rebase valid before or after this operation.
 Non-default Motion is an explicit blocker. Accepted derived data is not
 rewritten and becomes stale through its existing source fingerprints.
+
+World schema 58 adds an authoring-only Asset-root Position. Canvas presentation
+prefixes Asset-space transforms with translation followed by the existing
+independent X/Y scale around the Asset Pivot. The shared atomic Asset Transform Rebase
+adds translation exactly once to root-scoped Components, Groups, Asset Guides,
+and Weapon frames while preserving nested local placement, resets Root Position
+to zero, and also normalizes Root Scale as described above. The Asset Pivot is
+not moved by the bake.
 
 World schema 54 extends transform-based Weapon Guides with
 `reach_limit_primary`. It shares the existing frame data, scope inheritance,
@@ -353,6 +367,10 @@ handle mode.
 
 World schema 57 removes semantic gameplay Region records. Gameplay meaning is
 assigned by the consuming game to ordinary Component geometry.
+
+World schema 59 persists Asset-root `root_scale` as a two-axis vector and
+exposes separate `Scale X` and `Scale Y` Inspector controls. Legacy scalar
+root scales load as equal axes; Runtime Export requires both axes to be `1`.
 
 Sampling results carry their own algorithm version independently of the
 World schema. The junction-aware version invalidates pre-arrangement flat

@@ -15,11 +15,13 @@ func _init() -> void:
 	_test_contour_stroke_mesh()
 	_test_closed_contour_region_mesh()
 	_test_catch_parent_snapping()
+	_test_background_point_snapping_without_grid()
 	_test_canvas_navigation_key_reset()
 	_test_pivot_shortcut_robustness()
 	_test_contour_stroke_service()
 	_test_contour_stroke_robust_geometry()
 	_test_world_contour_settings()
+	_test_frame_guide_ui()
 	_test_component_scale_rebase()
 	_test_asset_scale_rebase()
 	_test_asset_authored_facing()
@@ -466,6 +468,22 @@ func _test_catch_parent_snapping() -> void:
 	canvas.free()
 
 
+func _test_background_point_snapping_without_grid() -> void:
+	var canvas := ComponentCanvas.new()
+	canvas.size = Vector2(400.0, 400.0)
+	canvas.set_camera_state(Vector2.ZERO, 20.0)
+	canvas.set_component_transform({"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO})
+	canvas.set_snap_settings(false, 16.0, 15.0)
+	canvas.set_reference_shapes([{
+		"id": "background", "transform": {"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO},
+		"bezier_points": [{"id": "target", "position": Vector2(10.0, 5.0)}], "visibility": true
+	}])
+	var snapped := canvas.snap_position(Vector2(10.15, 5.1))
+	_expect(snapped.distance_to(Vector2(10.0, 5.0)) < 0.01, "No Snap should still align the active Component to a visible background point.")
+	_expect(canvas.snap_position(Vector2(10.8, 5.8)).distance_to(Vector2(10.8, 5.8)) < 0.01, "No Snap should leave positions outside the point hit radius untouched.")
+	canvas.free()
+
+
 func _test_canvas_navigation_key_reset() -> void:
 	var canvas := ComponentCanvas.new()
 	var press_s := InputEventKey.new()
@@ -803,6 +821,27 @@ func _test_world_contour_settings() -> void:
 	application.free()
 
 
+func _test_frame_guide_ui() -> void:
+	var application = load("res://scripts/main.gd").new()
+	application._build_ui()
+	_expect(is_instance_valid(application.frame_button) and application.frame_button.text == "Frame: Off  ▼" and not application.frame_visible, "Frame should be available beside Snap and default to hidden.")
+	_expect(is_equal_approx(float(application.frame_half_extent_fields["x"].value), 10.0) and is_equal_approx(float(application.frame_half_extent_fields["y"].value), 10.0), "Frame Half Extent fields should default to 10 cm on both axes.")
+	_expect(is_equal_approx(float(application.frame_offset_fields["x"].value), 0.0) and is_equal_approx(float(application.frame_offset_fields["y"].value), 0.0), "Frame Offset / Pivot fields should default to zero.")
+	application._on_frame_field_changed(25.0, "half_extent", "x")
+	application._on_frame_field_changed(-5.0, "offset", "y")
+	_expect(application.frame_half_extent.is_equal_approx(Vector2(2.5, 1.0)) and application.frame_offset.is_equal_approx(Vector2(0.0, -0.5)), "Frame fields should convert authored centimetres into canvas units independently per axis.")
+	application._on_frame_visible_toggled(true)
+	_expect(application.frame_visible and application.canvas_view.frame_visible and application.canvas_view.frame_half_extent.is_equal_approx(Vector2(2.5, 1.0)) and application.canvas_view.frame_offset.is_equal_approx(Vector2(0.0, -0.5)), "Enabling Frame should forward the guide state to the canvas without changing document geometry.")
+	var state: Dictionary = application._serialize_editor_state()
+	var frame_state: Dictionary = state.get("frame", {})
+	_expect(bool(frame_state.get("visible", false)) and Array(frame_state.get("half_extent", [])).size() == 2 and is_equal_approx(float(frame_state["half_extent"][0]), 2.5) and is_equal_approx(float(frame_state["offset"][1]), -0.5), "Frame settings should round-trip through the editor-state snapshot.")
+	application._apply_frame_settings({})
+	_expect(not application.frame_visible and application.frame_half_extent.is_equal_approx(Vector2.ONE) and application.frame_offset.is_equal_approx(Vector2.ZERO), "Missing Frame editor state should restore the hidden defaults.")
+	application._apply_frame_settings(frame_state)
+	_expect(application.frame_visible and application.frame_half_extent.is_equal_approx(Vector2(2.5, 1.0)) and application.frame_offset.is_equal_approx(Vector2(0.0, -0.5)), "Persisted Frame editor state should restore visibility and both offsets.")
+	application.free()
+
+
 func _test_component_scale_rebase() -> void:
 	var curved := _component()
 	curved.merge({"id": "scaled_body", "name": "Body", "draw_mode": "closed_loop", "type": "component", "parent_component_id": "", "transform": {"position": Vector2(3.0, -2.0), "rotation": 27.0, "scale": Vector2(2.0, 0.5), "pivot": Vector2(1.0, 1.0)}})
@@ -977,7 +1016,7 @@ func _test_asset_scale_rebase() -> void:
 	weapon_frame["transform"]["rotation"] = 35.0
 	var asset := {
 		"id": "root_scale", "name": "Root Scale", "asset_type": "weapon", "visibility": true,
-		"asset_pivot": Vector2(5.0, 7.0), "root_scale": 3.6,
+		"asset_pivot": Vector2(5.0, 7.0), "root_position": Vector2(12.0, -8.0), "root_scale": 3.6,
 		"groups": [{"id": "hammer_group", "name": "Hammer Group", "visibility": true, "parent_component_id": "", "transform": {"position": Vector2(10.0, 2.0), "rotation": -12.0, "scale": Vector2.ONE, "pivot": Vector2(1.0, 1.0)}}],
 		"components": [component, circle, reference], "guides": [spine, weapon_frame],
 		"animation": MotionWorkspace.create_default_animation_document()
@@ -995,12 +1034,28 @@ func _test_asset_scale_rebase() -> void:
 	var reference_point_after := ComponentHierarchy.world_transform(asset, "reference") * Vector2(9.0, -4.0)
 	var spine_point_after := ComponentHierarchy.world_transform(asset, "head") * Vector2(asset["guides"][0]["points"][0]["position"])
 	var frame_after := ComponentHierarchy.group_world_transform(asset, "hammer_group") * ComponentHierarchy.local_transform(asset["guides"][1]["transform"])
-	_expect(bool(result.get("valid", false)) and is_equal_approx(float(asset.get("root_scale", 0.0)), 1.0) and Vector2(asset.get("asset_pivot", Vector2.ZERO)) == Vector2(5.0, 7.0), "Root Scale Rebase should succeed atomically, normalize Scale to 1, and preserve the Asset Pivot.")
+	_expect(bool(result.get("valid", false)) and is_equal_approx(float(asset.get("root_scale", 0.0)), 1.0) and Vector2(asset.get("root_position", Vector2.INF)) == Vector2.ZERO and Vector2(asset.get("asset_pivot", Vector2.ZERO)) == Vector2(5.0, 7.0), "Asset Transform Rebase should succeed atomically, normalize Position and Scale, and preserve the Asset Pivot.")
 	_expect(component_point_after.is_equal_approx(preview * component_point_before), "Root Scale Rebase should preserve the previewed world geometry of nested Components.")
 	_expect(PrimitiveGeometryService.center(rebased_circle).is_equal_approx(Vector2(3.6, -7.2)) and is_equal_approx(float(rebased_circle.get("primitive", {}).get("diameter_cm", 0.0)), 18.0), "Root Scale Rebase should bake the same uniform factor into analytic primitive centers and diameters.")
 	_expect(reference_point_after.is_equal_approx(preview * reference_point_before) and Vector2(rebased_reference.get("reference_instance_scale", Vector2.ZERO)).is_equal_approx(Vector2(4.5, 2.7)) and Vector2(rebased_reference.get("transform", {}).get("pivot", Vector2.ZERO)) == Vector2(2.0, -1.0), "Root Scale Rebase should scale Reference instances without double-scaling their pivots.")
 	_expect(spine_point_after.is_equal_approx(preview * spine_point_before) and frame_after.origin.is_equal_approx(preview * frame_before.origin) and is_equal_approx(frame_after.get_rotation(), frame_before.get_rotation()), "Root Scale Rebase should preserve previewed Spine points and oriented Weapon frames.")
 	_expect(Vector2(rebased_component.get("transform", {}).get("scale", Vector2.ZERO)) == Vector2.ONE, "Root Scale Rebase should remain independent from Component Scale Rebase.")
+	var position_only := asset.duplicate(true)
+	position_only["root_position"] = Vector2(-3.0, 4.0)
+	var position_only_point_before := ComponentHierarchy.world_transform(position_only, "head") * Vector2(ComponentHierarchy.component_by_id(position_only, "head")["points"][0]["position"])
+	var position_only_result := AssetScaleRebaseService.rebase_asset(position_only)
+	var position_only_point_after := ComponentHierarchy.world_transform(position_only, "head") * Vector2(ComponentHierarchy.component_by_id(position_only, "head")["points"][0]["position"])
+	_expect(bool(position_only_result.get("valid", false)) and Vector2(position_only.get("root_position", Vector2.INF)) == Vector2.ZERO and position_only_point_after.is_equal_approx(position_only_point_before + Vector2(-3.0, 4.0)), "Position-only Asset Transform Rebase should bake translation while Scale is already normalized.")
+
+	var anisotropic_component := _component()
+	anisotropic_component.merge({"id": "anisotropic_body", "name": "anisotropic_body", "visibility": true, "parent_component_id": "", "group_id": "", "transform": {"position": Vector2(4.0, -3.0), "rotation": 23.0, "scale": Vector2.ONE, "pivot": Vector2(1.0, 2.0)}})
+	BezierTopology.add_point(anisotropic_component, Vector2(2.0, 3.0), "corner")
+	var anisotropic_asset := {"id": "anisotropic", "name": "anisotropic", "asset_pivot": Vector2(5.0, 7.0), "root_position": Vector2(1.0, -2.0), "root_scale": Vector2(2.0, 0.5), "components": [anisotropic_component], "groups": [], "guides": [], "animation": MotionWorkspace.create_default_animation_document()}
+	var anisotropic_preview := AssetScaleRebaseService.root_transform(anisotropic_asset)
+	var anisotropic_point_before := ComponentHierarchy.world_transform(anisotropic_asset, "anisotropic_body") * Vector2(anisotropic_component["points"][0]["position"])
+	var anisotropic_result := AssetScaleRebaseService.rebase_asset(anisotropic_asset)
+	var anisotropic_point_after := ComponentHierarchy.world_transform(anisotropic_asset, "anisotropic_body") * Vector2(ComponentHierarchy.component_by_id(anisotropic_asset, "anisotropic_body")["points"][0]["position"])
+	_expect(bool(anisotropic_result.get("valid", false)) and Vector2(anisotropic_asset.get("root_scale", Vector2.ZERO)).is_equal_approx(Vector2.ONE) and anisotropic_point_after.is_equal_approx(anisotropic_preview * anisotropic_point_before), "Independent Asset-root X/Y Scale should preview and rebase both axes.")
 
 	var blocked := asset.duplicate(true)
 	blocked["root_scale"] = 2.0
@@ -1013,19 +1068,20 @@ func _test_asset_scale_rebase() -> void:
 	application.history_coalesce_timer = Timer.new()
 	application.add_child(application.history_coalesce_timer)
 	var ui_asset := asset.duplicate(true)
-	ui_asset["root_scale"] = 3.6
+	ui_asset["root_position"] = Vector2(0.25, -0.4)
+	ui_asset["root_scale"] = Vector2(3.6, 1.8)
 	var ui_assets: Array[Dictionary] = [ui_asset]
 	application.assets = ui_assets
 	application.selected_asset_id = "root_scale"
 	application.selected_component_id = ""
 	application._render_inspector()
-	_expect(is_instance_valid(application.asset_root_scale_field) and is_equal_approx(application.asset_root_scale_field.value, 3.6) and is_instance_valid(application.asset_root_scale_rebase_button) and not application.asset_root_scale_rebase_button.disabled, "The Root Asset Inspector should expose Scale 3.6 and enable its dedicated Rebase action.")
+	_expect(is_instance_valid(application.asset_root_scale_fields["scale_x"]) and is_instance_valid(application.asset_root_scale_fields["scale_y"]) and is_equal_approx(application.asset_root_scale_fields["scale_x"].value, 3.6) and is_equal_approx(application.asset_root_scale_fields["scale_y"].value, 1.8) and is_equal_approx(application.asset_root_position_fields["position_x"].value, 2.5) and is_equal_approx(application.asset_root_position_fields["position_y"].value, -4.0) and is_instance_valid(application.asset_root_scale_rebase_button) and not application.asset_root_scale_rebase_button.disabled, "The Root Asset Inspector should expose independent X/Y Scale fields and enable its shared Rebase action.")
 	application._on_rebase_asset_root_scale_pressed()
-	_expect(is_equal_approx(float(application._get_asset("root_scale").get("root_scale", 0.0)), 1.0) and application.asset_root_scale_rebase_button.disabled, "The Root Asset Inspector Rebase action should bake Scale 3.6 and return the field to 1.")
+	_expect(Vector2(application._get_asset("root_scale").get("root_position", Vector2.INF)) == Vector2.ZERO and Vector2(application._get_asset("root_scale").get("root_scale", Vector2.ZERO)).is_equal_approx(Vector2.ONE) and application.asset_root_scale_rebase_button.disabled, "The Root Asset Inspector Rebase action should bake Position and both Scale axes and normalize both fields.")
 	application._undo()
-	_expect(is_equal_approx(float(application._get_asset("root_scale").get("root_scale", 0.0)), 3.6), "Undo should restore the complete pre-Rebase Root Scale authoring state.")
+	_expect(Vector2(application._get_asset("root_scale").get("root_position", Vector2.ZERO)) == Vector2(0.25, -0.4) and Vector2(application._get_asset("root_scale").get("root_scale", Vector2.ZERO)).is_equal_approx(Vector2(3.6, 1.8)), "Undo should restore the complete pre-Rebase Asset Root Transform authoring state.")
 	application._redo()
-	_expect(is_equal_approx(float(application._get_asset("root_scale").get("root_scale", 0.0)), 1.0), "Redo should restore the atomically rebased Root Scale state.")
+	_expect(Vector2(application._get_asset("root_scale").get("root_position", Vector2.INF)) == Vector2.ZERO and Vector2(application._get_asset("root_scale").get("root_scale", Vector2.ZERO)).is_equal_approx(Vector2.ONE), "Redo should restore the atomically rebased Asset Root Transform state.")
 	application.free()
 
 
@@ -1069,9 +1125,9 @@ func _find_named_control(root: Node, target_name: String) -> Control:
 
 func _test_multi_component_inspector() -> void:
 	var first := _component()
-	first.merge({"id": "first", "name": "first", "visibility": true, "z_index": 1, "transform": {"position": Vector2(5.0, 10.0), "pivot": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE}})
+	first.merge({"id": "first", "name": "first", "visibility": true, "z_index": 1, "projection_depth_cm": 8.0, "transform": {"position": Vector2(5.0, 10.0), "pivot": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE}})
 	var second := _component()
-	second.merge({"id": "second", "name": "second", "visibility": false, "z_index": 2, "transform": {"position": Vector2(15.0, 20.0), "pivot": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE}})
+	second.merge({"id": "second", "name": "second", "visibility": false, "z_index": 2, "projection_depth_cm": 12.0, "transform": {"position": Vector2(15.0, 20.0), "pivot": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE}})
 	var asset := {"id": "multi_asset", "name": "Multi Asset", "asset_type": "character", "visibility": true, "asset_pivot": Vector2(1.0, 2.0), "components": [first, second], "groups": [], "guides": []}
 	var application = load("res://scripts/main.gd").new()
 	application._build_ui()
@@ -1085,10 +1141,13 @@ func _test_multi_component_inspector() -> void:
 	var inspector_text := _control_text(application.inspector_content)
 	_expect(inspector_text.contains("2 Components") and inspector_text.contains("Multi-Edit") and inspector_text.contains("Mixed"), "Selecting multiple Components should render a dedicated Multi-Edit Inspector with mixed-value hints.")
 	var z_field := _find_named_control(application.inspector_content, "MultiZIndex") as LineEdit
+	var projection_depth_field := _find_named_control(application.inspector_content, "MultiProjectionDepth") as LineEdit
 	var x_field := _find_named_control(application.inspector_content, "MultiPositionX") as LineEdit
-	_expect(is_instance_valid(z_field) and z_field.placeholder_text == "Mixed" and is_instance_valid(x_field) and x_field.placeholder_text == "Mixed", "Mixed Z Index and asset-relative Position fields should be exposed explicitly.")
+	_expect(is_instance_valid(z_field) and z_field.placeholder_text == "Mixed" and is_instance_valid(projection_depth_field) and projection_depth_field.placeholder_text == "Mixed" and is_instance_valid(x_field) and x_field.placeholder_text == "Mixed", "Mixed Z Index, Projection Depth, and asset-relative Position fields should be exposed explicitly.")
 	application._on_multi_component_z_index_changed(7.0)
 	_expect(int(application._get_component(asset, "first").get("z_index", 0)) == 7 and int(application._get_component(asset, "second").get("z_index", 0)) == 7 and application.undo_history.size() == 1, "A shared Z Index edit should update all selected Components in one undo step.")
+	application._on_multi_component_projection_depth_changed(25.0)
+	_expect(is_equal_approx(float(application._get_component(asset, "first").get("projection_depth_cm", 0.0)), 25.0) and is_equal_approx(float(application._get_component(asset, "second").get("projection_depth_cm", 0.0)), 25.0) and application.undo_history.size() == 2, "A shared Projection Depth edit should update all selected Components in one undo step.")
 	application._on_multi_component_position_changed(30.0, "position_x")
 	var first_world := ComponentHierarchy.world_transform_record(asset, "first")
 	var second_world := ComponentHierarchy.world_transform_record(asset, "second")
@@ -1200,7 +1259,7 @@ func _test_geometry_sampling_service() -> void:
 	_expect(not bool(GeometrySamplingService.generate(open_component).get("valid", true)), "An open contour should fail visibly at the mesh-pipeline Sampling boundary.")
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
-	_expect(application._has_supported_schema({"schema_version": 57}) and application._has_supported_schema({"schema_version": 56}) and not application._has_supported_schema({"schema_version": 58}), "Schema 57 should keep current and older World documents readable and reject unknown future schemas.")
+	_expect(application._has_supported_schema({"schema_version": 59}) and application._has_supported_schema({"schema_version": 58}) and not application._has_supported_schema({"schema_version": 60}), "Schema 59 should keep current and older World documents readable and reject unknown future schemas.")
 	_expect(application._normalize_component_draw_mode("ribbon", 39) == "contour" and application._normalize_component_draw_mode("contour", 42) == "contour", "Schema-42 loading must retain the explicit legacy Ribbon-to-Contour migration boundary.")
 	_expect(application._normalize_component_draw_mode("ribbon", 42) == "ribbon", "Current-schema Ribbon data must remain visibly invalid instead of receiving a silent backward fallback.")
 	var arranged_round_trip: Dictionary = application._normalize_sampling_bake(application._serialize_sampling_bake(arranged_result))
@@ -1211,7 +1270,7 @@ func _test_geometry_sampling_service() -> void:
 	baked_result["bake_id"] = "bake_test"
 	geometry_document["sampling"]["bakes"][GeometrySamplingService.ADAPTIVE] = baked_result
 	var serialized_geometry: Dictionary = application._serialize_geometry_document(geometry_document)
-	_expect(int(serialized_geometry.get("schema_version", 0)) == 57 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-57 JSON arrays.")
+	_expect(int(serialized_geometry.get("schema_version", 0)) == 59 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-59 JSON arrays.")
 	var normalized_geometry: Dictionary = application._normalize_geometry_document(serialized_geometry, "asset_1", "component_1")
 	_expect(normalized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Vector2, "Sampling bake loading should restore local sample positions as Vector2 values.")
 	_expect(normalized_geometry["sampling"]["bakes"].size() == 1, "Sampling should retain one Adaptive Bake.")
@@ -2115,6 +2174,10 @@ func _test_runtime_export_service() -> void:
 	root_scaled_export_asset["root_scale"] = 3.6
 	var root_scaled_export_result := RuntimeExportService.build_manifest(root_scaled_export_asset, {"component_a": source, "component_b": source})
 	_expect(not bool(root_scaled_export_result.get("valid", true)) and str(root_scaled_export_result.get("errors", [])).contains("Root Asset Scale must be rebased to 1 before Runtime Export."), "Runtime export must explicitly reject a non-rebased Root Asset Scale without silently changing package dimensions.")
+	var root_positioned_export_asset: Dictionary = asset.duplicate(true)
+	root_positioned_export_asset["root_position"] = Vector2(3.0, -2.0)
+	var root_positioned_export_result := RuntimeExportService.build_manifest(root_positioned_export_asset, {"component_a": source, "component_b": source})
+	_expect(not bool(root_positioned_export_result.get("valid", true)) and str(root_positioned_export_result.get("errors", [])).contains("Root Asset Position must be rebased to (0, 0) before Runtime Export."), "Runtime export must explicitly reject a non-rebased Root Asset Position without silently changing package placement.")
 	var open_contour_component: Dictionary = body.duplicate(true)
 	open_contour_component["draw_mode"] = "contour"
 	var open_contour_asset := {"id": "contour_asset", "name": "Contour Asset", "asset_type": "character", "visibility": true, "asset_pivot": Vector2.ZERO, "components": [open_contour_component]}
@@ -2779,7 +2842,7 @@ func _test_motion_act_evaluator() -> void:
 	var normalized: Dictionary = application._normalize_motion_act({"id": "act_7", "parameters": {"direction": [0.0, 2.0], "distance": 12.0}}, "fallback")
 	_expect(Vector2(normalized.get("parameters", {}).get("direction", Vector2.ZERO)) == Vector2(0.0, 2.0), "Persisted Slide direction arrays should normalize back to Vector2 values.")
 	var serialized: Dictionary = application._serialize_motion_act(normalized)
-	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 57, "Act persistence should serialize vectors as JSON arrays using schema 57.")
+	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 59, "Act persistence should serialize vectors as JSON arrays using schema 59.")
 	var normalized_jump: Dictionary = application._normalize_motion_act({"id": "act_8", "primitive": "jump", "parameters": {"direction": [1.0, 0.0], "distance": 7.0, "height": 2.5, "arc": "snappy"}}, "fallback")
 	var serialized_jump: Dictionary = application._serialize_motion_act(normalized_jump)
 	_expect(str(serialized_jump.get("primitive", "")) == MotionActEvaluator.JUMP and is_equal_approx(float(serialized_jump.get("parameters", {}).get("height", 0.0)), 2.5) and str(serialized_jump.get("parameters", {}).get("arc", "")) == MotionActEvaluator.JUMP_ARC_SNAPPY, "Jump-specific parameters should survive normalization and serialization.")

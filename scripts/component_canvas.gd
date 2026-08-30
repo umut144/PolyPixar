@@ -102,6 +102,9 @@ var pending_draw_has_handle := false
 var snap_enabled := true
 var grid_step := 16.0
 var rotation_step := 15.0
+var frame_visible := false
+var frame_half_extent := Vector2.ONE
+var frame_offset := Vector2.ZERO
 var world_grid_size := 0.5
 var component_transform: Dictionary = {
 	"position": Vector2.ZERO,
@@ -166,7 +169,7 @@ func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed:
 		grab_focus()
 		if event.button_index == MOUSE_BUTTON_LEFT and primitive_preview_active:
-			primitive_placed.emit(_snap_to_grid(_world_to_local(_screen_to_world(event.position))), primitive_preview_diameter_cm)
+			primitive_placed.emit(_snap_to_canvas_position(_world_to_local(_screen_to_world(event.position))), primitive_preview_diameter_cm)
 			primitive_preview_active = false
 			queue_redraw()
 			return
@@ -327,7 +330,7 @@ func _gui_input(event: InputEvent) -> void:
 		face_dragging = false
 	if event is InputEventMouseMotion:
 		cursor_over_canvas = true
-		cursor_world = constrain_draw_position(_snap_to_catch_parent(_snap_to_grid(_world_to_local(_screen_to_world(event.position)))))
+		cursor_world = constrain_draw_position(_snap_to_canvas_position(_world_to_local(_screen_to_world(event.position))))
 		if mirror_command_stage == "first":
 			mirror_axis_end = _snap_to_grid(_world_to_local(_screen_to_world(event.position)))
 			mirror_axis_candidate_visible = true
@@ -460,7 +463,7 @@ func _gui_input(event: InputEvent) -> void:
 func _begin_draw_pointer(screen_position: Vector2) -> void:
 	draw_pointer_down = true
 	pending_draw_connection_target_id = _draw_connection_target_id(screen_position) if active_tool == "point" else ""
-	pending_draw_position = constrain_draw_position(_snap_to_catch_parent(_snap_to_grid(_world_to_local(_screen_to_world(screen_position)))))
+	pending_draw_position = constrain_draw_position(_snap_to_canvas_position(_world_to_local(_screen_to_world(screen_position))))
 	pending_draw_handle_out = Vector2.ZERO
 	pending_draw_has_handle = false
 
@@ -682,8 +685,15 @@ func set_snap_settings(enabled: bool, new_grid_step: float, new_rotation_step: f
 	queue_redraw()
 
 
+func set_frame_guide(visible: bool, half_extent: Vector2, offset: Vector2) -> void:
+	frame_visible = visible
+	frame_half_extent = Vector2(maxf(half_extent.x, 0.0), maxf(half_extent.y, 0.0))
+	frame_offset = offset
+	queue_redraw()
+
+
 func snap_position(world_position: Vector2) -> Vector2:
-	return _snap_to_grid(world_position)
+	return _snap_to_canvas_position(world_position)
 
 
 func set_world_scale(new_grid_size: float) -> void:
@@ -956,6 +966,7 @@ func _draw() -> void:
 	var y_axis_color := Color("#4c6a5b")
 	draw_line(_world_to_screen(Vector2(min_world.x, 0.0)), _world_to_screen(Vector2(max_world.x, 0.0)), x_axis_color, 2.0)
 	draw_line(_world_to_screen(Vector2(0.0, min_world.y)), _world_to_screen(Vector2(0.0, max_world.y)), y_axis_color, 2.0)
+	_draw_frame_guide()
 	_draw_reference_image()
 	_draw_reference_shapes()
 	_draw_selection_mirror_command()
@@ -971,6 +982,15 @@ func _draw() -> void:
 	_draw_draw_preview()
 	_draw_primitive_preview()
 	_draw_measurement_guides()
+
+
+func _draw_frame_guide() -> void:
+	if not frame_visible:
+		return
+	var top_left_world := frame_offset + Vector2(-frame_half_extent.x, frame_half_extent.y)
+	var frame_size := Vector2(frame_half_extent.x * 2.0, frame_half_extent.y * 2.0) * zoom
+	var top_left_screen := _world_to_screen(top_left_world)
+	draw_rect(Rect2(top_left_screen, frame_size), Color("#8fd8f8b0"), false, 2.0)
 
 
 func _draw_fixed_grid() -> void:
@@ -1794,6 +1814,47 @@ func _snap_to_grid(world_position: Vector2) -> Vector2:
 		round(world_position.x / snap_step) * snap_step,
 		round(world_position.y / snap_step) * snap_step
 	)
+
+
+func _snap_to_canvas_position(local_position: Vector2) -> Vector2:
+	# Reference-point snapping is independent from the grid toggle. This lets
+	# No Snap remain a true no-grid mode while still aligning the active
+	# Component to authored points visible in the background.
+	var reference_snap := _nearest_reference_point(local_position)
+	if bool(reference_snap.get("found", false)):
+		return reference_snap.get("position", local_position)
+	return _snap_to_grid(_snap_to_catch_parent(local_position))
+
+
+func _nearest_reference_point(local_position: Vector2) -> Dictionary:
+	var cursor_screen := _world_to_screen(_local_to_world(local_position))
+	var best_screen := Vector2.ZERO
+	var best_distance := HANDLE_HIT_RADIUS
+	var found := false
+	for shape in reference_shapes:
+		if not bool(shape.get("visibility", true)):
+			continue
+		var transform: Dictionary = shape.get("transform", {})
+		var points: Array = shape.get("bezier_points", [])
+		# Referenced assets expose their transformed authored points through the
+		# same field; the fallback keeps older/reference shapes usable too.
+		if points.is_empty():
+			points = shape.get("points", [])
+		for point in points:
+			if not point is Dictionary:
+				continue
+			var point_position: Vector2 = point.get("position", point)
+			var point_screen := _world_to_screen(_local_to_world_with_transform(point_position, transform))
+			var point_distance := cursor_screen.distance_to(point_screen)
+			if point_distance <= best_distance:
+				best_distance = point_distance
+				best_screen = point_screen
+				found = true
+		if found and best_distance <= 0.001:
+			break
+	if not found:
+		return {"found": false}
+	return {"found": true, "position": _world_to_local(_screen_to_world(best_screen))}
 
 
 func _snap_to_catch_parent(local_position: Vector2) -> Vector2:

@@ -8,7 +8,7 @@ const EXPORT_SUBMODULES: Array[String] = []
 const MOTION_SUBMODULES := ["Animation", "Path", "Act", "Sequence"]
 const WORLDS_ROOT := "res://worlds"
 const CONFIG_PATH := "res://configs/app_config.json"
-const SCHEMA_VERSION := 57
+const SCHEMA_VERSION := 59
 const DEFAULT_PROJECTION_DEPTH_CM := 10.0
 const MAX_HISTORY_SIZE := 100
 const DRAW_MODES := ["closed_loop", "contour", "primitive"]
@@ -136,6 +136,11 @@ var selected_edge_ids: Array[String] = []
 var selected_point_id := ""
 var selected_point_ids: Array[String] = []
 var asset_pivot_fields: Dictionary = {}
+var asset_root_position_fields: Dictionary = {}
+# Asset-root Scale is intentionally stored as two independent fields. Keep
+# the singular reference as an X-axis compatibility alias for existing tests
+# and extensions that only inspect the former uniform control.
+var asset_root_scale_fields: Dictionary = {}
 var asset_root_scale_field: SpinBox
 var asset_root_scale_rebase_button: Button
 var asset_scale_rebase_button: Button
@@ -251,6 +256,15 @@ var snap_mode_buttons: Array[CheckBox] = []
 var snap_grid_info_label: Label
 var snap_rotation_slider: HSlider
 var snap_rotation_value_label: Label
+var frame_visible := false
+var frame_half_extent := Vector2(1.0, 1.0) # Tool units; 1 unit = 10 cm.
+var frame_offset := Vector2.ZERO # Tool units; frame center relative to origin.
+var frame_button: Button
+var frame_popup: PopupPanel
+var frame_visible_checkbox: CheckBox
+var frame_half_extent_fields: Dictionary = {}
+var frame_offset_fields: Dictionary = {}
+var frame_summary_label: Label
 var world_scale_menu: Button
 var world_scale_popup: PopupPanel
 var world_unit_option: OptionButton
@@ -778,6 +792,12 @@ func _build_ui() -> void:
 	snap_button.focus_mode = Control.FOCUS_NONE
 	snap_button.pressed.connect(_toggle_snap_popup)
 	toolbar.add_child(snap_button)
+	frame_button = Button.new()
+	frame_button.text = "Frame: Off  ▼"
+	frame_button.custom_minimum_size = Vector2(122, 32)
+	frame_button.focus_mode = Control.FOCUS_NONE
+	frame_button.pressed.connect(_toggle_frame_popup)
+	toolbar.add_child(frame_button)
 	var toolbar_spacer := Control.new()
 	toolbar_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	toolbar.add_child(toolbar_spacer)
@@ -931,6 +951,7 @@ func _build_ui() -> void:
 	context_bar.custom_minimum_size = Vector2(0, 32)
 	context_bar_panel.add_child(context_bar)
 	_create_snap_popup()
+	_create_frame_popup()
 
 	var canvas_panel := _create_panel(Color("#1b1e24"))
 	# Canvas drawing can legitimately extend beyond its Control rect while
@@ -1368,6 +1389,134 @@ func _create_snap_popup() -> void:
 	content.add_child(snap_rotation_slider)
 	_update_snap_popup_labels()
 	add_child(snap_popup)
+
+
+func _create_frame_popup() -> void:
+	frame_popup = PopupPanel.new()
+	frame_popup.size = Vector2i(300, 260)
+	frame_popup.add_theme_stylebox_override("panel", _opaque_popup_style())
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 6)
+	frame_popup.add_child(content)
+	var title := Label.new()
+	title.text = "Frame Guide"
+	content.add_child(title)
+	frame_visible_checkbox = CheckBox.new()
+	frame_visible_checkbox.text = "Visible"
+	frame_visible_checkbox.focus_mode = Control.FOCUS_NONE
+	frame_visible_checkbox.toggled.connect(_on_frame_visible_toggled)
+	content.add_child(frame_visible_checkbox)
+	var half_extent_label := Label.new()
+	half_extent_label.text = "Half Extent (cm)"
+	half_extent_label.add_theme_color_override("font_color", Color("#9aa3b2"))
+	content.add_child(half_extent_label)
+	var half_extent_grid := GridContainer.new()
+	half_extent_grid.columns = 2
+	half_extent_grid.add_theme_constant_override("h_separation", 8)
+	half_extent_grid.add_theme_constant_override("v_separation", 4)
+	content.add_child(half_extent_grid)
+	_add_frame_field(half_extent_grid, "X", _editor_units_to_world(frame_half_extent.x), "half_extent", "x", 0.0)
+	_add_frame_field(half_extent_grid, "Y", _editor_units_to_world(frame_half_extent.y), "half_extent", "y", 0.0)
+	var offset_label := Label.new()
+	offset_label.text = "Offset / Pivot (cm)"
+	offset_label.add_theme_color_override("font_color", Color("#9aa3b2"))
+	content.add_child(offset_label)
+	var offset_grid := GridContainer.new()
+	offset_grid.columns = 2
+	offset_grid.add_theme_constant_override("h_separation", 8)
+	offset_grid.add_theme_constant_override("v_separation", 4)
+	content.add_child(offset_grid)
+	_add_frame_field(offset_grid, "X", _editor_units_to_world(frame_offset.x), "offset", "x", -100000.0)
+	_add_frame_field(offset_grid, "Y", _editor_units_to_world(frame_offset.y), "offset", "y", -100000.0)
+	frame_summary_label = Label.new()
+	frame_summary_label.add_theme_color_override("font_color", Color("#9aa3b2"))
+	content.add_child(frame_summary_label)
+	add_child(frame_popup)
+	_update_frame_popup()
+
+
+func _add_frame_field(grid: GridContainer, axis_label: String, value: float, property_group: String, axis: String, minimum: float) -> void:
+	var label := Label.new()
+	label.text = axis_label
+	label.add_theme_font_size_override("font_size", 10)
+	label.add_theme_color_override("font_color", Color("#7f8a9b"))
+	grid.add_child(label)
+	var field := SpinBox.new()
+	field.min_value = minimum
+	field.max_value = 100000.0
+	field.step = 0.1
+	field.custom_arrow_step = 1.0
+	field.set_value_no_signal(value)
+	field.custom_minimum_size = Vector2(220, 26)
+	field.add_theme_font_size_override("font_size", 11)
+	field.value_changed.connect(_on_frame_field_changed.bind(property_group, axis))
+	if property_group == "half_extent":
+		frame_half_extent_fields[axis] = field
+	else:
+		frame_offset_fields[axis] = field
+	grid.add_child(field)
+
+
+func _toggle_frame_popup() -> void:
+	if frame_popup.visible:
+		frame_popup.hide()
+		return
+	var popup_position := frame_button.get_global_rect().position + Vector2(0.0, frame_button.size.y + 2.0)
+	frame_popup.popup(Rect2(popup_position, frame_popup.size))
+
+
+func _on_frame_visible_toggled(visible: bool) -> void:
+	frame_visible = visible
+	_apply_frame_to_canvas()
+	_update_frame_popup()
+
+
+func _on_frame_field_changed(value: float, property_group: String, axis: String) -> void:
+	if not is_finite(value):
+		return
+	var editor_value := _world_to_editor_units(value)
+	if property_group == "half_extent":
+		if editor_value < 0.0:
+			return
+		if axis == "x":
+			frame_half_extent.x = editor_value
+		else:
+			frame_half_extent.y = editor_value
+	else:
+		if axis == "x":
+			frame_offset.x = editor_value
+		else:
+			frame_offset.y = editor_value
+	_apply_frame_to_canvas()
+	_update_frame_popup()
+
+
+func _update_frame_popup() -> void:
+	if is_instance_valid(frame_button):
+		frame_button.text = "Frame: %s  ▼" % ("On" if frame_visible else "Off")
+	if is_instance_valid(frame_visible_checkbox):
+		frame_visible_checkbox.set_pressed_no_signal(frame_visible)
+	for axis in ["x", "y"]:
+		var half_field = frame_half_extent_fields.get(axis)
+		if is_instance_valid(half_field):
+			half_field.set_value_no_signal(_editor_units_to_world(frame_half_extent.x if axis == "x" else frame_half_extent.y))
+		var offset_field = frame_offset_fields.get(axis)
+		if is_instance_valid(offset_field):
+			offset_field.set_value_no_signal(_editor_units_to_world(frame_offset.x if axis == "x" else frame_offset.y))
+	if is_instance_valid(frame_summary_label):
+		var min_corner := frame_offset - frame_half_extent
+		var max_corner := frame_offset + frame_half_extent
+		frame_summary_label.text = "Bounds: %s…%s × %s…%s cm" % [
+			_format_scale_value(_editor_units_to_world(min_corner.x)),
+			_format_scale_value(_editor_units_to_world(max_corner.x)),
+			_format_scale_value(_editor_units_to_world(min_corner.y)),
+			_format_scale_value(_editor_units_to_world(max_corner.y))
+		]
+
+
+func _apply_frame_to_canvas() -> void:
+	if is_instance_valid(canvas_view):
+		canvas_view.set_frame_guide(frame_visible, frame_half_extent, frame_offset)
 
 
 func _create_world_scale_popup() -> void:
@@ -1891,6 +2040,10 @@ func _update_context_action_button() -> void:
 		snap_button.visible = show_asset_create_controls
 	if not show_asset_create_controls and is_instance_valid(snap_popup):
 		snap_popup.hide()
+	if is_instance_valid(frame_button):
+		frame_button.visible = show_asset_create_controls
+	if not show_asset_create_controls and is_instance_valid(frame_popup):
+		frame_popup.hide()
 	if active_module == "Create" and active_create_submodule in CREATE_SUBMODULES:
 		create_action_button.text = "Create Symbol" if active_create_submodule == "Symbols" else "Create %s" % active_create_submodule
 	elif active_module == "Style" and active_style_submodule == "Weighting":
@@ -2288,7 +2441,8 @@ func _save_world() -> void:
 			"authored_facing": AssetPresentation.serialize_authored_facing(asset.get("authored_facing", AssetPresentation.AuthoredFacing.NEUTRAL)),
 			"visibility": bool(asset.get("visibility", true)),
 			"asset_pivot": _serialize_vector(_asset_pivot(asset)),
-			"root_scale": AssetScaleRebaseService.root_scale(asset),
+			"root_position": _serialize_vector(AssetScaleRebaseService.root_position(asset)),
+			"root_scale": _serialize_vector(AssetScaleRebaseService.root_scale(asset)),
 			"reference_image": _serialize_reference_image(asset.get("reference_image", {})),
 			"animation": MotionWorkspace.normalize_animation_document(asset.get("animation", {})).duplicate(true),
 			"components": [],
@@ -2697,7 +2851,8 @@ func _load_world(world_entry: String, persist_as_last := true) -> bool:
 			"authored_facing": AssetPresentation.deserialize_authored_facing(asset_data.get("authored_facing", "neutral")),
 			"visibility": bool(asset_data.get("visibility", true)),
 			"asset_pivot": _deserialize_vector(asset_data.get("asset_pivot", [0.0, 0.0]), Vector2.ZERO),
-			"root_scale": _deserialize_asset_root_scale(asset_data.get("root_scale", 1.0)),
+			"root_position": _deserialize_vector(asset_data.get("root_position", [0.0, 0.0]), Vector2.ZERO),
+			"root_scale": _deserialize_asset_root_scale(asset_data.get("root_scale", [1.0, 1.0])),
 			"reference_image": _normalize_reference_image(asset_data.get("reference_image", {})),
 			"animation": MotionWorkspace.normalize_animation_document(asset_data.get("animation", {})),
 			"components": components,
@@ -2836,6 +2991,11 @@ func _serialize_editor_state() -> Dictionary:
 			"mode": snap_mode,
 			"grid_step": snap_grid_step,
 			"rotation_step": snap_rotation_step
+		},
+		"frame": {
+			"visible": frame_visible,
+			"half_extent": _serialize_vector(frame_half_extent),
+			"offset": _serialize_vector(frame_offset)
 		}
 	}
 
@@ -2866,6 +3026,9 @@ func _restore_editor_state(state) -> void:
 	active_geometry_submodule = "Sampling"
 	active_style_submodule = "Weighting"
 	active_motion_submodule = "Animation"
+	frame_visible = false
+	frame_half_extent = Vector2(1.0, 1.0)
+	frame_offset = Vector2.ZERO
 	outliner_asset_type_filters = {"character": true, "props": true, "weapons": true, "terrain": true, "icon": true, "symbols": true}
 	_apply_outliner_asset_type_filter_checkboxes()
 	expanded_assets.clear()
@@ -2875,6 +3038,7 @@ func _restore_editor_state(state) -> void:
 		expanded_assets[str(asset["id"])] = false
 	if not state is Dictionary:
 		_apply_snap_settings({})
+		_apply_frame_settings({})
 		return
 	var requested_asset_id := str(state.get("selected_asset_id", ""))
 	var selected_asset := _get_asset(requested_asset_id)
@@ -2941,6 +3105,7 @@ func _restore_editor_state(state) -> void:
 			_set_active_module_visual("Mesh", active_geometry_submodule)
 	_apply_world_scale_settings(state.get("world_scale", {}))
 	_apply_snap_settings(state.get("snap", {}))
+	_apply_frame_settings(state.get("frame", {}))
 	# Worlds saved before per-asset cameras keep their one legacy view on the
 	# active asset, rather than losing it during the migration.
 	var saved_camera = state.get("camera", {})
@@ -2998,6 +3163,7 @@ func _apply_world_scale_settings(settings) -> void:
 
 func _convert_asset_units(loaded_assets: Array[Dictionary], conversion_factor: float) -> void:
 	for asset in loaded_assets:
+		asset["root_position"] = AssetScaleRebaseService.root_position(asset) * conversion_factor
 		var reference_image := _normalize_reference_image(asset.get("reference_image", {}))
 		var reference_position: Vector2 = reference_image.get("position", Vector2.ZERO)
 		reference_position *= conversion_factor
@@ -3044,6 +3210,22 @@ func _apply_snap_settings(settings) -> void:
 		canvas_view.set_snap_settings(snap_enabled, snap_grid_step, snap_rotation_step)
 		canvas_view.set_world_scale(world_grid_size)
 	_update_snap_popup_labels()
+
+
+func _apply_frame_settings(settings) -> void:
+	frame_visible = false
+	frame_half_extent = Vector2(1.0, 1.0)
+	frame_offset = Vector2.ZERO
+	if settings is Dictionary:
+		frame_visible = bool(settings.get("visible", false))
+		var saved_half_extent := _deserialize_vector(settings.get("half_extent", [1.0, 1.0]), Vector2.ONE)
+		var saved_offset := _deserialize_vector(settings.get("offset", [0.0, 0.0]), Vector2.ZERO)
+		if saved_half_extent.is_finite() and saved_half_extent.x >= 0.0 and saved_half_extent.y >= 0.0:
+			frame_half_extent = saved_half_extent
+		if saved_offset.is_finite():
+			frame_offset = saved_offset
+	_apply_frame_to_canvas()
+	_update_frame_popup()
 
 
 func _serialize_bezier_points(points: Array) -> Array:
@@ -3182,11 +3364,16 @@ func _asset_pivot(asset: Dictionary) -> Vector2:
 	return _deserialize_vector(asset.get("asset_pivot", [0.0, 0.0]), Vector2.ZERO)
 
 
-func _deserialize_asset_root_scale(value) -> float:
-	if typeof(value) not in [TYPE_INT, TYPE_FLOAT]:
-		return 1.0
-	var scale := float(value)
-	return scale if is_finite(scale) and scale > AssetScaleRebaseService.SCALE_EPSILON else 1.0
+func _deserialize_asset_root_scale(value) -> Vector2:
+	# Scalar values are the schema-53 uniform representation and remain
+	# readable as equal X/Y axes.
+	if value is Array and value.size() >= 2:
+		var vector_value := Vector2(float(value[0]), float(value[1]))
+		return vector_value if vector_value.is_finite() and vector_value.x > AssetScaleRebaseService.SCALE_EPSILON and vector_value.y > AssetScaleRebaseService.SCALE_EPSILON else Vector2.ONE
+	if typeof(value) in [TYPE_INT, TYPE_FLOAT]:
+		var scalar := float(value)
+		return Vector2(scalar, scalar) if is_finite(scalar) and scalar > AssetScaleRebaseService.SCALE_EPSILON else Vector2.ONE
+	return Vector2.ONE
 
 
 func _serialize_transform(transform: Dictionary) -> Dictionary:
@@ -7033,7 +7220,7 @@ func _confirm_asset_creation() -> void:
 	_record_direct_change()
 	var asset_id := "asset_%d" % next_asset_id
 	next_asset_id += 1
-	assets.append({"id": asset_id, "name": asset_name, "asset_type": _create_submodule_asset_type(active_create_submodule), "authored_facing": AssetPresentation.AuthoredFacing.NEUTRAL, "visibility": true, "asset_pivot": Vector2.ZERO, "root_scale": 1.0, "reference_image": _default_reference_image(), "animation": MotionWorkspace.create_default_animation_document(), "components": [], "groups": [], "guides": []})
+	assets.append({"id": asset_id, "name": asset_name, "asset_type": _create_submodule_asset_type(active_create_submodule), "authored_facing": AssetPresentation.AuthoredFacing.NEUTRAL, "visibility": true, "asset_pivot": Vector2.ZERO, "root_position": Vector2.ZERO, "root_scale": Vector2.ONE, "reference_image": _default_reference_image(), "animation": MotionWorkspace.create_default_animation_document(), "components": [], "groups": [], "guides": []})
 	selected_asset_id = asset_id
 	selected_component_id = ""
 	selected_component_ids.clear()
@@ -7255,7 +7442,31 @@ func _on_asset_pivot_property_changed(value: float, property_name: String) -> vo
 		pivot.y = editor_value
 	_record_direct_change()
 	asset["asset_pivot"] = pivot
-	canvas_view.set_asset_pivot(pivot)
+	canvas_view.set_asset_pivot(AssetScaleRebaseService.root_transform(asset) * pivot)
+
+
+func _on_asset_root_position_changed(value: float, property_name: String) -> void:
+	if property_name not in ["position_x", "position_y"]:
+		return
+	var asset := _get_asset(selected_asset_id)
+	if asset.is_empty() or not selected_component_id.is_empty() or not is_finite(value):
+		return
+	var position := AssetScaleRebaseService.root_position(asset)
+	var editor_value := _world_to_editor_units(value)
+	if property_name == "position_x":
+		position.x = editor_value
+	else:
+		position.y = editor_value
+	if position.is_equal_approx(AssetScaleRebaseService.root_position(asset)):
+		return
+	_record_coalesced_change()
+	asset["root_position"] = position
+	_invalidate_batch_status()
+	if is_instance_valid(asset_root_scale_rebase_button):
+		var analysis := AssetScaleRebaseService.analyze_asset(asset)
+		asset_root_scale_rebase_button.disabled = not bool(analysis.get("can_rebase", false))
+		asset_root_scale_rebase_button.tooltip_text = "Bake Root Position and independent X/Y Scale into Components, Groups, References, Guides, and Weapon Frames." if analysis.get("blockers", []).is_empty() else str(analysis.get("blockers", [""])[0])
+	_render_canvas_context()
 
 
 func _update_reference_image_property(property_name: String, value) -> void:
@@ -12112,6 +12323,8 @@ func _render_inspector() -> void:
 	_clear(inspector_content)
 	transform_fields.clear()
 	asset_pivot_fields.clear()
+	asset_root_position_fields.clear()
+	asset_root_scale_fields.clear()
 	asset_root_scale_field = null
 	asset_root_scale_rebase_button = null
 	asset_scale_rebase_button = null
@@ -12186,6 +12399,9 @@ func _render_inspector() -> void:
 		asset_transform_grid.add_theme_constant_override("h_separation", 8)
 		asset_transform_grid.add_theme_constant_override("v_separation", 4)
 		var asset_pivot := _asset_pivot(asset)
+		var root_position := AssetScaleRebaseService.root_position(asset)
+		_add_asset_root_position_field(asset_transform_grid, "Position X (cm)", _editor_units_to_world(root_position.x), "position_x")
+		_add_asset_root_position_field(asset_transform_grid, "Position Y (cm)", _editor_units_to_world(root_position.y), "position_y")
 		_add_asset_pivot_field(asset_transform_grid, "Pivot X (cm)", _editor_units_to_world(asset_pivot.x), "pivot_x")
 		_add_asset_pivot_field(asset_transform_grid, "Pivot Y (cm)", _editor_units_to_world(asset_pivot.y), "pivot_y")
 		_add_asset_root_scale_field(asset_transform_grid, AssetScaleRebaseService.root_scale(asset))
@@ -12566,10 +12782,12 @@ func _render_multi_component_inspector(asset: Dictionary, components: Array[Dict
 	var visibility_values: Array[bool] = []
 	var z_values: Array[int] = []
 	var width_values: Array[float] = []
+	var projection_depth_values: Array[float] = []
 	for component in components:
 		visibility_values.append(bool(component.get("visibility", true)))
 		z_values.append(int(component.get("z_index", 0)))
 		width_values.append(_effective_contour_stroke_width_px(component))
+		projection_depth_values.append(_component_projection_depth_cm(component))
 	var visibility_option := OptionButton.new()
 	visibility_option.name = "MultiVisibility"
 	visibility_option.custom_minimum_size = Vector2(0, 26)
@@ -12595,6 +12813,10 @@ func _render_multi_component_inspector(asset: Dictionary, components: Array[Dict
 	for value in width_values.slice(1):
 		width_mixed = width_mixed or not is_equal_approx(value, width_values[0])
 	_multi_component_line_edit("Contour Stroke Width (px)", str(width_values[0]), width_mixed, "MultiContourWidth", "contour_width", false)
+	var projection_depth_mixed := false
+	for value in projection_depth_values.slice(1):
+		projection_depth_mixed = projection_depth_mixed or not is_equal_approx(value, projection_depth_values[0])
+	_multi_component_line_edit("Projection Depth (cm)", str(projection_depth_values[0]), projection_depth_mixed, "MultiProjectionDepth", "projection_depth", false)
 
 
 func _add_multi_component_position_field(grid: GridContainer, label_text: String, value: float, mixed: bool, axis: String) -> void:
@@ -12629,6 +12851,8 @@ func _on_multi_component_field_submitted(raw_value: String, _field: LineEdit, pr
 		_on_multi_component_z_index_changed(value)
 	elif property_name == "contour_width":
 		_on_multi_component_contour_width_changed(value)
+	elif property_name == "projection_depth":
+		_on_multi_component_projection_depth_changed(value)
 
 
 func _on_multi_component_field_focus_exited(field: LineEdit, property_name: String, integer_only: bool) -> void:
@@ -14218,24 +14442,53 @@ func _add_asset_pivot_field(grid: GridContainer, label_text: String, value: floa
 	grid.add_child(field)
 
 
-func _add_asset_root_scale_field(grid: GridContainer, value: float) -> void:
+func _add_asset_root_position_field(grid: GridContainer, label_text: String, value: float, property_name: String) -> void:
 	var label := Label.new()
-	label.text = "Scale"
+	label.text = label_text
 	label.add_theme_font_size_override("font_size", 10)
 	label.add_theme_color_override("font_color", Color("#7f8a9b"))
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	grid.add_child(label)
-	asset_root_scale_field = SpinBox.new()
-	asset_root_scale_field.min_value = 0.01
-	asset_root_scale_field.max_value = 100.0
-	asset_root_scale_field.step = 0.01
-	asset_root_scale_field.custom_arrow_step = 0.1
-	asset_root_scale_field.set_value_no_signal(value)
-	asset_root_scale_field.custom_minimum_size = Vector2(96, 26)
-	asset_root_scale_field.add_theme_font_size_override("font_size", 11)
-	asset_root_scale_field.tooltip_text = "Positive uniform preview Scale around the Asset Pivot. Rebase before Runtime Export."
-	asset_root_scale_field.value_changed.connect(_on_asset_root_scale_changed)
-	grid.add_child(asset_root_scale_field)
+	var field := SpinBox.new()
+	field.min_value = -100000.0
+	field.max_value = 100000.0
+	field.step = 0.01
+	field.custom_arrow_step = 0.1
+	field.set_value_no_signal(value)
+	field.custom_minimum_size = Vector2(96, 26)
+	field.add_theme_font_size_override("font_size", 11)
+	field.tooltip_text = "Preview translation for the complete Asset. Rebase before Runtime Export."
+	field.value_changed.connect(_on_asset_root_position_changed.bind(property_name))
+	asset_root_position_fields[property_name] = field
+	grid.add_child(field)
+
+
+func _add_asset_root_scale_field(grid: GridContainer, value: Vector2) -> void:
+	_add_asset_root_scale_axis_field(grid, "Scale X", value.x, "scale_x")
+	_add_asset_root_scale_axis_field(grid, "Scale Y", value.y, "scale_y")
+
+
+func _add_asset_root_scale_axis_field(grid: GridContainer, label_text: String, value: float, property_name: String) -> void:
+	var label := Label.new()
+	label.text = label_text
+	label.add_theme_font_size_override("font_size", 10)
+	label.add_theme_color_override("font_color", Color("#7f8a9b"))
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	grid.add_child(label)
+	var field := SpinBox.new()
+	field.min_value = 0.01
+	field.max_value = 100.0
+	field.step = 0.01
+	field.custom_arrow_step = 0.1
+	field.set_value_no_signal(value)
+	field.custom_minimum_size = Vector2(96, 26)
+	field.add_theme_font_size_override("font_size", 11)
+	field.tooltip_text = "Positive preview Scale on the %s axis around the Asset Pivot. Rebase before Runtime Export." % ("X" if property_name == "scale_x" else "Y")
+	field.value_changed.connect(_on_asset_root_scale_changed.bind(property_name))
+	asset_root_scale_fields[property_name] = field
+	if property_name == "scale_x":
+		asset_root_scale_field = field
+	grid.add_child(field)
 
 
 func _add_transform_field(grid: GridContainer, label_text: String, value: float, property_name: String, step: float) -> void:
@@ -14479,23 +14732,26 @@ func _on_ellipse_primitive_diameter_changed(value: float, property_name: String)
 
 
 func _render_asset_root_scale_rebase_inspector(asset: Dictionary) -> void:
-	inspector_content.add_child(_create_inspector_section("Asset Scale Rebase"))
+	inspector_content.add_child(_create_inspector_section("Asset Transform Rebase"))
 	var analysis := AssetScaleRebaseService.analyze_asset(asset)
 	var blockers: Array = analysis.get("blockers", [])
 	if bool(analysis.get("required", false)):
-		inspector_content.add_child(_create_inspector_field_label("Root Scale %s → 1" % _format_scale_value(float(analysis.get("scale", 1.0)))))
+		var position := Vector2(analysis.get("position", Vector2.ZERO))
+		inspector_content.add_child(_create_inspector_field_label("Position %s × %s cm → 0 × 0 cm" % [_format_scale_value(_editor_units_to_world(position.x)), _format_scale_value(_editor_units_to_world(position.y))]))
+		var scale := Vector2(analysis.get("scale", Vector2.ONE))
+		inspector_content.add_child(_create_inspector_field_label("Scale %s × %s → 1 × 1" % [_format_scale_value(scale.x), _format_scale_value(scale.y)]))
 	else:
-		inspector_content.add_child(_create_inspector_field_label("Root Scale is normalized (1)."))
+		inspector_content.add_child(_create_inspector_field_label("Root Position and Scale are normalized."))
 	for blocker in blockers:
 		var blocker_label := _create_inspector_field_label("• Blocked: %s" % str(blocker))
 		blocker_label.add_theme_color_override("font_color", Color("#ef8354"))
 		inspector_content.add_child(blocker_label)
 	asset_root_scale_rebase_button = Button.new()
-	asset_root_scale_rebase_button.text = "Rebase Asset Scale"
+	asset_root_scale_rebase_button.text = "Rebase Asset Transform"
 	asset_root_scale_rebase_button.custom_minimum_size = Vector2(0, 28)
 	asset_root_scale_rebase_button.focus_mode = Control.FOCUS_NONE
 	asset_root_scale_rebase_button.disabled = not bool(analysis.get("can_rebase", false))
-	asset_root_scale_rebase_button.tooltip_text = "Bake uniform Root Scale into Components, Groups, References, Guides, and Weapon Frames." if blockers.is_empty() else str(blockers[0])
+	asset_root_scale_rebase_button.tooltip_text = "Bake Root Position and independent X/Y Scale into Components, Groups, References, Guides, and Weapon Frames." if blockers.is_empty() else str(blockers[0])
 	asset_root_scale_rebase_button.pressed.connect(_on_rebase_asset_root_scale_pressed)
 	inspector_content.add_child(asset_root_scale_rebase_button)
 
@@ -14562,19 +14818,25 @@ func _on_rebase_asset_scales_pressed() -> void:
 	_render_canvas_context()
 
 
-func _on_asset_root_scale_changed(value: float) -> void:
+func _on_asset_root_scale_changed(value: float, property_name: String) -> void:
 	var asset := _get_asset(selected_asset_id)
-	if asset.is_empty() or not is_finite(value) or value <= AssetScaleRebaseService.SCALE_EPSILON:
+	if asset.is_empty() or property_name not in ["scale_x", "scale_y"] or not is_finite(value) or value <= AssetScaleRebaseService.SCALE_EPSILON:
 		return
-	if is_equal_approx(AssetScaleRebaseService.root_scale(asset), value):
+	var scale := AssetScaleRebaseService.root_scale(asset)
+	var previous_scale := scale
+	if property_name == "scale_x":
+		scale.x = value
+	else:
+		scale.y = value
+	if scale.is_equal_approx(previous_scale):
 		return
 	_record_coalesced_change()
-	asset["root_scale"] = value
+	asset["root_scale"] = scale
 	_invalidate_batch_status()
 	if is_instance_valid(asset_root_scale_rebase_button):
 		var analysis := AssetScaleRebaseService.analyze_asset(asset)
 		asset_root_scale_rebase_button.disabled = not bool(analysis.get("can_rebase", false))
-		asset_root_scale_rebase_button.tooltip_text = "Bake uniform Root Scale into Components, Groups, References, Guides, and Weapon Frames." if analysis.get("blockers", []).is_empty() else str(analysis.get("blockers", [""])[0])
+		asset_root_scale_rebase_button.tooltip_text = "Bake Root Position and independent X/Y Scale into Components, Groups, References, Guides, and Weapon Frames." if analysis.get("blockers", []).is_empty() else str(analysis.get("blockers", [""])[0])
 	_render_canvas_context()
 
 
@@ -14586,7 +14848,7 @@ func _on_rebase_asset_root_scale_pressed() -> void:
 	_record_direct_change()
 	var result := AssetScaleRebaseService.rebase_asset(asset)
 	if not bool(result.get("valid", false)):
-		_show_status_message(str(result.get("errors", ["Asset Scale Rebase failed."])[0]))
+		_show_status_message(str(result.get("errors", ["Asset Transform Rebase failed."])[0]))
 		return
 	geometry_sampling_preview = {}
 	geometry_sampling_preview_key = ""
@@ -14605,7 +14867,7 @@ func _on_rebase_asset_root_scale_pressed() -> void:
 	weighting_preview = {}
 	weighting_preview_key = ""
 	_invalidate_batch_status()
-	_show_status_message("Rebased Root Scale %s in %s." % [_format_scale_value(float(analysis.get("scale", 1.0))), str(asset.get("name", "Asset"))])
+	_show_status_message("Rebased Asset Root Transform in %s." % str(asset.get("name", "Asset")))
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
@@ -14794,6 +15056,26 @@ func _on_multi_component_contour_width_changed(value: float) -> void:
 	geometry_meshing_preview_key = ""
 	geometry_meshing_preview_state = "idle"
 	geometry_meshing_preview_revision += 1
+	_render_inspector()
+	_render_canvas_context()
+
+
+func _on_multi_component_projection_depth_changed(value: float) -> void:
+	var asset := _get_asset(selected_asset_id)
+	var components := _selected_components_for_inspector(asset)
+	if asset.is_empty() or components.size() < 2 or not is_finite(value) or value < 0.0:
+		return
+	var depth := snappedf(value, 0.1)
+	var changed := false
+	for component in components:
+		if not is_equal_approx(_component_projection_depth_cm(component), depth):
+			changed = true
+			break
+	if not changed:
+		return
+	_record_direct_change()
+	for component in components:
+		component["projection_depth_cm"] = depth
 	_render_inspector()
 	_render_canvas_context()
 
@@ -15314,7 +15596,7 @@ func _render_canvas_context() -> void:
 		canvas_context_label.text = "Asset: %s" % str(asset["name"])
 		canvas_view.set_context(str(asset["name"]))
 		canvas_view.set_interaction_state("asset")
-		canvas_view.set_asset_pivot(_asset_pivot(asset))
+		canvas_view.set_asset_pivot(AssetScaleRebaseService.root_transform(asset) * _asset_pivot(asset))
 		canvas_view.set_tool_mode("")
 		canvas_view.set_component_transform({})
 		canvas_view.set_reference_shapes(_build_reference_shapes(asset, "", selected_component_id))
@@ -15554,7 +15836,11 @@ func _reference_asset_shapes(target_asset: Dictionary, reference: Dictionary, em
 		var contour := PrimitiveGeometryService.contour(source_component) if PrimitiveGeometryService.has_analytic_shape(source_component) else BezierTopology.outer_control_polygon(source_component)
 		for point in contour:
 			points.append(_transform_point(_transform_point(Vector2(point), source_transform), reference_transform))
-		result.append({"id": str(reference.get("id", "")), "points": points, "closed": PrimitiveGeometryService.has_analytic_shape(source_component) or BezierTopology.outer_chain_closed(source_component), "transform": _default_component_transform(), "visibility": bool(target_asset.get("visibility", true)) and bool(reference.get("visibility", true)), "z_index": int(reference.get("z_index", 0)), "emphasized": str(reference.get("id", "")) == emphasized_component_id, "topology_role": str(reference.get("topology_role", "outer"))})
+		var authored_points: Array = []
+		for source_point in source_component.get("points", []):
+			if source_point is Dictionary:
+				authored_points.append({"id": str(source_point.get("id", "")), "position": _transform_point(_transform_point(Vector2(source_point.get("position", Vector2.ZERO)), source_transform), reference_transform)})
+		result.append({"id": str(reference.get("id", "")), "points": points, "bezier_points": authored_points, "closed": PrimitiveGeometryService.has_analytic_shape(source_component) or BezierTopology.outer_chain_closed(source_component), "transform": _default_component_transform(), "visibility": bool(target_asset.get("visibility", true)) and bool(reference.get("visibility", true)), "z_index": int(reference.get("z_index", 0)), "emphasized": str(reference.get("id", "")) == emphasized_component_id, "topology_role": str(reference.get("topology_role", "outer"))})
 	return result
 
 
@@ -15718,12 +16004,13 @@ func _on_asset_pivot_changed(pivot: Vector2) -> void:
 	if asset.is_empty() or not selected_component_id.is_empty():
 		return
 	_record_coalesced_change()
-	asset["asset_pivot"] = pivot
+	var authored_pivot := pivot - AssetScaleRebaseService.root_position(asset)
+	asset["asset_pivot"] = authored_pivot
 	for property_name in ["pivot_x", "pivot_y"]:
 		var field = asset_pivot_fields.get(property_name)
 		if not is_instance_valid(field):
 			continue
-		var value := _editor_units_to_world(pivot.x if property_name == "pivot_x" else pivot.y)
+		var value := _editor_units_to_world(authored_pivot.x if property_name == "pivot_x" else authored_pivot.y)
 		field.set_value_no_signal(value)
 
 

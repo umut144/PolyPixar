@@ -208,14 +208,15 @@ contains `Guide → Weapon → weapon_socket_primary | grip_primary |
 grip_secondary | attack_point_primary | reach_limit_primary`. Weapon Guides
 may use Component or Group scope and author position plus rotation only.
 
-World schema 53 adds a positive uniform `root_scale` to the Asset root's
-`Asset Transform` Inspector. It previews the complete Asset around the
-unchanged Asset Pivot, including Components, Groups, References, Guides,
-Weapon frames. `Rebase Asset Scale` atomically bakes that factor
-into canonical local coordinates and Reference instance scale, then resets the
-field to exactly `1`. Default Motion is supported; authored non-default Motion
-blocks the operation until a dedicated scale conversion exists. Runtime Export
-also blocks while `root_scale` is not `1`; it never applies the factor silently.
+World schema 53 adds positive X/Y `root_scale` axes to the Asset root's
+`Asset Transform` Inspector. Legacy scalar values migrate to equal X/Y axes.
+The independent axes preview the complete Asset around the unchanged Asset
+Pivot, including Components, Groups, References, Guides, and Weapon frames.
+`Rebase Asset Transform` atomically bakes both axes into canonical local
+coordinates and Reference instance scale, then resets the field to `(1, 1)`.
+Default Motion is supported; authored non-default Motion blocks the operation
+until a dedicated scale conversion exists. Runtime Export also blocks while
+either `root_scale` axis is not `1`; it never applies the scale silently.
 
 World schema 54 adds the transform-based Weapon Guide role
 `reach_limit_primary`. It is authored through the same Component/Group `+` and
@@ -239,6 +240,23 @@ point positions for projection-depth contour edges.
 
 World schema 57 removes semantic gameplay Region records. Gameplay meaning is
 assigned by the consuming game to ordinary Component geometry.
+
+World schema 58 adds `root_position` to the Asset root's `Asset Transform`
+Inspector. It previews a translation of the complete Asset independently from
+the unchanged Asset Pivot. `Rebase Asset Transform` atomically bakes Root
+Position and Root Scale together into canonical root placements and local
+coordinates, then resets Position to `(0, 0)` and Scale to `(1, 1)`. Authored
+non-default Motion remains a blocker. Runtime Export rejects either pending
+root transform instead of applying it silently.
+
+World schema 59 makes Asset-root Scale explicitly non-uniform: `root_scale` is
+serialized as `[scale_x, scale_y]`, and the Inspector exposes independent
+`Scale X` and `Scale Y` controls.
+
+The Create toolbar also provides an optional editor-only `Frame` guide. Its
+`Half Extent X/Y` and `Offset / Pivot X/Y` values are authored in centimetres,
+persist under `editor_state.frame`, default to hidden with a 10 cm half extent,
+and are never serialized into Asset geometry or Runtime export data.
 
 Plain `P` places the selected Asset, Group, or Component Pivot at the Canvas
 pointer. The shortcut is routed before focused Inspector controls can consume
