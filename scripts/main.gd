@@ -8988,6 +8988,7 @@ func _render_group_outliner_tree(container: VBoxContainer, asset: Dictionary, gr
 	group_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	group_button.focus_mode = Control.FOCUS_NONE
 	group_button.tooltip_text = "Component Group"
+	_style_outliner_button(group_button, group_id == selected_group_id and str(asset.get("id", "")) == selected_asset_id)
 	group_button.pressed.connect(_select_group.bind(str(asset.get("id", "")), group_id))
 	group_button.gui_input.connect(_on_group_outliner_gui_input.bind(str(asset.get("id", "")), group_id, group_button))
 	group_button.set_drag_forwarding(_outliner_get_drag_data.bind(str(asset.get("id", "")), group_id), _outliner_can_drop_data.bind(str(asset.get("id", "")), group_id), _outliner_drop_data.bind(str(asset.get("id", "")), group_id))
@@ -9090,7 +9091,9 @@ func _outliner_can_drop_data(_at_position: Vector2, data, asset_id: String, targ
 	var asset := _get_asset(asset_id)
 	if str(data.get("kind", "")) == "group":
 		var group_id := str(data.get("group_id", ""))
-		return ComponentHierarchy.can_parent_group(asset, group_id, "" if target_id == "root" else target_id)
+		if target_id == "root":
+			return ComponentHierarchy.can_parent_group(asset, group_id, "")
+		return ComponentHierarchy.can_move_group_to_component(asset, group_id, target_id)
 	if str(data.get("kind", "")) != "components":
 		return false
 	var component_ids: Array = data.get("component_ids", [])
@@ -9115,7 +9118,10 @@ func _outliner_drop_data(_at_position: Vector2, data, asset_id: String, target_i
 	if str(data.get("kind", "")) == "group":
 		var group_id := str(data.get("group_id", ""))
 		_record_direct_change()
-		_set_group_parent_preserving_world(asset, group_id, "" if target_id == "root" else target_id)
+		if target_id == "root":
+			_set_group_parent_preserving_world(asset, group_id, "")
+		else:
+			_move_group_under_component_preserving_world(asset, group_id, target_id)
 		selected_asset_id = asset_id
 		selected_group_id = group_id
 		selected_component_id = ""
@@ -9181,6 +9187,30 @@ func _set_group_parent_preserving_world(asset: Dictionary, group_id: String, par
 		var component := _get_component(asset, str(component_id))
 		if not component.is_empty():
 			component["transform"] = ComponentHierarchy.local_transform_from_world_record(asset, str(component_id), member_world_records[component_id])
+
+
+func _move_group_under_component_preserving_world(asset: Dictionary, group_id: String, parent_id: String) -> void:
+	var group := ComponentHierarchy.group_by_id(asset, group_id)
+	if group.is_empty() or not ComponentHierarchy.can_move_group_to_component(asset, group_id, parent_id):
+		return
+	var member_world_records: Dictionary = {}
+	for member in asset.get("components", []):
+		var member_id := str(member.get("id", "")) if member is Dictionary else ""
+		if not member_id.is_empty() and ComponentHierarchy.membership_group_id(asset, member_id) == group_id:
+			member_world_records[member_id] = ComponentHierarchy.world_transform_record(asset, member_id)
+	var group_world_record := ComponentHierarchy.group_world_transform_record(asset, group_id)
+	for member in ComponentHierarchy.direct_group_members(asset, group_id):
+		member["parent_component_id"] = parent_id
+	group["parent_component_id"] = parent_id
+	group["transform"] = ComponentHierarchy.group_local_transform_from_world_record(asset, group_id, group_world_record)
+	var member_ids: Array = member_world_records.keys()
+	member_ids.sort_custom(func(left, right) -> bool:
+		return ComponentHierarchy.component_depth(asset, str(left)) < ComponentHierarchy.component_depth(asset, str(right))
+	)
+	for member_id in member_ids:
+		var member := _get_component(asset, str(member_id))
+		if not member.is_empty():
+			member["transform"] = ComponentHierarchy.local_transform_from_world_record(asset, str(member_id), member_world_records[member_id])
 
 
 func _render_component_outliner_tree(container: VBoxContainer, asset: Dictionary, component: Dictionary, indent: int, rendered_component_ids: Dictionary, reference_summary := false, rendered_group_ids: Dictionary = {}, render_group_members := false) -> void:
@@ -10628,12 +10658,56 @@ func _delete_current_outliner_selection() -> void:
 		if not selected_weighting_style_id.is_empty():
 			_delete_selected_weighting_style()
 		return
-	if not selected_guide_id.is_empty():
+	if not selected_group_id.is_empty():
+		_delete_selected_group()
+	elif not selected_guide_id.is_empty():
 		_delete_selected_guide()
 	elif not selected_component_id.is_empty():
 		_delete_selected_component()
 	elif not selected_asset_id.is_empty():
 		_delete_selected_asset()
+
+
+func _delete_selected_group() -> void:
+	var asset := _get_asset(selected_asset_id)
+	var group := ComponentHierarchy.group_by_id(asset, selected_group_id)
+	if asset.is_empty() or group.is_empty():
+		return
+	var group_id := selected_group_id
+	var member_world_records: Dictionary = {}
+	for component in asset.get("components", []):
+		var component_id := str(component.get("id", "")) if component is Dictionary else ""
+		if not component_id.is_empty() and ComponentHierarchy.membership_group_id(asset, component_id) == group_id:
+			member_world_records[component_id] = ComponentHierarchy.world_transform_record(asset, component_id)
+	_record_direct_change()
+	asset["groups"].erase(group)
+	for component in asset.get("components", []):
+		if component is Dictionary and str(component.get("group_id", "")) == group_id:
+			component["group_id"] = ""
+	var surviving_guides: Array = []
+	for guide in asset.get("guides", []):
+		var scope: Dictionary = guide.get("scope", {}) if guide is Dictionary else {}
+		if str(scope.get("kind", "component")) == "group" and str(scope.get("group_id", "")) == group_id:
+			continue
+		surviving_guides.append(guide)
+	asset["guides"] = surviving_guides
+	var member_ids: Array = member_world_records.keys()
+	member_ids.sort_custom(func(left, right) -> bool:
+		return ComponentHierarchy.component_depth(asset, str(left)) < ComponentHierarchy.component_depth(asset, str(right))
+	)
+	for component_id in member_ids:
+		var component := _get_component(asset, str(component_id))
+		if not component.is_empty():
+			component["transform"] = ComponentHierarchy.local_transform_from_world_record(asset, str(component_id), member_world_records[component_id])
+	selected_group_id = ""
+	selected_component_id = ""
+	selected_component_ids.clear()
+	selected_guide_id = ""
+	active_state = ""
+	_render_outliner()
+	_render_inspector()
+	_render_canvas_context()
+	_show_status_message("Deleted Group · Components kept in place.")
 
 
 func _delete_selected_asset() -> void:

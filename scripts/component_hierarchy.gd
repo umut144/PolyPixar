@@ -69,6 +69,15 @@ static func group_members(asset: Dictionary, group_id: String) -> Array[Dictiona
 	return result
 
 
+static func direct_group_members(asset: Dictionary, group_id: String) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	for candidate in group_members(asset, group_id):
+		var parent_component_id := parent_id(candidate)
+		if parent_component_id.is_empty() or membership_group_id(asset, parent_component_id) != group_id:
+			result.append(candidate)
+	return result
+
+
 static func membership_group_id(asset: Dictionary, component_id: String) -> String:
 	var cursor := component_by_id(asset, component_id)
 	var visited: Dictionary = {}
@@ -133,6 +142,26 @@ static func can_parent_group(asset: Dictionary, group_id: String, candidate_pare
 		if not _component_chain_contains(asset, str(member.get("id", "")), candidate_parent_id):
 			return false
 	return true
+
+
+static func can_move_group_to_component(asset: Dictionary, group_id: String, candidate_parent_id: String) -> bool:
+	if group_by_id(asset, group_id).is_empty() or component_by_id(asset, candidate_parent_id).is_empty():
+		return false
+	# Nesting one Group through a Component owned by another Group would apply
+	# two unrelated Group transforms to the same Component chain.
+	if not membership_group_id(asset, candidate_parent_id).is_empty():
+		return false
+	var members := direct_group_members(asset, group_id)
+	if members.is_empty():
+		return false
+	for member in members:
+		if not can_parent(asset, str(member.get("id", "")), candidate_parent_id):
+			return false
+	return true
+
+
+static func component_depth(asset: Dictionary, component_id: String) -> int:
+	return maxi(_component_chain(asset, component_id).size() - 1, 0)
 
 
 static func next_guide_ordinal(asset: Dictionary, component_id: String, guide_type: String) -> int:

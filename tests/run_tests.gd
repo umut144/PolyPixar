@@ -45,6 +45,7 @@ func _init() -> void:
 	_test_runtime_export_service()
 	_test_weighting_service_and_ui()
 	_test_component_hierarchy_model()
+	_test_group_outliner_workflows()
 	_test_asset_guides()
 	_test_motion_selection_context()
 	_test_motion_player()
@@ -102,6 +103,16 @@ func _control_text(root: Node) -> String:
 	for child in root.get_children():
 		values.append(_control_text(child))
 	return "\n".join(values)
+
+
+func _button_with_text(root: Node, expected_text: String) -> Button:
+	if root is Button and str(root.text) == expected_text:
+		return root
+	for child in root.get_children():
+		var match := _button_with_text(child, expected_text)
+		if match != null:
+			return match
+	return null
 
 
 func _test_add_close_and_validate() -> void:
@@ -2687,6 +2698,39 @@ func _test_component_hierarchy_model() -> void:
 	parent["parent_component_id"] = "component_child"
 	ComponentHierarchy.normalize_asset(asset)
 	_expect(str(parent.get("parent_component_id", "")).is_empty(), "Loading cyclic Component data should safely promote one participant to the Asset root.")
+
+
+func _test_group_outliner_workflows() -> void:
+	var eye_left := {"id": "eye_left", "name": "eye_left", "type": "component", "parent_component_id": "", "group_id": "", "visibility": true, "transform": {"position": Vector2(10.0, 0.0), "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}}
+	var eye_right := {"id": "eye_right", "name": "eye_right", "type": "component", "parent_component_id": "", "group_id": "", "visibility": true, "transform": {"position": Vector2(30.0, 0.0), "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}}
+	var eyelashes_right := {"id": "eyelashes_right", "name": "eyelashes_right", "type": "component", "parent_component_id": "eye_left", "group_id": "lashes", "visibility": true, "transform": {"position": Vector2(2.0, 0.0), "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}}
+	var lashes_group := {"id": "lashes", "name": "eyelashes_right", "parent_component_id": "eye_left", "visibility": true, "transform": {"position": Vector2(1.0, 0.0), "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}}
+	var asset := {"id": "mage", "name": "Mage", "asset_type": "character", "visibility": true, "asset_pivot": Vector2.ZERO, "components": [eye_left, eye_right, eyelashes_right], "groups": [lashes_group], "guides": []}
+	ComponentHierarchy.normalize_asset(asset)
+	_expect(not ComponentHierarchy.can_parent_group(asset, "lashes", "eye_right") and ComponentHierarchy.can_move_group_to_component(asset, "lashes", "eye_right"), "Moving a Group should allow a sibling Component target by reparenting its direct Parts atomically.")
+	_expect(not ComponentHierarchy.can_move_group_to_component(asset, "lashes", "eyelashes_right"), "A Group must not be moved beneath one of its own Parts.")
+	var application = load("res://scripts/main.gd").new()
+	application._build_ui()
+	var test_assets: Array[Dictionary] = [asset]
+	application.assets = test_assets
+	application.active_module = "Create"
+	application.active_create_submodule = "Character"
+	application.expanded_assets["mage"] = true
+	application._select_group("mage", "lashes")
+	var group_button := _button_with_text(application.outliner_list, "G: eyelashes_right")
+	var selected_style := group_button.get_theme_stylebox("normal") as StyleBoxFlat if group_button != null else null
+	_expect(group_button != null and selected_style != null and selected_style.bg_color == Color("#f2c94c"), "The selected Group row should use the same highlighted Outliner style as selected Components.")
+	var world_before := ComponentHierarchy.world_transform(asset, "eyelashes_right")
+	var drag_data := {"kind": "group", "asset_id": "mage", "group_id": "lashes"}
+	_expect(application._outliner_can_drop_data(Vector2.ZERO, drag_data, "mage", "eye_right"), "A Group should be droppable onto a valid sibling Component.")
+	application._outliner_drop_data(Vector2.ZERO, drag_data, "mage", "eye_right")
+	_expect(ComponentHierarchy.group_parent_id(lashes_group) == "eye_right" and str(eyelashes_right.get("parent_component_id", "")) == "eye_right", "Dropping a Group onto a Component should move both the Group anchor and its direct Parts beneath that Component.")
+	_expect(ComponentHierarchy.world_transform(asset, "eyelashes_right").is_equal_approx(world_before), "Moving a Group to another Component must preserve every Part's visible world transform.")
+	var world_before_delete := ComponentHierarchy.world_transform(asset, "eyelashes_right")
+	application._delete_current_outliner_selection()
+	_expect(ComponentHierarchy.group_by_id(asset, "lashes").is_empty() and not ComponentHierarchy.component_by_id(asset, "eyelashes_right").is_empty() and str(eyelashes_right.get("group_id", "")) == "", "Delete on a selected Group should remove only the Group and retain its Components.")
+	_expect(ComponentHierarchy.world_transform(asset, "eyelashes_right").is_equal_approx(world_before_delete), "Deleting a Group should keep its former Components visually fixed.")
+	application.free()
 
 
 func _test_asset_guides() -> void:

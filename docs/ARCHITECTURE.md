@@ -91,7 +91,9 @@ ancestor of every direct Part, so a Group cannot be placed beneath one of its
 own Parts. Group visibility is effective while each Component's individual Z
 Index remains authoritative. Outliner drag-and-drop preserves each affected
 Component's world transform when changing Group membership, Component
-parentage, or Group parentage. Groups are editor-only containers: runtime
+parentage, or Group parentage. Dropping a Group across Component branches
+reparents its direct Parts atomically; deleting the selected Group removes the
+container while preserving those Parts and their world transforms. Groups are editor-only containers: runtime
 export emits ordinary Components and resolves the Group transform into their
 canonical exported transforms.
 

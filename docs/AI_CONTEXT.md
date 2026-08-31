@@ -81,6 +81,9 @@ parented below a Component only when that Component is an ancestor of every
 direct Part; its transform is then applied once after that Component. Moving a
 Component into or out of a Group, changing a Component parent, or reparenting a
 Group through the Outliner preserves every affected Component's world transform.
+Dropping a Group onto a new Component Parent atomically reparents its direct
+Parts so this invariant also holds across sibling Component branches. Deleting
+a Group removes only the editor container and keeps its former Parts in place.
 Group visibility is effective for all members. Each Component exclusively owns
 its individual Z Index. Runtime export does not emit Group records; it resolves
 Group transforms into ordinary Component exports.
