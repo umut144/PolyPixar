@@ -181,8 +181,6 @@ var component_add_weapon_guide_menu: PopupMenu
 var component_add_region_menu: PopupMenu
 var component_add_reference_menu: PopupMenu
 var component_context_menu: PopupMenu
-var component_context_weapon_menu: PopupMenu
-var component_context_region_menu: PopupMenu
 var group_dialog: ConfirmationDialog
 var group_name_input: LineEdit
 var guide_dialog: ConfirmationDialog
@@ -1937,24 +1935,6 @@ func _create_component_add_menu() -> void:
 func _create_component_context_menu() -> void:
 	component_context_menu = PopupMenu.new()
 	component_context_menu.name = "ComponentContextMenu"
-	component_context_weapon_menu = PopupMenu.new()
-	component_context_weapon_menu.name = "ContextWeaponGuideTypes"
-	component_context_weapon_menu.add_item("weapon_socket_primary", 0)
-	component_context_weapon_menu.add_item("grip_primary", 1)
-	component_context_weapon_menu.add_item("grip_secondary", 2)
-	component_context_weapon_menu.add_item("attack_point_primary", 3)
-	component_context_weapon_menu.add_item("reach_limit_primary", 4)
-	component_context_weapon_menu.id_pressed.connect(_on_context_weapon_guide_selected)
-	component_context_menu.add_child(component_context_weapon_menu)
-	component_context_menu.add_submenu_item("Guide → Weapon", "ContextWeaponGuideTypes", 100)
-	component_context_region_menu = PopupMenu.new()
-	component_context_region_menu.name = "ContextRegionTypes"
-	component_context_region_menu.add_item("Attack Region", 0)
-	component_context_region_menu.add_item("Hurt Region", 1)
-	component_context_region_menu.add_item("Collision Region", 2)
-	component_context_region_menu.id_pressed.connect(_on_context_region_selected)
-	component_context_menu.add_child(component_context_region_menu)
-	component_context_menu.add_submenu_item("Region", "ContextRegionTypes", 101)
 	component_context_menu.add_separator()
 	component_context_menu.add_item("Group", 4)
 	component_context_menu.add_item("Remove from Group", 5)
@@ -1969,25 +1949,8 @@ func _create_component_context_menu() -> void:
 	component_context_menu.add_separator()
 	component_context_menu.add_item("Detach from Parent", 3)
 	_style_popup_menu(component_context_menu)
-	_style_popup_menu(component_context_weapon_menu)
-	_style_popup_menu(component_context_region_menu)
 	component_context_menu.id_pressed.connect(_on_component_context_menu_selected)
 	add_child(component_context_menu)
-
-
-func _on_context_weapon_guide_selected(index: int) -> void:
-	var guide_types := [AssetGuide.WEAPON_SOCKET_PRIMARY, AssetGuide.GRIP_PRIMARY, AssetGuide.GRIP_SECONDARY, AssetGuide.ATTACK_POINT_PRIMARY, AssetGuide.REACH_LIMIT_PRIMARY]
-	if index < 0 or index >= guide_types.size():
-		return
-	var group_id := str(component_context_menu.get_meta("group_id", ""))
-	_create_weapon_guide(str(component_context_menu.get_meta("asset_id", "")), "group" if not group_id.is_empty() else "component", group_id if not group_id.is_empty() else str(component_context_menu.get_meta("component_id", "")), guide_types[index])
-
-
-func _on_context_region_selected(index: int) -> void:
-	if index < 0 or index >= REGION_TYPES.size():
-		return
-	var group_id := str(component_context_menu.get_meta("group_id", ""))
-	_create_region(str(component_context_menu.get_meta("asset_id", "")), "group" if not group_id.is_empty() else "component", group_id if not group_id.is_empty() else str(component_context_menu.get_meta("component_id", "")), REGION_TYPES[index])
 
 
 func _create_guide_dialog() -> void:

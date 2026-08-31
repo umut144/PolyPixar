@@ -2276,7 +2276,10 @@ func _test_component_names() -> void:
 	var semantic_assets: Array[Dictionary] = [semantic_asset, symbol_asset]
 	application.assets = semantic_assets
 	application._build_ui()
-	_expect(application.component_context_menu.get_item_text(application.component_context_menu.get_item_index(4)) == "Group" and application.component_context_menu.get_item_text(application.component_context_menu.get_item_index(6)) == "Copy Components" and application.component_context_menu.get_item_text(application.component_context_menu.get_item_index(0)) == "Duplicate", "The Component context menu should expose Component Clipboard actions above Duplicate with separators.")
+	var context_menu_items: Array[String] = []
+	for item_index in application.component_context_menu.item_count:
+		context_menu_items.append(application.component_context_menu.get_item_text(item_index))
+	_expect(application.component_context_menu.get_item_text(application.component_context_menu.get_item_index(4)) == "Group" and application.component_context_menu.get_item_text(application.component_context_menu.get_item_index(6)) == "Copy Components" and application.component_context_menu.get_item_text(application.component_context_menu.get_item_index(0)) == "Duplicate" and not context_menu_items.has("Guide → Weapon") and not context_menu_items.has("Region"), "The Component context menu should expose Component Clipboard actions above Duplicate with separators and omit Guide → Weapon and Region creation.")
 	_expect(not application.component_dialog.dialog_text.is_empty(), "Component creation should use a normal free-name input.")
 	application._duplicate_component("character", "component_1")
 	_expect(semantic_asset.get("components", []).size() == 2 and str(semantic_asset.get("components", [])[1].get("name", "")) == "body Copy", "Duplicating a Component should generate a unique free name automatically.")
