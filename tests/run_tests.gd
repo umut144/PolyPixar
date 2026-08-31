@@ -18,8 +18,10 @@ func _init() -> void:
 	_test_closed_contour_region_mesh()
 	_test_catch_parent_snapping()
 	_test_background_point_snapping_without_grid()
+	_test_pivot_point_snapping_without_grid()
 	_test_canvas_navigation_key_reset()
 	_test_pivot_shortcut_robustness()
+	_test_contour_rotation_access()
 	_test_contour_stroke_service()
 	_test_contour_stroke_robust_geometry()
 	_test_world_contour_settings()
@@ -587,6 +589,41 @@ func _test_background_point_snapping_without_grid() -> void:
 	_expect(snapped.distance_to(Vector2(10.0, 5.0)) < 0.01, "No Snap should still align the active Component to a visible background point.")
 	_expect(canvas.snap_position(Vector2(10.8, 5.8)).distance_to(Vector2(10.8, 5.8)) < 0.01, "No Snap should leave positions outside the point hit radius untouched.")
 	canvas.free()
+
+
+func _test_pivot_point_snapping_without_grid() -> void:
+	var canvas := ComponentCanvas.new()
+	canvas.size = Vector2(400.0, 400.0)
+	canvas.set_camera_state(Vector2.ZERO, 20.0)
+	canvas.set_context("Contour")
+	canvas.set_interaction_state("transform")
+	canvas.set_component_transform({"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO})
+	canvas.set_bezier_geometry([{"id": "drawn", "position": Vector2(3.0, 2.0)}], [], [])
+	canvas.set_snap_settings(false, 16.0, 15.0)
+	var near_point_screen := canvas._world_to_screen(Vector2(3.2, 2.1))
+	_expect(canvas._place_pivot_at_screen_position(near_point_screen), "A selected Contour Pivot should be placeable in Transform state.")
+	_expect(Vector2(canvas.component_transform.get("pivot", Vector2.ZERO)).is_equal_approx(Vector2(3.0, 2.0)), "No Snap should still align a Component Pivot to one of its authored points.")
+	_expect(Vector2(canvas.component_transform.get("position", Vector2.ZERO)).is_equal_approx(Vector2(3.0, 2.0)), "Snapping the Pivot must compensate Component Position so the authored geometry stays visually fixed.")
+	canvas.free()
+
+
+func _test_contour_rotation_access() -> void:
+	var contour := _component()
+	contour.merge({"id": "contour", "name": "Contour", "type": "component", "draw_mode": "contour", "visibility": true, "z_index": 0, "parent_component_id": "", "transform": {"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}})
+	var asset := {"id": "asset", "name": "Asset", "asset_type": "character", "visibility": true, "asset_pivot": Vector2.ZERO, "components": [contour], "groups": [], "guides": []}
+	var application = load("res://scripts/main.gd").new()
+	application._build_ui()
+	var contour_assets: Array[Dictionary] = [asset]
+	application.assets = contour_assets
+	application.selected_asset_id = "asset"
+	application.selected_component_id = "contour"
+	application._render_context_bar()
+	var transform_menu := _context_menu(application, "⌘4")
+	_expect(transform_menu != null and transform_menu.text.contains("Transform"), "Contour Components should expose the Transform menu in their canvas context.")
+	if transform_menu != null:
+		transform_menu.get_popup().emit_signal("id_pressed", 1)
+	_expect(application.active_state == "transform" and application.canvas_view.transform_mode == "rotate", "The Contour Transform menu should activate rotation around the Component Pivot.")
+	application.free()
 
 
 func _test_canvas_navigation_key_reset() -> void:

@@ -373,7 +373,7 @@ func _gui_input(event: InputEvent) -> void:
 			return
 		if pivot_dragging:
 			var old_pivot: Vector2 = component_transform.get("pivot", Vector2.ZERO)
-			var new_pivot := _snap_to_grid(_world_to_local(_screen_to_world(event.position)))
+			var new_pivot := _snap_pivot_position(_world_to_local(_screen_to_world(event.position)))
 			var transform_scale: Vector2 = component_transform.get("scale", Vector2.ONE)
 			var transform_rotation := deg_to_rad(float(component_transform.get("rotation", 0.0)))
 			var transform_position: Vector2 = component_transform.get("position", Vector2.ZERO)
@@ -885,7 +885,7 @@ func _place_pivot_at_screen_position(screen_position: Vector2) -> bool:
 	if context_name.is_empty() or interaction_state not in ["", "edit", "transform"]:
 		return false
 	var old_pivot: Vector2 = component_transform.get("pivot", Vector2.ZERO)
-	var new_pivot := _snap_to_grid(_world_to_local(_screen_to_world(screen_position)))
+	var new_pivot := _snap_pivot_position(_world_to_local(_screen_to_world(screen_position)))
 	var transform_scale: Vector2 = component_transform.get("scale", Vector2.ONE)
 	var transform_rotation := deg_to_rad(float(component_transform.get("rotation", 0.0)))
 	var transform_position: Vector2 = component_transform.get("position", Vector2.ZERO)
@@ -916,7 +916,7 @@ func mouse_world_position() -> Vector2:
 
 
 func mouse_local_position() -> Vector2:
-	return _snap_to_grid(_world_to_local(_screen_to_world(get_local_mouse_position())))
+	return _snap_pivot_position(_world_to_local(_screen_to_world(get_local_mouse_position())))
 
 
 func _confirm_mirror_axis(axis_end: Vector2) -> void:
@@ -1835,6 +1835,31 @@ func _snap_to_canvas_position(local_position: Vector2) -> Vector2:
 	if bool(reference_snap.get("found", false)):
 		return reference_snap.get("position", local_position)
 	return _snap_to_grid(_snap_to_catch_parent(local_position))
+
+
+func _snap_pivot_position(local_position: Vector2) -> Vector2:
+	# The selected Component is omitted from reference_shapes, but its authored
+	# points are still the most useful targets while positioning its Pivot.
+	var cursor_screen := _world_to_screen(_local_to_world(local_position))
+	var best_position := local_position
+	var best_distance := HANDLE_HIT_RADIUS
+	var found := false
+	for point in bezier_points:
+		var point_position: Vector2 = point.get("position", Vector2.ZERO)
+		var point_distance := cursor_screen.distance_to(_world_to_screen(_local_to_world(point_position)))
+		if point_distance <= best_distance:
+			best_distance = point_distance
+			best_position = point_position
+			found = true
+	var reference_snap := _nearest_reference_point(local_position)
+	if bool(reference_snap.get("found", false)):
+		var reference_position: Vector2 = reference_snap.get("position", local_position)
+		var reference_distance := cursor_screen.distance_to(_world_to_screen(_local_to_world(reference_position)))
+		if not found or reference_distance <= best_distance:
+			return reference_position
+	if found:
+		return best_position
+	return _snap_to_grid(local_position)
 
 
 func _nearest_reference_point(local_position: Vector2) -> Dictionary:
