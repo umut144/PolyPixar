@@ -18,6 +18,15 @@ const REGION_COLORS := {
 	"collision": Color("#f2994a")
 }
 const MAX_HISTORY_SIZE := 100
+# Render targets. Mutations declare what became stale; the flush below decides
+# what actually runs, once per frame.
+const RENDER_OUTLINER := 1
+const RENDER_INSPECTOR := 2
+const RENDER_CANVAS_CONTEXT := 4
+const RENDER_CONTEXT_BAR := 8
+const RENDER_INFO_BAR := 16
+# The combination nearly every document mutation needs.
+const RENDER_DOCUMENT := RENDER_OUTLINER | RENDER_INSPECTOR | RENDER_CANVAS_CONTEXT
 const DRAW_MODES := ["closed_loop", "contour", "primitive"]
 const GRID_BOX_TOOL_UNITS := 0.5
 const GAME_TILE_CENTIMETERS := 100.0
@@ -293,6 +302,9 @@ var reload_world_dialog: ConfirmationDialog
 var eye_contour_stroke_dialog: ConfirmationDialog
 var eye_contour_stroke_width_field: SpinBox
 var pending_save_after_new := false
+var pending_renders := 0
+var render_flush_queued := false
+var rendering := false
 var undo_history: Array[Dictionary] = []
 var redo_history: Array[Dictionary] = []
 var history_coalesce_timer: Timer
@@ -318,9 +330,7 @@ func _ready() -> void:
 	history_coalesce_timer.timeout.connect(_finish_history_coalescing)
 	add_child(history_coalesce_timer)
 	_apply_world_scale()
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 	_load_last_world()
 	call_deferred("_disable_quit_shortcut")
 	call_deferred("_focus_active_canvas_after_startup")
@@ -449,7 +459,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		return
 	if has_command_modifier and active_module == "Style" and active_style_submodule == "Weighting" and event.keycode == KEY_1:
 		_set_active_context_command("style.weighting.method")
-		_render_context_bar()
+		_invalidate_render(RENDER_CONTEXT_BAR)
 		if is_instance_valid(weighting_method_menu):
 			weighting_method_menu.show_popup()
 		get_viewport().set_input_as_handled()
@@ -544,7 +554,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			_set_active_state("draw")
 			_set_active_context_command("asset.create_primitive")
 			canvas_view.start_circle_primitive_preview()
-			_render_context_bar()
+			_invalidate_render(RENDER_CONTEXT_BAR)
 			get_viewport().set_input_as_handled()
 			return
 		if has_command_modifier and event.keycode == KEY_2:
@@ -613,8 +623,7 @@ func _nudge_selected_point(direction: Vector2) -> void:
 		point["position"] = Vector2(point.get("position", Vector2.ZERO)) + direction * step
 	BezierGeometry.resolve_auto_handles(component.get("points", []), component.get("chains", []))
 	_refresh_component_geometry(component)
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_INSPECTOR | RENDER_CANVAS_CONTEXT)
 
 
 func _is_plain_pivot_shortcut(event: InputEventKey) -> bool:
@@ -667,8 +676,7 @@ func _reset_to_default_state() -> void:
 		canvas_view.set_edit_mode(active_edit_mode)
 		canvas_view.set_transform_mode(active_transform_mode)
 		canvas_view.set_selected_edge_ids([])
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_INSPECTOR | RENDER_CANVAS_CONTEXT)
 
 
 func _set_geometry_command_state(state: String) -> void:
@@ -713,7 +721,7 @@ func _connect_context_method_menu(popup: PopupMenu, command: String, selection_h
 	popup.popup_hide.connect(func() -> void:
 		if active_context_command == command:
 			_set_active_context_command("")
-			_render_context_bar()
+			_invalidate_render(RENDER_CONTEXT_BAR)
 	)
 
 
@@ -722,7 +730,7 @@ func _complete_context_method_menu(command: String, popup: PopupMenu) -> void:
 		popup.hide()
 	if active_context_command == command:
 		_set_active_context_command("")
-		_render_context_bar()
+		_invalidate_render(RENDER_CONTEXT_BAR)
 
 
 func _stop_guide_draw_state() -> void:
@@ -1232,9 +1240,7 @@ func _confirm_motion_path_creation() -> void:
 	motion_paths.append(_default_motion_path(path_id, path_name))
 	selected_motion_path_id = path_id
 	motion_path_dialog.hide()
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 
 
 func _confirm_motion_sequence_creation() -> void:
@@ -1252,9 +1258,7 @@ func _confirm_motion_sequence_creation() -> void:
 	motion_sequence_playing = false
 	motion_sequence_preview_loop = true
 	motion_sequence_dialog.hide()
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 
 
 func _create_panel(background_color := Color("#20242c")) -> PanelContainer:
@@ -1590,8 +1594,7 @@ func _on_world_contour_stroke_width_changed(value: float) -> void:
 	geometry_meshing_preview_state = "idle"
 	geometry_meshing_preview_revision += 1
 	_update_world_scale_popup()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_INSPECTOR | RENDER_CANVAS_CONTEXT)
 
 
 func _apply_world_scale() -> void:
@@ -1601,7 +1604,7 @@ func _apply_world_scale() -> void:
 		canvas_view.set_world_scale(world_grid_size)
 	_update_world_scale_popup()
 	_update_snap_popup_labels()
-	_render_canvas_context()
+	_invalidate_render(RENDER_CANVAS_CONTEXT)
 
 
 func _update_world_scale_popup() -> void:
@@ -2085,9 +2088,7 @@ func _apply_eye_contour_stroke_width() -> void:
 	_show_status_message("Set Eye Contour Width to %s px on %d Component%s." % [
 		_format_scale_value(width), matching_components.size(), "" if matching_components.size() == 1 else "s"
 	])
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 
 
 func _open_new_world_dialog(save_after_creation: bool) -> void:
@@ -2164,9 +2165,7 @@ func _confirm_new_world() -> void:
 	_apply_snap_settings({})
 	pending_save_after_new = false
 	world_name_dialog.hide()
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 	if should_save:
 		_save_world()
 
@@ -2519,6 +2518,49 @@ func _incomplete_save_message(unwritten: Array[String]) -> String:
 	return "World partly saved · %s and %d more could not be written." % [unwritten[0], unwritten.size() - 1]
 
 
+func _invalidate_render(targets: int) -> void:
+	# Records what became stale instead of naming the render functions to call.
+	pending_renders |= targets
+	if rendering or render_flush_queued:
+		return
+	if not is_inside_tree():
+		# Outside the tree there is no frame to coalesce against, and a caller
+		# that inspects the result right away must still see it.
+		_flush_pending_renders()
+		return
+	render_flush_queued = true
+	call_deferred("_flush_pending_renders")
+
+
+func _flush_pending_renders() -> void:
+	render_flush_queued = false
+	if rendering:
+		return
+	rendering = true
+	# A render may invalidate again. Settle here rather than leaving a stale
+	# target for the next frame, but do not spin on a render that never settles.
+	var passes := 0
+	while pending_renders != 0 and passes < 4:
+		passes += 1
+		var targets := pending_renders
+		pending_renders = 0
+		if targets & RENDER_OUTLINER:
+			_render_outliner()
+		if targets & RENDER_INSPECTOR:
+			_render_inspector()
+		# _render_canvas_context renders the Context Bar and the Info Bar before it
+		# can return, so requesting it covers both. The reverse does not hold:
+		# _render_context_bar has exit paths that leave the Info Bar alone.
+		if targets & RENDER_CANVAS_CONTEXT:
+			_render_canvas_context()
+		else:
+			if targets & RENDER_CONTEXT_BAR:
+				_render_context_bar()
+			if targets & RENDER_INFO_BAR:
+				_render_info_bar()
+	rendering = false
+
+
 func _capture_history_snapshot() -> Dictionary:
 	# Every captured snapshot shares the current geometry documents, so the next
 	# mutation of one must copy it first.
@@ -2714,9 +2756,7 @@ func _restore_history_snapshot(snapshot: Dictionary) -> void:
 		if active_state == "draw":
 			_restore_draw_anchor_selection()
 	_update_world_scale_popup()
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 
 
 func _undo() -> void:
@@ -2910,9 +2950,7 @@ func _load_world(world_entry: String, persist_as_last := true) -> bool:
 	_restore_editor_state(world_data.get("editor_state", {}))
 	_update_next_ids()
 	active_state = ""
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 	if persist_as_last:
 		_write_json(CONFIG_PATH, {"schema_version": SCHEMA_VERSION, "last_world": world_name})
 	return true
@@ -5071,9 +5109,7 @@ func _on_update_meshes_pressed() -> void:
 	_save_world()
 	_refresh_export_preflight(true)
 	_show_status_message("Updated %d Mesh%s%s" % [succeeded, "" if succeeded == 1 else "es", " · %d need attention" % failed if failed > 0 else ""])
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 
 
 func _runtime_export_root() -> String:
@@ -5223,9 +5259,7 @@ func _on_runtime_export_pressed() -> void:
 	_invalidate_batch_status()
 	batch_status_snapshot = {}
 	_show_status_message("Exported %d Runtime package%s%s%s · %s" % [succeeded, "" if succeeded == 1 else "s", " · catalog updated" if catalog_updated else "", " · %d need attention" % failed if failed > 0 else "", _runtime_export_root()])
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 
 
 func _write_runtime_export_package(asset: Dictionary, build: Dictionary) -> bool:
@@ -5366,9 +5400,7 @@ func _generate_weighting_preview() -> void:
 	var mesh_bake := _component_mesh_bake(selected_asset_id, selected_component_id) if _component_mesh_status(selected_asset_id, selected_component_id, component) == "Ready" else {}
 	weighting_preview_key = _weighting_preview_id(selected_asset_id, selected_component_id, selected_weighting_style_id)
 	weighting_preview = WeightingService.generate(mesh_bake, style)
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 
 
 func _bake_weighting_preview() -> void:
@@ -5384,9 +5416,7 @@ func _bake_weighting_preview() -> void:
 	weighting_preview = {}
 	weighting_preview_key = ""
 	_show_status_message("Weighting baked for %s." % str(style.get("name", "Weighting Style")))
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 
 
 func _refresh_weighting_workspace() -> void:
@@ -5933,8 +5963,7 @@ func _set_motion_path_tool(value: String) -> void:
 	motion_path_tool = value if value in ["draw", "edit"] else "draw"
 	if is_instance_valid(motion_path_workspace):
 		motion_path_workspace.set_tool_mode(motion_path_tool)
-	_render_context_bar()
-	_render_info_bar()
+	_invalidate_render(RENDER_CONTEXT_BAR | RENDER_INFO_BAR)
 
 
 func _toggle_motion_path_playback() -> void:
@@ -5944,15 +5973,14 @@ func _toggle_motion_path_playback() -> void:
 	if not motion_path_playing and motion_path_phase >= 1.0:
 		motion_path_phase = 0.0
 	motion_path_playing = not motion_path_playing
-	_render_context_bar()
-	_render_info_bar()
+	_invalidate_render(RENDER_CONTEXT_BAR | RENDER_INFO_BAR)
 	_refresh_motion_path_workspace()
 
 
 func _on_motion_path_phase_changed(value: float) -> void:
 	motion_path_phase = clampf(value, 0.0, 1.0)
 	_refresh_motion_path_workspace()
-	_render_info_bar()
+	_invalidate_render(RENDER_INFO_BAR)
 
 
 func _advance_motion_path_preview(delta: float) -> void:
@@ -5969,7 +5997,7 @@ func _advance_motion_path_preview(delta: float) -> void:
 		else:
 			motion_path_phase = 1.0
 			motion_path_playing = false
-			_render_context_bar()
+			_invalidate_render(RENDER_CONTEXT_BAR)
 	_refresh_motion_path_workspace()
 
 
@@ -6018,14 +6046,14 @@ func _toggle_motion_act_playback() -> void:
 	if not motion_act_playing and motion_act_phase >= 1.0:
 		motion_act_phase = 0.0
 	motion_act_playing = not motion_act_playing
-	_render_context_bar()
+	_invalidate_render(RENDER_CONTEXT_BAR)
 	_refresh_motion_act_workspace()
 
 
 func _on_motion_act_phase_changed(value: float) -> void:
 	motion_act_phase = clampf(value, 0.0, 1.0)
 	_refresh_motion_act_workspace()
-	_render_info_bar()
+	_invalidate_render(RENDER_INFO_BAR)
 
 
 func _advance_motion_act_preview(delta: float) -> void:
@@ -6041,7 +6069,7 @@ func _advance_motion_act_preview(delta: float) -> void:
 		else:
 			motion_act_phase = 1.0
 			motion_act_playing = false
-			_render_context_bar()
+			_invalidate_render(RENDER_CONTEXT_BAR)
 	_refresh_motion_act_workspace()
 
 
@@ -6068,9 +6096,7 @@ func _set_geometry_sampling_method(method: String) -> void:
 	selected_geometry_bake_method = method
 	var current := _geometry_sampling_recipe(selected_asset_id, selected_component_id)
 	if str(current.get("method", "")) == method:
-		_render_outliner()
-		_render_inspector()
-		_render_context_bar()
+		_invalidate_render(RENDER_OUTLINER | RENDER_INSPECTOR | RENDER_CONTEXT_BAR)
 		_refresh_geometry_sampling_workspace()
 		return
 	_record_direct_change()
@@ -6082,9 +6108,7 @@ func _set_geometry_sampling_method(method: String) -> void:
 		recipe["parameters"] = matching_bake.get("parameters", {}).duplicate(true)
 	document["sampling"]["recipe"] = recipe
 	_clear_geometry_sampling_preview_for_selection()
-	_render_outliner()
-	_render_inspector()
-	_render_context_bar()
+	_invalidate_render(RENDER_OUTLINER | RENDER_INSPECTOR | RENDER_CONTEXT_BAR)
 	_refresh_geometry_sampling_workspace()
 	if matching_bake.is_empty():
 		call_deferred("_refresh_geometry_after_recipe_change")
@@ -6125,9 +6149,7 @@ func _set_geometry_seeding_method(method: String) -> void:
 	selected_geometry_bake_method = method
 	var current := _geometry_seeding_recipe(selected_asset_id, selected_component_id)
 	if str(current.get("method", "")) == method:
-		_render_outliner()
-		_render_inspector()
-		_render_context_bar()
+		_invalidate_render(RENDER_OUTLINER | RENDER_INSPECTOR | RENDER_CONTEXT_BAR)
 		_refresh_geometry_seeding_workspace()
 		if _geometry_seeding_status(selected_asset_id, selected_component_id, _get_component(_get_asset(selected_asset_id), selected_component_id)) == "Ready to Preview":
 			_schedule_geometry_seeding_preview()
@@ -6147,9 +6169,7 @@ func _set_geometry_seeding_method(method: String) -> void:
 	geometry_seeding_preview_key = ""
 	geometry_seeding_preview_state = "idle"
 	geometry_seeding_preview_revision += 1
-	_render_outliner()
-	_render_inspector()
-	_render_context_bar()
+	_invalidate_render(RENDER_OUTLINER | RENDER_INSPECTOR | RENDER_CONTEXT_BAR)
 	_refresh_geometry_seeding_workspace()
 	if matching_bake.is_empty() or not _geometry_seeding_result_matches(matching_bake, selected_asset_id, selected_component_id, _get_component(_get_asset(selected_asset_id), selected_component_id)):
 		call_deferred("_schedule_geometry_seeding_preview")
@@ -6159,8 +6179,7 @@ func _activate_geometry_seeding_method_choice() -> void:
 	if selected_asset_id.is_empty() or selected_component_id.is_empty():
 		return
 	_set_geometry_command_state("seeding_method")
-	_render_context_bar()
-	_render_info_bar()
+	_invalidate_render(RENDER_CONTEXT_BAR | RENDER_INFO_BAR)
 	_show_status_message("Seeding Method: 1 Poisson Fill · 2 Spine Flow")
 
 
@@ -6178,7 +6197,7 @@ func _toggle_geometry_seeding_edit() -> void:
 	else:
 		_set_geometry_command_state("")
 		_show_status_message("Generate a valid Seeding Preview before editing Seeds.")
-	_render_context_bar()
+	_invalidate_render(RENDER_CONTEXT_BAR)
 	_refresh_geometry_seeding_workspace()
 	if geometry_seeding_edit_active and is_instance_valid(geometry_seeding_workspace) and geometry_seeding_workspace.is_inside_tree():
 		geometry_seeding_workspace.grab_focus()
@@ -6188,7 +6207,7 @@ func _set_geometry_seeding_edit_tool(tool: String) -> void:
 	if tool not in ["select", "add", "remove"]:
 		return
 	geometry_seeding_edit_tool = tool
-	_render_context_bar()
+	_invalidate_render(RENDER_CONTEXT_BAR)
 	_refresh_geometry_seeding_workspace()
 
 
@@ -6215,9 +6234,7 @@ func _set_geometry_meshing_method(_method: String = GeometryMeshingService.CONST
 	selected_geometry_bake_method = GeometryMeshingService.CONSTRAINED_MESH
 	var current := _geometry_meshing_recipe(selected_asset_id, selected_component_id)
 	if str(current.get("method", "")) == GeometryMeshingService.CONSTRAINED_MESH:
-		_render_outliner()
-		_render_inspector()
-		_render_context_bar()
+		_invalidate_render(RENDER_OUTLINER | RENDER_INSPECTOR | RENDER_CONTEXT_BAR)
 		_refresh_geometry_meshing_workspace()
 		if _geometry_meshing_status(selected_asset_id, selected_component_id, _get_component(_get_asset(selected_asset_id), selected_component_id)) == "Ready to Preview":
 			_schedule_geometry_meshing_preview()
@@ -6233,9 +6250,7 @@ func _set_geometry_meshing_method(_method: String = GeometryMeshingService.CONST
 	geometry_meshing_preview_key = ""
 	geometry_meshing_preview_state = "idle"
 	geometry_meshing_preview_revision += 1
-	_render_outliner()
-	_render_inspector()
-	_render_context_bar()
+	_invalidate_render(RENDER_OUTLINER | RENDER_INSPECTOR | RENDER_CONTEXT_BAR)
 	_refresh_geometry_meshing_workspace()
 	if matching_bake.is_empty() or not _geometry_meshing_result_matches(matching_bake, selected_asset_id, selected_component_id, _get_component(_get_asset(selected_asset_id), selected_component_id)):
 		call_deferred("_schedule_geometry_meshing_preview")
@@ -6299,9 +6314,7 @@ func _set_motion_sequence_view(value: String) -> void:
 	motion_sequence_view = value if value in [MotionSequenceWorkspace.VIEW_COMPOSITION, MotionSequenceWorkspace.VIEW_PLAYER] else MotionSequenceWorkspace.VIEW_COMPOSITION
 	if motion_sequence_view != MotionSequenceWorkspace.VIEW_PLAYER:
 		motion_sequence_playing = false
-	_render_context_bar()
-	_render_inspector()
-	_render_info_bar()
+	_invalidate_render(RENDER_INSPECTOR | RENDER_CONTEXT_BAR | RENDER_INFO_BAR)
 	_refresh_motion_sequence_workspace()
 
 
@@ -6312,15 +6325,14 @@ func _toggle_motion_sequence_playback() -> void:
 	if not motion_sequence_playing and motion_sequence_phase >= 1.0:
 		motion_sequence_phase = 0.0
 	motion_sequence_playing = not motion_sequence_playing
-	_render_context_bar()
-	_render_info_bar()
+	_invalidate_render(RENDER_CONTEXT_BAR | RENDER_INFO_BAR)
 	_refresh_motion_sequence_workspace()
 
 
 func _on_motion_sequence_phase_changed(value: float) -> void:
 	motion_sequence_phase = clampf(value, 0.0, 1.0)
 	_refresh_motion_sequence_workspace()
-	_render_info_bar()
+	_invalidate_render(RENDER_INFO_BAR)
 
 
 func _on_motion_sequence_preview_loop_changed(enabled: bool) -> void:
@@ -6332,7 +6344,7 @@ func _advance_motion_sequence_preview(delta: float) -> void:
 	var context := _motion_sequence_entry_context(entry)
 	if not MotionSequenceEvaluator.validation_issues(entry, context.get("asset", {}), context.get("path", {})).is_empty():
 		motion_sequence_playing = false
-		_render_context_bar()
+		_invalidate_render(RENDER_CONTEXT_BAR)
 		return
 	var duration := maxf(0.01, float(context.get("path", {}).get("playback", {}).get("duration", 2.0)))
 	motion_sequence_phase += delta / duration
@@ -6342,7 +6354,7 @@ func _advance_motion_sequence_preview(delta: float) -> void:
 		else:
 			motion_sequence_phase = 1.0
 			motion_sequence_playing = false
-			_render_context_bar()
+			_invalidate_render(RENDER_CONTEXT_BAR)
 	_refresh_motion_sequence_workspace()
 
 
@@ -6411,8 +6423,7 @@ func _set_import_preview_mode(mode: String) -> void:
 	if mode != "original" and mode != "white_to_alpha":
 		mode = "original"
 	active_import_preview_mode = mode
-	_render_context_bar()
-	_render_canvas_context()
+	_invalidate_render(RENDER_CANVAS_CONTEXT | RENDER_CONTEXT_BAR)
 
 
 func _copy_external_file(source_path: String, destination_path: String) -> bool:
@@ -6528,8 +6539,7 @@ func _set_draw_point_mode(mode: String) -> void:
 	active_draw_point_mode = mode
 	if is_instance_valid(canvas_view):
 		canvas_view.set_draw_point_mode(mode)
-	_render_context_bar()
-	_render_info_bar()
+	_invalidate_render(RENDER_CONTEXT_BAR | RENDER_INFO_BAR)
 
 
 func _set_edit_mode(mode: String) -> void:
@@ -6547,8 +6557,7 @@ func _set_edit_mode(mode: String) -> void:
 	canvas_view.set_edit_handles_enabled(edit_bezier_handles)
 	canvas_view.set_edit_point_set_enabled(edit_point_set_mode)
 	canvas_view.set_selected_edge_ids(selected_edge_ids)
-	_render_context_bar()
-	_render_info_bar()
+	_invalidate_render(RENDER_CONTEXT_BAR | RENDER_INFO_BAR)
 
 
 func _activate_edit_state() -> void:
@@ -6574,9 +6583,7 @@ func _activate_guide_draw_state() -> void:
 	canvas_view.set_interaction_state("draw")
 	canvas_view.set_tool_mode("spine")
 	canvas_view.set_draw_point_mode(active_draw_point_mode)
-	_render_context_bar()
-	_render_info_bar()
-	_render_canvas_context()
+	_invalidate_render(RENDER_CANVAS_CONTEXT | RENDER_CONTEXT_BAR | RENDER_INFO_BAR)
 	_show_status_message("Draw Guide Point · Escape to stop")
 
 
@@ -6595,9 +6602,7 @@ func _activate_guide_edit_state(handle_editing := false, set_mode := false) -> v
 	canvas_view.set_edit_mode("point")
 	canvas_view.set_edit_handles_enabled(edit_bezier_handles)
 	canvas_view.set_edit_point_set_enabled(edit_point_set_mode)
-	_render_context_bar()
-	_render_info_bar()
-	_render_canvas_context()
+	_invalidate_render(RENDER_CANVAS_CONTEXT | RENDER_CONTEXT_BAR | RENDER_INFO_BAR)
 
 
 func _activate_edit_point_state(handle_editing := false, set_mode := false) -> void:
@@ -6617,7 +6622,7 @@ func _activate_fuse_point_state() -> void:
 		_fuse_selected_point(selected_point_ids[0])
 	else:
 		_show_status_message("Fuse Point · Select a Point to fuse with a nearby Point")
-	_render_context_bar()
+	_invalidate_render(RENDER_CONTEXT_BAR)
 
 
 func _fuse_selected_point(point_id: String) -> void:
@@ -6638,7 +6643,7 @@ func _fuse_selected_point(point_id: String) -> void:
 	selected_point_ids = [kept_id]
 	_refresh_component_geometry(component)
 	canvas_view.set_selected_point_id(kept_id)
-	_render_inspector()
+	_invalidate_render(RENDER_INSPECTOR)
 	_show_status_message("Fuse Point · Nearby Point fused")
 
 
@@ -6690,8 +6695,7 @@ func _flip_component_geometry_x(asset_id: String, component_id: String) -> void:
 	BezierGeometry.resolve_auto_handles(points, component.get("chains", []))
 	if asset_id == selected_asset_id and component_id == selected_component_id:
 		_refresh_component_geometry(component)
-		_render_inspector()
-		_render_canvas_context()
+		_invalidate_render(RENDER_INSPECTOR | RENDER_CANVAS_CONTEXT)
 	_show_status_message("Flipped Closed Loop across the Pivot's vertical axis.")
 
 
@@ -6703,7 +6707,7 @@ func _activate_selection_mirror() -> void:
 	if not canvas_view.start_mirror_command():
 		_set_active_context_command("asset.edit_point")
 		return
-	_render_context_bar()
+	_invalidate_render(RENDER_CONTEXT_BAR)
 	_show_mirror_prompt("Mirror Y · Set the first axis Point on the snapped grid")
 
 
@@ -6722,7 +6726,7 @@ func _on_mirror_axis_confirmed(axis_start: Vector2, axis_end: Vector2) -> void:
 		var errors: Array = result.get("errors", [])
 		_show_status_message(str(errors[0]) if not errors.is_empty() else "Mirror Y could not be applied.")
 		_set_active_context_command("asset.edit_point")
-		_render_context_bar()
+		_invalidate_render(RENDER_CONTEXT_BAR)
 		return
 	_record_direct_change()
 	var resolved: Dictionary = result.get("component", {})
@@ -6735,9 +6739,7 @@ func _on_mirror_axis_confirmed(axis_start: Vector2, axis_end: Vector2) -> void:
 	_activate_edit_point_state(false, false)
 	_refresh_component_geometry(component)
 	canvas_view.set_selected_point_ids(selected_point_ids)
-	_render_outliner()
-	_render_inspector()
-	_render_context_bar()
+	_invalidate_render(RENDER_OUTLINER | RENDER_INSPECTOR | RENDER_CONTEXT_BAR)
 	var auto_connected_count := int(result.get("auto_connected_count", 0))
 	if auto_connected_count > 0:
 		_show_status_message("Mirror Y applied · Overlapping endpoints connected")
@@ -6747,7 +6749,7 @@ func _on_mirror_axis_confirmed(axis_start: Vector2, axis_end: Vector2) -> void:
 
 func _on_mirror_axis_cancelled() -> void:
 	_set_active_context_command("asset.edit_point")
-	_render_context_bar()
+	_invalidate_render(RENDER_CONTEXT_BAR)
 	_show_status_message("Mirror Y cancelled")
 
 
@@ -6764,7 +6766,7 @@ func _activate_transform_state() -> void:
 func _set_transform_mode(mode: String) -> void:
 	active_transform_mode = mode
 	canvas_view.set_transform_mode(active_transform_mode)
-	_render_info_bar()
+	_invalidate_render(RENDER_INFO_BAR)
 
 
 func _set_active_state(state: String) -> void:
@@ -6786,8 +6788,7 @@ func _set_active_state(state: String) -> void:
 		if state == "edit":
 			canvas_view.set_edit_mode(active_edit_mode)
 		canvas_view.set_tool_mode("")
-	_render_context_bar()
-	_render_info_bar()
+	_invalidate_render(RENDER_CONTEXT_BAR | RENDER_INFO_BAR)
 
 
 func _render_info_bar() -> void:
@@ -7040,9 +7041,7 @@ func _confirm_asset_creation() -> void:
 	active_state = ""
 	_set_outliner_asset_expanded(asset_id, true)
 	asset_dialog.hide()
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 
 
 func _open_reference_image_dialog() -> void:
@@ -7098,8 +7097,7 @@ func _save_reference_image_result(reference_image_result: Image) -> void:
 	reference_image["scale"] = 1.0
 	_record_direct_change()
 	asset["reference_image"] = reference_image
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_INSPECTOR | RENDER_CANVAS_CONTEXT)
 
 
 func _apply_reference_image_orientation(image: Image, source_path: String) -> void:
@@ -7197,8 +7195,7 @@ func _clear_reference_image() -> void:
 	_record_direct_change()
 	reference_image["file"] = ""
 	asset["reference_image"] = reference_image
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_INSPECTOR | RENDER_CANVAS_CONTEXT)
 
 
 func _on_reference_image_visibility_changed(image_visible: bool) -> void:
@@ -7236,7 +7233,7 @@ func _on_reference_image_property_changed(value: float, property_name: String) -
 		return
 	_record_direct_change()
 	asset["reference_image"] = reference_image
-	_render_canvas_context()
+	_invalidate_render(RENDER_CANVAS_CONTEXT)
 
 
 func _on_asset_pivot_property_changed(value: float, property_name: String) -> void:
@@ -7277,7 +7274,7 @@ func _on_asset_root_position_changed(value: float, property_name: String) -> voi
 		var analysis := AssetScaleRebaseService.analyze_asset(asset)
 		asset_root_scale_rebase_button.disabled = not bool(analysis.get("can_rebase", false))
 		asset_root_scale_rebase_button.tooltip_text = "Bake Root Position and independent X/Y Scale into Components, Groups, References, Guides, and Weapon Frames." if analysis.get("blockers", []).is_empty() else str(analysis.get("blockers", [""])[0])
-	_render_canvas_context()
+	_invalidate_render(RENDER_CANVAS_CONTEXT)
 
 
 func _update_reference_image_property(property_name: String, value) -> void:
@@ -7288,8 +7285,7 @@ func _update_reference_image_property(property_name: String, value) -> void:
 	reference_image[property_name] = value
 	_record_direct_change()
 	asset["reference_image"] = reference_image
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_INSPECTOR | RENDER_CANVAS_CONTEXT)
 
 
 func _next_default_asset_name() -> String:
@@ -7338,7 +7334,7 @@ func _update_outliner_asset_type_filter_visibility() -> void:
 
 func _on_outliner_asset_type_filter_toggled(enabled: bool, asset_type: String) -> void:
 	outliner_asset_type_filters[asset_type] = enabled
-	_render_outliner()
+	_invalidate_render(RENDER_OUTLINER)
 
 
 func _set_all_outliner_asset_type_filters() -> void:
@@ -7348,7 +7344,7 @@ func _set_all_outliner_asset_type_filters() -> void:
 		var checkbox := outliner_asset_type_filter_checkboxes[asset_type] as CheckBox
 		if checkbox != null:
 			checkbox.set_pressed_no_signal(true)
-	_render_outliner()
+	_invalidate_render(RENDER_OUTLINER)
 
 
 func _apply_outliner_asset_type_filter_checkboxes() -> void:
@@ -7513,9 +7509,7 @@ func _select_motion_path(path_id: String) -> void:
 	motion_path_playing = false
 	if _get_asset(motion_path_preview_asset_id).is_empty():
 		motion_path_preview_asset_id = _default_motion_path_preview_asset_id()
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 
 
 func _select_motion_sequence(sequence_id: String) -> void:
@@ -7525,9 +7519,7 @@ func _select_motion_sequence(sequence_id: String) -> void:
 	selected_motion_sequence_entry_id = str(first_entry.get("id", ""))
 	motion_sequence_phase = 0.0
 	motion_sequence_playing = false
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 
 
 func _select_motion_act_preview_asset(asset_id: String) -> void:
@@ -7536,8 +7528,7 @@ func _select_motion_act_preview_asset(asset_id: String) -> void:
 	motion_act_preview_asset_id = asset_id
 	motion_act_phase = 0.0
 	motion_act_playing = false
-	_render_outliner()
-	_render_canvas_context()
+	_invalidate_render(RENDER_OUTLINER | RENDER_CANVAS_CONTEXT)
 
 
 func _select_motion_sequence_entry(entry_id: String) -> void:
@@ -7545,7 +7536,7 @@ func _select_motion_sequence_entry(entry_id: String) -> void:
 	if _get_motion_sequence_entry(sequence_document, entry_id).is_empty():
 		return
 	selected_motion_sequence_entry_id = entry_id
-	_render_inspector()
+	_invalidate_render(RENDER_INSPECTOR)
 	_refresh_motion_sequence_workspace()
 
 
@@ -7568,8 +7559,7 @@ func _add_motion_sequence_entry() -> void:
 	selected_motion_sequence_entry_id = str(entry["id"])
 	motion_sequence_phase = 0.0
 	motion_sequence_playing = false
-	_render_inspector()
-	_render_context_bar()
+	_invalidate_render(RENDER_INSPECTOR | RENDER_CONTEXT_BAR)
 	_refresh_motion_sequence_workspace()
 
 
@@ -7583,8 +7573,7 @@ func _remove_motion_sequence_entry() -> void:
 			selected_motion_sequence_entry_id = ""
 			motion_sequence_phase = 0.0
 			motion_sequence_playing = false
-			_render_inspector()
-			_render_context_bar()
+			_invalidate_render(RENDER_INSPECTOR | RENDER_CONTEXT_BAR)
 			_refresh_motion_sequence_workspace()
 			return
 
@@ -7607,7 +7596,7 @@ func _rename_motion_path(new_name: String, path_document: Dictionary, editor: Li
 		return
 	_record_direct_change()
 	path_document["name"] = normalized_name
-	_render_outliner()
+	_invalidate_render(RENDER_OUTLINER)
 	if is_instance_valid(motion_path_workspace):
 		motion_path_workspace.set_document(path_document)
 
@@ -7622,7 +7611,7 @@ func _rename_motion_sequence(new_name: String, sequence_document: Dictionary, ed
 		return
 	_record_direct_change()
 	sequence_document["name"] = normalized_name
-	_render_outliner()
+	_invalidate_render(RENDER_OUTLINER)
 	if is_instance_valid(motion_sequence_workspace):
 		motion_sequence_workspace.set_document(sequence_document)
 
@@ -7635,8 +7624,7 @@ func _on_motion_path_point_add_requested(world_position: Vector2) -> void:
 	MotionPathTopology.add_point(path_document["topology"], world_position)
 	motion_path_phase = 0.0
 	_refresh_motion_path_workspace()
-	_render_inspector()
-	_render_context_bar()
+	_invalidate_render(RENDER_INSPECTOR | RENDER_CONTEXT_BAR)
 
 
 func _on_motion_path_point_move_requested(point_id: String, world_position: Vector2) -> void:
@@ -7661,8 +7649,7 @@ func _on_motion_path_point_delete_requested(point_id: String) -> void:
 	if MotionPathTopology.delete_point(path_document["topology"], point_id):
 		motion_path_phase = 0.0
 		_refresh_motion_path_workspace()
-		_render_inspector()
-		_render_context_bar()
+		_invalidate_render(RENDER_INSPECTOR | RENDER_CONTEXT_BAR)
 
 
 func _refresh_motion_path_workspace() -> void:
@@ -7721,9 +7708,7 @@ func _select_motion_asset(asset_id: String) -> void:
 	if is_instance_valid(motion_workspace):
 		motion_workspace.set_asset(asset_id, str(asset.get("name", "Asset")), asset.get("components", []), _ensure_asset_animation(asset))
 	_sync_motion_player_document(asset)
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 
 
 func _render_weighting_outliner() -> void:
@@ -8115,8 +8100,7 @@ func _select_geometry_seeding_input(asset_id: String, component_id: String, inpu
 	selected_sampling_input_id = input_id
 	selected_sampling_input_kind = role
 	selected_guide_id = input_id if role in ["cut", "spine"] else ""
-	_render_outliner()
-	_render_inspector()
+	_invalidate_render(RENDER_OUTLINER | RENDER_INSPECTOR)
 	_refresh_geometry_seeding_workspace()
 
 
@@ -8339,9 +8323,7 @@ func _select_geometry_asset(asset_id: String) -> void:
 		_set_outliner_asset_expanded(asset_id, not bool(expanded_assets.get(asset_id, false)))
 	else:
 		_set_outliner_asset_expanded(asset_id, true)
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 
 
 func _select_geometry_component(asset_id: String, component_id: String) -> void:
@@ -8357,9 +8339,7 @@ func _select_geometry_component(asset_id: String, component_id: String) -> void:
 	selected_geometry_bake_method = ""
 	_set_geometry_command_state("")
 	_set_outliner_asset_expanded(asset_id, true)
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 	if active_geometry_submodule == "Sampling" and is_instance_valid(geometry_sampling_workspace):
 		geometry_sampling_workspace.grab_focus()
 		if not _geometry_sampling_bake_is_current(asset_id, component_id, _get_component(_get_asset(asset_id), component_id)):
@@ -8383,17 +8363,13 @@ func _select_geometry_sampling_reference(asset_id: String, parent_component_id: 
 	if not reference_id.is_empty():
 		selected_sampling_input_id = reference_id
 		selected_sampling_input_kind = "reference"
-		_render_outliner()
-		_render_inspector()
-		_render_canvas_context()
+		_invalidate_render(RENDER_DOCUMENT)
 		return
 	for reference in _get_asset(asset_id).get("components", []):
 		if _is_reference_component(reference) and str(reference.get("parent_component_id", "")) == parent_component_id:
 			selected_sampling_input_id = str(reference.get("id", ""))
 			selected_sampling_input_kind = "reference"
-			_render_outliner()
-			_render_inspector()
-			_render_canvas_context()
+			_invalidate_render(RENDER_DOCUMENT)
 			return
 
 
@@ -8534,9 +8510,7 @@ func _select_group(asset_id: String, group_id: String) -> void:
 	selected_component_ids.clear()
 	selected_guide_id = ""
 	active_state = ""
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 
 
 func _on_group_outliner_gui_input(event: InputEvent, asset_id: String, group_id: String, button: Button) -> void:
@@ -8636,9 +8610,7 @@ func _outliner_drop_data(_at_position: Vector2, data, asset_id: String, target_i
 		selected_group_id = group_id
 		selected_component_id = ""
 		selected_component_ids.clear()
-		_render_outliner()
-		_render_inspector()
-		_render_canvas_context()
+		_invalidate_render(RENDER_DOCUMENT)
 		_show_status_message("Removed Group from Parent." if target_id == "root" else "Parented Group under %s." % str(_get_component(asset, target_id).get("name", "Component")))
 		return
 	var component_ids: Array = data.get("component_ids", [])
@@ -8659,9 +8631,7 @@ func _outliner_drop_data(_at_position: Vector2, data, asset_id: String, target_i
 	selected_component_id = str(component_ids.back())
 	selected_component_ids = component_ids.duplicate()
 	selected_group_id = ""
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 
 
 func _set_component_group_preserving_world(asset: Dictionary, component_id: String, group_id: String) -> void:
@@ -8896,9 +8866,7 @@ func _select_asset(asset_id: String) -> void:
 		_set_outliner_asset_expanded(asset_id, not bool(expanded_assets.get(asset_id, false)))
 	else:
 		_set_outliner_asset_expanded(asset_id, true)
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 
 
 func _open_component_dialog(asset_id: String, anchor: Control) -> void:
@@ -9085,9 +9053,7 @@ func _on_draw_mode_status_selected(index: int) -> void:
 	selected_edge_id = ""
 	selected_edge_ids.clear()
 	canvas_view.clear_selection()
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 	_show_status_message("Draw Mode changed to %s." % _draw_mode_display_name(target_mode))
 
 
@@ -9191,9 +9157,7 @@ func _create_guide(asset_id: String, component_id: String, guide_type: String, l
 	guide_dialog.hide()
 	canvas_view.set_navigation_locked(false)
 	_show_status_message("Created %s." % _guide_display_name(asset, guide))
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 
 
 func _create_weapon_guide(asset_id: String, scope_kind: String, scope_id: String, guide_type: String) -> void:
@@ -9218,9 +9182,7 @@ func _create_weapon_guide(asset_id: String, scope_kind: String, scope_id: String
 	active_draw_tool = ""
 	_set_outliner_asset_expanded(asset_id, true)
 	_show_status_message("Created %s." % guide_type)
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 
 
 func _create_region(asset_id: String, scope_kind: String, scope_id: String, region_type: String) -> void:
@@ -9255,9 +9217,7 @@ func _create_region(asset_id: String, scope_kind: String, scope_id: String, regi
 	active_draw_tool = "point"
 	_set_outliner_asset_expanded(asset_id, true)
 	_show_status_message("Created %s Region · draw and close its boundary." % region_type.capitalize())
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 
 
 func _is_region(component: Dictionary) -> bool:
@@ -9289,9 +9249,7 @@ func _duplicate_selected_guide() -> void:
 	active_state = ""
 	_set_outliner_asset_expanded(selected_asset_id, true)
 	_show_status_message("Duplicated %s." % _guide_display_name(asset, guide_copy))
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 
 
 func _open_group_dialog(asset_id: String) -> void:
@@ -9371,9 +9329,7 @@ func _confirm_group_creation() -> void:
 	selected_component_ids = component_ids.duplicate()
 	selected_component_id = str(component_ids.back())
 	_set_outliner_asset_expanded(asset_id, true)
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 
 
 func _group_world_center(asset: Dictionary, component_ids: Array) -> Vector2:
@@ -9422,8 +9378,7 @@ func _place_selected_group_pivot_at_mouse() -> bool:
 	transform["pivot"] = new_pivot
 	transform["position"] = transform_position
 	group["transform"] = transform
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_INSPECTOR | RENDER_CANVAS_CONTEXT)
 	return true
 
 
@@ -9457,9 +9412,7 @@ func _on_component_context_menu_selected(action_id: int) -> void:
 		selected_group_id = ""
 		selected_component_ids = selected_ids.duplicate()
 		selected_component_id = str(selected_ids.back())
-		_render_outliner()
-		_render_inspector()
-		_render_canvas_context()
+		_invalidate_render(RENDER_DOCUMENT)
 		_show_status_message("Removed %d Component%s from Group." % [selected_ids.size(), "" if selected_ids.size() == 1 else "s"])
 		return
 	if not group_id.is_empty() and action_id in [0, 1, 2]:
@@ -9582,9 +9535,7 @@ func _paste_component_clipboard(target_asset_id: String, target_parent_id := "")
 	active_state = ""
 	_set_outliner_asset_expanded(target_asset_id, true)
 	_show_status_message("Pasted %d Component%s." % [pasted_root_ids.size(), "" if pasted_root_ids.size() == 1 else "s"])
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 
 
 func _next_pasted_component_name(asset: Dictionary, source_name: String) -> String:
@@ -9658,9 +9609,7 @@ func _duplicate_group(asset_id: String, group_id: String, mirror_mode := "none")
 				asset["components"].erase(ComponentHierarchy.component_by_id(asset, duplicated_id))
 			asset["groups"].erase(group_copy)
 			_show_status_message("Mirrored Group was not created: %s" % str(rebase_result.get("errors", ["Unknown error"])[0]))
-			_render_outliner()
-			_render_inspector()
-			_render_canvas_context()
+			_invalidate_render(RENDER_DOCUMENT)
 			return
 	selected_asset_id = asset_id
 	selected_group_id = new_group_id
@@ -9669,9 +9618,7 @@ func _duplicate_group(asset_id: String, group_id: String, mirror_mode := "none")
 	selected_guide_id = ""
 	_set_outliner_asset_expanded(asset_id, true)
 	_show_status_message("Duplicated Group %s." % str(group_copy.get("name", "Group")))
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 
 
 func _next_duplicate_group_name(asset: Dictionary, source_name: String) -> String:
@@ -9735,9 +9682,7 @@ func _duplicate_component(asset_id: String, component_id: String, mirror_mode :=
 			for duplicated_id in duplicated_component_ids:
 				asset["components"].erase(ComponentHierarchy.component_by_id(asset, duplicated_id))
 			_show_status_message("Mirrored Component was not created: %s" % str(rebase_result.get("errors", ["Unknown error"])[0]))
-			_render_outliner()
-			_render_inspector()
-			_render_canvas_context()
+			_invalidate_render(RENDER_DOCUMENT)
 			return
 	selected_asset_id = asset_id
 	selected_component_id = str(duplicate_root.get("id", ""))
@@ -9748,9 +9693,7 @@ func _duplicate_component(asset_id: String, component_id: String, mirror_mode :=
 	active_state = ""
 	_set_outliner_asset_expanded(asset_id, true)
 	_show_status_message("Duplicated %s subtree." % str(duplicate_root.get("name", "Component")) if source_tree.size() > 1 else "Duplicated %s." % str(duplicate_root.get("name", "Component")))
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 
 
 func _next_duplicate_component_name(asset: Dictionary, source_name: String) -> String:
@@ -9977,9 +9920,7 @@ func _confirm_component_creation() -> void:
 	_set_outliner_asset_expanded(asset_id, true)
 	component_dialog.hide()
 	canvas_view.set_navigation_locked(false)
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 
 
 func _next_default_component_name(asset: Dictionary) -> String:
@@ -10051,9 +9992,7 @@ func _select_component(asset_id: String, component_id: String, focus_outliner :=
 	active_state = ""
 	canvas_view.set_interaction_state("")
 	_set_outliner_asset_expanded(asset_id, true)
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 	if is_instance_valid(canvas_view):
 		canvas_view.grab_focus()
 
@@ -10077,9 +10016,7 @@ func _select_guide(asset_id: String, guide_id: String) -> void:
 			selected_point_ids.clear()
 			active_state = ""
 			_set_outliner_asset_expanded(asset_id, true)
-			_render_outliner()
-			_render_inspector()
-			_render_canvas_context()
+			_invalidate_render(RENDER_DOCUMENT)
 			return
 	active_module = "Create"
 	_set_create_submodule_context(_asset_type_create_submodule(_asset_type(_get_asset(asset_id))))
@@ -10095,9 +10032,7 @@ func _select_guide(asset_id: String, guide_id: String) -> void:
 	selected_point_ids.clear()
 	active_state = ""
 	_set_outliner_asset_expanded(asset_id, true)
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 
 
 func _delete_selected_component() -> void:
@@ -10173,9 +10108,7 @@ func _confirm_component_deletion() -> void:
 	selected_component_ids.clear()
 	selected_guide_id = ""
 	active_state = ""
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 
 
 func _delete_current_outliner_selection() -> void:
@@ -10229,9 +10162,7 @@ func _delete_selected_group() -> void:
 	selected_component_ids.clear()
 	selected_guide_id = ""
 	active_state = ""
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 	_show_status_message("Deleted Group · Components kept in place.")
 
 
@@ -10254,9 +10185,7 @@ func _delete_selected_asset() -> void:
 	selected_asset_id = ""
 	selected_component_id = ""
 	active_state = ""
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 
 
 func _style_outliner_button(button: Button, selected: bool, topology_role := "outer") -> void:
@@ -10367,8 +10296,7 @@ func _rename_selected_group(new_name: String) -> void:
 		return
 	_record_direct_change()
 	group["name"] = group_name
-	_render_outliner()
-	_render_inspector()
+	_invalidate_render(RENDER_OUTLINER | RENDER_INSPECTOR)
 
 
 func _add_group_transform_field(grid: GridContainer, label_text: String, value: float, property_name: String, step: float) -> void:
@@ -10414,8 +10342,7 @@ func _on_group_transform_value_changed(value: float, property_name: String) -> v
 	transform["scale"] = transform_scale
 	transform["pivot"] = pivot
 	group["transform"] = transform
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_INSPECTOR | RENDER_CANVAS_CONTEXT)
 
 
 func _on_group_visibility_entry_changed(visibility_enabled: bool, asset_id: String, group_id: String) -> void:
@@ -10425,9 +10352,7 @@ func _on_group_visibility_entry_changed(visibility_enabled: bool, asset_id: Stri
 		return
 	_record_direct_change()
 	group["visibility"] = visibility_enabled
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 
 
 func _on_group_visibility_changed(visibility_enabled: bool) -> void:
@@ -10437,8 +10362,7 @@ func _on_group_visibility_changed(visibility_enabled: bool) -> void:
 		return
 	_record_direct_change()
 	group["visibility"] = visibility_enabled
-	_render_outliner()
-	_render_canvas_context()
+	_invalidate_render(RENDER_OUTLINER | RENDER_CANVAS_CONTEXT)
 
 
 func _on_group_hierarchy_parent_selected(index: int, option: OptionButton) -> void:
@@ -10451,9 +10375,7 @@ func _on_group_hierarchy_parent_selected(index: int, option: OptionButton) -> vo
 		return
 	_record_direct_change()
 	_set_group_parent_preserving_world(asset, selected_group_id, parent_id)
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 
 
 func _render_guide_inspector(asset: Dictionary, guide: Dictionary) -> void:
@@ -10560,7 +10482,7 @@ func _on_weapon_frame_value_changed(value: float, property_name: String) -> void
 	transform["scale"] = Vector2.ONE
 	transform["pivot"] = Vector2.ZERO
 	guide["transform"] = transform
-	_render_canvas_context()
+	_invalidate_render(RENDER_CANVAS_CONTEXT)
 
 
 func _render_weighting_inspector() -> void:
@@ -10657,7 +10579,7 @@ func _rename_weighting_style(new_name: String) -> void:
 		return
 	_record_direct_change()
 	style["name"] = style_name
-	_render_outliner()
+	_invalidate_render(RENDER_OUTLINER)
 
 
 func _weighting_style_index(document: Dictionary, style_id: String) -> int:
@@ -10683,9 +10605,7 @@ func _delete_selected_weighting_style() -> void:
 			selected_weighting_style_id = ""
 			weighting_preview = {}
 			weighting_preview_key = ""
-			_render_outliner()
-			_render_inspector()
-			_render_canvas_context()
+			_invalidate_render(RENDER_DOCUMENT)
 			return
 
 
@@ -10742,9 +10662,7 @@ func _on_guide_type_selected(index: int, option: OptionButton) -> void:
 	var guide_ordinal := ComponentHierarchy.next_guide_ordinal(asset, str(guide.get("scope", {}).get("component_id", "")), guide_type)
 	guide["guide_type"] = guide_type
 	guide["ordinal"] = guide_ordinal
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 
 
 func _on_guide_target_selected(index: int, option: OptionButton) -> void:
@@ -10759,9 +10677,7 @@ func _on_guide_target_selected(index: int, option: OptionButton) -> void:
 	var guide_ordinal := ComponentHierarchy.next_guide_ordinal(asset, component_id, str(guide.get("guide_type", AssetGuide.SAMPLE)))
 	guide["scope"] = {"kind": "component", "component_id": component_id}
 	guide["ordinal"] = guide_ordinal
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 
 
 func _on_selected_guide_visibility_changed(enabled: bool) -> void:
@@ -10770,8 +10686,7 @@ func _on_selected_guide_visibility_changed(enabled: bool) -> void:
 		return
 	_record_direct_change()
 	guide["visibility"] = enabled
-	_render_outliner()
-	_render_canvas_context()
+	_invalidate_render(RENDER_OUTLINER | RENDER_CANVAS_CONTEXT)
 
 
 func _on_guide_visibility_entry_changed(enabled: bool, asset_id: String, guide_id: String) -> void:
@@ -10780,8 +10695,7 @@ func _on_guide_visibility_entry_changed(enabled: bool, asset_id: String, guide_i
 		return
 	_record_direct_change()
 	guide["visibility"] = enabled
-	_render_outliner()
-	_render_canvas_context()
+	_invalidate_render(RENDER_OUTLINER | RENDER_CANVAS_CONTEXT)
 
 
 func _delete_selected_guide() -> void:
@@ -10812,9 +10726,7 @@ func _confirm_guide_deletion() -> void:
 			guides.remove_at(guide_index)
 			if selected_guide_id == guide_id:
 				selected_guide_id = ""
-			_render_outliner()
-			_render_inspector()
-			_render_canvas_context()
+			_invalidate_render(RENDER_DOCUMENT)
 			return
 
 
@@ -11072,8 +10984,7 @@ func _generate_geometry_sampling_preview() -> void:
 	else:
 		geometry_sampling_preview_state = "ready"
 		_show_status_message("Generated %d Sample Points." % int(geometry_sampling_preview.get("sample_count", 0)))
-	_render_outliner()
-	_render_inspector()
+	_invalidate_render(RENDER_OUTLINER | RENDER_INSPECTOR)
 	_refresh_geometry_sampling_workspace()
 
 
@@ -11099,8 +11010,7 @@ func _bake_geometry_sampling_preview() -> void:
 	geometry_sampling_preview_key = ""
 	geometry_sampling_preview_state = "idle"
 	_show_status_message("Sampling baked for %s." % str(component.get("name", "Component")))
-	_render_outliner()
-	_render_inspector()
+	_invalidate_render(RENDER_OUTLINER | RENDER_INSPECTOR)
 	_refresh_geometry_sampling_workspace()
 
 
@@ -11149,7 +11059,7 @@ func _schedule_geometry_sampling_preview() -> void:
 	geometry_sampling_preview_key = _geometry_document_key(selected_asset_id, selected_component_id)
 	geometry_sampling_preview_state = "calculating"
 	geometry_sampling_input_refresh_pending = true
-	_render_outliner()
+	_invalidate_render(RENDER_OUTLINER)
 	_update_geometry_sampling_bake_button()
 	_refresh_geometry_sampling_workspace()
 	_generate_geometry_sampling_preview_after_delay(revision)
@@ -11467,7 +11377,7 @@ func _on_geometry_seeding_override_changed(parameter_name: String, enabled: bool
 
 func _on_geometry_seeding_advanced_pattern_toggled(expanded: bool) -> void:
 	geometry_seeding_advanced_pattern_expanded = expanded
-	_render_inspector()
+	_invalidate_render(RENDER_INSPECTOR)
 
 
 func _on_geometry_seeding_parameter_changed(value: float, parameter_name: String) -> void:
@@ -11540,8 +11450,7 @@ func _generate_geometry_seeding_preview() -> void:
 		geometry_seeding_preview_state = "invalid"
 		var errors: Array = geometry_seeding_preview.get("errors", [])
 		_show_status_message(str(errors[0]) if not errors.is_empty() else "Seeding could not be generated.")
-	_render_outliner()
-	_render_inspector()
+	_invalidate_render(RENDER_OUTLINER | RENDER_INSPECTOR)
 	_refresh_geometry_seeding_workspace()
 
 
@@ -11557,7 +11466,7 @@ func _schedule_geometry_seeding_preview() -> void:
 	geometry_seeding_preview = {}
 	geometry_seeding_preview_key = _geometry_document_key(selected_asset_id, selected_component_id)
 	geometry_seeding_preview_state = "calculating"
-	_render_outliner()
+	_invalidate_render(RENDER_OUTLINER)
 	_update_geometry_seeding_bake_button()
 	_refresh_geometry_seeding_workspace()
 	_generate_geometry_seeding_preview_after_delay(revision)
@@ -11611,9 +11520,7 @@ func _confirm_bake_geometry_seeding_preview() -> void:
 	_set_geometry_command_state("seeding_edit" if geometry_seeding_enter_edit_after_bake else "")
 	geometry_seeding_enter_edit_after_bake = false
 	_show_status_message("Seeding baked for %s." % str(component.get("name", "Component")))
-	_render_outliner()
-	_render_inspector()
-	_render_context_bar()
+	_invalidate_render(RENDER_OUTLINER | RENDER_INSPECTOR | RENDER_CONTEXT_BAR)
 	_refresh_geometry_seeding_workspace()
 	if geometry_seeding_edit_active and is_instance_valid(geometry_seeding_workspace) and geometry_seeding_workspace.is_inside_tree():
 		geometry_seeding_workspace.grab_focus()
@@ -11719,9 +11626,7 @@ func _on_geometry_seed_move_finished(_seed_id: String) -> void:
 	if bake.is_empty():
 		return
 	bake["seed_count"] = bake.get("seeds", []).size()
-	_render_outliner()
-	_render_inspector()
-	_render_context_bar()
+	_invalidate_render(RENDER_OUTLINER | RENDER_INSPECTOR | RENDER_CONTEXT_BAR)
 	_refresh_geometry_seeding_workspace()
 
 
@@ -11744,9 +11649,7 @@ func _on_geometry_seed_remove_requested(seed_id: String) -> void:
 func _mark_geometry_seeding_bake_edited(bake: Dictionary) -> void:
 	bake["seed_count"] = bake.get("seeds", []).size()
 	bake["edited"] = true
-	_render_outliner()
-	_render_inspector()
-	_render_context_bar()
+	_invalidate_render(RENDER_OUTLINER | RENDER_INSPECTOR | RENDER_CONTEXT_BAR)
 	_refresh_geometry_seeding_workspace()
 
 
@@ -12000,7 +11903,7 @@ func _on_geometry_meshing_override_changed(enabled: bool, parameter_name: String
 
 func _on_geometry_meshing_advanced_relaxation_toggled(expanded: bool) -> void:
 	geometry_meshing_advanced_relaxation_expanded = expanded
-	_render_inspector()
+	_invalidate_render(RENDER_INSPECTOR)
 
 
 func _on_geometry_meshing_view_option_changed(enabled: bool, option: String) -> void:
@@ -12035,8 +11938,7 @@ func _schedule_geometry_meshing_preview() -> void:
 	geometry_meshing_preview = {}
 	geometry_meshing_preview_key = _geometry_document_key(selected_asset_id, selected_component_id)
 	geometry_meshing_preview_state = "calculating"
-	_render_outliner()
-	_render_inspector()
+	_invalidate_render(RENDER_OUTLINER | RENDER_INSPECTOR)
 	_refresh_geometry_meshing_workspace()
 	_generate_geometry_meshing_preview_after_delay(revision)
 
@@ -12056,8 +11958,7 @@ func _generate_geometry_meshing_preview() -> void:
 		geometry_meshing_preview = ContourMeshService.generate(component, _effective_contour_stroke_width_px(component))
 		geometry_meshing_preview_state = "ready" if bool(geometry_meshing_preview.get("valid", false)) else "invalid"
 		_show_status_message("Generated %d Contour Triangles." % int(geometry_meshing_preview.get("triangle_count", 0)) if bool(geometry_meshing_preview.get("valid", false)) else str(geometry_meshing_preview.get("errors", ["Contour Mesh could not be generated."])[0]))
-		_render_outliner()
-		_render_inspector()
+		_invalidate_render(RENDER_OUTLINER | RENDER_INSPECTOR)
 		_refresh_geometry_meshing_workspace()
 		return
 	var recipe := _geometry_meshing_recipe(selected_asset_id, selected_component_id)
@@ -12077,8 +11978,7 @@ func _generate_geometry_meshing_preview() -> void:
 			geometry_meshing_preview_state = "invalid"
 			var errors: Array = geometry_meshing_preview.get("errors", [])
 			_show_status_message(str(errors[0]) if not errors.is_empty() else "Meshing could not be generated.")
-	_render_outliner()
-	_render_inspector()
+	_invalidate_render(RENDER_OUTLINER | RENDER_INSPECTOR)
 	_refresh_geometry_meshing_workspace()
 
 
@@ -12125,8 +12025,7 @@ func _bake_geometry_meshing_preview() -> void:
 	geometry_meshing_preview_key = ""
 	geometry_meshing_preview_state = "idle"
 	_show_status_message("Mesh baked for %s." % str(component.get("name", "Component")))
-	_render_outliner()
-	_render_inspector()
+	_invalidate_render(RENDER_OUTLINER | RENDER_INSPECTOR)
 	_refresh_geometry_meshing_workspace()
 
 
@@ -12672,14 +12571,14 @@ func _add_multi_component_position_field(grid: GridContainer, label_text: String
 func _on_multi_component_field_submitted(raw_value: String, _field: LineEdit, property_name: String, integer_only: bool) -> void:
 	var value_text := raw_value.strip_edges()
 	if value_text.is_empty():
-		_render_inspector()
+		_invalidate_render(RENDER_INSPECTOR)
 		return
 	var value := value_text.to_float()
 	if integer_only and not is_equal_approx(value, round(value)):
-		_render_inspector()
+		_invalidate_render(RENDER_INSPECTOR)
 		return
 	if not is_finite(value):
-		_render_inspector()
+		_invalidate_render(RENDER_INSPECTOR)
 		return
 	if property_name == "position_x" or property_name == "position_y":
 		_on_multi_component_position_changed(value, property_name)
@@ -12891,7 +12790,7 @@ func _on_motion_act_enabled_changed(enabled: bool) -> void:
 	_record_direct_change()
 	act["enabled"] = enabled
 	motion_act_playing = false
-	_render_context_bar()
+	_invalidate_render(RENDER_CONTEXT_BAR)
 	_refresh_motion_act_workspace()
 
 
@@ -12904,7 +12803,7 @@ func _on_motion_act_direction_changed(value: float, axis: String) -> void:
 	else: direction.y = value
 	act["parameters"]["direction"] = direction
 	_refresh_motion_act_workspace()
-	_render_context_bar()
+	_invalidate_render(RENDER_CONTEXT_BAR)
 
 
 func _on_motion_act_number_changed(value: float, property_name: String) -> void:
@@ -12977,8 +12876,7 @@ func _remove_selected_motion_act() -> void:
 	selected_motion_act_id = str(motion_acts[mini(index, motion_acts.size() - 1)].get("id", "")) if not motion_acts.is_empty() else ""
 	motion_act_phase = 0.0
 	motion_act_playing = false
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_INSPECTOR | RENDER_CANVAS_CONTEXT)
 
 
 func _render_motion_path_inspector() -> void:
@@ -13053,8 +12951,7 @@ func _on_motion_path_preview_asset_selected(index: int, option: OptionButton) ->
 	motion_path_preview_asset_id = str(option.get_item_metadata(index))
 	motion_path_playing = false
 	_refresh_motion_path_workspace()
-	_render_context_bar()
-	_render_info_bar()
+	_invalidate_render(RENDER_CONTEXT_BAR | RENDER_INFO_BAR)
 
 
 func _on_motion_path_duration_changed(value: float) -> void:
@@ -13197,8 +13094,7 @@ func _on_motion_sequence_entry_enabled_changed(enabled: bool) -> void:
 	_record_direct_change()
 	entry["enabled"] = enabled
 	motion_sequence_playing = false
-	_render_inspector()
-	_render_context_bar()
+	_invalidate_render(RENDER_INSPECTOR | RENDER_CONTEXT_BAR)
 	_refresh_motion_sequence_workspace()
 
 
@@ -13210,8 +13106,7 @@ func _on_motion_sequence_asset_selected(index: int, option: OptionButton) -> voi
 	entry["asset_id"] = str(option.get_item_metadata(index))
 	entry["animation_state_id"] = _default_sequence_state_id(_get_asset(str(entry["asset_id"])))
 	motion_sequence_playing = false
-	_render_inspector()
-	_render_context_bar()
+	_invalidate_render(RENDER_INSPECTOR | RENDER_CONTEXT_BAR)
 	_refresh_motion_sequence_workspace()
 
 
@@ -13222,8 +13117,7 @@ func _on_motion_sequence_state_selected(index: int, option: OptionButton) -> voi
 	_record_direct_change()
 	entry["animation_state_id"] = str(option.get_item_metadata(index))
 	motion_sequence_playing = false
-	_render_inspector()
-	_render_context_bar()
+	_invalidate_render(RENDER_INSPECTOR | RENDER_CONTEXT_BAR)
 	_refresh_motion_sequence_workspace()
 
 
@@ -13235,8 +13129,7 @@ func _on_motion_sequence_path_selected(index: int, option: OptionButton) -> void
 	entry["path_id"] = str(option.get_item_metadata(index))
 	motion_sequence_phase = 0.0
 	motion_sequence_playing = false
-	_render_inspector()
-	_render_context_bar()
+	_invalidate_render(RENDER_INSPECTOR | RENDER_CONTEXT_BAR)
 	_refresh_motion_sequence_workspace()
 
 
@@ -13681,9 +13574,7 @@ func _on_motion_selection_changed() -> void:
 	_sync_motion_player_document(_get_asset(selected_asset_id))
 	if motion_player != null and not motion_player.playing and not motion_selection.state_id.is_empty() and motion_player.current_state_id != motion_selection.state_id:
 		motion_player.set_state(motion_selection.state_id)
-	_render_inspector()
-	_render_context_bar()
-	_render_info_bar()
+	_invalidate_render(RENDER_INSPECTOR | RENDER_CONTEXT_BAR | RENDER_INFO_BAR)
 
 
 func _sync_motion_player_document(asset: Dictionary) -> void:
@@ -13728,13 +13619,13 @@ func _on_motion_player_state_changed(_previous_state_id: String, _state_id: Stri
 	if is_instance_valid(motion_asset_preview):
 		motion_asset_preview.set_runtime(motion_player.current_state_name(), motion_phase, motion_player.playing)
 	_refresh_motion_asset_preview()
-	_render_info_bar()
+	_invalidate_render(RENDER_INFO_BAR)
 
 
 func _on_motion_player_marker_fired(_state_id: String, event_id: String, kind: String) -> void:
 	motion_last_marker = "%s · %s" % [kind.to_upper(), event_id]
 	_show_status_message("Marker: %s" % motion_last_marker)
-	_render_info_bar()
+	_invalidate_render(RENDER_INFO_BAR)
 
 
 func _on_motion_player_playback_changed(_playing: bool) -> void:
@@ -13744,7 +13635,7 @@ func _on_motion_player_playback_changed(_playing: bool) -> void:
 	if is_instance_valid(motion_asset_preview):
 		motion_asset_preview.set_runtime(motion_player.current_state_name(), motion_phase, motion_player.playing)
 	_refresh_motion_asset_preview()
-	_render_info_bar()
+	_invalidate_render(RENDER_INFO_BAR)
 
 
 func _refresh_motion_asset_preview() -> void:
@@ -13998,7 +13889,7 @@ func _on_marker_phase_changed(value: float, state_id: String, marker_id: String)
 		return
 	motion_workspace.set_marker_property(state_id, marker_id, "phase", value, false)
 	motion_workspace.refresh_board()
-	_render_context_bar()
+	_invalidate_render(RENDER_CONTEXT_BAR)
 
 
 func _request_motion_item_removal(kind: String, state_id: String, item_id: String) -> void:
@@ -14042,7 +13933,7 @@ func _on_component_catch_parent_selected(index: int, option: OptionButton) -> vo
 		return
 	_record_direct_change()
 	component["catch_parent_component_id"] = parent_id
-	_render_canvas_context()
+	_invalidate_render(RENDER_CANVAS_CONTEXT)
 
 
 func _on_edge_render_outline_changed(enabled: bool) -> void:
@@ -14066,8 +13957,7 @@ func _on_edge_render_outline_changed(enabled: bool) -> void:
 	canvas_view.selected_edge_ids = restored_edge_ids.duplicate()
 	canvas_view.selected_edge_id = canvas_view.selected_edge_ids[0] if not canvas_view.selected_edge_ids.is_empty() else ""
 	canvas_view.queue_redraw()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_INSPECTOR | RENDER_CANVAS_CONTEXT)
 	selected_edge_ids = restored_edge_ids.duplicate()
 	selected_edge_id = selected_edge_ids[0]
 	canvas_view.selected_edge_ids = restored_edge_ids.duplicate()
@@ -14092,8 +13982,7 @@ func _on_component_debug_point_numbers_toggled(enabled: bool) -> void:
 	_record_direct_change()
 	component["show_point_numbers"] = enabled
 	canvas_view.set_point_numbers_visible(enabled)
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_INSPECTOR | RENDER_CANVAS_CONTEXT)
 
 
 func _valid_selected_point_ids(component: Dictionary) -> Array[String]:
@@ -14214,7 +14103,7 @@ func _on_selected_points_mode_selected(index: int, option: OptionButton, _point_
 		point["handle_source"] = "auto"
 	BezierGeometry.resolve_auto_handles(component.get("points", []), component.get("chains", []))
 	_refresh_component_geometry(component)
-	_render_inspector()
+	_invalidate_render(RENDER_INSPECTOR)
 
 
 func _on_selected_points_preserve_changed(enabled: bool, _point_ids: Array) -> void:
@@ -14225,7 +14114,7 @@ func _on_selected_points_preserve_changed(enabled: bool, _point_ids: Array) -> v
 	_record_direct_change()
 	for point_id in valid_ids:
 		BezierTopology.point_by_id(component.get("points", []), point_id)["preserve_point"] = enabled
-	_render_inspector()
+	_invalidate_render(RENDER_INSPECTOR)
 
 
 func _create_name_editor(value: String, placeholder: String) -> LineEdit:
@@ -14446,7 +14335,7 @@ func _on_point_position_changed(value: float, property_name: String) -> void:
 	point["position"] = point_position
 	BezierGeometry.resolve_auto_handles(component.get("points", []), component.get("chains", []))
 	_refresh_component_geometry(component)
-	_render_inspector()
+	_invalidate_render(RENDER_INSPECTOR)
 
 
 func _on_transform_value_changed(value: float, property_name: String) -> void:
@@ -14476,7 +14365,7 @@ func _on_transform_value_changed(value: float, property_name: String) -> void:
 	transform["scale"] = transform_scale
 	transform["pivot"] = pivot
 	component["transform"] = transform
-	_render_canvas_context()
+	_invalidate_render(RENDER_CANVAS_CONTEXT)
 
 
 func _on_global_transform_value_changed(value: float, property_name: String) -> void:
@@ -14499,8 +14388,7 @@ func _on_global_transform_value_changed(value: float, property_name: String) -> 
 	world_record["position"] = world_position
 	world_record["scale"] = world_scale
 	component["transform"] = ComponentHierarchy.local_transform_from_world_record(asset, selected_component_id, world_record)
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_INSPECTOR | RENDER_CANVAS_CONTEXT)
 
 
 func _on_component_visibility_changed(visibility_enabled: bool) -> void:
@@ -14508,8 +14396,7 @@ func _on_component_visibility_changed(visibility_enabled: bool) -> void:
 	if not component.is_empty():
 		_record_direct_change()
 		component["visibility"] = visibility_enabled
-		_render_outliner()
-		_render_canvas_context()
+		_invalidate_render(RENDER_OUTLINER | RENDER_CANVAS_CONTEXT)
 
 
 func _on_multi_component_visibility_selected(index: int) -> void:
@@ -14530,9 +14417,7 @@ func _on_multi_component_visibility_selected(index: int) -> void:
 	_record_direct_change()
 	for component in components:
 		component["visibility"] = visibility_enabled
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 
 
 func _on_circle_primitive_diameter_changed(value: float) -> void:
@@ -14542,7 +14427,7 @@ func _on_circle_primitive_diameter_changed(value: float) -> void:
 	_record_direct_change()
 	component["primitive"]["diameter_cm"] = maxf(value, 0.1)
 	_refresh_component_geometry(component)
-	_render_canvas_context()
+	_invalidate_render(RENDER_CANVAS_CONTEXT)
 
 
 func _add_ellipse_diameter_field(label_text: String, value: float, property_name: String) -> void:
@@ -14563,8 +14448,7 @@ func _on_ellipse_primitive_diameter_changed(value: float, property_name: String)
 	_record_direct_change()
 	component["primitive"][property_name] = maxf(value, 0.1)
 	_refresh_component_geometry(component)
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_INSPECTOR | RENDER_CANVAS_CONTEXT)
 
 
 func _render_asset_root_scale_rebase_inspector(asset: Dictionary) -> void:
@@ -14647,9 +14531,7 @@ func _on_rebase_asset_scales_pressed() -> void:
 	weighting_preview = {}
 	weighting_preview_key = ""
 	_show_status_message("Rebased %d Component and %d Group scale(s) in %s." % [result.get("rebased_component_ids", []).size(), result.get("rebased_group_ids", []).size(), str(asset.get("name", "Asset"))])
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 
 
 func _on_asset_root_scale_changed(value: float, property_name: String) -> void:
@@ -14671,7 +14553,7 @@ func _on_asset_root_scale_changed(value: float, property_name: String) -> void:
 		var analysis := AssetScaleRebaseService.analyze_asset(asset)
 		asset_root_scale_rebase_button.disabled = not bool(analysis.get("can_rebase", false))
 		asset_root_scale_rebase_button.tooltip_text = "Bake Root Position and independent X/Y Scale into Components, Groups, References, Guides, and Weapon Frames." if analysis.get("blockers", []).is_empty() else str(analysis.get("blockers", [""])[0])
-	_render_canvas_context()
+	_invalidate_render(RENDER_CANVAS_CONTEXT)
 
 
 func _on_rebase_asset_root_scale_pressed() -> void:
@@ -14700,9 +14582,7 @@ func _on_rebase_asset_root_scale_pressed() -> void:
 	weighting_preview_key = ""
 	_invalidate_batch_status()
 	_show_status_message("Rebased Asset Root Transform in %s." % str(asset.get("name", "Asset")))
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 
 
 func _on_asset_visibility_changed(visibility_enabled: bool, asset_id: String) -> void:
@@ -14711,8 +14591,7 @@ func _on_asset_visibility_changed(visibility_enabled: bool, asset_id: String) ->
 		return
 	_record_direct_change()
 	asset["visibility"] = visibility_enabled
-	_render_outliner()
-	_render_canvas_context()
+	_invalidate_render(RENDER_OUTLINER | RENDER_CANVAS_CONTEXT)
 
 
 func _on_asset_authored_facing_selected(index: int, option: OptionButton) -> void:
@@ -14724,7 +14603,7 @@ func _on_asset_authored_facing_selected(index: int, option: OptionButton) -> voi
 		return
 	_record_direct_change()
 	asset["authored_facing"] = selected_facing
-	_render_inspector()
+	_invalidate_render(RENDER_INSPECTOR)
 
 
 func _on_component_visibility_entry_changed(visibility_enabled: bool, asset_id: String, component_id: String) -> void:
@@ -14741,8 +14620,7 @@ func _on_component_visibility_entry_changed(visibility_enabled: bool, asset_id: 
 		return
 	_record_direct_change()
 	child["visibility"] = visibility_enabled
-	_render_outliner()
-	_render_canvas_context()
+	_invalidate_render(RENDER_OUTLINER | RENDER_CANVAS_CONTEXT)
 
 
 func _on_component_z_index_changed(value: float) -> void:
@@ -14750,7 +14628,7 @@ func _on_component_z_index_changed(value: float) -> void:
 	if not component.is_empty():
 		_record_direct_change()
 		component["z_index"] = int(value)
-		_render_canvas_context()
+		_invalidate_render(RENDER_CANVAS_CONTEXT)
 
 func _on_component_projection_depth_changed(value: float) -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
@@ -14761,7 +14639,7 @@ func _on_component_projection_depth_changed(value: float) -> void:
 		return
 	_record_direct_change()
 	component["projection_depth_cm"] = depth
-	_render_canvas_context()
+	_invalidate_render(RENDER_CANVAS_CONTEXT)
 
 
 func _on_multi_component_position_changed(value: float, property_name: String) -> void:
@@ -14800,8 +14678,7 @@ func _on_multi_component_position_changed(value: float, property_name: String) -
 		var component := _get_component(asset, str(target.get("id", "")))
 		var next_transform: Dictionary = ComponentHierarchy.local_transform_from_world_record(asset, str(target.get("id", "")), target.get("world", {}))
 		component["transform"] = next_transform
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_INSPECTOR | RENDER_CANVAS_CONTEXT)
 
 
 func _component_hierarchy_depth(asset: Dictionary, component_id: String) -> int:
@@ -14837,8 +14714,7 @@ func _on_component_contour_stroke_width_changed(value: float) -> void:
 	geometry_meshing_preview_key = ""
 	geometry_meshing_preview_state = "idle"
 	geometry_meshing_preview_revision += 1
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_INSPECTOR | RENDER_CANVAS_CONTEXT)
 
 
 func _on_multi_component_z_index_changed(value: float) -> void:
@@ -14857,8 +14733,7 @@ func _on_multi_component_z_index_changed(value: float) -> void:
 	_record_direct_change()
 	for component in components:
 		component["z_index"] = layer_z_index
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_INSPECTOR | RENDER_CANVAS_CONTEXT)
 
 
 func _on_multi_component_contour_width_changed(value: float) -> void:
@@ -14888,8 +14763,7 @@ func _on_multi_component_contour_width_changed(value: float) -> void:
 	geometry_meshing_preview_key = ""
 	geometry_meshing_preview_state = "idle"
 	geometry_meshing_preview_revision += 1
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_INSPECTOR | RENDER_CANVAS_CONTEXT)
 
 
 func _on_multi_component_projection_depth_changed(value: float) -> void:
@@ -14908,8 +14782,7 @@ func _on_multi_component_projection_depth_changed(value: float) -> void:
 	_record_direct_change()
 	for component in components:
 		component["projection_depth_cm"] = depth
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_INSPECTOR | RENDER_CANVAS_CONTEXT)
 
 
 func _rename_selected_asset(new_name: String) -> void:
@@ -14930,8 +14803,7 @@ func _rename_selected_asset(new_name: String) -> void:
 		return
 	_record_direct_change()
 	asset["name"] = asset_name
-	_render_outliner()
-	_render_canvas_context()
+	_invalidate_render(RENDER_OUTLINER | RENDER_CANVAS_CONTEXT)
 
 
 func _rename_selected_component(new_name: String) -> void:
@@ -14950,9 +14822,7 @@ func _rename_selected_component(new_name: String) -> void:
 		return
 	_record_direct_change()
 	component["name"] = component_name
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 
 
 func _on_import_threshold_changed(value: float) -> void:
@@ -15131,9 +15001,7 @@ func _on_build_all_pressed() -> void:
 		_append_export_attention("Runtime Export", export_preflight.get("runtime", {}))
 	export_running = false
 	_update_export_toolbar_buttons()
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 
 
 func _on_export_all_valid_pressed() -> void:
@@ -15164,9 +15032,7 @@ func _on_export_all_valid_pressed() -> void:
 		_append_export_attention("Runtime Export", export_preflight.get("runtime", {}))
 	export_running = false
 	_update_export_toolbar_buttons()
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 
 
 func _run_export_mesh_stage(candidates: Array[Dictionary]) -> Dictionary:
@@ -15743,9 +15609,7 @@ func _on_primitive_placed(center: Vector2, diameter_cm: float) -> void:
 	_set_active_state("")
 	_set_active_context_command("")
 	_refresh_component_geometry(component)
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 
 
 func _on_primitive_center_changed(center: Vector2) -> void:
@@ -15767,7 +15631,7 @@ func _on_primitive_preview_cancelled() -> void:
 		return
 	_set_active_state("")
 	_set_active_context_command("")
-	_render_canvas_context()
+	_invalidate_render(RENDER_CANVAS_CONTEXT)
 
 
 func _on_bezier_point_added(world_position: Vector2, point_mode: String = "linear", drawn_handle_out: Vector2 = Vector2.ZERO) -> void:
@@ -15779,7 +15643,7 @@ func _on_bezier_point_added(world_position: Vector2, point_mode: String = "linea
 		BezierTopology.add_point(guide, canvas_view.constrain_draw_position(world_position), "aligned", Vector2.ZERO)
 		BezierGeometry.resolve_auto_handles(guide.get("points", []), guide.get("chains", []))
 		canvas_view.set_bezier_geometry(guide.get("points", []), guide.get("edges", []), guide.get("chains", []))
-		_render_inspector()
+		_invalidate_render(RENDER_INSPECTOR)
 		return
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	if component.is_empty():
@@ -15880,7 +15744,7 @@ func _on_transform_changed(transform: Dictionary) -> void:
 		local_record["scale"] = Vector2.ONE
 		local_record["pivot"] = Vector2.ZERO
 		guide["transform"] = local_record
-		_render_inspector()
+		_invalidate_render(RENDER_INSPECTOR)
 		return
 	if not selected_group_id.is_empty():
 		var group := ComponentHierarchy.group_by_id(asset, selected_group_id)
@@ -15888,8 +15752,7 @@ func _on_transform_changed(transform: Dictionary) -> void:
 			return
 		_record_coalesced_change()
 		group["transform"] = ComponentHierarchy.group_local_transform_from_world_record(asset, selected_group_id, authored_world_transform)
-		_render_inspector()
-		_render_canvas_context()
+		_invalidate_render(RENDER_INSPECTOR | RENDER_CANVAS_CONTEXT)
 		return
 	var component := _get_component(asset, selected_component_id)
 	if not component.is_empty():
@@ -15929,9 +15792,7 @@ func _on_component_hierarchy_parent_selected(index: int, option: OptionButton) -
 	_record_direct_change()
 	component["parent_component_id"] = new_parent_id
 	component["transform"] = ComponentHierarchy.local_transform_from_world_record(asset, selected_component_id, world_transform)
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 
 
 func _on_component_topology_role_selected(index: int, option: OptionButton) -> void:
@@ -15946,9 +15807,7 @@ func _on_component_topology_role_selected(index: int, option: OptionButton) -> v
 	for chain in component.get("chains", []):
 		if chain is Dictionary and str(chain.get("topology_role", "outer")) in ["outer", "hole"]:
 			chain["topology_role"] = role
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 
 
 func _detach_component(asset_id: String, component_id: String) -> void:
@@ -15971,9 +15830,7 @@ func _detach_component(asset_id: String, component_id: String) -> void:
 	selected_component_id = component_id
 	selected_guide_id = ""
 	_show_status_message("Detached %s from Parent." % str(component.get("name", "Component")))
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 
 
 func _on_reference_component_selected(component_id: String) -> void:
@@ -16034,7 +15891,7 @@ func _on_bezier_points_moved(point_ids: Array, world_delta: Vector2) -> void:
 		_refresh_component_geometry(subject)
 	else:
 		canvas_view.set_bezier_geometry(subject.get("points", []), subject.get("edges", []), subject.get("chains", []))
-	_render_inspector()
+	_invalidate_render(RENDER_INSPECTOR)
 
 
 func _on_bezier_handle_changed(point_id: String, handle_side: String, value: Vector2) -> void:
@@ -16079,7 +15936,7 @@ func _on_bezier_edge_insert_requested(edge_id: String, t: float) -> void:
 		selected_point_ids = [guide_point_id]
 		canvas_view.set_bezier_geometry(guide.get("points", []), guide.get("edges", []), guide.get("chains", []))
 		canvas_view.set_selected_point_id(guide_point_id)
-		_render_inspector()
+		_invalidate_render(RENDER_INSPECTOR)
 		return
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	if component.is_empty() or BezierTopology.edge_by_id(component.get("edges", []), edge_id).is_empty():
@@ -16092,7 +15949,7 @@ func _on_bezier_edge_insert_requested(edge_id: String, t: float) -> void:
 	selected_point_ids = [new_point_id]
 	_refresh_component_geometry(component)
 	canvas_view.set_selected_point_id(selected_point_id)
-	_render_inspector()
+	_invalidate_render(RENDER_INSPECTOR)
 
 
 func _on_bezier_point_delete_requested(point_id: String, record_history := true) -> void:
@@ -16124,7 +15981,7 @@ func _on_bezier_point_delete_requested(point_id: String, record_history := true)
 	else:
 		canvas_view.set_bezier_geometry(subject.get("points", []), subject.get("edges", []), subject.get("chains", []))
 	canvas_view.set_selected_point_id(selected_point_id)
-	_render_inspector()
+	_invalidate_render(RENDER_INSPECTOR)
 
 
 func _on_bezier_points_delete_requested(point_ids: Array) -> void:
@@ -16146,7 +16003,7 @@ func _on_bezier_points_delete_requested(point_ids: Array) -> void:
 		_refresh_component_geometry(subject)
 	else:
 		canvas_view.set_bezier_geometry(subject.get("points", []), subject.get("edges", []), subject.get("chains", []))
-	_render_inspector()
+	_invalidate_render(RENDER_INSPECTOR)
 
 
 func _on_bezier_edges_delete_requested(edge_ids: Array) -> void:
@@ -16180,8 +16037,7 @@ func _on_bezier_edges_delete_requested(edge_ids: Array) -> void:
 	selected_point_ids.clear()
 	_refresh_component_geometry(subject)
 	canvas_view.clear_selection()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_INSPECTOR | RENDER_CANVAS_CONTEXT)
 
 
 func _on_point_selection_changed(point_id: String) -> void:
@@ -16191,7 +16047,7 @@ func _on_point_selection_changed(point_id: String) -> void:
 	if active_edit_mode == "point":
 		selected_edge_id = ""
 		selected_edge_ids.clear()
-		_render_inspector()
+		_invalidate_render(RENDER_INSPECTOR)
 
 
 func _on_point_selection_set_changed(point_ids: Array) -> void:
@@ -16206,8 +16062,7 @@ func _on_point_selection_set_changed(point_ids: Array) -> void:
 	if active_edit_mode == "point":
 		selected_edge_id = ""
 		selected_edge_ids.clear()
-		_render_inspector()
-		_render_context_bar()
+		_invalidate_render(RENDER_INSPECTOR | RENDER_CONTEXT_BAR)
 
 
 func _on_edge_selection_changed(edge_id: String) -> void:
@@ -16216,8 +16071,7 @@ func _on_edge_selection_changed(edge_id: String) -> void:
 		selected_edge_ids.clear()
 	elif edge_id not in selected_edge_ids:
 		selected_edge_ids = [edge_id]
-	_render_inspector()
-	_render_context_bar()
+	_invalidate_render(RENDER_INSPECTOR | RENDER_CONTEXT_BAR)
 
 
 func _on_edge_selection_set_changed(edge_ids: Array) -> void:
@@ -16227,12 +16081,11 @@ func _on_edge_selection_set_changed(edge_ids: Array) -> void:
 		if not edge_id.is_empty() and edge_id not in selected_edge_ids:
 			selected_edge_ids.append(edge_id)
 	selected_edge_id = selected_edge_ids[0] if not selected_edge_ids.is_empty() else ""
-	_render_inspector()
-	_render_context_bar()
+	_invalidate_render(RENDER_INSPECTOR | RENDER_CONTEXT_BAR)
 
 
 func _on_face_selection_changed(_selected: bool) -> void:
-	_render_inspector()
+	_invalidate_render(RENDER_INSPECTOR)
 
 
 func _get_asset(asset_id: String) -> Dictionary:
@@ -16393,8 +16246,7 @@ func _add_motion_act(primitive: String) -> void:
 	motion_act_playing = false
 	if _get_asset(motion_act_preview_asset_id).is_empty():
 		motion_act_preview_asset_id = _default_motion_path_preview_asset_id()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_INSPECTOR | RENDER_CANVAS_CONTEXT)
 
 
 func _add_motion_slide() -> void:
@@ -16415,9 +16267,9 @@ func _select_motion_act(act_id: String) -> void:
 	selected_motion_act_id = act_id
 	motion_act_phase = 0.0
 	motion_act_playing = false
-	_render_inspector()
+	_invalidate_render(RENDER_INSPECTOR)
 	_refresh_motion_act_workspace()
-	_render_context_bar()
+	_invalidate_render(RENDER_CONTEXT_BAR)
 
 
 func _default_motion_sequence(sequence_id: String, sequence_name: String) -> Dictionary:
@@ -16570,9 +16422,7 @@ func _on_category_pressed(_module_name: String) -> void:
 		_set_active_module_visual("Mesh", active_geometry_submodule)
 	elif active_module == "Style":
 		_set_active_module_visual("Style", active_style_submodule)
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 
 
 func _find_section(module_name: String) -> ModuleSection:
@@ -16602,19 +16452,14 @@ func _select_submodule(module_name: String, submodule: String, _section: ModuleS
 	active_module = module_name
 	if module_name == "Create":
 		_set_create_submodule_context(submodule)
-		_render_outliner()
-		_render_inspector()
-		_render_context_bar()
-		_render_canvas_context()
+		_invalidate_render(RENDER_DOCUMENT | RENDER_CONTEXT_BAR)
 	elif module_name == "Mesh" and submodule in GEOMETRY_SUBMODULES:
 		active_geometry_submodule = submodule
 		active_module = "Mesh"
 		_set_geometry_command_state("")
 		selected_geometry_bake_method = ""
 		active_state = ""
-		_render_outliner()
-		_render_inspector()
-		_render_canvas_context()
+		_invalidate_render(RENDER_DOCUMENT)
 		if submodule == "Sampling" and not selected_component_id.is_empty():
 			var selected_component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 			if not _geometry_sampling_bake_is_current(selected_asset_id, selected_component_id, selected_component):
@@ -16690,9 +16535,7 @@ func _enter_motion_context(submodule := "Animation") -> void:
 		var sequence_document := _get_motion_sequence(selected_motion_sequence_id)
 		if _get_motion_sequence_entry(sequence_document, selected_motion_sequence_entry_id).is_empty():
 			selected_motion_sequence_entry_id = str(_first_motion_sequence_entry(sequence_document).get("id", ""))
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 
 
 func _enter_weighting_context() -> void:
@@ -16701,9 +16544,7 @@ func _enter_weighting_context() -> void:
 	var style_section := _find_section("Style")
 	if style_section != null:
 		_set_active_module_visual("Style", "Weighting")
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
+	_invalidate_render(RENDER_DOCUMENT)
 
 
 func _select_weighting_asset(asset_id: String) -> void:

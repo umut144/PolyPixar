@@ -43,6 +43,16 @@ export data.
 - `main.gd` applies intent to the selected World document and records
   history.
 
+Rendering is invalidation-driven. A mutation calls `_invalidate_render` with the
+targets that became stale — `RENDER_OUTLINER`, `RENDER_INSPECTOR`,
+`RENDER_CANVAS_CONTEXT`, `RENDER_CONTEXT_BAR`, `RENDER_INFO_BAR`, or the
+`RENDER_DOCUMENT` combination of the first three — rather than naming the render
+functions to call. `_flush_pending_renders` runs the accumulated set once, in a
+fixed order, deferred to the end of the frame while the editor is in the tree
+and immediately otherwise, so a caller outside the tree still sees a finished
+render. Requesting the Canvas covers the Context Bar and Info Bar, which it
+renders unconditionally; the reverse does not hold.
+
 Pointer-based `P` Pivot placement is intercepted by `main.gd` during the early
 input phase because focused Inspector controls may consume printable keys
 before unhandled input. Routing requires the pointer inside the visible Canvas

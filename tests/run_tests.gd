@@ -31,6 +31,7 @@ func _init() -> void:
 	_test_asset_authored_facing()
 	_test_multi_component_inspector()
 	_test_multi_component_deletion()
+	_test_render_invalidation()
 	_test_atomic_document_writes()
 	_test_geometry_document_history_isolation()
 	_test_geometry_sampling_service()
@@ -1392,6 +1393,39 @@ func _distance_to_segment(point: Vector2, start: Vector2, end: Vector2) -> float
 		return point.distance_to(start)
 	var t := clampf((point - start).dot(delta) / delta.length_squared(), 0.0, 1.0)
 	return point.distance_to(start + delta * t)
+
+
+func _test_render_invalidation() -> void:
+	var application: Control = load("res://scripts/main.gd").new()
+	application._build_ui()
+
+	# Detached from the tree there is no frame to coalesce against, so a caller
+	# that inspects the result right away must still see a finished render.
+	_expect(not application.is_inside_tree(), "This test covers the detached path deliberately.")
+	application._invalidate_render(application.RENDER_DOCUMENT)
+	_expect(application.pending_renders == 0 and not application.render_flush_queued, "Invalidating outside the tree should render immediately and leave nothing pending.")
+
+	# With a flush already queued, further invalidations only accumulate.
+	application.render_flush_queued = true
+	application._invalidate_render(application.RENDER_OUTLINER)
+	application._invalidate_render(application.RENDER_INSPECTOR)
+	application._invalidate_render(application.RENDER_OUTLINER)
+	_expect(application.pending_renders == application.RENDER_OUTLINER | application.RENDER_INSPECTOR, "Repeated invalidations should collapse into one pending set instead of rendering each time.")
+	application._flush_pending_renders()
+	_expect(application.pending_renders == 0 and not application.render_flush_queued, "Flushing should run the pending targets and clear the set.")
+
+	# A render that invalidates again must not re-enter the flush.
+	application.rendering = true
+	application._invalidate_render(application.RENDER_INFO_BAR)
+	_expect(application.pending_renders == application.RENDER_INFO_BAR and not application.render_flush_queued, "Invalidating during a render should only record the target.")
+	application._flush_pending_renders()
+	_expect(application.pending_renders == application.RENDER_INFO_BAR, "A flush must not run while a render is already in progress.")
+	application.rendering = false
+	application._flush_pending_renders()
+	_expect(application.pending_renders == 0, "The recorded target should be rendered by the next flush.")
+
+	_expect(application.RENDER_DOCUMENT == application.RENDER_OUTLINER | application.RENDER_INSPECTOR | application.RENDER_CANVAS_CONTEXT, "RENDER_DOCUMENT should name the Outliner, Inspector, and Canvas combination.")
+	application.free()
 
 
 func _test_atomic_document_writes() -> void:
