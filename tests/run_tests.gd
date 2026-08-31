@@ -21,7 +21,7 @@ func _init() -> void:
 	_test_pivot_point_snapping_without_grid()
 	_test_canvas_navigation_key_reset()
 	_test_pivot_shortcut_robustness()
-	_test_contour_rotation_access()
+	_test_contour_rotation_spinbox()
 	_test_contour_stroke_service()
 	_test_contour_stroke_robust_geometry()
 	_test_world_contour_settings()
@@ -607,7 +607,7 @@ func _test_pivot_point_snapping_without_grid() -> void:
 	canvas.free()
 
 
-func _test_contour_rotation_access() -> void:
+func _test_contour_rotation_spinbox() -> void:
 	var contour := _component()
 	contour.merge({"id": "contour", "name": "Contour", "type": "component", "draw_mode": "contour", "visibility": true, "z_index": 0, "parent_component_id": "", "transform": {"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}})
 	var asset := {"id": "asset", "name": "Asset", "asset_type": "character", "visibility": true, "asset_pivot": Vector2.ZERO, "components": [contour], "groups": [], "guides": []}
@@ -617,12 +617,17 @@ func _test_contour_rotation_access() -> void:
 	application.assets = contour_assets
 	application.selected_asset_id = "asset"
 	application.selected_component_id = "contour"
-	application._render_context_bar()
-	var transform_menu := _context_menu(application, "⌘4")
-	_expect(transform_menu != null and transform_menu.text.contains("Transform"), "Contour Components should expose the Transform menu in their canvas context.")
-	if transform_menu != null:
-		transform_menu.get_popup().emit_signal("id_pressed", 1)
-	_expect(application.active_state == "transform" and application.canvas_view.transform_mode == "rotate", "The Contour Transform menu should activate rotation around the Component Pivot.")
+	application.active_module = "Create"
+	application.active_create_submodule = "Character"
+	application._render_inspector()
+	var rotation_field: SpinBox = application.transform_fields.get("rotation")
+	_expect(is_instance_valid(rotation_field) and is_equal_approx(rotation_field.step, 1.0) and is_equal_approx(rotation_field.custom_arrow_step, 1.0), "Component Rotation arrows should always count in exact one-degree steps.")
+	if is_instance_valid(rotation_field):
+		rotation_field.value += rotation_field.custom_arrow_step
+		rotation_field.value_changed.emit(rotation_field.value)
+	var updated_contour: Dictionary = application._get_component(application._get_asset("asset"), "contour")
+	_expect(is_equal_approx(float(updated_contour.get("transform", {}).get("rotation", 0.0)), 1.0), "Changing the Contour Rotation SpinBox should update its authored transform.")
+	_expect(is_equal_approx(float(application.canvas_view.component_transform.get("rotation", 0.0)), 1.0), "Changing the Contour Rotation SpinBox should immediately rotate the Canvas geometry around its Pivot.")
 	application.free()
 
 

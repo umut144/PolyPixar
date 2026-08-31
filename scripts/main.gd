@@ -585,8 +585,6 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	elif has_command_modifier and event.keycode == KEY_4:
 		if str(selected_component.get("draw_mode", "closed_loop")) == "closed_loop":
 			_activate_edit_face_state()
-		else:
-			_activate_transform_state()
 		get_viewport().set_input_as_handled()
 		return
 	elif not has_command_modifier and active_state == "edit" and active_edit_mode == "point" and event.keycode == KEY_1:
@@ -6179,20 +6177,6 @@ func _render_context_bar() -> void:
 		_style_context_command_button(mirror_button, _context_command_is("asset.mirror"))
 		mirror_button.pressed.connect(_activate_selection_mirror)
 		context_bar.add_child(mirror_button)
-	else:
-		var transform_menu := MenuButton.new()
-		transform_menu.text = "⌘4  Transform  ▼"
-		transform_menu.custom_minimum_size = Vector2(146, 32)
-		transform_menu.focus_mode = Control.FOCUS_NONE
-		transform_menu.get_popup().add_item("Move", 0)
-		transform_menu.get_popup().add_item("Rotate", 1)
-		transform_menu.get_popup().add_item("Scale", 2)
-		_style_popup_menu(transform_menu.get_popup())
-		transform_menu.get_popup().id_pressed.connect(_on_transform_menu_id)
-		context_bar.add_child(transform_menu)
-	_render_info_bar()
-
-
 func _next_default_guide_name(asset: Dictionary, guide_type: String) -> String:
 	var base := AssetGuide.display_name(guide_type)
 	var index := 1
@@ -14946,10 +14930,10 @@ func _add_transform_field(grid: GridContainer, label_text: String, value: float,
 	var field := SpinBox.new()
 	field.min_value = -100000.0
 	field.max_value = 100000.0
-	# Arrow buttons move in tenths; the embedded LineEdit accepts the field's
-	# configured precision, including thousandths for Component pivots.
+	# Rotation arrows use exact whole degrees. Other transform fields keep
+	# tenth-unit arrows while preserving their configured text precision.
 	field.step = step
-	field.custom_arrow_step = 0.1
+	field.custom_arrow_step = 1.0 if property_name == "rotation" else 0.1
 	field.value = value
 	field.custom_minimum_size = Vector2(96, 26)
 	field.add_theme_font_size_override("font_size", 11)
@@ -14969,7 +14953,7 @@ func _add_global_transform_field(grid: GridContainer, label_text: String, value:
 	field.min_value = -100000.0
 	field.max_value = 100000.0
 	field.step = step
-	field.custom_arrow_step = 0.1
+	field.custom_arrow_step = 1.0 if property_name == "rotation" else 0.1
 	field.value = value
 	field.custom_minimum_size = Vector2(96, 26)
 	field.add_theme_font_size_override("font_size", 11)
