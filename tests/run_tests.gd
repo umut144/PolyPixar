@@ -111,7 +111,7 @@ func _control_text(root: Node) -> String:
 
 
 func _outliner_button(application: Control, prefix: String) -> Button:
-	return _button_starting_with(application.outliner_list, prefix)
+	return _button_starting_with(application.outliner_view, prefix)
 
 
 func _button_starting_with(root: Node, prefix: String) -> Button:
@@ -746,9 +746,9 @@ func _test_create_outliner_expansion_scope() -> void:
 	application.active_create_submodule = "Symbols"
 	application._set_outliner_asset_expanded("symbol_a", true)
 	_expect(bool(application.expanded_assets.get("character_b", false)) and bool(application.expanded_assets.get("symbol_a", false)), "Expanding a Symbol should preserve the Character module's expanded Asset.")
-	_expect(application._outliner_focus_asset_id() == "symbol_a" and application._outliner_asset_is_visible(application.assets[2]), "The Symbols Outliner should retain its own visible expanded Asset.")
+	_expect(application._outliner_focus_asset_id() == "symbol_a" and application.outliner_view.asset_is_visible(application.assets[2]), "The Symbols Outliner should retain its own visible expanded Asset.")
 	application.active_create_submodule = "Character"
-	_expect(application._outliner_focus_asset_id() == "character_b" and application._outliner_asset_is_visible(application.assets[1]), "Returning to Characters should restore that module's expanded Asset.")
+	_expect(application._outliner_focus_asset_id() == "character_b" and application.outliner_view.asset_is_visible(application.assets[1]), "Returning to Characters should restore that module's expanded Asset.")
 	application.selected_asset_id = "character_b"
 	application.selected_component_id = "component_stale"
 	application.selected_guide_id = "guide_stale"
@@ -2025,7 +2025,7 @@ func _test_geometry_sampling_ui_shell() -> void:
 	application.active_module = "Mesh"
 	application._render_canvas_context()
 	_expect(application.geometry_sampling_workspace.visible, "Geometry Sampling should own a dedicated visible centre workspace.")
-	_expect(application.outliner_list.get_child_count() > 1, "Sampling Outliner should expose the Asset/Component hierarchy.")
+	_expect(application.outliner_view.get_child_count() > 1, "Sampling Outliner should expose the Asset/Component hierarchy.")
 	_expect(application.inspector_content.get_child_count() >= 8, "A selected Component should expose Adaptive parameters, boundary inputs, result, and Bake controls.")
 	_expect(application.geometry_sampling_workspace.component.get("points", []).size() == 4, "Sampling Workspace should receive an immutable Component view copy.")
 	application.geometry_sampling_workspace.component["points"][0]["position"] = Vector2(999.0, 999.0)
@@ -2229,7 +2229,7 @@ func _test_geometry_seeding_service() -> void:
 	application._render_inspector()
 	application._render_canvas_context()
 	_expect(application.geometry_seeding_workspace.visible and application.inspector_content.get_child_count() >= 10, "Geometry Seeding should expose its dedicated Workspace and compact Poisson Inspector.")
-	var seeding_outliner_text := _control_text(application.outliner_list)
+	var seeding_outliner_text := _control_text(application.outliner_view)
 	var seeding_inspector_text := _control_text(application.inspector_content)
 	_expect(seeding_outliner_text.contains("Sampling · Adaptive") and seeding_outliner_text.contains("Cut · Body → Cut01") and seeding_outliner_text.contains("Spine · Body → Sample01"), "The Seeding Outliner should nest its Sampling dependency, Cut barriers, and Sampler Spine inputs below the Body.")
 	_expect(seeding_inspector_text.contains("Holes · excluded + clearance") and seeding_inspector_text.contains("Cuts · barrier + clearance") and seeding_inspector_text.contains("Constraint Clearance: Auto"), "The Seeding Inspector should explain automatic Outer, Hole, and Cut constraint treatment.")
@@ -2447,7 +2447,7 @@ func _test_geometry_meshing_service_and_ui() -> void:
 	application._render_canvas_context()
 	_expect(application.geometry_meshing_workspace.visible and application.inspector_content.get_child_count() >= 10, "Geometry Meshing should expose its dedicated Workspace and compact Inspector.")
 	var meshing_inspector_text := _control_text(application.inspector_content)
-	var meshing_outliner_text := _control_text(application.outliner_list)
+	var meshing_outliner_text := _control_text(application.outliner_view)
 	_expect(meshing_inspector_text.contains("Constrained Mesh · Automatic") and meshing_inspector_text.contains("Mesh Character") and meshing_inspector_text.contains("Optimize Mesh") and meshing_inspector_text.contains("Advanced Optimization") and meshing_inspector_text.contains("Optimization") and meshing_inspector_text.contains("Quality") and meshing_inspector_text.contains("Auto Build Diagnostics") and meshing_inspector_text.contains("Recipe Ownership: Manual · Legacy / unclassified recipe") and not meshing_inspector_text.contains("Use as Component Mesh"), "Meshing should expose one Artistic Constrained Mesh workflow, explicit optimization control, read-only build provenance, and both diagnostic views without a separate Component Mesh action.")
 	_expect(meshing_outliner_text.contains("Sampling · Adaptive") and meshing_outliner_text.contains("Seeding · Poisson Fill") and meshing_outliner_text.contains("Constraints · Outer Preserved") and meshing_outliner_text.contains("Mesh · Constrained Mesh"), "Meshing Outliner should expose its complete nested pipeline dependencies.")
 	var current_sampling_bake: Dictionary = normalized["sampling"]["bakes"][GeometrySamplingService.ADAPTIVE]
@@ -2654,7 +2654,7 @@ func _test_component_names() -> void:
 	var created_reference: Dictionary = semantic_asset.get("components", [])[2]
 	_expect(str(created_reference.get("type", "")) == "reference" and str(created_reference.get("name", "")) == "reference" and str(created_reference.get("source_asset_id", "")) == "orb" and created_reference.get("points", []).is_empty(), "Reference creation should retain the source Asset ID without copying its Component geometry.")
 	created_reference["parent_component_id"] = "component_1"
-	_expect(application._component_tree_name(created_reference) == "R: reference" and application._component_outliner_name(semantic_asset, created_reference) == "reference ← Orb" and application._reference_outliner_tooltip(semantic_asset, created_reference) == "Referenced asset: Orb\nAttached to: body", "The Component tree should mark References locally while the References overview names their source Asset and retains the Parent in the tooltip.")
+	_expect(application.outliner_view._component_tree_name(created_reference) == "R: reference" and WorldDocumentService.component_outliner_name(application.assets, created_reference) == "reference ← Orb" and application.outliner_view._reference_outliner_tooltip(semantic_asset, created_reference) == "Referenced asset: Orb\nAttached to: body", "The Component tree should mark References locally while the References overview names their source Asset and retains the Parent in the tooltip.")
 	application._duplicate_component("character", str(created_reference.get("id", "")), "flip_orientation")
 	var mirrored_reference: Dictionary = application._get_component(semantic_asset, application.selected_component_id)
 	_expect(str(mirrored_reference.get("type", "")) == "reference" and Vector2(mirrored_reference.get("transform", {}).get("scale", Vector2.ZERO)) == Vector2.ONE and Vector2(mirrored_reference.get("reference_instance_scale", Vector2.ONE)).x < 0.0, "Duplicate & Mirror should normalize the Component Scale while preserving the signed Reference instance Scale.")
@@ -2994,12 +2994,12 @@ func _test_group_outliner_workflows() -> void:
 	application.active_create_submodule = "Character"
 	application.expanded_assets["mage"] = true
 	application._select_group("mage", "lashes")
-	var group_button := _button_with_text(application.outliner_list, "G: eyelashes_right")
+	var group_button := _button_with_text(application.outliner_view, "G: eyelashes_right")
 	var selected_style := group_button.get_theme_stylebox("normal") as StyleBoxFlat if group_button != null else null
 	_expect(group_button != null and selected_style != null and selected_style.bg_color == Color("#f2c94c"), "The selected Group row should use the same highlighted Outliner style as selected Components.")
 	var world_before := ComponentHierarchy.world_transform(asset, "eyelashes_right")
 	var drag_data := {"kind": "group", "asset_id": "mage", "group_id": "lashes"}
-	_expect(application._outliner_can_drop_data(Vector2.ZERO, drag_data, "mage", "eye_right"), "A Group should be droppable onto a valid sibling Component.")
+	_expect(application.outliner_view.can_drop_data(Vector2.ZERO, drag_data, "mage", "eye_right"), "A Group should be droppable onto a valid sibling Component.")
 	application._outliner_drop_data(Vector2.ZERO, drag_data, "mage", "eye_right")
 	_expect(ComponentHierarchy.group_parent_id(lashes_group) == "eye_right" and str(eyelashes_right.get("parent_component_id", "")) == "eye_right", "Dropping a Group onto a Component should move both the Group anchor and its direct Parts beneath that Component.")
 	_expect(ComponentHierarchy.world_transform(asset, "eyelashes_right").is_equal_approx(world_before), "Moving a Group to another Component must preserve every Part's visible world transform.")

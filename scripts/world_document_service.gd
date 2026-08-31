@@ -850,6 +850,71 @@ static func write_text_atomically(path: String, text: String) -> bool:
 		DirAccess.remove_absolute(backup)
 	return true
 
+# Document queries. Small enough to have lived in main.gd, but the Outliner
+# view needs them too, and one home beats two copies.
+
+static func guide_display_name(asset: Dictionary, guide: Dictionary) -> String:
+	var scope: Dictionary = guide.get("scope", {})
+	var scope_record := ComponentHierarchy.group_by_id(asset, str(scope.get("group_id", ""))) if str(scope.get("kind", "component")) == "group" else WorldDocumentService.component_by_id(asset, str(scope.get("component_id", "")))
+	var scope_name := str(scope_record.get("name", "Unassigned"))
+	if AssetGuide.is_weapon_frame(str(guide.get("guide_type", ""))):
+		return "%s → %s" % [scope_name, str(guide.get("guide_type", ""))]
+	return AssetGuide.outliner_name(guide, scope_name)
+
+
+static func component_outliner_name(assets: Array, component: Dictionary) -> String:
+	var component_name := normalized_component_name(component)
+	if not is_reference_component(component):
+		return component_name
+	var source_asset := asset_by_id(assets, str(component.get("source_asset_id", "")))
+	var source_name := str(source_asset.get("name", "Missing asset"))
+	return "%s ← %s" % [component_name, source_name]
+
+
+static func asset_by_id(assets: Array, asset_id: String) -> Dictionary:
+	for asset in assets:
+		if str(asset.get("id", "")) == asset_id:
+			return asset
+	return {}
+
+
+static func component_by_id(asset: Dictionary, component_id: String) -> Dictionary:
+	if asset.is_empty():
+		return {}
+	for component in asset.get("components", []):
+		if str(component.get("type", "component")) != "guide" and str(component.get("id", "")) == component_id:
+			return component
+	return {}
+
+
+static func motion_path_by_id(motion_paths: Array, path_id: String) -> Dictionary:
+	for path_document in motion_paths:
+		if str(path_document.get("id", "")) == path_id:
+			return path_document
+	return {}
+
+
+static func asset_type(asset: Dictionary) -> String:
+	return normalize_asset_type(asset.get("asset_type", "character"))
+
+
+static func is_region(component: Dictionary) -> bool:
+	return str(component.get("type", "component")) == "region"
+
+
+static func is_reference_component(component: Dictionary) -> bool:
+	return str(component.get("type", "component")) == "reference"
+
+
+static func normalized_component_name(component: Dictionary) -> String:
+	var normalized_name := str(component.get("name", "")).strip_edges()
+	return normalized_name if not normalized_name.is_empty() else "Component"
+
+
+static func sort_named_documents(a: Dictionary, b: Dictionary) -> bool:
+	return str(a.get("name", "")).to_lower() < str(b.get("name", "")).to_lower()
+
+
 static func read_json(path: String):
 	if not FileAccess.file_exists(path):
 		return null

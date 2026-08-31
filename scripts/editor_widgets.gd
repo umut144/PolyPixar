@@ -243,3 +243,11 @@ static func create_name_editor(value: String, placeholder: String) -> LineEdit:
 static func clear(container: Node) -> void:
 	for child in container.get_children():
 		child.queue_free()
+
+
+static func strikethrough_text(text: String) -> String:
+	var result := ""
+	var strike_mark := String.chr(0x0336)
+	for character in text:
+		result += character + strike_mark
+	return result

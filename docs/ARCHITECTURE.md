@@ -42,6 +42,15 @@ export data.
 - `ComponentCanvas` renders immutable copies and emits user intent.
 - `main.gd` applies intent to the selected World document and records
   history.
+- `OutlinerView` renders the Outliner list from a context `main.gd` pushes in
+  and emits what the user did. Like `ComponentCanvas` it holds no editor state
+  and mutates no document: a drop reports intent and `main.gd` applies it.
+  Derived row state, such as Weighting status, is resolved by `main.gd` and
+  handed over, so the view never reaches into the geometry documents. The Mesh
+  tree is the exception and still lives in `main.gd`: it reads the whole
+  derived geometry state across Sampling, Seeding and Meshing, and it renders
+  through the view's `geometry_tree_builder` until it has a view model of its
+  own.
 - `EditorWidgets` builds the shared widget vocabulary — panels, labels, section
   headers, buttons and their styling. It is static and purely constructive: it
   reads no editor state and knows nothing about Worlds, Assets or Components.

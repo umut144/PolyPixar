@@ -33,7 +33,7 @@ var active_style_submodule := "Weighting"
 var active_motion_submodule := "Animation"
 var active_module := "Create"
 var active_context_command := ""
-var outliner_list: VBoxContainer
+var outliner_view: OutlinerView
 var outliner_search_input: LineEdit
 var outliner_asset_type_filter_panel: VBoxContainer
 var outliner_asset_type_filter_checkboxes: Dictionary = {}
@@ -922,11 +922,28 @@ func _build_ui() -> void:
 	outliner_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	outliner_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	outliner_content.add_child(outliner_scroll)
-	outliner_list = VBoxContainer.new()
-	outliner_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	outliner_list.add_theme_constant_override("separation", 0)
-	outliner_list.focus_mode = Control.FOCUS_ALL
-	outliner_scroll.add_child(outliner_list)
+	outliner_view = OutlinerView.new()
+	outliner_view.geometry_tree_builder = _render_geometry_component_outliner
+	outliner_view.asset_selected.connect(_select_asset)
+	outliner_view.component_selected.connect(_on_outliner_component_selected)
+	outliner_view.group_selected.connect(_select_group)
+	outliner_view.guide_selected.connect(_select_guide)
+	outliner_view.region_selected.connect(_on_outliner_component_selected)
+	outliner_view.weighting_asset_selected.connect(_select_weighting_asset)
+	outliner_view.weighting_component_selected.connect(_select_weighting_component)
+	outliner_view.weighting_style_selected.connect(_select_weighting_style)
+	outliner_view.weighting_style_add_requested.connect(_create_weighting_style)
+	outliner_view.motion_asset_selected.connect(_select_motion_asset)
+	outliner_view.motion_path_selected.connect(_select_motion_path)
+	outliner_view.motion_sequence_selected.connect(_select_motion_sequence)
+	outliner_view.motion_act_preview_asset_selected.connect(_select_motion_act_preview_asset)
+	outliner_view.component_add_requested.connect(_open_component_add_menu)
+	outliner_view.group_add_requested.connect(_open_group_add_menu)
+	outliner_view.component_dialog_requested.connect(_open_component_dialog)
+	outliner_view.row_context_menu_requested.connect(_on_outliner_row_context_menu)
+	outliner_view.drop_requested.connect(_outliner_drop_data_from_view)
+	outliner_view.visibility_toggle_requested.connect(_on_outliner_visibility_toggled)
+	outliner_scroll.add_child(outliner_view)
 
 	var canvas_split := HSplitContainer.new()
 	canvas_split.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -6281,34 +6298,71 @@ func _next_default_asset_name() -> String:
 
 
 func _render_outliner() -> void:
-	EditorWidgets.clear(outliner_list)
+	# Pushes the current context into the view and lets it rebuild. The view
+	# owns the rows; this function owns what they are shown from.
 	_update_context_action_button()
 	_update_outliner_asset_type_filter_visibility()
-	if active_module == "Export":
+	if not is_instance_valid(outliner_view):
 		return
-	if active_module == "Motion":
-		_render_motion_outliner()
-		return
-	if active_module == "Style":
-		_render_weighting_outliner()
-		return
-	if active_module == "Mesh":
-		if active_geometry_submodule in GEOMETRY_SUBMODULES:
-			_render_geometry_component_outliner()
-		else:
-			outliner_list.add_child(EditorWidgets.create_outliner_group_label("Mesh · Placeholder"))
-			outliner_list.add_child(EditorWidgets.create_inspector_field_label("%s authoring will be introduced in a later phase." % active_geometry_submodule))
-		return
-	var search_text := outliner_search_input.text.strip_edges().to_lower() if is_instance_valid(outliner_search_input) else ""
-	if active_module == "Create" and active_create_submodule in CREATE_SUBMODULES:
-		var visible_assets: Array = []
-		for asset in assets:
-			if _outliner_asset_is_visible(asset) and _asset_type(asset) == _create_submodule_asset_type(active_create_submodule) and _asset_matches_search(asset, search_text):
-				visible_assets.append(asset)
-		visible_assets.sort_custom(_sort_named_documents)
-		outliner_list.add_child(EditorWidgets.create_outliner_group_label(active_create_submodule))
-		for asset in visible_assets:
-			_render_asset_outliner_entry(asset, not search_text.is_empty())
+	outliner_view.set_documents(assets, motion_paths, motion_sequences)
+	outliner_view.set_module(active_module, active_create_submodule, active_geometry_submodule, active_motion_submodule)
+	outliner_view.set_selection(selected_asset_id, selected_component_id, selected_component_ids, selected_group_id, selected_guide_id, selected_motion_path_id, selected_motion_sequence_id, selected_weighting_style_id, motion_act_preview_asset_id)
+	outliner_view.set_filters(outliner_search_input.text.strip_edges().to_lower() if is_instance_valid(outliner_search_input) else "", outliner_asset_type_filters)
+	outliner_view.set_expansion(expanded_assets, _outliner_focus_asset_id())
+	outliner_view.set_row_status(_outliner_row_status())
+	outliner_view.rebuild()
+
+
+func _outliner_row_status() -> Dictionary:
+	# Derived state the rows display, resolved here so the view never reaches
+	# into the geometry documents. Only the Style tree needs it today.
+	var status: Dictionary = {}
+	if active_module != "Style":
+		return status
+	for asset in assets:
+		var asset_id := str(asset.get("id", ""))
+		for component in asset.get("components", []):
+			var component_id := str(component.get("id", ""))
+			var styles: Array = _weighting_styles(asset_id, component_id)
+			var by_style: Dictionary = {}
+			for style in styles:
+				by_style[str(style.get("id", ""))] = _weighting_status(asset_id, component_id, component, style)
+			status["%s/%s" % [asset_id, component_id]] = {
+				"mesh_status": _component_mesh_status(asset_id, component_id, component),
+				"weighting_styles": styles,
+				"weighting_status": by_style
+			}
+	return status
+
+
+func _on_outliner_component_selected(asset_id: String, component_id: String) -> void:
+	_select_component(asset_id, component_id, true)
+
+
+func _on_outliner_visibility_toggled(kind: String, asset_id: String, target_id: String, visible: bool) -> void:
+	match kind:
+		"asset":
+			_on_asset_visibility_changed(visible, asset_id)
+		"group":
+			_on_group_visibility_entry_changed(visible, asset_id, target_id)
+		"guide":
+			_on_guide_visibility_entry_changed(visible, asset_id, target_id)
+		"component":
+			_on_component_visibility_entry_changed(visible, asset_id, target_id)
+
+
+func _on_outliner_row_context_menu(kind: String, asset_id: String, target_id: String, event: InputEvent, anchor: Button) -> void:
+	match kind:
+		"asset":
+			_on_asset_outliner_gui_input(event, asset_id, anchor)
+		"group":
+			_on_group_outliner_gui_input(event, asset_id, target_id, anchor)
+		"component":
+			_on_component_outliner_gui_input(event, asset_id, target_id, anchor)
+
+
+func _outliner_drop_data_from_view(asset_id: String, target_id: String, payload: Variant) -> void:
+	_outliner_drop_data(Vector2.ZERO, payload, asset_id, target_id)
 
 
 func _update_outliner_asset_type_filter_visibility() -> void:
@@ -6339,10 +6393,6 @@ func _apply_outliner_asset_type_filter_checkboxes() -> void:
 			checkbox.set_pressed_no_signal(bool(outliner_asset_type_filters.get(asset_type, true)))
 
 
-func _asset_type_filter_matches(asset: Dictionary) -> bool:
-	return bool(outliner_asset_type_filters.get(_asset_type(asset), false))
-
-
 func _outliner_focus_asset_id() -> String:
 	for asset in assets:
 		var asset_id := str(asset.get("id", ""))
@@ -6355,11 +6405,6 @@ func _outliner_expansion_scope_matches(asset: Dictionary) -> bool:
 	if active_module != "Create":
 		return true
 	return _asset_type(asset) == _create_submodule_asset_type(active_create_submodule)
-
-
-func _outliner_asset_is_visible(asset: Dictionary) -> bool:
-	var focused_asset_id := _outliner_focus_asset_id()
-	return focused_asset_id.is_empty() or focused_asset_id == str(asset.get("id", ""))
 
 
 func _set_outliner_asset_expanded(asset_id: String, expanded: bool) -> void:
@@ -6419,73 +6464,6 @@ func _navigate_outliner_component(direction: int) -> void:
 	var next_index := clampi(current_index + direction, 0, component_ids.size() - 1)
 	if next_index != current_index:
 		_select_component(selected_asset_id, component_ids[next_index], true)
-
-
-func _render_motion_outliner() -> void:
-	var search_text := outliner_search_input.text.strip_edges().to_lower() if is_instance_valid(outliner_search_input) else ""
-	if active_motion_submodule == "Path":
-		outliner_list.add_child(EditorWidgets.create_outliner_group_label("Paths"))
-		for path_document in motion_paths:
-			if search_text.is_empty() or str(path_document.get("name", "")).to_lower().contains(search_text):
-				var path_button := Button.new()
-				path_button.text = str(path_document.get("name", "Path"))
-				path_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-				path_button.focus_mode = Control.FOCUS_NONE
-				EditorWidgets.style_outliner_button(path_button, str(path_document.get("id", "")) == selected_motion_path_id)
-				path_button.pressed.connect(_select_motion_path.bind(str(path_document.get("id", ""))))
-				outliner_list.add_child(path_button)
-		if motion_paths.is_empty():
-			outliner_list.add_child(EditorWidgets.create_inspector_field_label("No Paths"))
-		return
-	if active_motion_submodule == "Sequence":
-		outliner_list.add_child(EditorWidgets.create_outliner_group_label("Sequences"))
-		for sequence_document in motion_sequences:
-			if search_text.is_empty() or str(sequence_document.get("name", "")).to_lower().contains(search_text):
-				var sequence_button := Button.new()
-				sequence_button.text = str(sequence_document.get("name", "Sequence"))
-				sequence_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-				sequence_button.focus_mode = Control.FOCUS_NONE
-				EditorWidgets.style_outliner_button(sequence_button, str(sequence_document.get("id", "")) == selected_motion_sequence_id)
-				sequence_button.pressed.connect(_select_motion_sequence.bind(str(sequence_document.get("id", ""))))
-				outliner_list.add_child(sequence_button)
-		if motion_sequences.is_empty():
-			outliner_list.add_child(EditorWidgets.create_inspector_field_label("No Sequences"))
-		return
-	if active_motion_submodule == "Act":
-		outliner_list.add_child(EditorWidgets.create_outliner_group_label("Preview Assets"))
-		for asset in assets:
-			if not search_text.is_empty() and not str(asset.get("name", "")).to_lower().contains(search_text):
-				continue
-			var asset_id := str(asset.get("id", ""))
-			var preview_button := Button.new()
-			preview_button.text = str(asset.get("name", "Asset"))
-			preview_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-			preview_button.focus_mode = Control.FOCUS_NONE
-			EditorWidgets.style_outliner_button(preview_button, asset_id == motion_act_preview_asset_id)
-			preview_button.pressed.connect(_select_motion_act_preview_asset.bind(asset_id))
-			outliner_list.add_child(preview_button)
-		if assets.is_empty():
-			outliner_list.add_child(EditorWidgets.create_inspector_field_label("No Assets"))
-		return
-	var visible_assets: Array[Dictionary] = []
-	for asset in assets:
-		if search_text.is_empty() or str(asset.get("name", "")).to_lower().contains(search_text):
-			visible_assets.append(asset)
-	visible_assets.sort_custom(_sort_named_documents)
-	outliner_list.add_child(EditorWidgets.create_outliner_group_label("Animation Assets"))
-	for asset in visible_assets:
-		var asset_id := str(asset.get("id", ""))
-		var asset_button := Button.new()
-		asset_button.text = str(asset.get("name", "Asset"))
-		asset_button.custom_minimum_size = Vector2(0, 30)
-		asset_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		asset_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		asset_button.focus_mode = Control.FOCUS_NONE
-		EditorWidgets.style_outliner_button(asset_button, asset_id == selected_asset_id)
-		asset_button.pressed.connect(_select_motion_asset.bind(asset_id))
-		outliner_list.add_child(asset_button)
-	if visible_assets.is_empty():
-		outliner_list.add_child(EditorWidgets.create_inspector_field_label("No Assets"))
 
 
 func _select_motion_path(path_id: String) -> void:
@@ -6696,115 +6674,29 @@ func _select_motion_asset(asset_id: String) -> void:
 	_invalidate_render(RENDER_DOCUMENT)
 
 
-func _render_weighting_outliner() -> void:
-	var search_text := outliner_search_input.text.strip_edges().to_lower() if is_instance_valid(outliner_search_input) else ""
-	outliner_list.add_child(EditorWidgets.create_outliner_group_label("Weighting"))
-	var visible_asset_count := 0
-	for asset in assets:
-		if not _outliner_asset_is_visible(asset) or not _asset_type_filter_matches(asset):
-			continue
-		var asset_id := str(asset.get("id", ""))
-		var asset_matches := search_text.is_empty() or str(asset.get("name", "")).to_lower().contains(search_text)
-		var component_matches := false
-		for component in asset.get("components", []):
-			if str(component.get("name", "")).to_lower().contains(search_text):
-				component_matches = true
-				break
-			for style in _weighting_styles(asset_id, str(component.get("id", ""))):
-				if str(style.get("name", "")).to_lower().contains(search_text):
-					component_matches = true
-		if not asset_matches and not component_matches:
-			continue
-		visible_asset_count += 1
-		var asset_button := Button.new()
-		asset_button.text = str(asset.get("name", "Asset"))
-		asset_button.custom_minimum_size = Vector2(0, 30)
-		asset_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		asset_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		asset_button.focus_mode = Control.FOCUS_NONE
-		EditorWidgets.style_outliner_button(asset_button, selected_asset_id == asset_id and selected_component_id.is_empty())
-		asset_button.pressed.connect(_select_weighting_asset.bind(asset_id))
-		outliner_list.add_child(asset_button)
-		if not bool(expanded_assets.get(asset_id, false)) and search_text.is_empty():
-			continue
-		for component in asset.get("components", []):
-			var component_id := str(component.get("id", ""))
-			var component_row := HBoxContainer.new()
-			var indent := Control.new()
-			indent.custom_minimum_size = Vector2(16, 0)
-			component_row.add_child(indent)
-			var component_button := Button.new()
-			var mesh_status := _component_mesh_status(asset_id, component_id, component)
-			component_button.text = "%s · %s" % [str(component.get("name", "Component")), "Mesh Ready" if mesh_status == "Ready" else "Missing Mesh" if mesh_status == "Missing" else "Mesh Stale"]
-			component_button.custom_minimum_size = Vector2(0, 30)
-			component_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			component_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-			component_button.focus_mode = Control.FOCUS_NONE
-			EditorWidgets.style_outliner_button(component_button, selected_asset_id == asset_id and selected_component_id == component_id and selected_weighting_style_id.is_empty())
-			component_button.pressed.connect(_select_weighting_component.bind(asset_id, component_id))
-			component_row.add_child(component_button)
-			var add_button := Button.new()
-			add_button.text = "+"
-			add_button.custom_minimum_size = Vector2(28, 30)
-			add_button.focus_mode = Control.FOCUS_NONE
-			add_button.tooltip_text = "Add Weighting Style"
-			add_button.pressed.connect(_create_weighting_style.bind(asset_id, component_id))
-			component_row.add_child(add_button)
-			outliner_list.add_child(component_row)
-			for style in _weighting_styles(asset_id, component_id):
-				var style_row := HBoxContainer.new()
-				var style_indent := Control.new()
-				style_indent.custom_minimum_size = Vector2(34, 0)
-				style_row.add_child(style_indent)
-				var style_button := Button.new()
-				style_button.text = "%s · %s" % [str(style.get("name", "Weighting Style")), _weighting_status(asset_id, component_id, component, style)]
-				style_button.custom_minimum_size = Vector2(0, 26)
-				style_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-				style_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-				style_button.focus_mode = Control.FOCUS_NONE
-				EditorWidgets.style_outliner_button(style_button, selected_weighting_style_id == str(style.get("id", "")))
-				style_button.pressed.connect(_select_weighting_style.bind(asset_id, component_id, str(style.get("id", ""))))
-				style_row.add_child(style_button)
-				outliner_list.add_child(style_row)
-	if visible_asset_count == 0:
-		outliner_list.add_child(EditorWidgets.create_inspector_field_label("No Assets match the selected types."))
-
-
-func _asset_matches_search(asset: Dictionary, search_text: String) -> bool:
-	if search_text.is_empty() or str(asset.get("name", "")).to_lower().contains(search_text):
-		return true
-	for component in asset.get("components", []):
-		if str(component.get("name", "")).to_lower().contains(search_text):
-			return true
-	for guide in asset.get("guides", []):
-		if _guide_display_name(asset, guide).to_lower().contains(search_text):
-			return true
-	return false
-
-
 func _sort_named_documents(a: Dictionary, b: Dictionary) -> bool:
-	return str(a.get("name", "")).to_lower() < str(b.get("name", "")).to_lower()
+	return WorldDocumentService.sort_named_documents(a, b)
 
 
 func _render_geometry_component_outliner() -> void:
 	var search_text := outliner_search_input.text.strip_edges().to_lower() if is_instance_valid(outliner_search_input) else ""
 	var visible_assets: Array = []
 	for asset in assets:
-		if _outliner_asset_is_visible(asset) and _asset_type_filter_matches(asset) and _asset_matches_search(asset, search_text):
+		if outliner_view.asset_is_visible(asset) and outliner_view.asset_type_filter_matches(asset) and outliner_view.asset_matches_search(asset, search_text):
 			visible_assets.append(asset)
 	visible_assets.sort_custom(_sort_named_documents)
-	outliner_list.add_child(EditorWidgets.create_outliner_group_label("%s · Components" % active_geometry_submodule))
+	outliner_view.add_child(EditorWidgets.create_outliner_group_label("%s · Components" % active_geometry_submodule))
 	for asset in visible_assets:
 		_render_geometry_component_asset_entry(asset, not search_text.is_empty())
 	if visible_assets.is_empty():
-		outliner_list.add_child(EditorWidgets.create_inspector_field_label("No Assets match the selected types."))
+		outliner_view.add_child(EditorWidgets.create_inspector_field_label("No Assets match the selected types."))
 
 
 func _render_geometry_component_asset_entry(asset: Dictionary, force_expand := false) -> void:
 	var asset_id := str(asset.get("id", ""))
 	var container := VBoxContainer.new()
 	container.add_theme_constant_override("separation", 0)
-	outliner_list.add_child(container)
+	outliner_view.add_child(container)
 	var asset_button := Button.new()
 	asset_button.text = str(asset.get("name", "Asset"))
 	asset_button.custom_minimum_size = Vector2(0, 30)
@@ -6833,7 +6725,7 @@ func _render_geometry_component_asset_entry(asset: Dictionary, force_expand := f
 				components.append(component)
 	components.sort_custom(_sort_named_documents)
 	references.sort_custom(_sort_named_documents)
-	guides.sort_custom(func(left: Dictionary, right: Dictionary) -> bool: return _guide_display_name(asset, left).naturalnocasecmp_to(_guide_display_name(asset, right)) < 0)
+	guides.sort_custom(func(left: Dictionary, right: Dictionary) -> bool: return WorldDocumentService.guide_display_name(asset, left).naturalnocasecmp_to(WorldDocumentService.guide_display_name(asset, right)) < 0)
 	for component in components:
 		if str(component.get("type", "component")) == "guide":
 			continue
@@ -6889,16 +6781,16 @@ func _render_geometry_component_asset_entry(asset: Dictionary, force_expand := f
 			_render_geometry_seeding_input_row(container, asset_id, component_id, "", "outer", "Outer · %s" % str(component.get("name", "Component")), "Clearance", "Outer")
 			for reference in references:
 				if str(reference.get("parent_component_id", "")) == component_id and str(reference.get("topology_role", "outer")) == "hole":
-					_render_geometry_seeding_input_row(container, asset_id, component_id, str(reference.get("id", "")), "hole", "Hole · %s" % _component_outliner_name(asset, reference), "Excluded", "Hole")
+					_render_geometry_seeding_input_row(container, asset_id, component_id, str(reference.get("id", "")), "hole", "Hole · %s" % WorldDocumentService.component_outliner_name(assets, reference), "Excluded", "Hole")
 			for guide in guides:
 				if str(guide.get("scope", {}).get("component_id", "")) != component_id:
 					continue
 				var guide_type := str(guide.get("guide_type", ""))
 				if guide_type == AssetGuide.CUT:
-					_render_geometry_seeding_input_row(container, asset_id, component_id, str(guide.get("id", "")), "cut", "Cut · %s" % _guide_display_name(asset, guide), "Barrier", "Cut")
+					_render_geometry_seeding_input_row(container, asset_id, component_id, str(guide.get("id", "")), "cut", "Cut · %s" % WorldDocumentService.guide_display_name(asset, guide), "Barrier", "Cut")
 				elif guide_type == AssetGuide.SAMPLER_SPINE:
 					var enabled := _geometry_seeding_spine_enabled(_geometry_seeding_recipe(asset_id, component_id), str(guide.get("id", "")))
-					_render_geometry_seeding_input_row(container, asset_id, component_id, str(guide.get("id", "")), "spine", "Spine · %s" % _guide_display_name(asset, guide), "Enabled" if enabled else "Disabled", "Spine")
+					_render_geometry_seeding_input_row(container, asset_id, component_id, str(guide.get("id", "")), "spine", "Spine · %s" % WorldDocumentService.guide_display_name(asset, guide), "Enabled" if enabled else "Disabled", "Spine")
 		elif active_geometry_submodule == "Meshing":
 			_render_geometry_meshing_pipeline_rows(container, asset, component)
 	if active_geometry_submodule != "Sampling":
@@ -6915,7 +6807,7 @@ func _render_geometry_reference_row(container: VBoxContainer, asset: Dictionary,
 	row.add_child(indent)
 	var button := Button.new()
 	var summary := _geometry_sampling_input_summary(asset_id, str(reference.get("parent_component_id", "")), reference_id, "hole")
-	button.text = "Hole · %s  %s" % [_component_outliner_name(asset, reference), str(summary.get("label", "↳"))]
+	button.text = "Hole · %s  %s" % [WorldDocumentService.component_outliner_name(assets, reference), str(summary.get("label", "↳"))]
 	button.tooltip_text = "Sampling dependency · select the parent Component to edit this contour"
 	button.custom_minimum_size = Vector2(0, 30)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -6937,7 +6829,7 @@ func _render_geometry_sampling_guide_row(container: VBoxContainer, asset: Dictio
 	indent.custom_minimum_size = Vector2(34, 0)
 	row.add_child(indent)
 	var button := Button.new()
-	var guide_name := _guide_display_name(asset, guide)
+	var guide_name := WorldDocumentService.guide_display_name(asset, guide)
 	var parent_component_id := str(guide.get("scope", {}).get("component_id", ""))
 	var summary := _geometry_sampling_input_summary(asset_id, parent_component_id, guide_id, "cut")
 	button.text = "Cut · %s  %s" % [guide_name, str(summary.get("label", "↳"))]
@@ -7321,123 +7213,6 @@ func _select_geometry_bake(asset_id: String, component_id: String, method: Strin
 		_set_geometry_meshing_method(method)
 
 
-func _render_asset_outliner_entry(asset: Dictionary, force_expand := false) -> void:
-	var asset_id := str(asset["id"])
-	var asset_container := VBoxContainer.new()
-	asset_container.add_theme_constant_override("separation", 0)
-	outliner_list.add_child(asset_container)
-	var asset_header := HBoxContainer.new()
-	asset_header.add_theme_constant_override("separation", 2)
-	asset_container.add_child(asset_header)
-	asset_header.add_child(EditorWidgets.create_visibility_checkbox(bool(asset.get("visibility", true)), _on_asset_visibility_changed.bind(asset_id)))
-	var asset_button := Button.new()
-	asset_button.text = str(asset["name"])
-	asset_button.custom_minimum_size = Vector2(0, 30)
-	asset_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	asset_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	asset_button.focus_mode = Control.FOCUS_NONE
-	EditorWidgets.style_outliner_button(asset_button, asset_id == selected_asset_id and selected_component_id.is_empty() and selected_guide_id.is_empty())
-	asset_button.pressed.connect(_select_asset.bind(asset_id))
-	asset_button.gui_input.connect(_on_asset_outliner_gui_input.bind(asset_id, asset_button))
-	asset_header.add_child(asset_button)
-	var add_button := Button.new()
-	add_button.text = "Add"
-	add_button.custom_minimum_size = Vector2(48, 30)
-	add_button.focus_mode = Control.FOCUS_NONE
-	add_button.pressed.connect(_open_component_dialog.bind(asset_id, add_button))
-	asset_header.add_child(add_button)
-	if not force_expand and not bool(expanded_assets.get(asset_id, false)):
-		return
-	var components: Array = []
-	var references: Array = []
-	var regions: Array = []
-	var guides: Array = asset.get("guides", []).duplicate(true)
-	for component in asset.get("components", []):
-		if str(component.get("type", "component")) == "guide":
-			guides.append(component)
-		elif _is_region(component):
-			regions.append(component)
-		elif _is_reference_component(component):
-			references.append(component)
-		else:
-			components.append(component)
-	components.sort_custom(_sort_named_documents)
-	guides.sort_custom(func(left: Dictionary, right: Dictionary) -> bool: return _guide_display_name(asset, left).naturalnocasecmp_to(_guide_display_name(asset, right)) < 0)
-	var components_label := EditorWidgets.create_outliner_child_group_label("Components")
-	components_label.set_drag_forwarding(_outliner_get_drag_data.bind(str(asset.get("id", "")), "root"), _outliner_can_drop_data.bind(str(asset.get("id", "")), "root"), _outliner_drop_data.bind(str(asset.get("id", "")), "root"))
-	asset_container.add_child(components_label)
-	var rendered_component_ids: Dictionary = {}
-	var rendered_group_ids: Dictionary = {}
-	var groups: Array = asset.get("groups", []).duplicate(true)
-	groups.sort_custom(_sort_named_documents)
-	for group in groups:
-		if str(group.get("parent_component_id", "")).is_empty():
-			_render_group_outliner_tree(asset_container, asset, group, 16, rendered_component_ids, rendered_group_ids)
-	for component in components:
-		if str(component.get("parent_component_id", "")).is_empty() and ComponentHierarchy.membership_group_id(asset, str(component.get("id", ""))).is_empty():
-			_render_component_outliner_tree(asset_container, asset, component, 16, rendered_component_ids, false, rendered_group_ids)
-	# A malformed in-memory document should remain editable even before its next load migration.
-	for component in components:
-		if not rendered_component_ids.has(str(component.get("id", ""))):
-			_render_component_outliner_tree(asset_container, asset, component, 16, rendered_component_ids, false, rendered_group_ids)
-	asset_container.add_child(EditorWidgets.create_outliner_child_group_label("References"))
-	references.sort_custom(_sort_named_documents)
-	for reference in references:
-		_render_component_outliner_tree(asset_container, asset, reference, 16, rendered_component_ids, true, {})
-	asset_container.add_child(EditorWidgets.create_outliner_child_group_label("Guides"))
-	for guide in guides:
-		_render_component_guide_row(asset_container, asset, guide)
-	asset_container.add_child(EditorWidgets.create_outliner_child_group_label("Regions"))
-	regions.sort_custom(_sort_named_documents)
-	for region in regions:
-		_render_region_outliner_row(asset_container, asset, region)
-
-
-func _render_group_outliner_tree(container: VBoxContainer, asset: Dictionary, group: Dictionary, indent: int, rendered_component_ids: Dictionary, rendered_group_ids: Dictionary) -> void:
-	var group_id := str(group.get("id", ""))
-	if group_id.is_empty() or rendered_group_ids.has(group_id):
-		return
-	rendered_group_ids[group_id] = true
-	var group_row := HBoxContainer.new()
-	group_row.add_theme_constant_override("separation", 0)
-	container.add_child(group_row)
-	var placeholder := Control.new()
-	placeholder.custom_minimum_size = Vector2(indent, 0)
-	group_row.add_child(placeholder)
-	group_row.add_child(EditorWidgets.create_visibility_checkbox(bool(group.get("visibility", true)), _on_group_visibility_entry_changed.bind(str(asset.get("id", "")), group_id)))
-	var group_button := Button.new()
-	group_button.text = "G: %s" % str(group.get("name", "Group"))
-	group_button.custom_minimum_size = Vector2(0, 30)
-	group_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	group_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	group_button.focus_mode = Control.FOCUS_NONE
-	group_button.tooltip_text = "Component Group"
-	EditorWidgets.style_outliner_button(group_button, group_id == selected_group_id and str(asset.get("id", "")) == selected_asset_id)
-	group_button.pressed.connect(_select_group.bind(str(asset.get("id", "")), group_id))
-	group_button.gui_input.connect(_on_group_outliner_gui_input.bind(str(asset.get("id", "")), group_id, group_button))
-	group_button.set_drag_forwarding(_outliner_get_drag_data.bind(str(asset.get("id", "")), group_id), _outliner_can_drop_data.bind(str(asset.get("id", "")), group_id), _outliner_drop_data.bind(str(asset.get("id", "")), group_id))
-	group_row.add_child(group_button)
-	var add_button := Button.new()
-	add_button.text = "+"
-	add_button.custom_minimum_size = Vector2(28, 30)
-	add_button.focus_mode = Control.FOCUS_NONE
-	add_button.tooltip_text = "Add Child or Guide to Group"
-	add_button.pressed.connect(_open_group_add_menu.bind(str(asset.get("id", "")), group_id, add_button))
-	group_row.add_child(add_button)
-	var group_components: Array = []
-	for component in asset.get("components", []):
-		if _is_region(component):
-			continue
-		if str(component.get("group_id", "")) != group_id:
-			continue
-		var parent_id := str(component.get("parent_component_id", ""))
-		if parent_id.is_empty() or ComponentHierarchy.membership_group_id(asset, parent_id) != group_id:
-			group_components.append(component)
-	group_components.sort_custom(_sort_named_documents)
-	for component in group_components:
-		_render_component_outliner_tree(container, asset, component, indent + 16, rendered_component_ids, false, rendered_group_ids, true)
-
-
 func _select_group(asset_id: String, group_id: String) -> void:
 	var asset := _get_asset(asset_id)
 	if asset.is_empty() or ComponentHierarchy.group_by_id(asset, group_id).is_empty():
@@ -7483,58 +7258,8 @@ func _on_asset_outliner_gui_input(event: InputEvent, asset_id: String, button: B
 	get_viewport().set_input_as_handled()
 
 
-func _outliner_get_drag_data(_at_position: Vector2, asset_id: String, target_id: String):
-	if target_id == "root":
-		return null
-	var asset := _get_asset(asset_id)
-	var group := ComponentHierarchy.group_by_id(asset, target_id)
-	if not group.is_empty():
-		var group_preview := Label.new()
-		group_preview.text = "G: %s" % str(group.get("name", "Group"))
-		set_drag_preview(group_preview)
-		return {"kind": "group", "asset_id": asset_id, "group_id": target_id}
-	var component := _get_component(asset, target_id)
-	if component.is_empty():
-		return null
-	var component_ids: Array[String] = []
-	if selected_component_ids.has(target_id):
-		component_ids = selected_component_ids.duplicate()
-	else:
-		component_ids = [target_id]
-	var preview := Label.new()
-	preview.text = str(component.get("name", "Component")) if component_ids.size() == 1 else "%d Components" % component_ids.size()
-	set_drag_preview(preview)
-	return {"kind": "components", "asset_id": asset_id, "component_ids": component_ids}
-
-
-func _outliner_can_drop_data(_at_position: Vector2, data, asset_id: String, target_id: String) -> bool:
-	if not data is Dictionary or str(data.get("asset_id", "")) != asset_id:
-		return false
-	var asset := _get_asset(asset_id)
-	if str(data.get("kind", "")) == "group":
-		var group_id := str(data.get("group_id", ""))
-		if target_id == "root":
-			return ComponentHierarchy.can_parent_group(asset, group_id, "")
-		return ComponentHierarchy.can_move_group_to_component(asset, group_id, target_id)
-	if str(data.get("kind", "")) != "components":
-		return false
-	var component_ids: Array = data.get("component_ids", [])
-	if component_ids.is_empty():
-		return false
-	if target_id == "root":
-		return true
-	if not ComponentHierarchy.group_by_id(asset, target_id).is_empty():
-		return true
-	if _get_component(asset, target_id).is_empty():
-		return false
-	for component_id in component_ids:
-		if not ComponentHierarchy.can_parent(asset, str(component_id), target_id):
-			return false
-	return true
-
-
 func _outliner_drop_data(_at_position: Vector2, data, asset_id: String, target_id: String) -> void:
-	if not _outliner_can_drop_data(Vector2.ZERO, data, asset_id, target_id):
+	if not outliner_view.can_drop_data(Vector2.ZERO, data, asset_id, target_id):
 		return
 	var asset := _get_asset(asset_id)
 	if str(data.get("kind", "")) == "group":
@@ -7631,59 +7356,6 @@ func _move_group_under_component_preserving_world(asset: Dictionary, group_id: S
 			member["transform"] = ComponentHierarchy.local_transform_from_world_record(asset, str(member_id), member_world_records[member_id])
 
 
-func _render_component_outliner_tree(container: VBoxContainer, asset: Dictionary, component: Dictionary, indent: int, rendered_component_ids: Dictionary, reference_summary := false, rendered_group_ids: Dictionary = {}, render_group_members := false) -> void:
-	var asset_id := str(asset.get("id", ""))
-	var component_id := str(component.get("id", ""))
-	if component_id.is_empty() or (not reference_summary and rendered_component_ids.has(component_id)):
-		return
-	if not reference_summary:
-		rendered_component_ids[component_id] = true
-	var component_row := HBoxContainer.new()
-	component_row.add_theme_constant_override("separation", 0)
-	container.add_child(component_row)
-	var child_placeholder := Control.new()
-	child_placeholder.custom_minimum_size = Vector2(indent, 0)
-	component_row.add_child(child_placeholder)
-	component_row.add_child(EditorWidgets.create_visibility_checkbox(bool(component.get("visibility", true)), _on_component_visibility_entry_changed.bind(asset_id, component_id)))
-	var component_button := Button.new()
-	var component_name := _component_outliner_name(asset, component) if reference_summary else _component_tree_name(component)
-	component_button.text = component_name if bool(component.get("visibility", true)) else _strikethrough_text(component_name)
-	component_button.custom_minimum_size = Vector2(0, 30)
-	component_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	component_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	component_button.focus_mode = Control.FOCUS_NONE
-	if _is_reference_component(component):
-		component_button.tooltip_text = _reference_outliner_tooltip(asset, component)
-	EditorWidgets.style_outliner_button(component_button, (component_id == selected_component_id or selected_component_ids.has(component_id)) and asset_id == selected_asset_id, str(component.get("topology_role", "outer")))
-	component_button.pressed.connect(_select_component.bind(asset_id, component_id, true))
-	component_button.gui_input.connect(_on_component_outliner_gui_input.bind(asset_id, component_id, component_button))
-	component_button.set_drag_forwarding(_outliner_get_drag_data.bind(asset_id, component_id), _outliner_can_drop_data.bind(asset_id, component_id), _outliner_drop_data.bind(asset_id, component_id))
-	component_row.add_child(component_button)
-	if _is_reference_component(component):
-		return
-	var add_button := Button.new()
-	add_button.text = "+"
-	add_button.custom_minimum_size = Vector2(28, 30)
-	add_button.focus_mode = Control.FOCUS_NONE
-	add_button.tooltip_text = "Add Child or Guide"
-	add_button.pressed.connect(_open_component_add_menu.bind(asset_id, component_id, add_button))
-	component_row.add_child(add_button)
-	var children := ComponentHierarchy.children(asset, component_id)
-	children.sort_custom(_sort_named_documents)
-	for child in children:
-		if _is_region(child):
-			continue
-		if not render_group_members and not ComponentHierarchy.membership_group_id(asset, str(child.get("id", ""))).is_empty():
-			continue
-		_render_component_outliner_tree(container, asset, child, indent + 16, rendered_component_ids, false, rendered_group_ids, render_group_members)
-	if not render_group_members:
-		var child_groups: Array = asset.get("groups", []).duplicate(true)
-		child_groups.sort_custom(_sort_named_documents)
-		for group in child_groups:
-			if str(group.get("parent_component_id", "")) == component_id:
-				_render_group_outliner_tree(container, asset, group, indent + 16, rendered_component_ids, rendered_group_ids)
-
-
 func _on_component_outliner_gui_input(event: InputEvent, asset_id: String, component_id: String, button: Button) -> void:
 	if not event is InputEventMouseButton or event.button_index != MOUSE_BUTTON_RIGHT or not event.pressed:
 		return
@@ -7709,69 +7381,6 @@ func _on_component_outliner_gui_input(event: InputEvent, asset_id: String, compo
 	component_context_menu.position = Vector2i(button.global_position + event.position)
 	component_context_menu.popup()
 	get_viewport().set_input_as_handled()
-
-
-func _render_component_guide_row(container: VBoxContainer, asset: Dictionary, guide: Dictionary) -> void:
-	var asset_id := str(asset.get("id", ""))
-	var guide_row := HBoxContainer.new()
-	guide_row.add_theme_constant_override("separation", 0)
-	container.add_child(guide_row)
-	var component_indent := Control.new()
-	component_indent.custom_minimum_size = Vector2(16, 0)
-	guide_row.add_child(component_indent)
-	guide_row.add_child(EditorWidgets.create_visibility_checkbox(bool(guide.get("visibility", true)), _on_guide_visibility_entry_changed.bind(asset_id, str(guide.get("id", "")))))
-	var guide_button := Button.new()
-	var guide_name := _guide_display_name(asset, guide)
-	guide_button.text = guide_name if bool(guide.get("visibility", true)) else _strikethrough_text(guide_name)
-	guide_button.tooltip_text = AssetGuide.display_name(str(guide.get("guide_type", AssetGuide.SAMPLER_SPINE)))
-	guide_button.custom_minimum_size = Vector2(0, 30)
-	guide_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	guide_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	guide_button.focus_mode = Control.FOCUS_NONE
-	EditorWidgets.style_guide_outliner_button(guide_button, str(guide.get("id", "")) == selected_guide_id, str(guide.get("guide_type", AssetGuide.SAMPLER_SPINE)))
-	guide_button.pressed.connect(_select_guide.bind(asset_id, str(guide.get("id", ""))))
-	guide_row.add_child(guide_button)
-
-
-func _render_region_outliner_row(container: VBoxContainer, asset: Dictionary, region: Dictionary) -> void:
-	var region_row := HBoxContainer.new()
-	region_row.add_theme_constant_override("separation", 0)
-	container.add_child(region_row)
-	var indent := Control.new()
-	indent.custom_minimum_size = Vector2(16, 0)
-	region_row.add_child(indent)
-	var region_id := str(region.get("id", ""))
-	region_row.add_child(EditorWidgets.create_visibility_checkbox(bool(region.get("visibility", true)), _on_component_visibility_entry_changed.bind(str(asset.get("id", "")), region_id)))
-	var button := Button.new()
-	var group_id := str(region.get("group_id", ""))
-	var parent_id := str(region.get("parent_component_id", ""))
-	var scope := ComponentHierarchy.group_by_id(asset, group_id) if not group_id.is_empty() else _get_component(asset, parent_id)
-	button.text = "%s → %s" % [str(scope.get("name", "Asset")), _normalized_component_name(region)]
-	button.tooltip_text = "%s gameplay region" % str(region.get("region_type", "attack")).capitalize()
-	button.custom_minimum_size = Vector2(0, 30)
-	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	button.focus_mode = Control.FOCUS_NONE
-	EditorWidgets.style_region_outliner_button(button, selected_component_id == region_id and selected_asset_id == str(asset.get("id", "")), str(region.get("region_type", "attack")))
-	button.pressed.connect(_select_component.bind(str(asset.get("id", "")), region_id, true))
-	region_row.add_child(button)
-
-
-func _guide_display_name(asset: Dictionary, guide: Dictionary) -> String:
-	var scope: Dictionary = guide.get("scope", {})
-	var scope_record := ComponentHierarchy.group_by_id(asset, str(scope.get("group_id", ""))) if str(scope.get("kind", "component")) == "group" else _get_component(asset, str(scope.get("component_id", "")))
-	var scope_name := str(scope_record.get("name", "Unassigned"))
-	if AssetGuide.is_weapon_frame(str(guide.get("guide_type", ""))):
-		return "%s → %s" % [scope_name, str(guide.get("guide_type", ""))]
-	return AssetGuide.outliner_name(guide, scope_name)
-
-
-func _strikethrough_text(text: String) -> String:
-	var result := ""
-	var strike_mark := String.chr(0x0336)
-	for character in text:
-		result += character + strike_mark
-	return result
 
 
 func _select_asset(asset_id: String) -> void:
@@ -8073,7 +7682,7 @@ func _create_guide(asset_id: String, component_id: String, guide_type: String, l
 	_set_outliner_asset_expanded(asset_id, true)
 	guide_dialog.hide()
 	canvas_view.set_navigation_locked(false)
-	_show_status_message("Created %s." % _guide_display_name(asset, guide))
+	_show_status_message("Created %s." % WorldDocumentService.guide_display_name(asset, guide))
 	_invalidate_render(RENDER_DOCUMENT)
 
 
@@ -8138,7 +7747,7 @@ func _create_region(asset_id: String, scope_kind: String, scope_id: String, regi
 
 
 func _is_region(component: Dictionary) -> bool:
-	return str(component.get("type", "component")) == "region"
+	return WorldDocumentService.is_region(component)
 
 
 func _component_local_visual_center(component: Dictionary) -> Vector2:
@@ -8165,7 +7774,7 @@ func _duplicate_selected_guide() -> void:
 	selected_component_id = ""
 	active_state = ""
 	_set_outliner_asset_expanded(selected_asset_id, true)
-	_show_status_message("Duplicated %s." % _guide_display_name(asset, guide_copy))
+	_show_status_message("Duplicated %s." % WorldDocumentService.guide_display_name(asset, guide_copy))
 	_invalidate_render(RENDER_DOCUMENT)
 
 
@@ -9263,7 +8872,7 @@ func _render_guide_inspector(asset: Dictionary, guide: Dictionary) -> void:
 		_render_weapon_guide_inspector(asset, guide)
 		return
 	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Name"))
-	inspector_content.add_child(EditorWidgets.create_inspector_field_label(_guide_display_name(asset, guide)))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label(WorldDocumentService.guide_display_name(asset, guide)))
 	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Type"))
 	var type_option := OptionButton.new()
 	type_option.add_item("Flow")
@@ -9582,7 +9191,7 @@ func _delete_selected_guide() -> void:
 	pending_guide_remove_id = selected_guide_id
 	var guide := _get_guide(asset, selected_guide_id)
 	if is_instance_valid(guide_remove_dialog):
-		guide_remove_dialog.dialog_text = "Delete Guide ‘%s’?" % _guide_display_name(asset, guide)
+		guide_remove_dialog.dialog_text = "Delete Guide ‘%s’?" % WorldDocumentService.guide_display_name(asset, guide)
 		guide_remove_dialog.popup_centered()
 	else:
 		_confirm_guide_deletion()
@@ -9618,8 +9227,8 @@ func _get_sampling_input(asset: Dictionary, input_id: String, input_kind: String
 
 func _sampling_input_display_name(asset: Dictionary, _parent: Dictionary, input: Dictionary, input_kind: String) -> String:
 	if input_kind == "guide":
-		return _guide_display_name(asset, input)
-	return _component_outliner_name(asset, input)
+		return WorldDocumentService.guide_display_name(asset, input)
+	return WorldDocumentService.component_outliner_name(assets, input)
 
 
 func _geometry_sampling_input_has_override(recipe: Dictionary, input_id: String) -> bool:
@@ -9723,14 +9332,14 @@ func _render_geometry_sampling_inspector() -> void:
 			references.append(reference)
 	for reference in references:
 		var reference_id := str(reference.get("id", ""))
-		var reference_name := _component_outliner_name(asset, reference)
+		var reference_name := WorldDocumentService.component_outliner_name(assets, reference)
 		_render_geometry_sampling_boundary_row("Hole · %s" % reference_name, reference_id, "hole", display_result, _select_geometry_sampling_reference.bind(selected_asset_id, selected_component_id, reference_id))
 
 	for guide in asset.get("guides", []):
 		if str(guide.get("scope", {}).get("component_id", "")) != selected_component_id or str(guide.get("guide_type", "")) != AssetGuide.CUT:
 			continue
 		var guide_id := str(guide.get("id", ""))
-		_render_geometry_sampling_boundary_row("Cut · %s" % _guide_display_name(asset, guide), guide_id, "cut", display_result, _select_guide.bind(selected_asset_id, guide_id))
+		_render_geometry_sampling_boundary_row("Cut · %s" % WorldDocumentService.guide_display_name(asset, guide), guide_id, "cut", display_result, _select_guide.bind(selected_asset_id, guide_id))
 
 	if not selected_sampling_input_id.is_empty():
 		_render_geometry_sampling_refinement_controls(base_recipe)
@@ -10084,7 +9693,7 @@ func _render_geometry_seeding_inspector() -> void:
 			var guide_id := str(guide.get("id", ""))
 			var enabled := _geometry_seeding_spine_enabled(recipe, guide_id)
 			var toggle := CheckBox.new()
-			toggle.text = _guide_display_name(_get_asset(selected_asset_id), guide)
+			toggle.text = WorldDocumentService.guide_display_name(_get_asset(selected_asset_id), guide)
 			toggle.button_pressed = enabled
 			toggle.toggled.connect(_on_geometry_seeding_spine_enabled.bind(guide_id))
 			inspector_content.add_child(toggle)
@@ -14236,7 +13845,7 @@ func _render_spine_canvas(asset: Dictionary, guide: Dictionary, drawing: bool) -
 	var target_component_id := str(guide.get("scope", {}).get("component_id", ""))
 	var target_component := _get_component(asset, target_component_id)
 	var type_name := AssetGuide.display_name(str(guide.get("guide_type", AssetGuide.SAMPLER_SPINE)))
-	var guide_name := _guide_display_name(asset, guide)
+	var guide_name := WorldDocumentService.guide_display_name(asset, guide)
 	canvas_context_label.text = "%s: %s%s" % [type_name, guide_name, " · Draft" if drawing else ""]
 	canvas_view.set_context(guide_name)
 	canvas_view.set_guide_style(true)
@@ -14363,36 +13972,11 @@ func _build_reference_shapes(asset: Dictionary, excluded_component_id := "", emp
 
 
 func _is_reference_component(component: Dictionary) -> bool:
-	return str(component.get("type", "component")) == "reference"
+	return WorldDocumentService.is_reference_component(component)
 
 
 func _normalized_component_name(component: Dictionary) -> String:
-	var normalized_name := str(component.get("name", "")).strip_edges()
-	return normalized_name if not normalized_name.is_empty() else "Component"
-
-
-func _component_tree_name(component: Dictionary) -> String:
-	var component_name := _normalized_component_name(component)
-	return "R: %s" % component_name if _is_reference_component(component) else component_name
-
-
-func _component_outliner_name(_asset: Dictionary, component: Dictionary) -> String:
-	var component_name := _normalized_component_name(component)
-	if not _is_reference_component(component):
-		return component_name
-	var source_asset := _get_asset(str(component.get("source_asset_id", "")))
-	var source_name := str(source_asset.get("name", "Missing asset"))
-	return "%s ← %s" % [component_name, source_name]
-
-
-func _reference_outliner_tooltip(asset: Dictionary, reference: Dictionary) -> String:
-	var source_asset := _get_asset(str(reference.get("source_asset_id", "")))
-	var source_name := str(source_asset.get("name", "Missing asset"))
-	var tooltip := "Referenced asset: %s" % source_name
-	var parent := _get_component(asset, str(reference.get("parent_component_id", "")))
-	if not parent.is_empty():
-		tooltip += "\nAttached to: %s" % _normalized_component_name(parent)
-	return tooltip
+	return WorldDocumentService.normalized_component_name(component)
 
 
 func _reference_asset_shapes(target_asset: Dictionary, reference: Dictionary, emphasized_component_id: String) -> Array:
@@ -14943,14 +14527,11 @@ func _on_face_selection_changed(_selected: bool) -> void:
 
 
 func _get_asset(asset_id: String) -> Dictionary:
-	for asset in assets:
-		if str(asset["id"]) == asset_id:
-			return asset
-	return {}
+	return WorldDocumentService.asset_by_id(assets, asset_id)
 
 
 func _asset_type(asset: Dictionary) -> String:
-	return WorldDocumentService.normalize_asset_type(asset.get("asset_type", "character"))
+	return WorldDocumentService.asset_type(asset)
 
 
 func _create_submodule_asset_type(submodule: String) -> String:
@@ -15028,10 +14609,7 @@ func _select_motion_act(act_id: String) -> void:
 
 
 func _get_motion_path(path_id: String) -> Dictionary:
-	for path_document in motion_paths:
-		if str(path_document.get("id", "")) == path_id:
-			return path_document
-	return {}
+	return WorldDocumentService.motion_path_by_id(motion_paths, path_id)
 
 
 func _get_motion_sequence(sequence_id: String) -> Dictionary:
@@ -15061,12 +14639,7 @@ func _default_motion_path_preview_asset_id() -> String:
 
 
 func _get_component(asset: Dictionary, component_id: String) -> Dictionary:
-	if asset.is_empty():
-		return {}
-	for component in asset["components"]:
-		if str(component.get("type", "component")) != "guide" and str(component["id"]) == component_id:
-			return component
-	return {}
+	return WorldDocumentService.component_by_id(asset, component_id)
 
 
 func _get_guide(asset: Dictionary, guide_id: String) -> Dictionary:
