@@ -303,7 +303,6 @@ var eye_contour_stroke_dialog: ConfirmationDialog
 var eye_contour_stroke_width_field: SpinBox
 var pending_save_after_new := false
 var pending_renders := 0
-var render_flush_queued := false
 var rendering := false
 var undo_history: Array[Dictionary] = []
 var redo_history: Array[Dictionary] = []
@@ -2519,26 +2518,23 @@ func _incomplete_save_message(unwritten: Array[String]) -> String:
 
 
 func _invalidate_render(targets: int) -> void:
-	# Records what became stale instead of naming the render functions to call.
+	# Records what became stale instead of naming the render functions to call,
+	# then renders it. Deliberately synchronous: several call sites consume the
+	# render output in the statements that follow — a Context Bar menu they open,
+	# a Workspace they focus once the render makes it visible, a canvas_view
+	# property the render writes as well. Deferring this to the end of the frame
+	# inverted that ordering.
 	pending_renders |= targets
-	if rendering or render_flush_queued:
-		return
-	if not is_inside_tree():
-		# Outside the tree there is no frame to coalesce against, and a caller
-		# that inspects the result right away must still see it.
-		_flush_pending_renders()
-		return
-	render_flush_queued = true
-	call_deferred("_flush_pending_renders")
+	_flush_pending_renders()
 
 
 func _flush_pending_renders() -> void:
-	render_flush_queued = false
 	if rendering:
+		# Re-entered from inside a render; the loop below picks the target up.
 		return
 	rendering = true
 	# A render may invalidate again. Settle here rather than leaving a stale
-	# target for the next frame, but do not spin on a render that never settles.
+	# target behind, but do not spin on a render that never settles.
 	var passes := 0
 	while pending_renders != 0 and passes < 4:
 		passes += 1

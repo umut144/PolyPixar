@@ -47,11 +47,18 @@ Rendering is invalidation-driven. A mutation calls `_invalidate_render` with the
 targets that became stale — `RENDER_OUTLINER`, `RENDER_INSPECTOR`,
 `RENDER_CANVAS_CONTEXT`, `RENDER_CONTEXT_BAR`, `RENDER_INFO_BAR`, or the
 `RENDER_DOCUMENT` combination of the first three — rather than naming the render
-functions to call. `_flush_pending_renders` runs the accumulated set once, in a
-fixed order, deferred to the end of the frame while the editor is in the tree
-and immediately otherwise, so a caller outside the tree still sees a finished
-render. Requesting the Canvas covers the Context Bar and Info Bar, which it
-renders unconditionally; the reverse does not hold.
+functions to call. `_flush_pending_renders` then runs the accumulated set once,
+in a fixed order, before `_invalidate_render` returns.
+
+The flush is synchronous on purpose. Several call sites consume render output in
+the statements that follow: the Weighting shortcut opens a Context Bar menu that
+the same render rebuilds, `_select_geometry_component` focuses a Workspace that
+the Canvas render makes visible, and a handful of handlers write `canvas_view`
+properties that the Canvas render also writes. Deferring the flush to the end of
+the frame inverts that ordering, so it is not done. Requesting the Canvas covers
+the Context Bar and Info Bar, which it renders before it can return; the reverse
+does not hold, because `_render_context_bar` has exit paths that leave the Info
+Bar alone.
 
 Pointer-based `P` Pivot placement is intercepted by `main.gd` during the early
 input phase because focused Inspector controls may consume printable keys

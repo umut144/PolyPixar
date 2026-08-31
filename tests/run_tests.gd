@@ -1396,30 +1396,39 @@ func _distance_to_segment(point: Vector2, start: Vector2, end: Vector2) -> float
 
 
 func _test_render_invalidation() -> void:
+	var component := _component()
+	BezierTopology.add_point(component, Vector2.ZERO, "corner")
+	BezierTopology.add_point(component, Vector2(10.0, 0.0), "linear")
+	BezierTopology.add_point(component, Vector2(10.0, 10.0), "linear")
+	BezierTopology.close_active_chain(component)
+	component.merge({"id": "component_1", "name": "body", "visibility": true})
 	var application: Control = load("res://scripts/main.gd").new()
 	application._build_ui()
+	var test_assets: Array[Dictionary] = [{"id": "asset_1", "name": "Wizard", "visibility": true, "components": [component], "guides": [], "groups": []}]
+	application.assets = test_assets
+	application.selected_asset_id = "asset_1"
+	application.expanded_assets["asset_1"] = true
 
-	# Detached from the tree there is no frame to coalesce against, so a caller
-	# that inspects the result right away must still see a finished render.
-	_expect(not application.is_inside_tree(), "This test covers the detached path deliberately.")
 	application._invalidate_render(application.RENDER_DOCUMENT)
-	_expect(application.pending_renders == 0 and not application.render_flush_queued, "Invalidating outside the tree should render immediately and leave nothing pending.")
+	_expect(application.pending_renders == 0, "Invalidating must render before it returns, so a caller can consume the result in the next statement.")
 
-	# With a flush already queued, further invalidations only accumulate.
-	application.render_flush_queued = true
-	application._invalidate_render(application.RENDER_OUTLINER)
-	application._invalidate_render(application.RENDER_INSPECTOR)
-	application._invalidate_render(application.RENDER_OUTLINER)
-	_expect(application.pending_renders == application.RENDER_OUTLINER | application.RENDER_INSPECTOR, "Repeated invalidations should collapse into one pending set instead of rendering each time.")
-	application._flush_pending_renders()
-	_expect(application.pending_renders == 0 and not application.render_flush_queued, "Flushing should run the pending targets and clear the set.")
+	# Several call sites read what the render just built. The Weighting shortcut
+	# opens the Context Bar menu that the same render replaces.
+	application.active_module = "Style"
+	application.active_style_submodule = "Weighting"
+	application._set_active_context_command("style.weighting.method")
+	application._invalidate_render(application.RENDER_CONTEXT_BAR)
+	var opened_menu: MenuButton = application.weighting_method_menu
+	_expect(is_instance_valid(opened_menu) and opened_menu.get_parent() == application.context_bar, "The Context Bar menu a shortcut opens must be the one the invalidation just installed, not the previous instance.")
+	# Rendering again replaces it; the reference a caller took before the render
+	# would be the stale one, which is why the flush cannot be deferred.
+	application._invalidate_render(application.RENDER_CONTEXT_BAR)
+	_expect(application.weighting_method_menu != opened_menu, "A Context Bar render replaces its menus, so the caller must read them after the render, not before.")
 
-	# A render that invalidates again must not re-enter the flush.
+	# A render may invalidate again; that must not re-enter the flush.
 	application.rendering = true
 	application._invalidate_render(application.RENDER_INFO_BAR)
-	_expect(application.pending_renders == application.RENDER_INFO_BAR and not application.render_flush_queued, "Invalidating during a render should only record the target.")
-	application._flush_pending_renders()
-	_expect(application.pending_renders == application.RENDER_INFO_BAR, "A flush must not run while a render is already in progress.")
+	_expect(application.pending_renders == application.RENDER_INFO_BAR, "Invalidating during a render should only record the target.")
 	application.rendering = false
 	application._flush_pending_renders()
 	_expect(application.pending_renders == 0, "The recorded target should be rendered by the next flush.")
