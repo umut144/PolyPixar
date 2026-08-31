@@ -27,3 +27,10 @@ Run both commands after geometry changes:
 
 Also run `git diff --check`. Files below `worlds/` are user data and must
 not be rewritten as test fixtures.
+
+## Commits
+
+After every change, create a Git commit automatically with a concise,
+appropriate commit message describing the change. Do not push commits; the
+user handles pushing separately. Before committing, review the staged diff
+and ensure that only the intended changes are included.
