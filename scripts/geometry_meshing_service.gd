@@ -341,7 +341,7 @@ static func _triangulate(vertices: Array, constraints: Array) -> Dictionary:
 	if not pslg_errors.is_empty():
 		return {"valid": false, "errors": pslg_errors, "diagnostics": {"stage": "pslg_validation"}}
 	if not ClassDB.class_exists(&"PolyToolsCDT"):
-		return {"valid": false, "errors": ["The PolyTools CDT native extension is unavailable. Rebuild native/polytools_cdt for macOS arm64."], "diagnostics": {"stage": "native_load"}}
+		return {"valid": false, "errors": ["The PolyTools CDT native extension is unavailable. Rebuild native/polytools_cdt for this platform."], "diagnostics": {"stage": "native_load"}}
 	var native_cdt: Object = ClassDB.instantiate(&"PolyToolsCDT")
 	var packed_constraints := PackedInt32Array()
 	for indices in constraint_indices:

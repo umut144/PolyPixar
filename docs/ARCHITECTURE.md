@@ -197,7 +197,7 @@ with the current constrained-mesh algorithm version.
 Schema 32 stores arranged Cut fragments. Sampling owns PSLG junction creation
 and clipping against Outer/Holes; Seeding consumes the resulting fragments as
 independent barriers. Meshing validates the PSLG and delegates only constrained
-triangulation to the pinned macOS-arm64 `artem-ogre/CDT` GDExtension. PolyTools
+triangulation to the pinned `artem-ogre/CDT` GDExtension. PolyTools
 continues to own document data, stable IDs, domain filtering, diagnostics,
 relaxation, and Cut-seam duplication.
 

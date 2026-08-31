@@ -17,3 +17,6 @@ native/polytools_cdt/godot-cpp/bin/
 native/polytools_cdt/godot-cpp/gen/
 native/polytools_cdt/godot-cpp/obj/
 native/polytools_cdt/src/*.os
+native/polytools_cdt/src/*.o
+# The macOS framework is checked in; the Linux product is built on demand.
+native/polytools_cdt/bin/*.so

@@ -14,13 +14,21 @@ env.Append(
 
 sources = Glob("src/*.cpp")
 
-if env["platform"] != "macos":
-    print("PolyTools CDT currently supports macOS only.")
+if env["platform"] == "macos":
+    # macOS loads the extension from a framework bundle.
+    target = "bin/libpolytools_cdt.{}.{}.framework/libpolytools_cdt.{}.{}".format(
+        env["platform"], env["target"], env["platform"], env["target"]
+    )
+elif env["platform"] in ("linux", "linuxbsd"):
+    # Linux is a build-from-source target for headless verification and CI.
+    # Unlike the macOS framework, its product is not checked in.
+    target = "bin/libpolytools_cdt.{}.{}.{}{}".format(
+        env["platform"], env["target"], env["arch"], env["SHLIBSUFFIX"]
+    )
+else:
+    print("PolyTools CDT supports macOS and Linux.")
     Exit(1)
 
-target = "bin/libpolytools_cdt.{}.{}.framework/libpolytools_cdt.{}.{}".format(
-    env["platform"], env["target"], env["platform"], env["target"]
-)
 library = env.SharedLibrary(target, source=sources)
 
 env.NoCache(library)

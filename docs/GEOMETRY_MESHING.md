@@ -111,8 +111,10 @@ Schema 32 adds persisted Cut fragments. Meshing algorithm version 3 replaces
 the former Godot Delaunay plus custom edge-flip recovery with the qualified
 native CDT backend, so older Mesh Bakes remain visible but stale until baked
 again. The checked-in macOS-arm64 debug framework supports the pinned Godot
-Mono 4.7.1 authoring environment; native rebuild instructions and exact
-dependency commits live in `native/polytools_cdt/README.md`.
+Mono 4.7.1 authoring environment. Linux is supported as a build-from-source
+target for headless verification, without a checked-in product. Native rebuild
+instructions and exact dependency commits live in
+`native/polytools_cdt/README.md`.
 
 Schema 33 and Meshing algorithm version 4 add conservative existing-point
 optimization diagnostics. This first optimizer phase never inserts or removes
