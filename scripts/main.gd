@@ -218,7 +218,7 @@ var pending_guide_remove_asset_id := ""
 var pending_guide_remove_id := ""
 var component_remove_dialog: ConfirmationDialog
 var pending_component_remove_asset_id := ""
-var pending_component_remove_id := ""
+var pending_component_remove_ids: Array[String] = []
 var motion_phase_value_label: Label
 var motion_phase_marks: MotionPhaseMarks
 var motion_phase_slider: HSlider
@@ -1209,7 +1209,7 @@ func _create_component_remove_dialog() -> void:
 	component_remove_dialog.confirmed.connect(_confirm_component_deletion)
 	component_remove_dialog.canceled.connect(func() -> void:
 		pending_component_remove_asset_id = ""
-		pending_component_remove_id = ""
+		pending_component_remove_ids.clear()
 	)
 	add_child(component_remove_dialog)
 
@@ -10592,44 +10592,59 @@ func _select_guide(asset_id: String, guide_id: String) -> void:
 
 func _delete_selected_component() -> void:
 	var asset := _get_asset(selected_asset_id)
-	if asset.is_empty() or selected_component_id.is_empty():
+	if asset.is_empty():
 		return
-	var component := _get_component(asset, selected_component_id)
-	if component.is_empty():
+	var root_component_ids := _selected_component_ids_for_group(asset)
+	if root_component_ids.is_empty():
 		return
 	pending_component_remove_asset_id = selected_asset_id
-	pending_component_remove_id = selected_component_id
-	var removed_component_ids: Dictionary = {selected_component_id: true}
-	for descendant in ComponentHierarchy.descendants(asset, selected_component_id):
-		removed_component_ids[str(descendant.get("id", ""))] = true
+	pending_component_remove_ids = root_component_ids.duplicate()
+	var removed_component_ids := _component_deletion_set(asset, root_component_ids)
 	var removed_guide_count := 0
 	for guide in asset.get("guides", []):
 		if removed_component_ids.has(str(guide.get("scope", {}).get("component_id", ""))):
 			removed_guide_count += 1
 	var component_count := removed_component_ids.size()
-	var description := "Delete Component ‘%s’" % str(component.get("name", "Component"))
-	if component_count > 1:
-		description += " and %d Child Components" % (component_count - 1)
+	var description := ""
+	if root_component_ids.size() == 1:
+		var component := _get_component(asset, root_component_ids[0])
+		description = "Delete Component ‘%s’" % str(component.get("name", "Component"))
+		if component_count > 1:
+			description += " and %d Child Components" % (component_count - 1)
+	else:
+		description = "Delete %d Components" % component_count
 	if removed_guide_count > 0:
 		description += " plus %d Guide%s" % [removed_guide_count, "s" if removed_guide_count != 1 else ""]
 	description += "? This cannot be undone except through Undo."
 	if is_instance_valid(component_remove_dialog):
+		component_remove_dialog.title = "Delete Component" if root_component_ids.size() == 1 else "Delete Components"
 		component_remove_dialog.dialog_text = description
 		component_remove_dialog.popup_centered()
 	else:
 		_confirm_component_deletion()
 
 
+func _component_deletion_set(asset: Dictionary, root_component_ids: Array[String]) -> Dictionary:
+	var removed_component_ids: Dictionary = {}
+	for component_id in root_component_ids:
+		if _get_component(asset, component_id).is_empty():
+			continue
+		removed_component_ids[component_id] = true
+		for descendant in ComponentHierarchy.descendants(asset, component_id):
+			removed_component_ids[str(descendant.get("id", ""))] = true
+	return removed_component_ids
+
+
 func _confirm_component_deletion() -> void:
 	var asset := _get_asset(pending_component_remove_asset_id)
-	var component_id := pending_component_remove_id
+	var root_component_ids := pending_component_remove_ids.duplicate()
 	pending_component_remove_asset_id = ""
-	pending_component_remove_id = ""
-	if asset.is_empty() or component_id.is_empty() or _get_component(asset, component_id).is_empty():
+	pending_component_remove_ids.clear()
+	if asset.is_empty() or root_component_ids.is_empty():
 		return
-	var removed_component_ids: Dictionary = {component_id: true}
-	for descendant in ComponentHierarchy.descendants(asset, component_id):
-		removed_component_ids[str(descendant.get("id", ""))] = true
+	var removed_component_ids := _component_deletion_set(asset, root_component_ids)
+	if removed_component_ids.is_empty():
+		return
 	_record_direct_change()
 	var surviving_components: Array = []
 	for existing_component in asset.get("components", []):

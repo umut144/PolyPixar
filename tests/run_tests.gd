@@ -30,6 +30,7 @@ func _init() -> void:
 	_test_asset_scale_rebase()
 	_test_asset_authored_facing()
 	_test_multi_component_inspector()
+	_test_multi_component_deletion()
 	_test_geometry_sampling_service()
 	_test_geometry_auto_build_service()
 	_test_geometry_auto_build_regression_corpus()
@@ -1312,6 +1313,42 @@ func _test_multi_component_inspector() -> void:
 	_expect(is_equal_approx(float(first_world.get("position", Vector2.ZERO).x), 4.0) and is_equal_approx(float(second_world.get("position", Vector2.ZERO).x), 4.0), "A shared Position X edit should use the Asset pivot as the (0, 0) origin.")
 	application._on_multi_component_visibility_selected(0)
 	_expect(bool(application._get_component(asset, "first").get("visibility", false)) and bool(application._get_component(asset, "second").get("visibility", false)), "A shared Visibility edit should update every selected Component.")
+	application.free()
+
+
+func _test_multi_component_deletion() -> void:
+	var parent := _component()
+	parent.merge({"id": "parent", "name": "parent", "type": "component", "parent_component_id": "", "visibility": true, "transform": {"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}})
+	var child := _component()
+	child.merge({"id": "child", "name": "child", "type": "component", "parent_component_id": "parent", "visibility": true, "transform": {"position": Vector2.ONE, "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}})
+	var sibling := _component()
+	sibling.merge({"id": "sibling", "name": "sibling", "type": "component", "parent_component_id": "", "visibility": true, "transform": {"position": Vector2(2.0, 0.0), "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}})
+	var survivor := _component()
+	survivor.merge({"id": "survivor", "name": "survivor", "type": "component", "parent_component_id": "", "catch_parent_component_id": "child", "visibility": true, "transform": {"position": Vector2(3.0, 0.0), "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}})
+	var guides := [
+		{"id": "parent_guide", "scope": {"component_id": "parent"}},
+		{"id": "child_guide", "scope": {"component_id": "child"}},
+		{"id": "sibling_guide", "scope": {"component_id": "sibling"}},
+		{"id": "survivor_guide", "scope": {"component_id": "survivor"}}
+	]
+	var asset := {"id": "asset", "name": "Asset", "asset_type": "character", "visibility": true, "asset_pivot": Vector2.ZERO, "components": [parent, child, sibling, survivor], "groups": [], "guides": guides}
+	var application = load("res://scripts/main.gd").new()
+	application._build_ui()
+	var test_assets: Array[Dictionary] = [asset]
+	application.assets = test_assets
+	application.active_module = "Create"
+	application.active_create_submodule = "Character"
+	application.selected_asset_id = "asset"
+	application.selected_component_id = "sibling"
+	var deletion_selection: Array[String] = ["parent", "child", "sibling"]
+	application.selected_component_ids = deletion_selection
+	var deletion_roots: Array[String] = application._selected_component_ids_for_group(asset)
+	_expect(deletion_roots == ["parent", "sibling"] and application._component_deletion_set(asset, deletion_roots).size() == 3, "Multi-delete should collapse a selected Child into its already selected Parent subtree and count every Component once.")
+	application.component_remove_dialog = null
+	application._delete_selected_component()
+	_expect(asset.get("components", []).size() == 1 and str(asset.get("components", [])[0].get("id", "")) == "survivor", "Confirming multi-delete should remove every selected Component subtree in one operation.")
+	_expect(asset.get("guides", []).size() == 1 and str(asset.get("guides", [])[0].get("id", "")) == "survivor_guide", "Multi-delete should remove Guides scoped to any deleted Component.")
+	_expect(str(survivor.get("catch_parent_component_id", "")) == "" and application.undo_history.size() == 1, "Multi-delete should clear surviving Catch Parent links and create one Undo step.")
 	application.free()
 
 
