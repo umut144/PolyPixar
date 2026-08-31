@@ -42,6 +42,12 @@ export data.
 - `ComponentCanvas` renders immutable copies and emits user intent.
 - `main.gd` applies intent to the selected World document and records
   history.
+- `WorldDocumentService` owns the on-disk document format: normalization on
+  load, serialization on save, and the atomic file replacement both sides use.
+  It is static and holds no editor state. `main.gd` keeps the orchestration —
+  which records exist, when they are read and written, and what the editor does
+  with them — including `_serialize_editor_state` and `_serialize_world_settings`,
+  which read editor state by definition.
 
 Rendering is invalidation-driven. A mutation calls `_invalidate_render` with the
 targets that became stale — `RENDER_OUTLINER`, `RENDER_INSPECTOR`,

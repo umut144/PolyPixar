@@ -426,21 +426,21 @@ func _test_contour_stroke_mesh() -> void:
 	var ellipse_stroke := ContourMeshService.generate(ellipse)
 	_expect(bool(ellipse_stroke.get("valid", false)) and str(ellipse_stroke.get("source_draw_mode", "")) == "primitive" and int(ellipse_stroke.get("triangle_count", 0)) > 0 and ellipse_stroke == ContourMeshService.generate(ellipse), "Analytic Circles and Ellipses must derive deterministic centered Stroke Bakes without persisted polygon topology.")
 	var application = load("res://scripts/main.gd").new()
-	var legacy_document: Dictionary = application._default_geometry_document("asset_legacy", "component_legacy")
+	var legacy_document: Dictionary = WorldDocumentService.default_geometry_document("asset_legacy", "component_legacy")
 	var legacy_bake: Dictionary = first.duplicate(true)
 	legacy_bake["method"] = GeometryMeshingService.RIBBON_STRIP
 	legacy_bake["algorithm_version"] = 0
 	legacy_bake["bake_id"] = "legacy_ribbon_bake"
 	legacy_document["component_mesh"] = {"bake_id": "legacy_ribbon_bake", "method": GeometryMeshingService.RIBBON_STRIP, "mesh_fingerprint": "legacy"}
 	legacy_document["meshing"]["bakes"] = {GeometryMeshingService.RIBBON_STRIP: legacy_bake}
-	var normalized_legacy: Dictionary = application._normalize_geometry_document(legacy_document, "asset_legacy", "component_legacy")
+	var normalized_legacy: Dictionary = WorldDocumentService.normalize_geometry_document(legacy_document, "asset_legacy", "component_legacy")
 	_expect(normalized_legacy.get("meshing", {}).get("bakes", {}).has(GeometryMeshingService.RIBBON_STRIP) and str(normalized_legacy.get("component_mesh", {}).get("method", "")) == GeometryMeshingService.RIBBON_STRIP, "Legacy Ribbon Strip Bakes should remain readable records without being relabeled as current Contour Stroke Bakes.")
-	var contour_document: Dictionary = application._default_geometry_document("asset_contour", "component_contour")
+	var contour_document: Dictionary = WorldDocumentService.default_geometry_document("asset_contour", "component_contour")
 	var persisted_contour: Dictionary = first.duplicate(true)
 	persisted_contour["bake_id"] = "contour_bake"
 	contour_document["component_mesh"] = {"bake_id": "contour_bake", "method": ContourMeshService.METHOD, "mesh_fingerprint": GeometryUVMappingService.mesh_fingerprint(persisted_contour)}
 	contour_document["meshing"]["bakes"] = {ContourMeshService.METHOD: persisted_contour}
-	var contour_round_trip: Dictionary = application._normalize_geometry_document(application._serialize_geometry_document(contour_document), "asset_contour", "component_contour")
+	var contour_round_trip: Dictionary = WorldDocumentService.normalize_geometry_document(WorldDocumentService.serialize_geometry_document(contour_document), "asset_contour", "component_contour")
 	var restored_contour: Dictionary = contour_round_trip.get("meshing", {}).get("bakes", {}).get(ContourMeshService.METHOD, {})
 	_expect(restored_contour.get("vertices", [])[0].has("edge_id") and restored_contour.get("runs", [])[0].get("centerline", [])[0].get("position", null) is Vector2, "Contour Mesh JSON persistence must retain typed Edge/curve provenance and restore Run centerlines as vectors.")
 	_expect(str(restored_contour.get("geometry_diagnostics", {}).get("triangle_validation", "")) == "complete", "Contour Mesh persistence must retain robust geometry diagnostics as typed engine-neutral data.")
@@ -564,10 +564,10 @@ func _test_closed_contour_region_mesh() -> void:
 	var application = load("res://scripts/main.gd").new()
 	var runtime_manifest_text := JSON.stringify(export_result.get("manifest", {}), "\t")
 	_expect(application._runtime_manifest_text_matches(runtime_manifest_text, runtime_manifest_text), "Runtime package staging must strictly accept the generated schema-15 closed-region payload after JSON round-trip.")
-	var document: Dictionary = application._default_geometry_document("region_asset", "convex_contour")
+	var document: Dictionary = WorldDocumentService.default_geometry_document("region_asset", "convex_contour")
 	export_bake["bake_id"] = "closed_region_bake"
 	document["meshing"]["bakes"] = {ContourMeshService.METHOD: export_bake}
-	var restored: Dictionary = application._normalize_geometry_document(application._serialize_geometry_document(document), "region_asset", "convex_contour").get("meshing", {}).get("bakes", {}).get(ContourMeshService.METHOD, {})
+	var restored: Dictionary = WorldDocumentService.normalize_geometry_document(WorldDocumentService.serialize_geometry_document(document), "region_asset", "convex_contour").get("meshing", {}).get("bakes", {}).get(ContourMeshService.METHOD, {})
 	_expect(restored.get("closed_region", {}).get("vertices", [])[0].get("position", null) is Vector2 and restored.get("closed_region", {}).get("triangles", []).size() == export_bake.get("closed_region", {}).get("triangles", []).size(), "Closed region Bake geometry and provenance must survive Geometry document persistence.")
 	application.free()
 
@@ -951,7 +951,7 @@ func _test_world_contour_settings() -> void:
 
 	var application = load("res://scripts/main.gd").new()
 	application._build_ui()
-	_expect(int(application.SCHEMA_VERSION) >= 41 and application.world_scale_menu.text.begins_with("World Settings"), "Slice 5 should expose World Settings in the top toolbar and retain its schema-41 persisted contract.")
+	_expect(int(WorldDocumentService.SCHEMA_VERSION) >= 41 and application.world_scale_menu.text.begins_with("World Settings"), "Slice 5 should expose World Settings in the top toolbar and retain its schema-41 persisted contract.")
 	_expect(is_equal_approx(float(application.world_contour_stroke_width_field.value), 4.0), "World Settings should show the 4 px default in its authored Contour width field.")
 	application.world_contour_stroke_width_px = 4.1
 	application._update_world_scale_popup()
@@ -1183,8 +1183,8 @@ func _test_component_scale_rebase() -> void:
 	ui_asset["components"][0]["transform"] = {"position": Vector2.ZERO, "rotation": 5.0, "scale": Vector2(1.5, 0.75), "pivot": Vector2.ZERO}
 	var application = load("res://scripts/main.gd").new()
 	application._build_ui()
-	var serialized_ellipse: Dictionary = application._serialize_primitive(rebased_circle.get("primitive", {}))
-	var restored_ellipse: Dictionary = application._deserialize_primitive(serialized_ellipse)
+	var serialized_ellipse: Dictionary = WorldDocumentService.serialize_primitive(rebased_circle.get("primitive", {}))
+	var restored_ellipse: Dictionary = WorldDocumentService.deserialize_primitive(serialized_ellipse)
 	_expect(serialized_ellipse.get("center", null) is Array and str(restored_ellipse.get("type", "")) == PrimitiveGeometryService.ELLIPSE and is_equal_approx(float(restored_ellipse.get("diameter_x_cm", 0.0)), 20.0), "Schema-42 persistence must round-trip analytic Ellipse parameters without storing a polygon approximation.")
 	var ui_assets: Array[Dictionary] = [ui_asset]
 	application.assets = ui_assets
@@ -1445,11 +1445,11 @@ func _test_atomic_document_writes() -> void:
 	if FileAccess.file_exists(target):
 		DirAccess.remove_absolute(target)
 
-	_expect(application._write_json(target, {"schema_version": 1, "value": "first"}), "Writing a record to a writable path should report success.")
-	_expect(str(application._read_json(target).get("value", "")) == "first", "A written record should read back with its content.")
+	_expect(WorldDocumentService.write_json(target, {"schema_version": 1, "value": "first"}), "Writing a record to a writable path should report success.")
+	_expect(str(WorldDocumentService.read_json(target).get("value", "")) == "first", "A written record should read back with its content.")
 
-	_expect(application._write_json(target, {"schema_version": 1, "value": "second"}), "Replacing an existing record should report success.")
-	_expect(str(application._read_json(target).get("value", "")) == "second", "Replacing a record should leave the new content in place.")
+	_expect(WorldDocumentService.write_json(target, {"schema_version": 1, "value": "second"}), "Replacing an existing record should report success.")
+	_expect(str(WorldDocumentService.read_json(target).get("value", "")) == "second", "Replacing a record should leave the new content in place.")
 
 	var staging := "%s/.record.json.staging" % root
 	var backup := "%s/.record.json.backup" % root
@@ -1459,16 +1459,16 @@ func _test_atomic_document_writes() -> void:
 	# a crash, which is the failure the caller has to be able to observe.
 	var blocked := "%s/blocked.json" % root
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(blocked))
-	_expect(not application._write_json(blocked, {"schema_version": 1}), "A record that cannot be written must report failure instead of reporting success.")
+	_expect(not WorldDocumentService.write_json(blocked, {"schema_version": 1}), "A record that cannot be written must report failure instead of reporting success.")
 	_expect(not FileAccess.file_exists("%s/.blocked.json.staging" % root), "A failed write should not leave its staging file behind.")
 
 	# An interrupted swap leaves a backup without its target. The next write has
 	# to recover that content rather than starting from nothing.
-	_expect(application._write_json(target, {"schema_version": 1, "value": "third"}), "Preparing the interrupted-swap case should succeed.")
+	_expect(WorldDocumentService.write_json(target, {"schema_version": 1, "value": "third"}), "Preparing the interrupted-swap case should succeed.")
 	DirAccess.rename_absolute(target, backup)
 	_expect(not FileAccess.file_exists(target) and FileAccess.file_exists(backup), "The interrupted-swap case should start with a backup and no target.")
-	_expect(application._write_json(target, {"schema_version": 1, "value": "fourth"}), "A write after an interrupted swap should succeed.")
-	_expect(str(application._read_json(target).get("value", "")) == "fourth", "A write after an interrupted swap should leave the new content in place.")
+	_expect(WorldDocumentService.write_json(target, {"schema_version": 1, "value": "fourth"}), "A write after an interrupted swap should succeed.")
+	_expect(str(WorldDocumentService.read_json(target).get("value", "")) == "fourth", "A write after an interrupted swap should leave the new content in place.")
 	_expect(not FileAccess.file_exists(backup), "Recovering from an interrupted swap should consume the backup.")
 
 	_expect(application._incomplete_save_message(["a.json"] as Array[String]).contains("a.json"), "A single unwritten record should be named in the status message.")
@@ -1616,19 +1616,19 @@ func _test_geometry_sampling_service() -> void:
 	_expect(not bool(GeometrySamplingService.generate(open_component).get("valid", true)), "An open contour should fail visibly at the mesh-pipeline Sampling boundary.")
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
-	_expect(application._has_supported_schema({"schema_version": 60}) and application._has_supported_schema({"schema_version": 59}) and not application._has_supported_schema({"schema_version": 61}), "Schema 60 should keep current and older World documents readable and reject unknown future schemas.")
-	_expect(application._normalize_component_draw_mode("ribbon", 39) == "contour" and application._normalize_component_draw_mode("contour", 42) == "contour", "Schema-42 loading must retain the explicit legacy Ribbon-to-Contour migration boundary.")
-	_expect(application._normalize_component_draw_mode("ribbon", 42) == "ribbon", "Current-schema Ribbon data must remain visibly invalid instead of receiving a silent backward fallback.")
-	var arranged_round_trip: Dictionary = application._normalize_sampling_bake(application._serialize_sampling_bake(arranged_result))
+	_expect(WorldDocumentService.has_supported_schema({"schema_version": 60}) and WorldDocumentService.has_supported_schema({"schema_version": 59}) and not WorldDocumentService.has_supported_schema({"schema_version": 61}), "Schema 60 should keep current and older World documents readable and reject unknown future schemas.")
+	_expect(WorldDocumentService.normalize_component_draw_mode("ribbon", 39) == "contour" and WorldDocumentService.normalize_component_draw_mode("contour", 42) == "contour", "Schema-42 loading must retain the explicit legacy Ribbon-to-Contour migration boundary.")
+	_expect(WorldDocumentService.normalize_component_draw_mode("ribbon", 42) == "ribbon", "Current-schema Ribbon data must remain visibly invalid instead of receiving a silent backward fallback.")
+	var arranged_round_trip: Dictionary = WorldDocumentService.normalize_sampling_bake(WorldDocumentService.serialize_sampling_bake(arranged_result))
 	_expect(arranged_round_trip.get("cuts", [])[0].get("fragments", []).size() == 2 and arranged_round_trip.get("cuts", [])[0].get("fragments", [])[0].get("samples", [])[0].get("position", null) is Vector2, "Schema 32 should preserve Cut fragment connectivity and restore fragment positions as Vector2 values.")
-	var geometry_document: Dictionary = application._default_geometry_document("asset_1", "component_1")
+	var geometry_document: Dictionary = WorldDocumentService.default_geometry_document("asset_1", "component_1")
 	geometry_document["sampling"]["recipe"] = {"method": GeometrySamplingService.EVEN_SPACING, "parameters": {"spacing": 2.5, "feature_detail": GeometrySamplingService.DEFAULT_FEATURE_DETAIL}}
 	var baked_result := adaptive.duplicate(true)
 	baked_result["bake_id"] = "bake_test"
 	geometry_document["sampling"]["bakes"][GeometrySamplingService.ADAPTIVE] = baked_result
-	var serialized_geometry: Dictionary = application._serialize_geometry_document(geometry_document)
+	var serialized_geometry: Dictionary = WorldDocumentService.serialize_geometry_document(geometry_document)
 	_expect(int(serialized_geometry.get("schema_version", 0)) == 60 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-60 JSON arrays.")
-	var normalized_geometry: Dictionary = application._normalize_geometry_document(serialized_geometry, "asset_1", "component_1")
+	var normalized_geometry: Dictionary = WorldDocumentService.normalize_geometry_document(serialized_geometry, "asset_1", "component_1")
 	_expect(normalized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Vector2, "Sampling bake loading should restore local sample positions as Vector2 values.")
 	_expect(normalized_geometry["sampling"]["bakes"].size() == 1, "Sampling should retain one Adaptive Bake.")
 	var test_assets: Array[Dictionary] = [{"id": "asset_1", "components": [component]}]
@@ -1725,7 +1725,7 @@ func _test_geometry_auto_build_service() -> void:
 	application._commit_component_mesh_build("auto_asset", "auto_body", build)
 	_expect(application._mesh_update_candidates("auto_asset").is_empty(), "A successfully committed automatic Mesh should become clean without a mutable dirty flag.")
 	_expect(application._all_mesh_update_candidates() == [{"asset_id": "auto_symbol", "component_id": "auto_symbol_body"}], "A committed Mesh should leave only dirty Components from other Assets in the global batch.")
-	var round_trip: Dictionary = application._normalize_geometry_document(application._serialize_geometry_document(application.geometry_documents["auto_asset/auto_body"]), "auto_asset", "auto_body")
+	var round_trip: Dictionary = WorldDocumentService.normalize_geometry_document(WorldDocumentService.serialize_geometry_document(application.geometry_documents["auto_asset/auto_body"]), "auto_asset", "auto_body")
 	var automatic_provenance: Dictionary = round_trip.get("component_mesh", {}).get("build_provenance", {})
 	_expect(not automatic_provenance.get("source_signature", {}).is_empty() and round_trip.get("meshing", {}).get("bakes", {}).has(ContourMeshService.METHOD), "Fill provenance and the separate Contour Stroke Bake should survive Geometry JSON persistence.")
 	_expect(str(automatic_provenance.get("recipe_mode", "")) == "automatic" and int(automatic_provenance.get("auto_recipe_version", 0)) == GeometryAutoBuildService.AUTO_RECIPE_VERSION and not str(automatic_provenance.get("pipeline_recipe_hash", "")).is_empty(), "Automatic Mesh provenance should retain recipe ownership so later model versions can migrate safely.")
@@ -1745,7 +1745,7 @@ func _test_geometry_auto_build_service() -> void:
 	var legacy_component := large_component.duplicate(true)
 	legacy_component["id"] = "legacy_large"
 	application.assets.append({"id": "legacy_asset", "name": "Legacy Asset", "asset_type": "prop", "visibility": true, "components": [legacy_component], "guides": []})
-	var legacy_document: Dictionary = application._default_geometry_document("legacy_asset", "legacy_large")
+	var legacy_document: Dictionary = WorldDocumentService.default_geometry_document("legacy_asset", "legacy_large")
 	legacy_document["sampling"]["recipe"] = GeometrySamplingService.normalize_recipe({"method": GeometrySamplingService.ADAPTIVE, "parameters": {"spacing": 0.55, "feature_detail": 0.55, "boundary_refinements": {}}})
 	legacy_document["seeding"]["recipe"] = GeometrySeedingService.normalize_recipe({"method": GeometrySeedingService.POISSON_FILL, "parameters": {"spacing": 0.55, "constraint_clearance_factor": GeometrySeedingService.DEFAULT_CONSTRAINT_CLEARANCE_FACTOR, "seed": GeometrySeedingService.DEFAULT_SEED}})
 	legacy_document["meshing"]["recipe"] = GeometryMeshingService.normalize_recipe({"method": GeometryMeshingService.CONSTRAINED_MESH, "parameters": {"seeding_method": GeometrySeedingService.POISSON_FILL, "mesh_character": GeometryMeshingService.DEFAULT_MESH_CHARACTER, "optimize_mesh": true}})
@@ -1756,7 +1756,7 @@ func _test_geometry_auto_build_service() -> void:
 	var legacy_default_component := large_component.duplicate(true)
 	legacy_default_component["id"] = "legacy_default_large"
 	application.assets.append({"id": "legacy_default_asset", "name": "Legacy Default Asset", "asset_type": "prop", "visibility": true, "components": [legacy_default_component], "guides": []})
-	var legacy_default_document: Dictionary = application._default_geometry_document("legacy_default_asset", "legacy_default_large")
+	var legacy_default_document: Dictionary = WorldDocumentService.default_geometry_document("legacy_default_asset", "legacy_default_large")
 	legacy_default_document["component_mesh"]["build_provenance"] = {"source_signature": {"version": 1}}
 	application.geometry_documents["legacy_default_asset/legacy_default_large"] = legacy_default_document
 	var migrated_default_recipes: Dictionary = application._geometry_build_recipes("legacy_default_asset", "legacy_default_large", legacy_default_component, [], [])
@@ -1764,7 +1764,7 @@ func _test_geometry_auto_build_service() -> void:
 	var legacy_default_small := tiny_component.duplicate(true)
 	legacy_default_small["id"] = "legacy_default_small"
 	application.assets.append({"id": "legacy_default_small_asset", "name": "Legacy Default Small Asset", "asset_type": "symbols", "visibility": true, "components": [legacy_default_small], "guides": []})
-	var legacy_default_small_document: Dictionary = application._default_geometry_document("legacy_default_small_asset", "legacy_default_small")
+	var legacy_default_small_document: Dictionary = WorldDocumentService.default_geometry_document("legacy_default_small_asset", "legacy_default_small")
 	legacy_default_small_document["component_mesh"]["build_provenance"] = {"source_signature": {"version": 1}}
 	application.geometry_documents["legacy_default_small_asset/legacy_default_small"] = legacy_default_small_document
 	var preserved_default_small: Dictionary = application._geometry_build_recipes("legacy_default_small_asset", "legacy_default_small", legacy_default_small, [], [])
@@ -1931,7 +1931,7 @@ func _test_geometry_sampling_ui_shell() -> void:
 	application._bake_geometry_sampling()
 	_expect(bool(application._geometry_sampling_bake("asset_1", "component_1").get("accepted_preview_marker", false)), "Bake Preview should copy the current matching Preview without regenerating it.")
 	spacing_input.free()
-	application.geometry_documents["asset_1/component_1"] = application._default_geometry_document("asset_1", "component_1")
+	application.geometry_documents["asset_1/component_1"] = WorldDocumentService.default_geometry_document("asset_1", "component_1")
 	application._push_undo_snapshot()
 	var history_snapshot: Dictionary = application.undo_history.back()
 	application._mutable_geometry_document("asset_1", "component_1")["sampling"]["recipe"]["parameters"]["spacing"] = 42.0
@@ -1949,7 +1949,7 @@ func _test_geometry_sampling_ui_shell() -> void:
 	application.asset_name_input.text = "Sword"
 	application._confirm_asset_creation()
 	_expect(str(application.assets[-1].get("asset_type", "")) == "weapons", "Create Weapons should persist the stable weapons Asset type.")
-	_expect(application._normalize_asset_type("") == "character" and application._asset_type_create_submodule("icon") == "Icon" and application._asset_type_create_submodule("weapons") == "Weapons", "Missing Asset types should normalize to Character while valid types map back to their Create module.")
+	_expect(WorldDocumentService.normalize_asset_type("") == "character" and application._asset_type_create_submodule("icon") == "Icon" and application._asset_type_create_submodule("weapons") == "Weapons", "Missing Asset types should normalize to Character while valid types map back to their Create module.")
 	application._on_outliner_asset_type_filter_toggled(false, "character")
 	_expect(not application.outliner_asset_type_filters["character"] and application.outliner_asset_type_filters["props"], "Mesh and Style filters should support independent Asset type checkboxes.")
 	application.active_module = "Style"
@@ -2083,7 +2083,7 @@ func _test_geometry_seeding_service() -> void:
 	_expect(bool(multi_flow.get("valid", false)) and represented_guides.has("guide_sampler") and represented_guides.has("guide_crossing") and multi_flow.get("guide_stats", []).size() == 2, "Multiple enabled Sampler Spines should contribute to one deterministic shared Seed set.")
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
-	var geometry_document: Dictionary = application._default_geometry_document("asset_1", "component_1")
+	var geometry_document: Dictionary = WorldDocumentService.default_geometry_document("asset_1", "component_1")
 	geometry_document["sampling"]["recipe"] = {"method": GeometrySamplingService.ADAPTIVE, "parameters": {"spacing": 1.0}}
 	geometry_document["sampling"]["bakes"][GeometrySamplingService.ADAPTIVE] = sampling
 	first["bake_id"] = "seeding_bake_test"
@@ -2091,9 +2091,9 @@ func _test_geometry_seeding_service() -> void:
 	first["seeds"][0]["origin"] = "manual_adjusted"
 	geometry_document["seeding"]["recipe"] = {"method": GeometrySeedingService.POISSON_FILL, "parameters": {"spacing": 2.0, "seed": 17}}
 	geometry_document["seeding"]["bakes"][GeometrySeedingService.POISSON_FILL] = first
-	var serialized: Dictionary = application._serialize_geometry_document(geometry_document)
+	var serialized: Dictionary = WorldDocumentService.serialize_geometry_document(geometry_document)
 	_expect(serialized.get("seeding", {}).get("bakes", {}).get(GeometrySeedingService.POISSON_FILL, {}).get("seeds", [])[0].get("position", null) is Array, "Seeding method Bake positions should serialize as schema JSON arrays.")
-	var normalized: Dictionary = application._normalize_geometry_document(serialized, "asset_1", "component_1")
+	var normalized: Dictionary = WorldDocumentService.normalize_geometry_document(serialized, "asset_1", "component_1")
 	_expect(normalized.get("seeding", {}).get("bakes", {}).get(GeometrySeedingService.POISSON_FILL, {}).get("seeds", [])[0].get("position", null) is Vector2 and bool(normalized.get("seeding", {}).get("bakes", {}).get(GeometrySeedingService.POISSON_FILL, {}).get("edited", false)), "Seeding method Bake loading should restore editable Seed vectors and edit state.")
 	var test_assets: Array[Dictionary] = [{"id": "asset_1", "name": "Asset", "components": [component], "guides": [sampler_spine, crossing_spine, cut]}]
 	application.assets = test_assets
@@ -2276,10 +2276,10 @@ func _test_geometry_meshing_service_and_ui() -> void:
 	_expect(not bool(GeometryMeshingService.generate({}, seeding, cdt_recipe).get("valid", true)), "Meshing should fail visibly without its referenced Sampling Bake.")
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
-	var serialized_organic: Dictionary = application._serialize_meshing_bake(organic)
-	var normalized_organic: Dictionary = application._normalize_meshing_bake(serialized_organic)
+	var serialized_organic: Dictionary = WorldDocumentService.serialize_meshing_bake(organic)
+	var normalized_organic: Dictionary = WorldDocumentService.normalize_meshing_bake(serialized_organic)
 	_expect(serialized_organic.get("optimization", {}).get("movements", [])[0].get("from", null) is Array and normalized_organic.get("optimization", {}).get("movements", [])[0].get("from", null) is Vector2, "Meshing persistence should serialize and restore Optimization movement diagnostics for before/after views.")
-	var document: Dictionary = application._default_geometry_document("asset_1", "component_1")
+	var document: Dictionary = WorldDocumentService.default_geometry_document("asset_1", "component_1")
 	document["sampling"]["recipe"] = {"method": GeometrySamplingService.ADAPTIVE, "parameters": {"spacing": 2.0}}
 	document["sampling"]["bakes"][GeometrySamplingService.ADAPTIVE] = sampling
 	document["seeding"]["recipe"] = {"method": GeometrySeedingService.POISSON_FILL, "parameters": {"spacing": 2.5, "seed": 9}}
@@ -2287,9 +2287,9 @@ func _test_geometry_meshing_service_and_ui() -> void:
 	document["meshing"]["recipe"] = cdt_recipe
 	cdt["bake_id"] = "mesh_cdt_test"
 	document["meshing"]["bakes"][GeometryMeshingService.CONSTRAINED_MESH] = cdt
-	var serialized: Dictionary = application._serialize_geometry_document(document)
+	var serialized: Dictionary = WorldDocumentService.serialize_geometry_document(document)
 	_expect(serialized.get("meshing", {}).get("bakes", {}).get(GeometryMeshingService.CONSTRAINED_MESH, {}).get("vertices", [])[0].get("position", null) is Array, "Mesh Bake positions should serialize as JSON arrays.")
-	var normalized: Dictionary = application._normalize_geometry_document(serialized, "asset_1", "component_1")
+	var normalized: Dictionary = WorldDocumentService.normalize_geometry_document(serialized, "asset_1", "component_1")
 	_expect(normalized.get("meshing", {}).get("bakes", {}).get(GeometryMeshingService.CONSTRAINED_MESH, {}).get("vertices", [])[0].get("position", null) is Vector2, "Mesh Bake loading should restore Component-local Vertex positions.")
 	var legacy_cdt := cdt.duplicate(true)
 	legacy_cdt["method"] = GeometryMeshingService.CONSTRAINED_DELAUNAY
@@ -2311,7 +2311,7 @@ func _test_geometry_meshing_service_and_ui() -> void:
 		"legacy_cdt_uv": {"valid": true, "method": GeometryUVMappingService.BOUNDS_PLANAR, "mesh_method": GeometryMeshingService.CONSTRAINED_DELAUNAY, "mesh_bake_id": "legacy_cdt", "uvs": [{"vertex_id": "cdt", "uv": [0.0, 0.0]}]},
 		"legacy_organic_uv": {"valid": true, "method": GeometryUVMappingService.BOUNDS_PLANAR, "mesh_method": GeometryMeshingService.ORGANIC_RELAXED, "mesh_bake_id": "legacy_organic", "uvs": [{"vertex_id": "organic", "uv": [1.0, 1.0]}]}
 	}
-	var migrated_legacy: Dictionary = application._normalize_geometry_document(legacy_document, "asset_1", "component_1")
+	var migrated_legacy: Dictionary = WorldDocumentService.normalize_geometry_document(legacy_document, "asset_1", "component_1")
 	_expect(migrated_legacy["meshing"]["bakes"].size() == 1 and migrated_legacy["meshing"]["bakes"].has(GeometryMeshingService.CONSTRAINED_MESH) and str(migrated_legacy["meshing"]["bakes"][GeometryMeshingService.CONSTRAINED_MESH].get("bake_id", "")) == "legacy_organic", "Schema-30 dual Meshing bakes should deterministically migrate the accepted Component Mesh into one Constrained Mesh bake.")
 	_expect(str(migrated_legacy["component_mesh"].get("method", "")) == GeometryMeshingService.CONSTRAINED_MESH and float(migrated_legacy["meshing"]["recipe"]["parameters"].get("mesh_character", 0.0)) > 0.0, "Legacy Organic Relaxed selection should migrate to Constrained Mesh with an Organic Character and keep its Component Mesh reference.")
 	var migrated_uv: Dictionary = migrated_legacy["uv_mapping"]["bakes"].values()[0]
@@ -2346,7 +2346,7 @@ func _test_geometry_meshing_service_and_ui() -> void:
 	application._bake_geometry_meshing_preview()
 	var accepted_mesh: Dictionary = application._geometry_meshing_bake("asset_1", "component_1")
 	_expect(bool(accepted_mesh.get("accepted_preview_marker", false)) and application._component_mesh_status("asset_1", "component_1", component) == "Ready" and str(application._component_mesh_bake("asset_1", "component_1").get("bake_id", "")) == str(accepted_mesh.get("bake_id", "")), "Bake Preview should copy the exact Preview and automatically make it the Component Mesh.")
-	component["transform"] = application._default_component_transform()
+	component["transform"] = WorldDocumentService.default_component_transform()
 	component["transform"]["position"] = Vector2(17.0, -6.0)
 	application.selected_component_id = ""
 	application._refresh_geometry_meshing_workspace()
@@ -2354,7 +2354,7 @@ func _test_geometry_meshing_service_and_ui() -> void:
 	var local_mesh_position := Vector2(accepted_mesh.get("vertices", [])[0].get("position", Vector2.ZERO))
 	var overview_position := Vector2(asset_overview.get("vertices", [])[0].get("position", Vector2.ZERO))
 	_expect(bool(asset_overview.get("valid", false)) and int(asset_overview.get("mesh_component_count", 0)) == 1 and str(asset_overview.get("vertices", [])[0].get("id", "")).begins_with("component_1/") and overview_position.is_equal_approx(local_mesh_position + Vector2(17.0, -6.0)), "Selecting a Meshing root Asset should compose current Component Meshes in the same transformed Asset coordinate space as Create.")
-	var component_mesh_round_trip: Dictionary = application._normalize_geometry_document(application._serialize_geometry_document(normalized), "asset_1", "component_1")
+	var component_mesh_round_trip: Dictionary = WorldDocumentService.normalize_geometry_document(WorldDocumentService.serialize_geometry_document(normalized), "asset_1", "component_1")
 	_expect(str(component_mesh_round_trip.get("component_mesh", {}).get("bake_id", "")) == str(accepted_mesh.get("bake_id", "")), "Automatic Component Mesh selection should survive Geometry document persistence.")
 	normalized["seeding"]["bakes"][GeometrySeedingService.POISSON_FILL]["seeds"][0]["position"] += Vector2(0.1, 0.0)
 	_expect(application._geometry_meshing_status("asset_1", "component_1", component) == "Ready to Preview", "Editing an upstream Seeding Bake should request a new Mesh Preview without reverse synchronization.")
@@ -2397,7 +2397,7 @@ func _test_geometry_uv_mapping_service_and_legacy_records() -> void:
 	_expect(not bool(GeometryUVMappingService.generate({}, recipe).get("valid", true)), "UV Mapping should fail visibly without a valid Mesh Bake.")
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
-	var document: Dictionary = application._default_geometry_document("asset_1", "component_1")
+	var document: Dictionary = WorldDocumentService.default_geometry_document("asset_1", "component_1")
 	document["sampling"]["recipe"] = {"method": GeometrySamplingService.ADAPTIVE, "parameters": {"spacing": 2.0}}
 	document["sampling"]["bakes"][GeometrySamplingService.ADAPTIVE] = sampling
 	document["seeding"]["recipe"] = {"method": GeometrySeedingService.POISSON_FILL, "parameters": {"spacing": 2.5, "seed": 4}}
@@ -2409,14 +2409,14 @@ func _test_geometry_uv_mapping_service_and_legacy_records() -> void:
 	var uv_key := GeometryUVMappingService.bake_key(GeometryMeshingService.CONSTRAINED_MESH, GeometryUVMappingService.BOUNDS_PLANAR)
 	document["uv_mapping"]["recipe"] = recipe
 	document["uv_mapping"]["bakes"][uv_key] = uv_result
-	var serialized: Dictionary = application._serialize_geometry_document(document)
+	var serialized: Dictionary = WorldDocumentService.serialize_geometry_document(document)
 	_expect(serialized.get("uv_mapping", {}).get("bakes", {}).get(uv_key, {}).get("uvs", [])[0].get("uv", null) is Array, "UV Bake coordinates should serialize as JSON arrays.")
-	var normalized: Dictionary = application._normalize_geometry_document(serialized, "asset_1", "component_1")
+	var normalized: Dictionary = WorldDocumentService.normalize_geometry_document(serialized, "asset_1", "component_1")
 	_expect(normalized.get("uv_mapping", {}).get("bakes", {}).get(uv_key, {}).get("uvs", [])[0].get("uv", null) is Vector2, "UV Bake loading should restore normalized coordinates as Vector2 values.")
 	# UV Mapping has no authoring surface any more. Schema 37 records stay
 	# readable Legacy data, so a load/save round trip must return them unchanged.
-	var round_trip: Dictionary = application._normalize_geometry_document(application._serialize_geometry_document(normalized), "asset_1", "component_1")
-	_expect(JSON.stringify(application._serialize_geometry_document(round_trip)) == JSON.stringify(serialized), "A legacy UV Bake must survive a load and save round trip unchanged.")
+	var round_trip: Dictionary = WorldDocumentService.normalize_geometry_document(WorldDocumentService.serialize_geometry_document(normalized), "asset_1", "component_1")
+	_expect(JSON.stringify(WorldDocumentService.serialize_geometry_document(round_trip)) == JSON.stringify(serialized), "A legacy UV Bake must survive a load and save round trip unchanged.")
 	application.free()
 
 
@@ -2473,7 +2473,7 @@ func _test_geometry_sdf_service_and_legacy_records() -> void:
 	contour_uv["bake_id"] = "uv_contour_sdf_test"
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
-	var document: Dictionary = application._default_geometry_document("asset_sdf", "component_sdf")
+	var document: Dictionary = WorldDocumentService.default_geometry_document("asset_sdf", "component_sdf")
 	document["meshing"]["bakes"][ContourMeshService.METHOD] = contour_mesh
 	document["component_mesh"] = {"bake_id": "mesh_contour_sdf_test", "method": ContourMeshService.METHOD, "mesh_fingerprint": GeometryUVMappingService.mesh_fingerprint(contour_mesh)}
 	document["uv_mapping"]["recipe"] = contour_uv_recipe
@@ -2499,11 +2499,11 @@ func _test_geometry_sdf_service_and_legacy_records() -> void:
 		"boundary_value": 0.5,
 		"inside_is_high": true
 	}
-	var serialized: Dictionary = application._serialize_geometry_document(document)
+	var serialized: Dictionary = WorldDocumentService.serialize_geometry_document(document)
 	_expect(str(serialized.get("sdf", {}).get("bake", {}).get("image_path", "")) == "contour_sdf.png" and not serialized.get("sdf", {}).get("bake", {}).has("image"), "A serialized SDF Bake should keep its relative image reference and carry no pixel data.")
-	var round_trip: Dictionary = application._normalize_geometry_document(serialized, "asset_sdf", "component_sdf")
+	var round_trip: Dictionary = WorldDocumentService.normalize_geometry_document(serialized, "asset_sdf", "component_sdf")
 	_expect(str(round_trip.get("sdf", {}).get("bake", {}).get("pixel_hash", "")) == "legacyhash", "Loading a legacy SDF Bake must preserve its pixel hash.")
-	_expect(JSON.stringify(application._serialize_geometry_document(round_trip)) == JSON.stringify(serialized), "A legacy SDF Bake must survive a load and save round trip unchanged.")
+	_expect(JSON.stringify(WorldDocumentService.serialize_geometry_document(round_trip)) == JSON.stringify(serialized), "A legacy SDF Bake must survive a load and save round trip unchanged.")
 	application.free()
 
 
@@ -2760,7 +2760,7 @@ func _test_weighting_service_and_ui() -> void:
 	_expect(bool(gradient.get("valid", false)) and is_zero_approx(float(gradient.get("minimum_weight", 1.0))) and is_equal_approx(float(gradient.get("maximum_weight", 0.0)), 1.0), "Axis Gradient should map Component-local Mesh bounds into a normalized zero-to-one Weight range.")
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
-	var document: Dictionary = application._default_geometry_document("asset_weighting", "component_weighting")
+	var document: Dictionary = WorldDocumentService.default_geometry_document("asset_weighting", "component_weighting")
 	document["sampling"]["recipe"] = {"method": GeometrySamplingService.ADAPTIVE, "parameters": {"spacing": 2.0}}
 	document["sampling"]["bakes"][GeometrySamplingService.ADAPTIVE] = sampling
 	document["seeding"]["recipe"] = {"method": GeometrySeedingService.POISSON_FILL, "parameters": {"spacing": 2.5, "seed": 5}}
@@ -2787,7 +2787,7 @@ func _test_weighting_service_and_ui() -> void:
 	_expect(str(gradient_style.get("method", "")) == WeightingService.UNIFORM and application.active_context_command.is_empty(), "Selecting a Weighting Method from CMD+1 must apply the method and clear the transient Context command instead of leaving the menu stuck.")
 	application._bake_weighting_preview()
 	_expect(application._weighting_status("asset_weighting", "component_weighting", component, gradient_style) == "Baked" and not gradient_style.get("bake", {}).is_empty(), "Weighting Bake should persist one derived result on its Style.")
-	var round_trip: Dictionary = application._normalize_geometry_document(application._serialize_geometry_document(document), "asset_weighting", "component_weighting")
+	var round_trip: Dictionary = WorldDocumentService.normalize_geometry_document(WorldDocumentService.serialize_geometry_document(document), "asset_weighting", "component_weighting")
 	_expect(round_trip.get("weighting", {}).get("styles", []).size() == 1 and int(round_trip.get("weighting", {}).get("styles", [])[0].get("bake", {}).get("weight_count", 0)) == int(mesh.get("vertex_count", 0)), "Weighting Styles and per-Vertex Bakes should survive Geometry persistence.")
 	application.free()
 
@@ -2914,14 +2914,14 @@ func _test_asset_guides() -> void:
 	_expect(AssetGuide.validation_issues(guide).is_empty(), "A Guide should validate as one open Spine without becoming Component geometry.")
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
-	var serialized: Dictionary = application._serialize_asset_guide(guide)
+	var serialized: Dictionary = WorldDocumentService.serialize_asset_guide(guide)
 	_expect(serialized.get("points", [])[0].get("position", null) is Array, "Guide persistence should serialize authored Spine positions as JSON arrays.")
-	var restored: Dictionary = application._deserialize_asset_guide(serialized)
+	var restored: Dictionary = WorldDocumentService.deserialize_asset_guide(serialized)
 	_expect(restored.get("points", [])[0].get("position", null) is Vector2 and str(restored.get("guide_type", "")) == AssetGuide.BODY_FLOW, "Guide loading should restore Vector2 topology and retain its semantic type.")
 	var animation_guide := AssetGuide.create("guide_animation", "Deform Spine", AssetGuide.ANIMATION_SPINE, "component_1")
 	BezierTopology.add_point(animation_guide, Vector2(1.0, 2.0), "aligned")
 	BezierTopology.add_point(animation_guide, Vector2(4.0, 6.0), "aligned")
-	var animation_round_trip: Dictionary = application._deserialize_asset_guide(application._serialize_asset_guide(animation_guide))
+	var animation_round_trip: Dictionary = WorldDocumentService.deserialize_asset_guide(WorldDocumentService.serialize_asset_guide(animation_guide))
 	_expect(str(animation_round_trip.get("guide_type", "")) == AssetGuide.MOTION and AssetGuide.display_name(AssetGuide.MOTION) == "Motion", "Motion Guides should persist as an independent Guide type.")
 	_expect(AssetGuide.validation_issues(animation_guide).is_empty(), "Animation Spines should use the same valid open Spine topology contract.")
 	var legacy_guide := guide.duplicate(true)
@@ -3077,7 +3077,7 @@ func _test_asset_guides() -> void:
 	_expect(str(pupil_component.get("parent_component_id", "")) == "component_1" and str(pupil_component.get("draw_mode", "")) == "primitive" and pupil_component.get("points", []).is_empty() and pupil_component.get("edges", []).is_empty() and pupil_component.get("chains", []).is_empty() and pupil_component.get("primitive", {}).is_empty(), "Primitive Child creation should create an empty Primitive Component without generated Bézier topology.")
 	application._on_primitive_placed(Vector2(0.25, -0.5), 2.5)
 	_expect(PrimitiveGeometryService.has_circle(pupil_component) and is_equal_approx(float(pupil_component.get("primitive", {}).get("diameter_cm", 0.0)), 2.5) and PrimitiveGeometryService.center(pupil_component).is_equal_approx(Vector2(0.25, -0.5)), "Circle placement should persist only its parametric center and diameter.")
-	_expect(application.DRAW_MODES == ["closed_loop", "contour", "primitive"], "Components should expose only Closed Loop, Contour, and Primitive draw modes.")
+	_expect(WorldDocumentService.DRAW_MODES == ["closed_loop", "contour", "primitive"], "Components should expose only Closed Loop, Contour, and Primitive draw modes.")
 	var primitive_sampling := GeometrySamplingService.generate(pupil_component)
 	var refined_primitive_sampling := GeometrySamplingService.generate(pupil_component, {"parameters": {"spacing": 0.01, "feature_detail": 0.5}})
 	_expect(bool(primitive_sampling.get("valid", false)) and int(primitive_sampling.get("sample_count", 0)) >= 4 and int(primitive_sampling.get("sample_count", 0)) != PrimitiveGeometryService.CIRCLE_MESH_SEGMENTS and int(refined_primitive_sampling.get("sample_count", 0)) > int(primitive_sampling.get("sample_count", 0)) and pupil_component.get("points", []).is_empty(), "Primitive sampling should adapt analytically to the recipe without storing Bézier topology or using a fixed mesh segment count.")
@@ -3297,11 +3297,11 @@ func _test_motion_sampler() -> void:
 func _test_motion_resource_shells() -> void:
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
-	var path_document: Dictionary = application._default_motion_path("path_7", "Orbit")
+	var path_document: Dictionary = WorldDocumentService.default_motion_path("path_7", "Orbit")
 	_expect(str(path_document.get("id", "")) == "path_7" and path_document.get("topology", {}).get("points", []).is_empty(), "A Path shell should own a stable ID and independent empty topology.")
-	var normalized_path: Dictionary = application._normalize_motion_path({"id": "path_7", "name": "Orbit", "playback": {"duration": 4.0}}, "fallback")
+	var normalized_path: Dictionary = WorldDocumentService.normalize_motion_path({"id": "path_7", "name": "Orbit", "playback": {"duration": 4.0}}, "fallback")
 	_expect(is_equal_approx(float(normalized_path.get("playback", {}).get("duration", 0.0)), 4.0) and bool(normalized_path.get("playback", {}).get("loop", false)), "Path normalization should merge persisted playback fields with stable defaults.")
-	var sequence_document: Dictionary = application._normalize_motion_sequence({"id": "sequence_3", "name": "Arrival", "entries": [{"id": "entry_1", "asset_id": "asset_1", "animation_state_id": "idle", "path_id": "path_7"}]}, "fallback")
+	var sequence_document: Dictionary = WorldDocumentService.normalize_motion_sequence({"id": "sequence_3", "name": "Arrival", "entries": [{"id": "entry_1", "asset_id": "asset_1", "animation_state_id": "idle", "path_id": "path_7"}]}, "fallback")
 	_expect(str(sequence_document.get("id", "")) == "sequence_3" and sequence_document.get("entries", []).size() == 1, "A Sequence shell should preserve stable composition references without owning Asset or Path data.")
 	application.free()
 
@@ -3380,17 +3380,17 @@ func _test_motion_act_evaluator() -> void:
 	_expect(not MotionActEvaluator.validation_issues(invalid_blink).is_empty(), "Blink should reject a zero Minimum Scale.")
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
-	var normalized: Dictionary = application._normalize_motion_act({"id": "act_7", "parameters": {"direction": [0.0, 2.0], "distance": 12.0}}, "fallback")
+	var normalized: Dictionary = WorldDocumentService.normalize_motion_act({"id": "act_7", "parameters": {"direction": [0.0, 2.0], "distance": 12.0}}, "fallback")
 	_expect(Vector2(normalized.get("parameters", {}).get("direction", Vector2.ZERO)) == Vector2(0.0, 2.0), "Persisted Slide direction arrays should normalize back to Vector2 values.")
-	var serialized: Dictionary = application._serialize_motion_act(normalized)
+	var serialized: Dictionary = WorldDocumentService.serialize_motion_act(normalized)
 	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 60, "Act persistence should serialize vectors as JSON arrays using schema 60.")
-	var normalized_jump: Dictionary = application._normalize_motion_act({"id": "act_8", "primitive": "jump", "parameters": {"direction": [1.0, 0.0], "distance": 7.0, "height": 2.5, "arc": "snappy"}}, "fallback")
-	var serialized_jump: Dictionary = application._serialize_motion_act(normalized_jump)
+	var normalized_jump: Dictionary = WorldDocumentService.normalize_motion_act({"id": "act_8", "primitive": "jump", "parameters": {"direction": [1.0, 0.0], "distance": 7.0, "height": 2.5, "arc": "snappy"}}, "fallback")
+	var serialized_jump: Dictionary = WorldDocumentService.serialize_motion_act(normalized_jump)
 	_expect(str(serialized_jump.get("primitive", "")) == MotionActEvaluator.JUMP and is_equal_approx(float(serialized_jump.get("parameters", {}).get("height", 0.0)), 2.5) and str(serialized_jump.get("parameters", {}).get("arc", "")) == MotionActEvaluator.JUMP_ARC_SNAPPY, "Jump-specific parameters should survive normalization and serialization.")
-	var normalized_blink: Dictionary = application._normalize_motion_act({"id": "act_9", "primitive": "blink", "parameters": {"direction": [1.0, 0.0], "distance": 11.0, "anticipation_distance": 1.5, "anticipation_share": 0.22, "minimum_scale": 0.08}}, "fallback")
-	var serialized_blink: Dictionary = application._serialize_motion_act(normalized_blink)
+	var normalized_blink: Dictionary = WorldDocumentService.normalize_motion_act({"id": "act_9", "primitive": "blink", "parameters": {"direction": [1.0, 0.0], "distance": 11.0, "anticipation_distance": 1.5, "anticipation_share": 0.22, "minimum_scale": 0.08}}, "fallback")
+	var serialized_blink: Dictionary = WorldDocumentService.serialize_motion_act(normalized_blink)
 	_expect(str(serialized_blink.get("primitive", "")) == MotionActEvaluator.BLINK and is_equal_approx(float(serialized_blink.get("parameters", {}).get("anticipation_distance", 0.0)), 1.5) and is_equal_approx(float(serialized_blink.get("parameters", {}).get("minimum_scale", 0.0)), 0.08), "Blink-specific anticipation and scale parameters should survive normalization and serialization.")
-	var migrated_blink: Dictionary = application._normalize_motion_act({"schema_version": 18, "id": "act_10", "primitive": "blink", "parameters": {"direction": [1.0, 0.0], "distance": 6.0, "anticipation_distance": 1.0, "anticipation_share": 0.18, "minimum_scale": 0.05}}, "fallback")
+	var migrated_blink: Dictionary = WorldDocumentService.normalize_motion_act({"schema_version": 18, "id": "act_10", "primitive": "blink", "parameters": {"direction": [1.0, 0.0], "distance": 6.0, "anticipation_distance": 1.0, "anticipation_share": 0.18, "minimum_scale": 0.05}}, "fallback")
 	_expect(is_equal_approx(float(migrated_blink.get("parameters", {}).get("anticipation_share", 0.0)), 0.5), "The Phase 15 default Blink timing should migrate from 18% to the accepted 50% anticipation split.")
 	application.free()
 	var workspace := MotionActWorkspace.new()

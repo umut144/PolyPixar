@@ -10,6 +10,8 @@ Read `docs/AI_CONTEXT.md`, `docs/ARCHITECTURE.md`, and
 - `BezierGeometry` owns cubic Bézier mathematics and handle resolution.
 - `ComponentCanvas` renders immutable view copies and emits user intent. It
   must not mutate World document topology.
+- `WorldDocumentService` owns the persisted document format and is static.
+  Do not give it editor state; persistence that needs state stays in `main.gd`.
 - Polygon arrays used by fill, hit testing, or the current export are derived
   on demand and are never stored in a Component.
 

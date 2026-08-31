@@ -9,8 +9,6 @@ const MOTION_SUBMODULES := ["Animation", "Path", "Act", "Sequence"]
 const WORLDS_ROOT := "res://worlds"
 const CONFIG_PATH := "res://configs/app_config.json"
 const CONSUMER_SYNC_SCRIPT := "res://scripts/sync_world01_consumers.sh"
-const SCHEMA_VERSION := 60
-const DEFAULT_PROJECTION_DEPTH_CM := 10.0
 const REGION_TYPES := ["attack", "hurt", "collision"]
 const REGION_COLORS := {
 	"attack": Color("#ef6c78"),
@@ -27,7 +25,6 @@ const RENDER_CONTEXT_BAR := 8
 const RENDER_INFO_BAR := 16
 # The combination nearly every document mutation needs.
 const RENDER_DOCUMENT := RENDER_OUTLINER | RENDER_INSPECTOR | RENDER_CANVAS_CONTEXT
-const DRAW_MODES := ["closed_loop", "contour", "primitive"]
 const GRID_BOX_TOOL_UNITS := 0.5
 const GAME_TILE_CENTIMETERS := 100.0
 const EYE_COMPONENT_NAME_TOKEN := "eye"
@@ -364,8 +361,8 @@ func _notification(what: int) -> void:
 		return
 	get_tree().quit()
 func _load_last_world() -> void:
-	var config_data = _read_json(CONFIG_PATH)
-	if _has_supported_schema(config_data):
+	var config_data = WorldDocumentService.read_json(CONFIG_PATH)
+	if WorldDocumentService.has_supported_schema(config_data):
 		var last_world := str(config_data.get("last_world", ""))
 		if not last_world.is_empty():
 			_load_world(last_world)
@@ -775,8 +772,8 @@ func _build_ui() -> void:
 	draw_mode_status.tooltip_text = "Select a Component to change how its geometry is authored."
 	draw_mode_status.add_theme_font_size_override("font_size", 11)
 	draw_mode_status.add_theme_color_override("font_color", Color("#9aa3b2"))
-	for draw_mode_index in range(DRAW_MODES.size()):
-		draw_mode_status.get_popup().add_radio_check_item(_draw_mode_display_name(DRAW_MODES[draw_mode_index]), draw_mode_index)
+	for draw_mode_index in range(WorldDocumentService.DRAW_MODES.size()):
+		draw_mode_status.get_popup().add_radio_check_item(_draw_mode_display_name(WorldDocumentService.DRAW_MODES[draw_mode_index]), draw_mode_index)
 	_style_popup_menu(draw_mode_status.get_popup())
 	draw_mode_status.get_popup().id_pressed.connect(_on_draw_mode_status_selected)
 	toolbar.add_child(draw_mode_status)
@@ -1236,7 +1233,7 @@ func _confirm_motion_path_creation() -> void:
 	_record_direct_change()
 	var path_id := "path_%d" % next_motion_path_id
 	next_motion_path_id += 1
-	motion_paths.append(_default_motion_path(path_id, path_name))
+	motion_paths.append(WorldDocumentService.default_motion_path(path_id, path_name))
 	selected_motion_path_id = path_id
 	motion_path_dialog.hide()
 	_invalidate_render(RENDER_DOCUMENT)
@@ -1249,7 +1246,7 @@ func _confirm_motion_sequence_creation() -> void:
 	_record_direct_change()
 	var sequence_id := "sequence_%d" % next_motion_sequence_id
 	next_motion_sequence_id += 1
-	motion_sequences.append(_default_motion_sequence(sequence_id, sequence_name))
+	motion_sequences.append(WorldDocumentService.default_motion_sequence(sequence_id, sequence_name))
 	selected_motion_sequence_id = sequence_id
 	selected_motion_sequence_entry_id = ""
 	motion_sequence_view = MotionSequenceWorkspace.VIEW_COMPOSITION
@@ -2338,11 +2335,11 @@ func _write_asset_catalog(build: Dictionary = {}) -> bool:
 	if resource_path.is_empty():
 		return false
 	var target := ProjectSettings.globalize_path(resource_path)
-	return _write_text_atomically(target, JSON.stringify(expected.get("catalog", {}), "\t"))
+	return WorldDocumentService.write_text_atomically(target, JSON.stringify(expected.get("catalog", {}), "\t"))
 
 
 func _read_asset_data(world_root: String, asset_id: String):
-	var legacy_data = _read_json("%s/assets/%s/asset.json" % [world_root, asset_id])
+	var legacy_data = WorldDocumentService.read_json("%s/assets/%s/asset.json" % [world_root, asset_id])
 	var directory := DirAccess.open("%s/assets" % world_root)
 	if directory == null:
 		return legacy_data if legacy_data is Dictionary else {}
@@ -2351,7 +2348,7 @@ func _read_asset_data(world_root: String, asset_id: String):
 		for file_name in DirAccess.get_files_at(ProjectSettings.globalize_path(asset_directory)):
 			if not str(file_name).to_lower().ends_with(".json"):
 				continue
-			var candidate = _read_json("%s/%s" % [asset_directory, file_name])
+			var candidate = WorldDocumentService.read_json("%s/%s" % [asset_directory, file_name])
 			if candidate is Dictionary and str(candidate.get("id", "")) == asset_id:
 				if str(file_name).to_lower() != "asset.json" or entry != asset_id:
 					return candidate
@@ -2388,16 +2385,16 @@ func _save_world() -> void:
 		var asset_root := _asset_storage_root(world_root, asset)
 		DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(asset_root))
 		var asset_data := {
-			"schema_version": SCHEMA_VERSION,
+			"schema_version": WorldDocumentService.SCHEMA_VERSION,
 			"id": asset_id,
 			"name": str(asset["name"]),
 			"asset_type": _asset_type(asset),
 			"authored_facing": AssetPresentation.serialize_authored_facing(asset.get("authored_facing", AssetPresentation.AuthoredFacing.NEUTRAL)),
 			"visibility": bool(asset.get("visibility", true)),
-			"asset_pivot": _serialize_vector(_asset_pivot(asset)),
-			"root_position": _serialize_vector(AssetScaleRebaseService.root_position(asset)),
-			"root_scale": _serialize_vector(AssetScaleRebaseService.root_scale(asset)),
-			"reference_image": _serialize_reference_image(asset.get("reference_image", {})),
+			"asset_pivot": WorldDocumentService.serialize_vector(_asset_pivot(asset)),
+			"root_position": WorldDocumentService.serialize_vector(AssetScaleRebaseService.root_position(asset)),
+			"root_scale": WorldDocumentService.serialize_vector(AssetScaleRebaseService.root_scale(asset)),
+			"reference_image": WorldDocumentService.serialize_reference_image(asset.get("reference_image", {})),
 			"animation": MotionWorkspace.normalize_animation_document(asset.get("animation", {})).duplicate(true),
 			"components": [],
 			"groups": [],
@@ -2408,7 +2405,7 @@ func _save_world() -> void:
 				"id": str(group.get("id", "")),
 				"name": str(group.get("name", "Group")),
 				"parent_component_id": str(group.get("parent_component_id", "")),
-				"transform": _serialize_transform(group.get("transform", _default_component_transform())),
+				"transform": WorldDocumentService.serialize_transform(group.get("transform", WorldDocumentService.default_component_transform())),
 				"visibility": bool(group.get("visibility", true))
 			})
 		for component in asset["components"]:
@@ -2419,44 +2416,44 @@ func _save_world() -> void:
 				"source_asset_id": str(component.get("source_asset_id", "")),
 				"parent_component_id": str(component.get("parent_component_id", "")),
 				"group_id": str(component.get("group_id", "")),
-				"points": _serialize_bezier_points(component.get("points", [])),
-				"edges": _serialize_edges(component.get("edges", [])),
-				"chains": _serialize_chains(component.get("chains", [])),
-				"transform": _serialize_transform(component.get("transform", {})),
+				"points": WorldDocumentService.serialize_bezier_points(component.get("points", [])),
+				"edges": WorldDocumentService.serialize_edges(component.get("edges", [])),
+				"chains": WorldDocumentService.serialize_chains(component.get("chains", [])),
+				"transform": WorldDocumentService.serialize_transform(component.get("transform", {})),
 				"visibility": bool(component.get("visibility", true)),
 				"z_index": int(component.get("z_index", 0)),
-				"projection_depth_cm": float(component.get("projection_depth_cm", DEFAULT_PROJECTION_DEPTH_CM)),
+				"projection_depth_cm": float(component.get("projection_depth_cm", WorldDocumentService.DEFAULT_PROJECTION_DEPTH_CM)),
 				"draw_mode": str(component.get("draw_mode", "closed_loop")),
 				"topology_role": str(component.get("topology_role", "outer")) if str(component.get("topology_role", "outer")) in ["outer", "hole"] else "outer",
 				"catch_parent_component_id": str(component.get("catch_parent_component_id", "")),
 				"show_point_numbers": bool(component.get("show_point_numbers", false)),
-				"primitive": _serialize_primitive(component.get("primitive", {}))
+				"primitive": WorldDocumentService.serialize_primitive(component.get("primitive", {}))
 			}
 			if _is_region(component):
 				serialized_component["region_type"] = str(component.get("region_type", "attack"))
 			if _is_reference_component(component):
-				serialized_component["reference_instance_scale"] = _serialize_vector(Vector2(component.get("reference_instance_scale", Vector2.ONE)))
+				serialized_component["reference_instance_scale"] = WorldDocumentService.serialize_vector(Vector2(component.get("reference_instance_scale", Vector2.ONE)))
 			if _component_has_contour_stroke_width_override(component):
 				serialized_component["contour_stroke_width_px"] = float(component["contour_stroke_width_px"])
 			asset_data["components"].append(serialized_component)
 		for guide in asset.get("guides", []):
-			asset_data["guides"].append(_serialize_asset_guide(guide))
-		if not _write_json("%s/%s.json" % [asset_root, asset_storage_name], asset_data):
+			asset_data["guides"].append(WorldDocumentService.serialize_asset_guide(guide))
+		if not WorldDocumentService.write_json("%s/%s.json" % [asset_root, asset_storage_name], asset_data):
 			unwritten.append("%s.json" % asset_storage_name)
 		for component in asset.get("components", []):
 			var geometry_key := _geometry_document_key(asset_id, str(component.get("id", "")))
 			if not geometry_documents.has(geometry_key):
 				continue
 			var geometry_path := "%s/geometry/%s/%s/geometry.json" % [world_root, asset_storage_name, str(component.get("id", ""))]
-			if not _write_json(geometry_path, _serialize_geometry_document(geometry_documents[geometry_key])):
+			if not WorldDocumentService.write_json(geometry_path, WorldDocumentService.serialize_geometry_document(geometry_documents[geometry_key])):
 				unwritten.append(geometry_path.get_file())
 			if _save_sdf_image(asset, str(component.get("id", ""))) != OK:
 				unwritten.append("contour_sdf.png (%s)" % str(component.get("name", component.get("id", ""))))
 	for path_document in motion_paths:
 		var path_id := str(path_document.get("id", ""))
 		motion_path_ids.append(path_id)
-		if not _write_json("%s/paths/%s/path.json" % [world_root, path_id], {
-			"schema_version": SCHEMA_VERSION,
+		if not WorldDocumentService.write_json("%s/paths/%s/path.json" % [world_root, path_id], {
+			"schema_version": WorldDocumentService.SCHEMA_VERSION,
 			"id": path_id,
 			"name": str(path_document.get("name", path_id)),
 			"visibility": bool(path_document.get("visibility", true)),
@@ -2467,8 +2464,8 @@ func _save_world() -> void:
 	for sequence_document in motion_sequences:
 		var sequence_id := str(sequence_document.get("id", ""))
 		motion_sequence_ids.append(sequence_id)
-		if not _write_json("%s/sequences/%s/sequence.json" % [world_root, sequence_id], {
-			"schema_version": SCHEMA_VERSION,
+		if not WorldDocumentService.write_json("%s/sequences/%s/sequence.json" % [world_root, sequence_id], {
+			"schema_version": WorldDocumentService.SCHEMA_VERSION,
 			"id": sequence_id,
 			"name": str(sequence_document.get("name", sequence_id)),
 			"visibility": bool(sequence_document.get("visibility", true)),
@@ -2479,12 +2476,12 @@ func _save_world() -> void:
 	for act_document in motion_acts:
 		var act_id := str(act_document.get("id", ""))
 		motion_act_ids.append(act_id)
-		if not _write_json("%s/acts/%s/act.json" % [world_root, act_id], _serialize_motion_act(act_document)):
+		if not WorldDocumentService.write_json("%s/acts/%s/act.json" % [world_root, act_id], WorldDocumentService.serialize_motion_act(act_document)):
 			unwritten.append("acts/%s/act.json" % act_id)
 	# The World index is written last, so an interrupted save leaves an index
 	# that still describes the previous set of records.
-	if not _write_json("%s/%s.json" % [world_root, world_name], {
-		"schema_version": SCHEMA_VERSION,
+	if not WorldDocumentService.write_json("%s/%s.json" % [world_root, world_name], {
+		"schema_version": WorldDocumentService.SCHEMA_VERSION,
 		"name": world_name,
 		"world_name": world_title if not world_title.is_empty() else world_name,
 		"world_settings": _serialize_world_settings(),
@@ -2495,7 +2492,7 @@ func _save_world() -> void:
 		"editor_state": _serialize_editor_state()
 	}):
 		unwritten.append("%s.json" % world_name)
-	if not _write_json(CONFIG_PATH, {"schema_version": SCHEMA_VERSION, "last_world": world_name}):
+	if not WorldDocumentService.write_json(CONFIG_PATH, {"schema_version": WorldDocumentService.SCHEMA_VERSION, "last_world": world_name}):
 		unwritten.append(CONFIG_PATH.get_file())
 	if not unwritten.is_empty():
 		_show_status_message(_incomplete_save_message(unwritten))
@@ -2798,8 +2795,8 @@ func _clear_status_message() -> void:
 
 func _load_world(world_entry: String, persist_as_last := true) -> bool:
 	var world_root := "%s/%s" % [WORLDS_ROOT, world_entry]
-	var world_data = _read_json("%s/%s.json" % [world_root, world_entry])
-	if not _has_supported_schema(world_data):
+	var world_data = WorldDocumentService.read_json("%s/%s.json" % [world_root, world_entry])
+	if not WorldDocumentService.has_supported_schema(world_data):
 		return false
 	var world_schema := int(world_data.get("schema_version", 0))
 	var decoded_world_settings := WorldSettingsService.decode(world_data.get("world_settings", null), world_schema)
@@ -2810,7 +2807,7 @@ func _load_world(world_entry: String, persist_as_last := true) -> bool:
 	for asset_id_variant in world_data.get("assets", []):
 		var asset_id := str(asset_id_variant)
 		var asset_data = _read_asset_data(world_root, asset_id)
-		if not _has_supported_schema(asset_data):
+		if not WorldDocumentService.has_supported_schema(asset_data):
 			continue
 		var components: Array[Dictionary] = []
 		var used_component_names: Dictionary = {}
@@ -2823,13 +2820,13 @@ func _load_world(world_entry: String, persist_as_last := true) -> bool:
 				"id": str(group_data.get("id", "")),
 				"name": str(group_data.get("name", "Group")),
 				"parent_component_id": str(group_data.get("parent_component_id", "")),
-				"transform": _deserialize_transform(group_data.get("transform", {})),
+				"transform": WorldDocumentService.deserialize_transform(group_data.get("transform", {})),
 				"visibility": bool(group_data.get("visibility", true))
 			})
 		for component_data in asset_data.get("components", []):
 			if not component_data is Dictionary:
 				continue
-			var topology := _deserialize_component_topology(component_data)
+			var topology := WorldDocumentService.deserialize_component_topology(component_data)
 			if str(component_data.get("type", "component")) == "guide":
 				var legacy_guide: Dictionary = component_data.duplicate(true)
 				legacy_guide["points"] = topology["points"]
@@ -2849,37 +2846,37 @@ func _load_world(world_entry: String, persist_as_last := true) -> bool:
 				"points": topology["points"],
 				"edges": topology["edges"],
 				"chains": topology["chains"],
-				"transform": _deserialize_transform(component_data.get("transform", {})),
+				"transform": WorldDocumentService.deserialize_transform(component_data.get("transform", {})),
 				"visibility": bool(component_data.get("visibility", true)),
 				"z_index": int(component_data.get("z_index", 0)),
-				"projection_depth_cm": _deserialize_projection_depth_cm(component_data.get("projection_depth_cm", DEFAULT_PROJECTION_DEPTH_CM)),
-				"draw_mode": _normalize_component_draw_mode(component_data.get("draw_mode", "closed_loop"), int(asset_data.get("schema_version", 0))),
+				"projection_depth_cm": WorldDocumentService.deserialize_projection_depth_cm(component_data.get("projection_depth_cm", WorldDocumentService.DEFAULT_PROJECTION_DEPTH_CM)),
+				"draw_mode": WorldDocumentService.normalize_component_draw_mode(component_data.get("draw_mode", "closed_loop"), int(asset_data.get("schema_version", 0))),
 				"topology_role": str(component_data.get("topology_role", "outer")) if str(component_data.get("topology_role", "outer")) in ["outer", "hole"] else "outer",
 				"catch_parent_component_id": str(component_data.get("catch_parent_component_id", "")),
 				"show_point_numbers": bool(component_data.get("show_point_numbers", false)),
-				"primitive": _deserialize_primitive(component_data.get("primitive", {}))
+				"primitive": WorldDocumentService.deserialize_primitive(component_data.get("primitive", {}))
 			}
 			if component_type == "region":
 				component["region_type"] = str(component_data.get("region_type", "attack")) if str(component_data.get("region_type", "attack")) in REGION_TYPES else "attack"
 			if component_type == "reference":
-				component["reference_instance_scale"] = _deserialize_vector(component_data.get("reference_instance_scale", [1.0, 1.0]), Vector2.ONE)
+				component["reference_instance_scale"] = WorldDocumentService.deserialize_vector(component_data.get("reference_instance_scale", [1.0, 1.0]), Vector2.ONE)
 			if _serialized_component_contour_stroke_width_is_valid(component_data):
 				component["contour_stroke_width_px"] = float(component_data["contour_stroke_width_px"])
 			components.append(component)
 		for guide_data in asset_data.get("guides", []):
 			if not guide_data is Dictionary:
 				continue
-			guides.append(_deserialize_asset_guide(guide_data))
+			guides.append(WorldDocumentService.deserialize_asset_guide(guide_data))
 		var loaded_asset := {
 			"id": str(asset_data.get("id", asset_id)),
 			"name": str(asset_data.get("name", asset_id)),
-			"asset_type": _normalize_asset_type(asset_data.get("asset_type", "character")),
+			"asset_type": WorldDocumentService.normalize_asset_type(asset_data.get("asset_type", "character")),
 			"authored_facing": AssetPresentation.deserialize_authored_facing(asset_data.get("authored_facing", "neutral")),
 			"visibility": bool(asset_data.get("visibility", true)),
-			"asset_pivot": _deserialize_vector(asset_data.get("asset_pivot", [0.0, 0.0]), Vector2.ZERO),
-			"root_position": _deserialize_vector(asset_data.get("root_position", [0.0, 0.0]), Vector2.ZERO),
-			"root_scale": _deserialize_asset_root_scale(asset_data.get("root_scale", [1.0, 1.0])),
-			"reference_image": _normalize_reference_image(asset_data.get("reference_image", {})),
+			"asset_pivot": WorldDocumentService.deserialize_vector(asset_data.get("asset_pivot", [0.0, 0.0]), Vector2.ZERO),
+			"root_position": WorldDocumentService.deserialize_vector(asset_data.get("root_position", [0.0, 0.0]), Vector2.ZERO),
+			"root_scale": WorldDocumentService.deserialize_asset_root_scale(asset_data.get("root_scale", [1.0, 1.0])),
+			"reference_image": WorldDocumentService.normalize_reference_image(asset_data.get("reference_image", {})),
 			"animation": MotionWorkspace.normalize_animation_document(asset_data.get("animation", {})),
 			"components": components,
 			"groups": groups,
@@ -2893,27 +2890,27 @@ func _load_world(world_entry: String, persist_as_last := true) -> bool:
 		var loaded_asset_id := str(loaded_asset.get("id", ""))
 		for loaded_component in loaded_asset.get("components", []):
 			var loaded_component_id := str(loaded_component.get("id", ""))
-			var geometry_data = _read_json("%s/geometry/%s/%s/geometry.json" % [world_root, _asset_storage_name(loaded_asset), loaded_component_id])
-			if _has_supported_schema(geometry_data):
-				loaded_geometry_documents[_geometry_document_key(loaded_asset_id, loaded_component_id)] = _normalize_geometry_document(geometry_data, loaded_asset_id, loaded_component_id)
+			var geometry_data = WorldDocumentService.read_json("%s/geometry/%s/%s/geometry.json" % [world_root, _asset_storage_name(loaded_asset), loaded_component_id])
+			if WorldDocumentService.has_supported_schema(geometry_data):
+				loaded_geometry_documents[_geometry_document_key(loaded_asset_id, loaded_component_id)] = WorldDocumentService.normalize_geometry_document(geometry_data, loaded_asset_id, loaded_component_id)
 	var loaded_motion_paths: Array[Dictionary] = []
 	for path_id_variant in world_data.get("paths", []):
 		var path_id := str(path_id_variant)
-		var path_data = _read_json("%s/paths/%s/path.json" % [world_root, path_id])
-		if _has_supported_schema(path_data):
-			loaded_motion_paths.append(_normalize_motion_path(path_data, path_id))
+		var path_data = WorldDocumentService.read_json("%s/paths/%s/path.json" % [world_root, path_id])
+		if WorldDocumentService.has_supported_schema(path_data):
+			loaded_motion_paths.append(WorldDocumentService.normalize_motion_path(path_data, path_id))
 	var loaded_motion_sequences: Array[Dictionary] = []
 	for sequence_id_variant in world_data.get("sequences", []):
 		var sequence_id := str(sequence_id_variant)
-		var sequence_data = _read_json("%s/sequences/%s/sequence.json" % [world_root, sequence_id])
-		if _has_supported_schema(sequence_data):
-			loaded_motion_sequences.append(_normalize_motion_sequence(sequence_data, sequence_id))
+		var sequence_data = WorldDocumentService.read_json("%s/sequences/%s/sequence.json" % [world_root, sequence_id])
+		if WorldDocumentService.has_supported_schema(sequence_data):
+			loaded_motion_sequences.append(WorldDocumentService.normalize_motion_sequence(sequence_data, sequence_id))
 	var loaded_motion_acts: Array[Dictionary] = []
 	for act_id_variant in world_data.get("acts", []):
 		var act_id := str(act_id_variant)
-		var act_data = _read_json("%s/acts/%s/act.json" % [world_root, act_id])
-		if _has_supported_schema(act_data):
-			loaded_motion_acts.append(_normalize_motion_act(act_data, act_id))
+		var act_data = WorldDocumentService.read_json("%s/acts/%s/act.json" % [world_root, act_id])
+		if WorldDocumentService.has_supported_schema(act_data):
+			loaded_motion_acts.append(WorldDocumentService.normalize_motion_act(act_data, act_id))
 	motion_paths = loaded_motion_paths
 	motion_acts = loaded_motion_acts
 	motion_sequences = loaded_motion_sequences
@@ -2948,7 +2945,7 @@ func _load_world(world_entry: String, persist_as_last := true) -> bool:
 	active_state = ""
 	_invalidate_render(RENDER_DOCUMENT)
 	if persist_as_last:
-		_write_json(CONFIG_PATH, {"schema_version": SCHEMA_VERSION, "last_world": world_name})
+		WorldDocumentService.write_json(CONFIG_PATH, {"schema_version": WorldDocumentService.SCHEMA_VERSION, "last_world": world_name})
 	return true
 
 
@@ -2981,7 +2978,7 @@ func _serialize_editor_state() -> Dictionary:
 		var asset_camera = asset_camera_states.get(asset_id, {})
 		if asset_camera is Dictionary and not asset_camera.is_empty():
 			serialized_asset_cameras[asset_id] = {
-				"position": _serialize_vector(asset_camera.get("position", Vector2.ZERO)),
+				"position": WorldDocumentService.serialize_vector(asset_camera.get("position", Vector2.ZERO)),
 				"zoom": float(asset_camera.get("zoom", 1.0))
 			}
 	return {
@@ -3019,8 +3016,8 @@ func _serialize_editor_state() -> Dictionary:
 		},
 		"frame": {
 			"visible": frame_visible,
-			"half_extent": _serialize_vector(frame_half_extent),
-			"offset": _serialize_vector(frame_offset)
+			"half_extent": WorldDocumentService.serialize_vector(frame_half_extent),
+			"offset": WorldDocumentService.serialize_vector(frame_offset)
 		}
 	}
 
@@ -3096,7 +3093,7 @@ func _restore_editor_state(state) -> void:
 			var saved_asset_camera = saved_asset_cameras.get(asset_id, {})
 			if saved_asset_camera is Dictionary and not saved_asset_camera.is_empty():
 				asset_camera_states[asset_id] = {
-					"position": _deserialize_vector(saved_asset_camera.get("position", [0.0, 0.0]), Vector2.ZERO),
+					"position": WorldDocumentService.deserialize_vector(saved_asset_camera.get("position", [0.0, 0.0]), Vector2.ZERO),
 					"zoom": clampf(float(saved_asset_camera.get("zoom", 1.0)), 0.25, 4096.0)
 				}
 	if not selected_component_id.is_empty() or not selected_guide_id.is_empty():
@@ -3136,7 +3133,7 @@ func _restore_editor_state(state) -> void:
 	var saved_camera = state.get("camera", {})
 	if saved_camera is Dictionary and not saved_camera.is_empty() and not selected_asset_id.is_empty() and not asset_camera_states.has(selected_asset_id):
 		asset_camera_states[selected_asset_id] = {
-			"position": _deserialize_vector(saved_camera.get("position", [0.0, 0.0]), Vector2.ZERO),
+			"position": WorldDocumentService.deserialize_vector(saved_camera.get("position", [0.0, 0.0]), Vector2.ZERO),
 			"zoom": clampf(float(saved_camera.get("zoom", 1.0)), 0.25, 4096.0)
 		}
 
@@ -3189,7 +3186,7 @@ func _apply_world_scale_settings(settings) -> void:
 func _convert_asset_units(loaded_assets: Array[Dictionary], conversion_factor: float) -> void:
 	for asset in loaded_assets:
 		asset["root_position"] = AssetScaleRebaseService.root_position(asset) * conversion_factor
-		var reference_image := _normalize_reference_image(asset.get("reference_image", {}))
+		var reference_image := WorldDocumentService.normalize_reference_image(asset.get("reference_image", {}))
 		var reference_position: Vector2 = reference_image.get("position", Vector2.ZERO)
 		reference_position *= conversion_factor
 		reference_image["position"] = reference_position
@@ -3202,7 +3199,7 @@ func _convert_asset_units(loaded_assets: Array[Dictionary], conversion_factor: f
 				bezier_point["position"] = Vector2(bezier_point.get("position", Vector2.ZERO)) * conversion_factor
 				bezier_point["handle_in"] = Vector2(bezier_point.get("handle_in", Vector2.ZERO)) * conversion_factor
 				bezier_point["handle_out"] = Vector2(bezier_point.get("handle_out", Vector2.ZERO)) * conversion_factor
-			var transform: Dictionary = component.get("transform", _default_component_transform()).duplicate(true)
+			var transform: Dictionary = component.get("transform", WorldDocumentService.default_component_transform()).duplicate(true)
 			var transform_position: Vector2 = transform.get("position", Vector2.ZERO)
 			var transform_pivot: Vector2 = transform.get("pivot", Vector2.ZERO)
 			transform["position"] = transform_position * conversion_factor
@@ -3243,8 +3240,8 @@ func _apply_frame_settings(settings) -> void:
 	frame_offset = Vector2.ZERO
 	if settings is Dictionary:
 		frame_visible = bool(settings.get("visible", false))
-		var saved_half_extent := _deserialize_vector(settings.get("half_extent", [1.0, 1.0]), Vector2.ONE)
-		var saved_offset := _deserialize_vector(settings.get("offset", [0.0, 0.0]), Vector2.ZERO)
+		var saved_half_extent := WorldDocumentService.deserialize_vector(settings.get("half_extent", [1.0, 1.0]), Vector2.ONE)
+		var saved_offset := WorldDocumentService.deserialize_vector(settings.get("offset", [0.0, 0.0]), Vector2.ZERO)
 		if saved_half_extent.is_finite() and saved_half_extent.x >= 0.0 and saved_half_extent.y >= 0.0:
 			frame_half_extent = saved_half_extent
 		if saved_offset.is_finite():
@@ -3253,205 +3250,12 @@ func _apply_frame_settings(settings) -> void:
 	_update_frame_popup()
 
 
-func _serialize_bezier_points(points: Array) -> Array:
-	var serialized: Array = []
-	for point_data in points:
-		if not point_data is Dictionary:
-			continue
-		var point: Vector2 = point_data.get("position", Vector2.ZERO)
-		var handle_in: Vector2 = point_data.get("handle_in", Vector2.ZERO)
-		var handle_out: Vector2 = point_data.get("handle_out", Vector2.ZERO)
-		serialized.append({
-			"id": str(point_data.get("id", "")),
-			"position": _serialize_vector(point),
-			"mode": str(point_data.get("mode", "linear")),
-			"preserve_point": bool(point_data.get("preserve_point", false)),
-			"handle_source": str(point_data.get("handle_source", "auto")),
-			"handle_in": _serialize_vector(handle_in),
-			"handle_out": _serialize_vector(handle_out)
-		})
-	return serialized
-
-
-func _serialize_edges(edges: Array) -> Array:
-	var serialized: Array = []
-	for edge_data in edges:
-		if not edge_data is Dictionary:
-			continue
-		serialized.append({
-			"id": str(edge_data.get("id", "")),
-			"start_point_id": str(edge_data.get("start_point_id", "")),
-			"end_point_id": str(edge_data.get("end_point_id", "")),
-			"render_outline": bool(edge_data.get("render_outline", true))
-		})
-	return serialized
-
-
-func _serialize_chains(chains: Array) -> Array:
-	var serialized: Array = []
-	for chain_data in chains:
-		if not chain_data is Dictionary:
-			continue
-		serialized.append({
-			"id": str(chain_data.get("id", "")),
-			"point_ids": chain_data.get("point_ids", []).duplicate(),
-			"edge_ids": chain_data.get("edge_ids", []).duplicate(),
-			"closed": bool(chain_data.get("closed", false)),
-			"topology_role": str(chain_data.get("topology_role", "outer"))
-		})
-	return serialized
-
-
-func _deserialize_component_topology(component_data: Dictionary) -> Dictionary:
-	var raw_points = component_data.get("points", [])
-	var raw_edges = component_data.get("edges", [])
-	var raw_chains = component_data.get("chains", [])
-	if not raw_points is Array or not raw_edges is Array or not raw_chains is Array:
-		return {"points": [], "edges": [], "chains": []}
-	var points: Array[Dictionary] = []
-	var known_point_ids: Dictionary = {}
-	for raw_point in raw_points:
-		if not raw_point is Dictionary:
-			continue
-		var point_id := str(raw_point.get("id", ""))
-		if point_id.is_empty() or known_point_ids.has(point_id):
-			continue
-		var point_mode := str(raw_point.get("mode", "linear"))
-		if point_mode not in BezierTopology.VALID_POINT_MODES:
-			point_mode = "linear"
-		points.append({
-			"id": point_id,
-			"position": _deserialize_vector(raw_point.get("position", [0.0, 0.0]), Vector2.ZERO),
-			"mode": point_mode,
-			"preserve_point": bool(raw_point.get("preserve_point", point_mode == "corner")),
-			"handle_source": "manual" if str(raw_point.get("handle_source", "auto")) == "manual" else "auto",
-			"handle_in": _deserialize_vector(raw_point.get("handle_in", [0.0, 0.0]), Vector2.ZERO),
-			"handle_out": _deserialize_vector(raw_point.get("handle_out", [0.0, 0.0]), Vector2.ZERO)
-		})
-		known_point_ids[point_id] = true
-	var edges: Array[Dictionary] = []
-	var known_edge_ids: Dictionary = {}
-	for raw_edge in raw_edges:
-		if not raw_edge is Dictionary:
-			continue
-		var edge_id := str(raw_edge.get("id", ""))
-		var start_point_id := str(raw_edge.get("start_point_id", ""))
-		var end_point_id := str(raw_edge.get("end_point_id", ""))
-		if edge_id.is_empty() or known_edge_ids.has(edge_id) or not known_point_ids.has(start_point_id) or not known_point_ids.has(end_point_id) or start_point_id == end_point_id:
-			continue
-		edges.append({
-			"id": edge_id,
-			"start_point_id": start_point_id,
-			"end_point_id": end_point_id,
-			"render_outline": bool(raw_edge.get("render_outline", true))
-		})
-		known_edge_ids[edge_id] = true
-	var chains: Array[Dictionary] = []
-	for raw_chain in raw_chains:
-		if not raw_chain is Dictionary:
-			continue
-		var point_ids: Array = []
-		for point_id_value in raw_chain.get("point_ids", []):
-			var point_id := str(point_id_value)
-			if known_point_ids.has(point_id):
-				point_ids.append(point_id)
-		if point_ids.is_empty():
-			continue
-		var edge_ids: Array = []
-		for edge_id_value in raw_chain.get("edge_ids", []):
-			var edge_id := str(edge_id_value)
-			if known_edge_ids.has(edge_id):
-				edge_ids.append(edge_id)
-		var topology_role := str(raw_chain.get("topology_role", "outer"))
-		if topology_role not in BezierTopology.VALID_TOPOLOGY_ROLES:
-			topology_role = "outer"
-		chains.append({
-			"id": str(raw_chain.get("id", "chain_%d" % (chains.size() + 1))),
-			"point_ids": point_ids,
-			"edge_ids": edge_ids,
-			"closed": bool(raw_chain.get("closed", false)) and point_ids.size() >= 3,
-			"topology_role": topology_role
-		})
-	BezierGeometry.resolve_auto_handles(points, chains)
-	return {"points": points, "edges": edges, "chains": chains}
-
-
-func _default_component_transform() -> Dictionary:
-	return {
-		"position": Vector2.ZERO,
-		"rotation": 0.0,
-		"scale": Vector2.ONE,
-		"pivot": Vector2.ZERO
-	}
-
-
 func _asset_pivot(asset: Dictionary) -> Vector2:
-	return _deserialize_vector(asset.get("asset_pivot", [0.0, 0.0]), Vector2.ZERO)
-
-
-func _deserialize_asset_root_scale(value) -> Vector2:
-	# Scalar values are the schema-53 uniform representation and remain
-	# readable as equal X/Y axes.
-	if value is Array and value.size() >= 2:
-		var vector_value := Vector2(float(value[0]), float(value[1]))
-		return vector_value if vector_value.is_finite() and vector_value.x > AssetScaleRebaseService.SCALE_EPSILON and vector_value.y > AssetScaleRebaseService.SCALE_EPSILON else Vector2.ONE
-	if typeof(value) in [TYPE_INT, TYPE_FLOAT]:
-		var scalar := float(value)
-		return Vector2(scalar, scalar) if is_finite(scalar) and scalar > AssetScaleRebaseService.SCALE_EPSILON else Vector2.ONE
-	return Vector2.ONE
-
-
-func _serialize_transform(transform: Dictionary) -> Dictionary:
-	var normalized := _deserialize_transform(transform)
-	return {
-		"position": _serialize_vector(normalized["position"]),
-		"rotation": float(normalized["rotation"]),
-		"scale": _serialize_vector(normalized["scale"]),
-		"pivot": _serialize_vector(normalized["pivot"])
-	}
-
-
-func _default_reference_image() -> Dictionary:
-	return {
-		"file": "",
-		"visible": true,
-		"opacity": 0.5,
-		"position": Vector2.ZERO,
-		"scale": 1.0,
-		"target_height_cm": 13.0,
-		"pivot_mode": "bottom_center"
-	}
-
-
-func _normalize_reference_image(raw_reference) -> Dictionary:
-	var result := _default_reference_image()
-	if not raw_reference is Dictionary:
-		return result
-	result["file"] = str(raw_reference.get("file", "")).get_file()
-	result["visible"] = bool(raw_reference.get("visible", true))
-	result["opacity"] = clampf(float(raw_reference.get("opacity", 0.5)), 0.0, 1.0)
-	result["position"] = _deserialize_vector(raw_reference.get("position", [0.0, 0.0]), Vector2.ZERO)
-	result["scale"] = maxf(float(raw_reference.get("scale", 1.0)), 0.01)
-	result["target_height_cm"] = maxf(float(raw_reference.get("target_height_cm", 13.0)), 0.01)
-	result["pivot_mode"] = "center" if str(raw_reference.get("pivot_mode", "bottom_center")) == "center" else "bottom_center"
-	return result
-
-
-func _serialize_reference_image(raw_reference) -> Dictionary:
-	var normalized := _normalize_reference_image(raw_reference)
-	return {
-		"file": str(normalized["file"]),
-		"visible": bool(normalized["visible"]),
-		"opacity": float(normalized["opacity"]),
-		"position": _serialize_vector(normalized["position"]),
-		"scale": float(normalized["scale"]),
-		"target_height_cm": float(normalized["target_height_cm"]),
-		"pivot_mode": str(normalized["pivot_mode"])
-	}
+	return WorldDocumentService.deserialize_vector(asset.get("asset_pivot", [0.0, 0.0]), Vector2.ZERO)
 
 
 func _reference_image_path(asset: Dictionary) -> String:
-	var reference_image := _normalize_reference_image(asset.get("reference_image", {}))
+	var reference_image := WorldDocumentService.normalize_reference_image(asset.get("reference_image", {}))
 	var reference_file := str(reference_image.get("file", ""))
 	if world_name.is_empty() or reference_file.is_empty():
 		return ""
@@ -3465,102 +3269,6 @@ func _reference_image_filename(asset: Dictionary) -> String:
 	if safe_name.is_empty():
 		safe_name = str(asset.get("id", "asset"))
 	return "%s_ref.png" % safe_name
-
-
-func _deserialize_transform(transform) -> Dictionary:
-	var result := _default_component_transform()
-	if not transform is Dictionary:
-		return result
-	result["position"] = _deserialize_vector(transform.get("position", [0.0, 0.0]), Vector2.ZERO)
-	result["rotation"] = float(transform.get("rotation", 0.0))
-	result["scale"] = _deserialize_vector(transform.get("scale", [1.0, 1.0]), Vector2.ONE)
-	result["pivot"] = _deserialize_vector(transform.get("pivot", [0.0, 0.0]), Vector2.ZERO)
-	return result
-
-
-func _serialize_vector(value: Vector2) -> Array:
-	return [value.x, value.y]
-
-
-func _serialize_color(value) -> Array:
-	var color := Color.WHITE
-	if value is Color:
-		color = value
-	return [color.r, color.g, color.b, color.a]
-
-
-func _deserialize_color(value, fallback: Color) -> Color:
-	if value is Array and value.size() >= 3:
-		return Color(float(value[0]), float(value[1]), float(value[2]), float(value[3]) if value.size() >= 4 else 1.0)
-	return fallback
-
-
-func _deserialize_vector(value, fallback: Vector2) -> Vector2:
-	if value is Vector2:
-		return value
-	if value is Array and value.size() >= 2:
-		return Vector2(float(value[0]), float(value[1]))
-	return fallback
-
-
-func _serialize_primitive(raw_primitive) -> Dictionary:
-	if not raw_primitive is Dictionary:
-		return {}
-	var primitive_type := str(raw_primitive.get("type", ""))
-	var result := {"type": primitive_type, "center": _serialize_vector(PrimitiveGeometryService.center({"draw_mode": "primitive", "primitive": raw_primitive}))}
-	if primitive_type == "circle":
-		result["diameter_cm"] = maxf(float(raw_primitive.get("diameter_cm", 1.0)), 0.001)
-		return result
-	if primitive_type == PrimitiveGeometryService.ELLIPSE:
-		result["diameter_x_cm"] = maxf(float(raw_primitive.get("diameter_x_cm", 1.0)), 0.001)
-		result["diameter_y_cm"] = maxf(float(raw_primitive.get("diameter_y_cm", 1.0)), 0.001)
-		return result
-	return {}
-
-
-func _deserialize_primitive(raw_primitive) -> Dictionary:
-	if not raw_primitive is Dictionary:
-		return {}
-	var primitive_type := str(raw_primitive.get("type", ""))
-	var result := {"type": primitive_type, "center": _deserialize_vector(raw_primitive.get("center", [0.0, 0.0]), Vector2.ZERO)}
-	if primitive_type == "circle":
-		result["diameter_cm"] = maxf(float(raw_primitive.get("diameter_cm", 1.0)), 0.001)
-		return result
-	if primitive_type == PrimitiveGeometryService.ELLIPSE:
-		result["diameter_x_cm"] = maxf(float(raw_primitive.get("diameter_x_cm", 1.0)), 0.001)
-		result["diameter_y_cm"] = maxf(float(raw_primitive.get("diameter_y_cm", 1.0)), 0.001)
-		return result
-	return {}
-
-
-func _serialize_asset_guide(raw_guide: Dictionary) -> Dictionary:
-	var guide := AssetGuide.normalize(raw_guide)
-	var serialized := {
-		"id": str(guide.get("id", "")),
-		"type": "guide",
-		"guide_type": str(guide.get("guide_type", AssetGuide.SAMPLER_SPINE)),
-		"name": str(guide.get("name", "Guide")),
-		"ordinal": int(guide.get("ordinal", 1)),
-		"visibility": bool(guide.get("visibility", true)),
-		"scope": guide.get("scope", {}).duplicate(true),
-		"points": _serialize_bezier_points(guide.get("points", [])),
-		"edges": _serialize_edges(guide.get("edges", [])),
-		"chains": _serialize_chains(guide.get("chains", []))
-	}
-	if AssetGuide.is_weapon_frame(str(guide.get("guide_type", ""))):
-		serialized["transform"] = _serialize_transform(guide.get("transform", _default_component_transform()))
-	return serialized
-
-
-func _deserialize_asset_guide(raw_guide: Dictionary) -> Dictionary:
-	var topology := _deserialize_component_topology(raw_guide)
-	var guide: Dictionary = raw_guide.duplicate(true)
-	guide["points"] = topology["points"]
-	guide["edges"] = topology["edges"]
-	guide["chains"] = topology["chains"]
-	if AssetGuide.is_weapon_frame(str(guide.get("guide_type", ""))):
-		guide["transform"] = _deserialize_transform(raw_guide.get("transform", {}))
-	return AssetGuide.normalize(guide)
 
 
 func _geometry_document_key(asset_id: String, component_id: String) -> String:
@@ -3601,49 +3309,6 @@ func _save_sdf_image(asset: Dictionary, component_id: String) -> Error:
 	return OK
 
 
-func _default_geometry_document(asset_id: String, component_id: String) -> Dictionary:
-	return {
-		"asset_id": asset_id,
-		"component_id": component_id,
-		"component_mesh": {
-			"bake_id": "",
-			"method": "",
-			"mesh_fingerprint": "",
-			"build_provenance": {},
-			"last_error": "",
-			"last_failure_signature": {}
-		},
-		"sampling": {
-			"recipe": GeometrySamplingService.default_recipe(),
-			"bakes": {}
-		},
-		"seeding": {
-			"recipe": GeometrySeedingService.default_recipe(),
-			"bakes": {}
-		},
-		"meshing": {
-			"recipe": GeometryMeshingService.default_recipe(),
-			"bakes": {}
-		},
-		"uv_mapping": {
-			"recipe": GeometryUVMappingService.default_recipe(),
-			"bakes": {},
-			"last_error": "",
-			"last_failure_fingerprint": ""
-		},
-		"sdf": {
-			"recipe": GeometrySDFService.default_recipe(),
-			"bake": {},
-			"last_error": "",
-			"last_failure_fingerprint": ""
-		},
-		"weighting": {
-			"next_style_index": 1,
-			"styles": []
-		}
-	}
-
-
 func _get_geometry_document(asset_id: String, component_id: String) -> Dictionary:
 	# Read-only view. The returned Dictionary may still be shared with a history
 	# snapshot, so callers must not mutate it. Use _mutable_geometry_document
@@ -3659,7 +3324,7 @@ func _mutable_geometry_document(asset_id: String, component_id: String) -> Dicti
 	# recorded change stay valid.
 	var key := _geometry_document_key(asset_id, component_id)
 	if not geometry_documents.has(key):
-		var document := _default_geometry_document(asset_id, component_id)
+		var document := WorldDocumentService.default_geometry_document(asset_id, component_id)
 		shared_geometry_document_keys.erase(key)
 		geometry_documents[key] = document
 		return document
@@ -3721,497 +3386,6 @@ func _geometry_uv_mapping_recipe(asset_id: String, component_id: String) -> Dict
 	if document.is_empty():
 		return GeometryUVMappingService.default_recipe()
 	return GeometryUVMappingService.normalize_recipe(document.get("uv_mapping", {}).get("recipe", {}))
-
-
-func _normalize_geometry_document(raw_document, asset_id: String, component_id: String) -> Dictionary:
-	var source: Dictionary = raw_document if raw_document is Dictionary else {}
-	var sampling_source = source.get("sampling", {})
-	if not sampling_source is Dictionary:
-		sampling_source = {}
-	var document := _default_geometry_document(asset_id, component_id)
-	var component_mesh_source = source.get("component_mesh", {})
-	if component_mesh_source is Dictionary:
-		document["component_mesh"] = {
-			"bake_id": str(component_mesh_source.get("bake_id", "")),
-			"method": str(component_mesh_source.get("method", "")),
-			"mesh_fingerprint": str(component_mesh_source.get("mesh_fingerprint", "")),
-			"build_provenance": component_mesh_source.get("build_provenance", {}).duplicate(true) if component_mesh_source.get("build_provenance", {}) is Dictionary else {},
-			"last_error": str(component_mesh_source.get("last_error", "")),
-			"last_failure_signature": component_mesh_source.get("last_failure_signature", {}).duplicate(true) if component_mesh_source.get("last_failure_signature", {}) is Dictionary else {}
-		}
-	document["sampling"]["recipe"] = GeometrySamplingService.normalize_recipe(sampling_source.get("recipe", {}))
-	var raw_sampling_bakes: Dictionary = sampling_source.get("bakes", {}) if sampling_source.get("bakes", {}) is Dictionary else {}
-	if raw_sampling_bakes.is_empty() and sampling_source.get("bake", {}) is Dictionary:
-		var legacy_sampling_bake: Dictionary = sampling_source.get("bake", {})
-		if bool(legacy_sampling_bake.get("valid", false)):
-			raw_sampling_bakes[str(legacy_sampling_bake.get("method", GeometrySamplingService.ADAPTIVE))] = legacy_sampling_bake
-	for raw_method in raw_sampling_bakes:
-		var raw_sampling_bake = raw_sampling_bakes[raw_method]
-		if str(raw_method) == GeometrySamplingService.EVEN_SPACING or (raw_sampling_bake is Dictionary and str(raw_sampling_bake.get("method", "")) == GeometrySamplingService.EVEN_SPACING):
-			continue
-		var sampling_bake := _normalize_sampling_bake(raw_sampling_bake)
-		if not sampling_bake.is_empty():
-			document["sampling"]["bakes"][str(sampling_bake.get("method", raw_method))] = sampling_bake
-	var seeding_source = source.get("seeding", {})
-	if not seeding_source is Dictionary:
-		seeding_source = {}
-	document["seeding"]["recipe"] = GeometrySeedingService.normalize_recipe(seeding_source.get("recipe", {}))
-	var raw_seeding_bakes: Dictionary = seeding_source.get("bakes", {}) if seeding_source.get("bakes", {}) is Dictionary else {}
-	if raw_seeding_bakes.is_empty() and seeding_source.get("bake", {}) is Dictionary:
-		var legacy_seeding_bake: Dictionary = seeding_source.get("bake", {})
-		if bool(legacy_seeding_bake.get("valid", false)):
-			raw_seeding_bakes[str(legacy_seeding_bake.get("method", GeometrySeedingService.POISSON_FILL))] = legacy_seeding_bake
-	for raw_method in raw_seeding_bakes:
-		var seeding_bake := _normalize_seeding_bake(raw_seeding_bakes[raw_method])
-		if not seeding_bake.is_empty():
-			document["seeding"]["bakes"][str(seeding_bake.get("method", raw_method))] = seeding_bake
-	var meshing_source = source.get("meshing", {})
-	if not meshing_source is Dictionary:
-		meshing_source = {}
-	var raw_meshing_recipe: Dictionary = meshing_source.get("recipe", {}) if meshing_source.get("recipe", {}) is Dictionary else {}
-	document["meshing"]["recipe"] = GeometryMeshingService.normalize_recipe(raw_meshing_recipe)
-	var raw_meshing_bakes: Dictionary = meshing_source.get("bakes", {}) if meshing_source.get("bakes", {}) is Dictionary else {}
-	var preferred_mesh_method := str(component_mesh_source.get("method", raw_meshing_recipe.get("method", GeometryMeshingService.CONSTRAINED_MESH))) if component_mesh_source is Dictionary else str(raw_meshing_recipe.get("method", GeometryMeshingService.CONSTRAINED_MESH))
-	var chosen_raw_bake: Dictionary = {}
-	if raw_meshing_bakes.get(preferred_mesh_method, {}) is Dictionary:
-		chosen_raw_bake = raw_meshing_bakes.get(preferred_mesh_method, {})
-	if chosen_raw_bake.is_empty():
-		for fallback_method in [GeometryMeshingService.CONSTRAINED_MESH, GeometryMeshingService.ORGANIC_RELAXED, GeometryMeshingService.CONSTRAINED_DELAUNAY, GeometryMeshingService.RIBBON_STRIP, ContourMeshService.METHOD]:
-			if raw_meshing_bakes.get(fallback_method, {}) is Dictionary and not raw_meshing_bakes.get(fallback_method, {}).is_empty():
-				chosen_raw_bake = raw_meshing_bakes[fallback_method]
-				break
-	if not chosen_raw_bake.is_empty():
-		var meshing_bake := _normalize_meshing_bake(chosen_raw_bake)
-		if not meshing_bake.is_empty():
-			document["meshing"]["bakes"][str(meshing_bake.get("method", GeometryMeshingService.CONSTRAINED_MESH))] = meshing_bake
-			if preferred_mesh_method in [GeometryMeshingService.CONSTRAINED_DELAUNAY, GeometryMeshingService.ORGANIC_RELAXED]:
-				document["meshing"]["recipe"] = GeometryMeshingService.normalize_recipe({"method": preferred_mesh_method, "parameters": chosen_raw_bake.get("parameters", {})})
-			if str(document["component_mesh"].get("bake_id", "")) == str(meshing_bake.get("bake_id", "")):
-				document["component_mesh"]["method"] = str(meshing_bake.get("method", GeometryMeshingService.CONSTRAINED_MESH))
-	# Schema 4 Runtime needs the centered Stroke beside, rather than instead of,
-	# a closed Component's selected Fill Mesh. Legacy normalization previously
-	# retained only the selected Meshing Bake.
-	if preferred_mesh_method != ContourMeshService.METHOD and raw_meshing_bakes.get(ContourMeshService.METHOD, {}) is Dictionary:
-		var contour_stroke_bake := _normalize_meshing_bake(raw_meshing_bakes.get(ContourMeshService.METHOD, {}))
-		if not contour_stroke_bake.is_empty():
-			document["meshing"]["bakes"][ContourMeshService.METHOD] = contour_stroke_bake
-	var uv_mapping_source = source.get("uv_mapping", {})
-	if not uv_mapping_source is Dictionary:
-		uv_mapping_source = {}
-	document["uv_mapping"]["recipe"] = GeometryUVMappingService.normalize_recipe(uv_mapping_source.get("recipe", {}))
-	document["uv_mapping"]["last_error"] = str(uv_mapping_source.get("last_error", ""))
-	document["uv_mapping"]["last_failure_fingerprint"] = str(uv_mapping_source.get("last_failure_fingerprint", ""))
-	var raw_uv_bakes: Dictionary = uv_mapping_source.get("bakes", {}) if uv_mapping_source.get("bakes", {}) is Dictionary else {}
-	var uv_bake_scores: Dictionary = {}
-	var chosen_mesh_bake_id := str(chosen_raw_bake.get("bake_id", ""))
-	for raw_key in raw_uv_bakes:
-		var uv_bake := _normalize_uv_mapping_bake(raw_uv_bakes[raw_key])
-		if not uv_bake.is_empty():
-			var bake_key := GeometryUVMappingService.bake_key(str(uv_bake.get("mesh_method", "")), str(uv_bake.get("method", "")))
-			var raw_uv_bake: Dictionary = raw_uv_bakes[raw_key]
-			var score := 0
-			if not chosen_mesh_bake_id.is_empty() and str(raw_uv_bake.get("mesh_bake_id", "")) == chosen_mesh_bake_id:
-				score = 2
-			elif str(raw_uv_bake.get("mesh_method", "")) == preferred_mesh_method:
-				score = 1
-			if not document["uv_mapping"]["bakes"].has(bake_key) or score > int(uv_bake_scores.get(bake_key, -1)):
-				document["uv_mapping"]["bakes"][bake_key] = uv_bake
-				uv_bake_scores[bake_key] = score
-	var sdf_source = source.get("sdf", {})
-	if sdf_source is Dictionary:
-		document["sdf"]["recipe"] = GeometrySDFService.normalize_recipe(sdf_source.get("recipe", {}))
-		document["sdf"]["bake"] = _normalize_sdf_bake(sdf_source.get("bake", {}))
-		document["sdf"]["last_error"] = str(sdf_source.get("last_error", ""))
-		document["sdf"]["last_failure_fingerprint"] = str(sdf_source.get("last_failure_fingerprint", ""))
-	var weighting_source = source.get("weighting", {})
-	if weighting_source is Dictionary:
-		document["weighting"]["next_style_index"] = maxi(1, int(weighting_source.get("next_style_index", 1)))
-		for raw_style in weighting_source.get("styles", []):
-			var style := WeightingService.normalize_style(raw_style)
-			if not str(style.get("id", "")).is_empty():
-				document["weighting"]["styles"].append(style)
-	return document
-
-
-func _normalize_sampling_bake(raw_bake) -> Dictionary:
-	if not raw_bake is Dictionary or not bool(raw_bake.get("valid", false)):
-		return {}
-	var bake: Dictionary = raw_bake.duplicate(true)
-	var normalized_chains: Array = []
-	for raw_chain in raw_bake.get("chains", []):
-		if not raw_chain is Dictionary:
-			continue
-		var samples: Array = []
-		for raw_sample in raw_chain.get("samples", []):
-			if raw_sample is Dictionary:
-				samples.append({"id": str(raw_sample.get("id", "")), "position": _deserialize_vector(raw_sample.get("position", [0.0, 0.0]), Vector2.ZERO), "edge_id": str(raw_sample.get("edge_id", "")), "curve_t": clampf(float(raw_sample.get("curve_t", 0.0)), 0.0, 1.0), "source_point_id": str(raw_sample.get("source_point_id", "")), "preserved": bool(raw_sample.get("preserved", false))})
-		normalized_chains.append({"chain_id": str(raw_chain.get("chain_id", "")), "input_id": str(raw_chain.get("input_id", "")), "topology_role": str(raw_chain.get("topology_role", "outer")), "closed": bool(raw_chain.get("closed", false)), "effective_spacing": maxf(float(raw_chain.get("effective_spacing", raw_bake.get("parameters", {}).get("spacing", GeometrySamplingService.DEFAULT_SPACING))), GeometrySamplingService.MIN_SPACING), "samples": samples})
-	bake["method"] = GeometrySamplingService.ADAPTIVE
-	bake["algorithm_version"] = int(raw_bake.get("algorithm_version", 0))
-	bake["parameters"] = GeometrySamplingService.normalize_recipe({"method": bake["method"], "parameters": raw_bake.get("parameters", {})})["parameters"]
-	bake["chains"] = normalized_chains
-	var normalized_cuts: Array = []
-	for raw_cut in raw_bake.get("cuts", []):
-		if not raw_cut is Dictionary:
-			continue
-		var cut_samples: Array = []
-		for raw_sample in raw_cut.get("samples", []):
-			if raw_sample is Dictionary:
-				cut_samples.append({"id": str(raw_sample.get("id", "")), "position": _deserialize_vector(raw_sample.get("position", [0.0, 0.0]), Vector2.ZERO), "edge_id": str(raw_sample.get("edge_id", "")), "curve_t": clampf(float(raw_sample.get("curve_t", 0.0)), 0.0, 1.0), "source_point_id": str(raw_sample.get("source_point_id", "")), "preserved": bool(raw_sample.get("preserved", false)), "guide_id": str(raw_sample.get("guide_id", raw_cut.get("guide_id", "")))})
-		var normalized_fragments: Array = []
-		for raw_fragment in raw_cut.get("fragments", []):
-			if not raw_fragment is Dictionary:
-				continue
-			var fragment_samples: Array = []
-			for raw_sample in raw_fragment.get("samples", []):
-				if raw_sample is Dictionary:
-					fragment_samples.append({"id": str(raw_sample.get("id", "")), "position": _deserialize_vector(raw_sample.get("position", [0.0, 0.0]), Vector2.ZERO), "edge_id": str(raw_sample.get("edge_id", "")), "curve_t": clampf(float(raw_sample.get("curve_t", 0.0)), 0.0, 1.0), "source_point_id": str(raw_sample.get("source_point_id", "")), "preserved": bool(raw_sample.get("preserved", false)), "guide_id": str(raw_sample.get("guide_id", raw_cut.get("guide_id", "")))})
-			if fragment_samples.size() >= 2:
-				normalized_fragments.append({"id": str(raw_fragment.get("id", "cut:%s:fragment:%d" % [str(raw_cut.get("guide_id", "")), normalized_fragments.size()])), "samples": fragment_samples})
-		if normalized_fragments.is_empty() and cut_samples.size() >= 2:
-			normalized_fragments.append({"id": "cut:%s:fragment:0" % str(raw_cut.get("guide_id", "")), "samples": cut_samples.duplicate(true)})
-		normalized_cuts.append({"valid": bool(raw_cut.get("valid", true)), "errors": raw_cut.get("errors", []).duplicate(), "guide_id": str(raw_cut.get("guide_id", "")), "input_id": str(raw_cut.get("input_id", raw_cut.get("guide_id", ""))), "effective_spacing": maxf(float(raw_cut.get("effective_spacing", raw_bake.get("parameters", {}).get("spacing", GeometrySamplingService.DEFAULT_SPACING))), GeometrySamplingService.MIN_SPACING), "samples": cut_samples, "fragments": normalized_fragments})
-	bake["cuts"] = normalized_cuts
-	bake["sample_count"] = int(raw_bake.get("sample_count", 0))
-	bake["preserve_count"] = int(raw_bake.get("preserve_count", 0))
-	bake["hole_count"] = normalized_chains.filter(func(chain: Dictionary) -> bool: return str(chain.get("topology_role", "outer")) == "hole").size()
-	var constraint_count := 0
-	for chain_data in normalized_chains:
-		constraint_count += chain_data.get("samples", []).size()
-	for cut_data in normalized_cuts:
-		constraint_count += cut_data.get("samples", []).size()
-	bake["constraint_sample_count"] = constraint_count
-	var boundary_stats: Array = []
-	for chain_data in normalized_chains:
-		boundary_stats.append({"input_id": str(chain_data.get("input_id", "")), "role": str(chain_data.get("topology_role", "outer")), "effective_spacing": float(chain_data.get("effective_spacing", GeometrySamplingService.DEFAULT_SPACING)), "sample_count": chain_data.get("samples", []).size()})
-	for cut_data in normalized_cuts:
-		boundary_stats.append({"input_id": str(cut_data.get("input_id", cut_data.get("guide_id", ""))), "role": "cut", "effective_spacing": float(cut_data.get("effective_spacing", GeometrySamplingService.DEFAULT_SPACING)), "sample_count": cut_data.get("samples", []).size()})
-	bake["boundary_stats"] = boundary_stats
-	return bake
-
-
-func _normalize_seeding_bake(raw_bake) -> Dictionary:
-	if not raw_bake is Dictionary or not bool(raw_bake.get("valid", false)):
-		return {}
-	var bake: Dictionary = raw_bake.duplicate(true)
-	var normalized_seeds: Array = []
-	for raw_seed in raw_bake.get("seeds", []):
-		if raw_seed is Dictionary:
-			normalized_seeds.append({"id": str(raw_seed.get("id", "")), "position": _deserialize_vector(raw_seed.get("position", [0.0, 0.0]), Vector2.ZERO), "origin": str(raw_seed.get("origin", "generated")), "method": str(raw_seed.get("method", GeometrySeedingService.POISSON_FILL)), "provenance": raw_seed.get("provenance", {}).duplicate(true) if raw_seed.get("provenance", {}) is Dictionary else {}})
-	bake["method"] = str(raw_bake.get("method", GeometrySeedingService.POISSON_FILL))
-	bake["parameters"] = GeometrySeedingService.normalize_recipe({"method": bake["method"], "parameters": raw_bake.get("parameters", {})})["parameters"]
-	bake["seeds"] = normalized_seeds
-	bake["seed_count"] = normalized_seeds.size()
-	bake["edited"] = bool(raw_bake.get("edited", false))
-	return bake
-
-
-func _normalize_meshing_bake(raw_bake) -> Dictionary:
-	if not raw_bake is Dictionary or not bool(raw_bake.get("valid", false)):
-		return {}
-	var bake: Dictionary = raw_bake.duplicate(true)
-	var normalized_vertices: Array = []
-	for raw_vertex in raw_bake.get("vertices", []):
-		if raw_vertex is Dictionary:
-			var normalized_vertex := {
-				"id": str(raw_vertex.get("id", "")),
-				"position": _deserialize_vector(raw_vertex.get("position", [0.0, 0.0]), Vector2.ZERO),
-				"origin": str(raw_vertex.get("origin", "seed")),
-				"source_id": str(raw_vertex.get("source_id", "")),
-				"preserved": bool(raw_vertex.get("preserved", false))
-			}
-			if raw_vertex.has("edge_id"):
-				normalized_vertex["edge_id"] = str(raw_vertex.get("edge_id", ""))
-			if raw_vertex.has("curve_t"):
-				normalized_vertex["curve_t"] = float(raw_vertex.get("curve_t", 0.0))
-			normalized_vertices.append(normalized_vertex)
-	var normalized_triangles: Array = []
-	for raw_triangle in raw_bake.get("triangles", []):
-		if raw_triangle is Dictionary and raw_triangle.get("vertex_ids", []) is Array:
-			var normalized_triangle := {"vertex_ids": raw_triangle.get("vertex_ids", []).duplicate()}
-			if raw_triangle.has("id"):
-				normalized_triangle["id"] = str(raw_triangle.get("id", ""))
-			normalized_triangles.append(normalized_triangle)
-	var raw_method := str(raw_bake.get("method", GeometryMeshingService.CONSTRAINED_MESH))
-	if raw_method == GeometryMeshingService.RIBBON_STRIP:
-		bake["method"] = raw_method
-		bake["parameters"] = raw_bake.get("parameters", {}).duplicate(true) if raw_bake.get("parameters", {}) is Dictionary else {}
-	else:
-		var normalized_recipe := GeometryMeshingService.normalize_recipe({"method": raw_method, "parameters": raw_bake.get("parameters", {})})
-		bake["method"] = str(normalized_recipe.get("method", GeometryMeshingService.CONSTRAINED_MESH))
-		bake["parameters"] = normalized_recipe["parameters"]
-	bake["algorithm_version"] = int(raw_bake.get("algorithm_version", 0))
-	bake["vertices"] = normalized_vertices
-	bake["triangles"] = normalized_triangles
-	var normalized_runs: Array = []
-	for raw_run in raw_bake.get("runs", []):
-		if not raw_run is Dictionary:
-			continue
-		var normalized_run: Dictionary = raw_run.duplicate(true)
-		var normalized_centerline: Array = []
-		for raw_sample in raw_run.get("centerline", []):
-			if not raw_sample is Dictionary:
-				continue
-			var normalized_sample: Dictionary = raw_sample.duplicate(true)
-			normalized_sample["position"] = _deserialize_vector(raw_sample.get("position", [0.0, 0.0]), Vector2.ZERO)
-			normalized_centerline.append(normalized_sample)
-		normalized_run["centerline"] = normalized_centerline
-		normalized_runs.append(normalized_run)
-	bake["runs"] = normalized_runs
-	var raw_closed_region = raw_bake.get("closed_region", {})
-	if raw_closed_region is Dictionary and not raw_closed_region.is_empty():
-		var normalized_closed_region: Dictionary = raw_closed_region.duplicate(true)
-		var normalized_region_vertices: Array = []
-		for raw_vertex in raw_closed_region.get("vertices", []):
-			if not raw_vertex is Dictionary:
-				continue
-			var normalized_vertex: Dictionary = raw_vertex.duplicate(true)
-			normalized_vertex["id"] = str(raw_vertex.get("id", ""))
-			normalized_vertex["position"] = _deserialize_vector(raw_vertex.get("position", [0.0, 0.0]), Vector2.ZERO)
-			normalized_vertex["edge_id"] = str(raw_vertex.get("edge_id", ""))
-			normalized_vertex["curve_t"] = float(raw_vertex.get("curve_t", 0.0))
-			normalized_region_vertices.append(normalized_vertex)
-		var normalized_region_triangles: Array = []
-		for raw_triangle in raw_closed_region.get("triangles", []):
-			if raw_triangle is Dictionary and raw_triangle.get("vertex_ids", []) is Array:
-				normalized_region_triangles.append({"id": str(raw_triangle.get("id", "")), "vertex_ids": raw_triangle.get("vertex_ids", []).duplicate()})
-		normalized_closed_region["vertices"] = normalized_region_vertices
-		normalized_closed_region["triangles"] = normalized_region_triangles
-		normalized_closed_region["vertex_count"] = normalized_region_vertices.size()
-		normalized_closed_region["triangle_count"] = normalized_region_triangles.size()
-		bake["closed_region"] = normalized_closed_region
-	else:
-		bake.erase("closed_region")
-	bake["boundary_constraints"] = raw_bake.get("boundary_constraints", []).duplicate(true)
-	bake["vertex_count"] = normalized_vertices.size()
-	bake["triangle_count"] = normalized_triangles.size()
-	bake["minimum_angle"] = maxf(float(raw_bake.get("minimum_angle", 0.0)), 0.0)
-	bake["worst_aspect_ratio"] = maxf(float(raw_bake.get("worst_aspect_ratio", 0.0)), 0.0)
-	bake["mean_quality"] = clampf(float(raw_bake.get("mean_quality", 0.0)), 0.0, 1.0)
-	var raw_optimization = raw_bake.get("optimization", {})
-	var optimization: Dictionary = raw_optimization.duplicate(true) if raw_optimization is Dictionary else {}
-	var normalized_movements: Array = []
-	for raw_movement in optimization.get("movements", []):
-		if raw_movement is Dictionary:
-			normalized_movements.append({
-				"vertex_id": str(raw_movement.get("vertex_id", "")),
-				"from": _deserialize_vector(raw_movement.get("from", [0.0, 0.0]), Vector2.ZERO),
-				"to": _deserialize_vector(raw_movement.get("to", [0.0, 0.0]), Vector2.ZERO),
-				"distance": maxf(float(raw_movement.get("distance", 0.0)), 0.0)
-			})
-	optimization["movements"] = normalized_movements
-	var normalized_baseline_triangles: Array = []
-	for raw_triangle in optimization.get("baseline_triangles", []):
-		if raw_triangle is Dictionary and raw_triangle.get("vertex_ids", []) is Array:
-			normalized_baseline_triangles.append({"vertex_ids": raw_triangle.get("vertex_ids", []).duplicate()})
-	optimization["baseline_triangles"] = normalized_baseline_triangles
-	bake["optimization"] = optimization
-	return bake
-
-
-func _normalize_uv_mapping_bake(raw_bake) -> Dictionary:
-	if not raw_bake is Dictionary or not bool(raw_bake.get("valid", false)):
-		return {}
-	var bake: Dictionary = raw_bake.duplicate(true)
-	var normalized_uvs: Array = []
-	for raw_entry in raw_bake.get("uvs", []):
-		if raw_entry is Dictionary:
-			normalized_uvs.append({
-				"vertex_id": str(raw_entry.get("vertex_id", "")),
-				"uv": _deserialize_vector(raw_entry.get("uv", [0.0, 0.0]), Vector2.ZERO)
-			})
-	bake["method"] = str(raw_bake.get("method", GeometryUVMappingService.BOUNDS_PLANAR))
-	var raw_mesh_method := str(raw_bake.get("mesh_method", GeometryMeshingService.CONSTRAINED_MESH))
-	bake["mesh_method"] = GeometryMeshingService.CONSTRAINED_MESH if raw_mesh_method in [GeometryMeshingService.CONSTRAINED_DELAUNAY, GeometryMeshingService.ORGANIC_RELAXED] else raw_mesh_method
-	var raw_parameters: Dictionary = raw_bake.get("parameters", {}).duplicate(true) if raw_bake.get("parameters", {}) is Dictionary else {}
-	# Pre-schema-36 UVs touched the normalized bounds. Preserve that exact
-	# meaning so the new padded default marks them stale instead of relabeling
-	# their old coordinates as padded.
-	if not raw_parameters.has("padding"):
-		raw_parameters["padding"] = 0.0
-	bake["parameters"] = GeometryUVMappingService.normalize_recipe({"method": bake["method"], "parameters": raw_parameters})["parameters"]
-	bake["uvs"] = normalized_uvs
-	bake["uv_count"] = normalized_uvs.size()
-	return bake
-
-
-func _serialize_sampling_bake(bake: Dictionary) -> Dictionary:
-	var serialized_bake := bake.duplicate(true)
-	var serialized_chains: Array = []
-	for chain_data in bake.get("chains", []):
-		var serialized_samples: Array = []
-		for sample in chain_data.get("samples", []):
-			serialized_samples.append({"id": str(sample.get("id", "")), "position": _serialize_vector(Vector2(sample.get("position", Vector2.ZERO))), "edge_id": str(sample.get("edge_id", "")), "curve_t": float(sample.get("curve_t", 0.0)), "source_point_id": str(sample.get("source_point_id", "")), "preserved": bool(sample.get("preserved", false))})
-		serialized_chains.append({"chain_id": str(chain_data.get("chain_id", "")), "input_id": str(chain_data.get("input_id", "")), "topology_role": str(chain_data.get("topology_role", "outer")), "closed": bool(chain_data.get("closed", false)), "effective_spacing": float(chain_data.get("effective_spacing", GeometrySamplingService.DEFAULT_SPACING)), "samples": serialized_samples})
-	serialized_bake["chains"] = serialized_chains
-	var serialized_cuts: Array = []
-	for cut_data in bake.get("cuts", []):
-		var serialized_samples: Array = []
-		for sample in cut_data.get("samples", []):
-			serialized_samples.append({"id": str(sample.get("id", "")), "position": _serialize_vector(Vector2(sample.get("position", Vector2.ZERO))), "edge_id": str(sample.get("edge_id", "")), "curve_t": float(sample.get("curve_t", 0.0)), "source_point_id": str(sample.get("source_point_id", "")), "preserved": bool(sample.get("preserved", false)), "guide_id": str(sample.get("guide_id", cut_data.get("guide_id", "")))})
-		var serialized_fragments: Array = []
-		for fragment in GeometrySamplingService.cut_fragments(cut_data):
-			var fragment_samples: Array = []
-			for sample in fragment.get("samples", []):
-				fragment_samples.append({"id": str(sample.get("id", "")), "position": _serialize_vector(Vector2(sample.get("position", Vector2.ZERO))), "edge_id": str(sample.get("edge_id", "")), "curve_t": float(sample.get("curve_t", 0.0)), "source_point_id": str(sample.get("source_point_id", "")), "preserved": bool(sample.get("preserved", false)), "guide_id": str(sample.get("guide_id", cut_data.get("guide_id", "")))})
-			serialized_fragments.append({"id": str(fragment.get("id", "")), "samples": fragment_samples})
-		serialized_cuts.append({"valid": bool(cut_data.get("valid", true)), "errors": cut_data.get("errors", []).duplicate(), "guide_id": str(cut_data.get("guide_id", "")), "input_id": str(cut_data.get("input_id", cut_data.get("guide_id", ""))), "effective_spacing": float(cut_data.get("effective_spacing", GeometrySamplingService.DEFAULT_SPACING)), "samples": serialized_samples, "fragments": serialized_fragments})
-	serialized_bake["cuts"] = serialized_cuts
-	serialized_bake["hole_count"] = serialized_chains.filter(func(chain: Dictionary) -> bool: return str(chain.get("topology_role", "outer")) == "hole").size()
-	return serialized_bake
-
-
-func _serialize_seeding_bake(bake: Dictionary) -> Dictionary:
-	var serialized_bake := bake.duplicate(true)
-	var serialized_seeds: Array = []
-	for seed_data in bake.get("seeds", []):
-		serialized_seeds.append({"id": str(seed_data.get("id", "")), "position": _serialize_vector(Vector2(seed_data.get("position", Vector2.ZERO))), "origin": str(seed_data.get("origin", "generated")), "method": str(seed_data.get("method", GeometrySeedingService.POISSON_FILL)), "provenance": seed_data.get("provenance", {}).duplicate(true) if seed_data.get("provenance", {}) is Dictionary else {}})
-	serialized_bake["seeds"] = serialized_seeds
-	return serialized_bake
-
-
-func _serialize_meshing_bake(bake: Dictionary) -> Dictionary:
-	var serialized_bake := bake.duplicate(true)
-	var serialized_vertices: Array = []
-	for vertex in bake.get("vertices", []):
-		var serialized_vertex := {
-			"id": str(vertex.get("id", "")),
-			"position": _serialize_vector(Vector2(vertex.get("position", Vector2.ZERO))),
-			"origin": str(vertex.get("origin", "seed")),
-			"source_id": str(vertex.get("source_id", "")),
-			"preserved": bool(vertex.get("preserved", false))
-		}
-		if vertex.has("edge_id"):
-			serialized_vertex["edge_id"] = str(vertex.get("edge_id", ""))
-		if vertex.has("curve_t"):
-			serialized_vertex["curve_t"] = float(vertex.get("curve_t", 0.0))
-		serialized_vertices.append(serialized_vertex)
-	serialized_bake["vertices"] = serialized_vertices
-	var serialized_runs: Array = []
-	for run_data in bake.get("runs", []):
-		if not run_data is Dictionary:
-			continue
-		var serialized_run: Dictionary = run_data.duplicate(true)
-		var serialized_centerline: Array = []
-		for sample in run_data.get("centerline", []):
-			if not sample is Dictionary:
-				continue
-			var serialized_sample: Dictionary = sample.duplicate(true)
-			serialized_sample["position"] = _serialize_vector(Vector2(sample.get("position", Vector2.ZERO)))
-			serialized_centerline.append(serialized_sample)
-		serialized_run["centerline"] = serialized_centerline
-		serialized_runs.append(serialized_run)
-	serialized_bake["runs"] = serialized_runs
-	var raw_closed_region = bake.get("closed_region", {})
-	if raw_closed_region is Dictionary and not raw_closed_region.is_empty():
-		var serialized_closed_region: Dictionary = raw_closed_region.duplicate(true)
-		var serialized_region_vertices: Array = []
-		for vertex in raw_closed_region.get("vertices", []):
-			if not vertex is Dictionary:
-				continue
-			var serialized_vertex: Dictionary = vertex.duplicate(true)
-			serialized_vertex["position"] = _serialize_vector(Vector2(vertex.get("position", Vector2.ZERO)))
-			serialized_region_vertices.append(serialized_vertex)
-		serialized_closed_region["vertices"] = serialized_region_vertices
-		serialized_bake["closed_region"] = serialized_closed_region
-	else:
-		serialized_bake.erase("closed_region")
-	var raw_optimization = bake.get("optimization", {})
-	if raw_optimization is Dictionary:
-		var optimization: Dictionary = raw_optimization.duplicate(true)
-		var serialized_movements: Array = []
-		for movement in optimization.get("movements", []):
-			if movement is Dictionary:
-				serialized_movements.append({
-					"vertex_id": str(movement.get("vertex_id", "")),
-					"from": _serialize_vector(_deserialize_vector(movement.get("from", Vector2.ZERO), Vector2.ZERO)),
-					"to": _serialize_vector(_deserialize_vector(movement.get("to", Vector2.ZERO), Vector2.ZERO)),
-					"distance": maxf(float(movement.get("distance", 0.0)), 0.0)
-				})
-		optimization["movements"] = serialized_movements
-		serialized_bake["optimization"] = optimization
-	return serialized_bake
-
-
-func _serialize_uv_mapping_bake(bake: Dictionary) -> Dictionary:
-	var serialized_bake := bake.duplicate(true)
-	var serialized_uvs: Array = []
-	for entry in bake.get("uvs", []):
-		serialized_uvs.append({
-			"vertex_id": str(entry.get("vertex_id", "")),
-			"uv": _serialize_vector(Vector2(entry.get("uv", Vector2.ZERO)))
-		})
-	serialized_bake["uvs"] = serialized_uvs
-	return serialized_bake
-
-
-func _normalize_sdf_bake(raw_bake) -> Dictionary:
-	if not raw_bake is Dictionary or not bool(raw_bake.get("valid", false)):
-		return {}
-	var bake: Dictionary = raw_bake.duplicate(true)
-	bake.erase("image")
-	bake["method"] = str(raw_bake.get("method", GeometrySDFService.SINGLE_CHANNEL_SDF))
-	bake["algorithm_version"] = int(raw_bake.get("algorithm_version", 0))
-	bake["parameters"] = GeometrySDFService.normalize_recipe({"method": bake["method"], "parameters": raw_bake.get("parameters", {})})["parameters"]
-	bake["resolution"] = raw_bake.get("resolution", [GeometrySDFService.DEFAULT_RESOLUTION, GeometrySDFService.DEFAULT_RESOLUTION]).duplicate()
-	bake["image_path"] = str(raw_bake.get("image_path", "contour_sdf.png"))
-	return bake
-
-
-func _serialize_sdf_bake(bake: Dictionary) -> Dictionary:
-	var serialized := bake.duplicate(true)
-	serialized.erase("image")
-	return serialized
-
-
-func _serialize_geometry_document(document: Dictionary) -> Dictionary:
-	var normalized := _normalize_geometry_document(document, str(document.get("asset_id", "")), str(document.get("component_id", "")))
-	var serialized_sampling_bakes: Dictionary = {}
-	for method in normalized.get("sampling", {}).get("bakes", {}):
-		serialized_sampling_bakes[str(method)] = _serialize_sampling_bake(normalized["sampling"]["bakes"][method])
-	var serialized_seeding_bakes: Dictionary = {}
-	for method in normalized.get("seeding", {}).get("bakes", {}):
-		serialized_seeding_bakes[str(method)] = _serialize_seeding_bake(normalized["seeding"]["bakes"][method])
-	var serialized_meshing_bakes: Dictionary = {}
-	for method in normalized.get("meshing", {}).get("bakes", {}):
-		serialized_meshing_bakes[str(method)] = _serialize_meshing_bake(normalized["meshing"]["bakes"][method])
-	var serialized_uv_mapping_bakes: Dictionary = {}
-	for bake_key in normalized.get("uv_mapping", {}).get("bakes", {}):
-		serialized_uv_mapping_bakes[str(bake_key)] = _serialize_uv_mapping_bake(normalized["uv_mapping"]["bakes"][bake_key])
-	return {
-		"schema_version": SCHEMA_VERSION,
-		"asset_id": str(normalized.get("asset_id", "")),
-		"component_id": str(normalized.get("component_id", "")),
-		"component_mesh": normalized.get("component_mesh", {}).duplicate(true),
-		"sampling": {
-			"recipe": normalized.get("sampling", {}).get("recipe", {}).duplicate(true),
-			"bakes": serialized_sampling_bakes
-		},
-		"seeding": {
-			"recipe": normalized.get("seeding", {}).get("recipe", {}).duplicate(true),
-			"bakes": serialized_seeding_bakes
-		},
-		"meshing": {
-			"recipe": normalized.get("meshing", {}).get("recipe", {}).duplicate(true),
-			"bakes": serialized_meshing_bakes
-		},
-		"uv_mapping": {
-			"recipe": normalized.get("uv_mapping", {}).get("recipe", {}).duplicate(true),
-			"bakes": serialized_uv_mapping_bakes,
-			"last_error": str(normalized.get("uv_mapping", {}).get("last_error", "")),
-			"last_failure_fingerprint": str(normalized.get("uv_mapping", {}).get("last_failure_fingerprint", ""))
-		},
-		"sdf": {
-			"recipe": normalized.get("sdf", {}).get("recipe", {}).duplicate(true),
-			"bake": _serialize_sdf_bake(normalized.get("sdf", {}).get("bake", {})),
-			"last_error": str(normalized.get("sdf", {}).get("last_error", "")),
-			"last_failure_fingerprint": str(normalized.get("sdf", {}).get("last_failure_fingerprint", ""))
-		},
-		"weighting": {
-			"next_style_index": int(normalized.get("weighting", {}).get("next_style_index", 1)),
-			"styles": normalized.get("weighting", {}).get("styles", []).duplicate(true)
-		}
-	}
 
 
 func _geometry_sampling_bakes(asset_id: String, component_id: String) -> Dictionary:
@@ -4526,13 +3700,8 @@ func _component_has_contour_stroke_width_override(component: Dictionary) -> bool
 func _effective_contour_stroke_width_px(component: Dictionary) -> float:
 	return float(component["contour_stroke_width_px"]) if _component_has_contour_stroke_width_override(component) else world_contour_stroke_width_px
 
-func _deserialize_projection_depth_cm(value: Variant) -> float:
-	if typeof(value) not in [TYPE_INT, TYPE_FLOAT] or not is_finite(float(value)) or float(value) < 0.0:
-		return DEFAULT_PROJECTION_DEPTH_CM
-	return float(value)
-
 func _component_projection_depth_cm(component: Dictionary) -> float:
-	return _deserialize_projection_depth_cm(component.get("projection_depth_cm", DEFAULT_PROJECTION_DEPTH_CM))
+	return WorldDocumentService.deserialize_projection_depth_cm(component.get("projection_depth_cm", WorldDocumentService.DEFAULT_PROJECTION_DEPTH_CM))
 
 
 func _contour_stroke_bake_is_current(asset_id: String, component_id: String, component: Dictionary) -> bool:
@@ -5561,63 +4730,6 @@ func _geometry_uv_mapping_bake(asset_id: String, component_id: String, mesh_meth
 	var resolved_mesh_method := mesh_method if not mesh_method.is_empty() else str(component_mesh.get("method", recipe.get("parameters", {}).get("mesh_method", "")))
 	var resolved_uv_method := uv_method if not uv_method.is_empty() else str(recipe.get("method", ""))
 	return _geometry_uv_mapping_bakes(asset_id, component_id).get(GeometryUVMappingService.bake_key(resolved_mesh_method, resolved_uv_method), {})
-
-
-func _write_json(path: String, data: Dictionary) -> bool:
-	return _write_text_atomically(path, JSON.stringify(data, "\t"))
-
-
-func _write_text_atomically(path: String, text: String) -> bool:
-	# Authored World data is replaced, never truncated in place: the new content
-	# is staged beside the target, read back, and only then swapped in. A failure
-	# at any step leaves the previous file intact. The Asset Catalog and the
-	# Runtime Export packages use the same contract.
-	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(path.get_base_dir()))
-	var staging := "%s/.%s.staging" % [path.get_base_dir(), path.get_file()]
-	var backup := "%s/.%s.backup" % [path.get_base_dir(), path.get_file()]
-	if FileAccess.file_exists(staging):
-		DirAccess.remove_absolute(staging)
-	if FileAccess.file_exists(backup):
-		# A backup without its target is the residue of an interrupted swap.
-		if FileAccess.file_exists(path):
-			DirAccess.remove_absolute(backup)
-		else:
-			DirAccess.rename_absolute(backup, path)
-	var file := FileAccess.open(staging, FileAccess.WRITE)
-	if file == null:
-		return false
-	file.store_string(text)
-	file.close()
-	if FileAccess.get_file_as_string(staging) != text:
-		DirAccess.remove_absolute(staging)
-		return false
-	if FileAccess.file_exists(path) and DirAccess.rename_absolute(path, backup) != OK:
-		DirAccess.remove_absolute(staging)
-		return false
-	if DirAccess.rename_absolute(staging, path) != OK:
-		if FileAccess.file_exists(backup):
-			DirAccess.rename_absolute(backup, path)
-		DirAccess.remove_absolute(staging)
-		return false
-	if FileAccess.file_exists(backup):
-		DirAccess.remove_absolute(backup)
-	return true
-
-
-func _read_json(path: String):
-	if not FileAccess.file_exists(path):
-		return null
-	var file := FileAccess.open(path, FileAccess.READ)
-	if file == null:
-		return null
-	return JSON.parse_string(file.get_as_text())
-
-
-func _has_supported_schema(data) -> bool:
-	if not data is Dictionary:
-		return false
-	var version := int(data.get("schema_version", data.get("format_version", 0)))
-	return version > 0 and version <= SCHEMA_VERSION
 
 
 func _update_next_ids() -> void:
@@ -7028,7 +6140,7 @@ func _confirm_asset_creation() -> void:
 	_record_direct_change()
 	var asset_id := "asset_%d" % next_asset_id
 	next_asset_id += 1
-	assets.append({"id": asset_id, "name": asset_name, "asset_type": _create_submodule_asset_type(active_create_submodule), "authored_facing": AssetPresentation.AuthoredFacing.NEUTRAL, "visibility": true, "asset_pivot": Vector2.ZERO, "root_position": Vector2.ZERO, "root_scale": Vector2.ONE, "reference_image": _default_reference_image(), "animation": MotionWorkspace.create_default_animation_document(), "components": [], "groups": [], "guides": []})
+	assets.append({"id": asset_id, "name": asset_name, "asset_type": _create_submodule_asset_type(active_create_submodule), "authored_facing": AssetPresentation.AuthoredFacing.NEUTRAL, "visibility": true, "asset_pivot": Vector2.ZERO, "root_position": Vector2.ZERO, "root_scale": Vector2.ONE, "reference_image": WorldDocumentService.default_reference_image(), "animation": MotionWorkspace.create_default_animation_document(), "components": [], "groups": [], "guides": []})
 	selected_asset_id = asset_id
 	selected_component_id = ""
 	selected_component_ids.clear()
@@ -7082,7 +6194,7 @@ func _save_reference_image_result(reference_image_result: Image) -> void:
 	if reference_image_result.save_png(ProjectSettings.globalize_path(destination_path)) != OK:
 		_show_status_message("Reference Image could not be copied.")
 		return
-	var reference_image := _normalize_reference_image(asset.get("reference_image", {}))
+	var reference_image := WorldDocumentService.normalize_reference_image(asset.get("reference_image", {}))
 	reference_image["file"] = reference_filename
 	# A newly imported reference must always be visible, even if the image it
 	# replaces had been hidden in the Inspector.
@@ -7185,7 +6297,7 @@ func _clear_reference_image() -> void:
 	var asset := _get_asset(selected_asset_id)
 	if asset.is_empty():
 		return
-	var reference_image := _normalize_reference_image(asset.get("reference_image", {}))
+	var reference_image := WorldDocumentService.normalize_reference_image(asset.get("reference_image", {}))
 	if str(reference_image.get("file", "")).is_empty():
 		return
 	_record_direct_change()
@@ -7212,7 +6324,7 @@ func _on_reference_image_property_changed(value: float, property_name: String) -
 	var asset := _get_asset(selected_asset_id)
 	if asset.is_empty():
 		return
-	var reference_image := _normalize_reference_image(asset.get("reference_image", {}))
+	var reference_image := WorldDocumentService.normalize_reference_image(asset.get("reference_image", {}))
 	if property_name == "opacity":
 		reference_image["opacity"] = clampf(value, 0.0, 1.0)
 	elif property_name == "position_x":
@@ -7277,7 +6389,7 @@ func _update_reference_image_property(property_name: String, value) -> void:
 	var asset := _get_asset(selected_asset_id)
 	if asset.is_empty():
 		return
-	var reference_image := _normalize_reference_image(asset.get("reference_image", {}))
+	var reference_image := WorldDocumentService.normalize_reference_image(asset.get("reference_image", {}))
 	reference_image[property_name] = value
 	_record_direct_change()
 	asset["reference_image"] = reference_image
@@ -8906,9 +8018,9 @@ func _open_group_add_menu(asset_id: String, group_id: String, anchor: Control) -
 
 
 func _on_component_add_child_selected(index: int) -> void:
-	if index < 0 or index >= DRAW_MODES.size():
+	if index < 0 or index >= WorldDocumentService.DRAW_MODES.size():
 		return
-	_open_component_name_dialog(str(component_add_menu.get_meta("asset_id", "")), str(component_add_menu.get_meta("parent_component_id", "")), DRAW_MODES[index], "", str(component_add_menu.get_meta("scope_id", "")) if str(component_add_menu.get_meta("scope_kind", "component")) == "group" else "")
+	_open_component_name_dialog(str(component_add_menu.get_meta("asset_id", "")), str(component_add_menu.get_meta("parent_component_id", "")), WorldDocumentService.DRAW_MODES[index], "", str(component_add_menu.get_meta("scope_id", "")) if str(component_add_menu.get_meta("scope_kind", "component")) == "group" else "")
 
 
 func _on_component_add_guide_selected(index: int) -> void:
@@ -8951,9 +8063,9 @@ func _on_component_add_reference_selected(index: int) -> void:
 
 
 func _on_component_draw_mode_selected(index: int) -> void:
-	if index < 0 or index >= DRAW_MODES.size():
+	if index < 0 or index >= WorldDocumentService.DRAW_MODES.size():
 		return
-	_open_component_name_dialog(str(component_draw_mode_menu.get_meta("asset_id", "")), str(component_draw_mode_menu.get_meta("parent_component_id", "")), DRAW_MODES[index])
+	_open_component_name_dialog(str(component_draw_mode_menu.get_meta("asset_id", "")), str(component_draw_mode_menu.get_meta("parent_component_id", "")), WorldDocumentService.DRAW_MODES[index])
 
 
 func _draw_mode_display_name(draw_mode: String) -> String:
@@ -8965,7 +8077,7 @@ func _draw_mode_display_name(draw_mode: String) -> String:
 
 
 func _draw_mode_change_issue(component: Dictionary, target_mode: String) -> String:
-	if component.is_empty() or target_mode not in DRAW_MODES:
+	if component.is_empty() or target_mode not in WorldDocumentService.DRAW_MODES:
 		return "Select a Component first."
 	if _is_reference_component(component):
 		return "Symbol References inherit their source geometry and cannot change Draw Mode."
@@ -9018,17 +8130,17 @@ func _update_draw_mode_status() -> void:
 	draw_mode_status.disabled = not has_editable_component
 	draw_mode_status.tooltip_text = "Closed Loop and Contour preserve Bezier topology. Primitive is available only while the Component is empty." if has_editable_component else ("Symbol References inherit their source Draw Mode." if _is_reference_component(component) else "Select a Component in Create to change Draw Mode.")
 	var popup := draw_mode_status.get_popup()
-	for draw_mode_index in range(DRAW_MODES.size()):
-		var target_mode: String = DRAW_MODES[draw_mode_index]
+	for draw_mode_index in range(WorldDocumentService.DRAW_MODES.size()):
+		var target_mode: String = WorldDocumentService.DRAW_MODES[draw_mode_index]
 		popup.set_item_checked(draw_mode_index, target_mode == current_mode)
 		popup.set_item_disabled(draw_mode_index, not has_editable_component or not _draw_mode_change_issue(component, target_mode).is_empty())
 
 
 func _on_draw_mode_status_selected(index: int) -> void:
-	if index < 0 or index >= DRAW_MODES.size():
+	if index < 0 or index >= WorldDocumentService.DRAW_MODES.size():
 		return
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	var target_mode: String = DRAW_MODES[index]
+	var target_mode: String = WorldDocumentService.DRAW_MODES[index]
 	var issue := _draw_mode_change_issue(component, target_mode)
 	if not issue.is_empty():
 		_show_status_message(issue)
@@ -9051,15 +8163,6 @@ func _on_draw_mode_status_selected(index: int) -> void:
 	canvas_view.clear_selection()
 	_invalidate_render(RENDER_DOCUMENT)
 	_show_status_message("Draw Mode changed to %s." % _draw_mode_display_name(target_mode))
-
-
-func _normalize_component_draw_mode(raw_mode, source_schema_version: int) -> String:
-	var draw_mode := str(raw_mode)
-	if draw_mode == "ribbon" and source_schema_version < 40:
-		return "contour"
-	if draw_mode == "ribbon":
-		return draw_mode
-	return draw_mode if draw_mode in DRAW_MODES else "closed_loop"
 
 
 func _open_component_name_dialog(asset_id: String, parent_component_id: String, draw_mode: String, source_asset_id := "", group_id := "") -> void:
@@ -9199,8 +8302,8 @@ func _create_region(asset_id: String, scope_kind: String, scope_id: String, regi
 		"id": component_id, "type": "region", "region_type": region_type, "name": region_name,
 		"source_asset_id": "", "parent_component_id": scope_id if scope_kind == "component" else "",
 		"group_id": scope_id if scope_kind == "group" else "", "points": [], "edges": [], "chains": [],
-		"transform": _default_component_transform(), "visibility": true, "z_index": 0,
-		"projection_depth_cm": DEFAULT_PROJECTION_DEPTH_CM, "draw_mode": "closed_loop",
+		"transform": WorldDocumentService.default_component_transform(), "visibility": true, "z_index": 0,
+		"projection_depth_cm": WorldDocumentService.DEFAULT_PROJECTION_DEPTH_CM, "draw_mode": "closed_loop",
 		"topology_role": "outer", "geometry_source": "bezier", "primitive": {},
 		"catch_parent_component_id": "", "show_point_numbers": false
 	})
@@ -9364,7 +8467,7 @@ func _place_selected_group_pivot_at_mouse() -> bool:
 	if asset.is_empty() or group.is_empty():
 		return false
 	_record_coalesced_change()
-	var transform: Dictionary = group.get("transform", _default_component_transform())
+	var transform: Dictionary = group.get("transform", WorldDocumentService.default_component_transform())
 	var old_pivot: Vector2 = transform.get("pivot", Vector2.ZERO)
 	var new_pivot := canvas_view.mouse_local_position()
 	var transform_scale: Vector2 = transform.get("scale", Vector2.ONE)
@@ -9568,7 +8671,7 @@ func _duplicate_group(asset_id: String, group_id: String, mirror_mode := "none")
 	group_copy["id"] = new_group_id
 	group_copy["name"] = _next_duplicate_group_name(asset, str(source_group.get("name", "Group")))
 	if mirror_mode != "none":
-		group_copy["transform"] = _mirrored_group_transform(group_copy.get("transform", _default_component_transform()), mirror_mode)
+		group_copy["transform"] = _mirrored_group_transform(group_copy.get("transform", WorldDocumentService.default_component_transform()), mirror_mode)
 	asset["groups"].append(group_copy)
 	var id_map: Dictionary = {}
 	var duplicated_component_ids: Array[String] = []
@@ -9588,7 +8691,7 @@ func _duplicate_group(asset_id: String, group_id: String, mirror_mode := "none")
 		var mirrored_world_records: Dictionary = {}
 		for duplicated_id in duplicated_component_ids:
 			mirrored_world_records[duplicated_id] = ComponentHierarchy.world_transform_record(asset, duplicated_id)
-		var normalized_group_transform: Dictionary = group_copy.get("transform", _default_component_transform()).duplicate(true)
+		var normalized_group_transform: Dictionary = group_copy.get("transform", WorldDocumentService.default_component_transform()).duplicate(true)
 		var normalized_group_scale: Vector2 = normalized_group_transform.get("scale", Vector2.ONE)
 		normalized_group_scale.x = absf(normalized_group_scale.x)
 		normalized_group_transform["scale"] = normalized_group_scale
@@ -9630,7 +8733,7 @@ func _next_duplicate_group_name(asset: Dictionary, source_name: String) -> Strin
 
 
 func _mirrored_group_transform(raw_transform: Dictionary, mirror_mode: String) -> Dictionary:
-	var transform := _deserialize_transform(raw_transform).duplicate(true)
+	var transform := WorldDocumentService.deserialize_transform(raw_transform).duplicate(true)
 	var mirrored_position: Vector2 = transform.get("position", Vector2.ZERO)
 	mirrored_position.x = -mirrored_position.x
 	transform["position"] = mirrored_position
@@ -9705,7 +8808,7 @@ func _next_duplicate_component_name(asset: Dictionary, source_name: String) -> S
 
 
 func _mirrored_duplicate_transform(component: Dictionary, mirror_mode: String) -> Dictionary:
-	var transform: Dictionary = component.get("transform", _default_component_transform()).duplicate(true)
+	var transform: Dictionary = component.get("transform", WorldDocumentService.default_component_transform()).duplicate(true)
 	if mirror_mode == "flip_orientation":
 		var transform_position: Vector2 = transform.get("position", Vector2.ZERO)
 		transform_position.x = -transform_position.x
@@ -9879,10 +8982,10 @@ func _confirm_component_creation() -> void:
 		target_group_id = ""
 	if not parent_component_id.is_empty() and _get_component(asset, parent_component_id).is_empty():
 		parent_component_id = ""
-	var component_transform := _default_component_transform()
+	var component_transform := WorldDocumentService.default_component_transform()
 	if not parent_component_id.is_empty():
 		var parent_component := _get_component(asset, parent_component_id)
-		var parent_transform := _deserialize_transform(parent_component.get("transform", {}))
+		var parent_transform := WorldDocumentService.deserialize_transform(parent_component.get("transform", {}))
 		var inherited_pivot: Vector2 = parent_transform.get("pivot", Vector2.ZERO)
 		# Local child position is the Parent-local point that maps to the Parent pivot.
 		component_transform["position"] = inherited_pivot
@@ -9900,8 +9003,8 @@ func _confirm_component_creation() -> void:
 		"transform": component_transform,
 		"visibility": true,
 		"z_index": 0,
-		"projection_depth_cm": DEFAULT_PROJECTION_DEPTH_CM,
-		"draw_mode": draw_mode if draw_mode in DRAW_MODES else "closed_loop",
+		"projection_depth_cm": WorldDocumentService.DEFAULT_PROJECTION_DEPTH_CM,
+		"draw_mode": draw_mode if draw_mode in WorldDocumentService.DRAW_MODES else "closed_loop",
 		"topology_role": "outer",
 		"geometry_source": "primitive" if draw_mode == "primitive" else "bezier",
 		"primitive": {},
@@ -10259,7 +9362,7 @@ func _render_group_inspector(_asset: Dictionary, group: Dictionary) -> void:
 	transform_grid.columns = 2
 	transform_grid.add_theme_constant_override("h_separation", 8)
 	transform_grid.add_theme_constant_override("v_separation", 4)
-	var transform: Dictionary = group.get("transform", _default_component_transform())
+	var transform: Dictionary = group.get("transform", WorldDocumentService.default_component_transform())
 	var transform_position: Vector2 = transform.get("position", Vector2.ZERO)
 	var transform_scale: Vector2 = transform.get("scale", Vector2.ONE)
 	var pivot: Vector2 = transform.get("pivot", Vector2.ZERO)
@@ -10316,7 +9419,7 @@ func _on_group_transform_value_changed(value: float, property_name: String) -> v
 	if group.is_empty():
 		return
 	_record_direct_change()
-	var transform: Dictionary = group.get("transform", _default_component_transform())
+	var transform: Dictionary = group.get("transform", WorldDocumentService.default_component_transform())
 	var transform_position: Vector2 = transform.get("position", Vector2.ZERO)
 	var transform_scale: Vector2 = transform.get("scale", Vector2.ONE)
 	var pivot: Vector2 = transform.get("pivot", Vector2.ZERO)
@@ -10434,7 +9537,7 @@ func _render_weapon_guide_inspector(asset: Dictionary, guide: Dictionary) -> voi
 	var scope_record := ComponentHierarchy.group_by_id(asset, scope_id) if scope_kind == "group" else _get_component(asset, scope_id)
 	inspector_content.add_child(_create_inspector_field_label("Parent %s: %s" % [scope_kind.capitalize(), str(scope_record.get("name", "Missing"))]))
 	inspector_content.add_child(_create_inspector_section("Local Frame"))
-	var transform: Dictionary = guide.get("transform", _default_component_transform())
+	var transform: Dictionary = guide.get("transform", WorldDocumentService.default_component_transform())
 	var grid := GridContainer.new()
 	grid.columns = 2
 	_add_weapon_frame_field(grid, "Position X (cm)", _editor_units_to_world(Vector2(transform.get("position", Vector2.ZERO)).x), "position_x")
@@ -10466,7 +9569,7 @@ func _on_weapon_frame_value_changed(value: float, property_name: String) -> void
 	if guide.is_empty() or not AssetGuide.is_weapon_frame(str(guide.get("guide_type", ""))):
 		return
 	_record_coalesced_change()
-	var transform: Dictionary = guide.get("transform", _default_component_transform())
+	var transform: Dictionary = guide.get("transform", WorldDocumentService.default_component_transform())
 	var frame_position := Vector2(transform.get("position", Vector2.ZERO))
 	if property_name == "position_x":
 		frame_position.x = _world_to_editor_units(value)
@@ -12139,7 +11242,7 @@ func _render_inspector() -> void:
 		inspector_content.add_child(asset_transform_grid)
 		_render_asset_root_scale_rebase_inspector(asset)
 		_render_asset_scale_rebase_inspector(asset)
-		var reference_image := _normalize_reference_image(asset.get("reference_image", {}))
+		var reference_image := WorldDocumentService.normalize_reference_image(asset.get("reference_image", {}))
 		inspector_content.add_child(_create_inspector_section("Reference Image"))
 		var reference_buttons := HBoxContainer.new()
 		var load_reference_button := Button.new()
@@ -12387,7 +11490,7 @@ func _render_inspector() -> void:
 	transform_grid.add_theme_constant_override("h_separation", 8)
 	transform_grid.add_theme_constant_override("v_separation", 4)
 	inspector_content.add_child(transform_grid)
-	var transform: Dictionary = component.get("transform", _default_component_transform())
+	var transform: Dictionary = component.get("transform", WorldDocumentService.default_component_transform())
 	var transform_position: Vector2 = transform.get("position", Vector2.ZERO)
 	var transform_scale: Vector2 = transform.get("scale", Vector2.ONE)
 	var pivot: Vector2 = transform.get("pivot", Vector2.ZERO)
@@ -14339,7 +13442,7 @@ func _on_transform_value_changed(value: float, property_name: String) -> void:
 	if component.is_empty():
 		return
 	_record_direct_change()
-	var transform: Dictionary = component.get("transform", _default_component_transform())
+	var transform: Dictionary = component.get("transform", WorldDocumentService.default_component_transform())
 	var transform_position: Vector2 = transform.get("position", Vector2.ZERO)
 	var transform_scale: Vector2 = transform.get("scale", Vector2.ONE)
 	var pivot: Vector2 = transform.get("pivot", Vector2.ZERO)
@@ -15389,7 +14492,7 @@ func _render_spine_canvas(asset: Dictionary, guide: Dictionary, drawing: bool) -
 	canvas_view.set_bezier_geometry(guide.get("points", []), guide.get("edges", []), guide.get("chains", []))
 	canvas_view.set_selected_point_ids(selected_point_ids)
 	if target_component.is_empty():
-		canvas_view.set_component_transform(_default_component_transform())
+		canvas_view.set_component_transform(WorldDocumentService.default_component_transform())
 	else:
 		var target_transform := _asset_preview_world_record(asset, ComponentHierarchy.world_transform_record(asset, target_component_id))
 		target_transform["visibility"] = bool(asset.get("visibility", true)) and bool(guide.get("visibility", true))
@@ -15453,7 +14556,7 @@ func _render_weapon_guide_canvas(asset: Dictionary, guide: Dictionary) -> void:
 
 
 func _set_reference_image_canvas(asset: Dictionary) -> void:
-	var reference_image := _normalize_reference_image(asset.get("reference_image", {}))
+	var reference_image := WorldDocumentService.normalize_reference_image(asset.get("reference_image", {}))
 	var reference_path := _reference_image_path(asset)
 	var reference_texture: Texture2D = null
 	if not reference_path.is_empty() and FileAccess.file_exists(ProjectSettings.globalize_path(reference_path)):
@@ -15555,7 +14658,7 @@ func _reference_asset_shapes(target_asset: Dictionary, reference: Dictionary, em
 		for source_point in source_component.get("points", []):
 			if source_point is Dictionary:
 				authored_points.append({"id": str(source_point.get("id", "")), "position": _transform_point(_transform_point(Vector2(source_point.get("position", Vector2.ZERO)), source_transform), reference_transform)})
-		result.append({"id": str(reference.get("id", "")), "points": points, "bezier_points": authored_points, "closed": PrimitiveGeometryService.has_analytic_shape(source_component) or BezierTopology.outer_chain_closed(source_component), "transform": _default_component_transform(), "visibility": bool(target_asset.get("visibility", true)) and bool(reference.get("visibility", true)), "z_index": int(reference.get("z_index", 0)), "emphasized": str(reference.get("id", "")) == emphasized_component_id, "topology_role": str(reference.get("topology_role", "outer"))})
+		result.append({"id": str(reference.get("id", "")), "points": points, "bezier_points": authored_points, "closed": PrimitiveGeometryService.has_analytic_shape(source_component) or BezierTopology.outer_chain_closed(source_component), "transform": WorldDocumentService.default_component_transform(), "visibility": bool(target_asset.get("visibility", true)) and bool(reference.get("visibility", true)), "z_index": int(reference.get("z_index", 0)), "emphasized": str(reference.get("id", "")) == emphasized_component_id, "topology_role": str(reference.get("topology_role", "outer"))})
 	return result
 
 
@@ -15699,7 +14802,7 @@ func _on_pivot_changed(pivot: Vector2) -> void:
 		if group.is_empty():
 			return
 		_record_coalesced_change()
-		var group_transform: Dictionary = group.get("transform", _default_component_transform())
+		var group_transform: Dictionary = group.get("transform", WorldDocumentService.default_component_transform())
 		group_transform["pivot"] = pivot
 		group["transform"] = group_transform
 		return
@@ -15707,7 +14810,7 @@ func _on_pivot_changed(pivot: Vector2) -> void:
 	if component.is_empty():
 		return
 	_record_coalesced_change()
-	var transform: Dictionary = component.get("transform", _default_component_transform())
+	var transform: Dictionary = component.get("transform", WorldDocumentService.default_component_transform())
 	transform["pivot"] = pivot
 	component["transform"] = transform
 
@@ -16091,21 +15194,16 @@ func _get_asset(asset_id: String) -> Dictionary:
 	return {}
 
 
-func _normalize_asset_type(value) -> String:
-	var normalized := str(value).strip_edges().to_lower()
-	return normalized if normalized in ["character", "props", "weapons", "terrain", "icon", "symbols"] else "character"
-
-
 func _asset_type(asset: Dictionary) -> String:
-	return _normalize_asset_type(asset.get("asset_type", "character"))
+	return WorldDocumentService.normalize_asset_type(asset.get("asset_type", "character"))
 
 
 func _create_submodule_asset_type(submodule: String) -> String:
-	return _normalize_asset_type(submodule)
+	return WorldDocumentService.normalize_asset_type(submodule)
 
 
 func _asset_type_create_submodule(asset_type: String) -> String:
-	match _normalize_asset_type(asset_type):
+	match WorldDocumentService.normalize_asset_type(asset_type):
 		"props":
 			return "Props"
 		"weapons":
@@ -16128,100 +15226,6 @@ func _ensure_asset_animation(asset: Dictionary) -> Dictionary:
 	return animation
 
 
-func _default_motion_path(path_id: String, path_name: String) -> Dictionary:
-	return {
-		"id": path_id,
-		"name": path_name,
-		"visibility": true,
-		"topology": MotionPathTopology.default_topology(),
-		"playback": {"duration": 2.0, "loop": true, "orient_along_path": false}
-	}
-
-
-func _normalize_motion_path(raw_path, fallback_id: String) -> Dictionary:
-	var source: Dictionary = raw_path if raw_path is Dictionary else {}
-	var result := _default_motion_path(str(source.get("id", fallback_id)), str(source.get("name", fallback_id)))
-	result["visibility"] = bool(source.get("visibility", true))
-	result["topology"] = MotionPathTopology.normalize(source.get("topology", {}))
-	if source.get("playback", {}) is Dictionary:
-		result["playback"].merge(source.get("playback", {}), true)
-	return result
-
-
-func _default_motion_act(act_id: String, act_name: String, primitive := MotionActEvaluator.SLIDE) -> Dictionary:
-	var resolved_primitive: String = primitive if primitive in MotionActEvaluator.PRIMITIVES else MotionActEvaluator.SLIDE
-	return {
-		"id": act_id,
-		"name": act_name,
-		"kind": MotionActEvaluator.KIND_PRIMITIVE,
-		"primitive": resolved_primitive,
-		"enabled": true,
-		"timing": {"duration": MotionActEvaluator.default_duration(resolved_primitive), "easing": MotionActEvaluator.EASE_IN_OUT},
-		"parameters": MotionActEvaluator.default_parameters(resolved_primitive)
-	}
-
-
-func _normalize_motion_act(raw_act, fallback_id: String) -> Dictionary:
-	var source: Dictionary = raw_act if raw_act is Dictionary else {}
-	var primitive := str(source.get("primitive", MotionActEvaluator.SLIDE))
-	if primitive not in MotionActEvaluator.PRIMITIVES:
-		primitive = MotionActEvaluator.SLIDE
-	var result := _default_motion_act(str(source.get("id", fallback_id)), str(source.get("name", MotionActEvaluator.primitive_label(primitive))), primitive)
-	result["enabled"] = bool(source.get("enabled", true))
-	var timing = source.get("timing", {})
-	if timing is Dictionary:
-		result["timing"]["duration"] = maxf(0.01, float(timing.get("duration", MotionActEvaluator.default_duration(primitive))))
-		var easing := str(timing.get("easing", MotionActEvaluator.EASE_IN_OUT))
-		result["timing"]["easing"] = easing if easing in MotionActEvaluator.EASING_OPTIONS else MotionActEvaluator.EASE_IN_OUT
-	var parameters = source.get("parameters", {})
-	if parameters is Dictionary:
-		if parameters.has("direction"):
-			result["parameters"]["direction"] = MotionActEvaluator._vector(parameters.get("direction"))
-		result["parameters"]["distance"] = maxf(0.0, float(parameters.get("distance", 4.0)))
-		if primitive == MotionActEvaluator.JUMP:
-			result["parameters"]["height"] = maxf(0.0, float(parameters.get("height", 3.0)))
-			var arc := str(parameters.get("arc", MotionActEvaluator.JUMP_ARC_SMOOTH))
-			result["parameters"]["arc"] = arc if arc in MotionActEvaluator.JUMP_ARC_OPTIONS else MotionActEvaluator.JUMP_ARC_SMOOTH
-		elif primitive == MotionActEvaluator.BLINK:
-			result["parameters"]["anticipation_distance"] = maxf(0.0, float(parameters.get("anticipation_distance", 1.0)))
-			var anticipation_share := float(parameters.get("anticipation_share", 0.5))
-			if int(source.get("schema_version", 0)) in range(1, 19) and is_equal_approx(anticipation_share, 0.18):
-				anticipation_share = 0.5
-			result["parameters"]["anticipation_share"] = clampf(anticipation_share, 0.01, 0.89)
-			result["parameters"]["minimum_scale"] = clampf(float(parameters.get("minimum_scale", 0.05)), 0.01, 1.0)
-	return result
-
-
-func _serialize_motion_act(act: Dictionary) -> Dictionary:
-	var normalized := _normalize_motion_act(act, str(act.get("id", "act")))
-	return {
-		"schema_version": SCHEMA_VERSION,
-		"id": str(normalized.get("id", "")),
-		"name": str(normalized.get("name", MotionActEvaluator.primitive_label(str(normalized.get("primitive", MotionActEvaluator.SLIDE))))),
-		"kind": MotionActEvaluator.KIND_PRIMITIVE,
-		"primitive": str(normalized.get("primitive", MotionActEvaluator.SLIDE)),
-		"enabled": bool(normalized.get("enabled", true)),
-		"timing": normalized.get("timing", {}).duplicate(true),
-		"parameters": _serialize_motion_act_parameters(normalized)
-	}
-
-
-func _serialize_motion_act_parameters(act: Dictionary) -> Dictionary:
-	var parameters: Dictionary = act.get("parameters", {})
-	var serialized := {
-		"direction": _serialize_vector(parameters.get("direction", Vector2.RIGHT)),
-		"distance": float(parameters.get("distance", 4.0))
-	}
-	if str(act.get("primitive", MotionActEvaluator.SLIDE)) == MotionActEvaluator.JUMP:
-		serialized["height"] = float(parameters.get("height", 3.0))
-		serialized["arc"] = str(parameters.get("arc", MotionActEvaluator.JUMP_ARC_SMOOTH))
-	elif str(act.get("primitive", MotionActEvaluator.SLIDE)) == MotionActEvaluator.BLINK:
-		serialized["anticipation_distance"] = float(parameters.get("anticipation_distance", 1.0))
-		serialized["anticipation_share"] = float(parameters.get("anticipation_share", 0.5))
-		serialized["minimum_scale"] = float(parameters.get("minimum_scale", 0.05))
-	return serialized
-
-
 func _get_motion_act(act_id: String) -> Dictionary:
 	for act in motion_acts:
 		if str(act.get("id", "")) == act_id:
@@ -16236,7 +15240,7 @@ func _add_motion_act(primitive: String) -> void:
 	var act_id := "act_%d" % next_motion_act_id
 	var act_name := "%s %02d" % [MotionActEvaluator.primitive_label(primitive), next_motion_act_id]
 	next_motion_act_id += 1
-	motion_acts.append(_default_motion_act(act_id, act_name, primitive))
+	motion_acts.append(WorldDocumentService.default_motion_act(act_id, act_name, primitive))
 	selected_motion_act_id = act_id
 	motion_act_phase = 0.0
 	motion_act_playing = false
@@ -16266,41 +15270,6 @@ func _select_motion_act(act_id: String) -> void:
 	_invalidate_render(RENDER_INSPECTOR)
 	_refresh_motion_act_workspace()
 	_invalidate_render(RENDER_CONTEXT_BAR)
-
-
-func _default_motion_sequence(sequence_id: String, sequence_name: String) -> Dictionary:
-	return {"id": sequence_id, "name": sequence_name, "visibility": true, "next_entry_index": 1, "entries": []}
-
-
-func _normalize_motion_sequence(raw_sequence, fallback_id: String) -> Dictionary:
-	var source: Dictionary = raw_sequence if raw_sequence is Dictionary else {}
-	var result := _default_motion_sequence(str(source.get("id", fallback_id)), str(source.get("name", fallback_id)))
-	result["visibility"] = bool(source.get("visibility", true))
-	var normalized_entries: Array = []
-	var raw_entries = source.get("entries", [])
-	if raw_entries is Array:
-		for raw_entry in raw_entries:
-			if not raw_entry is Dictionary:
-				continue
-			var entry_id := str(raw_entry.get("id", ""))
-			if entry_id.is_empty():
-				continue
-			normalized_entries.append({
-				"id": entry_id,
-				"name": str(raw_entry.get("name", "Composition Entry")),
-				"enabled": bool(raw_entry.get("enabled", true)),
-				"asset_id": str(raw_entry.get("asset_id", "")),
-				"animation_state_id": str(raw_entry.get("animation_state_id", "")),
-				"path_id": str(raw_entry.get("path_id", ""))
-			})
-	result["entries"] = normalized_entries
-	var inferred_next_entry_index := 1
-	for entry in normalized_entries:
-		var entry_id := str(entry.get("id", ""))
-		if entry_id.begins_with("entry_"):
-			inferred_next_entry_index = maxi(inferred_next_entry_index, entry_id.trim_prefix("entry_").to_int() + 1)
-	result["next_entry_index"] = maxi(inferred_next_entry_index, int(source.get("next_entry_index", inferred_next_entry_index)))
-	return result
 
 
 func _get_motion_path(path_id: String) -> Dictionary:
