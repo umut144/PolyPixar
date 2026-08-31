@@ -40,8 +40,8 @@ func _init() -> void:
 	_test_geometry_sampling_ui_shell()
 	_test_geometry_seeding_service()
 	_test_geometry_meshing_service_and_ui()
-	_test_geometry_uv_mapping_service_and_ui()
-	_test_geometry_sdf_service_and_batch()
+	_test_geometry_uv_mapping_service_and_legacy_records()
+	_test_geometry_sdf_service_and_legacy_records()
 	_test_component_names()
 	_test_component_clipboard()
 	_test_asset_catalog_service()
@@ -2328,7 +2328,7 @@ func _test_geometry_meshing_service_and_ui() -> void:
 	application.free()
 
 
-func _test_geometry_uv_mapping_service_and_ui() -> void:
+func _test_geometry_uv_mapping_service_and_legacy_records() -> void:
 	var component := _component()
 	component.merge({"id": "component_1", "name": "Body", "visibility": true})
 	for position in [Vector2.ZERO, Vector2(12.0, 0.0), Vector2(12.0, 8.0), Vector2(0.0, 8.0)]:
@@ -2370,67 +2370,14 @@ func _test_geometry_uv_mapping_service_and_ui() -> void:
 	_expect(serialized.get("uv_mapping", {}).get("bakes", {}).get(uv_key, {}).get("uvs", [])[0].get("uv", null) is Array, "UV Bake coordinates should serialize as JSON arrays.")
 	var normalized: Dictionary = application._normalize_geometry_document(serialized, "asset_1", "component_1")
 	_expect(normalized.get("uv_mapping", {}).get("bakes", {}).get(uv_key, {}).get("uvs", [])[0].get("uv", null) is Vector2, "UV Bake loading should restore normalized coordinates as Vector2 values.")
-	var test_assets: Array[Dictionary] = [{"id": "asset_1", "name": "Asset", "visibility": true, "components": [component], "guides": []}]
-	application.assets = test_assets
-	application.geometry_documents["asset_1/component_1"] = normalized
-	application._build_ui()
-	application.active_module = "Mesh"
-	application.active_geometry_submodule = "UV Mapping"
-	application.selected_asset_id = "asset_1"
-	application.selected_component_id = "component_1"
-	application.expanded_assets["asset_1"] = true
-	application._render_outliner()
-	application._render_inspector()
-	application._render_canvas_context()
-	_expect(application.geometry_uv_mapping_workspace.visible and application.inspector_content.get_child_count() >= 14, "UV Mapping should expose its dedicated split Workspace and compact Bounds / Planar Inspector.")
-	_expect(application._all_uv_update_candidates().is_empty(), "A current accepted UV Bake should leave the global UV batch empty.")
-	_expect(application._all_sdf_update_candidates().size() == 1, "A visible Component with current Mesh and UV Bakes should become an actionable SDF batch candidate.")
-	application._activate_geometry_uv_mapping_method_choice()
-	var active_style := application.geometry_uv_mapping_method_menu.get_theme_stylebox("normal") as StyleBoxFlat
-	_expect(application.active_context_command == "geometry.uv_mapping.method" and application.geometry_uv_mapping_method_choice_active and active_style != null and active_style.bg_color == Color("#8fd8f5"), "UV Mapping CMD+1 should use the shared exclusive Method state and highlight.")
-	application._set_geometry_uv_mapping_method(GeometryUVMappingService.BOUNDS_PLANAR)
-	_expect(application.selected_geometry_bake_method == uv_key and application._geometry_uv_mapping_status("asset_1", "component_1", component) == "Baked", "Selecting Bounds / Planar should select the matching Mesh-specific UV Bake.")
-	application._on_geometry_uv_mapping_checker_overlay_changed(false)
-	_expect(not application.geometry_uv_mapping_checker_overlay and not application.geometry_uv_mapping_workspace.checker_overlay_enabled, "UV Checker Overlay should be a live editor-only preview toggle without changing the UV Bake.")
-	application._on_geometry_uv_mapping_checker_overlay_changed(true)
-	_expect(application.geometry_uv_mapping_checker_overlay and application.geometry_uv_mapping_workspace.checker_overlay_enabled, "UV Checker Overlay should default back to the active mapped-Mesh debug preview.")
-	application._set_geometry_uv_mapping_mesh_source(GeometryMeshingService.CONSTRAINED_MESH)
-	var scale_input := SpinBox.new()
-	scale_input.min_value = GeometryUVMappingService.MIN_SCALE
-	scale_input.max_value = 100.0
-	application._commit_geometry_uv_mapping_float_text("1,25", scale_input, "scale")
-	_expect(is_equal_approx(float(application._geometry_uv_mapping_recipe("asset_1", "component_1").get("parameters", {}).get("scale", 0.0)), 1.25), "UV numeric fields should accept comma-decimal direct input and update the Recipe.")
-	_expect(application._geometry_uv_mapping_status("asset_1", "component_1", component) == "Stale" and application._all_uv_update_candidates().size() == 1, "Changing a UV recipe should make its accepted Bake stale and actionable without changing the Component Mesh.")
-	normalized["uv_mapping"]["recipe"] = GeometryUVMappingService.normalize_recipe(recipe)
-	normalized["meshing"]["bakes"][GeometryMeshingService.CONSTRAINED_MESH]["vertices"][0]["position"] += Vector2(0.1, 0.0)
-	_expect(application._geometry_uv_mapping_status("asset_1", "component_1", component) == "Mesh Required / Stale", "Changing the accepted Component Mesh should block UV use without changing Component topology.")
-	scale_input.free()
+	# UV Mapping has no authoring surface any more. Schema 37 records stay
+	# readable Legacy data, so a load/save round trip must return them unchanged.
+	var round_trip: Dictionary = application._normalize_geometry_document(application._serialize_geometry_document(normalized), "asset_1", "component_1")
+	_expect(JSON.stringify(application._serialize_geometry_document(round_trip)) == JSON.stringify(serialized), "A legacy UV Bake must survive a load and save round trip unchanged.")
 	application.free()
-	var ribbon := _component()
-	ribbon.merge({"id": "component_contour", "name": "ArmLine", "draw_mode": "contour", "visibility": true})
-	BezierTopology.add_point(ribbon, Vector2.ZERO, "linear")
-	BezierTopology.add_point(ribbon, Vector2(0.0, 8.0), "linear")
-	var contour_mesh := ContourMeshService.generate(ribbon)
-	contour_mesh["bake_id"] = "mesh_contour_uv_test"
-	var contour_application: Control = application_script.new()
-	var contour_document: Dictionary = contour_application._default_geometry_document("asset_contour", "component_contour")
-	contour_document["meshing"]["bakes"][ContourMeshService.METHOD] = contour_mesh
-	contour_document["component_mesh"] = {"bake_id": "mesh_contour_uv_test", "method": ContourMeshService.METHOD, "mesh_fingerprint": GeometryUVMappingService.mesh_fingerprint(contour_mesh)}
-	var contour_assets: Array[Dictionary] = [{"id": "asset_contour", "name": "Wizard", "visibility": true, "components": [ribbon], "guides": []}]
-	contour_application.assets = contour_assets
-	contour_application.geometry_documents["asset_contour/component_contour"] = contour_document
-	_expect(contour_application._all_uv_update_candidates() == [{"asset_id": "asset_contour", "component_id": "component_contour"}], "The UV batch should include a visible Contour with a current accepted Component Mesh.")
-	var contour_build: Dictionary = contour_application._generate_component_uv_build("asset_contour", "component_contour")
-	_expect(bool(contour_build.get("valid", false)) and str(contour_build.get("result", {}).get("mesh_method", "")) == ContourMeshService.METHOD, "Automatic UV generation should consume the accepted Contour Stroke Component Mesh without a manual source choice.")
-	contour_application._commit_component_uv_build("asset_contour", "component_contour", contour_build)
-	_expect(contour_application._all_uv_update_candidates().is_empty() and contour_application._geometry_uv_mapping_status("asset_contour", "component_contour", ribbon) == "Baked", "Committing an automatic Contour UV Bake should clear its actionable batch state.")
-	ribbon["visibility"] = false
-	contour_document["uv_mapping"]["bakes"].clear()
-	_expect(contour_application._all_uv_update_candidates().is_empty(), "The UV batch should not mutate hidden Components.")
-	contour_application.free()
 
 
-func _test_geometry_sdf_service_and_batch() -> void:
+func _test_geometry_sdf_service_and_legacy_records() -> void:
 	var mesh := {
 		"valid": true,
 		"bake_id": "mesh_sdf_test",
@@ -2493,14 +2440,27 @@ func _test_geometry_sdf_service_and_batch() -> void:
 	var assets: Array[Dictionary] = [{"id": "asset_sdf", "name": "Wizard", "visibility": true, "components": [ribbon], "guides": []}]
 	application.assets = assets
 	application.geometry_documents["asset_sdf/component_sdf"] = document
-	_expect(application._all_sdf_update_candidates() == [{"asset_id": "asset_sdf", "component_id": "component_sdf"}] and application._sdf_batch_summary(application._all_sdf_update_candidates()).get("attention", []).is_empty(), "A superseded validation failure should become actionable again without leaving a stale attention warning.")
-	var build: Dictionary = application._generate_component_sdf_build("asset_sdf", "component_sdf")
-	_expect(bool(build.get("valid", false)) and application._commit_component_sdf_build("asset_sdf", "component_sdf", build), "The SDF batch should generate and atomically accept a Contour contour image.")
-	_expect(application._sdf_status("asset_sdf", "component_sdf", ribbon) == "Baked" and application._all_sdf_update_candidates().is_empty(), "A current accepted SDF resource should clear the actionable batch state.")
-	var round_trip: Dictionary = application._normalize_geometry_document(application._serialize_geometry_document(document), "asset_sdf", "component_sdf")
-	_expect(str(round_trip.get("sdf", {}).get("bake", {}).get("pixel_hash", "")) == str(document.get("sdf", {}).get("bake", {}).get("pixel_hash", "")) and not round_trip.get("sdf", {}).get("bake", {}).has("image"), "SDF metadata should survive Geometry persistence without embedding image pixels into JSON.")
-	document["uv_mapping"]["bakes"][GeometryUVMappingService.bake_key(ContourMeshService.METHOD, GeometryUVMappingService.BOUNDS_PLANAR)]["uvs"][0]["uv"] += Vector2(0.001, 0.0)
-	_expect(application._sdf_status("asset_sdf", "component_sdf", ribbon) == "Stale" and application._all_sdf_update_candidates().size() == 1, "Changing accepted UV coordinates should make the dependent SDF stale without mutating Mesh or Component topology.")
+	# SDF has no authoring surface any more. Schema 37 records stay readable
+	# Legacy data, so an accepted Bake must survive load and save unchanged and
+	# must not be reinterpreted on the way.
+	document["sdf"]["bake"] = {
+		"valid": true,
+		"bake_id": "sdf_legacy_bake",
+		"method": GeometrySDFService.SINGLE_CHANNEL_SDF,
+		"algorithm_version": 1,
+		"parameters": GeometrySDFService.default_recipe()["parameters"],
+		"resolution": [256, 256],
+		"image_path": "contour_sdf.png",
+		"pixel_hash": "legacyhash",
+		"source_fingerprint": GeometrySDFService.source_fingerprint(contour_mesh, contour_uv, document["sdf"]["recipe"]),
+		"boundary_value": 0.5,
+		"inside_is_high": true
+	}
+	var serialized: Dictionary = application._serialize_geometry_document(document)
+	_expect(str(serialized.get("sdf", {}).get("bake", {}).get("image_path", "")) == "contour_sdf.png" and not serialized.get("sdf", {}).get("bake", {}).has("image"), "A serialized SDF Bake should keep its relative image reference and carry no pixel data.")
+	var round_trip: Dictionary = application._normalize_geometry_document(serialized, "asset_sdf", "component_sdf")
+	_expect(str(round_trip.get("sdf", {}).get("bake", {}).get("pixel_hash", "")) == "legacyhash", "Loading a legacy SDF Bake must preserve its pixel hash.")
+	_expect(JSON.stringify(application._serialize_geometry_document(round_trip)) == JSON.stringify(serialized), "A legacy SDF Bake must survive a load and save round trip unchanged.")
 	application.free()
 
 

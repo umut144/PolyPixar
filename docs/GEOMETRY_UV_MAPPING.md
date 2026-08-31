@@ -1,11 +1,15 @@
 # PolyTools – Geometry UV Mapping
 
 **Status:** Legacy derived-data contract. Runtime Manifest schema 4 and active
-Build All do not consume UV or SDF data.
+Build All do not consume UV or SDF data, and the authoring surface described
+below no longer exists: the `Geometry → UV Mapping` Workspace, its Inspector,
+and the `Update UVs (N)` and `Update SDFs (N)` batches have been removed.
 
-The services and existing Bakes described below remain readable for possible
-future effects and masks. Their former batch/export role is historical; no
-missing UV or SDF is actionable in the active pipeline.
+What remains is `GeometryUVMappingService`, `GeometrySDFService`, and the
+document normalization and serialization for their records. Existing Bakes and
+`contour_sdf.png` files stay readable and survive a load/save round trip
+unchanged; nothing generates new ones. The sections below therefore describe
+the recorded data and the service contracts, not a reachable workflow.
 
 ## Observable result
 

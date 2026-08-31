@@ -274,18 +274,22 @@ well-shaped normalized UV Triangles as degenerate. Its failure-retry signature
 is versioned independently from the pixel algorithm, allowing repaired
 validation failures to retry without invalidating every accepted SDF image.
 Runtime Manifest schema 4 later retires UV/SDF from the active build and
-package path. These services and records remain readable Legacy data and are
-not deleted or reinterpreted.
+package path, and the UV Mapping Workspace, Inspector, and the `Update UVs (N)`
+and `Update SDFs (N)` batches have since been removed. What remains is the
+Legacy data path: `GeometryUVMappingService` and `GeometrySDFService` plus the
+document normalization and serialization for their records. Existing UV and SDF
+Bakes and their `contour_sdf.png` files load, round-trip, and save unchanged;
+nothing generates new ones and nothing deletes or reinterprets the old ones.
 
 Schema 38 adds the Component-level `semantic_role` field. It retires the
 standalone Godot-scene Export workspace in favor of the persistent
 `Export Runtime (N)` batch, which automatically considers every visible Asset.
-The Mesh, UV, SDF, and Runtime Export batch tooltips share compact `Pending` and
+The Mesh and Runtime Export batch tooltips share compact `Pending` and
 `Needs attention` sections so blocked records remain discoverable without being
 treated as executable derived-build candidates. `BatchStatusButton` consumes
 the same summary and draws a per-Button attention point independently of the
 Button's enabled state; it never maintains a separate warning flag.
-All four Buttons consume one UI-only Batch-status snapshot. Selection and
+Both Buttons consume one UI-only Batch-status snapshot. Selection and
 render-only changes reuse it; document mutations invalidate it and coalesced
 edits refresh it after a short debounce. Batch execution never trusts the UI
 cache and recomputes authoritative candidates before mutating derived data.

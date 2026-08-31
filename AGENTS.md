@@ -28,6 +28,11 @@ Run both commands after geometry changes:
 Also run `git diff --check`. Files below `worlds/` are user data and must
 not be rewritten as test fixtures.
 
+A `SCRIPT ERROR` in the test output is a failure even when the runner prints
+`All PolyTools tests passed`: a runtime error aborts that test function, so its
+remaining assertions never run and never increment the failure count. CI fails
+the job on any such line.
+
 ## Commits
 
 After every change, create a Git commit automatically with a concise,

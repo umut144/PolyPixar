@@ -99,8 +99,19 @@ verify:
     - echo "── Native CDT smoke test ──"
     - "$GODOT --headless --path . -s res://tests/native_cdt_smoke.gd"
 
+    # A runtime error inside a test aborts that test function and returns to the
+    # runner, which never learns that its remaining assertions did not run. The
+    # suite would report success. Fail on any SCRIPT ERROR as well as on the
+    # runner's own exit code.
     - echo "── Test suite ──"
-    - "$GODOT --headless --path . -s res://tests/run_tests.gd"
+    - |
+      set -o pipefail
+      "$GODOT" --headless --path . -s res://tests/run_tests.gd 2>&1 | tee /tmp/tests.log
+      if grep -q "SCRIPT ERROR" /tmp/tests.log; then
+        echo "A test aborted on a runtime error; its remaining assertions never ran."
+        grep "SCRIPT ERROR" /tmp/tests.log
+        exit 1
+      fi
 
     - echo "── Whitespace ──"
     - |

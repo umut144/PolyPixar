@@ -72,9 +72,6 @@ var geometry_meshing_preview_state := "idle"
 var geometry_meshing_preview_revision := 0
 var geometry_meshing_bake_button: Button
 var geometry_meshing_advanced_relaxation_expanded := false
-var geometry_uv_mapping_preview: Dictionary = {}
-var geometry_uv_mapping_preview_key := ""
-var geometry_uv_mapping_checker_overlay := true
 var sdf_images: Dictionary = {}
 var sdf_resource_validation_cache: Dictionary = {}
 var batch_status_snapshot: Dictionary = {}
@@ -210,11 +207,8 @@ var geometry_seeding_method_choice_active := false
 var geometry_meshing_workspace: GeometryMeshingWorkspace
 var geometry_meshing_method_menu: MenuButton
 var geometry_meshing_method_choice_active := false
-var geometry_uv_mapping_workspace: GeometryUVMappingWorkspace
 var weighting_workspace: WeightingWorkspace
 var weighting_method_menu: MenuButton
-var geometry_uv_mapping_method_menu: MenuButton
-var geometry_uv_mapping_method_choice_active := false
 var selected_geometry_bake_method := ""
 var geometry_seeding_replace_dialog: ConfirmationDialog
 var guide_remove_dialog: ConfirmationDialog
@@ -286,10 +280,6 @@ var world_contour_stroke_width_field: SpinBox
 var world_scale_summary_label: Label
 var update_meshes_button: BatchStatusButton
 var mesh_batch_running := false
-var update_uvs_button: BatchStatusButton
-var uv_batch_running := false
-var update_sdfs_button: BatchStatusButton
-var sdf_batch_running := false
 var runtime_export_button: BatchStatusButton
 var runtime_export_batch_running := false
 var world_name := ""
@@ -498,18 +488,6 @@ func _unhandled_key_input(event: InputEvent) -> void:
 					geometry_seeding_workspace.delete_selected_seed()
 				get_viewport().set_input_as_handled()
 				return
-	if active_module == "Mesh" and active_geometry_submodule == "UV Mapping" and event.keycode == KEY_1:
-		var uv_focus_owner := get_viewport().gui_get_focus_owner()
-		if uv_focus_owner is LineEdit or uv_focus_owner is TextEdit or uv_focus_owner is SpinBox:
-			return
-		if has_command_modifier:
-			_activate_geometry_uv_mapping_method_choice()
-			get_viewport().set_input_as_handled()
-			return
-		if geometry_uv_mapping_method_choice_active:
-			_set_geometry_uv_mapping_method(GeometryUVMappingService.BOUNDS_PLANAR)
-			get_viewport().set_input_as_handled()
-			return
 	if not has_command_modifier and (event.keycode == KEY_BACKSPACE or event.keycode == KEY_DELETE) and active_state == "edit" and active_edit_mode == "point" and not selected_point_ids.is_empty():
 		if selected_point_ids.size() == 1:
 			_on_bezier_point_delete_requested(selected_point_ids[0])
@@ -698,7 +676,6 @@ func _set_geometry_command_state(state: String) -> void:
 	geometry_seeding_method_choice_active = state == "seeding_method"
 	geometry_seeding_edit_active = state == "seeding_edit"
 	geometry_meshing_method_choice_active = state == "meshing_method"
-	geometry_uv_mapping_method_choice_active = state == "uv_mapping_method"
 	if state == "sampling_method":
 		_set_active_context_command("geometry.sampling.method")
 	elif state == "seeding_method":
@@ -707,8 +684,6 @@ func _set_geometry_command_state(state: String) -> void:
 		_set_active_context_command("geometry.seeding.edit_seeds")
 	elif state == "meshing_method":
 		_set_active_context_command("geometry.meshing.method")
-	elif state == "uv_mapping_method":
-		_set_active_context_command("geometry.uv_mapping.method")
 	elif active_context_command.begins_with("geometry."):
 		_set_active_context_command("")
 	if not geometry_seeding_edit_active:
@@ -861,20 +836,6 @@ func _build_ui() -> void:
 	update_meshes_button.focus_mode = Control.FOCUS_NONE
 	update_meshes_button.disabled = true
 	update_meshes_button.pressed.connect(_on_update_meshes_pressed)
-	update_uvs_button = BatchStatusButton.new()
-	update_uvs_button.text = "Update UVs (0)"
-	update_uvs_button.tooltip_text = "All UVs current"
-	update_uvs_button.custom_minimum_size = Vector2(132, 32)
-	update_uvs_button.focus_mode = Control.FOCUS_NONE
-	update_uvs_button.disabled = true
-	update_uvs_button.pressed.connect(_on_update_uvs_pressed)
-	update_sdfs_button = BatchStatusButton.new()
-	update_sdfs_button.text = "Update SDFs (0)"
-	update_sdfs_button.tooltip_text = "All SDFs current"
-	update_sdfs_button.custom_minimum_size = Vector2(140, 32)
-	update_sdfs_button.focus_mode = Control.FOCUS_NONE
-	update_sdfs_button.disabled = true
-	update_sdfs_button.pressed.connect(_on_update_sdfs_pressed)
 	runtime_export_button = BatchStatusButton.new()
 	runtime_export_button.text = "Export Runtime (0)"
 	runtime_export_button.tooltip_text = "No pending runtime exports"
@@ -1032,7 +993,6 @@ func _build_ui() -> void:
 	_create_geometry_sampling_workspace(canvas_panel)
 	_create_geometry_seeding_workspace(canvas_panel)
 	_create_geometry_meshing_workspace(canvas_panel)
-	_create_geometry_uv_mapping_workspace(canvas_panel)
 	_create_weighting_workspace(canvas_panel)
 	canvas_context_label = Label.new()
 	canvas_context_label.position = Vector2(8, 6)
@@ -1168,13 +1128,6 @@ func _create_geometry_meshing_workspace(parent: Control) -> void:
 	geometry_meshing_workspace.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	geometry_meshing_workspace.visible = false
 	parent.add_child(geometry_meshing_workspace)
-
-
-func _create_geometry_uv_mapping_workspace(parent: Control) -> void:
-	geometry_uv_mapping_workspace = GeometryUVMappingWorkspace.new()
-	geometry_uv_mapping_workspace.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	geometry_uv_mapping_workspace.visible = false
-	parent.add_child(geometry_uv_mapping_workspace)
 
 
 func _create_weighting_workspace(parent: Control) -> void:
@@ -3586,33 +3539,6 @@ func _sdf_image_path(asset: Dictionary, component_id: String) -> String:
 	return "%s/%s/geometry/%s/%s/contour_sdf.png" % [WORLDS_ROOT, world_name, _asset_storage_name(asset), component_id]
 
 
-func _sdf_resource_available(asset_id: String, component_id: String) -> bool:
-	var key := _geometry_document_key(asset_id, component_id)
-	var bake := _sdf_bake(asset_id, component_id)
-	var resolution: Array = bake.get("resolution", [])
-	var expected_width := int(resolution[0]) if resolution.size() == 2 else 0
-	var expected_height := int(resolution[1]) if resolution.size() == 2 else 0
-	var expected_hash := str(bake.get("pixel_hash", ""))
-	if sdf_images.has(key) and sdf_images[key] is Image:
-		var transient_image: Image = sdf_images[key]
-		return not transient_image.is_empty() and transient_image.get_format() == Image.FORMAT_L8 \
-			and transient_image.get_width() == expected_width and transient_image.get_height() == expected_height \
-			and GeometrySDFService.image_pixel_hash(transient_image) == expected_hash
-	var path := _sdf_image_path(_get_asset(asset_id), component_id)
-	if path.is_empty() or not FileAccess.file_exists(path):
-		return false
-	var modified_time := FileAccess.get_modified_time(path)
-	var cache_key := "%s|%d|%d|%d|%s" % [path, modified_time, expected_width, expected_height, expected_hash]
-	if sdf_resource_validation_cache.has(cache_key):
-		return bool(sdf_resource_validation_cache[cache_key])
-	var image := Image.load_from_file(path)
-	var valid := image != null and not image.is_empty() and image.get_format() == Image.FORMAT_L8 \
-		and image.get_width() == expected_width and image.get_height() == expected_height \
-		and GeometrySDFService.image_pixel_hash(image) == expected_hash
-	sdf_resource_validation_cache[cache_key] = valid
-	return valid
-
-
 func _save_sdf_image(asset: Dictionary, component_id: String) -> Error:
 	var key := _geometry_document_key(str(asset.get("id", "")), component_id)
 	if not sdf_images.has(key) or not sdf_images[key] is Image:
@@ -4804,7 +4730,7 @@ func _refresh_batch_status_snapshot() -> void:
 func _update_meshes_button() -> void:
 	if not is_instance_valid(update_meshes_button):
 		return
-	if mesh_batch_running or uv_batch_running or sdf_batch_running or runtime_export_batch_running:
+	if mesh_batch_running or runtime_export_batch_running:
 		return
 	var status: Dictionary = _batch_status_snapshot().get("mesh", {})
 	var candidates: Array = status.get("candidates", [])
@@ -4816,46 +4742,6 @@ func _update_meshes_button() -> void:
 	update_meshes_button.disabled = count == 0
 
 
-func _component_uv_needs_update(asset_id: String, component: Dictionary) -> bool:
-	var asset := _get_asset(asset_id)
-	if asset.is_empty() or not bool(asset.get("visibility", true)) or not bool(component.get("visibility", true)):
-		return false
-	var component_id := str(component.get("id", ""))
-	if component_id.is_empty() or _component_mesh_status(asset_id, component_id, component) != "Ready":
-		return false
-	var mesh := _component_mesh_bake(asset_id, component_id)
-	var recipe := _resolved_geometry_uv_mapping_recipe(asset_id, component_id)
-	var fingerprint := GeometryUVMappingService.source_fingerprint(mesh, recipe)
-	var document := _get_geometry_document(asset_id, component_id)
-	if str(document.get("uv_mapping", {}).get("last_failure_fingerprint", "")) == fingerprint:
-		return false
-	return not GeometryUVMappingService.result_matches(_geometry_uv_mapping_bake(asset_id, component_id), mesh, recipe)
-
-
-func _all_uv_update_candidates() -> Array[Dictionary]:
-	var result: Array[Dictionary] = []
-	for asset in assets:
-		if not asset is Dictionary:
-			continue
-		var asset_id := str(asset.get("id", ""))
-		for component in asset.get("components", []):
-			if component is Dictionary and not _is_region(component) and _component_uv_needs_update(asset_id, component):
-				result.append({"asset_id": asset_id, "component_id": str(component.get("id", ""))})
-	return result
-
-
-func _update_uvs_button() -> void:
-	if not is_instance_valid(update_uvs_button) or mesh_batch_running or uv_batch_running or sdf_batch_running or runtime_export_batch_running:
-		return
-	var status: Dictionary = _batch_status_snapshot().get("uv", {})
-	var candidates: Array = status.get("candidates", [])
-	var summary: Dictionary = status.get("summary", {})
-	update_uvs_button.text = "Update UVs (%d)" % candidates.size()
-	update_uvs_button.tooltip_text = _batch_summary_tooltip(summary, "All UVs current")
-	update_uvs_button.set_attention_count(summary.get("attention", PackedStringArray()).size())
-	update_uvs_button.disabled = candidates.is_empty()
-
-
 func _sdf_recipe(asset_id: String, component_id: String) -> Dictionary:
 	var document := _get_geometry_document(asset_id, component_id)
 	return GeometrySDFService.normalize_recipe(document.get("sdf", {}).get("recipe", {})) if not document.is_empty() else GeometrySDFService.default_recipe()
@@ -4864,74 +4750,6 @@ func _sdf_recipe(asset_id: String, component_id: String) -> Dictionary:
 func _sdf_bake(asset_id: String, component_id: String) -> Dictionary:
 	var document := _get_geometry_document(asset_id, component_id)
 	return document.get("sdf", {}).get("bake", {}) if not document.is_empty() else {}
-
-
-func _sdf_inputs(asset_id: String, component_id: String) -> Dictionary:
-	return {
-		"mesh": _component_mesh_bake(asset_id, component_id),
-		"uv": _geometry_uv_mapping_bake(asset_id, component_id)
-	}
-
-
-func _sdf_status(asset_id: String, component_id: String, component: Dictionary) -> String:
-	if component.is_empty() or _component_mesh_status(asset_id, component_id, component) != "Ready":
-		return "Component Mesh Required / Stale"
-	var uv := _geometry_uv_mapping_bake(asset_id, component_id)
-	if not _geometry_uv_mapping_bake_is_current(asset_id, component_id, component, uv):
-		return "UV Bake Required / Stale"
-	var inputs := _sdf_inputs(asset_id, component_id)
-	var bake := _sdf_bake(asset_id, component_id)
-	if bake.is_empty():
-		return "Not Generated"
-	if not GeometrySDFService.result_matches(bake, inputs["mesh"], inputs["uv"], _sdf_recipe(asset_id, component_id)):
-		return "Stale"
-	return "Baked" if _sdf_resource_available(asset_id, component_id) else "Resource Missing"
-
-
-func _component_sdf_needs_update(asset_id: String, component: Dictionary) -> bool:
-	var asset := _get_asset(asset_id)
-	if asset.is_empty() or not bool(asset.get("visibility", true)) or not bool(component.get("visibility", true)):
-		return false
-	var component_id := str(component.get("id", ""))
-	if component_id.is_empty() or _component_mesh_status(asset_id, component_id, component) != "Ready":
-		return false
-	var uv := _geometry_uv_mapping_bake(asset_id, component_id)
-	if not _geometry_uv_mapping_bake_is_current(asset_id, component_id, component, uv):
-		return false
-	var mesh := _component_mesh_bake(asset_id, component_id)
-	var recipe := _sdf_recipe(asset_id, component_id)
-	var fingerprint := GeometrySDFService.failure_fingerprint(mesh, uv, recipe)
-	var document := _get_geometry_document(asset_id, component_id)
-	if str(document.get("sdf", {}).get("last_failure_fingerprint", "")) == fingerprint:
-		return false
-	return not GeometrySDFService.result_matches(_sdf_bake(asset_id, component_id), mesh, uv, recipe) \
-		or not _sdf_resource_available(asset_id, component_id)
-
-
-func _all_sdf_update_candidates() -> Array[Dictionary]:
-	var result: Array[Dictionary] = []
-	for asset in assets:
-		if not asset is Dictionary:
-			continue
-		var asset_id := str(asset.get("id", ""))
-		for component in asset.get("components", []):
-			if component is Dictionary and not _is_region(component) and _component_sdf_needs_update(asset_id, component):
-				result.append({"asset_id": asset_id, "component_id": str(component.get("id", ""))})
-	return result
-
-
-func _update_sdfs_button() -> void:
-	if not is_instance_valid(update_sdfs_button) or mesh_batch_running or uv_batch_running or sdf_batch_running or runtime_export_batch_running:
-		return
-	var status: Dictionary = _batch_status_snapshot().get("sdf", {})
-	var candidates: Array = status.get("candidates", [])
-	var summary: Dictionary = status.get("summary", {})
-	update_sdfs_button.text = "Update SDFs (%d)" % candidates.size()
-	update_sdfs_button.tooltip_text = _batch_summary_tooltip(summary, "All SDFs current")
-	update_sdfs_button.set_attention_count(summary.get("attention", PackedStringArray()).size())
-	update_sdfs_button.disabled = candidates.is_empty()
-
-
 
 
 func _batch_tooltip(pending: PackedStringArray, attention: PackedStringArray, current_message: String) -> String:
@@ -4984,59 +4802,6 @@ func _mesh_batch_summary(candidates: Array[Dictionary]) -> Dictionary:
 
 func _mesh_update_candidates_tooltip(candidates: Array[Dictionary]) -> String:
 	return _batch_summary_tooltip(_mesh_batch_summary(candidates), "All Meshes current")
-
-
-func _uv_batch_summary(candidates: Array[Dictionary]) -> Dictionary:
-	var attention := PackedStringArray()
-	for asset in assets:
-		if not asset is Dictionary or not bool(asset.get("visibility", true)):
-			continue
-		var asset_id := str(asset.get("id", ""))
-		for component in asset.get("components", []):
-			if not component is Dictionary or not bool(component.get("visibility", true)) or _is_reference_component(component) or _is_region(component):
-				continue
-			var component_id := str(component.get("id", ""))
-			var reason := ""
-			if _component_mesh_status(asset_id, component_id, component) != "Ready":
-				reason = "Current Component Mesh required"
-			else:
-				reason = str(_get_geometry_document(asset_id, component_id).get("uv_mapping", {}).get("last_error", ""))
-			if not reason.is_empty():
-				attention.append("%s / %s — %s" % [str(asset.get("name", "Asset")), str(component.get("name", "Component")), reason])
-	return {"pending": _candidate_tooltip_lines(candidates), "attention": attention}
-
-
-func _uv_update_candidates_tooltip(candidates: Array[Dictionary]) -> String:
-	return _batch_summary_tooltip(_uv_batch_summary(candidates), "All UVs current")
-
-
-func _sdf_batch_summary(candidates: Array[Dictionary]) -> Dictionary:
-	var attention := PackedStringArray()
-	for asset in assets:
-		if not asset is Dictionary or not bool(asset.get("visibility", true)):
-			continue
-		var asset_id := str(asset.get("id", ""))
-		for component in asset.get("components", []):
-			if not component is Dictionary or not bool(component.get("visibility", true)) or _is_reference_component(component) or _is_region(component):
-				continue
-			var component_id := str(component.get("id", ""))
-			var reason := ""
-			if _component_mesh_status(asset_id, component_id, component) != "Ready":
-				reason = "Current Component Mesh required"
-			elif not _geometry_uv_mapping_bake_is_current(asset_id, component_id, component, _geometry_uv_mapping_bake(asset_id, component_id)):
-				reason = "Current UV Bake required"
-			else:
-				var sdf_document: Dictionary = _get_geometry_document(asset_id, component_id).get("sdf", {})
-				var current_failure_fingerprint := GeometrySDFService.failure_fingerprint(_component_mesh_bake(asset_id, component_id), _geometry_uv_mapping_bake(asset_id, component_id), _sdf_recipe(asset_id, component_id))
-				if str(sdf_document.get("last_failure_fingerprint", "")) == current_failure_fingerprint:
-					reason = str(sdf_document.get("last_error", ""))
-			if not reason.is_empty():
-				attention.append("%s / %s — %s" % [str(asset.get("name", "Asset")), str(component.get("name", "Component")), reason])
-	return {"pending": _candidate_tooltip_lines(candidates), "attention": attention}
-
-
-func _sdf_update_candidates_tooltip(candidates: Array[Dictionary]) -> String:
-	return _batch_summary_tooltip(_sdf_batch_summary(candidates), "All SDFs current")
 
 
 func _generate_component_mesh_build(asset_id: String, component_id: String) -> Dictionary:
@@ -5267,7 +5032,7 @@ func _record_component_mesh_failure(asset_id: String, component_id: String, buil
 
 
 func _on_update_meshes_pressed() -> void:
-	if mesh_batch_running or uv_batch_running or sdf_batch_running or runtime_export_batch_running:
+	if mesh_batch_running or runtime_export_batch_running:
 		return
 	var candidates := _all_mesh_update_candidates()
 	if candidates.is_empty():
@@ -5275,8 +5040,6 @@ func _on_update_meshes_pressed() -> void:
 		return
 	mesh_batch_running = true
 	update_meshes_button.tooltip_text = _mesh_update_candidates_tooltip(candidates)
-	update_uvs_button.disabled = true
-	update_sdfs_button.disabled = true
 	var succeeded := 0
 	var failed := 0
 	var history_recorded := false
@@ -5308,180 +5071,6 @@ func _on_update_meshes_pressed() -> void:
 	_save_world()
 	_refresh_export_preflight(true)
 	_show_status_message("Updated %d Mesh%s%s" % [succeeded, "" if succeeded == 1 else "es", " · %d need attention" % failed if failed > 0 else ""])
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
-
-
-func _generate_component_uv_build(asset_id: String, component_id: String) -> Dictionary:
-	var component := _get_component(_get_asset(asset_id), component_id)
-	if component.is_empty() or _component_mesh_status(asset_id, component_id, component) != "Ready":
-		return {"valid": false, "errors": ["UV Mapping requires a current accepted Component Mesh."]}
-	var mesh := _component_mesh_bake(asset_id, component_id)
-	var recipe := _resolved_geometry_uv_mapping_recipe(asset_id, component_id)
-	var result := GeometryUVMappingService.generate(mesh, recipe)
-	return {
-		"valid": bool(result.get("valid", false)),
-		"errors": result.get("errors", []).duplicate(),
-		"recipe": recipe,
-		"result": result,
-		"source_fingerprint": GeometryUVMappingService.source_fingerprint(mesh, recipe)
-	}
-
-
-func _commit_component_uv_build(asset_id: String, component_id: String, build: Dictionary) -> void:
-	var document := _mutable_geometry_document(asset_id, component_id)
-	var result: Dictionary = build.get("result", {}).duplicate(true)
-	result["bake_id"] = "uv_bake_%d" % ResourceUID.create_id()
-	var recipe := GeometryUVMappingService.normalize_recipe(build.get("recipe", {}))
-	var key := GeometryUVMappingService.bake_key(str(result.get("mesh_method", "")), str(result.get("method", "")))
-	document["uv_mapping"]["recipe"] = recipe
-	document["uv_mapping"]["bakes"][key] = result
-	document["uv_mapping"]["last_error"] = ""
-	document["uv_mapping"]["last_failure_fingerprint"] = ""
-
-
-func _record_component_uv_failure(asset_id: String, component_id: String, build: Dictionary) -> void:
-	var document := _mutable_geometry_document(asset_id, component_id)
-	var errors: Array = build.get("errors", [])
-	document["uv_mapping"]["last_error"] = str(errors[0]) if not errors.is_empty() else "Automatic UV generation failed."
-	document["uv_mapping"]["last_failure_fingerprint"] = str(build.get("source_fingerprint", ""))
-
-
-func _on_update_uvs_pressed() -> void:
-	if uv_batch_running or mesh_batch_running or sdf_batch_running or runtime_export_batch_running:
-		return
-	var candidates := _all_uv_update_candidates()
-	if candidates.is_empty():
-		_update_uvs_button()
-		return
-	uv_batch_running = true
-	update_uvs_button.tooltip_text = _uv_update_candidates_tooltip(candidates)
-	update_meshes_button.disabled = true
-	update_sdfs_button.disabled = true
-	var succeeded := 0
-	var failed := 0
-	var history_recorded := false
-	for index in range(candidates.size()):
-		update_uvs_button.text = "Updating %d/%d" % [index + 1, candidates.size()]
-		update_uvs_button.disabled = true
-		await get_tree().process_frame
-		var candidate: Dictionary = candidates[index]
-		var asset_id := str(candidate.get("asset_id", ""))
-		var component_id := str(candidate.get("component_id", ""))
-		var build := _generate_component_uv_build(asset_id, component_id)
-		if not history_recorded:
-			_record_direct_change()
-			history_recorded = true
-		if bool(build.get("valid", false)):
-			var component := _get_component(_get_asset(asset_id), component_id)
-			var mesh := _component_mesh_bake(asset_id, component_id)
-			var recipe := _resolved_geometry_uv_mapping_recipe(asset_id, component_id, build.get("recipe", {}))
-			if _component_mesh_status(asset_id, component_id, component) == "Ready" \
-				and GeometryUVMappingService.source_fingerprint(mesh, recipe) == str(build.get("source_fingerprint", "")):
-				_commit_component_uv_build(asset_id, component_id, build)
-				succeeded += 1
-			else:
-				build["errors"] = ["Component Mesh changed while its UVs were being generated."]
-				_record_component_uv_failure(asset_id, component_id, build)
-				failed += 1
-		else:
-			_record_component_uv_failure(asset_id, component_id, build)
-			failed += 1
-	uv_batch_running = false
-	_show_status_message("Updated %d UV Bake%s%s" % [succeeded, "" if succeeded == 1 else "s", " · %d need attention" % failed if failed > 0 else ""])
-	_render_outliner()
-	_render_inspector()
-	_render_canvas_context()
-
-
-func _generate_component_sdf_build(asset_id: String, component_id: String) -> Dictionary:
-	var component := _get_component(_get_asset(asset_id), component_id)
-	var status := _sdf_status(asset_id, component_id, component)
-	if status in ["Component Mesh Required / Stale", "UV Bake Required / Stale"]:
-		return {"valid": false, "errors": [status]}
-	var inputs := _sdf_inputs(asset_id, component_id)
-	var recipe := _sdf_recipe(asset_id, component_id)
-	var result := GeometrySDFService.generate(inputs["mesh"], inputs["uv"], recipe)
-	return {
-		"valid": bool(result.get("valid", false)),
-		"errors": result.get("errors", []).duplicate(),
-		"recipe": recipe,
-		"result": result,
-		"source_fingerprint": GeometrySDFService.source_fingerprint(inputs["mesh"], inputs["uv"], recipe),
-		"failure_fingerprint": GeometrySDFService.failure_fingerprint(inputs["mesh"], inputs["uv"], recipe)
-	}
-
-
-func _commit_component_sdf_build(asset_id: String, component_id: String, build: Dictionary) -> bool:
-	var result: Dictionary = build.get("result", {})
-	var image = result.get("image", null)
-	if not image is Image or image.is_empty():
-		return false
-	var key := _geometry_document_key(asset_id, component_id)
-	sdf_images[key] = image
-	var asset := _get_asset(asset_id)
-	if not world_name.is_empty() and _save_sdf_image(asset, component_id) != OK:
-		sdf_images.erase(key)
-		return false
-	var bake := result.duplicate(true)
-	bake.erase("image")
-	bake["bake_id"] = "sdf_bake_%d" % ResourceUID.create_id()
-	var document := _mutable_geometry_document(asset_id, component_id)
-	document["sdf"]["recipe"] = GeometrySDFService.normalize_recipe(build.get("recipe", {}))
-	document["sdf"]["bake"] = bake
-	document["sdf"]["last_error"] = ""
-	document["sdf"]["last_failure_fingerprint"] = ""
-	return true
-
-
-func _record_component_sdf_failure(asset_id: String, component_id: String, build: Dictionary) -> void:
-	var document := _mutable_geometry_document(asset_id, component_id)
-	var errors: Array = build.get("errors", [])
-	document["sdf"]["last_error"] = str(errors[0]) if not errors.is_empty() else "Automatic SDF generation failed."
-	document["sdf"]["last_failure_fingerprint"] = str(build.get("failure_fingerprint", build.get("source_fingerprint", "")))
-
-
-func _on_update_sdfs_pressed() -> void:
-	if sdf_batch_running or mesh_batch_running or uv_batch_running or runtime_export_batch_running:
-		return
-	var candidates := _all_sdf_update_candidates()
-	if candidates.is_empty():
-		_update_sdfs_button()
-		return
-	sdf_batch_running = true
-	update_sdfs_button.tooltip_text = _sdf_update_candidates_tooltip(candidates)
-	update_meshes_button.disabled = true
-	update_uvs_button.disabled = true
-	var succeeded := 0
-	var failed := 0
-	var history_recorded := false
-	for index in range(candidates.size()):
-		update_sdfs_button.text = "Updating %d/%d" % [index + 1, candidates.size()]
-		update_sdfs_button.disabled = true
-		await get_tree().process_frame
-		var candidate: Dictionary = candidates[index]
-		var asset_id := str(candidate.get("asset_id", ""))
-		var component_id := str(candidate.get("component_id", ""))
-		var build := _generate_component_sdf_build(asset_id, component_id)
-		if not history_recorded:
-			_record_direct_change()
-			history_recorded = true
-		if bool(build.get("valid", false)):
-			var inputs := _sdf_inputs(asset_id, component_id)
-			var recipe := _sdf_recipe(asset_id, component_id)
-			if GeometrySDFService.source_fingerprint(inputs["mesh"], inputs["uv"], recipe) == str(build.get("source_fingerprint", "")) \
-				and _commit_component_sdf_build(asset_id, component_id, build):
-				succeeded += 1
-			else:
-				build["errors"] = ["SDF inputs changed or the contour image could not be written."]
-				_record_component_sdf_failure(asset_id, component_id, build)
-				failed += 1
-		else:
-			_record_component_sdf_failure(asset_id, component_id, build)
-			failed += 1
-	sdf_batch_running = false
-	_show_status_message("Updated %d SDF Bake%s%s" % [succeeded, "" if succeeded == 1 else "s", " · %d need attention" % failed if failed > 0 else ""])
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()
@@ -5587,7 +5176,7 @@ func _runtime_export_batch_summary(candidates: Array[Dictionary]) -> Dictionary:
 
 
 func _update_runtime_export_button() -> void:
-	if not is_instance_valid(runtime_export_button) or mesh_batch_running or uv_batch_running or sdf_batch_running or runtime_export_batch_running:
+	if not is_instance_valid(runtime_export_button) or mesh_batch_running or runtime_export_batch_running:
 		return
 	var status: Dictionary = _batch_status_snapshot().get("runtime", {})
 	var candidates: Array = status.get("candidates", [])
@@ -5599,7 +5188,7 @@ func _update_runtime_export_button() -> void:
 
 
 func _on_runtime_export_pressed() -> void:
-	if runtime_export_batch_running or mesh_batch_running or uv_batch_running or sdf_batch_running:
+	if runtime_export_batch_running or mesh_batch_running:
 		return
 	var candidates := _all_runtime_export_candidates()
 	if candidates.is_empty():
@@ -5607,8 +5196,6 @@ func _on_runtime_export_pressed() -> void:
 		return
 	runtime_export_batch_running = true
 	update_meshes_button.disabled = true
-	update_uvs_button.disabled = true
-	update_sdfs_button.disabled = true
 	var succeeded := 0
 	var failed := 0
 	var catalog_requested := false
@@ -5950,60 +5537,6 @@ func _geometry_uv_mapping_bake(asset_id: String, component_id: String, mesh_meth
 	return _geometry_uv_mapping_bakes(asset_id, component_id).get(GeometryUVMappingService.bake_key(resolved_mesh_method, resolved_uv_method), {})
 
 
-func _geometry_uv_mapping_input(asset_id: String, component_id: String, _recipe: Dictionary = {}) -> Dictionary:
-	return _component_mesh_bake(asset_id, component_id)
-
-
-func _resolved_geometry_uv_mapping_recipe(asset_id: String, component_id: String, recipe: Dictionary = {}) -> Dictionary:
-	var resolved := GeometryUVMappingService.normalize_recipe(recipe if not recipe.is_empty() else _geometry_uv_mapping_recipe(asset_id, component_id))
-	var component_mesh := _component_mesh_bake(asset_id, component_id)
-	if not component_mesh.is_empty():
-		resolved["parameters"]["mesh_method"] = str(component_mesh.get("method", ""))
-	return resolved
-
-
-func _geometry_uv_mapping_input_is_current(asset_id: String, component_id: String, component: Dictionary, _recipe: Dictionary = {}) -> bool:
-	return not component.is_empty() and _component_mesh_status(asset_id, component_id, component) == "Ready"
-
-
-func _geometry_uv_mapping_result_matches(result: Dictionary, asset_id: String, component_id: String, component: Dictionary) -> bool:
-	if result.is_empty() or not bool(result.get("valid", false)):
-		return false
-	var recipe := _resolved_geometry_uv_mapping_recipe(asset_id, component_id)
-	if not _geometry_uv_mapping_input_is_current(asset_id, component_id, component, recipe):
-		return false
-	var mesh_bake := _geometry_uv_mapping_input(asset_id, component_id, recipe)
-	return GeometryUVMappingService.result_matches(result, mesh_bake, recipe)
-
-
-func _geometry_uv_mapping_preview_matches(asset_id: String, component_id: String, component: Dictionary) -> bool:
-	return geometry_uv_mapping_preview_key == _geometry_document_key(asset_id, component_id) \
-		and _geometry_uv_mapping_result_matches(geometry_uv_mapping_preview, asset_id, component_id, component)
-
-
-func _geometry_uv_mapping_bake_is_current(asset_id: String, component_id: String, component: Dictionary, bake: Dictionary) -> bool:
-	if bake.is_empty() or not _geometry_uv_mapping_input_is_current(asset_id, component_id, component):
-		return false
-	return GeometryUVMappingService.result_matches(
-		bake,
-		_geometry_uv_mapping_input(asset_id, component_id),
-		_resolved_geometry_uv_mapping_recipe(asset_id, component_id)
-	)
-
-
-func _geometry_uv_mapping_status(asset_id: String, component_id: String, component: Dictionary) -> String:
-	if component.is_empty() or not _geometry_uv_mapping_input_is_current(asset_id, component_id, component):
-		return "Mesh Required / Stale"
-	if geometry_uv_mapping_preview_key == _geometry_document_key(asset_id, component_id) and not bool(geometry_uv_mapping_preview.get("valid", true)):
-		return "Invalid"
-	if _geometry_uv_mapping_preview_matches(asset_id, component_id, component):
-		return "Preview"
-	var bake := _geometry_uv_mapping_bake(asset_id, component_id)
-	if bake.is_empty():
-		return "Not Generated"
-	return "Baked" if _geometry_uv_mapping_bake_is_current(asset_id, component_id, component, bake) else "Stale"
-
-
 func _write_json(path: String, data: Dictionary) -> bool:
 	return _write_text_atomically(path, JSON.stringify(data, "\t"))
 
@@ -6128,8 +5661,6 @@ func _render_context_bar() -> void:
 			_render_geometry_seeding_context_bar()
 		elif active_geometry_submodule == "Meshing":
 			_render_geometry_meshing_context_bar()
-		elif active_geometry_submodule == "UV Mapping":
-			_render_geometry_uv_mapping_context_bar()
 		else:
 			var geometry_label := Label.new()
 			geometry_label.text = "Mesh → %s" % active_geometry_submodule
@@ -6712,53 +6243,6 @@ func _set_geometry_meshing_method(_method: String = GeometryMeshingService.CONST
 
 func _activate_geometry_meshing_method_choice() -> void:
 	_set_geometry_meshing_method(GeometryMeshingService.CONSTRAINED_MESH)
-
-
-func _render_geometry_uv_mapping_context_bar() -> void:
-	geometry_uv_mapping_method_menu = MenuButton.new()
-	geometry_uv_mapping_method_menu.text = "⌘1  Method"
-	geometry_uv_mapping_method_menu.custom_minimum_size = Vector2(118, 32)
-	geometry_uv_mapping_method_menu.focus_mode = Control.FOCUS_NONE
-	_style_context_command_button(geometry_uv_mapping_method_menu, _context_command_is("geometry.uv_mapping.method"))
-	var popup := geometry_uv_mapping_method_menu.get_popup()
-	_style_popup_menu(popup)
-	popup.add_item("1  Bounds / Planar", 0)
-	popup.set_item_metadata(0, GeometryUVMappingService.BOUNDS_PLANAR)
-	_connect_context_method_menu(popup, "geometry.uv_mapping.method", _set_geometry_uv_mapping_method)
-	context_bar.add_child(geometry_uv_mapping_method_menu)
-	var method_label := Label.new()
-	method_label.text = "Bounds / Planar"
-	method_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	method_label.add_theme_color_override("font_color", Color("#9aa3b2"))
-	context_bar.add_child(method_label)
-
-
-func _set_geometry_uv_mapping_method(method: String) -> void:
-	if selected_asset_id.is_empty() or selected_component_id.is_empty() or method not in GeometryUVMappingService.VALID_METHODS:
-		return
-	_set_geometry_command_state("uv_mapping_method")
-	var recipe := _resolved_geometry_uv_mapping_recipe(selected_asset_id, selected_component_id)
-	var mesh_method := str(recipe.get("parameters", {}).get("mesh_method", ""))
-	var matching_bake := _geometry_uv_mapping_bake(selected_asset_id, selected_component_id, mesh_method, method)
-	selected_geometry_bake_method = GeometryUVMappingService.bake_key(mesh_method, method) if not matching_bake.is_empty() else ""
-	if not matching_bake.is_empty():
-		var document := _mutable_geometry_document(selected_asset_id, selected_component_id)
-		document["uv_mapping"]["recipe"] = GeometryUVMappingService.normalize_recipe({"method": method, "parameters": matching_bake.get("parameters", {})})
-	_render_outliner()
-	_render_inspector()
-	_render_context_bar()
-	_refresh_geometry_uv_mapping_workspace()
-	if matching_bake.is_empty():
-		call_deferred("_generate_geometry_uv_mapping_preview")
-
-
-func _activate_geometry_uv_mapping_method_choice() -> void:
-	if selected_asset_id.is_empty() or selected_component_id.is_empty():
-		return
-	_set_geometry_command_state("uv_mapping_method")
-	_render_context_bar()
-	_render_info_bar()
-	_show_status_message("UV Mapping Method: 1 Bounds / Planar")
 
 
 func _render_motion_sequence_context_bar() -> void:
@@ -7372,8 +6856,6 @@ func _render_info_bar() -> void:
 				{"label": "3: Remove", "id": "remove"}
 			], geometry_seeding_edit_tool)
 			_add_info_option("Delete: Remove selected")
-		elif active_geometry_submodule == "UV Mapping" and geometry_uv_mapping_method_choice_active:
-			geometry_state_label.text = "State: UV Mapping Method"
 			info_bar.add_child(geometry_state_label)
 			_add_info_mode_group([
 				{"label": "1: Bounds / Planar", "id": GeometryUVMappingService.BOUNDS_PLANAR}
@@ -8667,53 +8149,6 @@ func _create_geometry_role_badge(role: String) -> Label:
 	return badge
 
 
-func _render_geometry_uv_mapping_bake_rows(container: VBoxContainer, asset_id: String, component_id: String, component: Dictionary) -> void:
-	var mesh_bakes := _geometry_meshing_bakes(asset_id, component_id)
-	var uv_bakes := _geometry_uv_mapping_bakes(asset_id, component_id)
-	var recipe := _geometry_uv_mapping_recipe(asset_id, component_id)
-	for mesh_method in GeometryMeshingService.VALID_METHODS:
-		if not mesh_bakes.has(mesh_method):
-			continue
-		var mesh_row := HBoxContainer.new()
-		var mesh_indent := Control.new()
-		mesh_indent.custom_minimum_size = Vector2(34, 0)
-		mesh_row.add_child(mesh_indent)
-		var mesh_button := Button.new()
-		mesh_button.text = "%s Mesh  ·  %s" % [_geometry_bake_method_label(mesh_method), "Baked" if _geometry_meshing_bake_is_current(asset_id, component_id, component, mesh_method) else "Stale"]
-		mesh_button.custom_minimum_size = Vector2(0, 26)
-		mesh_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		mesh_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		mesh_button.focus_mode = Control.FOCUS_NONE
-		_style_outliner_button(mesh_button, str(recipe.get("parameters", {}).get("mesh_method", "")) == mesh_method and selected_geometry_bake_method.is_empty())
-		mesh_button.pressed.connect(_set_geometry_uv_mapping_mesh_source.bind(mesh_method))
-		mesh_row.add_child(mesh_button)
-		container.add_child(mesh_row)
-		var key := GeometryUVMappingService.bake_key(mesh_method, GeometryUVMappingService.BOUNDS_PLANAR)
-		if not uv_bakes.has(key):
-			continue
-		var uv_bake: Dictionary = uv_bakes[key]
-		var uv_row := HBoxContainer.new()
-		var uv_indent := Control.new()
-		uv_indent.custom_minimum_size = Vector2(52, 0)
-		uv_row.add_child(uv_indent)
-		var uv_button := Button.new()
-		uv_button.text = "Bounds / Planar UV  ·  %s" % ("Baked" if _geometry_uv_mapping_bake_is_current(asset_id, component_id, component, uv_bake) else "Stale")
-		uv_button.custom_minimum_size = Vector2(0, 24)
-		uv_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		uv_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		uv_button.focus_mode = Control.FOCUS_NONE
-		_style_outliner_button(uv_button, selected_asset_id == asset_id and selected_component_id == component_id and selected_geometry_bake_method == key)
-		uv_button.pressed.connect(_select_geometry_uv_mapping_bake.bind(asset_id, component_id, mesh_method, GeometryUVMappingService.BOUNDS_PLANAR))
-		uv_row.add_child(uv_button)
-		container.add_child(uv_row)
-
-
-func _select_geometry_uv_mapping_bake(asset_id: String, component_id: String, mesh_method: String, uv_method: String) -> void:
-	_select_geometry_component(asset_id, component_id)
-	_set_geometry_uv_mapping_mesh_source(mesh_method)
-	_set_geometry_uv_mapping_method(uv_method)
-
-
 func _geometry_bake_methods_for_active_module(bakes: Dictionary) -> Array[String]:
 	var order: Array[String] = []
 	if active_geometry_submodule == "Sampling":
@@ -8777,37 +8212,20 @@ func _geometry_outliner_status_summary(asset_id: String, component_id: String, c
 		return {"color": _geometry_status_color(sampling_status), "count": bake_count, "tooltip": "%s\n%s Adaptive Sampling — %s" % [str(component.get("name", "Component")), _geometry_status_symbol(sampling_status), sampling_status]}
 	var entries_by_key: Dictionary = {}
 	var order: Array[String] = []
-	if active_geometry_submodule == "UV Mapping":
-		var uv_bakes := _geometry_uv_mapping_bakes(asset_id, component_id)
-		var keys: Array[String] = []
-		for bake_key in uv_bakes:
-			keys.append(str(bake_key))
-		keys.sort()
-		for bake_key in keys:
-			var uv_bake: Dictionary = uv_bakes[bake_key]
-			var uv_method := str(uv_bake.get("method", GeometryUVMappingService.BOUNDS_PLANAR))
-			var mesh_method := str(uv_bake.get("mesh_method", ""))
-			entries_by_key[bake_key] = {
-				"label": _geometry_method_number_label(uv_method) + ": " + _geometry_bake_method_label(uv_method) + " · " + _geometry_bake_method_label(mesh_method) + " Mesh",
-				"status": "Baked" if _geometry_uv_mapping_bake_is_current(asset_id, component_id, component, uv_bake) else "Stale"
-			}
-			order.append(bake_key)
-	else:
-		var bakes := _geometry_sampling_bakes(asset_id, component_id) if active_geometry_submodule == "Sampling" \
-			else _geometry_seeding_bakes(asset_id, component_id) if active_geometry_submodule == "Seeding" \
-			else _geometry_meshing_bakes(asset_id, component_id)
-		for method in _geometry_bake_methods_for_active_module(bakes):
-			entries_by_key[method] = {
-				"label": _geometry_method_number_label(method) + ": " + _geometry_bake_method_label(method),
-				"status": _geometry_bake_status(method, bakes[method], asset_id, component_id, component)
-			}
-			order.append(method)
+	var bakes := _geometry_sampling_bakes(asset_id, component_id) if active_geometry_submodule == "Sampling" \
+		else _geometry_seeding_bakes(asset_id, component_id) if active_geometry_submodule == "Seeding" \
+		else _geometry_meshing_bakes(asset_id, component_id)
+	for method in _geometry_bake_methods_for_active_module(bakes):
+		entries_by_key[method] = {
+			"label": _geometry_method_number_label(method) + ": " + _geometry_bake_method_label(method),
+			"status": _geometry_bake_status(method, bakes[method], asset_id, component_id, component)
+		}
+		order.append(method)
 
 	if order.is_empty():
 		var empty_status := _geometry_sampling_status(asset_id, component_id, component) if active_geometry_submodule == "Sampling" \
 			else _geometry_seeding_status(asset_id, component_id, component) if active_geometry_submodule == "Seeding" \
-			else _geometry_meshing_status(asset_id, component_id, component) if active_geometry_submodule == "Meshing" \
-			else _geometry_uv_mapping_status(asset_id, component_id, component)
+			else _geometry_meshing_status(asset_id, component_id, component)
 		entries_by_key["state"] = {"label": "Current state", "status": empty_status}
 		order.append("state")
 
@@ -8847,12 +8265,6 @@ func _geometry_outliner_active_preview(asset_id: String, component_id: String, c
 		var method := str(geometry_meshing_preview.get("method", ""))
 		if not method.is_empty() or geometry_meshing_preview_state == "calculating":
 			return {"key": GeometryMeshingService.CONSTRAINED_MESH, "label": "Constrained Mesh", "status": "Preview Ready" if _geometry_meshing_preview_matches(asset_id, component_id, component) else "Calculating" if geometry_meshing_preview_state == "calculating" else "Invalid"}
-	if active_geometry_submodule == "UV Mapping" and geometry_uv_mapping_preview_key == document_key:
-		var method := str(geometry_uv_mapping_preview.get("method", ""))
-		var mesh_method := str(geometry_uv_mapping_preview.get("mesh_method", ""))
-		if not method.is_empty():
-			var preview_key := GeometryUVMappingService.bake_key(mesh_method, method)
-			return {"key": preview_key, "label": _geometry_method_number_label(method) + ": " + _geometry_bake_method_label(method) + " · " + _geometry_bake_method_label(mesh_method) + " Mesh", "status": "Preview" if _geometry_uv_mapping_preview_matches(asset_id, component_id, component) else "Invalid"}
 	return {}
 
 
@@ -8958,8 +8370,6 @@ func _select_geometry_component(asset_id: String, component_id: String) -> void:
 			_schedule_geometry_seeding_preview()
 	elif active_geometry_submodule == "Meshing" and is_instance_valid(geometry_meshing_workspace):
 		geometry_meshing_workspace.grab_focus()
-	elif active_geometry_submodule == "UV Mapping" and is_instance_valid(geometry_uv_mapping_workspace):
-		geometry_uv_mapping_workspace.grab_focus()
 
 
 func _select_geometry_sampling_reference(asset_id: String, parent_component_id: String, reference_id := "") -> void:
@@ -12747,226 +12157,6 @@ func _refresh_geometry_meshing_workspace() -> void:
 	geometry_meshing_workspace.set_context(input.get("sampling", {}), input.get("seeding", {}), result, _geometry_meshing_status(selected_asset_id, selected_component_id, component))
 
 
-func _render_geometry_uv_mapping_inspector() -> void:
-	inspector_content.add_child(_create_inspector_section("UV Mapping"))
-	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	if component.is_empty():
-		inspector_content.add_child(_create_inspector_field_label("Select one Component to map its Mesh into UV space."))
-		return
-	inspector_content.add_child(_create_inspector_field_label(str(component.get("name", "Component"))))
-	var recipe := _geometry_uv_mapping_recipe(selected_asset_id, selected_component_id)
-	inspector_content.add_child(_create_inspector_field_label("Method"))
-	var method_option := OptionButton.new()
-	method_option.add_item("Bounds / Planar")
-	method_option.set_item_metadata(0, GeometryUVMappingService.BOUNDS_PLANAR)
-	method_option.select(0)
-	method_option.item_selected.connect(func(_index: int) -> void: _set_geometry_uv_mapping_method(GeometryUVMappingService.BOUNDS_PLANAR))
-	inspector_content.add_child(method_option)
-	inspector_content.add_child(_create_inspector_section("Input"))
-	var component_mesh := _component_mesh_bake(selected_asset_id, selected_component_id)
-	inspector_content.add_child(_create_inspector_field_label("Component Mesh: %s" % (_geometry_bake_method_label(str(component_mesh.get("method", ""))) if not component_mesh.is_empty() else "Required / Stale")))
-	var input_current := _geometry_uv_mapping_input_is_current(selected_asset_id, selected_component_id, component, recipe)
-	var input_label := _create_inspector_field_label("Input Status: %s" % ("Ready" if input_current else "Required / Stale"))
-	input_label.add_theme_color_override("font_color", Color("#75b88a") if input_current else Color("#ef8354"))
-	inspector_content.add_child(input_label)
-	inspector_content.add_child(_create_inspector_section("Parameters"))
-	_add_geometry_uv_mapping_float_parameter("Scale", recipe, "scale", GeometryUVMappingService.MIN_SCALE, 100.0)
-	_add_geometry_uv_mapping_float_parameter("Rotation", recipe, "rotation", -180.0, 180.0, "°")
-	_add_geometry_uv_mapping_float_parameter("Offset U", recipe, "offset_u", -100.0, 100.0)
-	_add_geometry_uv_mapping_float_parameter("Offset V", recipe, "offset_v", -100.0, 100.0)
-	_add_geometry_uv_mapping_float_parameter("Padding", recipe, "padding", 0.0, GeometryUVMappingService.MAX_PADDING, "", 0.001)
-	var preserve_aspect := CheckBox.new()
-	preserve_aspect.text = "Preserve Aspect"
-	preserve_aspect.button_pressed = bool(recipe.get("parameters", {}).get("preserve_aspect", GeometryUVMappingService.DEFAULT_PRESERVE_ASPECT))
-	preserve_aspect.toggled.connect(_on_geometry_uv_mapping_preserve_aspect_changed)
-	inspector_content.add_child(preserve_aspect)
-	inspector_content.add_child(_create_inspector_section("Preview"))
-	var checker_overlay := CheckBox.new()
-	checker_overlay.text = "UV Checker Overlay"
-	checker_overlay.button_pressed = geometry_uv_mapping_checker_overlay
-	checker_overlay.toggled.connect(_on_geometry_uv_mapping_checker_overlay_changed)
-	inspector_content.add_child(checker_overlay)
-	var status := _geometry_uv_mapping_status(selected_asset_id, selected_component_id, component)
-	inspector_content.add_child(_create_inspector_section("Result"))
-	inspector_content.add_child(_create_inspector_field_label("Status: %s" % status))
-	var result := geometry_uv_mapping_preview if _geometry_uv_mapping_preview_matches(selected_asset_id, selected_component_id, component) else _geometry_uv_mapping_bake(selected_asset_id, selected_component_id)
-	if not result.is_empty():
-		inspector_content.add_child(_create_inspector_field_label("UV Vertices: %d" % int(result.get("uv_count", 0))))
-		inspector_content.add_child(_create_inspector_field_label("Mesh: %s" % _geometry_bake_method_label(str(result.get("mesh_method", "")))))
-	if geometry_uv_mapping_preview_key == _geometry_document_key(selected_asset_id, selected_component_id) and not bool(geometry_uv_mapping_preview.get("valid", true)):
-		for error_message in geometry_uv_mapping_preview.get("errors", []):
-			var error_label := _create_inspector_field_label(str(error_message))
-			error_label.add_theme_color_override("font_color", Color("#ef8354"))
-			inspector_content.add_child(error_label)
-	var persisted_error := str(_get_geometry_document(selected_asset_id, selected_component_id).get("uv_mapping", {}).get("last_error", ""))
-	if not persisted_error.is_empty():
-		var persisted_error_label := _create_inspector_field_label("Batch: %s" % persisted_error)
-		persisted_error_label.add_theme_color_override("font_color", Color("#ef8354"))
-		inspector_content.add_child(persisted_error_label)
-	var actions := HBoxContainer.new()
-	var generate_button := Button.new()
-	generate_button.text = "Generate"
-	generate_button.custom_minimum_size = Vector2(96, 28)
-	generate_button.focus_mode = Control.FOCUS_NONE
-	generate_button.disabled = not input_current
-	generate_button.pressed.connect(_generate_geometry_uv_mapping_preview)
-	actions.add_child(generate_button)
-	var bake_button := Button.new()
-	bake_button.text = "Bake"
-	bake_button.custom_minimum_size = Vector2(76, 28)
-	bake_button.focus_mode = Control.FOCUS_NONE
-	bake_button.disabled = not _geometry_uv_mapping_preview_matches(selected_asset_id, selected_component_id, component)
-	bake_button.pressed.connect(_bake_geometry_uv_mapping_preview)
-	actions.add_child(bake_button)
-	inspector_content.add_child(actions)
-
-
-func _add_geometry_uv_mapping_float_parameter(label_text: String, recipe: Dictionary, parameter_name: String, minimum: float, maximum: float, suffix := "", step := 0.01) -> void:
-	inspector_content.add_child(_create_inspector_field_label(label_text))
-	var field := SpinBox.new()
-	field.min_value = minimum
-	field.max_value = maximum
-	field.step = step
-	field.custom_arrow_step = step
-	field.suffix = suffix
-	field.set_value_no_signal(float(recipe.get("parameters", {}).get(parameter_name, minimum)))
-	field.value_changed.connect(_on_geometry_uv_mapping_parameter_changed.bind(parameter_name))
-	field.get_line_edit().text_submitted.connect(_on_geometry_uv_mapping_float_text_submitted.bind(field, parameter_name))
-	field.get_line_edit().focus_exited.connect(_on_geometry_uv_mapping_float_focus_exited.bind(field, parameter_name))
-	inspector_content.add_child(field)
-
-
-func _on_geometry_uv_mapping_mesh_source_selected(index: int, option: OptionButton) -> void:
-	if index < 0 or index >= option.item_count:
-		return
-	_set_geometry_uv_mapping_mesh_source(str(option.get_item_metadata(index)))
-
-
-func _set_geometry_uv_mapping_mesh_source(mesh_method: String) -> void:
-	var component_mesh := _component_mesh_bake(selected_asset_id, selected_component_id)
-	if component_mesh.is_empty() or mesh_method != str(component_mesh.get("method", "")):
-		return
-	var current := _geometry_uv_mapping_recipe(selected_asset_id, selected_component_id)
-	var changed := str(current.get("parameters", {}).get("mesh_method", "")) != mesh_method
-	var matching_bake := _geometry_uv_mapping_bake(selected_asset_id, selected_component_id, mesh_method, str(current.get("method", "")))
-	if changed:
-		_record_direct_change()
-	current["parameters"]["mesh_method"] = mesh_method
-	if not matching_bake.is_empty():
-		current["parameters"] = matching_bake.get("parameters", {}).duplicate(true)
-	var document := _mutable_geometry_document(selected_asset_id, selected_component_id)
-	document["uv_mapping"]["recipe"] = GeometryUVMappingService.normalize_recipe(current)
-	selected_geometry_bake_method = GeometryUVMappingService.bake_key(mesh_method, str(current.get("method", ""))) if not matching_bake.is_empty() else ""
-	geometry_uv_mapping_preview = {}
-	geometry_uv_mapping_preview_key = ""
-	_render_outliner()
-	_render_inspector()
-	_render_context_bar()
-	_refresh_geometry_uv_mapping_workspace()
-	if matching_bake.is_empty():
-		call_deferred("_generate_geometry_uv_mapping_preview")
-
-
-func _on_geometry_uv_mapping_parameter_changed(value: float, parameter_name: String) -> void:
-	var current := _geometry_uv_mapping_recipe(selected_asset_id, selected_component_id)
-	var normalized := maxf(value, GeometryUVMappingService.MIN_SCALE) if parameter_name == "scale" else value
-	if is_equal_approx(float(current.get("parameters", {}).get(parameter_name, normalized)), normalized):
-		return
-	_record_coalesced_change()
-	current["parameters"][parameter_name] = normalized
-	var document := _mutable_geometry_document(selected_asset_id, selected_component_id)
-	document["uv_mapping"]["recipe"] = GeometryUVMappingService.normalize_recipe(current)
-	call_deferred("_generate_geometry_uv_mapping_preview")
-
-
-func _on_geometry_uv_mapping_preserve_aspect_changed(enabled: bool) -> void:
-	var current := _geometry_uv_mapping_recipe(selected_asset_id, selected_component_id)
-	if bool(current.get("parameters", {}).get("preserve_aspect", true)) == enabled:
-		return
-	_record_direct_change()
-	current["parameters"]["preserve_aspect"] = enabled
-	var document := _mutable_geometry_document(selected_asset_id, selected_component_id)
-	document["uv_mapping"]["recipe"] = GeometryUVMappingService.normalize_recipe(current)
-	call_deferred("_generate_geometry_uv_mapping_preview")
-
-
-func _on_geometry_uv_mapping_checker_overlay_changed(enabled: bool) -> void:
-	geometry_uv_mapping_checker_overlay = enabled
-	_refresh_geometry_uv_mapping_workspace()
-
-
-func _on_geometry_uv_mapping_float_text_submitted(text: String, field: SpinBox, parameter_name: String) -> void:
-	_commit_geometry_uv_mapping_float_text(text, field, parameter_name)
-
-
-func _on_geometry_uv_mapping_float_focus_exited(field: SpinBox, parameter_name: String) -> void:
-	_commit_geometry_uv_mapping_float_text(field.get_line_edit().text, field, parameter_name)
-
-
-func _commit_geometry_uv_mapping_float_text(raw_text: String, field: SpinBox, parameter_name: String) -> void:
-	var normalized_text := raw_text.strip_edges().replace(",", ".")
-	if not normalized_text.is_valid_float():
-		field.get_line_edit().text = String.num(field.value, 2)
-		return
-	var value := clampf(float(normalized_text), field.min_value, field.max_value)
-	field.set_value_no_signal(value)
-	field.get_line_edit().text = String.num(value, 2)
-	_on_geometry_uv_mapping_parameter_changed(value, parameter_name)
-
-
-func _generate_geometry_uv_mapping_preview() -> void:
-	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	var recipe := _resolved_geometry_uv_mapping_recipe(selected_asset_id, selected_component_id)
-	geometry_uv_mapping_preview_key = _geometry_document_key(selected_asset_id, selected_component_id)
-	if not _geometry_uv_mapping_input_is_current(selected_asset_id, selected_component_id, component, recipe):
-		geometry_uv_mapping_preview = GeometryUVMappingService.generate({}, recipe)
-		_show_status_message("Bake a current Mesh before generating UVs.")
-	else:
-		geometry_uv_mapping_preview = GeometryUVMappingService.generate(_geometry_uv_mapping_input(selected_asset_id, selected_component_id, recipe), recipe)
-		if bool(geometry_uv_mapping_preview.get("valid", false)):
-			_show_status_message("Generated %d UV Vertices." % int(geometry_uv_mapping_preview.get("uv_count", 0)))
-		else:
-			var errors: Array = geometry_uv_mapping_preview.get("errors", [])
-			_show_status_message(str(errors[0]) if not errors.is_empty() else "UV Mapping could not be generated.")
-	_render_outliner()
-	_render_inspector()
-	_refresh_geometry_uv_mapping_workspace()
-
-
-func _bake_geometry_uv_mapping_preview() -> void:
-	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	if not _geometry_uv_mapping_preview_matches(selected_asset_id, selected_component_id, component):
-		return
-	_record_direct_change()
-	var document := _mutable_geometry_document(selected_asset_id, selected_component_id)
-	var bake := geometry_uv_mapping_preview.duplicate(true)
-	bake["bake_id"] = "uv_bake_%d" % ResourceUID.create_id()
-	var key := GeometryUVMappingService.bake_key(str(bake.get("mesh_method", "")), str(bake.get("method", "")))
-	document["uv_mapping"]["recipe"] = GeometryUVMappingService.normalize_recipe({"method": bake.get("method", ""), "parameters": bake.get("parameters", {})})
-	document["uv_mapping"]["bakes"][key] = bake
-	document["uv_mapping"]["last_error"] = ""
-	document["uv_mapping"]["last_failure_fingerprint"] = ""
-	selected_geometry_bake_method = key
-	geometry_uv_mapping_preview = {}
-	geometry_uv_mapping_preview_key = ""
-	_show_status_message("UV Mapping baked for %s." % str(component.get("name", "Component")))
-	_render_outliner()
-	_render_inspector()
-	_refresh_geometry_uv_mapping_workspace()
-
-
-func _refresh_geometry_uv_mapping_workspace() -> void:
-	if not is_instance_valid(geometry_uv_mapping_workspace):
-		return
-	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	if component.is_empty():
-		geometry_uv_mapping_workspace.clear_context()
-		return
-	var mesh_bake := _geometry_uv_mapping_input(selected_asset_id, selected_component_id)
-	var result := geometry_uv_mapping_preview if _geometry_uv_mapping_preview_matches(selected_asset_id, selected_component_id, component) else _geometry_uv_mapping_bake(selected_asset_id, selected_component_id)
-	geometry_uv_mapping_workspace.set_context(mesh_bake, result, _geometry_uv_mapping_status(selected_asset_id, selected_component_id, component), geometry_uv_mapping_checker_overlay)
-
-
 func _render_inspector() -> void:
 	_clear(inspector_content)
 	transform_fields.clear()
@@ -12999,8 +12189,6 @@ func _render_inspector() -> void:
 			_render_geometry_seeding_inspector()
 		elif active_geometry_submodule == "Meshing":
 			_render_geometry_meshing_inspector()
-		elif active_geometry_submodule == "UV Mapping":
-			_render_geometry_uv_mapping_inspector()
 		else:
 			inspector_content.add_child(_create_inspector_section(active_geometry_submodule))
 			inspector_content.add_child(_create_inspector_field_label("Placeholder module"))
@@ -15456,8 +14644,6 @@ func _on_rebase_asset_scales_pressed() -> void:
 	geometry_meshing_preview_key = ""
 	geometry_meshing_preview_state = "idle"
 	geometry_meshing_preview_revision += 1
-	geometry_uv_mapping_preview = {}
-	geometry_uv_mapping_preview_key = ""
 	weighting_preview = {}
 	weighting_preview_key = ""
 	_show_status_message("Rebased %d Component and %d Group scale(s) in %s." % [result.get("rebased_component_ids", []).size(), result.get("rebased_group_ids", []).size(), str(asset.get("name", "Asset"))])
@@ -15510,8 +14696,6 @@ func _on_rebase_asset_root_scale_pressed() -> void:
 	geometry_meshing_preview_key = ""
 	geometry_meshing_preview_state = "idle"
 	geometry_meshing_preview_revision += 1
-	geometry_uv_mapping_preview = {}
-	geometry_uv_mapping_preview_key = ""
 	weighting_preview = {}
 	weighting_preview_key = ""
 	_invalidate_batch_status()
@@ -16015,60 +15199,6 @@ func _run_export_mesh_stage(candidates: Array[Dictionary]) -> Dictionary:
 	return {"succeeded": succeeded, "failed": failed}
 
 
-func _run_export_uv_stage(candidates: Array[Dictionary]) -> Dictionary:
-	var succeeded := 0
-	var failed := 0
-	export_log.append_text("\n[b]UV[/b] · %d Kandidaten\n" % candidates.size())
-	for candidate in candidates:
-		await get_tree().process_frame
-		var asset_id := str(candidate.get("asset_id", ""))
-		var component_id := str(candidate.get("component_id", ""))
-		var build := _generate_component_uv_build(asset_id, component_id)
-		var label := _export_component_label(asset_id, component_id)
-		if bool(build.get("valid", false)):
-			var component := _get_component(_get_asset(asset_id), component_id)
-			var mesh := _component_mesh_bake(asset_id, component_id)
-			var recipe := _resolved_geometry_uv_mapping_recipe(asset_id, component_id, build.get("recipe", {}))
-			if _component_mesh_status(asset_id, component_id, component) == "Ready" and GeometryUVMappingService.source_fingerprint(mesh, recipe) == str(build.get("source_fingerprint", "")):
-				_commit_component_uv_build(asset_id, component_id, build)
-				succeeded += 1
-				export_log.append_text("  [color=#75b88a]✓ %s[/color]\n" % label)
-			else:
-				build["errors"] = ["Component Mesh changed while its UVs were being generated."]
-				_record_component_uv_failure(asset_id, component_id, build)
-				failed += 1
-				export_log.append_text("  [color=#ef8354]✕ %s — %s[/color]\n" % [label, build["errors"][0]])
-		else:
-			_record_component_uv_failure(asset_id, component_id, build)
-			failed += 1
-			var errors: Array = build.get("errors", [])
-			export_log.append_text("  [color=#ef8354]✕ %s — %s[/color]\n" % [label, str(errors[0]) if not errors.is_empty() else "UV generation failed."])
-	return {"succeeded": succeeded, "failed": failed}
-
-
-func _run_export_sdf_stage(candidates: Array[Dictionary]) -> Dictionary:
-	var succeeded := 0
-	var failed := 0
-	export_log.append_text("\n[b]SDF[/b] · %d Kandidaten\n" % candidates.size())
-	for candidate in candidates:
-		await get_tree().process_frame
-		var asset_id := str(candidate.get("asset_id", ""))
-		var component_id := str(candidate.get("component_id", ""))
-		var build := _generate_component_sdf_build(asset_id, component_id)
-		var label := _export_component_label(asset_id, component_id)
-		if bool(build.get("valid", false)) and GeometrySDFService.source_fingerprint(_component_mesh_bake(asset_id, component_id), _geometry_uv_mapping_bake(asset_id, component_id), _sdf_recipe(asset_id, component_id)) == str(build.get("source_fingerprint", "")) and _commit_component_sdf_build(asset_id, component_id, build):
-			succeeded += 1
-			export_log.append_text("  [color=#75b88a]✓ %s[/color]\n" % label)
-		else:
-			if bool(build.get("valid", false)):
-				build["errors"] = ["SDF inputs changed or the contour image could not be written."]
-			_record_component_sdf_failure(asset_id, component_id, build)
-			failed += 1
-			var errors: Array = build.get("errors", [])
-			export_log.append_text("  [color=#ef8354]✕ %s — %s[/color]\n" % [label, str(errors[0]) if not errors.is_empty() else "SDF generation failed."])
-	return {"succeeded": succeeded, "failed": failed}
-
-
 func _run_export_runtime_stage(valid_only := false) -> Dictionary:
 	var succeeded := 0
 	var failed := 0
@@ -16214,7 +15344,6 @@ func _render_canvas_context() -> void:
 	geometry_sampling_workspace.visible = false
 	geometry_seeding_workspace.visible = false
 	geometry_meshing_workspace.visible = false
-	geometry_uv_mapping_workspace.visible = false
 	weighting_workspace.visible = false
 	if is_instance_valid(export_workspace):
 		export_workspace.visible = active_module == "Export"
@@ -16264,16 +15393,13 @@ func _render_canvas_context() -> void:
 		geometry_sampling_workspace.visible = active_geometry_submodule == "Sampling"
 		geometry_seeding_workspace.visible = active_geometry_submodule == "Seeding"
 		geometry_meshing_workspace.visible = active_geometry_submodule == "Meshing"
-		geometry_uv_mapping_workspace.visible = active_geometry_submodule == "UV Mapping"
 		if active_geometry_submodule == "Sampling":
 			_refresh_geometry_sampling_workspace()
 		elif active_geometry_submodule == "Seeding":
 			_refresh_geometry_seeding_workspace()
 		elif active_geometry_submodule == "Meshing":
 			_refresh_geometry_meshing_workspace()
-		elif active_geometry_submodule == "UV Mapping":
-			_refresh_geometry_uv_mapping_workspace()
-		canvas_context_label.text = "" if active_geometry_submodule in ["Sampling", "Seeding", "Meshing", "UV Mapping"] else "Mesh → %s · Placeholder" % active_geometry_submodule
+		canvas_context_label.text = "" if active_geometry_submodule in ["Sampling", "Seeding", "Meshing"] else "Mesh → %s · Placeholder" % active_geometry_submodule
 		return
 	if active_module == "Style":
 		motion_workspace.visible = false

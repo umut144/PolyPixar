@@ -179,9 +179,11 @@ Geometry regression tests use synthetic tiny-Symbol, Barde-scale, Tree-scale,
 concave, Hole, and Cut fixtures with invariant/range assertions; files under
 `worlds/` remain user data and are not test fixtures.
 
-UV and SDF services and their existing derived records remain readable Legacy
-data. They are not active batch stages, Runtime dependencies, or schema-4
-fields. PolyTools does not delete or silently reinterpret those records.
+UV and SDF have no authoring surface: no Workspace, Inspector, batch, or
+Canvas presentation. Their services and existing derived records remain
+readable Legacy data. They are not active batch stages, Runtime dependencies,
+or schema-4 fields. PolyTools does not delete or silently reinterpret those
+records, and a load/save round trip returns them unchanged.
 
 The persistent `Export Runtime (N)` action automatically considers every visible
 Asset. Every visible Component must have one unique free-form `name`. Closed
