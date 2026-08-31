@@ -16829,8 +16829,6 @@ func _on_bezier_edges_delete_requested(edge_ids: Array) -> void:
 	var deleted_edge_ids := BezierTopology.delete_edges(subject, valid_edge_ids)
 	if deleted_edge_ids.is_empty():
 		return
-	if str(subject.get("draw_mode", "closed_loop")) == "closed_loop":
-		subject["draw_mode"] = "contour"
 	selected_edge_id = ""
 	selected_edge_ids.clear()
 	selected_point_id = ""

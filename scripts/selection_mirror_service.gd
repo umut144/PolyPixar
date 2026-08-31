@@ -123,6 +123,8 @@ static func _pairs_are_open_endpoints(component: Dictionary, pairs: Array) -> bo
 static func _merge_coincident_closed_loop(component: Dictionary, pairs: Array) -> Dictionary:
 	var first_pair: Dictionary = pairs[0]
 	var first_mirrored_id := str(first_pair.get("mirrored_id", ""))
+	_merge_reflected_endpoint_handles(component, first_pair)
+	_merge_reflected_endpoint_handles(component, pairs[1])
 	if not BezierTopology.join_open_chain_endpoints(component, str(first_pair.get("source_id", "")), first_mirrored_id):
 		return {"count": 0, "removed_mirrored_id": ""}
 	var merged_chain := BezierTopology.chain_for_point(component.get("chains", []), str(first_pair.get("source_id", "")))
@@ -139,6 +141,25 @@ static func _merge_coincident_closed_loop(component: Dictionary, pairs: Array) -
 	_remove_point(component, first_mirrored_id)
 	_remove_point(component, second_mirrored_id)
 	return {"count": 2, "removed_mirrored_id": second_mirrored_id}
+
+
+## Keeps the source Point identity while restoring the Handle contributed by
+## the reflected half. The source Chain endpoint has only one active side while
+## open; after joining, the coincident reflected endpoint supplies the other.
+static func _merge_reflected_endpoint_handles(component: Dictionary, pair: Dictionary) -> void:
+	var source := BezierTopology.point_by_id(component.get("points", []), str(pair.get("source_id", "")))
+	var mirrored := BezierTopology.point_by_id(component.get("points", []), str(pair.get("mirrored_id", "")))
+	if source.is_empty() or mirrored.is_empty():
+		return
+	var source_chain := BezierTopology.chain_for_point(component.get("chains", []), str(source.get("id", "")))
+	if source_chain.is_empty():
+		return
+	var source_ids: Array = source_chain.get("point_ids", [])
+	var source_id := str(source.get("id", ""))
+	if source_id == str(source_ids.front()):
+		source["handle_in"] = Vector2(mirrored.get("handle_in", Vector2.ZERO))
+	elif source_id == str(source_ids.back()):
+		source["handle_out"] = Vector2(mirrored.get("handle_out", Vector2.ZERO))
 
 
 static func _remove_point(component: Dictionary, point_id: String) -> void:
@@ -175,8 +196,8 @@ static func _merge_coincident_point(component: Dictionary, source_id: String, mi
 
 
 ## Merges coincident endpoints into one shared Point. The original pre-mirror
-## Point wins, so its handles and authoring settings take precedence over the
-## just-created mirrored duplicate.
+## Point keeps its identity and settings while the reflected half contributes
+## the Handle needed on its newly connected side.
 static func _merge_coincident_open_endpoints(component: Dictionary, source_ids: Array, mirrored_ids: Array) -> Dictionary:
 	if source_ids.is_empty() or mirrored_ids.is_empty():
 		return {"count": 0, "removed_mirrored_id": ""}
@@ -194,6 +215,7 @@ static func _merge_coincident_open_endpoints(component: Dictionary, source_ids: 
 			var mirrored_position: Vector2 = mirrored_point.get("position", Vector2.ZERO)
 			if source_position.distance_squared_to(mirrored_position) > COINCIDENT_ENDPOINT_EPSILON * COINCIDENT_ENDPOINT_EPSILON:
 				continue
+			_merge_reflected_endpoint_handles(component, {"source_id": source_endpoint, "mirrored_id": mirrored_endpoint})
 			if BezierTopology.join_open_chain_endpoints(component, source_endpoint, mirrored_endpoint):
 				var merged_chain := BezierTopology.chain_for_point(component.get("chains", []), source_endpoint)
 				var merged_ids: Array = merged_chain.get("point_ids", []).duplicate()

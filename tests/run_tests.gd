@@ -5,7 +5,7 @@ var failures := 0
 
 func _init() -> void:
 	_test_add_close_and_validate()
-	_test_delete_edge_opens_contour()
+	_test_delete_edge_opens_closed_loop_draft()
 	_test_delete_exactly_one_point()
 	_test_fuse_point()
 	_test_delete_multiple_points_and_protect_closed_minimum()
@@ -116,9 +116,9 @@ func _test_add_close_and_validate() -> void:
 	_expect(not BezierTopology.validate(duplicate_point_chain).is_empty(), "A Chain with a duplicate Point ID must be invalid.")
 
 
-func _test_delete_edge_opens_contour() -> void:
+func _test_delete_edge_opens_closed_loop_draft() -> void:
 	var component := _component()
-	component["draw_mode"] = "contour"
+	component["draw_mode"] = "closed_loop"
 	for position in [Vector2.ZERO, Vector2(4.0, 0.0), Vector2(4.0, 4.0), Vector2(0.0, 4.0)]:
 		BezierTopology.add_point(component, position, "corner")
 	BezierTopology.close_active_chain(component)
@@ -127,10 +127,13 @@ func _test_delete_edge_opens_contour() -> void:
 	var point_ids_before: Array = chain["point_ids"].duplicate()
 	var deleted := BezierTopology.delete_edges(component, [removed_edge_id])
 	var opened_chain: Dictionary = component["chains"][0]
+	var expected_open_order := [point_ids_before[3], point_ids_before[0], point_ids_before[1], point_ids_before[2]]
 	_expect(deleted == [removed_edge_id], "Deleting a selected closed-chain Edge should report that Edge as deleted.")
 	_expect(not bool(opened_chain.get("closed", true)) and opened_chain.get("point_ids", []).size() == point_ids_before.size(), "Deleting a closed-chain Edge should open the Chain without deleting Points.")
+	_expect(opened_chain.get("point_ids", []) == expected_open_order, "The opened Chain should start after the deleted Edge and retain the direction of every surviving Edge.")
 	_expect(component.get("edges", []).size() == point_ids_before.size() - 1 and opened_chain.get("edge_ids", []).size() == point_ids_before.size() - 1, "An opened Chain should retain every non-deleted Edge.")
-	_expect(BezierTopology.mode_validation_issues(component, true).is_empty(), "An opened Contour should remain valid after Edge deletion.")
+	_expect(str(component.get("draw_mode", "")) == "closed_loop", "Opening a Closed Loop by deleting an Edge must retain its authoring mode.")
+	_expect(BezierTopology.validate(component).is_empty(), "An opened Closed Loop draft should retain valid structural topology.")
 
 
 func _test_delete_exactly_one_point() -> void:
@@ -333,6 +336,26 @@ func _test_closed_loop_selection_mirror() -> void:
 	var multi_mirror: Dictionary = multi_result.get("component", {})
 	_expect(int(multi_result.get("auto_connected_count", 0)) == 2 and multi_mirror.get("points", []).size() == 6, "Mirror should fuse both coincident axis endpoints and remove their duplicate Points.")
 	_expect(multi_mirror.get("chains", []).size() == 1 and bool(multi_mirror["chains"][0].get("closed", false)) and BezierTopology.mode_validation_issues(multi_mirror, true).is_empty(), "Multiple coincident axis endpoints should produce one valid closed Mirror Chain.")
+	var curved_component := _component()
+	curved_component["draw_mode"] = "closed_loop"
+	var curved_ids: Array[String] = []
+	for point_position in [Vector2(0.0, 0.0), Vector2(-2.0, 1.0), Vector2(-2.0, 3.0), Vector2(0.0, 4.0)]:
+		curved_ids.append(BezierTopology.add_point(curved_component, point_position, "aligned"))
+	var curved_points: Array = curved_component.get("points", [])
+	for point_data in curved_points:
+		point_data["handle_source"] = "manual"
+	BezierTopology.point_by_id(curved_points, curved_ids[0])["handle_out"] = Vector2(-0.8, 0.2)
+	BezierTopology.point_by_id(curved_points, curved_ids[1])["handle_in"] = Vector2(0.6, -0.2)
+	BezierTopology.point_by_id(curved_points, curved_ids[1])["handle_out"] = Vector2(-0.3, 0.7)
+	BezierTopology.point_by_id(curved_points, curved_ids[2])["handle_in"] = Vector2(-0.2, -0.5)
+	BezierTopology.point_by_id(curved_points, curved_ids[2])["handle_out"] = Vector2(0.5, 0.4)
+	BezierTopology.point_by_id(curved_points, curved_ids[3])["handle_in"] = Vector2(-0.7, -0.1)
+	var curved_result := SelectionMirrorService.apply(curved_component, curved_ids, mirror_axis_start, mirror_axis_end)
+	var curved_mirror: Dictionary = curved_result.get("component", {})
+	var top_axis_point := BezierTopology.point_by_id(curved_mirror.get("points", []), curved_ids[0])
+	var bottom_axis_point := BezierTopology.point_by_id(curved_mirror.get("points", []), curved_ids[3])
+	_expect(Vector2(top_axis_point.get("handle_in", Vector2.ZERO)).is_equal_approx(Vector2(0.8, 0.2)), "Mirror closure should retain the reflected incoming Handle at the first axis endpoint.")
+	_expect(Vector2(bottom_axis_point.get("handle_out", Vector2.ZERO)).is_equal_approx(Vector2(0.7, -0.1)), "Mirror closure should retain the reflected outgoing Handle at the last axis endpoint.")
 
 
 func _test_contour_stroke_mesh() -> void:
