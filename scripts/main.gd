@@ -15295,11 +15295,11 @@ func _render_asset_scale_rebase_inspector(asset: Dictionary) -> void:
 		blocker_label.add_theme_color_override("font_color", Color("#ef8354"))
 		inspector_content.add_child(blocker_label)
 	asset_scale_rebase_button = Button.new()
-	asset_scale_rebase_button.text = "Rebase Component Scales (%d)" % candidates.size()
+	asset_scale_rebase_button.text = "Rebase Scales (%d)" % candidates.size()
 	asset_scale_rebase_button.custom_minimum_size = Vector2(0, 28)
 	asset_scale_rebase_button.focus_mode = Control.FOCUS_NONE
 	asset_scale_rebase_button.disabled = not bool(analysis.get("can_rebase", false))
-	asset_scale_rebase_button.tooltip_text = "Bake finite, non-zero Component Scale, including Mirror signs, into owned geometry without changing Position or Rotation." if blockers.is_empty() else "Resolve every listed blocker before rebasing this Asset atomically."
+	asset_scale_rebase_button.tooltip_text = "Bake finite, non-zero Component and Group Scale, including Mirror signs, into canonical geometry while preserving visible transforms." if blockers.is_empty() else "Resolve every listed blocker before rebasing this Asset atomically."
 	asset_scale_rebase_button.pressed.connect(_on_rebase_asset_scales_pressed)
 	inspector_content.add_child(asset_scale_rebase_button)
 
@@ -15330,7 +15330,7 @@ func _on_rebase_asset_scales_pressed() -> void:
 	geometry_uv_mapping_preview_key = ""
 	weighting_preview = {}
 	weighting_preview_key = ""
-	_show_status_message("Rebased %d Component scale(s) in %s." % [result.get("rebased_component_ids", []).size(), str(asset.get("name", "Asset"))])
+	_show_status_message("Rebased %d Component and %d Group scale(s) in %s." % [result.get("rebased_component_ids", []).size(), result.get("rebased_group_ids", []).size(), str(asset.get("name", "Asset"))])
 	_render_outliner()
 	_render_inspector()
 	_render_canvas_context()

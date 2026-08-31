@@ -1,28 +1,33 @@
 class_name ComponentScaleRebaseService
 extends RefCounted
 
-## Explicitly bakes finite, non-zero signed local Component scale into owned source geometry.
-## Parent Rebase compensates direct Child transforms to preserve Child world transforms.
+## Explicitly bakes finite, non-zero signed Component and Group scale into
+## canonical authoring data while preserving visible world transforms.
 
 const ALGORITHM_VERSION := 3
 const SCALE_EPSILON := 0.000001
 
 
 static func analyze_asset(asset: Dictionary) -> Dictionary:
-	var candidates: Array = []
+	var working_asset := asset.duplicate(true)
+	var group_result := _rebase_group_scales(working_asset)
+	var candidates: Array = group_result.get("candidates", []).duplicate()
 	var blockers: Array = []
-	for component in asset.get("components", []):
+	for blocker in group_result.get("blockers", []):
+		blockers.append(blocker)
+	for component in working_asset.get("components", []):
 		if not component is Dictionary or str(component.get("type", "component")) == "guide":
 			continue
 		var scale := _component_scale(component)
 		if _is_unit_scale(scale):
 			continue
 		var entry := {
+			"scope_type": "component",
 			"component_id": str(component.get("id", "")),
 			"name": str(component.get("name", "Component")),
 			"scale": scale
 		}
-		var reason := "" if str(component.get("type", "component")) == "reference" else _blocking_reason(asset, component, scale)
+		var reason := "" if str(component.get("type", "component")) == "reference" else _blocking_reason(working_asset, component, scale)
 		if reason.is_empty():
 			entry["result_primitive_type"] = _result_primitive_type(component, scale)
 			candidates.append(entry)
@@ -48,18 +53,22 @@ static func rebase_asset(asset: Dictionary) -> Dictionary:
 			for blocker in analysis.get("blockers", []):
 				errors.append("%s: %s" % [str(blocker.get("name", "Component")), str(blocker.get("reason", "Scale cannot be rebased."))])
 		else:
-			errors.append("No Component scale requires Rebase.")
-		return {"valid": false, "errors": errors, "analysis": analysis, "rebased_component_ids": []}
+			errors.append("No Component or Group scale requires Rebase.")
+		return {"valid": false, "errors": errors, "analysis": analysis, "rebased_component_ids": [], "rebased_group_ids": []}
 	var candidate_ids: Array[String] = []
 	for candidate in analysis.get("candidates", []):
-		candidate_ids.append(str(candidate.get("component_id", "")))
+		if str(candidate.get("scope_type", "component")) == "component":
+			candidate_ids.append(str(candidate.get("component_id", "")))
 	var working_asset := asset.duplicate(true)
+	var group_result := _rebase_group_scales(working_asset)
+	if not bool(group_result.get("valid", false)):
+		return {"valid": false, "errors": group_result.get("errors", []), "analysis": analysis, "rebased_component_ids": [], "rebased_group_ids": []}
 	var result := rebase_components(working_asset, candidate_ids)
 	if not bool(result.get("valid", false)):
-		return {"valid": false, "errors": result.get("errors", []), "analysis": analysis, "rebased_component_ids": []}
+		return {"valid": false, "errors": result.get("errors", []), "analysis": analysis, "rebased_component_ids": [], "rebased_group_ids": []}
 	asset.clear()
 	asset.merge(working_asset, true)
-	return {"valid": true, "errors": [], "analysis": analysis, "rebased_component_ids": result.get("rebased_component_ids", [])}
+	return {"valid": true, "errors": [], "analysis": analysis, "rebased_component_ids": result.get("rebased_component_ids", []), "rebased_group_ids": group_result.get("rebased_group_ids", [])}
 
 
 static func rebase_components(asset: Dictionary, component_ids: Array) -> Dictionary:
@@ -118,6 +127,82 @@ static func rebase_components(asset: Dictionary, component_ids: Array) -> Dictio
 	asset.clear()
 	asset.merge(working_asset, true)
 	return {"valid": true, "errors": [], "rebased_component_ids": rebased_ids}
+
+
+static func _rebase_group_scales(asset: Dictionary) -> Dictionary:
+	var candidates: Array = []
+	var blockers: Array = []
+	for group in asset.get("groups", []):
+		if not group is Dictionary:
+			continue
+		var scale := Vector2(group.get("transform", {}).get("scale", Vector2.ONE))
+		if _is_unit_scale(scale):
+			continue
+		var entry := {
+			"scope_type": "group",
+			"group_id": str(group.get("id", "")),
+			"name": "%s (Group)" % str(group.get("name", "Group")),
+			"scale": scale
+		}
+		if not scale.is_finite() or absf(scale.x) <= SCALE_EPSILON or absf(scale.y) <= SCALE_EPSILON:
+			entry["reason"] = "Scale axes must be finite and non-zero."
+			blockers.append(entry)
+		else:
+			candidates.append(entry)
+	if not blockers.is_empty():
+		var errors: Array[String] = []
+		for blocker in blockers:
+			errors.append("%s: %s" % [str(blocker.get("name", "Group")), str(blocker.get("reason", "Scale cannot be rebased."))])
+		return {"valid": false, "errors": errors, "candidates": candidates, "blockers": blockers, "rebased_group_ids": []}
+
+	var rebased_ids: Array[String] = []
+	for candidate in candidates:
+		var group_id := str(candidate.get("group_id", ""))
+		var group := ComponentHierarchy.group_by_id(asset, group_id)
+		if group.is_empty():
+			continue
+		var group_world_before := ComponentHierarchy.group_world_transform(asset, group_id)
+		var member_world_records: Dictionary = {}
+		for component in asset.get("components", []):
+			if component is Dictionary:
+				var component_id := str(component.get("id", ""))
+				if ComponentHierarchy.membership_group_id(asset, component_id) == group_id:
+					member_world_records[component_id] = ComponentHierarchy.world_transform_record(asset, component_id)
+		var group_transform: Dictionary = group.get("transform", {}).duplicate(true)
+		group_transform["scale"] = Vector2.ONE
+		group["transform"] = group_transform
+		var member_ids: Array[String] = []
+		for component_id in member_world_records:
+			member_ids.append(str(component_id))
+		member_ids.sort_custom(func(left: String, right: String) -> bool:
+			return _component_depth(asset, left) < _component_depth(asset, right)
+		)
+		for component_id in member_ids:
+			var component := ComponentHierarchy.component_by_id(asset, component_id)
+			component["transform"] = ComponentHierarchy.local_transform_from_world_record(asset, component_id, member_world_records[component_id])
+		_bake_group_guides(asset, group_id, group_world_before)
+		rebased_ids.append(group_id)
+	return {"valid": true, "errors": [], "candidates": candidates, "blockers": blockers, "rebased_group_ids": rebased_ids}
+
+
+static func _bake_group_guides(asset: Dictionary, group_id: String, group_world_before: Transform2D) -> void:
+	var group_world_after := ComponentHierarchy.group_world_transform(asset, group_id)
+	var local_affine := group_world_after.affine_inverse() * group_world_before
+	for guide in asset.get("guides", []):
+		if not guide is Dictionary or str(guide.get("scope", {}).get("kind", "component")) != "group" or str(guide.get("scope", {}).get("group_id", "")) != group_id:
+			continue
+		if AssetGuide.is_weapon_frame(str(guide.get("guide_type", ""))):
+			var frame_world := group_world_before * ComponentHierarchy.local_transform(guide.get("transform", {}))
+			guide["transform"] = ComponentHierarchy.group_local_transform_from_world_record(asset, group_id, ComponentHierarchy.transform_record_from_affine(frame_world, Vector2.ZERO))
+			continue
+		BezierGeometry.resolve_auto_handles(guide.get("points", []), guide.get("chains", []))
+		for point in guide.get("points", []):
+			if not point is Dictionary:
+				continue
+			point["position"] = local_affine * Vector2(point.get("position", Vector2.ZERO))
+			point["handle_in"] = local_affine.basis_xform(Vector2(point.get("handle_in", Vector2.ZERO)))
+			point["handle_out"] = local_affine.basis_xform(Vector2(point.get("handle_out", Vector2.ZERO)))
+			point["handle_source"] = "manual"
 
 
 static func _blocking_reason(_asset: Dictionary, component: Dictionary, scale: Vector2) -> String:

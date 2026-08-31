@@ -108,9 +108,11 @@ changing that source. Schema 40 and older Worlds migrate explicitly
 to 4 px.
 
 World schema 42 adds the Asset Inspector's atomic Scale Rebase. Finite, non-zero
-signed local Scale is baked around the unchanged Pivot into owned Points,
-resolved handles, Component Guides, or analytic primitive axes; local Scale
-becomes `(1, 1)`. Parent rebases compensate direct Child local transforms to
+signed local Component and Group Scale is normalized together. Group Rebase
+first compensates member transforms, then bakes the resulting Component Scale
+around the unchanged Pivot into owned Points, resolved handles, Component
+Guides, or analytic primitive axes; all local Scale becomes `(1, 1)`. Parent
+rebases compensate direct Child local transforms to
 preserve their visible world transforms, so Child Position, Rotation, or Scale
 may change. Negative axes encode a transient Mirror reflection. Non-uniform
 Circles become analytic Ellipses. Zero/non-finite Scale is an explicit blocker

@@ -29,8 +29,9 @@ stale for an explicit rebuild.
 ## Component Scale
 
 World schema 42 adds an explicit Asset-level Scale Rebase workflow. Component
-Scale is an authoring convenience; Rebase bakes it into owned source geometry
-and sets both local Scale axes exactly to `1`.
+and Group Scale are authoring conveniences; Rebase normalizes both local Scale
+axes to `1`. A Group Rebase first compensates member transforms, then bakes the
+resulting Component Scale into owned source geometry.
 
 The operation is atomic across the selected Asset and preserves each affected
 Component's Pivot, hierarchy, visibility, animation document, and visible world
@@ -57,9 +58,9 @@ Ellipse contours, sampling, automatic metrics, hit geometry, and mesh inputs
 remain derived; Rebase never polygonizes the primitive into stored Bézier
 topology.
 
-The Asset Inspector lists every candidate and blocker. Its Rebase button is
+The Asset Inspector lists every Component and Group candidate and blocker. Its Rebase button is
 enabled only when at least one candidate exists and the complete operation is
-safe. Finite, non-zero signed Scale is accepted for owned Components.
+safe. Finite, non-zero signed Scale is accepted for owned Components and Groups.
 Negative axes are a transient Mirror/authoring representation: their reflection
 is baked into the owned geometry before Scale becomes `(1, 1)`. Primitive
 centers receive the signed affine transform while their analytic axis diameters
@@ -68,7 +69,8 @@ References are source-Asset instances and are excluded from Rebase; their
 finite, non-zero signed Scale remains an instance placement transform. Scaled
 Components with Children are supported: Child local transforms are compensated
 so the visible Child subtree stays in place. There is no partial or silent
-fallback.
+fallback. Group-scoped Bézier Guides and Weapon frames are compensated with
+their Group so their visible world transform is retained.
 
 Duplicate & Mirror with Flip Orientation uses a targeted atomic Rebase for the
 newly duplicated Component subtree. It preserves the subtree's world transforms

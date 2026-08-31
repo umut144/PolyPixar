@@ -1141,6 +1141,38 @@ func _test_component_scale_rebase() -> void:
 	var child_world_preserved := child_world_after.origin.is_equal_approx(child_world_before.origin) and child_world_after.basis_xform(Vector2.RIGHT).is_equal_approx(child_world_before.basis_xform(Vector2.RIGHT)) and child_world_after.basis_xform(Vector2.DOWN).is_equal_approx(child_world_before.basis_xform(Vector2.DOWN))
 	_expect(bool(child_rebase_result.get("valid", false)) and child_rebase_result.get("rebased_component_ids", []).size() == 1 and Vector2(ComponentHierarchy.component_by_id(child_rebase_asset, "parent").get("transform", {}).get("scale", Vector2.ZERO)) == Vector2.ONE and child_world_preserved and not Vector2(rebased_child.get("transform", {}).get("position", Vector2.ZERO)).is_equal_approx(Vector2.ONE), "Rebasing a scaled Parent must compensate its Child local transform while preserving the Child's visible world transform.")
 
+	var group_parent := curved_source.duplicate(true)
+	group_parent["id"] = "group_parent"
+	group_parent["name"] = "Group Parent"
+	group_parent["parent_component_id"] = ""
+	group_parent["group_id"] = ""
+	group_parent["transform"] = {"position": Vector2(3.0, -2.0), "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}
+	var group_member := curved_source.duplicate(true)
+	group_member["id"] = "group_member"
+	group_member["name"] = "Group Member"
+	group_member["parent_component_id"] = "group_parent"
+	group_member["group_id"] = "scaled_group"
+	group_member["transform"] = {"position": Vector2(2.0, 1.0), "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}
+	var group_guide := AssetGuide.create("group_guide", "Group Guide", AssetGuide.SAMPLER_SPINE, "")
+	group_guide["scope"] = {"kind": "group", "group_id": "scaled_group"}
+	BezierTopology.add_point(group_guide, Vector2(1.0, 2.0), "free", Vector2(0.25, -0.5))
+	var group_rebase_asset := {
+		"id": "group_rebase", "name": "Group Rebase", "components": [group_parent, group_member],
+		"groups": [{"id": "scaled_group", "name": "scaled_group", "parent_component_id": "group_parent", "visibility": true, "transform": {"position": Vector2(4.0, 5.0), "rotation": 20.0, "scale": Vector2(1.25, 0.8), "pivot": Vector2(1.0, -1.0)}}],
+		"guides": [group_guide]
+	}
+	var group_member_point_before := ComponentHierarchy.world_transform(group_rebase_asset, "group_member") * Vector2(group_member.get("points", [])[0].get("position", Vector2.ZERO))
+	var group_guide_point_before := ComponentHierarchy.group_world_transform(group_rebase_asset, "scaled_group") * Vector2(group_guide.get("points", [])[0].get("position", Vector2.ZERO))
+	var group_analysis := ComponentScaleRebaseService.analyze_asset(group_rebase_asset)
+	var group_rebase_result := ComponentScaleRebaseService.rebase_asset(group_rebase_asset)
+	var rebased_group := ComponentHierarchy.group_by_id(group_rebase_asset, "scaled_group")
+	var rebased_group_member := ComponentHierarchy.component_by_id(group_rebase_asset, "group_member")
+	var group_member_point_after := ComponentHierarchy.world_transform(group_rebase_asset, "group_member") * Vector2(rebased_group_member.get("points", [])[0].get("position", Vector2.ZERO))
+	var rebased_group_guide: Dictionary = group_rebase_asset.get("guides", [])[0]
+	var group_guide_point_after := ComponentHierarchy.group_world_transform(group_rebase_asset, "scaled_group") * Vector2(rebased_group_guide.get("points", [])[0].get("position", Vector2.ZERO))
+	_expect(bool(group_analysis.get("can_rebase", false)) and group_analysis.get("candidates", []).size() == 2 and bool(group_rebase_result.get("valid", false)) and group_rebase_result.get("rebased_group_ids", []).size() == 1 and Vector2(rebased_group.get("transform", {}).get("scale", Vector2.ZERO)) == Vector2.ONE and Vector2(rebased_group_member.get("transform", {}).get("scale", Vector2.ZERO)) == Vector2.ONE, "Scale Rebase should include a scaled Group and normalize both the Group and its compensated member Component.")
+	_expect(group_member_point_after.distance_to(group_member_point_before) <= 0.000001 and group_guide_point_after.distance_to(group_guide_point_before) <= 0.000001 and str(rebased_group_guide.get("points", [])[0].get("handle_source", "")) == "manual", "Group Scale Rebase must preserve member geometry and group-scoped Guide curves in world space.")
+
 	var ui_asset := {"id": "ui_rebase", "name": "UI Rebase", "asset_type": "character", "visibility": true, "asset_pivot": Vector2.ZERO, "components": [curved_source.duplicate(true)], "guides": [], "animation": MotionWorkspace.create_default_animation_document()}
 	ui_asset["components"][0]["id"] = "ui_component"
 	ui_asset["components"][0]["name"] = "UI Component"
