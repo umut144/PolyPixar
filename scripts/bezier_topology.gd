@@ -288,9 +288,9 @@ static func join_open_chain_endpoints(component: Dictionary, anchor_point_id: St
 	var anchor_ids: Array = anchor_chain.get("point_ids", []).duplicate()
 	var target_ids: Array = target_chain.get("point_ids", []).duplicate()
 	if anchor_point_id == str(anchor_ids.front()):
-		anchor_ids.reverse()
+		_reverse_point_run(component.get("points", []), anchor_ids)
 	if target_point_id == str(target_ids.back()):
-		target_ids.reverse()
+		_reverse_point_run(component.get("points", []), target_ids)
 	anchor_ids.append_array(target_ids)
 	anchor_chain["point_ids"] = anchor_ids
 	anchor_chain["closed"] = false
@@ -303,6 +303,20 @@ static func join_open_chain_endpoints(component: Dictionary, anchor_point_id: St
 	rebuild_chain_edges(component, anchor_chain)
 	BezierGeometry.resolve_auto_handles(component.get("points", []), chains)
 	return true
+
+
+## Reversing Chain traversal also reverses the semantic incoming/outgoing side
+## of every Point. Keep authored cubic controls attached to the same geometric
+## segments while changing their traversal direction.
+static func _reverse_point_run(points: Array, point_ids: Array) -> void:
+	point_ids.reverse()
+	for point_id_value in point_ids:
+		var point := point_by_id(points, str(point_id_value))
+		if point.is_empty():
+			continue
+		var handle_in: Vector2 = point.get("handle_in", Vector2.ZERO)
+		point["handle_in"] = Vector2(point.get("handle_out", Vector2.ZERO))
+		point["handle_out"] = handle_in
 
 
 static func insert_point_on_edge(component: Dictionary, edge_id: String, t: float) -> String:

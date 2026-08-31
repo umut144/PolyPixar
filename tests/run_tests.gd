@@ -354,8 +354,17 @@ func _test_closed_loop_selection_mirror() -> void:
 	var curved_mirror: Dictionary = curved_result.get("component", {})
 	var top_axis_point := BezierTopology.point_by_id(curved_mirror.get("points", []), curved_ids[0])
 	var bottom_axis_point := BezierTopology.point_by_id(curved_mirror.get("points", []), curved_ids[3])
-	_expect(Vector2(top_axis_point.get("handle_in", Vector2.ZERO)).is_equal_approx(Vector2(0.8, 0.2)), "Mirror closure should retain the reflected incoming Handle at the first axis endpoint.")
-	_expect(Vector2(bottom_axis_point.get("handle_out", Vector2.ZERO)).is_equal_approx(Vector2(0.7, -0.1)), "Mirror closure should retain the reflected outgoing Handle at the last axis endpoint.")
+	var reversed_source_point := BezierTopology.point_by_id(curved_mirror.get("points", []), curved_ids[1])
+	var reflected_source_position := Vector2(2.0, 1.0)
+	var reflected_source_point: Dictionary = {}
+	for point_data in curved_mirror.get("points", []):
+		if Vector2(point_data.get("position", Vector2.ZERO)).is_equal_approx(reflected_source_position):
+			reflected_source_point = point_data
+			break
+	_expect(Vector2(top_axis_point.get("handle_in", Vector2.ZERO)).is_equal_approx(Vector2(-0.8, 0.2)) and Vector2(top_axis_point.get("handle_out", Vector2.ZERO)).is_equal_approx(Vector2(0.8, 0.2)), "Mirror closure should preserve both directed Handles at the first axis endpoint.")
+	_expect(Vector2(bottom_axis_point.get("handle_in", Vector2.ZERO)).is_equal_approx(Vector2(0.7, -0.1)) and Vector2(bottom_axis_point.get("handle_out", Vector2.ZERO)).is_equal_approx(Vector2(-0.7, -0.1)), "Mirror closure should preserve both directed Handles at the last axis endpoint.")
+	_expect(Vector2(reversed_source_point.get("handle_in", Vector2.ZERO)).is_equal_approx(Vector2(-0.3, 0.7)) and Vector2(reversed_source_point.get("handle_out", Vector2.ZERO)).is_equal_approx(Vector2(0.6, -0.2)), "Reversing the source Chain during Mirror should swap every Point's incoming and outgoing Handles.")
+	_expect(not reflected_source_point.is_empty() and Vector2(reflected_source_point.get("handle_in", Vector2.ZERO)).is_equal_approx(Vector2(-0.6, -0.2)) and Vector2(reflected_source_point.get("handle_out", Vector2.ZERO)).is_equal_approx(Vector2(0.3, 0.7)), "Reversing the reflected Chain during Mirror should retain its directed cubic controls.")
 
 
 func _test_contour_stroke_mesh() -> void:
