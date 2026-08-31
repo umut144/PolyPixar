@@ -1,0 +1,118 @@
+# Headless verification for PolyTools.
+#
+# Runs what AGENTS.md requires after a change: a headless editor parse, the test
+# suite, and a whitespace check on the pushed diff. The native CDT extension is
+# built from source, because Meshing, UV, SDF, and Weighting all fail without it
+# and the checked-in build is macOS-only.
+#
+# macOS stays the authoring platform. This pipeline is a second opinion on
+# Linux, not a replacement for running the two AGENTS.md commands locally.
+
+stages:
+  - verify
+
+variables:
+  # Matches native/polytools_cdt/toolchain-lock.json. That file names the Mono
+  # build; the project contains no C#, so the standard build is used here.
+  GODOT_VERSION: "4.7.1-stable"
+  GODOT_BIN: "Godot_v4.7.1-stable_linux.x86_64"
+  # Enough history for the whitespace check, without cloning all of it.
+  GIT_DEPTH: "50"
+  # godot-cpp is a 130 MB checkout that is only needed when the extension is
+  # actually rebuilt. The script fetches it on demand.
+  GIT_SUBMODULE_STRATEGY: none
+
+verify:
+  stage: verify
+  image: buildpack-deps:24.04
+  # Commits land here in quick succession; let a newer push cancel this run
+  # instead of paying for a result nobody will read.
+  interruptible: true
+
+  cache:
+    - key: "godot-$GODOT_VERSION"
+      paths:
+        - .ci-cache/godot/
+    # Holds finished extension builds keyed by content, so an unchanged native
+    # boundary skips the ~10 minute godot-cpp compile entirely. Caching the
+    # intermediates instead does not work: godot-cpp keeps its 1000+ object
+    # files beside the sources, and without them SCons rebuilds regardless.
+    - key: "polytools-cdt-linux-x86_64"
+      paths:
+        - .ci-cache/native/
+
+  before_script:
+    - |
+      set -eu
+      if [ ! -x ".ci-cache/godot/$GODOT_BIN" ]; then
+        echo "Downloading Godot $GODOT_VERSION"
+        mkdir -p .ci-cache/godot
+        curl -sSfL -o /tmp/godot.zip \
+          "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/${GODOT_BIN}.zip"
+        apt-get update -qq && apt-get install -y -qq unzip >/dev/null
+        unzip -oq /tmp/godot.zip -d .ci-cache/godot
+        chmod +x ".ci-cache/godot/$GODOT_BIN"
+      fi
+    - export GODOT="$CI_PROJECT_DIR/.ci-cache/godot/$GODOT_BIN"
+    - "$GODOT --version"
+
+  script:
+    - echo "── Native CDT extension ──"
+    - |
+      set -eu
+      library="libpolytools_cdt.linux.template_debug.x86_64.so"
+      # Pinned dependency commits plus the adapter itself. Reading the submodule
+      # SHAs from the tree avoids checking them out just to identify them.
+      fingerprint=$(
+        {
+          git ls-tree HEAD native/polytools_cdt/godot-cpp native/polytools_cdt/third_party/CDT
+          cat native/polytools_cdt/SConstruct native/polytools_cdt/src/*
+        } | sha256sum | cut -d' ' -f1
+      )
+      cached=".ci-cache/native/$fingerprint/$library"
+      mkdir -p native/polytools_cdt/bin
+      if [ -f "$cached" ]; then
+        echo "Reusing cached build $fingerprint"
+        cp "$cached" "native/polytools_cdt/bin/$library"
+      else
+        echo "Building $fingerprint"
+        git submodule update --init --depth 1 --recursive \
+          native/polytools_cdt/godot-cpp native/polytools_cdt/third_party/CDT
+        apt-get update -qq && apt-get install -y -qq python3-pip >/dev/null
+        # The pinned SCons from the documented native toolchain. build.sh accepts
+        # a system SCons on Linux, so no virtualenv is provisioned here.
+        pip3 install --break-system-packages -q \
+          -r native/polytools_cdt/requirements-native.txt
+        native/polytools_cdt/build.sh -j"$(nproc)"
+        # Keep only the current build so the cache cannot grow without bound.
+        rm -rf .ci-cache/native
+        mkdir -p ".ci-cache/native/$fingerprint"
+        cp "native/polytools_cdt/bin/$library" ".ci-cache/native/$fingerprint/"
+      fi
+
+    # Also populates .godot/, including the global class cache the suite needs
+    # to resolve class_name identifiers. On a fresh checkout it must therefore
+    # run before the suite.
+    - echo "── Headless editor parse ──"
+    - "$GODOT --headless --path . --editor --quit"
+
+    - echo "── Native CDT smoke test ──"
+    - "$GODOT --headless --path . -s res://tests/native_cdt_smoke.gd"
+
+    - echo "── Test suite ──"
+    - "$GODOT --headless --path . -s res://tests/run_tests.gd"
+
+    - echo "── Whitespace ──"
+    - |
+      base=""
+      if [ -n "${CI_MERGE_REQUEST_DIFF_BASE_SHA:-}" ]; then
+        base="$CI_MERGE_REQUEST_DIFF_BASE_SHA"
+      elif [ -n "${CI_COMMIT_BEFORE_SHA:-}" ] \
+        && [ "$CI_COMMIT_BEFORE_SHA" != "0000000000000000000000000000000000000000" ]; then
+        base="$CI_COMMIT_BEFORE_SHA"
+      fi
+      if [ -n "$base" ] && git cat-file -e "$base^{commit}" 2>/dev/null; then
+        git diff --check "$base" HEAD
+      else
+        echo "No reachable base commit for this pipeline; skipping the diff check."
+      fi
