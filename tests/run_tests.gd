@@ -31,6 +31,7 @@ func _init() -> void:
 	_test_asset_authored_facing()
 	_test_multi_component_inspector()
 	_test_multi_component_deletion()
+	_test_outliner_selection_wiring()
 	_test_render_invalidation()
 	_test_atomic_document_writes()
 	_test_geometry_document_history_isolation()
@@ -107,6 +108,35 @@ func _control_text(root: Node) -> String:
 	for child in root.get_children():
 		values.append(_control_text(child))
 	return "\n".join(values)
+
+
+func _outliner_button(application: Control, prefix: String) -> Button:
+	return _button_starting_with(application.outliner_list, prefix)
+
+
+func _button_starting_with(root: Node, prefix: String) -> Button:
+	# Rendering clears the previous rows with queue_free, which only takes effect
+	# at the end of a frame. Detached from the tree no frame ever ends, so rows
+	# from earlier renders are still children here and must be skipped.
+	if root.is_queued_for_deletion():
+		return null
+	if root is Button and str(root.text).begins_with(prefix):
+		return root
+	for child in root.get_children():
+		var match := _button_starting_with(child, prefix)
+		if match != null:
+			return match
+	return null
+
+
+func _press_outliner_button(application: Control, prefix: String) -> bool:
+	# Presses the row the Outliner actually built, so the test covers the
+	# wiring between the row and its handler, not just the handler.
+	var button := _outliner_button(application, prefix)
+	if button == null:
+		return false
+	button.pressed.emit()
+	return true
 
 
 func _button_with_text(root: Node, expected_text: String) -> Button:
@@ -1393,6 +1423,93 @@ func _distance_to_segment(point: Vector2, start: Vector2, end: Vector2) -> float
 		return point.distance_to(start)
 	var t := clampf((point - start).dot(delta) / delta.length_squared(), 0.0, 1.0)
 	return point.distance_to(start + delta * t)
+
+
+func _outliner_test_component(component_id: String, component_name: String) -> Dictionary:
+	var component := _component()
+	BezierTopology.add_point(component, Vector2.ZERO, "corner")
+	BezierTopology.add_point(component, Vector2(10.0, 0.0), "linear")
+	BezierTopology.add_point(component, Vector2(10.0, 10.0), "linear")
+	BezierTopology.close_active_chain(component)
+	component.merge({"id": component_id, "name": component_name, "visibility": true})
+	return component
+
+
+func _test_outliner_selection_wiring() -> void:
+	# Every Outliner row reaches its handler through a signal connection the
+	# parser cannot check. These press the rows the Outliner actually builds, so
+	# a broken connection fails here instead of only under the mouse.
+	var body := _outliner_test_component("component_1", "body")
+	var arm := _outliner_test_component("component_2", "arm")
+	var guide := {"id": "guide_1", "guide_type": AssetGuide.SAMPLE, "ordinal": 1, "visibility": true,
+		"scope": {"kind": "component", "component_id": "component_1"},
+		"points": [], "edges": [], "chains": []}
+	var group := {"id": "group_1", "name": "torso", "transform": {}, "visibility": true, "parent_component_id": ""}
+	var asset := {"id": "asset_1", "name": "Wizard", "visibility": true, "components": [body, arm], "groups": [group], "guides": [guide]}
+	var second_asset := {"id": "asset_2", "name": "Rogue", "visibility": true, "components": [], "groups": [], "guides": []}
+
+	var application: Control = load("res://scripts/main.gd").new()
+	application._build_ui()
+	var test_assets: Array[Dictionary] = [asset, second_asset]
+	application.assets = test_assets
+
+	# Create. Expanding an Asset focuses the Outliner on it, so the Asset row of
+	# a second Asset is only reachable while nothing is expanded.
+	application.active_module = "Create"
+	application._render_outliner()
+	_expect(_press_outliner_button(application, "Rogue"), "The Create Outliner should offer a row per Asset while nothing is expanded.")
+	_expect(application.selected_asset_id == "asset_2" and application.active_module == "Create", "Pressing an Asset row should select that Asset.")
+
+	application._select_asset("asset_1")
+	application._set_outliner_asset_expanded("asset_1", true)
+	application._render_outliner()
+	_expect(_press_outliner_button(application, "arm"), "The Create Outliner should offer a Component row.")
+	_expect(application.selected_component_id == "component_2", "Pressing a Component row should select that Component.")
+	application._render_outliner()
+	_expect(_press_outliner_button(application, "G: torso"), "The Create Outliner should offer a Group row.")
+	_expect(application.selected_group_id == "group_1", "Pressing a Group row should select that Group.")
+	application._render_outliner()
+	_expect(_press_outliner_button(application, AssetGuide.outliner_name(guide, "body")), "The Create Outliner should offer a Guide row.")
+	_expect(application.selected_guide_id == "guide_1", "Pressing a Guide row should select that Guide.")
+
+	# Mesh
+	application.active_module = "Mesh"
+	application.active_geometry_submodule = "Sampling"
+	application.selected_asset_id = ""
+	application.selected_component_id = ""
+	application.expanded_assets.clear()
+	application._render_outliner()
+	_expect(_press_outliner_button(application, "Wizard"), "The Mesh Outliner should offer an Asset row.")
+	_expect(application.selected_asset_id == "asset_1", "Pressing a Mesh Asset row should select that Asset.")
+	application._set_outliner_asset_expanded("asset_1", true)
+	application._render_outliner()
+	_expect(_press_outliner_button(application, "body"), "The Mesh Outliner should offer a Component row.")
+	_expect(application.selected_component_id == "component_1" and application.selected_guide_id.is_empty(), "Pressing a Mesh Component row should select that Component.")
+
+	# Style
+	application.active_module = "Style"
+	application.active_style_submodule = "Weighting"
+	application.selected_asset_id = ""
+	application.selected_component_id = ""
+	application.expanded_assets.clear()
+	application._render_outliner()
+	_expect(_press_outliner_button(application, "Wizard"), "The Style Outliner should offer an Asset row.")
+	_expect(application.selected_asset_id == "asset_1", "Pressing a Style Asset row should select that Asset.")
+	application._set_outliner_asset_expanded("asset_1", true)
+	application._render_outliner()
+	_expect(_press_outliner_button(application, "body ·"), "The Style Outliner should offer a Component row carrying its Mesh state.")
+	_expect(application.selected_component_id == "component_1" and application.selected_weighting_style_id.is_empty(), "Pressing a Style Component row should select that Component and clear the Style.")
+
+	application._create_weighting_style("asset_1", "component_1")
+	var styles: Array = application._weighting_styles("asset_1", "component_1")
+	_expect(styles.size() == 1, "Creating a Weighting Style should record exactly one Style on the Component.")
+	application.selected_weighting_style_id = ""
+	application._render_outliner()
+	var created: Dictionary = styles[0]
+	_expect(_press_outliner_button(application, str(created.get("name", "")) + " ·"), "The Style Outliner should offer a Style row.")
+	_expect(application.selected_weighting_style_id == str(created.get("id", "")), "Pressing a Style row should select that Style.")
+
+	application.free()
 
 
 func _test_render_invalidation() -> void:
