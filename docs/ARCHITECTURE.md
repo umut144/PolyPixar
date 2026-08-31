@@ -42,6 +42,10 @@ export data.
 - `ComponentCanvas` renders immutable copies and emits user intent.
 - `main.gd` applies intent to the selected World document and records
   history.
+- `EditorWidgets` builds the shared widget vocabulary — panels, labels, section
+  headers, buttons and their styling. It is static and purely constructive: it
+  reads no editor state and knows nothing about Worlds, Assets or Components.
+  A control that needs a handler receives it as a `Callable`.
 - `WorldDocumentService` owns the on-disk document format: normalization on
   load, serialization on save, and the atomic file replacement both sides use.
   It is static and holds no editor state. `main.gd` keeps the orchestration —

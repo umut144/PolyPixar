@@ -10,11 +10,6 @@ const WORLDS_ROOT := "res://worlds"
 const CONFIG_PATH := "res://configs/app_config.json"
 const CONSUMER_SYNC_SCRIPT := "res://scripts/sync_world01_consumers.sh"
 const REGION_TYPES := ["attack", "hurt", "collision"]
-const REGION_COLORS := {
-	"attack": Color("#ef6c78"),
-	"hurt": Color("#68d391"),
-	"collision": Color("#f2994a")
-}
 const MAX_HISTORY_SIZE := 100
 # Render targets. Mutations declare what became stale; the flush below decides
 # what actually runs, once per frame.
@@ -753,7 +748,7 @@ func _build_ui() -> void:
 	main_layout.add_theme_constant_override("separation", 1)
 	root_margin.add_child(main_layout)
 
-	var toolbar_panel := _create_panel()
+	var toolbar_panel := EditorWidgets.create_panel()
 	main_layout.add_child(toolbar_panel)
 	var toolbar := HBoxContainer.new()
 	toolbar.custom_minimum_size = Vector2(0, 32)
@@ -774,7 +769,7 @@ func _build_ui() -> void:
 	draw_mode_status.add_theme_color_override("font_color", Color("#9aa3b2"))
 	for draw_mode_index in range(WorldDocumentService.DRAW_MODES.size()):
 		draw_mode_status.get_popup().add_radio_check_item(_draw_mode_display_name(WorldDocumentService.DRAW_MODES[draw_mode_index]), draw_mode_index)
-	_style_popup_menu(draw_mode_status.get_popup())
+	EditorWidgets.style_popup_menu(draw_mode_status.get_popup())
 	draw_mode_status.get_popup().id_pressed.connect(_on_draw_mode_status_selected)
 	toolbar.add_child(draw_mode_status)
 	export_run_button = Button.new()
@@ -822,7 +817,7 @@ func _build_ui() -> void:
 	world_menu.custom_minimum_size = Vector2(132, 32)
 	world_menu.focus_mode = Control.FOCUS_NONE
 	var world_popup := world_menu.get_popup()
-	_style_popup_menu(world_popup)
+	EditorWidgets.style_popup_menu(world_popup)
 	world_popup.add_item("New")
 	world_popup.add_item("Save")
 	world_popup.add_item("Load")
@@ -855,7 +850,7 @@ func _build_ui() -> void:
 	workspace_row.add_theme_constant_override("separation", 1)
 	main_layout.add_child(workspace_row)
 
-	var module_rail_panel := _create_panel(Color("#20242c"))
+	var module_rail_panel := EditorWidgets.create_panel(Color("#20242c"))
 	module_rail_panel.custom_minimum_size = Vector2(104, 0)
 	workspace_row.add_child(module_rail_panel)
 	var module_rail := VBoxContainer.new()
@@ -875,7 +870,7 @@ func _build_ui() -> void:
 	workspace_split.split_offset = 220
 	workspace_row.add_child(workspace_split)
 
-	outliner_panel = _create_panel()
+	outliner_panel = EditorWidgets.create_panel()
 	outliner_panel.custom_minimum_size = Vector2(180, 0)
 	workspace_split.add_child(outliner_panel)
 	var outliner_content := VBoxContainer.new()
@@ -896,7 +891,7 @@ func _build_ui() -> void:
 	outliner_content.add_child(outliner_asset_type_filter_panel)
 	var filter_header := HBoxContainer.new()
 	filter_header.add_theme_constant_override("separation", 4)
-	var filter_label := _create_panel_label("Asset Filter")
+	var filter_label := EditorWidgets.create_panel_label("Asset Filter")
 	filter_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	filter_header.add_child(filter_label)
 	var filter_reset := Button.new()
@@ -947,7 +942,7 @@ func _build_ui() -> void:
 	canvas_column.add_theme_constant_override("separation", 1)
 	canvas_split.add_child(canvas_column)
 
-	context_bar_panel = _create_panel()
+	context_bar_panel = EditorWidgets.create_panel()
 	canvas_column.add_child(context_bar_panel)
 	context_bar = HBoxContainer.new()
 	context_bar.custom_minimum_size = Vector2(0, 32)
@@ -955,7 +950,7 @@ func _build_ui() -> void:
 	_create_snap_popup()
 	_create_frame_popup()
 
-	var canvas_panel := _create_panel(Color("#1b1e24"))
+	var canvas_panel := EditorWidgets.create_panel(Color("#1b1e24"))
 	# Canvas drawing can legitimately extend beyond its Control rect while
 	# panning/zooming. Clip it at the workspace panel so it never paints over
 	# the outliner, toolbar, or inspector.
@@ -1005,7 +1000,7 @@ func _build_ui() -> void:
 	canvas_context_label.add_theme_color_override("font_color", Color("#9aa3b2"))
 	canvas.add_child(canvas_context_label)
 
-	inspector_panel = _create_panel()
+	inspector_panel = EditorWidgets.create_panel()
 	inspector_panel.custom_minimum_size = Vector2(260, 0)
 	canvas_split.add_child(inspector_panel)
 	inspector_content = VBoxContainer.new()
@@ -1013,13 +1008,13 @@ func _build_ui() -> void:
 	inspector_panel.add_child(inspector_content)
 	_create_export_workspace(canvas_panel)
 
-	var status_bar := _create_panel()
+	var status_bar := EditorWidgets.create_panel()
 	status_bar.custom_minimum_size = Vector2(0, 24)
 	main_layout.add_child(status_bar)
 	var status_layout := HBoxContainer.new()
 	status_layout.add_theme_constant_override("separation", 1)
 	status_bar.add_child(status_layout)
-	var status_left := _create_status_region()
+	var status_left := EditorWidgets.create_status_region()
 	status_left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	status_left.size_flags_stretch_ratio = 17.0
 	status_layout.add_child(status_left)
@@ -1029,14 +1024,14 @@ func _build_ui() -> void:
 	program_status_label.add_theme_font_size_override("font_size", 11)
 	program_status_label.add_theme_color_override("font_color", Color("#f2c94c"))
 	status_left.add_child(program_status_label)
-	var status_middle := _create_status_region()
+	var status_middle := EditorWidgets.create_status_region()
 	status_middle.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	status_middle.size_flags_stretch_ratio = 64.0
 	status_layout.add_child(status_middle)
 	info_bar = HBoxContainer.new()
 	info_bar.add_theme_constant_override("separation", 16)
 	status_middle.add_child(info_bar)
-	var status_right := _create_status_region()
+	var status_right := EditorWidgets.create_status_region()
 	status_right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	status_right.size_flags_stretch_ratio = 17.0
 	status_layout.add_child(status_right)
@@ -1257,54 +1252,6 @@ func _confirm_motion_sequence_creation() -> void:
 	_invalidate_render(RENDER_DOCUMENT)
 
 
-func _create_panel(background_color := Color("#20242c")) -> PanelContainer:
-	var panel := PanelContainer.new()
-	var style := StyleBoxFlat.new()
-	style.bg_color = background_color
-	style.border_color = Color("#363d48")
-	style.set_border_width_all(1)
-	style.corner_radius_top_left = 2
-	style.corner_radius_top_right = 2
-	style.corner_radius_bottom_right = 2
-	style.corner_radius_bottom_left = 2
-	panel.add_theme_stylebox_override("panel", style)
-	return panel
-
-
-func _create_panel_label(text: String) -> Label:
-	var label := Label.new()
-	label.text = text
-	label.custom_minimum_size = Vector2(0, 24)
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", 11)
-	label.add_theme_color_override("font_color", Color("#9aa3b2"))
-	return label
-
-
-func _create_inspector_section(text: String) -> VBoxContainer:
-	var section := VBoxContainer.new()
-	section.set_meta("inspector_section", true)
-	section.add_theme_constant_override("separation", 0)
-	var separator := HSeparator.new()
-	separator.modulate = Color("#3a424f")
-	section.add_child(separator)
-	var header := Button.new()
-	header.text = "▾  %s" % text
-	header.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	header.custom_minimum_size = Vector2(0, 24)
-	header.focus_mode = Control.FOCUS_NONE
-	header.toggle_mode = true
-	header.button_pressed = true
-	header.flat = true
-	header.add_theme_font_size_override("font_size", 10)
-	header.add_theme_color_override("font_color", Color("#c0c8d5"))
-	header.add_theme_color_override("font_hover_color", Color("#ffffff"))
-	header.pressed.connect(_on_inspector_section_toggled.bind(section, text, header))
-	section.add_child(header)
-	return section
-
-
 func _on_inspector_section_toggled(section: VBoxContainer, text: String, header: Button) -> void:
 	var parent := section.get_parent()
 	if parent == null:
@@ -1320,30 +1267,10 @@ func _on_inspector_section_toggled(section: VBoxContainer, text: String, header:
 			sibling.visible = expanded
 
 
-func _create_inspector_field_label(text: String) -> Label:
-	var label := Label.new()
-	label.text = text
-	label.custom_minimum_size = Vector2(0, 18)
-	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", 10)
-	label.add_theme_color_override("font_color", Color("#7f8a9b"))
-	return label
-
-
-func _create_status_region() -> PanelContainer:
-	var region := PanelContainer.new()
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color("#20242c")
-	style.border_color = Color("#363d48")
-	style.set_border_width_all(1)
-	region.add_theme_stylebox_override("panel", style)
-	return region
-
-
 func _create_snap_popup() -> void:
 	snap_popup = PopupPanel.new()
 	snap_popup.size = Vector2i(250, 230)
-	snap_popup.add_theme_stylebox_override("panel", _opaque_popup_style())
+	snap_popup.add_theme_stylebox_override("panel", EditorWidgets.opaque_popup_style())
 	var content := VBoxContainer.new()
 	content.add_theme_constant_override("separation", 6)
 	snap_popup.add_child(content)
@@ -1374,7 +1301,7 @@ func _create_snap_popup() -> void:
 	content.add_child(snap_grid_info_label)
 	snap_rotation_value_label = Label.new()
 	content.add_child(snap_rotation_value_label)
-	snap_rotation_slider = _create_snap_slider(1.0, 90.0, 1.0, snap_rotation_step)
+	snap_rotation_slider = EditorWidgets.create_snap_slider(1.0, 90.0, 1.0, snap_rotation_step)
 	snap_rotation_slider.value_changed.connect(_on_snap_rotation_changed)
 	content.add_child(snap_rotation_slider)
 	_update_snap_popup_labels()
@@ -1384,7 +1311,7 @@ func _create_snap_popup() -> void:
 func _create_frame_popup() -> void:
 	frame_popup = PopupPanel.new()
 	frame_popup.size = Vector2i(300, 260)
-	frame_popup.add_theme_stylebox_override("panel", _opaque_popup_style())
+	frame_popup.add_theme_stylebox_override("panel", EditorWidgets.opaque_popup_style())
 	var content := VBoxContainer.new()
 	content.add_theme_constant_override("separation", 6)
 	frame_popup.add_child(content)
@@ -1645,16 +1572,6 @@ func _world_to_editor_units(value: float) -> float:
 	return ToolUnits.from_centimeters(value)
 
 
-func _create_snap_slider(minimum: float, maximum: float, step: float, value: float) -> HSlider:
-	var slider := HSlider.new()
-	slider.min_value = minimum
-	slider.max_value = maximum
-	slider.step = step
-	slider.value = value
-	slider.custom_minimum_size = Vector2(220, 20)
-	return slider
-
-
 func _toggle_snap_popup() -> void:
 	if snap_popup.visible:
 		snap_popup.hide()
@@ -1731,46 +1648,6 @@ func _snap_mode_label() -> String:
 		_: return "Coarse"
 
 
-func _opaque_popup_style() -> StyleBoxFlat:
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color("#20242c")
-	style.border_color = Color("#363d48")
-	style.set_border_width_all(1)
-	return style
-
-
-func _style_popup_menu(popup: PopupMenu) -> void:
-	popup.add_theme_stylebox_override("panel", _opaque_popup_style())
-
-
-func _style_context_command_button(button: BaseButton, active: bool) -> void:
-	button.toggle_mode = true
-	button.set_pressed_no_signal(active)
-	if button is MenuButton:
-		(button as MenuButton).flat = not active
-	elif button is Button:
-		(button as Button).flat = not active
-	var active_style := StyleBoxFlat.new()
-	active_style.bg_color = Color("#8fd8f5")
-	active_style.border_color = Color("#c5efff")
-	active_style.set_border_width_all(1)
-	active_style.corner_radius_top_left = 3
-	active_style.corner_radius_top_right = 3
-	active_style.corner_radius_bottom_left = 3
-	active_style.corner_radius_bottom_right = 3
-	var active_text := Color("#10202a")
-	if active:
-		for style_name in ["normal", "hover", "pressed", "hover_pressed", "focus"]:
-			button.add_theme_stylebox_override(style_name, active_style)
-		for color_name in ["font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color", "font_focus_color"]:
-			button.add_theme_color_override(color_name, active_text)
-	else:
-		button.add_theme_stylebox_override("pressed", active_style)
-		button.add_theme_stylebox_override("hover_pressed", active_style)
-		button.add_theme_color_override("font_pressed_color", active_text)
-		button.add_theme_color_override("font_hover_pressed_color", active_text)
-
-
 func _create_asset_dialog() -> void:
 	asset_dialog = ConfirmationDialog.new()
 	asset_dialog.title = "New Asset"
@@ -1830,7 +1707,7 @@ func _create_component_draw_mode_menu() -> void:
 	component_draw_mode_menu.add_item("Closed Loop", 0)
 	component_draw_mode_menu.add_item("Contour", 1)
 	component_draw_mode_menu.add_item("Primitive", 2)
-	_style_popup_menu(component_draw_mode_menu)
+	EditorWidgets.style_popup_menu(component_draw_mode_menu)
 	component_draw_mode_menu.id_pressed.connect(_on_component_draw_mode_selected)
 	add_child(component_draw_mode_menu)
 
@@ -1879,12 +1756,12 @@ func _create_component_add_menu() -> void:
 	component_add_menu.add_submenu_item("Guide", "GuideTypes")
 	component_add_menu.add_submenu_item("Region", "RegionTypes")
 	component_add_menu.add_submenu_item("Reference", "ReferenceSymbols")
-	_style_popup_menu(component_add_menu)
-	_style_popup_menu(component_add_child_menu)
-	_style_popup_menu(component_add_guide_menu)
-	_style_popup_menu(component_add_weapon_guide_menu)
-	_style_popup_menu(component_add_region_menu)
-	_style_popup_menu(component_add_reference_menu)
+	EditorWidgets.style_popup_menu(component_add_menu)
+	EditorWidgets.style_popup_menu(component_add_child_menu)
+	EditorWidgets.style_popup_menu(component_add_guide_menu)
+	EditorWidgets.style_popup_menu(component_add_weapon_guide_menu)
+	EditorWidgets.style_popup_menu(component_add_region_menu)
+	EditorWidgets.style_popup_menu(component_add_reference_menu)
 	add_child(component_add_menu)
 
 
@@ -1904,7 +1781,7 @@ func _create_component_context_menu() -> void:
 	component_context_menu.add_item("Duplicate & Mirror Y · Flip Orientation", 2)
 	component_context_menu.add_separator()
 	component_context_menu.add_item("Detach from Parent", 3)
-	_style_popup_menu(component_context_menu)
+	EditorWidgets.style_popup_menu(component_context_menu)
 	component_context_menu.id_pressed.connect(_on_component_context_menu_selected)
 	add_child(component_context_menu)
 
@@ -4833,21 +4710,21 @@ func _render_context_bar() -> void:
 		draw_guide_menu.text = "⌘1  Draw Guide Point  ▼"
 		draw_guide_menu.custom_minimum_size = Vector2(204, 32)
 		draw_guide_menu.focus_mode = Control.FOCUS_NONE
-		_style_context_command_button(draw_guide_menu, _context_command_is("guide.draw_point"))
+		EditorWidgets.style_context_command_button(draw_guide_menu, _context_command_is("guide.draw_point"))
 		for point_mode_index in range(5):
 			draw_guide_menu.get_popup().add_item(["1: Linear", "2: Aligned", "3: Free", "4: Mirrored", "5: Corner"][point_mode_index], point_mode_index)
-		_style_popup_menu(draw_guide_menu.get_popup())
+		EditorWidgets.style_popup_menu(draw_guide_menu.get_popup())
 		draw_guide_menu.get_popup().id_pressed.connect(_on_guide_draw_menu_id)
 		context_bar.add_child(draw_guide_menu)
 		var edit_guide_menu := MenuButton.new()
 		edit_guide_menu.text = "⌘2  Edit Guide Point  ▼"
 		edit_guide_menu.custom_minimum_size = Vector2(194, 32)
 		edit_guide_menu.focus_mode = Control.FOCUS_NONE
-		_style_context_command_button(edit_guide_menu, _context_command_is("guide.edit_point"))
+		EditorWidgets.style_context_command_button(edit_guide_menu, _context_command_is("guide.edit_point"))
 		edit_guide_menu.get_popup().add_item("1: Select", 0)
 		edit_guide_menu.get_popup().add_item("2: Bezier Handle", 1)
 		edit_guide_menu.get_popup().add_item("3: Add Point", 2)
-		_style_popup_menu(edit_guide_menu.get_popup())
+		EditorWidgets.style_popup_menu(edit_guide_menu.get_popup())
 		edit_guide_menu.get_popup().id_pressed.connect(_on_guide_edit_menu_id)
 		context_bar.add_child(edit_guide_menu)
 		_render_info_bar()
@@ -4887,34 +4764,34 @@ func _render_context_bar() -> void:
 	draw_menu.text = "⌘1  Draw Point  ▼"
 	draw_menu.custom_minimum_size = Vector2(156, 32)
 	draw_menu.focus_mode = Control.FOCUS_NONE
-	_style_context_command_button(draw_menu, _context_command_is("asset.draw_point"))
+	EditorWidgets.style_context_command_button(draw_menu, _context_command_is("asset.draw_point"))
 	draw_menu.get_popup().add_item("1: Linear", 0)
 	draw_menu.get_popup().add_item("2: Aligned", 1)
 	draw_menu.get_popup().add_item("3: Free", 2)
 	draw_menu.get_popup().add_item("4: Mirrored", 3)
 	draw_menu.get_popup().add_item("5: Corner", 4)
-	_style_popup_menu(draw_menu.get_popup())
+	EditorWidgets.style_popup_menu(draw_menu.get_popup())
 	draw_menu.get_popup().id_pressed.connect(_on_draw_menu_id)
 	context_bar.add_child(draw_menu)
 	var edit_point_menu := MenuButton.new()
 	edit_point_menu.text = "⌘2  Edit Point  ▼"
 	edit_point_menu.custom_minimum_size = Vector2(138, 32)
 	edit_point_menu.focus_mode = Control.FOCUS_NONE
-	_style_context_command_button(edit_point_menu, _context_command_is("asset.edit_point") or _context_command_is("asset.fuse_point"))
+	EditorWidgets.style_context_command_button(edit_point_menu, _context_command_is("asset.edit_point") or _context_command_is("asset.fuse_point"))
 	edit_point_menu.get_popup().add_item("1: Select", 0)
 	edit_point_menu.get_popup().add_item("2: Bezier Handle", 1)
 	edit_point_menu.get_popup().add_item("3: Add Point", 2)
 	edit_point_menu.get_popup().add_item("4: Fuse Point", 3)
-	_style_popup_menu(edit_point_menu.get_popup())
+	EditorWidgets.style_popup_menu(edit_point_menu.get_popup())
 	edit_point_menu.get_popup().id_pressed.connect(_on_edit_menu_id)
 	context_bar.add_child(edit_point_menu)
 	var edit_edge_menu := MenuButton.new()
 	edit_edge_menu.text = "⌘3  Edit Edge  ▼"
 	edit_edge_menu.custom_minimum_size = Vector2(136, 32)
 	edit_edge_menu.focus_mode = Control.FOCUS_NONE
-	_style_context_command_button(edit_edge_menu, _context_command_is("asset.edit_edge"))
+	EditorWidgets.style_context_command_button(edit_edge_menu, _context_command_is("asset.edit_edge"))
 	edit_edge_menu.get_popup().add_item("Select Edge", 0)
-	_style_popup_menu(edit_edge_menu.get_popup())
+	EditorWidgets.style_popup_menu(edit_edge_menu.get_popup())
 	edit_edge_menu.get_popup().id_pressed.connect(_on_edit_edge_menu_id)
 	context_bar.add_child(edit_edge_menu)
 	var selected_component := _get_component(_get_asset(selected_asset_id), selected_component_id)
@@ -4923,9 +4800,9 @@ func _render_context_bar() -> void:
 		edit_face_menu.text = "⌘4  Edit Face  ▼"
 		edit_face_menu.custom_minimum_size = Vector2(134, 32)
 		edit_face_menu.focus_mode = Control.FOCUS_NONE
-		_style_context_command_button(edit_face_menu, _context_command_is("asset.edit_face"))
+		EditorWidgets.style_context_command_button(edit_face_menu, _context_command_is("asset.edit_face"))
 		edit_face_menu.get_popup().add_item("Move Face", 0)
-		_style_popup_menu(edit_face_menu.get_popup())
+		EditorWidgets.style_popup_menu(edit_face_menu.get_popup())
 		edit_face_menu.get_popup().id_pressed.connect(_on_edit_face_menu_id)
 		context_bar.add_child(edit_face_menu)
 		var mirror_spacer := Control.new()
@@ -4935,7 +4812,7 @@ func _render_context_bar() -> void:
 		flip_x_button.text = "Flip X"
 		flip_x_button.tooltip_text = "Flip the complete Closed Loop around the Component Pivot's vertical axis"
 		flip_x_button.focus_mode = Control.FOCUS_NONE
-		_style_context_command_button(flip_x_button, false)
+		EditorWidgets.style_context_command_button(flip_x_button, false)
 		flip_x_button.pressed.connect(_flip_selected_component_geometry_x)
 		context_bar.add_child(flip_x_button)
 		var mirror_button := Button.new()
@@ -4943,7 +4820,7 @@ func _render_context_bar() -> void:
 		mirror_button.tooltip_text = "Mirror a contiguous selection from the open source Chain across an interactively defined axis"
 		mirror_button.focus_mode = Control.FOCUS_NONE
 		mirror_button.disabled = not _can_activate_selection_mirror(selected_component)
-		_style_context_command_button(mirror_button, _context_command_is("asset.mirror"))
+		EditorWidgets.style_context_command_button(mirror_button, _context_command_is("asset.mirror"))
 		mirror_button.pressed.connect(_activate_selection_mirror)
 		context_bar.add_child(mirror_button)
 func _next_default_guide_name(asset: Dictionary, guide_type: String) -> String:
@@ -5032,13 +4909,13 @@ func _render_motion_path_context_bar() -> void:
 	var path_document := _get_motion_path(selected_motion_path_id)
 	var draw_button := Button.new()
 	draw_button.text = "Draw Path"
-	_style_context_command_button(draw_button, motion_path_tool == "draw")
+	EditorWidgets.style_context_command_button(draw_button, motion_path_tool == "draw")
 	draw_button.disabled = path_document.is_empty()
 	draw_button.pressed.connect(_set_motion_path_tool.bind("draw"))
 	context_bar.add_child(draw_button)
 	var edit_button := Button.new()
 	edit_button.text = "Edit Path"
-	_style_context_command_button(edit_button, motion_path_tool == "edit")
+	EditorWidgets.style_context_command_button(edit_button, motion_path_tool == "edit")
 	edit_button.disabled = path_document.is_empty()
 	edit_button.pressed.connect(_set_motion_path_tool.bind("edit"))
 	context_bar.add_child(edit_button)
@@ -5231,9 +5108,9 @@ func _render_geometry_seeding_context_bar() -> void:
 	geometry_seeding_method_menu.text = "⌘1  Method"
 	geometry_seeding_method_menu.custom_minimum_size = Vector2(118, 32)
 	geometry_seeding_method_menu.focus_mode = Control.FOCUS_NONE
-	_style_context_command_button(geometry_seeding_method_menu, _context_command_is("geometry.seeding.method"))
+	EditorWidgets.style_context_command_button(geometry_seeding_method_menu, _context_command_is("geometry.seeding.method"))
 	var popup := geometry_seeding_method_menu.get_popup()
-	_style_popup_menu(popup)
+	EditorWidgets.style_popup_menu(popup)
 	popup.add_item("1  Poisson Fill", 0)
 	popup.set_item_metadata(0, GeometrySeedingService.POISSON_FILL)
 	popup.add_item("2  Spine Flow", 1)
@@ -5244,7 +5121,7 @@ func _render_geometry_seeding_context_bar() -> void:
 	var status := _geometry_seeding_status(selected_asset_id, selected_component_id, component)
 	var edit_button := Button.new()
 	edit_button.text = "⌘2  Edit Seeds"
-	_style_context_command_button(edit_button, _context_command_is("geometry.seeding.edit_seeds"))
+	EditorWidgets.style_context_command_button(edit_button, _context_command_is("geometry.seeding.edit_seeds"))
 	edit_button.disabled = status not in ["Preview Ready", "Baked", "Edited"]
 	edit_button.tooltip_text = "Bake the current Preview and edit it" if status == "Preview Ready" else "Edit the current Seeding Bake"
 	edit_button.focus_mode = Control.FOCUS_NONE
@@ -5371,12 +5248,12 @@ func _activate_geometry_meshing_method_choice() -> void:
 func _render_motion_sequence_context_bar() -> void:
 	var composition_button := Button.new()
 	composition_button.text = "⌘1  Composition"
-	_style_context_command_button(composition_button, motion_sequence_view == MotionSequenceWorkspace.VIEW_COMPOSITION)
+	EditorWidgets.style_context_command_button(composition_button, motion_sequence_view == MotionSequenceWorkspace.VIEW_COMPOSITION)
 	composition_button.pressed.connect(_set_motion_sequence_view.bind(MotionSequenceWorkspace.VIEW_COMPOSITION))
 	context_bar.add_child(composition_button)
 	var player_button := Button.new()
 	player_button.text = "⌘2  Player"
-	_style_context_command_button(player_button, motion_sequence_view == MotionSequenceWorkspace.VIEW_PLAYER)
+	EditorWidgets.style_context_command_button(player_button, motion_sequence_view == MotionSequenceWorkspace.VIEW_PLAYER)
 	player_button.pressed.connect(_set_motion_sequence_view.bind(MotionSequenceWorkspace.VIEW_PLAYER))
 	context_bar.add_child(player_button)
 	var sequence_document := _get_motion_sequence(selected_motion_sequence_id)
@@ -5485,13 +5362,13 @@ func _render_weighting_context_bar() -> void:
 	weighting_method_menu.text = "⌘1  Method  ▼"
 	weighting_method_menu.custom_minimum_size = Vector2(132, 32)
 	weighting_method_menu.focus_mode = Control.FOCUS_NONE
-	_style_context_command_button(weighting_method_menu, _context_command_is("style.weighting.method"))
+	EditorWidgets.style_context_command_button(weighting_method_menu, _context_command_is("style.weighting.method"))
 	var popup := weighting_method_menu.get_popup()
 	popup.add_item("1  Uniform", 0)
 	popup.set_item_metadata(0, WeightingService.UNIFORM)
 	popup.add_item("2  Axis Gradient", 1)
 	popup.set_item_metadata(1, WeightingService.AXIS_GRADIENT)
-	_style_popup_menu(popup)
+	EditorWidgets.style_popup_menu(popup)
 	_connect_context_method_menu(popup, "style.weighting.method", _set_weighting_method)
 	context_bar.add_child(weighting_method_menu)
 
@@ -5902,7 +5779,7 @@ func _set_active_state(state: String) -> void:
 func _render_info_bar() -> void:
 	if not is_instance_valid(info_bar):
 		return
-	_clear(info_bar)
+	EditorWidgets.clear(info_bar)
 	if active_module == "Motion":
 		if active_motion_submodule == "Path":
 			var path_document := _get_motion_path(selected_motion_path_id)
@@ -6404,7 +6281,7 @@ func _next_default_asset_name() -> String:
 
 
 func _render_outliner() -> void:
-	_clear(outliner_list)
+	EditorWidgets.clear(outliner_list)
 	_update_context_action_button()
 	_update_outliner_asset_type_filter_visibility()
 	if active_module == "Export":
@@ -6419,8 +6296,8 @@ func _render_outliner() -> void:
 		if active_geometry_submodule in GEOMETRY_SUBMODULES:
 			_render_geometry_component_outliner()
 		else:
-			outliner_list.add_child(_create_outliner_group_label("Mesh · Placeholder"))
-			outliner_list.add_child(_create_inspector_field_label("%s authoring will be introduced in a later phase." % active_geometry_submodule))
+			outliner_list.add_child(EditorWidgets.create_outliner_group_label("Mesh · Placeholder"))
+			outliner_list.add_child(EditorWidgets.create_inspector_field_label("%s authoring will be introduced in a later phase." % active_geometry_submodule))
 		return
 	var search_text := outliner_search_input.text.strip_edges().to_lower() if is_instance_valid(outliner_search_input) else ""
 	if active_module == "Create" and active_create_submodule in CREATE_SUBMODULES:
@@ -6429,7 +6306,7 @@ func _render_outliner() -> void:
 			if _outliner_asset_is_visible(asset) and _asset_type(asset) == _create_submodule_asset_type(active_create_submodule) and _asset_matches_search(asset, search_text):
 				visible_assets.append(asset)
 		visible_assets.sort_custom(_sort_named_documents)
-		outliner_list.add_child(_create_outliner_group_label(active_create_submodule))
+		outliner_list.add_child(EditorWidgets.create_outliner_group_label(active_create_submodule))
 		for asset in visible_assets:
 			_render_asset_outliner_entry(asset, not search_text.is_empty())
 
@@ -6547,35 +6424,35 @@ func _navigate_outliner_component(direction: int) -> void:
 func _render_motion_outliner() -> void:
 	var search_text := outliner_search_input.text.strip_edges().to_lower() if is_instance_valid(outliner_search_input) else ""
 	if active_motion_submodule == "Path":
-		outliner_list.add_child(_create_outliner_group_label("Paths"))
+		outliner_list.add_child(EditorWidgets.create_outliner_group_label("Paths"))
 		for path_document in motion_paths:
 			if search_text.is_empty() or str(path_document.get("name", "")).to_lower().contains(search_text):
 				var path_button := Button.new()
 				path_button.text = str(path_document.get("name", "Path"))
 				path_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 				path_button.focus_mode = Control.FOCUS_NONE
-				_style_outliner_button(path_button, str(path_document.get("id", "")) == selected_motion_path_id)
+				EditorWidgets.style_outliner_button(path_button, str(path_document.get("id", "")) == selected_motion_path_id)
 				path_button.pressed.connect(_select_motion_path.bind(str(path_document.get("id", ""))))
 				outliner_list.add_child(path_button)
 		if motion_paths.is_empty():
-			outliner_list.add_child(_create_inspector_field_label("No Paths"))
+			outliner_list.add_child(EditorWidgets.create_inspector_field_label("No Paths"))
 		return
 	if active_motion_submodule == "Sequence":
-		outliner_list.add_child(_create_outliner_group_label("Sequences"))
+		outliner_list.add_child(EditorWidgets.create_outliner_group_label("Sequences"))
 		for sequence_document in motion_sequences:
 			if search_text.is_empty() or str(sequence_document.get("name", "")).to_lower().contains(search_text):
 				var sequence_button := Button.new()
 				sequence_button.text = str(sequence_document.get("name", "Sequence"))
 				sequence_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 				sequence_button.focus_mode = Control.FOCUS_NONE
-				_style_outliner_button(sequence_button, str(sequence_document.get("id", "")) == selected_motion_sequence_id)
+				EditorWidgets.style_outliner_button(sequence_button, str(sequence_document.get("id", "")) == selected_motion_sequence_id)
 				sequence_button.pressed.connect(_select_motion_sequence.bind(str(sequence_document.get("id", ""))))
 				outliner_list.add_child(sequence_button)
 		if motion_sequences.is_empty():
-			outliner_list.add_child(_create_inspector_field_label("No Sequences"))
+			outliner_list.add_child(EditorWidgets.create_inspector_field_label("No Sequences"))
 		return
 	if active_motion_submodule == "Act":
-		outliner_list.add_child(_create_outliner_group_label("Preview Assets"))
+		outliner_list.add_child(EditorWidgets.create_outliner_group_label("Preview Assets"))
 		for asset in assets:
 			if not search_text.is_empty() and not str(asset.get("name", "")).to_lower().contains(search_text):
 				continue
@@ -6584,18 +6461,18 @@ func _render_motion_outliner() -> void:
 			preview_button.text = str(asset.get("name", "Asset"))
 			preview_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 			preview_button.focus_mode = Control.FOCUS_NONE
-			_style_outliner_button(preview_button, asset_id == motion_act_preview_asset_id)
+			EditorWidgets.style_outliner_button(preview_button, asset_id == motion_act_preview_asset_id)
 			preview_button.pressed.connect(_select_motion_act_preview_asset.bind(asset_id))
 			outliner_list.add_child(preview_button)
 		if assets.is_empty():
-			outliner_list.add_child(_create_inspector_field_label("No Assets"))
+			outliner_list.add_child(EditorWidgets.create_inspector_field_label("No Assets"))
 		return
 	var visible_assets: Array[Dictionary] = []
 	for asset in assets:
 		if search_text.is_empty() or str(asset.get("name", "")).to_lower().contains(search_text):
 			visible_assets.append(asset)
 	visible_assets.sort_custom(_sort_named_documents)
-	outliner_list.add_child(_create_outliner_group_label("Animation Assets"))
+	outliner_list.add_child(EditorWidgets.create_outliner_group_label("Animation Assets"))
 	for asset in visible_assets:
 		var asset_id := str(asset.get("id", ""))
 		var asset_button := Button.new()
@@ -6604,11 +6481,11 @@ func _render_motion_outliner() -> void:
 		asset_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		asset_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		asset_button.focus_mode = Control.FOCUS_NONE
-		_style_outliner_button(asset_button, asset_id == selected_asset_id)
+		EditorWidgets.style_outliner_button(asset_button, asset_id == selected_asset_id)
 		asset_button.pressed.connect(_select_motion_asset.bind(asset_id))
 		outliner_list.add_child(asset_button)
 	if visible_assets.is_empty():
-		outliner_list.add_child(_create_inspector_field_label("No Assets"))
+		outliner_list.add_child(EditorWidgets.create_inspector_field_label("No Assets"))
 
 
 func _select_motion_path(path_id: String) -> void:
@@ -6821,7 +6698,7 @@ func _select_motion_asset(asset_id: String) -> void:
 
 func _render_weighting_outliner() -> void:
 	var search_text := outliner_search_input.text.strip_edges().to_lower() if is_instance_valid(outliner_search_input) else ""
-	outliner_list.add_child(_create_outliner_group_label("Weighting"))
+	outliner_list.add_child(EditorWidgets.create_outliner_group_label("Weighting"))
 	var visible_asset_count := 0
 	for asset in assets:
 		if not _outliner_asset_is_visible(asset) or not _asset_type_filter_matches(asset):
@@ -6845,7 +6722,7 @@ func _render_weighting_outliner() -> void:
 		asset_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		asset_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		asset_button.focus_mode = Control.FOCUS_NONE
-		_style_outliner_button(asset_button, selected_asset_id == asset_id and selected_component_id.is_empty())
+		EditorWidgets.style_outliner_button(asset_button, selected_asset_id == asset_id and selected_component_id.is_empty())
 		asset_button.pressed.connect(_select_weighting_asset.bind(asset_id))
 		outliner_list.add_child(asset_button)
 		if not bool(expanded_assets.get(asset_id, false)) and search_text.is_empty():
@@ -6863,7 +6740,7 @@ func _render_weighting_outliner() -> void:
 			component_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			component_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 			component_button.focus_mode = Control.FOCUS_NONE
-			_style_outliner_button(component_button, selected_asset_id == asset_id and selected_component_id == component_id and selected_weighting_style_id.is_empty())
+			EditorWidgets.style_outliner_button(component_button, selected_asset_id == asset_id and selected_component_id == component_id and selected_weighting_style_id.is_empty())
 			component_button.pressed.connect(_select_weighting_component.bind(asset_id, component_id))
 			component_row.add_child(component_button)
 			var add_button := Button.new()
@@ -6885,12 +6762,12 @@ func _render_weighting_outliner() -> void:
 				style_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 				style_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 				style_button.focus_mode = Control.FOCUS_NONE
-				_style_outliner_button(style_button, selected_weighting_style_id == str(style.get("id", "")))
+				EditorWidgets.style_outliner_button(style_button, selected_weighting_style_id == str(style.get("id", "")))
 				style_button.pressed.connect(_select_weighting_style.bind(asset_id, component_id, str(style.get("id", ""))))
 				style_row.add_child(style_button)
 				outliner_list.add_child(style_row)
 	if visible_asset_count == 0:
-		outliner_list.add_child(_create_inspector_field_label("No Assets match the selected types."))
+		outliner_list.add_child(EditorWidgets.create_inspector_field_label("No Assets match the selected types."))
 
 
 func _asset_matches_search(asset: Dictionary, search_text: String) -> bool:
@@ -6909,40 +6786,6 @@ func _sort_named_documents(a: Dictionary, b: Dictionary) -> bool:
 	return str(a.get("name", "")).to_lower() < str(b.get("name", "")).to_lower()
 
 
-func _create_outliner_group_label(text: String) -> Label:
-	var label := _create_panel_label(text)
-	label.add_theme_color_override("font_color", Color("#737f91"))
-	label.add_theme_font_size_override("font_size", 10)
-	return label
-
-
-func _create_visibility_checkbox(visibility_enabled: bool, callback: Callable) -> CheckBox:
-	var checkbox := CheckBox.new()
-	checkbox.custom_minimum_size = Vector2(26, 30)
-	checkbox.focus_mode = Control.FOCUS_NONE
-	checkbox.button_pressed = visibility_enabled
-	checkbox.tooltip_text = "Visibility"
-	checkbox.toggled.connect(callback)
-	return checkbox
-
-
-func _create_outliner_child_group_label(text: String, indent := 16) -> HBoxContainer:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 0)
-	var placeholder := Control.new()
-	placeholder.custom_minimum_size = Vector2(indent, 0)
-	row.add_child(placeholder)
-	var label := Label.new()
-	label.text = text
-	label.custom_minimum_size = Vector2(0, 24)
-	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", 10)
-	label.add_theme_color_override("font_color", Color("#737f91"))
-	row.add_child(label)
-	return row
-
-
 func _render_geometry_component_outliner() -> void:
 	var search_text := outliner_search_input.text.strip_edges().to_lower() if is_instance_valid(outliner_search_input) else ""
 	var visible_assets: Array = []
@@ -6950,11 +6793,11 @@ func _render_geometry_component_outliner() -> void:
 		if _outliner_asset_is_visible(asset) and _asset_type_filter_matches(asset) and _asset_matches_search(asset, search_text):
 			visible_assets.append(asset)
 	visible_assets.sort_custom(_sort_named_documents)
-	outliner_list.add_child(_create_outliner_group_label("%s · Components" % active_geometry_submodule))
+	outliner_list.add_child(EditorWidgets.create_outliner_group_label("%s · Components" % active_geometry_submodule))
 	for asset in visible_assets:
 		_render_geometry_component_asset_entry(asset, not search_text.is_empty())
 	if visible_assets.is_empty():
-		outliner_list.add_child(_create_inspector_field_label("No Assets match the selected types."))
+		outliner_list.add_child(EditorWidgets.create_inspector_field_label("No Assets match the selected types."))
 
 
 func _render_geometry_component_asset_entry(asset: Dictionary, force_expand := false) -> void:
@@ -6968,12 +6811,12 @@ func _render_geometry_component_asset_entry(asset: Dictionary, force_expand := f
 	asset_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	asset_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	asset_button.focus_mode = Control.FOCUS_NONE
-	_style_outliner_button(asset_button, selected_asset_id == asset_id and selected_component_id.is_empty())
+	EditorWidgets.style_outliner_button(asset_button, selected_asset_id == asset_id and selected_component_id.is_empty())
 	asset_button.pressed.connect(_select_geometry_asset.bind(asset_id))
 	container.add_child(asset_button)
 	if not force_expand and not bool(expanded_assets.get(asset_id, false)):
 		return
-	container.add_child(_create_outliner_child_group_label("Components"))
+	container.add_child(EditorWidgets.create_outliner_child_group_label("Components"))
 	var components: Array = asset.get("components", []).duplicate()
 	var references: Array = []
 	var guides: Array = asset.get("guides", []).duplicate(true) if active_geometry_submodule in ["Sampling", "Seeding", "Meshing"] else []
@@ -7010,10 +6853,10 @@ func _render_geometry_component_asset_entry(asset: Dictionary, force_expand := f
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		button.focus_mode = Control.FOCUS_NONE
-		_style_outliner_button(button, selected_asset_id == asset_id and selected_component_id == component_id and selected_geometry_bake_method.is_empty())
+		EditorWidgets.style_outliner_button(button, selected_asset_id == asset_id and selected_component_id == component_id and selected_geometry_bake_method.is_empty())
 		button.pressed.connect(_select_geometry_component.bind(asset_id, component_id))
 		row.add_child(button)
-		row.add_child(_create_geometry_role_badge(str(component.get("topology_role", "outer"))))
+		row.add_child(EditorWidgets.create_geometry_role_badge(str(component.get("topology_role", "outer"))))
 		var status_dot := Label.new()
 		status_dot.text = "●"
 		status_dot.custom_minimum_size = Vector2(28, 30)
@@ -7078,10 +6921,10 @@ func _render_geometry_reference_row(container: VBoxContainer, asset: Dictionary,
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	button.focus_mode = Control.FOCUS_NONE
-	_style_outliner_button(button, selected_sampling_input_id == reference_id, str(reference.get("topology_role", "outer")))
+	EditorWidgets.style_outliner_button(button, selected_sampling_input_id == reference_id, str(reference.get("topology_role", "outer")))
 	button.pressed.connect(_select_geometry_sampling_reference.bind(asset_id, str(reference.get("parent_component_id", "")), reference_id))
 	row.add_child(button)
-	row.add_child(_create_geometry_role_badge(str(reference.get("topology_role", "outer"))))
+	row.add_child(EditorWidgets.create_geometry_role_badge(str(reference.get("topology_role", "outer"))))
 	container.add_child(row)
 
 
@@ -7103,10 +6946,10 @@ func _render_geometry_sampling_guide_row(container: VBoxContainer, asset: Dictio
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	button.focus_mode = Control.FOCUS_NONE
-	_style_guide_outliner_button(button, str(guide.get("id", "")) == selected_guide_id, str(guide.get("guide_type", AssetGuide.SAMPLER_SPINE)))
+	EditorWidgets.style_guide_outliner_button(button, str(guide.get("id", "")) == selected_guide_id, str(guide.get("guide_type", AssetGuide.SAMPLER_SPINE)))
 	button.pressed.connect(_select_guide.bind(asset_id, guide_id))
 	row.add_child(button)
-	row.add_child(_create_geometry_role_badge("Cut" if str(guide.get("guide_type", "")) == AssetGuide.CUT else "Guide"))
+	row.add_child(EditorWidgets.create_geometry_role_badge("Cut" if str(guide.get("guide_type", "")) == AssetGuide.CUT else "Guide"))
 	container.add_child(row)
 
 
@@ -7195,10 +7038,10 @@ func _render_geometry_seeding_input_row(container: VBoxContainer, asset_id: Stri
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	button.focus_mode = Control.FOCUS_NONE
-	_style_outliner_button(button, not input_id.is_empty() and selected_sampling_input_id == input_id)
+	EditorWidgets.style_outliner_button(button, not input_id.is_empty() and selected_sampling_input_id == input_id)
 	button.pressed.connect(_select_geometry_seeding_input.bind(asset_id, component_id, input_id, role))
 	row.add_child(button)
-	row.add_child(_create_geometry_role_badge(badge))
+	row.add_child(EditorWidgets.create_geometry_role_badge(badge))
 	container.add_child(row)
 
 
@@ -7226,19 +7069,6 @@ func _geometry_sampling_input_summary(asset_id: String, component_id: String, in
 	if count > 0:
 		state_label += "  %d" % count
 	return {"label": state_label, "count": count, "factor": factor}
-
-
-func _create_geometry_role_badge(role: String) -> Label:
-	var badge := Label.new()
-	badge.text = role.capitalize()
-	badge.custom_minimum_size = Vector2(42, 24)
-	badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	badge.add_theme_font_size_override("font_size", 9)
-	var normalized_role := role.to_lower()
-	var badge_color := Color("#ef6c78") if normalized_role in ["hole", "cut"] else Color("#f2c94c") if normalized_role == "spine" else Color("#737f91")
-	badge.add_theme_color_override("font_color", badge_color.lightened(0.35))
-	return badge
 
 
 func _geometry_bake_methods_for_active_module(bakes: Dictionary) -> Array[String]:
@@ -7499,14 +7329,14 @@ func _render_asset_outliner_entry(asset: Dictionary, force_expand := false) -> v
 	var asset_header := HBoxContainer.new()
 	asset_header.add_theme_constant_override("separation", 2)
 	asset_container.add_child(asset_header)
-	asset_header.add_child(_create_visibility_checkbox(bool(asset.get("visibility", true)), _on_asset_visibility_changed.bind(asset_id)))
+	asset_header.add_child(EditorWidgets.create_visibility_checkbox(bool(asset.get("visibility", true)), _on_asset_visibility_changed.bind(asset_id)))
 	var asset_button := Button.new()
 	asset_button.text = str(asset["name"])
 	asset_button.custom_minimum_size = Vector2(0, 30)
 	asset_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	asset_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	asset_button.focus_mode = Control.FOCUS_NONE
-	_style_outliner_button(asset_button, asset_id == selected_asset_id and selected_component_id.is_empty() and selected_guide_id.is_empty())
+	EditorWidgets.style_outliner_button(asset_button, asset_id == selected_asset_id and selected_component_id.is_empty() and selected_guide_id.is_empty())
 	asset_button.pressed.connect(_select_asset.bind(asset_id))
 	asset_button.gui_input.connect(_on_asset_outliner_gui_input.bind(asset_id, asset_button))
 	asset_header.add_child(asset_button)
@@ -7533,7 +7363,7 @@ func _render_asset_outliner_entry(asset: Dictionary, force_expand := false) -> v
 			components.append(component)
 	components.sort_custom(_sort_named_documents)
 	guides.sort_custom(func(left: Dictionary, right: Dictionary) -> bool: return _guide_display_name(asset, left).naturalnocasecmp_to(_guide_display_name(asset, right)) < 0)
-	var components_label := _create_outliner_child_group_label("Components")
+	var components_label := EditorWidgets.create_outliner_child_group_label("Components")
 	components_label.set_drag_forwarding(_outliner_get_drag_data.bind(str(asset.get("id", "")), "root"), _outliner_can_drop_data.bind(str(asset.get("id", "")), "root"), _outliner_drop_data.bind(str(asset.get("id", "")), "root"))
 	asset_container.add_child(components_label)
 	var rendered_component_ids: Dictionary = {}
@@ -7550,14 +7380,14 @@ func _render_asset_outliner_entry(asset: Dictionary, force_expand := false) -> v
 	for component in components:
 		if not rendered_component_ids.has(str(component.get("id", ""))):
 			_render_component_outliner_tree(asset_container, asset, component, 16, rendered_component_ids, false, rendered_group_ids)
-	asset_container.add_child(_create_outliner_child_group_label("References"))
+	asset_container.add_child(EditorWidgets.create_outliner_child_group_label("References"))
 	references.sort_custom(_sort_named_documents)
 	for reference in references:
 		_render_component_outliner_tree(asset_container, asset, reference, 16, rendered_component_ids, true, {})
-	asset_container.add_child(_create_outliner_child_group_label("Guides"))
+	asset_container.add_child(EditorWidgets.create_outliner_child_group_label("Guides"))
 	for guide in guides:
 		_render_component_guide_row(asset_container, asset, guide)
-	asset_container.add_child(_create_outliner_child_group_label("Regions"))
+	asset_container.add_child(EditorWidgets.create_outliner_child_group_label("Regions"))
 	regions.sort_custom(_sort_named_documents)
 	for region in regions:
 		_render_region_outliner_row(asset_container, asset, region)
@@ -7574,7 +7404,7 @@ func _render_group_outliner_tree(container: VBoxContainer, asset: Dictionary, gr
 	var placeholder := Control.new()
 	placeholder.custom_minimum_size = Vector2(indent, 0)
 	group_row.add_child(placeholder)
-	group_row.add_child(_create_visibility_checkbox(bool(group.get("visibility", true)), _on_group_visibility_entry_changed.bind(str(asset.get("id", "")), group_id)))
+	group_row.add_child(EditorWidgets.create_visibility_checkbox(bool(group.get("visibility", true)), _on_group_visibility_entry_changed.bind(str(asset.get("id", "")), group_id)))
 	var group_button := Button.new()
 	group_button.text = "G: %s" % str(group.get("name", "Group"))
 	group_button.custom_minimum_size = Vector2(0, 30)
@@ -7582,7 +7412,7 @@ func _render_group_outliner_tree(container: VBoxContainer, asset: Dictionary, gr
 	group_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	group_button.focus_mode = Control.FOCUS_NONE
 	group_button.tooltip_text = "Component Group"
-	_style_outliner_button(group_button, group_id == selected_group_id and str(asset.get("id", "")) == selected_asset_id)
+	EditorWidgets.style_outliner_button(group_button, group_id == selected_group_id and str(asset.get("id", "")) == selected_asset_id)
 	group_button.pressed.connect(_select_group.bind(str(asset.get("id", "")), group_id))
 	group_button.gui_input.connect(_on_group_outliner_gui_input.bind(str(asset.get("id", "")), group_id, group_button))
 	group_button.set_drag_forwarding(_outliner_get_drag_data.bind(str(asset.get("id", "")), group_id), _outliner_can_drop_data.bind(str(asset.get("id", "")), group_id), _outliner_drop_data.bind(str(asset.get("id", "")), group_id))
@@ -7814,7 +7644,7 @@ func _render_component_outliner_tree(container: VBoxContainer, asset: Dictionary
 	var child_placeholder := Control.new()
 	child_placeholder.custom_minimum_size = Vector2(indent, 0)
 	component_row.add_child(child_placeholder)
-	component_row.add_child(_create_visibility_checkbox(bool(component.get("visibility", true)), _on_component_visibility_entry_changed.bind(asset_id, component_id)))
+	component_row.add_child(EditorWidgets.create_visibility_checkbox(bool(component.get("visibility", true)), _on_component_visibility_entry_changed.bind(asset_id, component_id)))
 	var component_button := Button.new()
 	var component_name := _component_outliner_name(asset, component) if reference_summary else _component_tree_name(component)
 	component_button.text = component_name if bool(component.get("visibility", true)) else _strikethrough_text(component_name)
@@ -7824,7 +7654,7 @@ func _render_component_outliner_tree(container: VBoxContainer, asset: Dictionary
 	component_button.focus_mode = Control.FOCUS_NONE
 	if _is_reference_component(component):
 		component_button.tooltip_text = _reference_outliner_tooltip(asset, component)
-	_style_outliner_button(component_button, (component_id == selected_component_id or selected_component_ids.has(component_id)) and asset_id == selected_asset_id, str(component.get("topology_role", "outer")))
+	EditorWidgets.style_outliner_button(component_button, (component_id == selected_component_id or selected_component_ids.has(component_id)) and asset_id == selected_asset_id, str(component.get("topology_role", "outer")))
 	component_button.pressed.connect(_select_component.bind(asset_id, component_id, true))
 	component_button.gui_input.connect(_on_component_outliner_gui_input.bind(asset_id, component_id, component_button))
 	component_button.set_drag_forwarding(_outliner_get_drag_data.bind(asset_id, component_id), _outliner_can_drop_data.bind(asset_id, component_id), _outliner_drop_data.bind(asset_id, component_id))
@@ -7889,7 +7719,7 @@ func _render_component_guide_row(container: VBoxContainer, asset: Dictionary, gu
 	var component_indent := Control.new()
 	component_indent.custom_minimum_size = Vector2(16, 0)
 	guide_row.add_child(component_indent)
-	guide_row.add_child(_create_visibility_checkbox(bool(guide.get("visibility", true)), _on_guide_visibility_entry_changed.bind(asset_id, str(guide.get("id", "")))))
+	guide_row.add_child(EditorWidgets.create_visibility_checkbox(bool(guide.get("visibility", true)), _on_guide_visibility_entry_changed.bind(asset_id, str(guide.get("id", "")))))
 	var guide_button := Button.new()
 	var guide_name := _guide_display_name(asset, guide)
 	guide_button.text = guide_name if bool(guide.get("visibility", true)) else _strikethrough_text(guide_name)
@@ -7898,7 +7728,7 @@ func _render_component_guide_row(container: VBoxContainer, asset: Dictionary, gu
 	guide_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	guide_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	guide_button.focus_mode = Control.FOCUS_NONE
-	_style_guide_outliner_button(guide_button, str(guide.get("id", "")) == selected_guide_id, str(guide.get("guide_type", AssetGuide.SAMPLER_SPINE)))
+	EditorWidgets.style_guide_outliner_button(guide_button, str(guide.get("id", "")) == selected_guide_id, str(guide.get("guide_type", AssetGuide.SAMPLER_SPINE)))
 	guide_button.pressed.connect(_select_guide.bind(asset_id, str(guide.get("id", ""))))
 	guide_row.add_child(guide_button)
 
@@ -7911,7 +7741,7 @@ func _render_region_outliner_row(container: VBoxContainer, asset: Dictionary, re
 	indent.custom_minimum_size = Vector2(16, 0)
 	region_row.add_child(indent)
 	var region_id := str(region.get("id", ""))
-	region_row.add_child(_create_visibility_checkbox(bool(region.get("visibility", true)), _on_component_visibility_entry_changed.bind(str(asset.get("id", "")), region_id)))
+	region_row.add_child(EditorWidgets.create_visibility_checkbox(bool(region.get("visibility", true)), _on_component_visibility_entry_changed.bind(str(asset.get("id", "")), region_id)))
 	var button := Button.new()
 	var group_id := str(region.get("group_id", ""))
 	var parent_id := str(region.get("parent_component_id", ""))
@@ -7922,21 +7752,9 @@ func _render_region_outliner_row(container: VBoxContainer, asset: Dictionary, re
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	button.focus_mode = Control.FOCUS_NONE
-	_style_region_outliner_button(button, selected_component_id == region_id and selected_asset_id == str(asset.get("id", "")), str(region.get("region_type", "attack")))
+	EditorWidgets.style_region_outliner_button(button, selected_component_id == region_id and selected_asset_id == str(asset.get("id", "")), str(region.get("region_type", "attack")))
 	button.pressed.connect(_select_component.bind(str(asset.get("id", "")), region_id, true))
 	region_row.add_child(button)
-
-
-func _style_region_outliner_button(button: Button, selected: bool, region_type := "attack") -> void:
-	var color: Color = REGION_COLORS.get(region_type, REGION_COLORS["attack"])
-	var normal := StyleBoxFlat.new()
-	normal.bg_color = color if selected else color.darkened(0.68)
-	normal.border_color = color.lightened(0.18) if selected else color.darkened(0.42)
-	normal.set_border_width_all(1)
-	button.add_theme_stylebox_override("normal", normal)
-	button.add_theme_stylebox_override("hover", normal)
-	button.add_theme_stylebox_override("pressed", normal)
-	button.add_theme_color_override("font_color", Color("#f4f7ff") if selected else color.lightened(0.38))
 
 
 func _guide_display_name(asset: Dictionary, guide: Dictionary) -> String:
@@ -9287,59 +9105,18 @@ func _delete_selected_asset() -> void:
 	_invalidate_render(RENDER_DOCUMENT)
 
 
-func _style_outliner_button(button: Button, selected: bool, topology_role := "outer") -> void:
-	var normal := StyleBoxFlat.new()
-	normal.bg_color = Color("#f2c94c") if selected else Color("#252a33")
-	normal.border_color = Color("#f2c94c") if selected else Color("#303744")
-	normal.set_border_width_all(1)
-	var hover := normal.duplicate()
-	hover.bg_color = Color("#ffe083") if selected else Color("#303744")
-	var pressed := normal.duplicate()
-	pressed.bg_color = Color("#e7b936") if selected else Color("#394252")
-	button.add_theme_stylebox_override("normal", normal)
-	button.add_theme_stylebox_override("hover", hover)
-	button.add_theme_stylebox_override("pressed", pressed)
-	button.add_theme_stylebox_override("focus", normal)
-	var text_color := Color("#ef6c78") if topology_role == "hole" else Color("#16181d") if selected else Color("#ffffff")
-	button.add_theme_color_override("font_color", text_color)
-	button.add_theme_color_override("font_hover_color", Color("#ef6c78") if topology_role == "hole" else Color("#16181d") if selected else Color("#ffffff"))
-	button.add_theme_color_override("font_pressed_color", Color("#ef6c78") if topology_role == "hole" else Color("#16181d"))
-	button.add_theme_color_override("font_focus_color", text_color)
-
-
-func _style_guide_outliner_button(button: Button, selected: bool, guide_type := AssetGuide.SAMPLER_SPINE) -> void:
-	var guide_color := AssetGuide.color(guide_type)
-	var normal := StyleBoxFlat.new()
-	normal.bg_color = guide_color if selected else guide_color.darkened(0.55)
-	normal.border_color = guide_color.lightened(0.2) if selected else guide_color.darkened(0.35)
-	normal.set_border_width_all(1)
-	var hover := normal.duplicate()
-	hover.bg_color = guide_color.lightened(0.15) if selected else guide_color.darkened(0.4)
-	var pressed := normal.duplicate()
-	pressed.bg_color = guide_color.darkened(0.1) if selected else guide_color.darkened(0.3)
-	button.add_theme_stylebox_override("normal", normal)
-	button.add_theme_stylebox_override("hover", hover)
-	button.add_theme_stylebox_override("pressed", pressed)
-	button.add_theme_stylebox_override("focus", normal)
-	var selected_text_color := Color("#16181d") if guide_color.get_luminance() > 0.55 else Color("#f4f7ff")
-	button.add_theme_color_override("font_color", selected_text_color if selected else guide_color.lightened(0.35))
-	button.add_theme_color_override("font_hover_color", selected_text_color if selected else guide_color.lightened(0.55))
-	button.add_theme_color_override("font_pressed_color", selected_text_color)
-	button.add_theme_color_override("font_focus_color", selected_text_color if selected else guide_color.lightened(0.35))
-
-
 func _render_group_inspector(_asset: Dictionary, group: Dictionary) -> void:
-	inspector_content.add_child(_create_inspector_section("Group"))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Group", _on_inspector_section_toggled))
 	if group.is_empty():
-		inspector_content.add_child(_create_inspector_field_label("Group not found."))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Group not found."))
 		return
-	inspector_content.add_child(_create_inspector_field_label("Name"))
-	var name_editor := _create_name_editor(str(group.get("name", "Group")), "Group name")
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Name"))
+	var name_editor := EditorWidgets.create_name_editor(str(group.get("name", "Group")), "Group name")
 	name_editor.text_submitted.connect(_rename_selected_group)
 	name_editor.focus_exited.connect(func() -> void: _rename_selected_group(name_editor.text))
 	inspector_content.add_child(name_editor)
-	inspector_content.add_child(_create_inspector_section("Hierarchy"))
-	inspector_content.add_child(_create_inspector_field_label("Parent Component"))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Hierarchy", _on_inspector_section_toggled))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Parent Component"))
 	var parent_option := OptionButton.new()
 	parent_option.custom_minimum_size = Vector2(0, 26)
 	parent_option.add_item("Root")
@@ -9357,7 +9134,7 @@ func _render_group_inspector(_asset: Dictionary, group: Dictionary) -> void:
 			break
 	parent_option.item_selected.connect(_on_group_hierarchy_parent_selected.bind(parent_option))
 	inspector_content.add_child(parent_option)
-	inspector_content.add_child(_create_inspector_section("Group Transform"))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Group Transform", _on_inspector_section_toggled))
 	var transform_grid := GridContainer.new()
 	transform_grid.columns = 2
 	transform_grid.add_theme_constant_override("h_separation", 8)
@@ -9374,7 +9151,7 @@ func _render_group_inspector(_asset: Dictionary, group: Dictionary) -> void:
 	_add_group_transform_field(transform_grid, "Pivot X (cm)", _editor_units_to_world(pivot.x), "pivot_x", 0.001)
 	_add_group_transform_field(transform_grid, "Pivot Y (cm)", _editor_units_to_world(pivot.y), "pivot_y", 0.001)
 	inspector_content.add_child(transform_grid)
-	inspector_content.add_child(_create_inspector_section("Group Visibility"))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Group Visibility", _on_inspector_section_toggled))
 	var visibility_toggle := CheckButton.new()
 	visibility_toggle.text = "Visible"
 	visibility_toggle.custom_minimum_size = Vector2(0, 26)
@@ -9399,7 +9176,7 @@ func _rename_selected_group(new_name: String) -> void:
 
 
 func _add_group_transform_field(grid: GridContainer, label_text: String, value: float, property_name: String, step: float) -> void:
-	var label := _create_inspector_field_label(label_text)
+	var label := EditorWidgets.create_inspector_field_label(label_text)
 	grid.add_child(label)
 	var field := SpinBox.new()
 	field.min_value = -100000.0
@@ -9478,16 +9255,16 @@ func _on_group_hierarchy_parent_selected(index: int, option: OptionButton) -> vo
 
 
 func _render_guide_inspector(asset: Dictionary, guide: Dictionary) -> void:
-	inspector_content.add_child(_create_inspector_section("Guide"))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Guide", _on_inspector_section_toggled))
 	if guide.is_empty():
-		inspector_content.add_child(_create_inspector_field_label("Guide not found."))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Guide not found."))
 		return
 	if AssetGuide.is_weapon_frame(str(guide.get("guide_type", ""))):
 		_render_weapon_guide_inspector(asset, guide)
 		return
-	inspector_content.add_child(_create_inspector_field_label("Name"))
-	inspector_content.add_child(_create_inspector_field_label(_guide_display_name(asset, guide)))
-	inspector_content.add_child(_create_inspector_field_label("Type"))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Name"))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label(_guide_display_name(asset, guide)))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Type"))
 	var type_option := OptionButton.new()
 	type_option.add_item("Flow")
 	type_option.set_item_metadata(0, AssetGuide.BODY_FLOW)
@@ -9502,7 +9279,7 @@ func _render_guide_inspector(asset: Dictionary, guide: Dictionary) -> void:
 			break
 	type_option.item_selected.connect(_on_guide_type_selected.bind(type_option))
 	inspector_content.add_child(type_option)
-	inspector_content.add_child(_create_inspector_field_label("Parent Component"))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Parent Component"))
 	var target_id := str(guide.get("scope", {}).get("component_id", ""))
 	var target_name := "Missing Component"
 	for component in asset.get("components", []):
@@ -9510,18 +9287,18 @@ func _render_guide_inspector(asset: Dictionary, guide: Dictionary) -> void:
 			continue
 		if str(component.get("id", "")) == target_id:
 			target_name = str(component.get("name", "Component"))
-	inspector_content.add_child(_create_inspector_field_label(target_name))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label(target_name))
 	var visible_toggle := CheckBox.new()
 	visible_toggle.text = "Visible"
 	visible_toggle.button_pressed = bool(guide.get("visibility", true))
 	visible_toggle.toggled.connect(_on_selected_guide_visibility_changed)
 	inspector_content.add_child(visible_toggle)
-	inspector_content.add_child(_create_inspector_section("Topology"))
-	inspector_content.add_child(_create_inspector_field_label("Open Spine · %d Points" % guide.get("points", []).size()))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Topology", _on_inspector_section_toggled))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Open Spine · %d Points" % guide.get("points", []).size()))
 	var status := "Ready" if AssetGuide.validation_issues(guide).is_empty() else "Ready to draw" if guide.get("points", []).is_empty() else "Invalid"
 	if _get_component(asset, target_id).is_empty():
 		status = "Unassigned"
-	inspector_content.add_child(_create_inspector_field_label("Status: %s" % status))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Status: %s" % status))
 	var delete_button := Button.new()
 	delete_button.text = "Delete Guide"
 	delete_button.focus_mode = Control.FOCUS_NONE
@@ -9530,13 +9307,13 @@ func _render_guide_inspector(asset: Dictionary, guide: Dictionary) -> void:
 
 
 func _render_weapon_guide_inspector(asset: Dictionary, guide: Dictionary) -> void:
-	inspector_content.add_child(_create_inspector_field_label(str(guide.get("guide_type", ""))))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label(str(guide.get("guide_type", ""))))
 	var scope: Dictionary = guide.get("scope", {})
 	var scope_kind := str(scope.get("kind", "component"))
 	var scope_id := str(scope.get("group_id", "")) if scope_kind == "group" else str(scope.get("component_id", ""))
 	var scope_record := ComponentHierarchy.group_by_id(asset, scope_id) if scope_kind == "group" else _get_component(asset, scope_id)
-	inspector_content.add_child(_create_inspector_field_label("Parent %s: %s" % [scope_kind.capitalize(), str(scope_record.get("name", "Missing"))]))
-	inspector_content.add_child(_create_inspector_section("Local Frame"))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Parent %s: %s" % [scope_kind.capitalize(), str(scope_record.get("name", "Missing"))]))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Local Frame", _on_inspector_section_toggled))
 	var transform: Dictionary = guide.get("transform", WorldDocumentService.default_component_transform())
 	var grid := GridContainer.new()
 	grid.columns = 2
@@ -9544,7 +9321,7 @@ func _render_weapon_guide_inspector(asset: Dictionary, guide: Dictionary) -> voi
 	_add_weapon_frame_field(grid, "Position Y (cm)", _editor_units_to_world(Vector2(transform.get("position", Vector2.ZERO)).y), "position_y")
 	_add_weapon_frame_field(grid, "Rotation (deg)", float(transform.get("rotation", 0.0)), "rotation")
 	inspector_content.add_child(grid)
-	var status := _create_inspector_field_label("Frame: Valid" if AssetGuide.validation_issues(guide).is_empty() and not scope_record.is_empty() else "Frame: Invalid or unassigned")
+	var status := EditorWidgets.create_inspector_field_label("Frame: Valid" if AssetGuide.validation_issues(guide).is_empty() and not scope_record.is_empty() else "Frame: Invalid or unassigned")
 	status.add_theme_color_override("font_color", Color("#75b88a") if AssetGuide.validation_issues(guide).is_empty() and not scope_record.is_empty() else Color("#ef6c78"))
 	inspector_content.add_child(status)
 	var delete_button := Button.new()
@@ -9554,7 +9331,7 @@ func _render_weapon_guide_inspector(asset: Dictionary, guide: Dictionary) -> voi
 
 
 func _add_weapon_frame_field(grid: GridContainer, label_text: String, value: float, property_name: String) -> void:
-	grid.add_child(_create_inspector_field_label(label_text))
+	grid.add_child(EditorWidgets.create_inspector_field_label(label_text))
 	var field := SpinBox.new()
 	field.min_value = -100000.0
 	field.max_value = 100000.0
@@ -9585,26 +9362,26 @@ func _on_weapon_frame_value_changed(value: float, property_name: String) -> void
 
 
 func _render_weighting_inspector() -> void:
-	inspector_content.add_child(_create_inspector_section("Weighting"))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Weighting", _on_inspector_section_toggled))
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	if component.is_empty():
-		inspector_content.add_child(_create_inspector_field_label("Select a Component to create or inspect Weighting Styles."))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Select a Component to create or inspect Weighting Styles."))
 		return
-	inspector_content.add_child(_create_inspector_field_label(str(component.get("name", "Component"))))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label(str(component.get("name", "Component"))))
 	var mesh_status := _component_mesh_status(selected_asset_id, selected_component_id, component)
-	var mesh_label := _create_inspector_field_label("Component Mesh: %s" % mesh_status)
+	var mesh_label := EditorWidgets.create_inspector_field_label("Component Mesh: %s" % mesh_status)
 	mesh_label.add_theme_color_override("font_color", Color("#75b88a") if mesh_status == "Ready" else Color("#ef8354"))
 	inspector_content.add_child(mesh_label)
 	var style := _weighting_style(selected_asset_id, selected_component_id, selected_weighting_style_id)
 	if style.is_empty():
-		inspector_content.add_child(_create_inspector_field_label("Create or select a Weighting Style."))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Create or select a Weighting Style."))
 		return
-	inspector_content.add_child(_create_inspector_field_label("Name"))
-	var name_editor := _create_name_editor(str(style.get("name", "Weighting Style")), "Weighting Style name")
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Name"))
+	var name_editor := EditorWidgets.create_name_editor(str(style.get("name", "Weighting Style")), "Weighting Style name")
 	name_editor.text_submitted.connect(_rename_weighting_style)
 	name_editor.focus_exited.connect(func() -> void: _rename_weighting_style(name_editor.text))
 	inspector_content.add_child(name_editor)
-	inspector_content.add_child(_create_inspector_section("Method"))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Method", _on_inspector_section_toggled))
 	var method_option := OptionButton.new()
 	for method_data in [["Uniform", WeightingService.UNIFORM], ["Axis Gradient", WeightingService.AXIS_GRADIENT]]:
 		method_option.add_item(str(method_data[0]))
@@ -9613,9 +9390,9 @@ func _render_weighting_inspector() -> void:
 			method_option.select(method_option.item_count - 1)
 	method_option.item_selected.connect(_on_weighting_method_selected.bind(method_option))
 	inspector_content.add_child(method_option)
-	inspector_content.add_child(_create_inspector_section("Parameters"))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Parameters", _on_inspector_section_toggled))
 	if str(style.get("method", "")) == WeightingService.AXIS_GRADIENT:
-		inspector_content.add_child(_create_inspector_field_label("Direction"))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Direction"))
 		var direction_option := OptionButton.new()
 		for direction_data in [["Bottom → Top", WeightingService.BOTTOM_TO_TOP], ["Top → Bottom", WeightingService.TOP_TO_BOTTOM], ["Left → Right", WeightingService.LEFT_TO_RIGHT], ["Right → Left", WeightingService.RIGHT_TO_LEFT]]:
 			direction_option.add_item(str(direction_data[0]))
@@ -9624,7 +9401,7 @@ func _render_weighting_inspector() -> void:
 				direction_option.select(direction_option.item_count - 1)
 		direction_option.item_selected.connect(_on_weighting_direction_selected.bind(direction_option))
 		inspector_content.add_child(direction_option)
-		inspector_content.add_child(_create_inspector_field_label("Curve"))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Curve"))
 		var curve_option := OptionButton.new()
 		for curve_data in [["Linear", WeightingService.LINEAR], ["Ease In", WeightingService.EASE_IN], ["Ease Out", WeightingService.EASE_OUT], ["Smooth", WeightingService.SMOOTH]]:
 			curve_option.add_item(str(curve_data[0]))
@@ -9638,7 +9415,7 @@ func _render_weighting_inspector() -> void:
 		invert.button_pressed = bool(style.get("parameters", {}).get("invert", false))
 		invert.toggled.connect(_on_weighting_invert_changed)
 		inspector_content.add_child(invert)
-	inspector_content.add_child(_create_inspector_field_label("Strength"))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Strength"))
 	var strength := SpinBox.new()
 	strength.min_value = 0.0
 	strength.max_value = 1.0
@@ -9647,12 +9424,12 @@ func _render_weighting_inspector() -> void:
 	strength.value_changed.connect(_on_weighting_strength_changed)
 	inspector_content.add_child(strength)
 	var status := _weighting_status(selected_asset_id, selected_component_id, component, style)
-	inspector_content.add_child(_create_inspector_section("Result"))
-	inspector_content.add_child(_create_inspector_field_label("Status: %s" % status))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Result", _on_inspector_section_toggled))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Status: %s" % status))
 	var result: Dictionary = weighting_preview if weighting_preview_key == _weighting_preview_id(selected_asset_id, selected_component_id, selected_weighting_style_id) else style.get("bake", {})
 	if not result.is_empty():
-		inspector_content.add_child(_create_inspector_field_label("Vertices: %d" % int(result.get("weight_count", 0))))
-		inspector_content.add_child(_create_inspector_field_label("Range: %.2f → %.2f" % [float(result.get("minimum_weight", 0.0)), float(result.get("maximum_weight", 0.0))]))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Vertices: %d" % int(result.get("weight_count", 0))))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Range: %.2f → %.2f" % [float(result.get("minimum_weight", 0.0)), float(result.get("maximum_weight", 0.0))]))
 	var actions := HBoxContainer.new()
 	var generate_button := Button.new()
 	generate_button.text = "Generate"
@@ -9909,13 +9686,13 @@ func _render_geometry_sampling_inspector() -> void:
 	var asset := _get_asset(selected_asset_id)
 	var component := _get_component(asset, selected_component_id)
 	if component.is_empty():
-		inspector_content.add_child(_create_inspector_section("Sampling"))
-		inspector_content.add_child(_create_inspector_field_label("Select one Component to configure its boundary sampling."))
+		inspector_content.add_child(EditorWidgets.create_inspector_section("Sampling", _on_inspector_section_toggled))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Select one Component to configure its boundary sampling."))
 		return
-	inspector_content.add_child(_create_inspector_section("Boundary Sampling · %s" % str(component.get("name", "Component"))))
-	inspector_content.add_child(_create_inspector_field_label("One adaptive Body recipe shared by Outer, Holes, and Cuts."))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Boundary Sampling · %s" % str(component.get("name", "Component")), _on_inspector_section_toggled))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("One adaptive Body recipe shared by Outer, Holes, and Cuts."))
 	var base_recipe := _geometry_sampling_recipe(selected_asset_id, selected_component_id)
-	inspector_content.add_child(_create_inspector_field_label("Target Edge Length (Body units)"))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Target Edge Length (Body units)"))
 	var spacing := SpinBox.new()
 	spacing.min_value = GeometrySamplingService.MIN_SPACING
 	spacing.max_value = 10000.0
@@ -9926,7 +9703,7 @@ func _render_geometry_sampling_inspector() -> void:
 	spacing.get_line_edit().text_submitted.connect(_on_geometry_spacing_text_submitted.bind(spacing))
 	spacing.get_line_edit().focus_exited.connect(_on_geometry_spacing_focus_exited.bind(spacing))
 	inspector_content.add_child(spacing)
-	inspector_content.add_child(_create_inspector_field_label("Curve Detail"))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Curve Detail"))
 	var feature_detail := SpinBox.new()
 	feature_detail.min_value = 0.0
 	feature_detail.max_value = 100.0
@@ -9937,7 +9714,7 @@ func _render_geometry_sampling_inspector() -> void:
 	inspector_content.add_child(feature_detail)
 
 	var display_result := geometry_sampling_preview if _geometry_sampling_preview_matches(selected_asset_id, selected_component_id, component) else _geometry_sampling_bake(selected_asset_id, selected_component_id)
-	inspector_content.add_child(_create_inspector_section("Boundary Inputs"))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Boundary Inputs", _on_inspector_section_toggled))
 	_render_geometry_sampling_boundary_row("Outer · %s" % str(component.get("name", "Component")), "", "outer", display_result, Callable())
 
 	var references: Array = []
@@ -9959,11 +9736,11 @@ func _render_geometry_sampling_inspector() -> void:
 		_render_geometry_sampling_refinement_controls(base_recipe)
 
 	var status := _geometry_sampling_status(selected_asset_id, selected_component_id, component)
-	inspector_content.add_child(_create_inspector_section("Result"))
-	inspector_content.add_child(_create_inspector_field_label("Status: %s" % status))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Result", _on_inspector_section_toggled))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Status: %s" % status))
 	if not display_result.is_empty():
-		inspector_content.add_child(_create_inspector_field_label("Constraint Samples: %d" % int(display_result.get("constraint_sample_count", display_result.get("sample_count", 0)))))
-		inspector_content.add_child(_create_inspector_field_label("Preserved Points: %d" % int(display_result.get("preserve_count", 0))))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Constraint Samples: %d" % int(display_result.get("constraint_sample_count", display_result.get("sample_count", 0)))))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Preserved Points: %d" % int(display_result.get("preserve_count", 0))))
 	var actions := HBoxContainer.new()
 	var bake_button := Button.new()
 	bake_button.text = "Calculating…" if status == "Calculating" else "Baked" if status == "Baked" else "Bake Preview"
@@ -9999,7 +9776,7 @@ func _render_geometry_sampling_refinement_controls(recipe: Dictionary) -> void:
 	var input := _get_sampling_input(_get_asset(selected_asset_id), selected_sampling_input_id, selected_sampling_input_kind)
 	if input.is_empty():
 		return
-	inspector_content.add_child(_create_inspector_section("Boundary Density · %s" % _sampling_input_display_name(_get_asset(selected_asset_id), _get_component(_get_asset(selected_asset_id), selected_component_id), input, selected_sampling_input_kind)))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Boundary Density · %s" % _sampling_input_display_name(_get_asset(selected_asset_id), _get_component(_get_asset(selected_asset_id), selected_component_id), input, selected_sampling_input_kind), _on_inspector_section_toggled))
 	var refinement: Dictionary = recipe.get("parameters", {}).get("boundary_refinements", {}).get(selected_sampling_input_id, {})
 	var factor := float(refinement.get("factor", 1.0))
 	var has_adjustment := _geometry_sampling_input_has_override(recipe, selected_sampling_input_id)
@@ -10009,9 +9786,9 @@ func _render_geometry_sampling_refinement_controls(recipe: Dictionary) -> void:
 	toggle.toggled.connect(_on_geometry_sampling_refinement_toggled.bind(selected_sampling_input_id))
 	inspector_content.add_child(toggle)
 	var effective_spacing := float(recipe.get("parameters", {}).get("spacing", GeometrySamplingService.DEFAULT_SPACING)) / factor
-	inspector_content.add_child(_create_inspector_field_label("Effective Edge Length: %.2f" % effective_spacing))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Effective Edge Length: %.2f" % effective_spacing))
 	if has_adjustment:
-		inspector_content.add_child(_create_inspector_field_label("Density Factor · below 1× is coarser"))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Density Factor · below 1× is coarser"))
 		var factor_input := SpinBox.new()
 		factor_input.min_value = GeometrySamplingService.MIN_REFINEMENT_FACTOR
 		factor_input.max_value = GeometrySamplingService.MAX_REFINEMENT_FACTOR
@@ -10278,19 +10055,19 @@ func _geometry_sampling_overlays(asset: Dictionary, component_id: String) -> Dic
 func _render_geometry_seeding_inspector() -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	if component.is_empty():
-		inspector_content.add_child(_create_inspector_section("Seeding"))
-		inspector_content.add_child(_create_inspector_field_label("Select one Component to configure its interior seeding."))
+		inspector_content.add_child(EditorWidgets.create_inspector_section("Seeding", _on_inspector_section_toggled))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Select one Component to configure its interior seeding."))
 		return
-	inspector_content.add_child(_create_inspector_section("Seeding · %s" % str(component.get("name", "Component"))))
-	inspector_content.add_child(_create_inspector_field_label("One derived Seed set from the accepted Sampling constraints."))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Seeding · %s" % str(component.get("name", "Component")), _on_inspector_section_toggled))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("One derived Seed set from the accepted Sampling constraints."))
 	var upstream_current := _geometry_sampling_bake_is_current(selected_asset_id, selected_component_id, component)
-	inspector_content.add_child(_create_inspector_section("Input"))
-	var input_label := _create_inspector_field_label("Sampling · Adaptive: %s" % ("Baked" if upstream_current else "Required / Stale"))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Input", _on_inspector_section_toggled))
+	var input_label := EditorWidgets.create_inspector_field_label("Sampling · Adaptive: %s" % ("Baked" if upstream_current else "Required / Stale"))
 	input_label.add_theme_color_override("font_color", Color("#75b88a") if upstream_current else Color("#ef8354"))
 	inspector_content.add_child(input_label)
 	var recipe := _geometry_seeding_recipe(selected_asset_id, selected_component_id)
 	var sampling_bake := _geometry_sampling_bake(selected_asset_id, selected_component_id)
-	inspector_content.add_child(_create_inspector_field_label("Method"))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Method"))
 	var method_option := OptionButton.new()
 	method_option.add_item("Poisson Fill")
 	method_option.set_item_metadata(0, GeometrySeedingService.POISSON_FILL)
@@ -10299,10 +10076,10 @@ func _render_geometry_seeding_inspector() -> void:
 	method_option.select(0 if str(recipe.get("method", "")) == GeometrySeedingService.POISSON_FILL else 1)
 	method_option.item_selected.connect(func(index: int) -> void: _set_geometry_seeding_method(str(method_option.get_item_metadata(index))))
 	inspector_content.add_child(method_option)
-	inspector_content.add_child(_create_inspector_section("Parameters"))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Parameters", _on_inspector_section_toggled))
 	if str(recipe.get("method", "")) == GeometrySeedingService.SPINE_FLOW:
 		var sampler_guides := _sampler_spines_for_component(_get_asset(selected_asset_id), selected_component_id)
-		inspector_content.add_child(_create_inspector_field_label("Active Sampler Spines"))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Active Sampler Spines"))
 		for guide in sampler_guides:
 			var guide_id := str(guide.get("id", ""))
 			var enabled := _geometry_seeding_spine_enabled(recipe, guide_id)
@@ -10312,7 +10089,7 @@ func _render_geometry_seeding_inspector() -> void:
 			toggle.toggled.connect(_on_geometry_seeding_spine_enabled.bind(guide_id))
 			inspector_content.add_child(toggle)
 		if sampler_guides.is_empty():
-			var missing_guide := _create_inspector_field_label("Create and author a Sampler Spine on this Component.")
+			var missing_guide := EditorWidgets.create_inspector_field_label("Create and author a Sampler Spine on this Component.")
 			missing_guide.add_theme_color_override("font_color", Color("#ef8354"))
 			inspector_content.add_child(missing_guide)
 		_add_geometry_seeding_float_parameter("Seed Spacing (Body units)", recipe, "spacing", GeometrySeedingService.MIN_SPACING, 10000.0)
@@ -10325,7 +10102,7 @@ func _render_geometry_seeding_inspector() -> void:
 		var parameters: Dictionary = recipe.get("parameters", {})
 		var boundary_override := bool(parameters.get("boundary_clearance_override", false))
 		var boundary_clearance := float(parameters.get("boundary_clearance", GeometrySeedingService.DEFAULT_BOUNDARY_CLEARANCE))
-		inspector_content.add_child(_create_inspector_field_label("Boundary Margin: %s · %s" % ["Refined" if boundary_override else "Auto", _format_scale_value(boundary_clearance)]))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Boundary Margin: %s · %s" % ["Refined" if boundary_override else "Auto", _format_scale_value(boundary_clearance)]))
 		var refine_boundary := CheckBox.new()
 		refine_boundary.text = "Refine Boundary Margin"
 		refine_boundary.button_pressed = boundary_override
@@ -10342,11 +10119,11 @@ func _render_geometry_seeding_inspector() -> void:
 		advanced_pattern.toggled.connect(_on_geometry_seeding_advanced_pattern_toggled)
 		inspector_content.add_child(advanced_pattern)
 		if geometry_seeding_advanced_pattern_expanded:
-			inspector_content.add_child(_create_inspector_field_label("Along Spacing: Derived · %s" % _format_scale_value(float(parameters.get("along_spacing", GeometrySeedingService.DEFAULT_ALONG_SPACING)))))
-			inspector_content.add_child(_create_inspector_field_label("Across Spacing: Derived · %s" % _format_scale_value(float(parameters.get("across_spacing", GeometrySeedingService.DEFAULT_ACROSS_SPACING)))))
+			inspector_content.add_child(EditorWidgets.create_inspector_field_label("Along Spacing: Derived · %s" % _format_scale_value(float(parameters.get("along_spacing", GeometrySeedingService.DEFAULT_ALONG_SPACING)))))
+			inspector_content.add_child(EditorWidgets.create_inspector_field_label("Across Spacing: Derived · %s" % _format_scale_value(float(parameters.get("across_spacing", GeometrySeedingService.DEFAULT_ACROSS_SPACING)))))
 			var stagger_override := bool(parameters.get("stagger_override", false))
 			var stagger := float(parameters.get("stagger", GeometrySeedingService.DEFAULT_ARTISTIC_STAGGER))
-			inspector_content.add_child(_create_inspector_field_label("Stagger: %s · %s" % ["Refined" if stagger_override else "Auto", _format_scale_value(stagger)]))
+			inspector_content.add_child(EditorWidgets.create_inspector_field_label("Stagger: %s · %s" % ["Refined" if stagger_override else "Auto", _format_scale_value(stagger)]))
 			var refine_stagger := CheckBox.new()
 			refine_stagger.text = "Refine Stagger"
 			refine_stagger.button_pressed = stagger_override
@@ -10357,9 +10134,9 @@ func _render_geometry_seeding_inspector() -> void:
 	else:
 		_add_geometry_seeding_float_parameter("Seed Spacing (Body units)", recipe, "spacing", GeometrySeedingService.MIN_SPACING, 10000.0)
 		var clearance := float(recipe.get("parameters", {}).get("spacing", GeometrySeedingService.DEFAULT_SPACING)) * float(recipe.get("parameters", {}).get("constraint_clearance_factor", GeometrySeedingService.DEFAULT_CONSTRAINT_CLEARANCE_FACTOR))
-		inspector_content.add_child(_create_inspector_field_label("Constraint Clearance: Auto · %.2f" % clearance))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Constraint Clearance: Auto · %.2f" % clearance))
 	if str(recipe.get("method", "")) == GeometrySeedingService.POISSON_FILL or (geometry_seeding_advanced_pattern_expanded and bool(recipe.get("parameters", {}).get("fill_gaps", false))):
-		inspector_content.add_child(_create_inspector_field_label("Random Seed"))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Random Seed"))
 		var random_seed := SpinBox.new()
 		random_seed.min_value = 0.0
 		random_seed.max_value = 2147483647.0
@@ -10367,7 +10144,7 @@ func _render_geometry_seeding_inspector() -> void:
 		random_seed.set_value_no_signal(float(recipe.get("parameters", {}).get("seed", GeometrySeedingService.DEFAULT_SEED)))
 		random_seed.value_changed.connect(_on_geometry_seeding_parameter_changed.bind("seed"))
 		inspector_content.add_child(random_seed)
-	inspector_content.add_child(_create_inspector_section("Constraints"))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Constraints", _on_inspector_section_toggled))
 	var outer_count := 0
 	var hole_count := 0
 	var cut_count := 0
@@ -10379,17 +10156,17 @@ func _render_geometry_seeding_inspector() -> void:
 			hole_count += int(stat.get("sample_count", 0))
 		elif role == "cut":
 			cut_count += int(stat.get("sample_count", 0))
-	inspector_content.add_child(_create_inspector_field_label("Outer · inward clearance · %d points" % outer_count))
-	inspector_content.add_child(_create_inspector_field_label("Holes · excluded + clearance · %d points" % hole_count))
-	inspector_content.add_child(_create_inspector_field_label("Cuts · barrier + clearance · %d points" % cut_count))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Outer · inward clearance · %d points" % outer_count))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Holes · excluded + clearance · %d points" % hole_count))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Cuts · barrier + clearance · %d points" % cut_count))
 	var status := _geometry_seeding_status(selected_asset_id, selected_component_id, component)
-	inspector_content.add_child(_create_inspector_section("Result"))
-	inspector_content.add_child(_create_inspector_field_label("Status: %s" % status))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Result", _on_inspector_section_toggled))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Status: %s" % status))
 	var result := geometry_seeding_preview if _geometry_seeding_preview_matches(selected_asset_id, selected_component_id, component) else _geometry_seeding_bake(selected_asset_id, selected_component_id)
 	if not result.is_empty():
-		inspector_content.add_child(_create_inspector_field_label("Seeds: %d" % int(result.get("seed_count", result.get("seeds", []).size()))))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Seeds: %d" % int(result.get("seed_count", result.get("seeds", []).size()))))
 		if str(result.get("method", "")) == GeometrySeedingService.SPINE_FLOW:
-			inspector_content.add_child(_create_inspector_field_label("Flow: %d · Gap Fill: %d" % [int(result.get("flow_seed_count", 0)), int(result.get("gap_seed_count", 0))]))
+			inspector_content.add_child(EditorWidgets.create_inspector_field_label("Flow: %d · Gap Fill: %d" % [int(result.get("flow_seed_count", 0)), int(result.get("gap_seed_count", 0))]))
 	var actions := HBoxContainer.new()
 	var bake_button := Button.new()
 	bake_button.text = "Calculating…" if status == "Calculating" else "Baked" if status in ["Baked", "Edited"] else "Bake Preview"
@@ -10403,7 +10180,7 @@ func _render_geometry_seeding_inspector() -> void:
 
 
 func _add_geometry_seeding_float_parameter(label_text: String, recipe: Dictionary, parameter_name: String, minimum: float, maximum: float, suffix := "") -> void:
-	inspector_content.add_child(_create_inspector_field_label(label_text))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label(label_text))
 	var field := SpinBox.new()
 	field.min_value = minimum
 	field.max_value = maximum
@@ -10753,32 +10530,32 @@ func _mark_geometry_seeding_bake_edited(bake: Dictionary) -> void:
 
 
 func _render_geometry_meshing_inspector() -> void:
-	inspector_content.add_child(_create_inspector_section("Meshing"))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Meshing", _on_inspector_section_toggled))
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	if component.is_empty():
-		inspector_content.add_child(_create_inspector_field_label("Select one Component to generate its derived Mesh."))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Select one Component to generate its derived Mesh."))
 		return
 	if str(component.get("draw_mode", "")) == "contour":
 		_render_contour_meshing_inspector(component)
 		return
-	inspector_content.add_child(_create_inspector_field_label(str(component.get("name", "Component"))))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label(str(component.get("name", "Component"))))
 	var source_issues := _component_mesh_source_validation_issues(_get_asset(selected_asset_id), component)
 	if not source_issues.is_empty():
-		inspector_content.add_child(_create_inspector_section("Source Validation"))
-		var source_status := _create_inspector_field_label("Invalid source topology")
+		inspector_content.add_child(EditorWidgets.create_inspector_section("Source Validation", _on_inspector_section_toggled))
+		var source_status := EditorWidgets.create_inspector_field_label("Invalid source topology")
 		source_status.add_theme_color_override("font_color", Color("#ef8354"))
 		inspector_content.add_child(source_status)
 		for issue in source_issues:
-			var issue_label := _create_inspector_field_label(str(issue))
+			var issue_label := EditorWidgets.create_inspector_field_label(str(issue))
 			issue_label.add_theme_color_override("font_color", Color("#ef8354"))
 			inspector_content.add_child(issue_label)
 	var recipe := _geometry_meshing_recipe(selected_asset_id, selected_component_id)
-	inspector_content.add_child(_create_inspector_section("Input"))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Input", _on_inspector_section_toggled))
 	var sampling_current := _geometry_sampling_bake_is_current(selected_asset_id, selected_component_id, component)
-	var sampling_label := _create_inspector_field_label("Sampling · Adaptive: %s" % ("Baked" if sampling_current else "Required / Stale"))
+	var sampling_label := EditorWidgets.create_inspector_field_label("Sampling · Adaptive: %s" % ("Baked" if sampling_current else "Required / Stale"))
 	sampling_label.add_theme_color_override("font_color", Color("#75b88a") if sampling_current else Color("#ef8354"))
 	inspector_content.add_child(sampling_label)
-	inspector_content.add_child(_create_inspector_field_label("Seeding Source"))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Seeding Source"))
 	var seed_option := OptionButton.new()
 	var seeding_bakes := _geometry_seeding_bakes(selected_asset_id, selected_component_id)
 	for method in GeometrySeedingService.VALID_METHODS:
@@ -10792,19 +10569,19 @@ func _render_geometry_meshing_inspector() -> void:
 	seed_option.item_selected.connect(_on_geometry_meshing_seed_source_selected.bind(seed_option))
 	inspector_content.add_child(seed_option)
 	if seed_option.item_count == 0:
-		var missing_seed := _create_inspector_field_label("Bake at least one Seeding method first.")
+		var missing_seed := EditorWidgets.create_inspector_field_label("Bake at least one Seeding method first.")
 		missing_seed.add_theme_color_override("font_color", Color("#ef8354"))
 		inspector_content.add_child(missing_seed)
 	var input_current := _geometry_meshing_input_is_current(selected_asset_id, selected_component_id, component, recipe)
-	var input_label := _create_inspector_field_label("Input Status: %s" % ("Ready" if input_current else "Required / Stale"))
+	var input_label := EditorWidgets.create_inspector_field_label("Input Status: %s" % ("Ready" if input_current else "Required / Stale"))
 	input_label.add_theme_color_override("font_color", Color("#75b88a") if input_current else Color("#ef8354"))
 	inspector_content.add_child(input_label)
-	inspector_content.add_child(_create_inspector_section("Method"))
-	inspector_content.add_child(_create_inspector_field_label("Constrained Mesh · Automatic"))
-	inspector_content.add_child(_create_inspector_section("Parameters"))
-	inspector_content.add_child(_create_inspector_field_label("Mesh Character"))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Method", _on_inspector_section_toggled))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Constrained Mesh · Automatic"))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Parameters", _on_inspector_section_toggled))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Mesh Character"))
 	var character_row := HBoxContainer.new()
-	character_row.add_child(_create_inspector_field_label("Structured"))
+	character_row.add_child(EditorWidgets.create_inspector_field_label("Structured"))
 	var character := HSlider.new()
 	character.min_value = 0.0
 	character.max_value = 100.0
@@ -10813,10 +10590,10 @@ func _render_geometry_meshing_inspector() -> void:
 	character.set_value_no_signal(float(recipe.get("parameters", {}).get("mesh_character", GeometryMeshingService.DEFAULT_MESH_CHARACTER)) * 100.0)
 	character.value_changed.connect(func(value: float) -> void: _on_geometry_meshing_parameter_changed(value / 100.0, "mesh_character"))
 	character_row.add_child(character)
-	character_row.add_child(_create_inspector_field_label("Organic"))
+	character_row.add_child(EditorWidgets.create_inspector_field_label("Organic"))
 	inspector_content.add_child(character_row)
-	inspector_content.add_child(_create_inspector_field_label("Character: %d%%" % roundi(character.value)))
-	inspector_content.add_child(_create_inspector_section("Optimization"))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Character: %d%%" % roundi(character.value)))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Optimization", _on_inspector_section_toggled))
 	var optimize_mesh := CheckBox.new()
 	optimize_mesh.text = "Optimize Mesh"
 	optimize_mesh.button_pressed = bool(recipe.get("parameters", {}).get("optimize_mesh", GeometryMeshingService.DEFAULT_OPTIMIZE_MESH))
@@ -10834,7 +10611,7 @@ func _render_geometry_meshing_inspector() -> void:
 	if geometry_meshing_advanced_relaxation_expanded:
 		var parameters: Dictionary = recipe.get("parameters", {})
 		var relaxation_override := bool(parameters.get("relaxation_override", false))
-		inspector_content.add_child(_create_inspector_field_label("Relaxation Strength: %s · %s" % ["Refined" if relaxation_override else "Derived", _format_scale_value(float(parameters.get("relaxation", 0.0)))]))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Relaxation Strength: %s · %s" % ["Refined" if relaxation_override else "Derived", _format_scale_value(float(parameters.get("relaxation", 0.0)))]))
 		var refine_relaxation := CheckBox.new()
 		refine_relaxation.text = "Refine Relaxation Strength"
 		refine_relaxation.button_pressed = relaxation_override
@@ -10852,7 +10629,7 @@ func _render_geometry_meshing_inspector() -> void:
 			relaxation.get_line_edit().focus_exited.connect(_on_geometry_meshing_float_focus_exited.bind(relaxation, "relaxation"))
 			inspector_content.add_child(relaxation)
 		var passes_override := bool(parameters.get("passes_override", false))
-		inspector_content.add_child(_create_inspector_field_label("Relaxation Passes: %s · %d" % ["Refined" if passes_override else "Derived", int(parameters.get("passes", 0))]))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Relaxation Passes: %s · %d" % ["Refined" if passes_override else "Derived", int(parameters.get("passes", 0))]))
 		var refine_passes := CheckBox.new()
 		refine_passes.text = "Refine Relaxation Passes"
 		refine_passes.button_pressed = passes_override
@@ -10866,13 +10643,13 @@ func _render_geometry_meshing_inspector() -> void:
 			passes.set_value_no_signal(float(parameters.get("passes", GeometryMeshingService.DEFAULT_PASSES)))
 			passes.value_changed.connect(_on_geometry_meshing_parameter_changed.bind("passes"))
 			inspector_content.add_child(passes)
-	inspector_content.add_child(_create_inspector_section("Constraints"))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Constraints", _on_inspector_section_toggled))
 	var input := _geometry_meshing_input(selected_asset_id, selected_component_id, recipe)
 	var sampling_bake: Dictionary = input.get("sampling", {})
-	inspector_content.add_child(_create_inspector_field_label("Outer · Preserved"))
-	inspector_content.add_child(_create_inspector_field_label("Holes · Preserved · %d" % int(sampling_bake.get("hole_count", 0))))
-	inspector_content.add_child(_create_inspector_field_label("Cuts · Seam · %d" % sampling_bake.get("cuts", []).size()))
-	inspector_content.add_child(_create_inspector_section("View"))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Outer · Preserved"))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Holes · Preserved · %d" % int(sampling_bake.get("hole_count", 0))))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Cuts · Seam · %d" % sampling_bake.get("cuts", []).size()))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("View", _on_inspector_section_toggled))
 	if is_instance_valid(geometry_meshing_workspace):
 		for view_option in [
 			{"key": "mesh_edges", "label": "Mesh Edges", "value": geometry_meshing_workspace.show_mesh_edges},
@@ -10889,32 +10666,32 @@ func _render_geometry_meshing_inspector() -> void:
 			inspector_content.add_child(view_toggle)
 	var build_diagnostic_lines := _component_mesh_build_diagnostic_lines(selected_asset_id, selected_component_id)
 	if not build_diagnostic_lines.is_empty():
-		inspector_content.add_child(_create_inspector_section("Auto Build Diagnostics"))
+		inspector_content.add_child(EditorWidgets.create_inspector_section("Auto Build Diagnostics", _on_inspector_section_toggled))
 		for diagnostic_line in build_diagnostic_lines:
-			inspector_content.add_child(_create_inspector_field_label(diagnostic_line))
+			inspector_content.add_child(EditorWidgets.create_inspector_field_label(diagnostic_line))
 	var status := _geometry_meshing_status(selected_asset_id, selected_component_id, component)
-	inspector_content.add_child(_create_inspector_section("Result"))
-	inspector_content.add_child(_create_inspector_field_label("Status: %s" % status))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Result", _on_inspector_section_toggled))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Status: %s" % status))
 	var auto_build_error := str(_component_mesh_reference(selected_asset_id, selected_component_id).get("last_error", ""))
 	if not auto_build_error.is_empty():
-		var error_label := _create_inspector_field_label("Update Meshes: %s" % auto_build_error)
+		var error_label := EditorWidgets.create_inspector_field_label("Update Meshes: %s" % auto_build_error)
 		error_label.add_theme_color_override("font_color", Color("#ef8354"))
 		inspector_content.add_child(error_label)
 	var result := geometry_meshing_preview if _geometry_meshing_preview_matches(selected_asset_id, selected_component_id, component) else _geometry_meshing_bake(selected_asset_id, selected_component_id)
 	if not result.is_empty():
-		inspector_content.add_child(_create_inspector_field_label("Vertices: %d" % int(result.get("vertex_count", 0))))
-		inspector_content.add_child(_create_inspector_field_label("Triangles: %d" % int(result.get("triangle_count", 0))))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Vertices: %d" % int(result.get("vertex_count", 0))))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Triangles: %d" % int(result.get("triangle_count", 0))))
 		var optimization: Dictionary = result.get("optimization", {})
 		var quality_before: Dictionary = optimization.get("quality_before", {})
 		var quality_after: Dictionary = optimization.get("quality_after", {})
 		if not quality_before.is_empty() and not quality_after.is_empty():
-			inspector_content.add_child(_create_inspector_field_label("Minimum Angle: %.1f° → %.1f°" % [float(quality_before.get("minimum_angle", 0.0)), float(quality_after.get("minimum_angle", 0.0))]))
-			inspector_content.add_child(_create_inspector_field_label("Worst Aspect Ratio: %.2f → %.2f" % [float(quality_before.get("worst_aspect_ratio", 0.0)), float(quality_after.get("worst_aspect_ratio", 0.0))]))
-			inspector_content.add_child(_create_inspector_field_label("Moved Seeds: %d · Removed: %d" % [int(optimization.get("moved_seed_count", 0)), int(optimization.get("removed_seed_count", 0))]))
+			inspector_content.add_child(EditorWidgets.create_inspector_field_label("Minimum Angle: %.1f° → %.1f°" % [float(quality_before.get("minimum_angle", 0.0)), float(quality_after.get("minimum_angle", 0.0))]))
+			inspector_content.add_child(EditorWidgets.create_inspector_field_label("Worst Aspect Ratio: %.2f → %.2f" % [float(quality_before.get("worst_aspect_ratio", 0.0)), float(quality_after.get("worst_aspect_ratio", 0.0))]))
+			inspector_content.add_child(EditorWidgets.create_inspector_field_label("Moved Seeds: %d · Removed: %d" % [int(optimization.get("moved_seed_count", 0)), int(optimization.get("removed_seed_count", 0))]))
 		else:
-			inspector_content.add_child(_create_inspector_field_label("Minimum Angle: %.1f°" % float(result.get("minimum_angle", 0.0))))
-		inspector_content.add_child(_create_inspector_field_label("Constraints: %s" % ("Valid" if bool(result.get("constraints_valid", false)) else "Invalid")))
-		inspector_content.add_child(_create_inspector_field_label("Cut Seam Vertices: %d" % int(result.get("cut_seam_vertex_count", 0))))
+			inspector_content.add_child(EditorWidgets.create_inspector_field_label("Minimum Angle: %.1f°" % float(result.get("minimum_angle", 0.0))))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Constraints: %s" % ("Valid" if bool(result.get("constraints_valid", false)) else "Invalid")))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Cut Seam Vertices: %d" % int(result.get("cut_seam_vertex_count", 0))))
 	var actions := HBoxContainer.new()
 	var bake_button := Button.new()
 	bake_button.text = "Calculating…" if status == "Calculating" else "Baked · Component Mesh" if status == "Baked" else "Bake Preview"
@@ -10928,27 +10705,27 @@ func _render_geometry_meshing_inspector() -> void:
 
 
 func _render_contour_meshing_inspector(component: Dictionary) -> void:
-	inspector_content.add_child(_create_inspector_field_label(str(component.get("name", "Contour"))))
-	inspector_content.add_child(_create_inspector_section("Contour Stroke · Automatic"))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label(str(component.get("name", "Contour"))))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Contour Stroke · Automatic", _on_inspector_section_toggled))
 	var stroke_width_px := _effective_contour_stroke_width_px(component)
 	var source_label := "Component override" if _component_has_contour_stroke_width_override(component) else "World Settings"
-	inspector_content.add_child(_create_inspector_field_label("Width: %.1f px (%.5f m) · %s" % [stroke_width_px, ContourStrokeService.stroke_width_meters(stroke_width_px), source_label]))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Width: %.1f px (%.5f m) · %s" % [stroke_width_px, ContourStrokeService.stroke_width_meters(stroke_width_px), source_label]))
 	var issues := ContourMeshService.validation_issues(component, stroke_width_px)
-	var input_status := _create_inspector_field_label("Input: Ready" if issues.is_empty() else "Input: Draft · %s" % issues[0])
+	var input_status := EditorWidgets.create_inspector_field_label("Input: Ready" if issues.is_empty() else "Input: Draft · %s" % issues[0])
 	input_status.add_theme_color_override("font_color", Color("#75b88a") if issues.is_empty() else Color("#ef8354"))
 	inspector_content.add_child(input_status)
 	var status := _geometry_meshing_status(selected_asset_id, selected_component_id, component)
-	inspector_content.add_child(_create_inspector_section("Result"))
-	inspector_content.add_child(_create_inspector_field_label("Status: %s" % status))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Result", _on_inspector_section_toggled))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Status: %s" % status))
 	var auto_build_error := str(_component_mesh_reference(selected_asset_id, selected_component_id).get("last_error", ""))
 	if not auto_build_error.is_empty():
-		var error_label := _create_inspector_field_label("Update Meshes: %s" % auto_build_error)
+		var error_label := EditorWidgets.create_inspector_field_label("Update Meshes: %s" % auto_build_error)
 		error_label.add_theme_color_override("font_color", Color("#ef8354"))
 		inspector_content.add_child(error_label)
 	var result := geometry_meshing_preview if _geometry_meshing_preview_matches(selected_asset_id, selected_component_id, component) else _geometry_meshing_bake(selected_asset_id, selected_component_id, ContourMeshService.METHOD)
 	if not result.is_empty():
-		inspector_content.add_child(_create_inspector_field_label("Vertices: %d" % int(result.get("vertex_count", 0))))
-		inspector_content.add_child(_create_inspector_field_label("Triangles: %d" % int(result.get("triangle_count", 0))))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Vertices: %d" % int(result.get("vertex_count", 0))))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Triangles: %d" % int(result.get("triangle_count", 0))))
 	var actions := HBoxContainer.new()
 	var bake_button := Button.new()
 	bake_button.text = "Calculating…" if status == "Calculating" else "Baked · Component Mesh" if status == "Baked" else "Bake Preview"
@@ -11156,7 +10933,7 @@ func _refresh_geometry_meshing_workspace() -> void:
 
 
 func _render_inspector() -> void:
-	_clear(inspector_content)
+	EditorWidgets.clear(inspector_content)
 	transform_fields.clear()
 	asset_pivot_fields.clear()
 	asset_root_position_fields.clear()
@@ -11188,9 +10965,9 @@ func _render_inspector() -> void:
 		elif active_geometry_submodule == "Meshing":
 			_render_geometry_meshing_inspector()
 		else:
-			inspector_content.add_child(_create_inspector_section(active_geometry_submodule))
-			inspector_content.add_child(_create_inspector_field_label("Placeholder module"))
-			inspector_content.add_child(_create_inspector_field_label("Mesh pipeline tooling is planned for a later phase."))
+			inspector_content.add_child(EditorWidgets.create_inspector_section(active_geometry_submodule, _on_inspector_section_toggled))
+			inspector_content.add_child(EditorWidgets.create_inspector_field_label("Placeholder module"))
+			inspector_content.add_child(EditorWidgets.create_inspector_field_label("Mesh pipeline tooling is planned for a later phase."))
 		return
 	var asset := _get_asset(selected_asset_id)
 	if asset.is_empty():
@@ -11206,15 +10983,15 @@ func _render_inspector() -> void:
 		_render_multi_component_inspector(asset, inspector_components)
 		return
 	if selected_component_id.is_empty():
-		inspector_content.add_child(_create_inspector_field_label("Name"))
-		asset_name_editor = _create_name_editor(str(asset["name"]), "Asset name")
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Name"))
+		asset_name_editor = EditorWidgets.create_name_editor(str(asset["name"]), "Asset name")
 		asset_name_editor.text_submitted.connect(_rename_selected_asset)
 		asset_name_editor.focus_exited.connect(func() -> void:
 			_rename_selected_asset(asset_name_editor.text)
 		)
 		inspector_content.add_child(asset_name_editor)
-		inspector_content.add_child(_create_inspector_section("Initial Pose"))
-		inspector_content.add_child(_create_inspector_field_label("Authored Facing"))
+		inspector_content.add_child(EditorWidgets.create_inspector_section("Initial Pose", _on_inspector_section_toggled))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Authored Facing"))
 		asset_authored_facing_option = OptionButton.new()
 		asset_authored_facing_option.custom_minimum_size = Vector2(0, 26)
 		for facing in AssetPresentation.SERIALIZED_VALUES:
@@ -11227,7 +11004,7 @@ func _render_inspector() -> void:
 				break
 		asset_authored_facing_option.item_selected.connect(_on_asset_authored_facing_selected.bind(asset_authored_facing_option))
 		inspector_content.add_child(asset_authored_facing_option)
-		inspector_content.add_child(_create_inspector_section("Asset Transform"))
+		inspector_content.add_child(EditorWidgets.create_inspector_section("Asset Transform", _on_inspector_section_toggled))
 		var asset_transform_grid := GridContainer.new()
 		asset_transform_grid.columns = 2
 		asset_transform_grid.add_theme_constant_override("h_separation", 8)
@@ -11243,7 +11020,7 @@ func _render_inspector() -> void:
 		_render_asset_root_scale_rebase_inspector(asset)
 		_render_asset_scale_rebase_inspector(asset)
 		var reference_image := WorldDocumentService.normalize_reference_image(asset.get("reference_image", {}))
-		inspector_content.add_child(_create_inspector_section("Reference Image"))
+		inspector_content.add_child(EditorWidgets.create_inspector_section("Reference Image", _on_inspector_section_toggled))
 		var reference_buttons := HBoxContainer.new()
 		var load_reference_button := Button.new()
 		load_reference_button.text = "Load Image" if str(reference_image.get("file", "")).is_empty() else "Replace Image"
@@ -11261,7 +11038,7 @@ func _render_inspector() -> void:
 			reference_buttons.add_child(clear_reference_button)
 		inspector_content.add_child(reference_buttons)
 		if not str(reference_image.get("file", "")).is_empty():
-			var reference_file_label := _create_inspector_field_label(str(reference_image.get("file", "")))
+			var reference_file_label := EditorWidgets.create_inspector_field_label(str(reference_image.get("file", "")))
 			reference_file_label.add_theme_color_override("font_color", Color("#9aa3b2"))
 			inspector_content.add_child(reference_file_label)
 		var target_height := SpinBox.new()
@@ -11272,9 +11049,9 @@ func _render_inspector() -> void:
 		target_height.custom_minimum_size = Vector2(0, 26)
 		target_height.value = float(reference_image.get("target_height_cm", 13.0))
 		target_height.value_changed.connect(_on_reference_image_target_height_changed)
-		inspector_content.add_child(_create_inspector_field_label("Target Height (cm)"))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Target Height (cm)"))
 		inspector_content.add_child(target_height)
-		var pivot_label := _create_inspector_field_label("Pivot")
+		var pivot_label := EditorWidgets.create_inspector_field_label("Pivot")
 		inspector_content.add_child(pivot_label)
 		var pivot_option := OptionButton.new()
 		pivot_option.custom_minimum_size = Vector2(0, 26)
@@ -11305,7 +11082,7 @@ func _render_inspector() -> void:
 			reference_opacity.custom_minimum_size = Vector2(0, 26)
 			reference_opacity.value = float(reference_image.get("opacity", 0.5))
 			reference_opacity.value_changed.connect(_on_reference_image_property_changed.bind("opacity"))
-			inspector_content.add_child(_create_inspector_field_label("Opacity"))
+			inspector_content.add_child(EditorWidgets.create_inspector_field_label("Opacity"))
 			inspector_content.add_child(reference_opacity)
 			var reference_transform_grid := GridContainer.new()
 			reference_transform_grid.columns = 2
@@ -11323,16 +11100,16 @@ func _render_inspector() -> void:
 	if active_state == "edit" and active_edit_mode == "point":
 		var point_ids := _valid_selected_point_ids(component)
 		if point_ids.is_empty():
-			inspector_content.add_child(_create_inspector_field_label("Edit Point"))
-			inspector_content.add_child(_create_inspector_section("Point Settings"))
-			var selection_hint := _create_inspector_field_label("Select one or more points to edit them.")
+			inspector_content.add_child(EditorWidgets.create_inspector_field_label("Edit Point"))
+			inspector_content.add_child(EditorWidgets.create_inspector_section("Point Settings", _on_inspector_section_toggled))
+			var selection_hint := EditorWidgets.create_inspector_field_label("Select one or more points to edit them.")
 			selection_hint.add_theme_color_override("font_color", Color("#9aa3b2"))
 			inspector_content.add_child(selection_hint)
 			_add_component_debug_inspector(component)
 			return
 		var is_multi_point_selection := point_ids.size() > 1
-		inspector_content.add_child(_create_inspector_field_label("%d Points" % point_ids.size() if is_multi_point_selection else "Point"))
-		inspector_content.add_child(_create_inspector_section("Transform"))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("%d Points" % point_ids.size() if is_multi_point_selection else "Point"))
+		inspector_content.add_child(EditorWidgets.create_inspector_section("Transform", _on_inspector_section_toggled))
 		var point_transform_grid := GridContainer.new()
 		point_transform_grid.columns = 2
 		point_transform_grid.add_theme_constant_override("h_separation", 8)
@@ -11346,7 +11123,7 @@ func _render_inspector() -> void:
 			_add_point_position_field(point_transform_grid, "Position X (cm)", _editor_units_to_world(point_position.x), "position_x")
 			_add_point_position_field(point_transform_grid, "Position Y (cm)", _editor_units_to_world(point_position.y), "position_y")
 		inspector_content.add_child(point_transform_grid)
-		inspector_content.add_child(_create_inspector_section("Point Settings"))
+		inspector_content.add_child(EditorWidgets.create_inspector_section("Point Settings", _on_inspector_section_toggled))
 		_add_selected_point_settings(component, point_ids)
 		_add_component_debug_inspector(component)
 		return
@@ -11360,10 +11137,10 @@ func _render_inspector() -> void:
 			var fallback_edge := _get_edge(component, selected_edge_id)
 			if not fallback_edge.is_empty():
 				selected_edges.append(fallback_edge)
-		inspector_content.add_child(_create_inspector_field_label("%d Edges" % selected_edges.size() if selected_edges.size() > 1 else "Edge"))
-		inspector_content.add_child(_create_inspector_section("Edge Settings"))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("%d Edges" % selected_edges.size() if selected_edges.size() > 1 else "Edge"))
+		inspector_content.add_child(EditorWidgets.create_inspector_section("Edge Settings", _on_inspector_section_toggled))
 		if selected_edges.is_empty():
-			var edge_hint := _create_inspector_field_label("Select an edge to edit it.")
+			var edge_hint := EditorWidgets.create_inspector_field_label("Select an edge to edit it.")
 			edge_hint.add_theme_color_override("font_color", Color("#9aa3b2"))
 			inspector_content.add_child(edge_hint)
 		else:
@@ -11378,17 +11155,17 @@ func _render_inspector() -> void:
 			inspector_content.add_child(render_outline)
 		return
 	if active_state == "edit" and active_edit_mode == "face":
-		inspector_content.add_child(_create_inspector_field_label("Face"))
-		inspector_content.add_child(_create_inspector_section("Face Settings"))
-		var face_hint := _create_inspector_field_label("Face selected." if canvas_view.face_selected else "Select the face to edit it.")
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Face"))
+		inspector_content.add_child(EditorWidgets.create_inspector_section("Face Settings", _on_inspector_section_toggled))
+		var face_hint := EditorWidgets.create_inspector_field_label("Face selected." if canvas_view.face_selected else "Select the face to edit it.")
 		face_hint.add_theme_color_override("font_color", Color("#8fd8f8") if canvas_view.face_selected else Color("#9aa3b2"))
 		inspector_content.add_child(face_hint)
 		return
 	if not selected_edge_id.is_empty():
 		var selected_edge := _get_edge(component, selected_edge_id)
 		if not selected_edge.is_empty():
-			inspector_content.add_child(_create_inspector_field_label("Edge"))
-			inspector_content.add_child(_create_inspector_section("Edge Settings"))
+			inspector_content.add_child(EditorWidgets.create_inspector_field_label("Edge"))
+			inspector_content.add_child(EditorWidgets.create_inspector_section("Edge Settings", _on_inspector_section_toggled))
 			var render_outline := CheckButton.new()
 			render_outline.text = "Render Outline"
 			render_outline.custom_minimum_size = Vector2(0, 26)
@@ -11396,13 +11173,13 @@ func _render_inspector() -> void:
 			render_outline.toggled.connect(_on_edge_render_outline_changed)
 			inspector_content.add_child(render_outline)
 			return
-	inspector_content.add_child(_create_inspector_section("Component"))
-	component_name_editor = _create_name_editor(_normalized_component_name(component), "Component name")
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Component", _on_inspector_section_toggled))
+	component_name_editor = EditorWidgets.create_name_editor(_normalized_component_name(component), "Component name")
 	component_name_editor.text_submitted.connect(_rename_selected_component)
 	component_name_editor.focus_exited.connect(func() -> void: _rename_selected_component(component_name_editor.text))
 	inspector_content.add_child(component_name_editor)
-	inspector_content.add_child(_create_inspector_section("Hierarchy"))
-	inspector_content.add_child(_create_inspector_field_label("Parent Component"))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Hierarchy", _on_inspector_section_toggled))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Parent Component"))
 	var hierarchy_parent_option := OptionButton.new()
 	hierarchy_parent_option.custom_minimum_size = Vector2(0, 26)
 	hierarchy_parent_option.add_item("Root")
@@ -11421,9 +11198,9 @@ func _render_inspector() -> void:
 	hierarchy_parent_option.item_selected.connect(_on_component_hierarchy_parent_selected.bind(hierarchy_parent_option))
 	inspector_content.add_child(hierarchy_parent_option)
 	var draw_mode := str(component.get("draw_mode", "closed_loop"))
-	inspector_content.add_child(_create_inspector_field_label("Draw Mode: %s" % _draw_mode_display_name(draw_mode)))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Draw Mode: %s" % _draw_mode_display_name(draw_mode)))
 	if _is_reference_component(component) or draw_mode == "closed_loop":
-		inspector_content.add_child(_create_inspector_section("Topology"))
+		inspector_content.add_child(EditorWidgets.create_inspector_section("Topology", _on_inspector_section_toggled))
 		var topology_role_option := OptionButton.new()
 		topology_role_option.custom_minimum_size = Vector2(0, 26)
 		topology_role_option.add_item("Outer")
@@ -11439,11 +11216,11 @@ func _render_inspector() -> void:
 		inspector_content.add_child(topology_role_option)
 	var primitive = component.get("primitive", {})
 	if primitive is Dictionary and str(primitive.get("type", "")) in ["circle", PrimitiveGeometryService.ELLIPSE]:
-		inspector_content.add_child(_create_inspector_section("Geometry"))
+		inspector_content.add_child(EditorWidgets.create_inspector_section("Geometry", _on_inspector_section_toggled))
 		var primitive_type := str(primitive.get("type", ""))
-		inspector_content.add_child(_create_inspector_field_label("Type: %s" % primitive_type.capitalize()))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Type: %s" % primitive_type.capitalize()))
 		if primitive_type == "circle":
-			inspector_content.add_child(_create_inspector_field_label("Diameter (cm)"))
+			inspector_content.add_child(EditorWidgets.create_inspector_field_label("Diameter (cm)"))
 			var diameter_field := SpinBox.new()
 			diameter_field.min_value = 0.1
 			diameter_field.max_value = 100000.0
@@ -11458,13 +11235,13 @@ func _render_inspector() -> void:
 	var configured_catch_parent_id := str(component.get("catch_parent_component_id", ""))
 	if not configured_catch_parent_id.is_empty() and (configured_catch_parent_id == selected_component_id or _get_component(asset, configured_catch_parent_id).is_empty()):
 		mode_issues.append("Catch Parent references a missing Component.")
-	inspector_content.add_child(_create_inspector_section("Validation"))
-	var mode_status := _create_inspector_field_label("Geometry: Valid" if mode_issues.is_empty() else "Geometry: Draft · %s" % mode_issues[0])
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Validation", _on_inspector_section_toggled))
+	var mode_status := EditorWidgets.create_inspector_field_label("Geometry: Valid" if mode_issues.is_empty() else "Geometry: Draft · %s" % mode_issues[0])
 	mode_status.add_theme_color_override("font_color", Color("#75b88a") if mode_issues.is_empty() else Color("#f2c94c"))
 	inspector_content.add_child(mode_status)
 	if draw_mode == "contour":
-		inspector_content.add_child(_create_inspector_section("Drawing Reference"))
-		inspector_content.add_child(_create_inspector_field_label("Catch Parent"))
+		inspector_content.add_child(EditorWidgets.create_inspector_section("Drawing Reference", _on_inspector_section_toggled))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Catch Parent"))
 		var catch_parent_option := OptionButton.new()
 		catch_parent_option.custom_minimum_size = Vector2(0, 26)
 		catch_parent_option.add_item("None")
@@ -11484,7 +11261,7 @@ func _render_inspector() -> void:
 		inspector_content.add_child(catch_parent_option)
 	var component_group_id := ComponentHierarchy.membership_group_id(asset, selected_component_id)
 	var show_global_transform := not component_group_id.is_empty()
-	inspector_content.add_child(_create_inspector_section("Global Transform" if show_global_transform else "Transform"))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Global Transform" if show_global_transform else "Transform", _on_inspector_section_toggled))
 	var transform_grid := GridContainer.new()
 	transform_grid.columns = 2
 	transform_grid.add_theme_constant_override("h_separation", 8)
@@ -11511,7 +11288,7 @@ func _render_inspector() -> void:
 		_add_transform_field(transform_grid, "Scale Y", transform_scale.y, "scale_y", 0.01)
 	_add_transform_field(transform_grid, "Pivot X (cm)", _editor_units_to_world(pivot.x), "pivot_x", 0.001)
 	_add_transform_field(transform_grid, "Pivot Y (cm)", _editor_units_to_world(pivot.y), "pivot_y", 0.001)
-	inspector_content.add_child(_create_inspector_section("Visibility / Layer"))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Visibility / Layer", _on_inspector_section_toggled))
 	var visibility_toggle := CheckButton.new()
 	visibility_toggle.text = "Visible"
 	visibility_toggle.custom_minimum_size = Vector2(0, 26)
@@ -11519,7 +11296,7 @@ func _render_inspector() -> void:
 	visibility_toggle.button_pressed = bool(component.get("visibility", true))
 	visibility_toggle.toggled.connect(_on_component_visibility_changed)
 	inspector_content.add_child(visibility_toggle)
-	inspector_content.add_child(_create_inspector_field_label("Contour Stroke Width (px)"))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Contour Stroke Width (px)"))
 	var contour_width_field := SpinBox.new()
 	contour_width_field.min_value = 0.1
 	contour_width_field.max_value = 1024.0
@@ -11530,7 +11307,7 @@ func _render_inspector() -> void:
 	contour_width_field.tooltip_text = "Overrides every Contour part of the referenced source Asset without changing that Asset." if _is_reference_component(component) else ""
 	contour_width_field.value_changed.connect(_on_component_contour_stroke_width_changed)
 	inspector_content.add_child(contour_width_field)
-	inspector_content.add_child(_create_inspector_field_label("Projection Depth (cm)"))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Projection Depth (cm)"))
 	var projection_depth_field := SpinBox.new()
 	projection_depth_field.min_value = 0.0
 	projection_depth_field.max_value = 1000.0
@@ -11541,7 +11318,7 @@ func _render_inspector() -> void:
 	projection_depth_field.tooltip_text = "Visible component depth used by runtime presentation; independent of Scale, Z Order, and Contour Stroke Width."
 	projection_depth_field.value_changed.connect(_on_component_projection_depth_changed)
 	inspector_content.add_child(projection_depth_field)
-	var z_order_label := _create_inspector_field_label("Z Order (Asset-local)")
+	var z_order_label := EditorWidgets.create_inspector_field_label("Z Order (Asset-local)")
 	z_order_label.tooltip_text = "Orders Components only inside this Asset; Runtime consumers choose the Asset's contextual game layer."
 	inspector_content.add_child(z_order_label)
 	var z_index_field := SpinBox.new()
@@ -11576,7 +11353,7 @@ func _selected_components_for_inspector(asset: Dictionary) -> Array[Dictionary]:
 
 
 func _multi_component_line_edit(label_text: String, value_text: String, is_mixed: bool, field_name: String, axis: String, integer_only := false) -> LineEdit:
-	inspector_content.add_child(_create_inspector_field_label(label_text))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label(label_text))
 	var field := LineEdit.new()
 	field.name = field_name
 	field.custom_minimum_size = Vector2(0, 26)
@@ -11591,8 +11368,8 @@ func _multi_component_line_edit(label_text: String, value_text: String, is_mixed
 
 
 func _render_multi_component_inspector(asset: Dictionary, components: Array[Dictionary]) -> void:
-	inspector_content.add_child(_create_inspector_field_label("%d Components" % components.size()))
-	inspector_content.add_child(_create_inspector_section("Multi-Edit"))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("%d Components" % components.size()))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Multi-Edit", _on_inspector_section_toggled))
 	var positions: Array[Vector2] = []
 	for component in components:
 		var component_id := str(component.get("id", ""))
@@ -11636,7 +11413,7 @@ func _render_multi_component_inspector(asset: Dictionary, components: Array[Dict
 		visibility_mixed = visibility_mixed or value != visibility_values[0]
 	visibility_option.select(2 if visibility_mixed else (0 if visibility_values[0] else 1))
 	visibility_option.item_selected.connect(_on_multi_component_visibility_selected)
-	inspector_content.add_child(_create_inspector_field_label("Visibility"))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Visibility"))
 	inspector_content.add_child(visibility_option)
 
 	var z_mixed := false
@@ -11654,7 +11431,7 @@ func _render_multi_component_inspector(asset: Dictionary, components: Array[Dict
 
 
 func _add_multi_component_position_field(grid: GridContainer, label_text: String, value: float, mixed: bool, axis: String) -> void:
-	grid.add_child(_create_inspector_field_label(label_text))
+	grid.add_child(EditorWidgets.create_inspector_field_label(label_text))
 	var field := LineEdit.new()
 	field.name = "MultiPositionX" if axis == "position_x" else "MultiPositionY"
 	field.custom_minimum_size = Vector2(0, 26)
@@ -11694,16 +11471,16 @@ func _on_multi_component_field_focus_exited(field: LineEdit, property_name: Stri
 
 
 func _render_motion_inspector() -> void:
-	inspector_content.add_child(_create_inspector_section("Animation Preview"))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Animation Preview", _on_inspector_section_toggled))
 	var asset := _get_asset(selected_asset_id)
-	var preview_panel := _create_panel(Color("#171b22"))
+	var preview_panel := EditorWidgets.create_panel(Color("#171b22"))
 	motion_asset_preview = MotionAssetPreview.new()
 	motion_asset_preview.set_asset(asset)
 	motion_asset_preview.set_runtime(motion_player.current_state_name() if motion_player != null else "None", motion_phase, motion_player.playing if motion_player != null else false)
 	preview_panel.add_child(motion_asset_preview)
 	inspector_content.add_child(preview_panel)
 	if asset.is_empty():
-		inspector_content.add_child(_create_inspector_field_label("Select an Asset in the Motion Outliner."))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Select an Asset in the Motion Outliner."))
 		return
 	if is_instance_valid(motion_workspace) and motion_workspace.asset_id != selected_asset_id:
 		motion_selection.select_asset(selected_asset_id)
@@ -11715,22 +11492,22 @@ func _render_motion_inspector() -> void:
 		_render_simulation_contract_inspector()
 		_render_legacy_path_follow_migration(asset)
 		_render_animation_validation_inspector()
-		inspector_content.add_child(_create_inspector_field_label("Persisted with the Asset · evaluated beginning in Phase 8."))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Persisted with the Asset · evaluated beginning in Phase 8."))
 		return
 	if preview.is_empty():
-		inspector_content.add_child(_create_inspector_field_label("Select a State or one of its Preview entries."))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Select a State or one of its Preview entries."))
 		return
 	var kind := str(preview.get("kind", MotionSelection.NONE))
 	var state: Dictionary = preview.get("state", {})
-	inspector_content.add_child(_create_inspector_section(kind.capitalize()))
+	inspector_content.add_child(EditorWidgets.create_inspector_section(kind.capitalize(), _on_inspector_section_toggled))
 	if kind == MotionSelection.STATE:
 		var state_id := str(state.get("id", ""))
-		inspector_content.add_child(_create_inspector_field_label("Name"))
-		var state_name_editor := _create_name_editor(str(state.get("name", "State")), "State name")
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Name"))
+		var state_name_editor := EditorWidgets.create_name_editor(str(state.get("name", "State")), "State name")
 		state_name_editor.text_submitted.connect(_rename_motion_state.bind(state_id, state_name_editor))
 		state_name_editor.focus_exited.connect(func() -> void: _rename_motion_state(state_name_editor.text, state_id, state_name_editor))
 		inspector_content.add_child(state_name_editor)
-		inspector_content.add_child(_create_inspector_field_label("Cycle Duration (s)"))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Cycle Duration (s)"))
 		var cycle_duration := SpinBox.new()
 		cycle_duration.min_value = 0.01
 		cycle_duration.max_value = 3600.0
@@ -11738,9 +11515,9 @@ func _render_motion_inspector() -> void:
 		cycle_duration.value = float(state.get("cycle_duration", 1.0))
 		cycle_duration.value_changed.connect(_on_motion_state_cycle_duration_changed.bind(state_id))
 		inspector_content.add_child(cycle_duration)
-		inspector_content.add_child(_create_motion_inspector_value("Motion", "%d Preview entries" % state.get("motions", []).size()))
-		inspector_content.add_child(_create_motion_inspector_value("Transitions", "%d Preview entries" % state.get("transitions", []).size()))
-		inspector_content.add_child(_create_motion_inspector_value("Markers", "%d Preview entries" % state.get("markers", []).size()))
+		inspector_content.add_child(EditorWidgets.create_motion_inspector_value("Motion", "%d Preview entries" % state.get("motions", []).size()))
+		inspector_content.add_child(EditorWidgets.create_motion_inspector_value("Transitions", "%d Preview entries" % state.get("transitions", []).size()))
+		inspector_content.add_child(EditorWidgets.create_motion_inspector_value("Markers", "%d Preview entries" % state.get("markers", []).size()))
 		var remove_state_button := Button.new()
 		remove_state_button.text = "Remove State"
 		remove_state_button.custom_minimum_size = Vector2(0, 28)
@@ -11758,42 +11535,42 @@ func _render_motion_inspector() -> void:
 		_render_marker_authoring_inspector(state, marker)
 	else:
 		var item: Dictionary = preview.get("item", {})
-		inspector_content.add_child(_create_motion_inspector_value("State", str(state.get("name", "State"))))
-		inspector_content.add_child(_create_motion_inspector_value("Name", motion_workspace.item_display_name(kind, item)))
-		inspector_content.add_child(_create_motion_inspector_value("Preview", motion_workspace.item_summary(kind, item)))
+		inspector_content.add_child(EditorWidgets.create_motion_inspector_value("State", str(state.get("name", "State"))))
+		inspector_content.add_child(EditorWidgets.create_motion_inspector_value("Name", motion_workspace.item_display_name(kind, item)))
+		inspector_content.add_child(EditorWidgets.create_motion_inspector_value("Preview", motion_workspace.item_summary(kind, item)))
 		if kind == MotionSelection.TRANSITION:
-			inspector_content.add_child(_create_motion_inspector_value("Priority", "List order · first eligible wins"))
-	inspector_content.add_child(_create_inspector_field_label("Persisted Animation data · runtime evaluation follows in Phase 8."))
+			inspector_content.add_child(EditorWidgets.create_motion_inspector_value("Priority", "List order · first eligible wins"))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Persisted Animation data · runtime evaluation follows in Phase 8."))
 
 
 func _render_motion_act_inspector() -> void:
-	inspector_content.add_child(_create_inspector_section("Act"))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Act", _on_inspector_section_toggled))
 	var act := _get_motion_act(selected_motion_act_id)
 	if act.is_empty():
-		inspector_content.add_child(_create_inspector_field_label("Add a Slide, Jump, or Blink with the + button in the Act list."))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Add a Slide, Jump, or Blink with the + button in the Act list."))
 		return
 	var primitive := str(act.get("primitive", MotionActEvaluator.SLIDE))
 	var primitive_label := MotionActEvaluator.primitive_label(primitive)
-	inspector_content.add_child(_create_inspector_field_label("Name"))
-	var name_editor := _create_name_editor(str(act.get("name", primitive_label)), "Act name")
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Name"))
+	var name_editor := EditorWidgets.create_name_editor(str(act.get("name", primitive_label)), "Act name")
 	name_editor.text_submitted.connect(_rename_motion_act.bind(act, name_editor))
 	name_editor.focus_exited.connect(func() -> void: _rename_motion_act(name_editor.text, act, name_editor))
 	inspector_content.add_child(name_editor)
-	inspector_content.add_child(_create_motion_inspector_value("Stable Act ID", str(act.get("id", ""))))
+	inspector_content.add_child(EditorWidgets.create_motion_inspector_value("Stable Act ID", str(act.get("id", ""))))
 	var enabled_toggle := CheckBox.new()
 	enabled_toggle.text = "Enabled"
 	enabled_toggle.button_pressed = bool(act.get("enabled", true))
 	enabled_toggle.toggled.connect(_on_motion_act_enabled_changed)
 	inspector_content.add_child(enabled_toggle)
-	inspector_content.add_child(_create_inspector_section("Primitive"))
-	inspector_content.add_child(_create_motion_inspector_value("Type", primitive_label))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Primitive", _on_inspector_section_toggled))
+	inspector_content.add_child(EditorWidgets.create_motion_inspector_value("Type", primitive_label))
 	var parameters: Dictionary = act.get("parameters", {})
 	var direction: Vector2 = parameters.get("direction", Vector2.RIGHT)
-	inspector_content.add_child(_create_inspector_field_label("Direction"))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Direction"))
 	var direction_grid := GridContainer.new()
 	direction_grid.columns = 2
 	for axis_data in [["X", direction.x, "x"], ["Y", direction.y, "y"]]:
-		direction_grid.add_child(_create_inspector_field_label(str(axis_data[0])))
+		direction_grid.add_child(EditorWidgets.create_inspector_field_label(str(axis_data[0])))
 		var field := SpinBox.new()
 		field.min_value = -1000.0
 		field.max_value = 1000.0
@@ -11802,7 +11579,7 @@ func _render_motion_act_inspector() -> void:
 		field.value_changed.connect(_on_motion_act_direction_changed.bind(str(axis_data[2])))
 		direction_grid.add_child(field)
 	inspector_content.add_child(direction_grid)
-	inspector_content.add_child(_create_inspector_field_label("Distance (cm)"))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Distance (cm)"))
 	var distance := SpinBox.new()
 	distance.min_value = 0.0
 	distance.max_value = 100000.0
@@ -11811,7 +11588,7 @@ func _render_motion_act_inspector() -> void:
 	distance.value_changed.connect(_on_motion_act_number_changed.bind("distance"))
 	inspector_content.add_child(distance)
 	if primitive == MotionActEvaluator.JUMP:
-		inspector_content.add_child(_create_inspector_field_label("Height (cm)"))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Height (cm)"))
 		var height := SpinBox.new()
 		height.min_value = 0.01
 		height.max_value = 100000.0
@@ -11819,7 +11596,7 @@ func _render_motion_act_inspector() -> void:
 		height.value = float(parameters.get("height", 3.0))
 		height.value_changed.connect(_on_motion_act_number_changed.bind("height"))
 		inspector_content.add_child(height)
-		inspector_content.add_child(_create_inspector_field_label("Arc Shape"))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Arc Shape"))
 		var arc_option := OptionButton.new()
 		var current_arc := str(parameters.get("arc", MotionActEvaluator.JUMP_ARC_SMOOTH))
 		for arc in MotionActEvaluator.JUMP_ARC_OPTIONS:
@@ -11834,15 +11611,15 @@ func _render_motion_act_inspector() -> void:
 		var anticipation_share := float(parameters.get("anticipation_share", 0.5))
 		var anticipation_field := _add_motion_act_parameter_field("Anticipation Share", anticipation_share, "anticipation_share", 0.01, 0.89, 0.01)
 		_add_motion_act_parameter_field("Minimum Scale", float(parameters.get("minimum_scale", 0.05)), "minimum_scale", 0.01, 1.0, 0.01)
-		var timing_split := _create_motion_inspector_value("Timing Split", _motion_act_blink_timing_text(anticipation_share))
+		var timing_split := EditorWidgets.create_motion_inspector_value("Timing Split", _motion_act_blink_timing_text(anticipation_share))
 		inspector_content.add_child(timing_split)
 		anticipation_field.value_changed.connect(func(value: float) -> void:
 			var timing_value := timing_split.get_child(1) as Label
 			if is_instance_valid(timing_value):
 				timing_value.text = _motion_act_blink_timing_text(value)
 		)
-	inspector_content.add_child(_create_inspector_section("Timing"))
-	inspector_content.add_child(_create_inspector_field_label("Duration (s)"))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Timing", _on_inspector_section_toggled))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Duration (s)"))
 	var duration := SpinBox.new()
 	duration.min_value = 0.01
 	duration.max_value = 3600.0
@@ -11850,7 +11627,7 @@ func _render_motion_act_inspector() -> void:
 	duration.value = float(act.get("timing", {}).get("duration", 0.6))
 	duration.value_changed.connect(_on_motion_act_number_changed.bind("duration"))
 	inspector_content.add_child(duration)
-	inspector_content.add_child(_create_inspector_field_label("Easing"))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Easing"))
 	var easing_option := OptionButton.new()
 	var current_easing := str(act.get("timing", {}).get("easing", MotionActEvaluator.EASE_IN_OUT))
 	for easing in MotionActEvaluator.EASING_OPTIONS:
@@ -11861,7 +11638,7 @@ func _render_motion_act_inspector() -> void:
 	easing_option.item_selected.connect(_on_motion_act_easing_selected.bind(easing_option))
 	inspector_content.add_child(easing_option)
 	var issues := MotionActEvaluator.validation_issues(act)
-	var validation := _create_inspector_field_label("Ready for Preview" if issues.is_empty() else str(issues[0]))
+	var validation := EditorWidgets.create_inspector_field_label("Ready for Preview" if issues.is_empty() else str(issues[0]))
 	validation.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	validation.add_theme_color_override("font_color", Color("#75b88a") if issues.is_empty() else Color("#f2c94c"))
 	inspector_content.add_child(validation)
@@ -11925,7 +11702,7 @@ func _on_motion_act_number_changed(value: float, property_name: String) -> void:
 
 
 func _add_motion_act_parameter_field(label_text: String, value: float, property_name: String, minimum: float, maximum: float, step: float) -> SpinBox:
-	inspector_content.add_child(_create_inspector_field_label(label_text))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label(label_text))
 	var field := SpinBox.new()
 	field.min_value = minimum
 	field.max_value = maximum
@@ -11979,19 +11756,19 @@ func _remove_selected_motion_act() -> void:
 
 
 func _render_motion_path_inspector() -> void:
-	inspector_content.add_child(_create_inspector_section("Path"))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Path", _on_inspector_section_toggled))
 	var path_document := _get_motion_path(selected_motion_path_id)
 	if path_document.is_empty():
-		inspector_content.add_child(_create_inspector_field_label("Create or select an independent Path resource."))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Create or select an independent Path resource."))
 		return
-	inspector_content.add_child(_create_inspector_field_label("Name"))
-	var name_editor := _create_name_editor(str(path_document.get("name", "Path")), "Path name")
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Name"))
+	var name_editor := EditorWidgets.create_name_editor(str(path_document.get("name", "Path")), "Path name")
 	name_editor.text_submitted.connect(_rename_motion_path.bind(path_document, name_editor))
 	name_editor.focus_exited.connect(func() -> void: _rename_motion_path(name_editor.text, path_document, name_editor))
 	inspector_content.add_child(name_editor)
-	inspector_content.add_child(_create_motion_inspector_value("Stable Resource ID", str(path_document.get("id", ""))))
-	inspector_content.add_child(_create_inspector_section("Path Preview"))
-	inspector_content.add_child(_create_inspector_field_label("Preview Asset · editor-only"))
+	inspector_content.add_child(EditorWidgets.create_motion_inspector_value("Stable Resource ID", str(path_document.get("id", ""))))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Path Preview", _on_inspector_section_toggled))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Preview Asset · editor-only"))
 	var preview_asset_option := OptionButton.new()
 	preview_asset_option.custom_minimum_size = Vector2(0, 28)
 	preview_asset_option.add_item("No Preview Asset")
@@ -12004,7 +11781,7 @@ func _render_motion_path_inspector() -> void:
 	preview_asset_option.item_selected.connect(_on_motion_path_preview_asset_selected.bind(preview_asset_option))
 	inspector_content.add_child(preview_asset_option)
 	var playback: Dictionary = path_document.get("playback", {})
-	inspector_content.add_child(_create_inspector_field_label("Duration (s)"))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Duration (s)"))
 	var duration_input := SpinBox.new()
 	duration_input.min_value = 0.01
 	duration_input.max_value = 3600.0
@@ -12022,11 +11799,11 @@ func _render_motion_path_inspector() -> void:
 	orient_toggle.button_pressed = bool(playback.get("orient_along_path", false))
 	orient_toggle.toggled.connect(_on_motion_path_playback_toggle.bind("orient_along_path"))
 	inspector_content.add_child(orient_toggle)
-	inspector_content.add_child(_create_inspector_section("Path Geometry"))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Path Geometry", _on_inspector_section_toggled))
 	var topology: Dictionary = path_document.get("topology", {})
-	inspector_content.add_child(_create_motion_inspector_value("Points", str(topology.get("points", []).size())))
-	inspector_content.add_child(_create_motion_inspector_value("Segments", str(topology.get("segments", []).size())))
-	inspector_content.add_child(_create_motion_inspector_value("Ownership", "Independent World resource · no Asset reference"))
+	inspector_content.add_child(EditorWidgets.create_motion_inspector_value("Points", str(topology.get("points", []).size())))
+	inspector_content.add_child(EditorWidgets.create_motion_inspector_value("Segments", str(topology.get("segments", []).size())))
+	inspector_content.add_child(EditorWidgets.create_motion_inspector_value("Ownership", "Independent World resource · no Asset reference"))
 	var validation := MotionPathTopology.validate(topology)
 	var sample := MotionPathSampler.sample(topology, 0.5)
 	var validation_text := "Ready for Preview · %.2f cm" % float(sample.get("length", 0.0))
@@ -12038,7 +11815,7 @@ func _render_motion_path_inspector() -> void:
 		validation_text = "Invalid · Path length must be greater than zero."
 	elif _get_asset(motion_path_preview_asset_id).is_empty():
 		validation_text = "Select a Preview Asset."
-	var validation_label := _create_inspector_field_label(validation_text)
+	var validation_label := EditorWidgets.create_inspector_field_label(validation_text)
 	validation_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	validation_label.add_theme_color_override("font_color", Color("#75b88a") if _motion_path_is_previewable(path_document) else Color("#f2c94c"))
 	inspector_content.add_child(validation_label)
@@ -12071,28 +11848,28 @@ func _on_motion_path_playback_toggle(enabled: bool, property_name: String) -> vo
 
 
 func _render_motion_sequence_inspector() -> void:
-	inspector_content.add_child(_create_inspector_section("Sequence"))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Sequence", _on_inspector_section_toggled))
 	var sequence_document := _get_motion_sequence(selected_motion_sequence_id)
 	if sequence_document.is_empty():
-		inspector_content.add_child(_create_inspector_field_label("Create or select a Sequence resource."))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Create or select a Sequence resource."))
 		return
 	var entry := _resolved_motion_sequence_entry(sequence_document)
 	if motion_sequence_view == MotionSequenceWorkspace.VIEW_PLAYER:
-		inspector_content.add_child(_create_motion_inspector_value("Stable Resource ID", str(sequence_document.get("id", ""))))
+		inspector_content.add_child(EditorWidgets.create_motion_inspector_value("Stable Resource ID", str(sequence_document.get("id", ""))))
 		_render_motion_sequence_player_inspector(entry)
 		return
-	inspector_content.add_child(_create_inspector_field_label("Name"))
-	var name_editor := _create_name_editor(str(sequence_document.get("name", "Sequence")), "Sequence name")
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Name"))
+	var name_editor := EditorWidgets.create_name_editor(str(sequence_document.get("name", "Sequence")), "Sequence name")
 	name_editor.text_submitted.connect(_rename_motion_sequence.bind(sequence_document, name_editor))
 	name_editor.focus_exited.connect(func() -> void: _rename_motion_sequence(name_editor.text, sequence_document, name_editor))
 	inspector_content.add_child(name_editor)
-	inspector_content.add_child(_create_motion_inspector_value("Stable Resource ID", str(sequence_document.get("id", ""))))
-	inspector_content.add_child(_create_motion_inspector_value("Entries", "%d composition entries" % sequence_document.get("entries", []).size()))
+	inspector_content.add_child(EditorWidgets.create_motion_inspector_value("Stable Resource ID", str(sequence_document.get("id", ""))))
+	inspector_content.add_child(EditorWidgets.create_motion_inspector_value("Entries", "%d composition entries" % sequence_document.get("entries", []).size()))
 	if entry.is_empty():
-		inspector_content.add_child(_create_inspector_field_label("Add one Composition Entry to reference an Asset, Animation State, and Path."))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Add one Composition Entry to reference an Asset, Animation State, and Path."))
 		return
-	inspector_content.add_child(_create_inspector_section("Composition Entry"))
-	var entry_name := _create_name_editor(str(entry.get("name", "Composition Entry")), "Entry name")
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Composition Entry", _on_inspector_section_toggled))
+	var entry_name := EditorWidgets.create_name_editor(str(entry.get("name", "Composition Entry")), "Entry name")
 	entry_name.text_submitted.connect(_rename_motion_sequence_entry.bind(entry, entry_name))
 	entry_name.focus_exited.connect(func() -> void: _rename_motion_sequence_entry(entry_name.text, entry, entry_name))
 	inspector_content.add_child(entry_name)
@@ -12101,7 +11878,7 @@ func _render_motion_sequence_inspector() -> void:
 	enabled_toggle.button_pressed = bool(entry.get("enabled", true))
 	enabled_toggle.toggled.connect(_on_motion_sequence_entry_enabled_changed)
 	inspector_content.add_child(enabled_toggle)
-	inspector_content.add_child(_create_inspector_field_label("Asset"))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Asset"))
 	var asset_option := OptionButton.new()
 	asset_option.add_item("Select Asset")
 	asset_option.set_item_metadata(0, "")
@@ -12112,7 +11889,7 @@ func _render_motion_sequence_inspector() -> void:
 			asset_option.select(asset_option.item_count - 1)
 	asset_option.item_selected.connect(_on_motion_sequence_asset_selected.bind(asset_option))
 	inspector_content.add_child(asset_option)
-	inspector_content.add_child(_create_inspector_field_label("Animation State"))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Animation State"))
 	var state_option := OptionButton.new()
 	state_option.add_item("Select State")
 	state_option.set_item_metadata(0, "")
@@ -12124,7 +11901,7 @@ func _render_motion_sequence_inspector() -> void:
 			state_option.select(state_option.item_count - 1)
 	state_option.item_selected.connect(_on_motion_sequence_state_selected.bind(state_option))
 	inspector_content.add_child(state_option)
-	inspector_content.add_child(_create_inspector_field_label("Path"))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Path"))
 	var path_option := OptionButton.new()
 	path_option.add_item("Select Path")
 	path_option.set_item_metadata(0, "")
@@ -12137,7 +11914,7 @@ func _render_motion_sequence_inspector() -> void:
 	inspector_content.add_child(path_option)
 	var context := _motion_sequence_entry_context(entry)
 	var issues := MotionSequenceEvaluator.validation_issues(entry, context.get("asset", {}), context.get("path", {}))
-	var validation_label := _create_inspector_field_label("Ready for Playback" if issues.is_empty() else "Incomplete · %s" % issues[0])
+	var validation_label := EditorWidgets.create_inspector_field_label("Ready for Playback" if issues.is_empty() else "Incomplete · %s" % issues[0])
 	validation_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	validation_label.add_theme_color_override("font_color", Color("#75b88a") if issues.is_empty() else Color("#f2c94c"))
 	inspector_content.add_child(validation_label)
@@ -12148,27 +11925,27 @@ func _render_motion_sequence_inspector() -> void:
 
 
 func _render_motion_sequence_player_inspector(entry: Dictionary) -> void:
-	inspector_content.add_child(_create_inspector_section("Resolved Entry"))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Resolved Entry", _on_inspector_section_toggled))
 	var context := _motion_sequence_entry_context(entry)
 	var asset: Dictionary = context.get("asset", {})
 	var path_document: Dictionary = context.get("path", {})
 	var snapshot := MotionSequenceEvaluator.evaluate(entry, asset, path_document, motion_sequence_phase)
-	inspector_content.add_child(_create_motion_inspector_value("Asset", str(asset.get("name", "Missing Asset"))))
-	inspector_content.add_child(_create_motion_inspector_value("State", str(snapshot.get("state_name", "Missing State"))))
-	inspector_content.add_child(_create_motion_inspector_value("Path", str(path_document.get("name", "Missing Path"))))
-	inspector_content.add_child(_create_inspector_section("Runtime"))
-	var sequence_phase_field := _create_motion_inspector_value("Sequence Phase", "%.2f" % motion_sequence_phase)
+	inspector_content.add_child(EditorWidgets.create_motion_inspector_value("Asset", str(asset.get("name", "Missing Asset"))))
+	inspector_content.add_child(EditorWidgets.create_motion_inspector_value("State", str(snapshot.get("state_name", "Missing State"))))
+	inspector_content.add_child(EditorWidgets.create_motion_inspector_value("Path", str(path_document.get("name", "Missing Path"))))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Runtime", _on_inspector_section_toggled))
+	var sequence_phase_field := EditorWidgets.create_motion_inspector_value("Sequence Phase", "%.2f" % motion_sequence_phase)
 	motion_sequence_runtime_sequence_label = sequence_phase_field.get_child(1) as Label
 	inspector_content.add_child(sequence_phase_field)
-	var path_phase_field := _create_motion_inspector_value("Path Phase", "%.2f" % float(snapshot.get("path_phase", 0.0)))
+	var path_phase_field := EditorWidgets.create_motion_inspector_value("Path Phase", "%.2f" % float(snapshot.get("path_phase", 0.0)))
 	motion_sequence_runtime_path_label = path_phase_field.get_child(1) as Label
 	inspector_content.add_child(path_phase_field)
-	var animation_phase_field := _create_motion_inspector_value("Animation Phase", "%.2f" % float(snapshot.get("animation_phase", 0.0)))
+	var animation_phase_field := EditorWidgets.create_motion_inspector_value("Animation Phase", "%.2f" % float(snapshot.get("animation_phase", 0.0)))
 	motion_sequence_runtime_animation_label = animation_phase_field.get_child(1) as Label
 	inspector_content.add_child(animation_phase_field)
-	inspector_content.add_child(_create_motion_inspector_value("Duration", "%.2f s · inherited from Path" % float(snapshot.get("duration", 0.0))))
+	inspector_content.add_child(EditorWidgets.create_motion_inspector_value("Duration", "%.2f s · inherited from Path" % float(snapshot.get("duration", 0.0))))
 	var issues: Array = snapshot.get("issues", [])
-	var status := _create_inspector_field_label("Ready for Playback" if issues.is_empty() else "Blocked · %s" % issues[0])
+	var status := EditorWidgets.create_inspector_field_label("Ready for Playback" if issues.is_empty() else "Blocked · %s" % issues[0])
 	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	status.add_theme_color_override("font_color", Color("#75b88a") if issues.is_empty() else Color("#f2c94c"))
 	inspector_content.add_child(status)
@@ -12236,9 +12013,9 @@ func _render_motion_authoring_inspector(state: Dictionary, motion: Dictionary) -
 	var state_id := str(state.get("id", ""))
 	var motion_id := str(motion.get("id", ""))
 	var domain := str(motion.get("domain", MotionWorkspace.OUTER))
-	inspector_content.add_child(_create_motion_inspector_value("State", str(state.get("name", "State"))))
-	inspector_content.add_child(_create_inspector_field_label("Name"))
-	var name_editor := _create_name_editor(str(motion.get("name", "Motion")), "Motion name")
+	inspector_content.add_child(EditorWidgets.create_motion_inspector_value("State", str(state.get("name", "State"))))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Name"))
+	var name_editor := EditorWidgets.create_name_editor(str(motion.get("name", "Motion")), "Motion name")
 	name_editor.text_submitted.connect(_rename_motion.bind(state_id, motion_id, name_editor))
 	name_editor.focus_exited.connect(func() -> void: _rename_motion(name_editor.text, state_id, motion_id, name_editor))
 	inspector_content.add_child(name_editor)
@@ -12247,7 +12024,7 @@ func _render_motion_authoring_inspector(state: Dictionary, motion: Dictionary) -
 	enabled_toggle.button_pressed = bool(motion.get("enabled", true))
 	enabled_toggle.toggled.connect(_on_motion_enabled_changed.bind(state_id, motion_id))
 	inspector_content.add_child(enabled_toggle)
-	inspector_content.add_child(_create_inspector_field_label("Domain"))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Domain"))
 	var domain_option := OptionButton.new()
 	domain_option.custom_minimum_size = Vector2(0, 28)
 	for domain_data in [["Outer", MotionWorkspace.OUTER], ["Inner", MotionWorkspace.INNER]]:
@@ -12257,7 +12034,7 @@ func _render_motion_authoring_inspector(state: Dictionary, motion: Dictionary) -
 			domain_option.select(domain_option.item_count - 1)
 	domain_option.item_selected.connect(_on_motion_domain_selected.bind(domain_option, state_id, motion_id))
 	inspector_content.add_child(domain_option)
-	inspector_content.add_child(_create_inspector_field_label("Target"))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Target"))
 	var target_option := OptionButton.new()
 	target_option.custom_minimum_size = Vector2(0, 28)
 	if domain == MotionWorkspace.OUTER:
@@ -12278,7 +12055,7 @@ func _render_motion_authoring_inspector(state: Dictionary, motion: Dictionary) -
 			break
 	target_option.item_selected.connect(_on_motion_target_selected.bind(target_option, state_id, motion_id))
 	inspector_content.add_child(target_option)
-	inspector_content.add_child(_create_inspector_field_label("Primitive"))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Primitive"))
 	var primitive_option := OptionButton.new()
 	primitive_option.custom_minimum_size = Vector2(0, 28)
 	for primitive in motion_workspace.primitive_options(domain):
@@ -12291,13 +12068,13 @@ func _render_motion_authoring_inspector(state: Dictionary, motion: Dictionary) -
 	var primitive := str(motion.get("primitive", MotionWorkspace.BOB))
 	if domain == MotionWorkspace.INNER:
 		_add_unavailable_motion_guide_field("Motion Guides", "Motion Guide authoring is not available yet.")
-	inspector_content.add_child(_create_inspector_section("Parameters"))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Parameters", _on_inspector_section_toggled))
 	if primitive == MotionWorkspace.BOB:
 		_add_motion_number_parameter("Distance", state_id, motion_id, "distance", float(motion.get("parameters", {}).get("distance", 0.25)), 0.0, 1000.0, 0.05)
 	elif primitive == MotionWorkspace.SPINE_SWAY:
 		_add_motion_number_parameter("Strength", state_id, motion_id, "strength", float(motion.get("parameters", {}).get("strength", 0.5)), 0.0, 1.0, 0.05)
 	_add_motion_number_parameter("Cycles", state_id, motion_id, "cycles", float(motion.get("parameters", {}).get("cycles", 1.0)), 0.01, 100.0, 0.1)
-	inspector_content.add_child(_create_inspector_field_label("Phase Offset"))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Phase Offset"))
 	var phase_offset := SpinBox.new()
 	phase_offset.min_value = -1.0
 	phase_offset.max_value = 1.0
@@ -12324,7 +12101,7 @@ func _render_motion_authoring_inspector(state: Dictionary, motion: Dictionary) -
 func _render_transition_authoring_inspector(state: Dictionary, transition: Dictionary) -> void:
 	var state_id := str(state.get("id", ""))
 	var transition_id := str(transition.get("id", ""))
-	inspector_content.add_child(_create_motion_inspector_value("Source State", str(state.get("name", "State"))))
+	inspector_content.add_child(EditorWidgets.create_motion_inspector_value("Source State", str(state.get("name", "State"))))
 	var priority_index := motion_workspace.transition_index(state_id, transition_id)
 	var transition_count: int = state.get("transitions", []).size()
 	var priority_row := HBoxContainer.new()
@@ -12345,7 +12122,7 @@ func _render_transition_authoring_inspector(state: Dictionary, transition: Dicti
 	move_down.pressed.connect(_move_transition.bind(state_id, transition_id, 1))
 	priority_row.add_child(move_down)
 	inspector_content.add_child(priority_row)
-	inspector_content.add_child(_create_inspector_field_label("Target State"))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Target State"))
 	var target_option := OptionButton.new()
 	target_option.custom_minimum_size = Vector2(0, 28)
 	var target_state_id := str(transition.get("target_state_id", ""))
@@ -12368,7 +12145,7 @@ func _render_transition_authoring_inspector(state: Dictionary, transition: Dicti
 			target_option.select(target_option.item_count - 1)
 	target_option.item_selected.connect(_on_transition_target_selected.bind(target_option, state_id, transition_id))
 	inspector_content.add_child(target_option)
-	inspector_content.add_child(_create_inspector_field_label("Exit Policy"))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Exit Policy"))
 	var exit_option := OptionButton.new()
 	for exit_data in [["Any Phase", MotionWorkspace.EXIT_ANY_PHASE], ["After Phase", MotionWorkspace.EXIT_AFTER_PHASE], ["At Loop End", MotionWorkspace.EXIT_LOOP_END]]:
 		exit_option.add_item(str(exit_data[0]))
@@ -12378,7 +12155,7 @@ func _render_transition_authoring_inspector(state: Dictionary, transition: Dicti
 	exit_option.item_selected.connect(_on_transition_exit_policy_selected.bind(exit_option, state_id, transition_id))
 	inspector_content.add_child(exit_option)
 	if str(transition.get("exit_policy", MotionWorkspace.EXIT_ANY_PHASE)) == MotionWorkspace.EXIT_AFTER_PHASE:
-		inspector_content.add_child(_create_inspector_field_label("Exit After Phase"))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Exit After Phase"))
 		var exit_phase := SpinBox.new()
 		exit_phase.min_value = 0.0
 		exit_phase.max_value = 1.0
@@ -12386,7 +12163,7 @@ func _render_transition_authoring_inspector(state: Dictionary, transition: Dicti
 		exit_phase.value = float(transition.get("exit_phase", 0.8))
 		exit_phase.value_changed.connect(_on_transition_number_changed.bind(state_id, transition_id, "exit_phase"))
 		inspector_content.add_child(exit_phase)
-	inspector_content.add_child(_create_inspector_field_label("Entry Mode"))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Entry Mode"))
 	var entry_option := OptionButton.new()
 	for entry_data in [["Restart", MotionWorkspace.ENTRY_RESTART], ["Preserve Phase", MotionWorkspace.ENTRY_PRESERVE_PHASE]]:
 		entry_option.add_item(str(entry_data[0]))
@@ -12395,7 +12172,7 @@ func _render_transition_authoring_inspector(state: Dictionary, transition: Dicti
 			entry_option.select(entry_option.item_count - 1)
 	entry_option.item_selected.connect(_on_transition_entry_mode_selected.bind(entry_option, state_id, transition_id))
 	inspector_content.add_child(entry_option)
-	inspector_content.add_child(_create_inspector_field_label("Blend Duration (s)"))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Blend Duration (s)"))
 	var blend_duration := SpinBox.new()
 	blend_duration.min_value = 0.0
 	blend_duration.max_value = 10.0
@@ -12403,10 +12180,10 @@ func _render_transition_authoring_inspector(state: Dictionary, transition: Dicti
 	blend_duration.value = float(transition.get("blend_duration", 0.15))
 	blend_duration.value_changed.connect(_on_transition_number_changed.bind(state_id, transition_id, "blend_duration"))
 	inspector_content.add_child(blend_duration)
-	inspector_content.add_child(_create_inspector_section("Rules · ALL"))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Rules · ALL", _on_inspector_section_toggled))
 	var rules: Array = transition.get("rules", [])
 	if rules.is_empty():
-		var no_rules := _create_inspector_field_label("No Rules · phase policy alone controls eligibility")
+		var no_rules := EditorWidgets.create_inspector_field_label("No Rules · phase policy alone controls eligibility")
 		no_rules.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		inspector_content.add_child(no_rules)
 	for rule in rules:
@@ -12419,7 +12196,7 @@ func _render_transition_authoring_inspector(state: Dictionary, transition: Dicti
 	inspector_content.add_child(add_rule_button)
 	var rules_valid := motion_workspace.transition_rules_valid(transition)
 	var transition_validation := "Ready for future evaluation" if target_exists and rules_valid else ("Incomplete · Target State no longer exists" if not target_exists else "Incomplete · Rule references are invalid")
-	var transition_validation_label := _create_inspector_field_label(transition_validation)
+	var transition_validation_label := EditorWidgets.create_inspector_field_label(transition_validation)
 	transition_validation_label.add_theme_color_override("font_color", Color("#75b88a") if target_exists and rules_valid else Color("#f2c94c"))
 	inspector_content.add_child(transition_validation_label)
 	var remove_button := Button.new()
@@ -12429,14 +12206,14 @@ func _render_transition_authoring_inspector(state: Dictionary, transition: Dicti
 
 
 func _render_simulation_contract_inspector() -> void:
-	inspector_content.add_child(_create_inspector_section("Simulation Contract"))
-	var explanation := _create_inspector_field_label("Typed inputs exposed by the host Simulation. Transition Rules reference stable parameter IDs.")
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Simulation Contract", _on_inspector_section_toggled))
+	var explanation := EditorWidgets.create_inspector_field_label("Typed inputs exposed by the host Simulation. Transition Rules reference stable parameter IDs.")
 	explanation.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	inspector_content.add_child(explanation)
-	inspector_content.add_child(_create_motion_inspector_value("Source", "Persisted Asset Contract · future external import boundary"))
+	inspector_content.add_child(EditorWidgets.create_motion_inspector_value("Source", "Persisted Asset Contract · future external import boundary"))
 	var parameters := motion_workspace.get_contract_parameters()
 	if parameters.is_empty():
-		inspector_content.add_child(_create_inspector_field_label("No parameters declared."))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("No parameters declared."))
 	for parameter in parameters:
 		_render_contract_parameter(parameter)
 	var add_parameter := Button.new()
@@ -12447,8 +12224,8 @@ func _render_simulation_contract_inspector() -> void:
 
 
 func _render_simulation_preview_values() -> void:
-	inspector_content.add_child(_create_inspector_section("Simulation Preview Values"))
-	var note := _create_inspector_field_label("Runtime-only values · used by the Phase 8 Transition evaluator")
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Simulation Preview Values", _on_inspector_section_toggled))
+	var note := EditorWidgets.create_inspector_field_label("Runtime-only values · used by the Phase 8 Transition evaluator")
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	inspector_content.add_child(note)
 	for parameter in motion_workspace.get_contract_parameters():
@@ -12461,7 +12238,7 @@ func _render_simulation_preview_values() -> void:
 			bool_input.toggled.connect(_on_motion_runtime_bool_changed.bind(parameter_id))
 			inspector_content.add_child(bool_input)
 		else:
-			inspector_content.add_child(_create_inspector_field_label(parameter_name))
+			inspector_content.add_child(EditorWidgets.create_inspector_field_label(parameter_name))
 			var number_input := SpinBox.new()
 			number_input.min_value = -1000000.0
 			number_input.max_value = 1000000.0
@@ -12472,18 +12249,18 @@ func _render_simulation_preview_values() -> void:
 
 
 func _render_animation_validation_inspector() -> void:
-	inspector_content.add_child(_create_inspector_section("Validation"))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Validation", _on_inspector_section_toggled))
 	var issues := motion_workspace.validation_issues()
 	if issues.is_empty():
-		var valid_label := _create_inspector_field_label("Animation document is valid.")
+		var valid_label := EditorWidgets.create_inspector_field_label("Animation document is valid.")
 		valid_label.add_theme_color_override("font_color", Color("#75b88a"))
 		inspector_content.add_child(valid_label)
 		return
-	var summary := _create_inspector_field_label("%d issue%s" % [issues.size(), "" if issues.size() == 1 else "s"])
+	var summary := EditorWidgets.create_inspector_field_label("%d issue%s" % [issues.size(), "" if issues.size() == 1 else "s"])
 	summary.add_theme_color_override("font_color", Color("#f2c94c"))
 	inspector_content.add_child(summary)
 	for issue in issues:
-		var issue_label := _create_inspector_field_label("• %s" % issue)
+		var issue_label := EditorWidgets.create_inspector_field_label("• %s" % issue)
 		issue_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		inspector_content.add_child(issue_label)
 
@@ -12493,23 +12270,23 @@ func _render_legacy_path_follow_migration(asset: Dictionary) -> void:
 	var archived = animation.get("legacy_path_follow_motions", [])
 	if not archived is Array or archived.is_empty():
 		return
-	inspector_content.add_child(_create_inspector_section("Phase 10 Migration"))
-	var summary := _create_inspector_field_label("%d legacy Path Follow Motion%s retained in the Animation archive." % [archived.size(), "" if archived.size() == 1 else "s"])
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Phase 10 Migration", _on_inspector_section_toggled))
+	var summary := EditorWidgets.create_inspector_field_label("%d legacy Path Follow Motion%s retained in the Animation archive." % [archived.size(), "" if archived.size() == 1 else "s"])
 	summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	summary.add_theme_color_override("font_color", Color("#f2c94c"))
 	inspector_content.add_child(summary)
-	var note := _create_inspector_field_label("They no longer evaluate as Animation primitives. Their original data remains persisted so it can be recreated as an independent Motion → Path resource in Phase 11.")
+	var note := EditorWidgets.create_inspector_field_label("They no longer evaluate as Animation primitives. Their original data remains persisted so it can be recreated as an independent Motion → Path resource in Phase 11.")
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	inspector_content.add_child(note)
 
 
 func _render_contract_parameter(parameter: Dictionary) -> void:
 	var parameter_id := str(parameter.get("id", ""))
-	var panel := _create_panel(Color("#252b35"))
+	var panel := EditorWidgets.create_panel(Color("#252b35"))
 	var content := VBoxContainer.new()
 	content.add_theme_constant_override("separation", 4)
 	panel.add_child(content)
-	var name_editor := _create_name_editor(str(parameter.get("name", "parameter")), "Parameter name")
+	var name_editor := EditorWidgets.create_name_editor(str(parameter.get("name", "parameter")), "Parameter name")
 	name_editor.text_submitted.connect(_rename_contract_parameter.bind(parameter_id, name_editor))
 	name_editor.focus_exited.connect(func() -> void: _rename_contract_parameter(name_editor.text, parameter_id, name_editor))
 	content.add_child(name_editor)
@@ -12521,7 +12298,7 @@ func _render_contract_parameter(parameter: Dictionary) -> void:
 			type_option.select(type_option.item_count - 1)
 	type_option.item_selected.connect(_on_contract_parameter_type_selected.bind(type_option, parameter_id))
 	content.add_child(type_option)
-	var id_label := _create_inspector_field_label("Stable ID · %s" % parameter_id)
+	var id_label := EditorWidgets.create_inspector_field_label("Stable ID · %s" % parameter_id)
 	id_label.add_theme_color_override("font_color", Color("#737f91"))
 	content.add_child(id_label)
 	var remove_parameter := Button.new()
@@ -12533,13 +12310,13 @@ func _render_contract_parameter(parameter: Dictionary) -> void:
 
 func _render_transition_rule(state_id: String, transition_id: String, rule: Dictionary) -> void:
 	var rule_id := str(rule.get("id", ""))
-	var panel := _create_panel(Color("#252b35"))
+	var panel := EditorWidgets.create_panel(Color("#252b35"))
 	var grid := GridContainer.new()
 	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", 6)
 	grid.add_theme_constant_override("v_separation", 4)
 	panel.add_child(grid)
-	grid.add_child(_create_inspector_field_label("Parameter"))
+	grid.add_child(EditorWidgets.create_inspector_field_label("Parameter"))
 	var parameter_option := OptionButton.new()
 	parameter_option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var parameter_id := str(rule.get("parameter_id", ""))
@@ -12555,7 +12332,7 @@ func _render_transition_rule(state_id: String, transition_id: String, rule: Dict
 			parameter_option.select(parameter_option.item_count - 1)
 	parameter_option.item_selected.connect(_on_transition_rule_parameter_selected.bind(parameter_option, state_id, transition_id, rule_id))
 	grid.add_child(parameter_option)
-	grid.add_child(_create_inspector_field_label("Operator"))
+	grid.add_child(EditorWidgets.create_inspector_field_label("Operator"))
 	var operator_option := OptionButton.new()
 	var parameter_type := str(parameter.get("type", MotionWorkspace.PARAM_NUMBER))
 	for operator in motion_workspace.rule_operators(parameter_type):
@@ -12567,7 +12344,7 @@ func _render_transition_rule(state_id: String, transition_id: String, rule: Dict
 	operator_option.item_selected.connect(_on_transition_rule_operator_selected.bind(operator_option, state_id, transition_id, rule_id))
 	grid.add_child(operator_option)
 	if parameter_type == MotionWorkspace.PARAM_NUMBER and not parameter.is_empty():
-		grid.add_child(_create_inspector_field_label("Value"))
+		grid.add_child(EditorWidgets.create_inspector_field_label("Value"))
 		var rule_value := SpinBox.new()
 		rule_value.min_value = -1000000.0
 		rule_value.max_value = 1000000.0
@@ -12575,8 +12352,8 @@ func _render_transition_rule(state_id: String, transition_id: String, rule: Dict
 		rule_value.value = float(rule.get("value", 0.0))
 		rule_value.value_changed.connect(_on_transition_rule_value_changed.bind(state_id, transition_id, rule_id))
 		grid.add_child(rule_value)
-	grid.add_child(_create_inspector_field_label("Rule ID"))
-	grid.add_child(_create_inspector_field_label(rule_id))
+	grid.add_child(EditorWidgets.create_inspector_field_label("Rule ID"))
+	grid.add_child(EditorWidgets.create_inspector_field_label(rule_id))
 	var remove_rule := Button.new()
 	remove_rule.text = "Remove Rule"
 	remove_rule.pressed.connect(_remove_transition_rule.bind(state_id, transition_id, rule_id))
@@ -12588,13 +12365,13 @@ func _render_transition_rule(state_id: String, transition_id: String, rule: Dict
 func _render_marker_authoring_inspector(state: Dictionary, marker: Dictionary) -> void:
 	var state_id := str(state.get("id", ""))
 	var marker_id := str(marker.get("id", ""))
-	inspector_content.add_child(_create_motion_inspector_value("State", str(state.get("name", "State"))))
-	inspector_content.add_child(_create_inspector_field_label("Event ID"))
-	var event_editor := _create_name_editor(str(marker.get("event_id", "event")), "Event ID")
+	inspector_content.add_child(EditorWidgets.create_motion_inspector_value("State", str(state.get("name", "State"))))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Event ID"))
+	var event_editor := EditorWidgets.create_name_editor(str(marker.get("event_id", "event")), "Event ID")
 	event_editor.text_submitted.connect(_rename_marker_event.bind(state_id, marker_id, event_editor))
 	event_editor.focus_exited.connect(func() -> void: _rename_marker_event(event_editor.text, state_id, marker_id, event_editor))
 	inspector_content.add_child(event_editor)
-	inspector_content.add_child(_create_inspector_field_label("Kind"))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Kind"))
 	var kind_option := OptionButton.new()
 	for kind_data in [["Event", MotionWorkspace.MARKER_EVENT], ["SFX", MotionWorkspace.MARKER_SFX], ["VFX", MotionWorkspace.MARKER_VFX]]:
 		kind_option.add_item(str(kind_data[0]))
@@ -12603,7 +12380,7 @@ func _render_marker_authoring_inspector(state: Dictionary, marker: Dictionary) -
 			kind_option.select(kind_option.item_count - 1)
 	kind_option.item_selected.connect(_on_marker_kind_selected.bind(kind_option, state_id, marker_id))
 	inspector_content.add_child(kind_option)
-	inspector_content.add_child(_create_inspector_field_label("Normalized Phase"))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Normalized Phase"))
 	var marker_phase := SpinBox.new()
 	marker_phase.min_value = 0.0
 	marker_phase.max_value = 1.0
@@ -12611,7 +12388,7 @@ func _render_marker_authoring_inspector(state: Dictionary, marker: Dictionary) -
 	marker_phase.value = float(marker.get("phase", 0.5))
 	marker_phase.value_changed.connect(_on_marker_phase_changed.bind(state_id, marker_id))
 	inspector_content.add_child(marker_phase)
-	var marker_note := _create_inspector_field_label("Marker ticks are shown below the normalized Phase scrubber.")
+	var marker_note := EditorWidgets.create_inspector_field_label("Marker ticks are shown below the normalized Phase scrubber.")
 	marker_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	inspector_content.add_child(marker_note)
 	var remove_button := Button.new()
@@ -12621,7 +12398,7 @@ func _render_marker_authoring_inspector(state: Dictionary, marker: Dictionary) -
 
 
 func _add_unavailable_motion_guide_field(label_text: String, tooltip: String) -> void:
-	inspector_content.add_child(_create_inspector_field_label(label_text))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label(label_text))
 	var guide_option := OptionButton.new()
 	guide_option.add_item("Not available")
 	guide_option.disabled = true
@@ -12631,7 +12408,7 @@ func _add_unavailable_motion_guide_field(label_text: String, tooltip: String) ->
 
 
 func _add_motion_number_parameter(label_text: String, state_id: String, motion_id: String, parameter_name: String, value: float, minimum: float, maximum: float, step: float) -> void:
-	inspector_content.add_child(_create_inspector_field_label(label_text))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label(label_text))
 	var field := SpinBox.new()
 	field.min_value = minimum
 	field.max_value = maximum
@@ -12654,19 +12431,6 @@ func _motion_preview_validation(motion: Dictionary) -> String:
 	if domain == MotionWorkspace.INNER:
 		return "Not Previewable · Animation Guides and mesh are not available"
 	return "Ready for Preview"
-
-
-func _create_motion_inspector_value(label_text: String, value_text: String) -> VBoxContainer:
-	var field := VBoxContainer.new()
-	field.add_theme_constant_override("separation", 1)
-	field.add_child(_create_inspector_field_label(label_text))
-	var value := Label.new()
-	value.text = value_text
-	value.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	value.add_theme_font_size_override("font_size", 11)
-	value.add_theme_color_override("font_color", Color("#d6dbe4"))
-	field.add_child(value)
-	return field
 
 
 func _on_motion_selection_changed() -> void:
@@ -13065,7 +12829,7 @@ func _on_edge_render_outline_changed(enabled: bool) -> void:
 
 
 func _add_component_debug_inspector(component: Dictionary) -> void:
-	inspector_content.add_child(_create_inspector_section("Debug"))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Debug", _on_inspector_section_toggled))
 	var show_numbers := CheckButton.new()
 	show_numbers.text = "Show Point Numbers"
 	show_numbers.focus_mode = Control.FOCUS_NONE
@@ -13155,7 +12919,7 @@ func _add_selected_point_settings(component: Dictionary, point_ids: Array[String
 			or handle_source != shared_handle_source \
 			or not handle_in.is_equal_approx(shared_handle_in) \
 			or not handle_out.is_equal_approx(shared_handle_out)
-	inspector_content.add_child(_create_inspector_field_label("Handle Mode"))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Handle Mode"))
 	var point_mode_option := OptionButton.new()
 	point_mode_option.custom_minimum_size = Vector2(0, 26)
 	if mode_mixed:
@@ -13180,7 +12944,7 @@ func _add_selected_point_settings(component: Dictionary, point_ids: Array[String
 	preserve_point.toggled.connect(_on_selected_points_preserve_changed.bind(point_ids.duplicate()))
 	inspector_content.add_child(preserve_point)
 	var handles_label := "Handles: - Mixed -" if handles_mixed else "Handles: %s" % ("Manual" if shared_handle_source == "manual" else "Auto")
-	inspector_content.add_child(_create_inspector_field_label(handles_label))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label(handles_label))
 
 
 func _on_selected_points_mode_selected(index: int, option: OptionButton, _point_ids: Array) -> void:
@@ -13214,15 +12978,6 @@ func _on_selected_points_preserve_changed(enabled: bool, _point_ids: Array) -> v
 	for point_id in valid_ids:
 		BezierTopology.point_by_id(component.get("points", []), point_id)["preserve_point"] = enabled
 	_invalidate_render(RENDER_INSPECTOR)
-
-
-func _create_name_editor(value: String, placeholder: String) -> LineEdit:
-	var editor := LineEdit.new()
-	editor.text = value
-	editor.custom_minimum_size = Vector2(0, 26)
-	editor.placeholder_text = placeholder
-	editor.add_theme_font_size_override("font_size", 12)
-	return editor
 
 
 func _add_reference_image_field(grid: GridContainer, label_text: String, value: float, property_name: String) -> void:
@@ -13530,7 +13285,7 @@ func _on_circle_primitive_diameter_changed(value: float) -> void:
 
 
 func _add_ellipse_diameter_field(label_text: String, value: float, property_name: String) -> void:
-	inspector_content.add_child(_create_inspector_field_label(label_text))
+	inspector_content.add_child(EditorWidgets.create_inspector_field_label(label_text))
 	var field := SpinBox.new()
 	field.min_value = 0.1
 	field.max_value = 100000.0
@@ -13551,18 +13306,18 @@ func _on_ellipse_primitive_diameter_changed(value: float, property_name: String)
 
 
 func _render_asset_root_scale_rebase_inspector(asset: Dictionary) -> void:
-	inspector_content.add_child(_create_inspector_section("Asset Transform Rebase"))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Asset Transform Rebase", _on_inspector_section_toggled))
 	var analysis := AssetScaleRebaseService.analyze_asset(asset)
 	var blockers: Array = analysis.get("blockers", [])
 	if bool(analysis.get("required", false)):
 		var root_position := Vector2(analysis.get("position", Vector2.ZERO))
-		inspector_content.add_child(_create_inspector_field_label("Position %s × %s cm → 0 × 0 cm" % [_format_scale_value(_editor_units_to_world(root_position.x)), _format_scale_value(_editor_units_to_world(root_position.y))]))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Position %s × %s cm → 0 × 0 cm" % [_format_scale_value(_editor_units_to_world(root_position.x)), _format_scale_value(_editor_units_to_world(root_position.y))]))
 		var root_scale := Vector2(analysis.get("scale", Vector2.ONE))
-		inspector_content.add_child(_create_inspector_field_label("Scale %s × %s → 1 × 1" % [_format_scale_value(root_scale.x), _format_scale_value(root_scale.y)]))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Scale %s × %s → 1 × 1" % [_format_scale_value(root_scale.x), _format_scale_value(root_scale.y)]))
 	else:
-		inspector_content.add_child(_create_inspector_field_label("Root Position and Scale are normalized."))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Root Position and Scale are normalized."))
 	for blocker in blockers:
-		var blocker_label := _create_inspector_field_label("• Blocked: %s" % str(blocker))
+		var blocker_label := EditorWidgets.create_inspector_field_label("• Blocked: %s" % str(blocker))
 		blocker_label.add_theme_color_override("font_color", Color("#ef8354"))
 		inspector_content.add_child(blocker_label)
 	asset_root_scale_rebase_button = Button.new()
@@ -13576,23 +13331,23 @@ func _render_asset_root_scale_rebase_inspector(asset: Dictionary) -> void:
 
 
 func _render_asset_scale_rebase_inspector(asset: Dictionary) -> void:
-	inspector_content.add_child(_create_inspector_section("Component Scale Rebase"))
+	inspector_content.add_child(EditorWidgets.create_inspector_section("Component Scale Rebase", _on_inspector_section_toggled))
 	var analysis := ComponentScaleRebaseService.analyze_asset(asset)
 	var candidates: Array = analysis.get("candidates", [])
 	var blockers: Array = analysis.get("blockers", [])
 	if candidates.is_empty() and blockers.is_empty():
-		inspector_content.add_child(_create_inspector_field_label("All Component scales are normalized (1 × 1)."))
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("All Component scales are normalized (1 × 1)."))
 	for candidate in candidates:
 		var component_scale := Vector2(candidate.get("scale", Vector2.ONE))
 		var suffix := " · Circle → Ellipse" if str(candidate.get("result_primitive_type", "")) == PrimitiveGeometryService.ELLIPSE else ""
-		inspector_content.add_child(_create_inspector_field_label("• %s · %s × %s → 1 × 1%s" % [
+		inspector_content.add_child(EditorWidgets.create_inspector_field_label("• %s · %s × %s → 1 × 1%s" % [
 			str(candidate.get("name", "Component")),
 			_format_scale_value(component_scale.x),
 			_format_scale_value(component_scale.y),
 			suffix
 		]))
 	for blocker in blockers:
-		var blocker_label := _create_inspector_field_label("• %s · Blocked: %s" % [str(blocker.get("name", "Component")), str(blocker.get("reason", "Scale cannot be rebased."))])
+		var blocker_label := EditorWidgets.create_inspector_field_label("• %s · Blocked: %s" % [str(blocker.get("name", "Component")), str(blocker.get("reason", "Scale cannot be rebased."))])
 		blocker_label.add_theme_color_override("font_color", Color("#ef8354"))
 		inspector_content.add_child(blocker_label)
 	asset_scale_rebase_button = Button.new()
@@ -14463,7 +14218,7 @@ func _render_canvas_context() -> void:
 	canvas_view.set_component_transform(component_transform)
 	canvas_view.set_reference_shapes(_build_reference_shapes(asset, selected_component_id))
 	if _is_region(component):
-		canvas_view.set_bezier_color_override(REGION_COLORS.get(str(component.get("region_type", "attack")), REGION_COLORS["attack"]))
+		canvas_view.set_bezier_color_override(EditorWidgets.REGION_COLORS.get(str(component.get("region_type", "attack")), EditorWidgets.REGION_COLORS["attack"]))
 	canvas_view.set_component_draw_mode(str(component.get("draw_mode", "closed_loop")))
 	canvas_view.set_point_numbers_visible(bool(component.get("show_point_numbers", false)))
 	var catch_parent_id := str(component.get("parent_component_id", ""))
@@ -15330,11 +15085,6 @@ func _get_edge(component: Dictionary, edge_id: String) -> Dictionary:
 		if str(edge.get("id", "")) == edge_id:
 			return edge
 	return {}
-
-
-func _clear(container: Node) -> void:
-	for child in container.get_children():
-		child.queue_free()
 
 
 func _clear_context_bar() -> void:
