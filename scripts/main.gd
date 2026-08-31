@@ -2387,36 +2387,7 @@ func _write_asset_catalog(build: Dictionary = {}) -> bool:
 	if resource_path.is_empty():
 		return false
 	var target := ProjectSettings.globalize_path(resource_path)
-	DirAccess.make_dir_recursive_absolute(target.get_base_dir())
-	var staging := target + ".staging"
-	var backup := target + ".backup"
-	if FileAccess.file_exists(staging):
-		DirAccess.remove_absolute(staging)
-	if FileAccess.file_exists(backup):
-		if FileAccess.file_exists(target):
-			DirAccess.remove_absolute(backup)
-		else:
-			DirAccess.rename_absolute(backup, target)
-	var catalog_text := JSON.stringify(expected.get("catalog", {}), "\t")
-	var file := FileAccess.open(staging, FileAccess.WRITE)
-	if file == null:
-		return false
-	file.store_string(catalog_text)
-	file.close()
-	if FileAccess.get_file_as_string(staging) != catalog_text:
-		DirAccess.remove_absolute(staging)
-		return false
-	if FileAccess.file_exists(target) and DirAccess.rename_absolute(target, backup) != OK:
-		DirAccess.remove_absolute(staging)
-		return false
-	if DirAccess.rename_absolute(staging, target) != OK:
-		if FileAccess.file_exists(backup):
-			DirAccess.rename_absolute(backup, target)
-		DirAccess.remove_absolute(staging)
-		return false
-	if FileAccess.file_exists(backup):
-		DirAccess.remove_absolute(backup)
-	return true
+	return _write_text_atomically(target, JSON.stringify(expected.get("catalog", {}), "\t"))
 
 
 func _read_asset_data(world_root: String, asset_id: String):
@@ -2455,6 +2426,10 @@ func _save_world() -> void:
 	var motion_path_ids: Array[String] = []
 	var motion_act_ids: Array[String] = []
 	var motion_sequence_ids: Array[String] = []
+	# Every record is replaced atomically, so a failure leaves that file at its
+	# previous content rather than truncated. Writing continues so one bad path
+	# cannot cost the remaining records, and the first failure is reported.
+	var unwritten: Array[String] = []
 	for asset in assets:
 		var asset_id := str(asset["id"])
 		asset_ids.append(asset_id)
@@ -2515,41 +2490,49 @@ func _save_world() -> void:
 			asset_data["components"].append(serialized_component)
 		for guide in asset.get("guides", []):
 			asset_data["guides"].append(_serialize_asset_guide(guide))
-		_write_json("%s/%s.json" % [asset_root, asset_storage_name], asset_data)
+		if not _write_json("%s/%s.json" % [asset_root, asset_storage_name], asset_data):
+			unwritten.append("%s.json" % asset_storage_name)
 		for component in asset.get("components", []):
 			var geometry_key := _geometry_document_key(asset_id, str(component.get("id", "")))
 			if not geometry_documents.has(geometry_key):
 				continue
 			var geometry_path := "%s/geometry/%s/%s/geometry.json" % [world_root, asset_storage_name, str(component.get("id", ""))]
-			_write_json(geometry_path, _serialize_geometry_document(geometry_documents[geometry_key]))
-			_save_sdf_image(asset, str(component.get("id", "")))
+			if not _write_json(geometry_path, _serialize_geometry_document(geometry_documents[geometry_key])):
+				unwritten.append(geometry_path.get_file())
+			if _save_sdf_image(asset, str(component.get("id", ""))) != OK:
+				unwritten.append("contour_sdf.png (%s)" % str(component.get("name", component.get("id", ""))))
 	for path_document in motion_paths:
 		var path_id := str(path_document.get("id", ""))
 		motion_path_ids.append(path_id)
-		_write_json("%s/paths/%s/path.json" % [world_root, path_id], {
+		if not _write_json("%s/paths/%s/path.json" % [world_root, path_id], {
 			"schema_version": SCHEMA_VERSION,
 			"id": path_id,
 			"name": str(path_document.get("name", path_id)),
 			"visibility": bool(path_document.get("visibility", true)),
 			"topology": MotionPathTopology.serialize(path_document.get("topology", {})),
 			"playback": path_document.get("playback", {}).duplicate(true)
-		})
+		}):
+			unwritten.append("paths/%s/path.json" % path_id)
 	for sequence_document in motion_sequences:
 		var sequence_id := str(sequence_document.get("id", ""))
 		motion_sequence_ids.append(sequence_id)
-		_write_json("%s/sequences/%s/sequence.json" % [world_root, sequence_id], {
+		if not _write_json("%s/sequences/%s/sequence.json" % [world_root, sequence_id], {
 			"schema_version": SCHEMA_VERSION,
 			"id": sequence_id,
 			"name": str(sequence_document.get("name", sequence_id)),
 			"visibility": bool(sequence_document.get("visibility", true)),
 			"next_entry_index": int(sequence_document.get("next_entry_index", 1)),
 			"entries": sequence_document.get("entries", []).duplicate(true)
-		})
+		}):
+			unwritten.append("sequences/%s/sequence.json" % sequence_id)
 	for act_document in motion_acts:
 		var act_id := str(act_document.get("id", ""))
 		motion_act_ids.append(act_id)
-		_write_json("%s/acts/%s/act.json" % [world_root, act_id], _serialize_motion_act(act_document))
-	_write_json("%s/%s.json" % [world_root, world_name], {
+		if not _write_json("%s/acts/%s/act.json" % [world_root, act_id], _serialize_motion_act(act_document)):
+			unwritten.append("acts/%s/act.json" % act_id)
+	# The World index is written last, so an interrupted save leaves an index
+	# that still describes the previous set of records.
+	if not _write_json("%s/%s.json" % [world_root, world_name], {
 		"schema_version": SCHEMA_VERSION,
 		"name": world_name,
 		"world_name": world_title if not world_title.is_empty() else world_name,
@@ -2559,14 +2542,28 @@ func _save_world() -> void:
 		"acts": motion_act_ids,
 		"sequences": motion_sequence_ids,
 		"editor_state": _serialize_editor_state()
-	})
-	_write_json(CONFIG_PATH, {"schema_version": SCHEMA_VERSION, "last_world": world_name})
+	}):
+		unwritten.append("%s.json" % world_name)
+	if not _write_json(CONFIG_PATH, {"schema_version": SCHEMA_VERSION, "last_world": world_name}):
+		unwritten.append(CONFIG_PATH.get_file())
+	if not unwritten.is_empty():
+		_show_status_message(_incomplete_save_message(unwritten))
+		return
 	if not _write_asset_catalog(catalog_build):
 		_show_status_message("World saved, but catalog.json could not be updated.")
 		return
 	_invalidate_batch_status()
 	batch_status_snapshot = {}
 	_show_status_message("Saved World: %s!" % world_name)
+
+
+func _incomplete_save_message(unwritten: Array[String]) -> String:
+	# Names the first failure so the cause is actionable, and the count so the
+	# scope is visible. Records that were written are current; the rest kept
+	# their previous content.
+	if unwritten.size() == 1:
+		return "World partly saved · %s could not be written." % unwritten[0]
+	return "World partly saved · %s and %d more could not be written." % [unwritten[0], unwritten.size() - 1]
 
 
 func _capture_history_snapshot() -> Dictionary:
@@ -3624,9 +3621,24 @@ func _save_sdf_image(asset: Dictionary, component_id: String) -> Error:
 	if path.is_empty():
 		return ERR_UNCONFIGURED
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(path.get_base_dir()))
-	var result := (sdf_images[key] as Image).save_png(path)
+	# Staged and swapped like the JSON records, so a failed encode cannot leave a
+	# truncated image beside a Bake that still references it.
+	var staging := "%s/.%s.staging" % [path.get_base_dir(), path.get_file()]
+	if FileAccess.file_exists(staging):
+		DirAccess.remove_absolute(staging)
+	var result := (sdf_images[key] as Image).save_png(staging)
+	if result != OK:
+		if FileAccess.file_exists(staging):
+			DirAccess.remove_absolute(staging)
+		return result
+	if FileAccess.file_exists(path):
+		DirAccess.remove_absolute(path)
+	result = DirAccess.rename_absolute(staging, path)
+	if result != OK:
+		DirAccess.remove_absolute(staging)
+		return result
 	sdf_resource_validation_cache.clear()
-	return result
+	return OK
 
 
 func _default_geometry_document(asset_id: String, component_id: String) -> Dictionary:
@@ -5992,11 +6004,45 @@ func _geometry_uv_mapping_status(asset_id: String, component_id: String, compone
 	return "Baked" if _geometry_uv_mapping_bake_is_current(asset_id, component_id, component, bake) else "Stale"
 
 
-func _write_json(path: String, data: Dictionary) -> void:
+func _write_json(path: String, data: Dictionary) -> bool:
+	return _write_text_atomically(path, JSON.stringify(data, "\t"))
+
+
+func _write_text_atomically(path: String, text: String) -> bool:
+	# Authored World data is replaced, never truncated in place: the new content
+	# is staged beside the target, read back, and only then swapped in. A failure
+	# at any step leaves the previous file intact. The Asset Catalog and the
+	# Runtime Export packages use the same contract.
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(path.get_base_dir()))
-	var file := FileAccess.open(path, FileAccess.WRITE)
-	if file != null:
-		file.store_string(JSON.stringify(data, "\t"))
+	var staging := "%s/.%s.staging" % [path.get_base_dir(), path.get_file()]
+	var backup := "%s/.%s.backup" % [path.get_base_dir(), path.get_file()]
+	if FileAccess.file_exists(staging):
+		DirAccess.remove_absolute(staging)
+	if FileAccess.file_exists(backup):
+		# A backup without its target is the residue of an interrupted swap.
+		if FileAccess.file_exists(path):
+			DirAccess.remove_absolute(backup)
+		else:
+			DirAccess.rename_absolute(backup, path)
+	var file := FileAccess.open(staging, FileAccess.WRITE)
+	if file == null:
+		return false
+	file.store_string(text)
+	file.close()
+	if FileAccess.get_file_as_string(staging) != text:
+		DirAccess.remove_absolute(staging)
+		return false
+	if FileAccess.file_exists(path) and DirAccess.rename_absolute(path, backup) != OK:
+		DirAccess.remove_absolute(staging)
+		return false
+	if DirAccess.rename_absolute(staging, path) != OK:
+		if FileAccess.file_exists(backup):
+			DirAccess.rename_absolute(backup, path)
+		DirAccess.remove_absolute(staging)
+		return false
+	if FileAccess.file_exists(backup):
+		DirAccess.remove_absolute(backup)
+	return true
 
 
 func _read_json(path: String):

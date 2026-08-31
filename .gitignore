@@ -10,6 +10,10 @@ exports/
 # macOS
 .DS_Store
 
+# Residue of an interrupted atomic document write
+*.staging
+*.backup
+
 # Local native-extension toolchain and build products
 native/polytools_cdt/.venv/
 native/polytools_cdt/.sconsign.dblite

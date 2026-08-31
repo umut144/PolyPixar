@@ -31,6 +31,7 @@ func _init() -> void:
 	_test_asset_authored_facing()
 	_test_multi_component_inspector()
 	_test_multi_component_deletion()
+	_test_atomic_document_writes()
 	_test_geometry_document_history_isolation()
 	_test_geometry_sampling_service()
 	_test_geometry_auto_build_service()
@@ -1391,6 +1392,50 @@ func _distance_to_segment(point: Vector2, start: Vector2, end: Vector2) -> float
 		return point.distance_to(start)
 	var t := clampf((point - start).dot(delta) / delta.length_squared(), 0.0, 1.0)
 	return point.distance_to(start + delta * t)
+
+
+func _test_atomic_document_writes() -> void:
+	var application = load("res://scripts/main.gd").new()
+	var root := "user://polytools_atomic_write_test"
+	var target := "%s/record.json" % root
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(root))
+	if FileAccess.file_exists(target):
+		DirAccess.remove_absolute(target)
+
+	_expect(application._write_json(target, {"schema_version": 1, "value": "first"}), "Writing a record to a writable path should report success.")
+	_expect(str(application._read_json(target).get("value", "")) == "first", "A written record should read back with its content.")
+
+	_expect(application._write_json(target, {"schema_version": 1, "value": "second"}), "Replacing an existing record should report success.")
+	_expect(str(application._read_json(target).get("value", "")) == "second", "Replacing a record should leave the new content in place.")
+
+	var staging := "%s/.record.json.staging" % root
+	var backup := "%s/.record.json.backup" % root
+	_expect(not FileAccess.file_exists(staging) and not FileAccess.file_exists(backup), "A completed write should leave no staging or backup residue beside the record.")
+
+	# A directory standing where the record belongs makes the swap fail without
+	# a crash, which is the failure the caller has to be able to observe.
+	var blocked := "%s/blocked.json" % root
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(blocked))
+	_expect(not application._write_json(blocked, {"schema_version": 1}), "A record that cannot be written must report failure instead of reporting success.")
+	_expect(not FileAccess.file_exists("%s/.blocked.json.staging" % root), "A failed write should not leave its staging file behind.")
+
+	# An interrupted swap leaves a backup without its target. The next write has
+	# to recover that content rather than starting from nothing.
+	_expect(application._write_json(target, {"schema_version": 1, "value": "third"}), "Preparing the interrupted-swap case should succeed.")
+	DirAccess.rename_absolute(target, backup)
+	_expect(not FileAccess.file_exists(target) and FileAccess.file_exists(backup), "The interrupted-swap case should start with a backup and no target.")
+	_expect(application._write_json(target, {"schema_version": 1, "value": "fourth"}), "A write after an interrupted swap should succeed.")
+	_expect(str(application._read_json(target).get("value", "")) == "fourth", "A write after an interrupted swap should leave the new content in place.")
+	_expect(not FileAccess.file_exists(backup), "Recovering from an interrupted swap should consume the backup.")
+
+	_expect(application._incomplete_save_message(["a.json"] as Array[String]).contains("a.json"), "A single unwritten record should be named in the status message.")
+	var many: Array[String] = ["a.json", "b.json", "c.json"]
+	_expect(application._incomplete_save_message(many).contains("a.json") and application._incomplete_save_message(many).contains("2 more"), "Several unwritten records should name the first and count the rest.")
+
+	DirAccess.remove_absolute(target)
+	DirAccess.remove_absolute(blocked)
+	DirAccess.remove_absolute(root)
+	application.free()
 
 
 func _test_geometry_document_history_isolation() -> void:
