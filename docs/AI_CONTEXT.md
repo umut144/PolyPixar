@@ -204,12 +204,13 @@ includes command output on failure. Export and synchronization are deliberately
 separate actions: a downstream failure does not alter the already published
 PolyTools Runtime packages, and each consumer script remains responsible for
 its own atomic target update.
-Runtime Manifest schema 14 exports `contour_stroke_mesh` independently from the
+Runtime Manifest schema 15 exports `contour_stroke_mesh` independently from the
 unchanged Fill Mesh and adds geometry-only `closed_region_mesh` to closed
 Contours. It also exports Asset-local Weapon Attachment Frames and the ordered
 local-meter positions of authored `corner` points as `projection_depth_corners`.
-Gameplay
-systems assign meaning to ordinary Component geometry outside PolyTools.
+It additionally exports an optional `regions` array for authored Attack, Hurt,
+and Collision Regions. Missing or empty Regions preserve the consumer's
+Component-based fallback behavior.
 It contains no UV, SDF, mask, or Carrier compatibility fields;
 older consumers must reject it.
 The normative field-level package and consumer rules live in
@@ -269,12 +270,13 @@ and strictly replaces schema 10.
 World schema 56 adds Component-local `projection_depth_cm` for visible
 Components. It is shown only in the Component Inspector beside Contour Stroke
 Width and Z Order, defaults to `10 cm`, and is independent of Component/Asset
-Scale, Rebase, Z Order, and Contour Stroke Width. Runtime Manifest schema 14
+Scale, Rebase, Z Order, and Contour Stroke Width. Runtime Manifest schema 15
 exports the corresponding `projection_depth_meters` value and authored `corner`
 point positions for projection-depth contour edges.
 
-World schema 57 removes semantic gameplay Region records. Gameplay meaning is
-assigned by the consuming game to ordinary Component geometry.
+World schema 60 restores optional semantic gameplay Regions. They reuse the
+canonical `points`/`edges`/`chains` Bézier topology, remain outside visual Mesh
+processing, and are exported separately from ordinary Components.
 
 World schema 58 adds `root_position` to the Asset root's `Asset Transform`
 Inspector. It previews a translation of the complete Asset independently from

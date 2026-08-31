@@ -5,8 +5,10 @@ truth: ordered Bézier topology stored in `points`, `edges`, and `chains`.
 Primitive draw mode is a separate source model and is documented below; it
 does not serialize generated Bézier topology.
 
-Gameplay systems consume the geometry of ordinary Components directly. There
-is no separate Attack, Hurt, or Collision Region authoring model in PolyTools.
+Optional Attack, Hurt, and Collision Regions reuse the same canonical
+`points`/`edges`/`chains` representation as Bézier Components. They are
+nonvisual records and their sampled polygon/triangulation is derived only for
+validation and Runtime Export.
 Weapon Guides are instead oriented transform frames and intentionally contain
 no Bézier topology.
 
