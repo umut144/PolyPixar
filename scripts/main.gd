@@ -52,6 +52,10 @@ var motion_paths: Array[Dictionary] = []
 var motion_acts: Array[Dictionary] = []
 var motion_sequences: Array[Dictionary] = []
 var geometry_documents: Dictionary = {}
+# Geometry document keys that at least one history snapshot still references.
+# Such a document is copied before its first mutation, so snapshots share
+# unchanged documents instead of deep-copying the whole derived corpus.
+var shared_geometry_document_keys: Dictionary = {}
 var geometry_sampling_preview: Dictionary = {}
 var geometry_sampling_preview_key := ""
 var geometry_sampling_preview_state := "idle"
@@ -2159,6 +2163,7 @@ func _confirm_new_world() -> void:
 	motion_acts.clear()
 	motion_sequences.clear()
 	geometry_documents.clear()
+	shared_geometry_document_keys.clear()
 	sdf_images.clear()
 	sdf_resource_validation_cache.clear()
 	geometry_sampling_preview = {}
@@ -2565,6 +2570,9 @@ func _save_world() -> void:
 
 
 func _capture_history_snapshot() -> Dictionary:
+	# Every captured snapshot shares the current geometry documents, so the next
+	# mutation of one must copy it first.
+	_mark_geometry_documents_shared()
 	return {
 		"world_contour_stroke_width_px": world_contour_stroke_width_px,
 		"assets": assets.duplicate(true),
@@ -2577,7 +2585,7 @@ func _capture_history_snapshot() -> Dictionary:
 		"motion_acts": motion_acts.duplicate(true),
 		"next_motion_act_id": next_motion_act_id,
 		"motion_sequences": motion_sequences.duplicate(true),
-		"geometry_documents": geometry_documents.duplicate(true),
+		"geometry_documents": geometry_documents.duplicate(false),
 		"next_motion_sequence_id": next_motion_sequence_id,
 		"selected_asset_id": selected_asset_id,
 		"selected_component_id": selected_component_id,
@@ -2650,7 +2658,10 @@ func _restore_history_snapshot(snapshot: Dictionary) -> void:
 	motion_paths = snapshot.get("motion_paths", []).duplicate(true)
 	motion_acts = snapshot.get("motion_acts", []).duplicate(true)
 	motion_sequences = snapshot.get("motion_sequences", []).duplicate(true)
-	geometry_documents = snapshot.get("geometry_documents", {}).duplicate(true)
+	# The snapshot keeps its own reference to these documents for redo, so the
+	# restored map shares them until the next mutation copies one.
+	geometry_documents = snapshot.get("geometry_documents", {}).duplicate(false)
+	_mark_geometry_documents_shared()
 	geometry_sampling_preview = {}
 	geometry_sampling_preview_key = ""
 	geometry_sampling_preview_state = "idle"
@@ -2762,7 +2773,8 @@ func _undo() -> void:
 	if undo_history.is_empty():
 		return
 	history_coalescing = false
-	history_coalesce_timer.stop()
+	if is_instance_valid(history_coalesce_timer):
+		history_coalesce_timer.stop()
 	redo_history.append(_capture_history_snapshot())
 	var snapshot: Dictionary = undo_history.pop_back()
 	_restore_history_snapshot(snapshot)
@@ -2772,7 +2784,8 @@ func _redo() -> void:
 	if redo_history.is_empty():
 		return
 	history_coalescing = false
-	history_coalesce_timer.stop()
+	if is_instance_valid(history_coalesce_timer):
+		history_coalesce_timer.stop()
 	undo_history.append(_capture_history_snapshot())
 	var snapshot: Dictionary = redo_history.pop_back()
 	_restore_history_snapshot(snapshot)
@@ -2919,6 +2932,7 @@ func _load_world(world_entry: String, persist_as_last := true) -> bool:
 	motion_acts = loaded_motion_acts
 	motion_sequences = loaded_motion_sequences
 	geometry_documents = loaded_geometry_documents
+	shared_geometry_document_keys.clear()
 	world_contour_stroke_width_px = float(loaded_world_settings.get("contour_stroke_width_px", WorldSettingsService.DEFAULT_CONTOUR_STROKE_WIDTH_PX))
 	sdf_images.clear()
 	sdf_resource_validation_cache.clear()
@@ -3658,15 +3672,55 @@ func _default_geometry_document(asset_id: String, component_id: String) -> Dicti
 	}
 
 
-func _get_geometry_document(asset_id: String, component_id: String, create_if_missing := false) -> Dictionary:
+func _get_geometry_document(asset_id: String, component_id: String) -> Dictionary:
+	# Read-only view. The returned Dictionary may still be shared with a history
+	# snapshot, so callers must not mutate it. Use _mutable_geometry_document
+	# instead, after recording the change.
 	var key := _geometry_document_key(asset_id, component_id)
-	if geometry_documents.has(key):
-		return geometry_documents[key]
-	if not create_if_missing:
-		return {}
-	var document := _default_geometry_document(asset_id, component_id)
-	geometry_documents[key] = document
-	return document
+	return geometry_documents[key] if geometry_documents.has(key) else {}
+
+
+func _mutable_geometry_document(asset_id: String, component_id: String) -> Dictionary:
+	# Write access. Hands out the live document so the caller may mutate it in
+	# place; every history snapshot that still shares it gets its own copy first.
+	# The live Dictionary keeps its identity, so references held across a
+	# recorded change stay valid.
+	var key := _geometry_document_key(asset_id, component_id)
+	if not geometry_documents.has(key):
+		var document := _default_geometry_document(asset_id, component_id)
+		shared_geometry_document_keys.erase(key)
+		geometry_documents[key] = document
+		return document
+	var live: Dictionary = geometry_documents[key]
+	if shared_geometry_document_keys.has(key):
+		_copy_geometry_document_into_snapshots(key, live)
+		shared_geometry_document_keys.erase(key)
+	return live
+
+
+func _copy_geometry_document_into_snapshots(key: String, live: Dictionary) -> void:
+	# One copy of the current state, handed to every snapshot that still points
+	# at the live document. Snapshots that already hold their own copy, and a
+	# document no snapshot references, cost nothing.
+	var preserved: Dictionary = {}
+	var copied := false
+	for history in [undo_history, redo_history]:
+		for snapshot in history:
+			var documents: Dictionary = snapshot.get("geometry_documents", {})
+			if not documents.has(key) or not is_same(documents[key], live):
+				continue
+			if not copied:
+				preserved = live.duplicate(true)
+				copied = true
+			documents[key] = preserved
+
+
+func _mark_geometry_documents_shared() -> void:
+	# Called whenever a snapshot starts referencing the current documents. The
+	# flag only avoids the history walk for documents already detached.
+	shared_geometry_document_keys = {}
+	for key in geometry_documents:
+		shared_geometry_document_keys[key] = true
 
 
 func _geometry_sampling_recipe(asset_id: String, component_id: String) -> Dictionary:
@@ -5146,7 +5200,7 @@ func _generate_component_mesh_build(asset_id: String, component_id: String) -> D
 
 
 func _commit_component_mesh_build(asset_id: String, component_id: String, build: Dictionary) -> void:
-	var document := _get_geometry_document(asset_id, component_id, true)
+	var document := _mutable_geometry_document(asset_id, component_id)
 	var mesh: Dictionary = build.get("meshing", {})
 	if not build.get("recipes", {}).is_empty():
 		var recipes: Dictionary = build["recipes"]
@@ -5181,7 +5235,7 @@ func _commit_component_mesh_build(asset_id: String, component_id: String, build:
 
 
 func _record_component_mesh_failure(asset_id: String, component_id: String, build: Dictionary) -> void:
-	var document := _get_geometry_document(asset_id, component_id, true)
+	var document := _mutable_geometry_document(asset_id, component_id)
 	var recipes = build.get("recipes", {})
 	if recipes is Dictionary and not recipes.is_empty():
 		document["sampling"]["recipe"] = recipes.get("sampling", document["sampling"]["recipe"]).duplicate(true)
@@ -5264,7 +5318,7 @@ func _generate_component_uv_build(asset_id: String, component_id: String) -> Dic
 
 
 func _commit_component_uv_build(asset_id: String, component_id: String, build: Dictionary) -> void:
-	var document := _get_geometry_document(asset_id, component_id, true)
+	var document := _mutable_geometry_document(asset_id, component_id)
 	var result: Dictionary = build.get("result", {}).duplicate(true)
 	result["bake_id"] = "uv_bake_%d" % ResourceUID.create_id()
 	var recipe := GeometryUVMappingService.normalize_recipe(build.get("recipe", {}))
@@ -5276,7 +5330,7 @@ func _commit_component_uv_build(asset_id: String, component_id: String, build: D
 
 
 func _record_component_uv_failure(asset_id: String, component_id: String, build: Dictionary) -> void:
-	var document := _get_geometry_document(asset_id, component_id, true)
+	var document := _mutable_geometry_document(asset_id, component_id)
 	var errors: Array = build.get("errors", [])
 	document["uv_mapping"]["last_error"] = str(errors[0]) if not errors.is_empty() else "Automatic UV generation failed."
 	document["uv_mapping"]["last_failure_fingerprint"] = str(build.get("source_fingerprint", ""))
@@ -5361,7 +5415,7 @@ func _commit_component_sdf_build(asset_id: String, component_id: String, build: 
 	var bake := result.duplicate(true)
 	bake.erase("image")
 	bake["bake_id"] = "sdf_bake_%d" % ResourceUID.create_id()
-	var document := _get_geometry_document(asset_id, component_id, true)
+	var document := _mutable_geometry_document(asset_id, component_id)
 	document["sdf"]["recipe"] = GeometrySDFService.normalize_recipe(build.get("recipe", {}))
 	document["sdf"]["bake"] = bake
 	document["sdf"]["last_error"] = ""
@@ -5370,7 +5424,7 @@ func _commit_component_sdf_build(asset_id: String, component_id: String, build: 
 
 
 func _record_component_sdf_failure(asset_id: String, component_id: String, build: Dictionary) -> void:
-	var document := _get_geometry_document(asset_id, component_id, true)
+	var document := _mutable_geometry_document(asset_id, component_id)
 	var errors: Array = build.get("errors", [])
 	document["sdf"]["last_error"] = str(errors[0]) if not errors.is_empty() else "Automatic SDF generation failed."
 	document["sdf"]["last_failure_fingerprint"] = str(build.get("failure_fingerprint", build.get("source_fingerprint", "")))
@@ -5692,7 +5746,7 @@ func _create_weighting_style(asset_id: String, component_id: String) -> void:
 		_show_status_message("Select a Component before creating a Weighting Style.")
 		return
 	_record_direct_change()
-	var document := _get_geometry_document(asset_id, component_id, true)
+	var document := _mutable_geometry_document(asset_id, component_id)
 	var index := int(document["weighting"].get("next_style_index", 1))
 	document["weighting"]["next_style_index"] = index + 1
 	var style_id := "weighting_%d" % ResourceUID.create_id()
@@ -6443,7 +6497,7 @@ func _set_geometry_sampling_method(method: String) -> void:
 		_refresh_geometry_sampling_workspace()
 		return
 	_record_direct_change()
-	var document := _get_geometry_document(selected_asset_id, selected_component_id, true)
+	var document := _mutable_geometry_document(selected_asset_id, selected_component_id)
 	var recipe := GeometrySamplingService.normalize_recipe(document.get("sampling", {}).get("recipe", {}))
 	recipe["method"] = method
 	var matching_bake := _geometry_sampling_bake(selected_asset_id, selected_component_id, method)
@@ -6502,7 +6556,7 @@ func _set_geometry_seeding_method(method: String) -> void:
 			_schedule_geometry_seeding_preview()
 		return
 	_record_direct_change()
-	var document := _get_geometry_document(selected_asset_id, selected_component_id, true)
+	var document := _mutable_geometry_document(selected_asset_id, selected_component_id)
 	var next_recipe := GeometrySeedingService.normalize_recipe({"method": method, "parameters": current.get("parameters", {})})
 	var matching_bake := _geometry_seeding_bake(selected_asset_id, selected_component_id, method)
 	if not matching_bake.is_empty():
@@ -6592,7 +6646,7 @@ func _set_geometry_meshing_method(_method: String = GeometryMeshingService.CONST
 			_schedule_geometry_meshing_preview()
 		return
 	_record_direct_change()
-	var document := _get_geometry_document(selected_asset_id, selected_component_id, true)
+	var document := _mutable_geometry_document(selected_asset_id, selected_component_id)
 	var next_recipe := GeometryMeshingService.normalize_recipe({"method": GeometryMeshingService.CONSTRAINED_MESH, "parameters": current.get("parameters", {})})
 	var matching_bake := _geometry_meshing_bake(selected_asset_id, selected_component_id, GeometryMeshingService.CONSTRAINED_MESH)
 	if not matching_bake.is_empty():
@@ -6642,7 +6696,7 @@ func _set_geometry_uv_mapping_method(method: String) -> void:
 	var matching_bake := _geometry_uv_mapping_bake(selected_asset_id, selected_component_id, mesh_method, method)
 	selected_geometry_bake_method = GeometryUVMappingService.bake_key(mesh_method, method) if not matching_bake.is_empty() else ""
 	if not matching_bake.is_empty():
-		var document := _get_geometry_document(selected_asset_id, selected_component_id, true)
+		var document := _mutable_geometry_document(selected_asset_id, selected_component_id)
 		document["uv_mapping"]["recipe"] = GeometryUVMappingService.normalize_recipe({"method": method, "parameters": matching_bake.get("parameters", {})})
 	_render_outliner()
 	_render_inspector()
@@ -11150,14 +11204,25 @@ func _rename_weighting_style(new_name: String) -> void:
 	_render_outliner()
 
 
+func _weighting_style_index(document: Dictionary, style_id: String) -> int:
+	var styles: Array = document.get("weighting", {}).get("styles", [])
+	for style_index in range(styles.size()):
+		if str(styles[style_index].get("id", "")) == style_id:
+			return style_index
+	return -1
+
+
 func _delete_selected_weighting_style() -> void:
-	var document := _get_geometry_document(selected_asset_id, selected_component_id)
-	if document.is_empty() or selected_weighting_style_id.is_empty():
+	if selected_weighting_style_id.is_empty():
 		return
+	var existing := _get_geometry_document(selected_asset_id, selected_component_id)
+	if existing.is_empty() or _weighting_style_index(existing, selected_weighting_style_id) < 0:
+		return
+	_record_direct_change()
+	var document := _mutable_geometry_document(selected_asset_id, selected_component_id)
 	var styles: Array = document.get("weighting", {}).get("styles", [])
 	for style_index in range(styles.size()):
 		if str(styles[style_index].get("id", "")) == selected_weighting_style_id:
-			_record_direct_change()
 			styles.remove_at(style_index)
 			selected_weighting_style_id = ""
 			weighting_preview = {}
@@ -11341,7 +11406,7 @@ func _set_geometry_sampling_refinement(input_id: String, factor: float) -> void:
 	if had_refinement and is_equal_approx(current_factor, normalized_factor):
 		return
 	_record_coalesced_change()
-	var document := _get_geometry_document(selected_asset_id, selected_component_id, true)
+	var document := _mutable_geometry_document(selected_asset_id, selected_component_id)
 	recipe = GeometrySamplingService.normalize_recipe(document.get("sampling", {}).get("recipe", {}))
 	var refinements: Dictionary = recipe["parameters"].get("boundary_refinements", {}).duplicate(true)
 	refinements[input_id] = {"factor": normalized_factor}
@@ -11360,7 +11425,7 @@ func _on_geometry_sampling_refinement_toggled(enabled: bool, input_id: String) -
 	if not _geometry_sampling_input_has_override(recipe, input_id):
 		return
 	_record_coalesced_change()
-	var document := _get_geometry_document(selected_asset_id, selected_component_id, true)
+	var document := _mutable_geometry_document(selected_asset_id, selected_component_id)
 	recipe = GeometrySamplingService.normalize_recipe(document.get("sampling", {}).get("recipe", {}))
 	var refinements: Dictionary = recipe["parameters"].get("boundary_refinements", {}).duplicate(true)
 	refinements.erase(input_id)
@@ -11498,7 +11563,7 @@ func _on_geometry_sampling_parameter_changed(value: float, parameter_name: Strin
 	if is_equal_approx(float(current_recipe.get("parameters", {}).get(parameter_name, normalized_value)), normalized_value):
 		return
 	_record_coalesced_change()
-	var document := _get_geometry_document(selected_asset_id, selected_component_id, true)
+	var document := _mutable_geometry_document(selected_asset_id, selected_component_id)
 	var recipe := GeometrySamplingService.normalize_recipe(document.get("sampling", {}).get("recipe", {}))
 	recipe["parameters"][parameter_name] = normalized_value
 	document["sampling"]["recipe"] = recipe
@@ -11565,7 +11630,7 @@ func _bake_geometry_sampling_preview() -> void:
 	if not _geometry_sampling_preview_matches(selected_asset_id, selected_component_id, component):
 		return
 	_record_direct_change()
-	var document := _get_geometry_document(selected_asset_id, selected_component_id, true)
+	var document := _mutable_geometry_document(selected_asset_id, selected_component_id)
 	var bake := geometry_sampling_preview.duplicate(true)
 	bake["bake_id"] = "bake_%d" % ResourceUID.create_id()
 	var asset := _get_asset(selected_asset_id)
@@ -11895,9 +11960,9 @@ func _geometry_seeding_spine_enabled(recipe: Dictionary, guide_id: String) -> bo
 
 
 func _on_geometry_seeding_spine_enabled(enabled: bool, guide_id: String) -> void:
-	var document := _get_geometry_document(selected_asset_id, selected_component_id, true)
 	var recipe := _geometry_seeding_recipe(selected_asset_id, selected_component_id)
 	_record_direct_change()
+	var document := _mutable_geometry_document(selected_asset_id, selected_component_id)
 	var inputs: Array = recipe.get("parameters", {}).get("spine_inputs", []).duplicate(true)
 	var found := false
 	for input in inputs:
@@ -11913,11 +11978,11 @@ func _on_geometry_seeding_spine_enabled(enabled: bool, guide_id: String) -> void
 
 
 func _on_geometry_seeding_fill_gaps_changed(enabled: bool) -> void:
-	var document := _get_geometry_document(selected_asset_id, selected_component_id, true)
 	var recipe := _geometry_seeding_recipe(selected_asset_id, selected_component_id)
 	if bool(recipe.get("parameters", {}).get("fill_gaps", true)) == enabled:
 		return
 	_record_direct_change()
+	var document := _mutable_geometry_document(selected_asset_id, selected_component_id)
 	recipe["parameters"]["fill_gaps"] = enabled
 	document["seeding"]["recipe"] = GeometrySeedingService.normalize_recipe(recipe)
 	call_deferred("_refresh_geometry_after_recipe_change")
@@ -11934,11 +11999,11 @@ func _on_geometry_seeding_stagger_override_changed(enabled: bool) -> void:
 func _on_geometry_seeding_override_changed(parameter_name: String, enabled: bool) -> void:
 	if selected_asset_id.is_empty() or selected_component_id.is_empty():
 		return
-	var document := _get_geometry_document(selected_asset_id, selected_component_id, true)
 	var recipe := _geometry_seeding_recipe(selected_asset_id, selected_component_id)
 	if bool(recipe.get("parameters", {}).get(parameter_name, false)) == enabled:
 		return
 	_record_direct_change()
+	var document := _mutable_geometry_document(selected_asset_id, selected_component_id)
 	recipe["parameters"][parameter_name] = enabled
 	document["seeding"]["recipe"] = GeometrySeedingService.normalize_recipe(recipe)
 	call_deferred("_refresh_geometry_after_recipe_change")
@@ -11967,7 +12032,7 @@ func _on_geometry_seeding_parameter_changed(value: float, parameter_name: String
 	if current.get("parameters", {}).get(parameter_name) == normalized_value:
 		return
 	_record_coalesced_change()
-	var document := _get_geometry_document(selected_asset_id, selected_component_id, true)
+	var document := _mutable_geometry_document(selected_asset_id, selected_component_id)
 	var recipe := GeometrySeedingService.normalize_recipe(document.get("seeding", {}).get("recipe", {}))
 	recipe["parameters"][parameter_name] = normalized_value
 	document["seeding"]["recipe"] = GeometrySeedingService.normalize_recipe(recipe)
@@ -12077,7 +12142,7 @@ func _confirm_bake_geometry_seeding_preview() -> void:
 		geometry_seeding_enter_edit_after_bake = false
 		return
 	_record_direct_change()
-	var document := _get_geometry_document(selected_asset_id, selected_component_id, true)
+	var document := _mutable_geometry_document(selected_asset_id, selected_component_id)
 	var bake := geometry_seeding_preview.duplicate(true)
 	bake["bake_id"] = "seeding_bake_%d" % ResourceUID.create_id()
 	bake["edited"] = false
@@ -12116,9 +12181,21 @@ func _refresh_geometry_seeding_workspace() -> void:
 
 
 func _editable_geometry_seeding_bake() -> Dictionary:
+	# Read-only view of the Bake that manual seed editing may edit. Callers that
+	# actually change it must record the change first and then take write access
+	# through _mutable_geometry_seeding_bake.
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	if _geometry_seeding_status(selected_asset_id, selected_component_id, component) not in ["Baked", "Edited"]:
 		return {}
+	return _geometry_seeding_bake(selected_asset_id, selected_component_id)
+
+
+func _mutable_geometry_seeding_bake() -> Dictionary:
+	# Write access to the editable Seeding Bake. Detaches the owning geometry
+	# document from every history snapshot before the Bake is mutated in place.
+	if _editable_geometry_seeding_bake().is_empty():
+		return {}
+	_mutable_geometry_document(selected_asset_id, selected_component_id)
 	return _geometry_seeding_bake(selected_asset_id, selected_component_id)
 
 
@@ -12134,8 +12211,11 @@ func _on_geometry_seed_add_requested(world_position: Vector2) -> void:
 			_show_status_message("Seeds must respect the current minimum spacing.")
 			return
 	_record_direct_change()
-	bake["seeds"].append({"id": "seed:manual:%d" % ResourceUID.create_id(), "position": world_position, "origin": "manual", "method": "manual", "provenance": {}})
-	_mark_geometry_seeding_bake_edited(bake)
+	var editable := _mutable_geometry_seeding_bake()
+	if editable.is_empty():
+		return
+	editable["seeds"].append({"id": "seed:manual:%d" % ResourceUID.create_id(), "position": world_position, "origin": "manual", "method": "manual", "provenance": {}})
+	_mark_geometry_seeding_bake_edited(editable)
 
 
 func _on_geometry_seed_move_started(_seed_id: String) -> void:
@@ -12144,7 +12224,8 @@ func _on_geometry_seed_move_started(_seed_id: String) -> void:
 
 
 func _on_geometry_seed_move_requested(seed_id: String, world_position: Vector2) -> void:
-	var bake := _editable_geometry_seeding_bake()
+	# _on_geometry_seed_move_started already recorded the snapshot for this drag.
+	var bake := _mutable_geometry_seeding_bake()
 	var recipe := _geometry_seeding_recipe(selected_asset_id, selected_component_id)
 	if bake.is_empty() or not GeometrySeedingService.point_is_valid(_geometry_sampling_bake(selected_asset_id, selected_component_id), world_position, _geometry_seeding_constraint_clearance(recipe)):
 		return
@@ -12178,7 +12259,7 @@ func _geometry_seeding_manual_minimum_distance(recipe: Dictionary) -> float:
 
 
 func _on_geometry_seed_move_finished(_seed_id: String) -> void:
-	var bake := _editable_geometry_seeding_bake()
+	var bake := _mutable_geometry_seeding_bake()
 	if bake.is_empty():
 		return
 	bake["seed_count"] = bake.get("seeds", []).size()
@@ -12196,8 +12277,11 @@ func _on_geometry_seed_remove_requested(seed_id: String) -> void:
 	for seed_index in range(seeds.size()):
 		if str(seeds[seed_index].get("id", "")) == seed_id:
 			_record_direct_change()
-			seeds.remove_at(seed_index)
-			_mark_geometry_seeding_bake_edited(bake)
+			var editable := _mutable_geometry_seeding_bake()
+			if editable.is_empty():
+				return
+			editable.get("seeds", []).remove_at(seed_index)
+			_mark_geometry_seeding_bake_edited(editable)
 			return
 
 
@@ -12425,7 +12509,7 @@ func _on_geometry_meshing_seed_source_selected(index: int, option: OptionButton)
 	if str(current.get("parameters", {}).get("seeding_method", "")) == seeding_method:
 		return
 	_record_direct_change()
-	var document := _get_geometry_document(selected_asset_id, selected_component_id, true)
+	var document := _mutable_geometry_document(selected_asset_id, selected_component_id)
 	current["parameters"]["seeding_method"] = seeding_method
 	document["meshing"]["recipe"] = GeometryMeshingService.normalize_recipe(current)
 	call_deferred("_refresh_geometry_after_recipe_change")
@@ -12441,7 +12525,7 @@ func _on_geometry_meshing_parameter_changed(value: float, parameter_name: String
 	if current.get("parameters", {}).get(parameter_name) == normalized:
 		return
 	_record_coalesced_change()
-	var document := _get_geometry_document(selected_asset_id, selected_component_id, true)
+	var document := _mutable_geometry_document(selected_asset_id, selected_component_id)
 	current["parameters"][parameter_name] = normalized
 	document["meshing"]["recipe"] = GeometryMeshingService.normalize_recipe(current)
 	call_deferred("_refresh_geometry_after_recipe_change")
@@ -12452,7 +12536,7 @@ func _on_geometry_meshing_override_changed(enabled: bool, parameter_name: String
 	if bool(current.get("parameters", {}).get(parameter_name, false)) == enabled:
 		return
 	_record_direct_change()
-	var document := _get_geometry_document(selected_asset_id, selected_component_id, true)
+	var document := _mutable_geometry_document(selected_asset_id, selected_component_id)
 	current["parameters"][parameter_name] = enabled
 	document["meshing"]["recipe"] = GeometryMeshingService.normalize_recipe(current)
 	call_deferred("_refresh_geometry_after_recipe_change")
@@ -12551,7 +12635,7 @@ func _bake_geometry_meshing_preview() -> void:
 	if not _geometry_meshing_preview_matches(selected_asset_id, selected_component_id, component):
 		return
 	_record_direct_change()
-	var document := _get_geometry_document(selected_asset_id, selected_component_id, true)
+	var document := _mutable_geometry_document(selected_asset_id, selected_component_id)
 	var bake := geometry_meshing_preview.duplicate(true)
 	bake["bake_id"] = "meshing_bake_%d" % ResourceUID.create_id()
 	document["meshing"]["bakes"][str(bake.get("method", ""))] = bake
@@ -12724,7 +12808,7 @@ func _set_geometry_uv_mapping_mesh_source(mesh_method: String) -> void:
 	current["parameters"]["mesh_method"] = mesh_method
 	if not matching_bake.is_empty():
 		current["parameters"] = matching_bake.get("parameters", {}).duplicate(true)
-	var document := _get_geometry_document(selected_asset_id, selected_component_id, true)
+	var document := _mutable_geometry_document(selected_asset_id, selected_component_id)
 	document["uv_mapping"]["recipe"] = GeometryUVMappingService.normalize_recipe(current)
 	selected_geometry_bake_method = GeometryUVMappingService.bake_key(mesh_method, str(current.get("method", ""))) if not matching_bake.is_empty() else ""
 	geometry_uv_mapping_preview = {}
@@ -12744,7 +12828,7 @@ func _on_geometry_uv_mapping_parameter_changed(value: float, parameter_name: Str
 		return
 	_record_coalesced_change()
 	current["parameters"][parameter_name] = normalized
-	var document := _get_geometry_document(selected_asset_id, selected_component_id, true)
+	var document := _mutable_geometry_document(selected_asset_id, selected_component_id)
 	document["uv_mapping"]["recipe"] = GeometryUVMappingService.normalize_recipe(current)
 	call_deferred("_generate_geometry_uv_mapping_preview")
 
@@ -12755,7 +12839,7 @@ func _on_geometry_uv_mapping_preserve_aspect_changed(enabled: bool) -> void:
 		return
 	_record_direct_change()
 	current["parameters"]["preserve_aspect"] = enabled
-	var document := _get_geometry_document(selected_asset_id, selected_component_id, true)
+	var document := _mutable_geometry_document(selected_asset_id, selected_component_id)
 	document["uv_mapping"]["recipe"] = GeometryUVMappingService.normalize_recipe(current)
 	call_deferred("_generate_geometry_uv_mapping_preview")
 
@@ -12808,7 +12892,7 @@ func _bake_geometry_uv_mapping_preview() -> void:
 	if not _geometry_uv_mapping_preview_matches(selected_asset_id, selected_component_id, component):
 		return
 	_record_direct_change()
-	var document := _get_geometry_document(selected_asset_id, selected_component_id, true)
+	var document := _mutable_geometry_document(selected_asset_id, selected_component_id)
 	var bake := geometry_uv_mapping_preview.duplicate(true)
 	bake["bake_id"] = "uv_bake_%d" % ResourceUID.create_id()
 	var key := GeometryUVMappingService.bake_key(str(bake.get("mesh_method", "")), str(bake.get("method", "")))

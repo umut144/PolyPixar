@@ -31,6 +31,7 @@ func _init() -> void:
 	_test_asset_authored_facing()
 	_test_multi_component_inspector()
 	_test_multi_component_deletion()
+	_test_geometry_document_history_isolation()
 	_test_geometry_sampling_service()
 	_test_geometry_auto_build_service()
 	_test_geometry_auto_build_regression_corpus()
@@ -1392,6 +1393,47 @@ func _distance_to_segment(point: Vector2, start: Vector2, end: Vector2) -> float
 	return point.distance_to(start + delta * t)
 
 
+func _test_geometry_document_history_isolation() -> void:
+	var component := _component()
+	BezierTopology.add_point(component, Vector2.ZERO, "corner")
+	BezierTopology.add_point(component, Vector2(10.0, 0.0), "linear")
+	BezierTopology.add_point(component, Vector2(10.0, 10.0), "linear")
+	BezierTopology.close_active_chain(component)
+	component.merge({"id": "component_1", "name": "body", "visibility": true})
+	var application: Control = load("res://scripts/main.gd").new()
+	application._build_ui()
+	var test_assets: Array[Dictionary] = [{"id": "asset_1", "name": "Wizard", "visibility": true, "components": [component]}]
+	application.assets = test_assets
+	application.selected_asset_id = "asset_1"
+	application.selected_component_id = "component_1"
+	var key: String = application._geometry_document_key("asset_1", "component_1")
+
+	var live: Dictionary = application._mutable_geometry_document("asset_1", "component_1")
+	live["sampling"]["recipe"]["parameters"]["feature_detail"] = 0.25
+
+	application._record_direct_change()
+	var snapshot: Dictionary = application.undo_history.back().get("geometry_documents", {})
+	# is_same, not ==: Dictionary equality compares by value and would pass even
+	# if the snapshot had deep-copied the document.
+	_expect(is_same(snapshot[key], live), "Recording a change must not copy a geometry document that nothing has mutated yet.")
+
+	var mutable: Dictionary = application._mutable_geometry_document("asset_1", "component_1")
+	_expect(is_same(mutable, live), "Write access must keep the live document's identity, so references held across a recorded change stay valid.")
+	_expect(not is_same(snapshot[key], live), "Write access must hand the sharing snapshot its own copy of the document.")
+	mutable["sampling"]["recipe"]["parameters"]["feature_detail"] = 0.75
+	_expect(is_equal_approx(float(snapshot[key]["sampling"]["recipe"]["parameters"]["feature_detail"]), 0.25), "Mutating the live document must not reach into the snapshot that preceded it.")
+
+	application._undo()
+	_expect(is_equal_approx(float(application._get_geometry_document("asset_1", "component_1")["sampling"]["recipe"]["parameters"]["feature_detail"]), 0.25), "Undo must restore the geometry document recorded in the snapshot.")
+	application._redo()
+	_expect(is_equal_approx(float(application._get_geometry_document("asset_1", "component_1")["sampling"]["recipe"]["parameters"]["feature_detail"]), 0.75), "Redo must restore the geometry document captured before the Undo.")
+
+	application._record_direct_change()
+	var created: Dictionary = application._mutable_geometry_document("asset_1", "component_2")
+	_expect(not created.is_empty() and application.geometry_documents.has(application._geometry_document_key("asset_1", "component_2")), "Requesting write access for an unknown Component should create its geometry document.")
+	application.free()
+
+
 func _test_geometry_sampling_service() -> void:
 	var component := _component()
 	var first_id := BezierTopology.add_point(component, Vector2(0.0, 0.0), "corner")
@@ -1802,8 +1844,9 @@ func _test_geometry_sampling_ui_shell() -> void:
 	_expect(bool(application._geometry_sampling_bake("asset_1", "component_1").get("accepted_preview_marker", false)), "Bake Preview should copy the current matching Preview without regenerating it.")
 	spacing_input.free()
 	application.geometry_documents["asset_1/component_1"] = application._default_geometry_document("asset_1", "component_1")
-	var history_snapshot: Dictionary = application._capture_history_snapshot()
-	application.geometry_documents["asset_1/component_1"]["sampling"]["recipe"]["parameters"]["spacing"] = 42.0
+	application._push_undo_snapshot()
+	var history_snapshot: Dictionary = application.undo_history.back()
+	application._mutable_geometry_document("asset_1", "component_1")["sampling"]["recipe"]["parameters"]["spacing"] = 42.0
 	application._restore_history_snapshot(history_snapshot)
 	_expect(is_equal_approx(float(application.geometry_documents["asset_1/component_1"]["sampling"]["recipe"]["parameters"]["spacing"]), GeometrySamplingService.DEFAULT_SPACING), "Geometry recipes and bakes should participate in World Undo/Redo snapshots.")
 	var create_section: ModuleSection = application._find_section("Create")
