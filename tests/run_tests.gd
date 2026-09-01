@@ -1,8 +1,8 @@
 extends SceneTree
 
 var failures := 0
-var motion_signals_emitted: Dictionary = {}
-var motion_signal_argument_failures: Array[String] = []
+var view_signals_emitted: Dictionary = {}
+var view_signal_argument_failures: Array[String] = []
 
 
 func _init() -> void:
@@ -63,6 +63,7 @@ func _init() -> void:
 	_test_motion_resource_shells()
 	_test_motion_path_topology_and_sampler()
 	_test_outliner_wiring()
+	_test_geometry_inspector_wiring()
 	_test_motion_inspector_wiring()
 	_test_motion_act_evaluator()
 	_test_motion_module_separators()
@@ -3888,8 +3889,8 @@ func _prepare_motion_case(application: Control, case_name: String) -> String:
 	return "Animation"
 
 
-func _record_motion_signal(signal_name: String, arguments: Array, values: Array) -> void:
-	motion_signals_emitted[signal_name] = true
+func _record_view_signal(signal_name: String, arguments: Array, values: Array) -> void:
+	view_signals_emitted[signal_name] = true
 	for index in range(arguments.size()):
 		var declared_type: int = int(arguments[index].get("type", TYPE_NIL))
 		if declared_type == TYPE_NIL or index >= values.size():
@@ -3898,25 +3899,25 @@ func _record_motion_signal(signal_name: String, arguments: Array, values: Array)
 		if declared_type == TYPE_FLOAT and typeof(value) == TYPE_INT:
 			continue
 		if typeof(value) != declared_type and value != null:
-			motion_signal_argument_failures.append("%s argument %d is %d, declared %d" % [
+			view_signal_argument_failures.append("%s argument %d is %d, declared %d" % [
 				signal_name, index, typeof(value), declared_type])
 
 
-func _motion_signal_recorder(signal_name: String, arguments: Array) -> Callable:
+func _view_signal_recorder(signal_name: String, arguments: Array) -> Callable:
 	# A signal can only be connected to a Callable of its own arity, so one
-	# recorder per arity. Six covers every Motion signal.
+	# recorder per arity. Six covers every view signal in the editor.
 	match arguments.size():
 		0:
-			return func() -> void: _record_motion_signal(signal_name, arguments, [])
+			return func() -> void: _record_view_signal(signal_name, arguments, [])
 		1:
-			return func(a) -> void: _record_motion_signal(signal_name, arguments, [a])
+			return func(a) -> void: _record_view_signal(signal_name, arguments, [a])
 		2:
-			return func(a, b) -> void: _record_motion_signal(signal_name, arguments, [a, b])
+			return func(a, b) -> void: _record_view_signal(signal_name, arguments, [a, b])
 		3:
-			return func(a, b, c) -> void: _record_motion_signal(signal_name, arguments, [a, b, c])
+			return func(a, b, c) -> void: _record_view_signal(signal_name, arguments, [a, b, c])
 		4:
-			return func(a, b, c, d) -> void: _record_motion_signal(signal_name, arguments, [a, b, c, d])
-	return func(a, b, c, d, e) -> void: _record_motion_signal(signal_name, arguments, [a, b, c, d, e])
+			return func(a, b, c, d) -> void: _record_view_signal(signal_name, arguments, [a, b, c, d])
+	return func(a, b, c, d, e) -> void: _record_view_signal(signal_name, arguments, [a, b, c, d, e])
 
 
 func _exercise_control(control: Node) -> void:
@@ -3927,6 +3928,11 @@ func _exercise_control(control: Node) -> void:
 			control.item_selected.emit(0)
 	elif control is CheckBox or control is CheckButton:
 		control.toggled.emit(not control.button_pressed)
+	elif control is Button and control.toggle_mode:
+		# A toggle-mode Button reports through toggled, not pressed. The Mesh
+		# Inspector builds its advanced blocks that way.
+		control.toggled.emit(not control.button_pressed)
+		control.pressed.emit()
 	elif control is SpinBox:
 		control.value_changed.emit(control.value)
 		control.get_line_edit().text_submitted.emit(str(control.value))
@@ -4101,6 +4107,222 @@ func _exercise_outliner_control(control: Node) -> void:
 			control.gui_input.emit(click)
 
 
+const GEOMETRY_SIGNAL_ROUTES := [
+	["meshing_advanced_relaxation_toggled", "_on_geometry_meshing_advanced_relaxation_toggled"],
+	["meshing_bake_requested", "_bake_geometry_meshing"],
+	["meshing_float_focus_exited", "_on_geometry_meshing_float_focus_exited"],
+	["meshing_float_text_submitted", "_on_geometry_meshing_float_text_submitted"],
+	["meshing_override_changed", "_on_geometry_meshing_override_changed"],
+	["meshing_parameter_changed", "_on_geometry_meshing_parameter_changed"],
+	["meshing_seed_source_selected", "_on_geometry_meshing_seed_source_selected"],
+	["meshing_view_option_changed", "_on_geometry_meshing_view_option_changed"],
+	["sampling_bake_requested", "_bake_geometry_sampling"],
+	["sampling_feature_detail_changed", "_on_geometry_sampling_feature_detail_changed"],
+	["sampling_parameter_changed", "_on_geometry_sampling_parameter_changed"],
+	["sampling_refinement_changed", "_on_geometry_sampling_refinement_changed"],
+	["sampling_refinement_toggled", "_on_geometry_sampling_refinement_toggled"],
+	["sampling_spacing_focus_exited", "_on_geometry_spacing_focus_exited"],
+	["sampling_spacing_text_submitted", "_on_geometry_spacing_text_submitted"],
+	["section_toggled", "_on_inspector_section_toggled"],
+	["seeding_advanced_pattern_toggled", "_on_geometry_seeding_advanced_pattern_toggled"],
+	["seeding_bake_requested", "_bake_geometry_seeding"],
+	["seeding_boundary_override_changed", "_on_geometry_seeding_boundary_override_changed"],
+	["seeding_fill_gaps_changed", "_on_geometry_seeding_fill_gaps_changed"],
+	["seeding_float_focus_exited", "_on_geometry_seeding_float_focus_exited"],
+	["seeding_float_text_submitted", "_on_geometry_seeding_float_text_submitted"],
+	["seeding_method_selected", "_on_geometry_seeding_method_selected"],
+	["seeding_parameter_changed", "_on_geometry_seeding_parameter_changed"],
+	["seeding_spine_enabled_changed", "_on_geometry_seeding_spine_enabled"],
+	["seeding_stagger_override_changed", "_on_geometry_seeding_stagger_override_changed"],
+]
+
+# Connected through an adapter lambda rather than a named handler, because the
+# view reports only the id and main.gd binds the current Asset and Component
+# around it. get_method() reports "<anonymous lambda>" for those, so the routing
+# table cannot name a target; what the adapter does is asserted directly below
+# instead, which is the stronger check of the two.
+const GEOMETRY_ADAPTER_SIGNALS := ["sampling_reference_selected", "sampling_cut_selected"]
+
+const GEOMETRY_PROBE_CASES := ["sampling", "sampling_refined", "seeding_poisson",
+	"seeding_spine", "meshing", "meshing_contour"]
+
+
+func _geometry_wiring_asset() -> Dictionary:
+	# One Component carrying every Sampling input the boundary rows can show,
+	# plus a Contour sibling for the Meshing branch that replaces the panel.
+	var body := _outliner_test_component("component_1", "body")
+	body["topology_role"] = "outer"
+	var hole := {"points": [], "edges": [], "chains": [], "id": "component_3", "name": "eye",
+		"visibility": true, "type": "reference", "parent_component_id": "component_1",
+		"topology_role": "hole", "source_asset_id": "asset_2"}
+	var contour := _outliner_test_component("component_9", "outline")
+	contour["draw_mode"] = "contour"
+	var cut := {"id": "guide_1", "guide_type": AssetGuide.CUT, "ordinal": 1, "visibility": true,
+		"scope": {"kind": "component", "component_id": "component_1"},
+		"points": [], "edges": [], "chains": []}
+	var spine := {"id": "guide_2", "guide_type": AssetGuide.SAMPLER_SPINE, "ordinal": 1,
+		"visibility": true, "scope": {"kind": "component", "component_id": "component_1"},
+		"points": [], "edges": [], "chains": []}
+	return {"id": "asset_1", "name": "Wizard", "visibility": true,
+		"components": [body, hole, contour], "groups": [], "guides": [cut, spine]}
+
+
+func _geometry_wiring_document(application: Control, spine_flow: bool) -> void:
+	# Baked results and refined overrides, so the rows that only appear once
+	# something is baked or refined are actually built.
+	var document: Dictionary = application._mutable_geometry_document("asset_1", "component_1")
+	document["sampling"]["recipe"] = {"method": GeometrySamplingService.ADAPTIVE,
+		"parameters": {"spacing": 2.0, "feature_detail": 0.4,
+			"boundary_refinements": {"guide_1": {"factor": 2.5}}}}
+	document["sampling"]["bakes"][GeometrySamplingService.ADAPTIVE] = {"sample_count": 42,
+		"constraint_sample_count": 40, "preserve_count": 3, "hole_count": 1, "cuts": [{}],
+		"boundary_stats": [{"input_id": "", "role": "outer", "sample_count": 20},
+			{"input_id": "guide_1", "role": "cut", "sample_count": 12},
+			{"input_id": "component_3", "role": "hole", "sample_count": 10}]}
+	var seeding_method := GeometrySeedingService.SPINE_FLOW if spine_flow else GeometrySeedingService.POISSON_FILL
+	document["seeding"]["recipe"] = {"method": seeding_method,
+		"parameters": {"spacing": 2.5, "flow_stretch": 1.5, "fill_gaps": true,
+			"boundary_clearance_override": true, "boundary_clearance": 0.8,
+			"stagger_override": true, "stagger": 0.25, "seed": 7,
+			"spine_inputs": [{"guide_id": "guide_2", "enabled": true}]}}
+	document["seeding"]["bakes"][seeding_method] = {"seed_count": 33, "method": seeding_method,
+		"flow_seed_count": 30, "gap_seed_count": 3}
+	document["meshing"]["recipe"] = {"method": GeometryMeshingService.CONSTRAINED_MESH,
+		"parameters": {"seeding_method": seeding_method, "mesh_character": 0.6,
+			"optimize_mesh": true, "relaxation_override": true, "relaxation": 0.4,
+			"passes_override": true, "passes": 3}}
+	document["meshing"]["bakes"][GeometryMeshingService.CONSTRAINED_MESH] = {"vertex_count": 55,
+		"triangle_count": 66, "minimum_angle": 24.5, "constraints_valid": true,
+		"cut_seam_vertex_count": 4}
+
+
+func _prepare_geometry_case(application: Control, case_name: String) -> String:
+	application.active_module = "Mesh"
+	application.selected_asset_id = "asset_1"
+	application.selected_component_id = "component_1"
+	application.selected_sampling_input_id = ""
+	application.selected_sampling_input_kind = ""
+	application.geometry_seeding_advanced_pattern_expanded = false
+	application.geometry_meshing_advanced_relaxation_expanded = false
+	_geometry_wiring_document(application, case_name == "seeding_spine")
+	match case_name:
+		"sampling":
+			return "Sampling"
+		"sampling_refined":
+			# The Boundary Density block only exists while an input is selected,
+			# and its factor field only while that input carries an override.
+			application.selected_sampling_input_id = "guide_1"
+			# _get_sampling_input knows "guide" and "reference"; selecting a Cut
+			# boundary row goes through _select_guide, which sets "guide".
+			application.selected_sampling_input_kind = "guide"
+			return "Sampling"
+		"seeding_poisson":
+			return "Seeding"
+		"seeding_spine":
+			application.geometry_seeding_advanced_pattern_expanded = true
+			return "Seeding"
+		"meshing":
+			application.geometry_meshing_advanced_relaxation_expanded = true
+			return "Meshing"
+		"meshing_contour":
+			application.selected_component_id = "component_9"
+			return "Meshing"
+	return "Sampling"
+
+
+func _build_geometry_probe(application: Control, submodule: String) -> GeometryInspectorView:
+	# A bare view fed the same contexts the router pushes, so the walk can fire
+	# controls without the editor's handlers re-rendering them away.
+	var probe := GeometryInspectorView.new()
+	probe.set_submodule(submodule, application.world_contour_stroke_width_px)
+	var component: Dictionary = WorldDocumentService.component_by_id(
+		application._get_asset(application.selected_asset_id), application.selected_component_id)
+	if submodule == "Sampling":
+		probe.set_sampling_context(application._geometry_sampling_inspector_context(component))
+	elif submodule == "Seeding":
+		probe.set_seeding_context(application._geometry_seeding_inspector_context(component))
+	elif submodule == "Meshing":
+		probe.set_meshing_context(application._geometry_meshing_inspector_context(component))
+	return probe
+
+
+func _test_geometry_inspector_wiring() -> void:
+	# The two tables the Motion Inspector and the Outliner carry, for the Mesh
+	# Inspector. The routing half checks that each signal reaches the handler it
+	# names; the emission half renders six Mesh states, fires every control the
+	# view builds, and checks that each signal is reachable and arrives with its
+	# declared argument types.
+	var geometry_assets: Array[Dictionary] = [_geometry_wiring_asset(),
+		{"id": "asset_2", "name": "Orb", "visibility": true,
+			"components": [], "groups": [], "guides": []}]
+	var application: Control = load("res://scripts/main.gd").new()
+	application._build_ui()
+	application.assets = geometry_assets
+	var view: GeometryInspectorView = application.geometry_inspector_view
+
+	var routed: Array[String] = []
+	for route in GEOMETRY_SIGNAL_ROUTES:
+		var signal_name := str(route[0])
+		var expected_handler := str(route[1])
+		routed.append(signal_name)
+		var handlers: Array[String] = []
+		for connection in view.get_signal_connection_list(signal_name):
+			handlers.append(str((connection["callable"] as Callable).get_method()))
+		_expect(handlers.size() == 1 and handlers[0] == expected_handler,
+			"The Mesh Inspector signal %s should reach %s, not %s." % [signal_name, expected_handler, str(handlers)])
+	for signal_name in GEOMETRY_ADAPTER_SIGNALS:
+		var connections: Array = view.get_signal_connection_list(str(signal_name))
+		_expect(connections.size() == 1 and (connections[0]["callable"] as Callable).is_custom(),
+			"The Mesh Inspector signal %s should be wired through exactly one adapter lambda." % signal_name)
+	var declared_arguments: Dictionary = {}
+	for entry in view.get_script().get_script_signal_list():
+		var declared := str(entry["name"])
+		declared_arguments[declared] = entry["args"]
+		if declared in routed or declared in GEOMETRY_ADAPTER_SIGNALS:
+			continue
+		_expect(false, "The Mesh Inspector declares %s, which is in neither the routing table nor the adapter list." % declared)
+
+	# What the two adapters do, since the table cannot name their target.
+	application.active_module = "Mesh"
+	application.active_geometry_submodule = "Sampling"
+	application.selected_asset_id = "asset_1"
+	application.selected_component_id = "component_1"
+	application.selected_sampling_input_id = ""
+	view.sampling_reference_selected.emit("component_3")
+	_expect(application.selected_sampling_input_id == "component_3"
+		and application.selected_sampling_input_kind == "reference",
+		"The Hole boundary row should select that reference as the Sampling input.")
+	view.sampling_cut_selected.emit("guide_1")
+	_expect(application.selected_guide_id == "guide_1",
+		"The Cut boundary row should select that Guide.")
+
+	view_signals_emitted = {}
+	view_signal_argument_failures = [] as Array[String]
+	for case_name in GEOMETRY_PROBE_CASES:
+		var submodule := _prepare_geometry_case(application, case_name)
+		var probe := _build_geometry_probe(application, submodule)
+		for route in GEOMETRY_SIGNAL_ROUTES:
+			var signal_name := str(route[0])
+			probe.connect(signal_name, _view_signal_recorder(signal_name, declared_arguments.get(signal_name, [])))
+		for signal_name in GEOMETRY_ADAPTER_SIGNALS:
+			probe.connect(str(signal_name), _view_signal_recorder(str(signal_name), declared_arguments.get(str(signal_name), [])))
+		probe.rebuild()
+		var controls: Array = []
+		_inspector_controls(probe, controls)
+		for control in controls:
+			_exercise_control(control)
+		probe.free()
+	var unreachable: Array[String] = []
+	for signal_name in routed + GEOMETRY_ADAPTER_SIGNALS:
+		if not view_signals_emitted.has(str(signal_name)):
+			unreachable.append(str(signal_name))
+	_expect(unreachable.is_empty(),
+		"Every Mesh Inspector signal should be reachable from a control; unreachable: %s" % str(unreachable))
+	_expect(view_signal_argument_failures.is_empty(),
+		"Mesh Inspector signals should arrive with their declared argument types; %s" % str(view_signal_argument_failures))
+	application.free()
+
+
 func _test_outliner_wiring() -> void:
 	# The same two tables the Motion Inspector carries, for the view that was
 	# extracted before the render comparison existed and has had the least
@@ -4136,14 +4358,14 @@ func _test_outliner_wiring() -> void:
 		if declared in routed or declared in OUTLINER_UNCONNECTED_SIGNALS:
 			continue
 		_expect(false, "The Outliner declares %s, which is in neither the routing table nor the unconnected list." % declared)
-	motion_signals_emitted = {}
-	motion_signal_argument_failures = [] as Array[String]
+	view_signals_emitted = {}
+	view_signal_argument_failures = [] as Array[String]
 	for case_name in OUTLINER_PROBE_CASES:
 		_prepare_outliner_case(application, case_name)
 		var probe := _build_outliner_probe(application)
 		for route in OUTLINER_SIGNAL_ROUTES:
 			var signal_name := str(route[0])
-			probe.connect(signal_name, _motion_signal_recorder(signal_name, declared_arguments.get(signal_name, [])))
+			probe.connect(signal_name, _view_signal_recorder(signal_name, declared_arguments.get(signal_name, [])))
 		probe.rebuild()
 		var controls: Array = []
 		_inspector_controls(probe, controls)
@@ -4154,15 +4376,15 @@ func _test_outliner_wiring() -> void:
 	for route in OUTLINER_SIGNAL_ROUTES:
 		var signal_name := str(route[0])
 		if signal_name in OUTLINER_UNDRIVABLE_SIGNALS:
-			_expect(not motion_signals_emitted.has(signal_name),
+			_expect(not view_signals_emitted.has(signal_name),
 				"%s is listed as undrivable but the walk reached it; move it out of that list." % signal_name)
 			continue
-		if not motion_signals_emitted.has(signal_name):
+		if not view_signals_emitted.has(signal_name):
 			unreachable.append(signal_name)
 	_expect(unreachable.is_empty(),
 		"Every connected Outliner signal should be reachable from a row; unreachable: %s" % str(unreachable))
-	_expect(motion_signal_argument_failures.is_empty(),
-		"Outliner signals should arrive with their declared argument types; %s" % str(motion_signal_argument_failures))
+	_expect(view_signal_argument_failures.is_empty(),
+		"Outliner signals should arrive with their declared argument types; %s" % str(view_signal_argument_failures))
 	application.free()
 
 
@@ -4195,8 +4417,8 @@ func _test_motion_inspector_wiring() -> void:
 	var declared_arguments: Dictionary = {}
 	for entry in view.get_signal_list():
 		declared_arguments[str(entry["name"])] = entry["args"]
-	motion_signals_emitted = {}
-	motion_signal_argument_failures = [] as Array[String]
+	view_signals_emitted = {}
+	view_signal_argument_failures = [] as Array[String]
 	for case_name in MOTION_PROBE_CASES:
 		var submodule := _prepare_motion_case(application, case_name)
 		application.active_motion_submodule = submodule
@@ -4205,7 +4427,7 @@ func _test_motion_inspector_wiring() -> void:
 		var probe := MotionInspectorView.new()
 		for route in MOTION_SIGNAL_ROUTES:
 			var signal_name := str(route[0])
-			probe.connect(signal_name, _motion_signal_recorder(signal_name, declared_arguments.get(signal_name, [])))
+			probe.connect(signal_name, _view_signal_recorder(signal_name, declared_arguments.get(signal_name, [])))
 		probe.set_models(application.motion_workspace, application.motion_player, application.motion_selection)
 		probe.set_context(application._motion_inspector_context())
 		probe.rebuild()
@@ -4216,12 +4438,12 @@ func _test_motion_inspector_wiring() -> void:
 		probe.free()
 	var unreachable: Array[String] = []
 	for route in MOTION_SIGNAL_ROUTES:
-		if not motion_signals_emitted.has(str(route[0])):
+		if not view_signals_emitted.has(str(route[0])):
 			unreachable.append(str(route[0]))
 	_expect(unreachable.is_empty(),
 		"Every Motion Inspector signal should be reachable from a control; unreachable: %s" % str(unreachable))
-	_expect(motion_signal_argument_failures.is_empty(),
-		"Motion Inspector signals should arrive with their declared argument types; %s" % str(motion_signal_argument_failures))
+	_expect(view_signal_argument_failures.is_empty(),
+		"Motion Inspector signals should arrive with their declared argument types; %s" % str(view_signal_argument_failures))
 	application.free()
 
 
