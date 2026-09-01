@@ -57,6 +57,14 @@ export data.
   headers, buttons and their styling. It is static and purely constructive: it
   reads no editor state and knows nothing about Worlds, Assets or Components.
   A control that needs a handler receives it as a `Callable`.
+  `build_number_grid` takes a grid, an array of field descriptors (`caption`,
+  `property`, `value`, optionally `min`, `max`, `step`, `arrow_step`, `tooltip`
+  and `silent`) and one handler bound per property, and *returns* the built
+  fields keyed by property. Callers that need live updates keep that map —
+  `transform_fields`, `asset_pivot_fields`, `asset_root_position_fields`,
+  `asset_root_scale_fields` — instead of the builder writing into editor state
+  behind their back. Read-only blocks such as the Global Transform simply drop
+  the return value.
 - `WorldDocumentService` owns the on-disk document format: normalization on
   load, serialization on save, and the atomic file replacement both sides use.
   It is static and holds no editor state. `main.gd` keeps the orchestration —

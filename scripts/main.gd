@@ -23,6 +23,8 @@ const RENDER_DOCUMENT := RENDER_OUTLINER | RENDER_INSPECTOR | RENDER_CANVAS_CONT
 const GRID_BOX_TOOL_UNITS := 0.5
 const GAME_TILE_CENTIMETERS := 100.0
 const EYE_COMPONENT_NAME_TOKEN := "eye"
+const ASSET_ROOT_POSITION_TOOLTIP := "Preview translation for the complete Asset. Rebase before Runtime Export."
+const ASSET_ROOT_SCALE_TOOLTIP := "Positive preview Scale on the %s axis around the Asset Pivot. Rebase before Runtime Export."
 # Kept available for a later Outliner presentation, but processed outputs are
 # currently reached through the Import Preview instead of additional rows.
 const SHOW_PROCESSED_OUTLINER := false
@@ -10560,11 +10562,24 @@ func _render_inspector() -> void:
 		asset_transform_grid.add_theme_constant_override("v_separation", 4)
 		var asset_pivot := _asset_pivot(asset)
 		var root_position := AssetScaleRebaseService.root_position(asset)
-		_add_asset_root_position_field(asset_transform_grid, "Position X (cm)", _editor_units_to_world(root_position.x), "position_x")
-		_add_asset_root_position_field(asset_transform_grid, "Position Y (cm)", _editor_units_to_world(root_position.y), "position_y")
-		_add_asset_pivot_field(asset_transform_grid, "Pivot X (cm)", _editor_units_to_world(asset_pivot.x), "pivot_x")
-		_add_asset_pivot_field(asset_transform_grid, "Pivot Y (cm)", _editor_units_to_world(asset_pivot.y), "pivot_y")
-		_add_asset_root_scale_field(asset_transform_grid, AssetScaleRebaseService.root_scale(asset))
+		var asset_root_scale := AssetScaleRebaseService.root_scale(asset)
+		asset_root_position_fields = EditorWidgets.build_number_grid(asset_transform_grid, [
+			{"caption": "Position X (cm)", "property": "position_x", "value": _editor_units_to_world(root_position.x),
+				"tooltip": ASSET_ROOT_POSITION_TOOLTIP},
+			{"caption": "Position Y (cm)", "property": "position_y", "value": _editor_units_to_world(root_position.y),
+				"tooltip": ASSET_ROOT_POSITION_TOOLTIP},
+		], _on_asset_root_position_changed)
+		asset_pivot_fields = EditorWidgets.build_number_grid(asset_transform_grid, [
+			{"caption": "Pivot X (cm)", "property": "pivot_x", "value": _editor_units_to_world(asset_pivot.x)},
+			{"caption": "Pivot Y (cm)", "property": "pivot_y", "value": _editor_units_to_world(asset_pivot.y)},
+		], _on_asset_pivot_property_changed)
+		asset_root_scale_fields = EditorWidgets.build_number_grid(asset_transform_grid, [
+			{"caption": "Scale X", "property": "scale_x", "value": asset_root_scale.x, "min": 0.01, "max": 100.0,
+				"tooltip": ASSET_ROOT_SCALE_TOOLTIP % "X"},
+			{"caption": "Scale Y", "property": "scale_y", "value": asset_root_scale.y, "min": 0.01, "max": 100.0,
+				"tooltip": ASSET_ROOT_SCALE_TOOLTIP % "Y"},
+		], _on_asset_root_scale_changed)
+		asset_root_scale_field = asset_root_scale_fields.get("scale_x")
 		inspector_content.add_child(asset_transform_grid)
 		_render_asset_root_scale_rebase_inspector(asset)
 		_render_asset_scale_rebase_inspector(asset)
@@ -10824,19 +10839,25 @@ func _render_inspector() -> void:
 		var displayed_transform: Dictionary = ComponentHierarchy.world_transform_record(asset, selected_component_id)
 		var displayed_position: Vector2 = displayed_transform.get("position", Vector2.ZERO)
 		var global_scale: Vector2 = displayed_transform.get("scale", Vector2.ONE)
-		_add_global_transform_field(transform_grid, "Position X (cm)", _editor_units_to_world(displayed_position.x), "position_x", 0.01)
-		_add_global_transform_field(transform_grid, "Position Y (cm)", _editor_units_to_world(displayed_position.y), "position_y", 0.01)
-		_add_global_transform_field(transform_grid, "Rotation", float(displayed_transform.get("rotation", 0.0)), "rotation", 1.0)
-		_add_global_transform_field(transform_grid, "Scale X", global_scale.x, "scale_x", 0.01)
-		_add_global_transform_field(transform_grid, "Scale Y", global_scale.y, "scale_y", 0.01)
+		# Global values are read-only echoes of the hierarchy, so the returned
+		# fields are not kept: only local transform fields get live updates.
+		EditorWidgets.build_number_grid(transform_grid,
+			_component_transform_descriptors(_editor_units_to_world(displayed_position.x),
+				_editor_units_to_world(displayed_position.y),
+				float(displayed_transform.get("rotation", 0.0)), global_scale),
+			_on_global_transform_value_changed)
 	else:
-		_add_transform_field(transform_grid, "Position X (cm)", _editor_units_to_world(transform_position.x), "position_x", 0.01)
-		_add_transform_field(transform_grid, "Position Y (cm)", _editor_units_to_world(transform_position.y), "position_y", 0.01)
-		_add_transform_field(transform_grid, "Rotation", float(transform.get("rotation", 0.0)), "rotation", 1.0)
-		_add_transform_field(transform_grid, "Scale X", transform_scale.x, "scale_x", 0.01)
-		_add_transform_field(transform_grid, "Scale Y", transform_scale.y, "scale_y", 0.01)
-	_add_transform_field(transform_grid, "Pivot X (cm)", _editor_units_to_world(pivot.x), "pivot_x", 0.001)
-	_add_transform_field(transform_grid, "Pivot Y (cm)", _editor_units_to_world(pivot.y), "pivot_y", 0.001)
+		transform_fields = EditorWidgets.build_number_grid(transform_grid,
+			_component_transform_descriptors(_editor_units_to_world(transform_position.x),
+				_editor_units_to_world(transform_position.y),
+				float(transform.get("rotation", 0.0)), transform_scale),
+			_on_transform_value_changed)
+	transform_fields.merge(EditorWidgets.build_number_grid(transform_grid, [
+		{"caption": "Pivot X (cm)", "property": "pivot_x", "value": _editor_units_to_world(pivot.x),
+			"step": 0.001, "silent": false},
+		{"caption": "Pivot Y (cm)", "property": "pivot_y", "value": _editor_units_to_world(pivot.y),
+			"step": 0.001, "silent": false},
+	], _on_transform_value_changed), true)
 	inspector_content.add_child(EditorWidgets.create_inspector_section("Visibility / Layer", _on_inspector_section_toggled))
 	var visibility_toggle := CheckButton.new()
 	visibility_toggle.text = "Visible"
@@ -12538,56 +12559,19 @@ func _add_reference_image_field(grid: GridContainer, label_text: String, value: 
 	grid.add_child(field)
 
 
-func _add_asset_pivot_field(grid: GridContainer, label_text: String, value: float, property_name: String) -> void:
-	grid.add_child(EditorWidgets.create_field_caption(label_text))
-	var field := EditorWidgets.create_number_field(value, -100000.0, 100000.0, 0.01, 0.1,
-		_on_asset_pivot_property_changed.bind(property_name))
-	asset_pivot_fields[property_name] = field
-	grid.add_child(field)
-
-
-func _add_asset_root_position_field(grid: GridContainer, label_text: String, value: float, property_name: String) -> void:
-	grid.add_child(EditorWidgets.create_field_caption(label_text))
-	var field := EditorWidgets.create_number_field(value, -100000.0, 100000.0, 0.01, 0.1,
-		_on_asset_root_position_changed.bind(property_name))
-	field.tooltip_text = "Preview translation for the complete Asset. Rebase before Runtime Export."
-	asset_root_position_fields[property_name] = field
-	grid.add_child(field)
-
-
-func _add_asset_root_scale_field(grid: GridContainer, value: Vector2) -> void:
-	_add_asset_root_scale_axis_field(grid, "Scale X", value.x, "scale_x")
-	_add_asset_root_scale_axis_field(grid, "Scale Y", value.y, "scale_y")
-
-
-func _add_asset_root_scale_axis_field(grid: GridContainer, label_text: String, value: float, property_name: String) -> void:
-	grid.add_child(EditorWidgets.create_field_caption(label_text))
-	var field := EditorWidgets.create_number_field(value, 0.01, 100.0, 0.01, 0.1,
-		_on_asset_root_scale_changed.bind(property_name))
-	field.tooltip_text = "Positive preview Scale on the %s axis around the Asset Pivot. Rebase before Runtime Export." % ("X" if property_name == "scale_x" else "Y")
-	asset_root_scale_fields[property_name] = field
-	if property_name == "scale_x":
-		asset_root_scale_field = field
-	grid.add_child(field)
-
-
-func _add_transform_field(grid: GridContainer, label_text: String, value: float, property_name: String, step: float) -> void:
-	grid.add_child(EditorWidgets.create_field_caption(label_text))
-	# Rotation arrows use exact whole degrees. Other transform fields keep
-	# tenth-unit arrows while preserving their configured text precision.
-	var field := EditorWidgets.create_number_field(value, -100000.0, 100000.0, step,
-		1.0 if property_name == "rotation" else 0.1,
-		_on_transform_value_changed.bind(property_name), "", false)
-	transform_fields[property_name] = field
-	grid.add_child(field)
-
-
-func _add_global_transform_field(grid: GridContainer, label_text: String, value: float, property_name: String, step: float) -> void:
-	grid.add_child(EditorWidgets.create_field_caption(label_text))
-	var field := EditorWidgets.create_number_field(value, -100000.0, 100000.0, step,
-		1.0 if property_name == "rotation" else 0.1,
-		_on_global_transform_value_changed.bind(property_name), "", false)
-	grid.add_child(field)
+func _component_transform_descriptors(position_x: float, position_y: float, rotation: float, scale: Vector2) -> Array:
+	# One shape for the local and the global transform block. Rotation steps and
+	# arrows in whole degrees; the other fields keep hundredth text precision with
+	# tenth-unit arrows. None of them is silent: a few callers rely on the initial
+	# value_changed.
+	return [
+		{"caption": "Position X (cm)", "property": "position_x", "value": position_x, "silent": false},
+		{"caption": "Position Y (cm)", "property": "position_y", "value": position_y, "silent": false},
+		{"caption": "Rotation", "property": "rotation", "value": rotation,
+			"step": 1.0, "arrow_step": 1.0, "silent": false},
+		{"caption": "Scale X", "property": "scale_x", "value": scale.x, "silent": false},
+		{"caption": "Scale Y", "property": "scale_y", "value": scale.y, "silent": false},
+	]
 
 
 func _add_point_position_field(grid: GridContainer, label_text: String, value: float, property_name: String) -> void:

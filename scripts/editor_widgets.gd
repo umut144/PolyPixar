@@ -282,3 +282,33 @@ static func create_number_field(value: float, minimum: float, maximum: float, st
 	if on_changed.is_valid():
 		field.value_changed.connect(on_changed)
 	return field
+
+static func build_number_grid(grid: GridContainer, descriptors: Array, on_changed: Callable) -> Dictionary:
+	# Builds a caption/field row per descriptor and returns the fields by
+	# property name. The caller keeps that map rather than the builder writing
+	# into one behind its back.
+	#
+	# Descriptor keys: caption, value, property, and optionally min, max, step,
+	# arrow_step, tooltip and silent (whether setting the initial value fires
+	# value_changed).
+	var fields: Dictionary = {}
+	for descriptor in descriptors:
+		if not descriptor is Dictionary:
+			continue
+		var property_name := str(descriptor.get("property", ""))
+		grid.add_child(create_field_caption(str(descriptor.get("caption", ""))))
+		var field := create_number_field(
+			float(descriptor.get("value", 0.0)),
+			float(descriptor.get("min", -100000.0)),
+			float(descriptor.get("max", 100000.0)),
+			float(descriptor.get("step", 0.01)),
+			float(descriptor.get("arrow_step", 0.1)),
+			on_changed.bind(property_name) if on_changed.is_valid() else Callable(),
+			"",
+			bool(descriptor.get("silent", true)))
+		var tooltip := str(descriptor.get("tooltip", ""))
+		if not tooltip.is_empty():
+			field.tooltip_text = tooltip
+		grid.add_child(field)
+		fields[property_name] = field
+	return fields
