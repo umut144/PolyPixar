@@ -283,6 +283,34 @@ static func create_number_field(value: float, minimum: float, maximum: float, st
 		field.value_changed.connect(on_changed)
 	return field
 
+static func create_option_field(items: Array, selected_metadata: String, on_selected: Callable, sized := true) -> OptionButton:
+	# The Inspector's dropdown: a list of {label, metadata} entries, optionally
+	# with "disabled", and the entry whose metadata matches selected_metadata
+	# preselected. Nothing is selected when none matches, which is what an
+	# unresolvable reference should look like.
+	#
+	# The handler is bound to the button because every caller reads the choice
+	# back through get_item_metadata(index).
+	var option := OptionButton.new()
+	var chosen := -1
+	if sized:
+		option.custom_minimum_size = Vector2(0, 26)
+	for item in items:
+		if not item is Dictionary:
+			continue
+		option.add_item(str(item.get("label", "")))
+		var index := option.item_count - 1
+		option.set_item_metadata(index, str(item.get("metadata", "")))
+		if bool(item.get("disabled", false)):
+			option.set_item_disabled(index, true)
+		if chosen < 0 and str(item.get("metadata", "")) == selected_metadata:
+			chosen = index
+			option.select(index)
+	if on_selected.is_valid():
+		option.item_selected.connect(on_selected.bind(option))
+	return option
+
+
 static func add_stacked_number_field(container: Node, descriptor: Dictionary, on_changed: Callable) -> SpinBox:
 	# The Inspector's other numeric shape: a caption line above a full-width
 	# field, rather than the caption/field pairs a grid holds.

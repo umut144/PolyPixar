@@ -143,6 +143,24 @@ func _edit_inspector_value(field: SpinBox, value: float) -> void:
 	field.value_changed.emit(value)
 
 
+func _inspector_option(application: Control, first_item_text: String) -> OptionButton:
+	# Inspector dropdowns sit under section headers rather than captions, so they
+	# are identified by their first entry, which is unique per dropdown.
+	var controls: Array = []
+	_inspector_controls(application.inspector_content, controls)
+	for control in controls:
+		if control is OptionButton and control.item_count > 0 and str(control.get_item_text(0)) == first_item_text:
+			return control
+	return null
+
+
+func _choose_option(option: OptionButton, index: int) -> void:
+	# A click both moves the selection and emits item_selected; the handlers read
+	# the index they are given, so the test drives the signal.
+	option.select(index)
+	option.item_selected.emit(index)
+
+
 func _inspector_toggle(application: Control, text: String) -> Button:
 	var controls: Array = []
 	_inspector_controls(application.inspector_content, controls)
@@ -3159,6 +3177,29 @@ func _test_weighting_service_and_ui() -> void:
 	application.active_style_submodule = "Weighting"
 	application._generate_weighting_preview()
 	_expect(application.weighting_workspace.visible and WeightingService.result_matches(application.weighting_preview, mesh, gradient_style), "Style Weighting should show a generated Mesh heatmap from the explicit Component Mesh and selected Style.")
+
+	# The Weighting dropdowns are built from item descriptors, so what each entry
+	# writes back is only checked here.
+	application._render_inspector()
+	var weighting_method_option := _inspector_option(application, "Uniform")
+	_expect(weighting_method_option != null and str(weighting_method_option.get_item_metadata(weighting_method_option.selected)) == WeightingService.AXIS_GRADIENT,
+		"The Weighting Inspector should preselect the Style's own Method.")
+	var weighting_direction_option := _inspector_option(application, "Bottom → Top")
+	_expect(weighting_direction_option != null, "An Axis Gradient Style should expose its Direction.")
+	_choose_option(weighting_direction_option, 3)
+	_expect(str(gradient_style.get("parameters", {}).get("direction", "")) == WeightingService.RIGHT_TO_LEFT,
+		"The Direction dropdown should write the Style parameters.")
+	var weighting_curve_option := _inspector_option(application, "Linear")
+	_expect(weighting_curve_option != null, "An Axis Gradient Style should expose its Curve.")
+	_choose_option(weighting_curve_option, 2)
+	_expect(str(gradient_style.get("parameters", {}).get("curve", "")) == WeightingService.EASE_OUT,
+		"The Curve dropdown should write the Style parameters.")
+	_choose_option(weighting_method_option, 0)
+	_expect(str(gradient_style.get("method", "")) == WeightingService.UNIFORM,
+		"The Method dropdown should write the Style.")
+	gradient_style["method"] = WeightingService.AXIS_GRADIENT
+	gradient_style["parameters"] = WeightingService.default_parameters(WeightingService.AXIS_GRADIENT)
+
 	application._set_active_context_command("style.weighting.method")
 	application._render_context_bar()
 	var weighting_popup: PopupMenu = application.weighting_method_menu.get_popup()

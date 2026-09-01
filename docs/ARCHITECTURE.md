@@ -66,7 +66,11 @@ export data.
   behind their back. Read-only blocks such as the Global Transform simply drop
   the return value. `add_stacked_number_field` is the same idea for the
   Inspector's other numeric shape — a caption line above a full-width field —
-  and `create_toggle_field` for its boolean rows.
+  and `create_toggle_field` for its boolean rows. `create_option_field` takes a
+  dropdown as a list of `{label, metadata}` entries plus the metadata to
+  preselect; twelve of the editor's thirty-two dropdowns go through it, and the
+  rest — Motion, Export, the world settings bar — still build their items by
+  hand because no render comparison covers those states yet.
 - `WorldDocumentService` owns the on-disk document format: normalization on
   load, serialization on save, and the atomic file replacement both sides use.
   It is static and holds no editor state. `main.gd` keeps the orchestration —

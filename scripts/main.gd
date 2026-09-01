@@ -8671,23 +8671,14 @@ func _render_group_inspector(_asset: Dictionary, group: Dictionary) -> void:
 	inspector_content.add_child(name_editor)
 	inspector_content.add_child(EditorWidgets.create_inspector_section("Hierarchy", _on_inspector_section_toggled))
 	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Parent Component"))
-	var parent_option := OptionButton.new()
-	parent_option.custom_minimum_size = Vector2(0, 26)
-	parent_option.add_item("Root")
-	parent_option.set_item_metadata(0, "")
+	var group_parent_items: Array = [{"label": "Root", "metadata": ""}]
 	for candidate in _asset.get("components", []):
 		var candidate_id := str(candidate.get("id", ""))
 		if not ComponentHierarchy.can_parent_group(_asset, str(group.get("id", "")), candidate_id):
 			continue
-		parent_option.add_item(str(candidate.get("name", "Component")))
-		parent_option.set_item_metadata(parent_option.item_count - 1, candidate_id)
-	var parent_component_id := ComponentHierarchy.group_parent_id(group)
-	for option_index in range(parent_option.item_count):
-		if str(parent_option.get_item_metadata(option_index)) == parent_component_id:
-			parent_option.select(option_index)
-			break
-	parent_option.item_selected.connect(_on_group_hierarchy_parent_selected.bind(parent_option))
-	inspector_content.add_child(parent_option)
+		group_parent_items.append({"label": str(candidate.get("name", "Component")), "metadata": candidate_id})
+	inspector_content.add_child(EditorWidgets.create_option_field(group_parent_items,
+		ComponentHierarchy.group_parent_id(group), _on_group_hierarchy_parent_selected))
 	inspector_content.add_child(EditorWidgets.create_inspector_section("Group Transform", _on_inspector_section_toggled))
 	var transform_grid := GridContainer.new()
 	transform_grid.columns = 2
@@ -8819,20 +8810,11 @@ func _render_guide_inspector(asset: Dictionary, guide: Dictionary) -> void:
 	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Name"))
 	inspector_content.add_child(EditorWidgets.create_inspector_field_label(WorldDocumentService.guide_display_name(asset, guide)))
 	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Type"))
-	var type_option := OptionButton.new()
-	type_option.add_item("Flow")
-	type_option.set_item_metadata(0, AssetGuide.BODY_FLOW)
-	type_option.add_item("Sample")
-	type_option.set_item_metadata(1, AssetGuide.SAMPLER_SPINE)
-	type_option.add_item("Motion")
-	type_option.set_item_metadata(2, AssetGuide.ANIMATION_SPINE)
-	var guide_type := str(guide.get("guide_type", AssetGuide.BODY_FLOW))
-	for type_index in range(type_option.item_count):
-		if str(type_option.get_item_metadata(type_index)) == guide_type:
-			type_option.select(type_index)
-			break
-	type_option.item_selected.connect(_on_guide_type_selected.bind(type_option))
-	inspector_content.add_child(type_option)
+	inspector_content.add_child(EditorWidgets.create_option_field([
+		{"label": "Flow", "metadata": AssetGuide.BODY_FLOW},
+		{"label": "Sample", "metadata": AssetGuide.SAMPLER_SPINE},
+		{"label": "Motion", "metadata": AssetGuide.ANIMATION_SPINE},
+	], str(guide.get("guide_type", AssetGuide.BODY_FLOW)), _on_guide_type_selected, false))
 	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Parent Component"))
 	var target_id := str(guide.get("scope", {}).get("component_id", ""))
 	var target_name := "Missing Component"
@@ -8936,34 +8918,26 @@ func _render_weighting_inspector() -> void:
 	name_editor.focus_exited.connect(func() -> void: _rename_weighting_style(name_editor.text))
 	inspector_content.add_child(name_editor)
 	inspector_content.add_child(EditorWidgets.create_inspector_section("Method", _on_inspector_section_toggled))
-	var method_option := OptionButton.new()
-	for method_data in [["Uniform", WeightingService.UNIFORM], ["Axis Gradient", WeightingService.AXIS_GRADIENT]]:
-		method_option.add_item(str(method_data[0]))
-		method_option.set_item_metadata(method_option.item_count - 1, str(method_data[1]))
-		if str(style.get("method", "")) == str(method_data[1]):
-			method_option.select(method_option.item_count - 1)
-	method_option.item_selected.connect(_on_weighting_method_selected.bind(method_option))
-	inspector_content.add_child(method_option)
+	inspector_content.add_child(EditorWidgets.create_option_field([
+		{"label": "Uniform", "metadata": WeightingService.UNIFORM},
+		{"label": "Axis Gradient", "metadata": WeightingService.AXIS_GRADIENT},
+	], str(style.get("method", "")), _on_weighting_method_selected, false))
 	inspector_content.add_child(EditorWidgets.create_inspector_section("Parameters", _on_inspector_section_toggled))
 	if str(style.get("method", "")) == WeightingService.AXIS_GRADIENT:
 		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Direction"))
-		var direction_option := OptionButton.new()
-		for direction_data in [["Bottom → Top", WeightingService.BOTTOM_TO_TOP], ["Top → Bottom", WeightingService.TOP_TO_BOTTOM], ["Left → Right", WeightingService.LEFT_TO_RIGHT], ["Right → Left", WeightingService.RIGHT_TO_LEFT]]:
-			direction_option.add_item(str(direction_data[0]))
-			direction_option.set_item_metadata(direction_option.item_count - 1, str(direction_data[1]))
-			if str(style.get("parameters", {}).get("direction", "")) == str(direction_data[1]):
-				direction_option.select(direction_option.item_count - 1)
-		direction_option.item_selected.connect(_on_weighting_direction_selected.bind(direction_option))
-		inspector_content.add_child(direction_option)
+		inspector_content.add_child(EditorWidgets.create_option_field([
+			{"label": "Bottom → Top", "metadata": WeightingService.BOTTOM_TO_TOP},
+			{"label": "Top → Bottom", "metadata": WeightingService.TOP_TO_BOTTOM},
+			{"label": "Left → Right", "metadata": WeightingService.LEFT_TO_RIGHT},
+			{"label": "Right → Left", "metadata": WeightingService.RIGHT_TO_LEFT},
+		], str(style.get("parameters", {}).get("direction", "")), _on_weighting_direction_selected, false))
 		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Curve"))
-		var curve_option := OptionButton.new()
-		for curve_data in [["Linear", WeightingService.LINEAR], ["Ease In", WeightingService.EASE_IN], ["Ease Out", WeightingService.EASE_OUT], ["Smooth", WeightingService.SMOOTH]]:
-			curve_option.add_item(str(curve_data[0]))
-			curve_option.set_item_metadata(curve_option.item_count - 1, str(curve_data[1]))
-			if str(style.get("parameters", {}).get("curve", "")) == str(curve_data[1]):
-				curve_option.select(curve_option.item_count - 1)
-		curve_option.item_selected.connect(_on_weighting_curve_selected.bind(curve_option))
-		inspector_content.add_child(curve_option)
+		inspector_content.add_child(EditorWidgets.create_option_field([
+			{"label": "Linear", "metadata": WeightingService.LINEAR},
+			{"label": "Ease In", "metadata": WeightingService.EASE_IN},
+			{"label": "Ease Out", "metadata": WeightingService.EASE_OUT},
+			{"label": "Smooth", "metadata": WeightingService.SMOOTH},
+		], str(style.get("parameters", {}).get("curve", "")), _on_weighting_curve_selected, false))
 		var invert := CheckBox.new()
 		invert.text = "Invert"
 		invert.button_pressed = bool(style.get("parameters", {}).get("invert", false))
@@ -9622,14 +9596,13 @@ func _render_geometry_seeding_inspector() -> void:
 	var recipe := _geometry_seeding_recipe(selected_asset_id, selected_component_id)
 	var sampling_bake := _geometry_sampling_bake(selected_asset_id, selected_component_id)
 	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Method"))
-	var method_option := OptionButton.new()
-	method_option.add_item("Poisson Fill")
-	method_option.set_item_metadata(0, GeometrySeedingService.POISSON_FILL)
-	method_option.add_item("Spine Flow")
-	method_option.set_item_metadata(1, GeometrySeedingService.SPINE_FLOW)
-	method_option.select(0 if str(recipe.get("method", "")) == GeometrySeedingService.POISSON_FILL else 1)
-	method_option.item_selected.connect(func(index: int) -> void: _set_geometry_seeding_method(str(method_option.get_item_metadata(index))))
-	inspector_content.add_child(method_option)
+	# Anything that is not Poisson Fill is shown as Spine Flow, which is what the
+	# original index arithmetic did.
+	var seeding_method := GeometrySeedingService.POISSON_FILL if str(recipe.get("method", "")) == GeometrySeedingService.POISSON_FILL else GeometrySeedingService.SPINE_FLOW
+	inspector_content.add_child(EditorWidgets.create_option_field([
+		{"label": "Poisson Fill", "metadata": GeometrySeedingService.POISSON_FILL},
+		{"label": "Spine Flow", "metadata": GeometrySeedingService.SPINE_FLOW},
+	], seeding_method, _on_geometry_seeding_method_selected, false))
 	inspector_content.add_child(EditorWidgets.create_inspector_section("Parameters", _on_inspector_section_toggled))
 	if str(recipe.get("method", "")) == GeometrySeedingService.SPINE_FLOW:
 		var sampler_guides := _sampler_spines_for_component(_get_asset(selected_asset_id), selected_component_id)
@@ -10110,17 +10083,17 @@ func _render_geometry_meshing_inspector() -> void:
 	sampling_label.add_theme_color_override("font_color", Color("#75b88a") if sampling_current else Color("#ef8354"))
 	inspector_content.add_child(sampling_label)
 	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Seeding Source"))
-	var seed_option := OptionButton.new()
 	var seeding_bakes := _geometry_seeding_bakes(selected_asset_id, selected_component_id)
+	var seed_items: Array = []
 	for method in GeometrySeedingService.VALID_METHODS:
 		var available := seeding_bakes.has(method)
-		seed_option.add_item(_geometry_bake_method_label(method) if available else "%s · Required" % _geometry_bake_method_label(method))
-		seed_option.set_item_metadata(seed_option.item_count - 1, method)
-		seed_option.set_item_disabled(seed_option.item_count - 1, not available)
-		if method == str(recipe.get("parameters", {}).get("seeding_method", "")):
-			seed_option.select(seed_option.item_count - 1)
+		seed_items.append({
+			"label": _geometry_bake_method_label(method) if available else "%s · Required" % _geometry_bake_method_label(method),
+			"metadata": method, "disabled": not available})
+	var seed_option := EditorWidgets.create_option_field(seed_items,
+		str(recipe.get("parameters", {}).get("seeding_method", "")),
+		_on_geometry_meshing_seed_source_selected, false)
 	seed_option.disabled = seeding_bakes.is_empty()
-	seed_option.item_selected.connect(_on_geometry_meshing_seed_source_selected.bind(seed_option))
 	inspector_content.add_child(seed_option)
 	if seed_option.item_count == 0:
 		var missing_seed := EditorWidgets.create_inspector_field_label("Bake at least one Seeding method first.")
@@ -10288,6 +10261,10 @@ func _render_contour_meshing_inspector(component: Dictionary) -> void:
 	geometry_meshing_bake_button = bake_button
 	actions.add_child(bake_button)
 	inspector_content.add_child(actions)
+
+
+func _on_geometry_seeding_method_selected(index: int, option: OptionButton) -> void:
+	_set_geometry_seeding_method(str(option.get_item_metadata(index)))
 
 
 func _on_geometry_meshing_seed_source_selected(index: int, option: OptionButton) -> void:
@@ -10546,17 +10523,12 @@ func _render_inspector() -> void:
 		inspector_content.add_child(asset_name_editor)
 		inspector_content.add_child(EditorWidgets.create_inspector_section("Initial Pose", _on_inspector_section_toggled))
 		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Authored Facing"))
-		asset_authored_facing_option = OptionButton.new()
-		asset_authored_facing_option.custom_minimum_size = Vector2(0, 26)
+		var facing_items: Array = []
 		for facing in AssetPresentation.SERIALIZED_VALUES:
-			asset_authored_facing_option.add_item(AssetPresentation.display_name(facing))
-			asset_authored_facing_option.set_item_metadata(asset_authored_facing_option.item_count - 1, facing)
-		var authored_facing := AssetPresentation.serialize_authored_facing(asset.get("authored_facing", AssetPresentation.AuthoredFacing.NEUTRAL))
-		for facing_index in range(asset_authored_facing_option.item_count):
-			if str(asset_authored_facing_option.get_item_metadata(facing_index)) == authored_facing:
-				asset_authored_facing_option.select(facing_index)
-				break
-		asset_authored_facing_option.item_selected.connect(_on_asset_authored_facing_selected.bind(asset_authored_facing_option))
+			facing_items.append({"label": AssetPresentation.display_name(facing), "metadata": facing})
+		asset_authored_facing_option = EditorWidgets.create_option_field(facing_items,
+			AssetPresentation.serialize_authored_facing(asset.get("authored_facing", AssetPresentation.AuthoredFacing.NEUTRAL)),
+			_on_asset_authored_facing_selected)
 		inspector_content.add_child(asset_authored_facing_option)
 		inspector_content.add_child(EditorWidgets.create_inspector_section("Asset Transform", _on_inspector_section_toggled))
 		var asset_transform_grid := GridContainer.new()
@@ -10614,19 +10586,10 @@ func _render_inspector() -> void:
 		}, _on_reference_image_target_height_changed)
 		var pivot_label := EditorWidgets.create_inspector_field_label("Pivot")
 		inspector_content.add_child(pivot_label)
-		var pivot_option := OptionButton.new()
-		pivot_option.custom_minimum_size = Vector2(0, 26)
-		pivot_option.add_item("Center")
-		pivot_option.set_item_metadata(0, "center")
-		pivot_option.add_item("Bottom Center")
-		pivot_option.set_item_metadata(1, "bottom_center")
-		var pivot_mode := str(reference_image.get("pivot_mode", "bottom_center"))
-		for pivot_index in range(pivot_option.item_count):
-			if str(pivot_option.get_item_metadata(pivot_index)) == pivot_mode:
-				pivot_option.select(pivot_index)
-				break
-		pivot_option.item_selected.connect(_on_reference_image_pivot_selected.bind(pivot_option))
-		inspector_content.add_child(pivot_option)
+		inspector_content.add_child(EditorWidgets.create_option_field([
+			{"label": "Center", "metadata": "center"},
+			{"label": "Bottom Center", "metadata": "bottom_center"},
+		], str(reference_image.get("pivot_mode", "bottom_center")), _on_reference_image_pivot_selected))
 		if not str(reference_image.get("file", "")).is_empty():
 			var reference_visibility := CheckBox.new()
 			reference_visibility.text = "Visible"
@@ -10748,40 +10711,22 @@ func _render_inspector() -> void:
 	inspector_content.add_child(component_name_editor)
 	inspector_content.add_child(EditorWidgets.create_inspector_section("Hierarchy", _on_inspector_section_toggled))
 	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Parent Component"))
-	var hierarchy_parent_option := OptionButton.new()
-	hierarchy_parent_option.custom_minimum_size = Vector2(0, 26)
-	hierarchy_parent_option.add_item("Root")
-	hierarchy_parent_option.set_item_metadata(0, "")
+	var hierarchy_parent_items: Array = [{"label": "Root", "metadata": ""}]
 	for candidate in asset.get("components", []):
 		var candidate_id := str(candidate.get("id", ""))
 		if candidate_id == selected_component_id or not ComponentHierarchy.can_parent(asset, selected_component_id, candidate_id):
 			continue
-		hierarchy_parent_option.add_item(str(candidate.get("name", "Component")))
-		hierarchy_parent_option.set_item_metadata(hierarchy_parent_option.item_count - 1, candidate_id)
-	var hierarchy_parent_id := str(component.get("parent_component_id", ""))
-	for option_index in range(hierarchy_parent_option.item_count):
-		if str(hierarchy_parent_option.get_item_metadata(option_index)) == hierarchy_parent_id:
-			hierarchy_parent_option.select(option_index)
-			break
-	hierarchy_parent_option.item_selected.connect(_on_component_hierarchy_parent_selected.bind(hierarchy_parent_option))
-	inspector_content.add_child(hierarchy_parent_option)
+		hierarchy_parent_items.append({"label": str(candidate.get("name", "Component")), "metadata": candidate_id})
+	inspector_content.add_child(EditorWidgets.create_option_field(hierarchy_parent_items,
+		str(component.get("parent_component_id", "")), _on_component_hierarchy_parent_selected))
 	var draw_mode := str(component.get("draw_mode", "closed_loop"))
 	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Draw Mode: %s" % _draw_mode_display_name(draw_mode)))
 	if _is_reference_component(component) or draw_mode == "closed_loop":
 		inspector_content.add_child(EditorWidgets.create_inspector_section("Topology", _on_inspector_section_toggled))
-		var topology_role_option := OptionButton.new()
-		topology_role_option.custom_minimum_size = Vector2(0, 26)
-		topology_role_option.add_item("Outer")
-		topology_role_option.set_item_metadata(0, "outer")
-		topology_role_option.add_item("Hole")
-		topology_role_option.set_item_metadata(1, "hole")
-		var topology_role := str(component.get("topology_role", "outer"))
-		for role_index in range(topology_role_option.item_count):
-			if str(topology_role_option.get_item_metadata(role_index)) == topology_role:
-				topology_role_option.select(role_index)
-				break
-		topology_role_option.item_selected.connect(_on_component_topology_role_selected.bind(topology_role_option))
-		inspector_content.add_child(topology_role_option)
+		inspector_content.add_child(EditorWidgets.create_option_field([
+			{"label": "Outer", "metadata": "outer"},
+			{"label": "Hole", "metadata": "hole"},
+		], str(component.get("topology_role", "outer")), _on_component_topology_role_selected))
 	var primitive = component.get("primitive", {})
 	if primitive is Dictionary and str(primitive.get("type", "")) in ["circle", PrimitiveGeometryService.ELLIPSE]:
 		inspector_content.add_child(EditorWidgets.create_inspector_section("Geometry", _on_inspector_section_toggled))
@@ -10810,23 +10755,14 @@ func _render_inspector() -> void:
 	if draw_mode == "contour":
 		inspector_content.add_child(EditorWidgets.create_inspector_section("Drawing Reference", _on_inspector_section_toggled))
 		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Catch Parent"))
-		var catch_parent_option := OptionButton.new()
-		catch_parent_option.custom_minimum_size = Vector2(0, 26)
-		catch_parent_option.add_item("None")
-		catch_parent_option.set_item_metadata(0, "")
+		var catch_parent_items: Array = [{"label": "None", "metadata": ""}]
 		for candidate in asset.get("components", []):
 			var candidate_id := str(candidate.get("id", ""))
 			if candidate_id == selected_component_id:
 				continue
-			catch_parent_option.add_item(str(candidate.get("name", "Component")))
-			catch_parent_option.set_item_metadata(catch_parent_option.item_count - 1, candidate_id)
-		var catch_parent_id := str(component.get("catch_parent_component_id", ""))
-		for option_index in range(catch_parent_option.item_count):
-			if str(catch_parent_option.get_item_metadata(option_index)) == catch_parent_id:
-				catch_parent_option.select(option_index)
-				break
-		catch_parent_option.item_selected.connect(_on_component_catch_parent_selected.bind(catch_parent_option))
-		inspector_content.add_child(catch_parent_option)
+			catch_parent_items.append({"label": str(candidate.get("name", "Component")), "metadata": candidate_id})
+		inspector_content.add_child(EditorWidgets.create_option_field(catch_parent_items,
+			str(component.get("catch_parent_component_id", "")), _on_component_catch_parent_selected))
 	var component_group_id := ComponentHierarchy.membership_group_id(asset, selected_component_id)
 	var show_global_transform := not component_group_id.is_empty()
 	inspector_content.add_child(EditorWidgets.create_inspector_section("Global Transform" if show_global_transform else "Transform", _on_inspector_section_toggled))
