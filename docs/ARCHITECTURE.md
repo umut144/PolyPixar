@@ -64,7 +64,9 @@ export data.
   `transform_fields`, `asset_pivot_fields`, `asset_root_position_fields`,
   `asset_root_scale_fields` — instead of the builder writing into editor state
   behind their back. Read-only blocks such as the Global Transform simply drop
-  the return value.
+  the return value. `add_stacked_number_field` is the same idea for the
+  Inspector's other numeric shape — a caption line above a full-width field —
+  and `create_toggle_field` for its boolean rows.
 - `WorldDocumentService` owns the on-disk document format: normalization on
   load, serialization on save, and the atomic file replacement both sides use.
   It is static and holds no editor state. `main.gd` keeps the orchestration —

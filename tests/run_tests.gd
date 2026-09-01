@@ -143,6 +143,22 @@ func _edit_inspector_value(field: SpinBox, value: float) -> void:
 	field.value_changed.emit(value)
 
 
+func _inspector_toggle(application: Control, text: String) -> Button:
+	var controls: Array = []
+	_inspector_controls(application.inspector_content, controls)
+	for control in controls:
+		if (control is CheckButton or control is CheckBox) and str(control.text) == text:
+			return control
+	return null
+
+
+func _press_inspector_toggle(toggle: Button, pressed: bool) -> void:
+	# The boolean counterpart of _edit_inspector_value: set the state without a
+	# signal and emit it, so the test drives exactly what a click drives.
+	toggle.set_pressed_no_signal(pressed)
+	toggle.toggled.emit(pressed)
+
+
 func _inspector_spin(application: Control, label_text: String) -> SpinBox:
 	var control := _inspector_control_after(application, label_text, "SpinBox")
 	return control as SpinBox
@@ -1645,6 +1661,39 @@ func _test_inspector_field_wiring() -> void:
 		and is_equal_approx(second_after.x - second_before.x, expected_delta),
 		"The Delta X field should offset every selected Point by the same amount.")
 	_expect(is_zero_approx(delta_field.value), "The Delta field should reset itself after applying the offset.")
+
+	# Edge level: one toggle writes every selected Edge.
+	application.active_edit_mode = "edge"
+	var edge_ids: Array[String] = []
+	for edge in body["edges"]:
+		edge_ids.append(str(edge["id"]))
+	var selected_edges: Array[String] = [edge_ids[0], edge_ids[1]]
+	application.selected_edge_ids = selected_edges
+	application._render_inspector()
+	var outline_toggle := _inspector_toggle(application, "Render Outline")
+	_expect(outline_toggle != null, "An Edge selection should expose its Render Outline toggle.")
+	_press_inspector_toggle(outline_toggle, false)
+	_expect(not bool(application._get_edge(body, edge_ids[0]).get("render_outline", true))
+		and not bool(application._get_edge(body, edge_ids[1]).get("render_outline", true)),
+		"The Render Outline toggle should write every selected Edge.")
+
+	# Back at Component level: the toggle and the stacked numeric fields.
+	application.active_state = "select"
+	application.active_edit_mode = ""
+	var no_edges: Array[String] = []
+	application.selected_edge_ids = no_edges
+	# Rendering mirrors the plural selection into the singular id, so both have
+	# to be cleared to leave the Edge Inspector.
+	application.selected_edge_id = ""
+	application._render_inspector()
+	var visibility_toggle := _inspector_toggle(application, "Visible")
+	_expect(visibility_toggle != null, "A selected Component should expose its Visible toggle.")
+	_press_inspector_toggle(visibility_toggle, false)
+	_expect(not bool(body.get("visibility", true)), "The Visible toggle should write the Component.")
+	var z_order_field := _inspector_spin(application, "Z Order (Asset-local)")
+	_expect(z_order_field != null, "A selected Component should expose its Z Order.")
+	_edit_inspector_value(z_order_field, 5.0)
+	_expect(int(body.get("z_index", 0)) == 5, "The Z Order field should write the Component.")
 	application.free()
 
 
