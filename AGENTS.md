@@ -41,6 +41,13 @@ A `SCRIPT ERROR` in the test output is a failure even when the runner prints
 remaining assertions never run and never increment the failure count. CI fails
 the job on any such line.
 
+`tools/inspector_render_probe.gd` renders the Inspector in 33 fixed states and
+prints one line per control. Run it before and after any change that is meant to
+leave the Inspector looking the same, and diff the two outputs; the file's own
+header has the commands. It has caught three real regressions that the suite did
+not. When a render function is added, add the state that reaches it — the header
+lists what each state is for.
+
 The `--editor --quit` run is not a full parse check: it reported clean on a
 script with undeclared identifiers that the test run caught immediately. Treat
 the test run, not the editor run, as the parser of record.
