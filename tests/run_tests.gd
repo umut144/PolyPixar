@@ -1,6 +1,8 @@
 extends SceneTree
 
 var failures := 0
+var motion_signals_emitted: Dictionary = {}
+var motion_signal_argument_failures: Array[String] = []
 
 
 func _init() -> void:
@@ -3770,51 +3772,226 @@ func _test_motion_path_topology_and_sampler() -> void:
 	canvas.free()
 
 
+const MOTION_SIGNAL_ROUTES := [
+	["act_direction_changed", "_on_motion_act_direction_changed"],
+	["act_easing_selected", "_on_motion_act_easing_selected"],
+	["act_enabled_changed", "_on_motion_act_enabled_changed"],
+	["act_jump_arc_selected", "_on_motion_act_jump_arc_selected"],
+	["act_number_changed", "_on_motion_act_number_changed"],
+	["act_remove_requested", "_remove_selected_motion_act"],
+	["act_rename_requested", "_rename_motion_act"],
+	["contract_parameter_add_requested", "_add_contract_parameter"],
+	["contract_parameter_remove_requested", "_remove_contract_parameter"],
+	["contract_parameter_rename_requested", "_rename_contract_parameter"],
+	["contract_parameter_type_selected", "_on_contract_parameter_type_selected"],
+	["marker_event_rename_requested", "_rename_marker_event"],
+	["marker_kind_selected", "_on_marker_kind_selected"],
+	["marker_phase_changed", "_on_marker_phase_changed"],
+	["motion_domain_selected", "_on_motion_domain_selected"],
+	["motion_enabled_changed", "_on_motion_enabled_changed"],
+	["motion_item_remove_requested", "_request_motion_item_removal"],
+	["motion_parameter_changed", "_on_motion_parameter_changed"],
+	["motion_phase_offset_changed", "_on_motion_phase_offset_changed"],
+	["motion_primitive_selected", "_on_motion_primitive_selected"],
+	["motion_remove_requested", "_request_motion_removal"],
+	["motion_rename_requested", "_rename_motion"],
+	["motion_target_selected", "_on_motion_target_selected"],
+	["path_duration_changed", "_on_motion_path_duration_changed"],
+	["path_playback_toggled", "_on_motion_path_playback_toggle"],
+	["path_preview_asset_selected", "_on_motion_path_preview_asset_selected"],
+	["path_rename_requested", "_rename_motion_path"],
+	["runtime_bool_changed", "_on_motion_runtime_bool_changed"],
+	["runtime_number_changed", "_on_motion_runtime_number_changed"],
+	["section_toggled", "_on_inspector_section_toggled"],
+	["sequence_asset_selected", "_on_motion_sequence_asset_selected"],
+	["sequence_entry_enabled_changed", "_on_motion_sequence_entry_enabled_changed"],
+	["sequence_entry_remove_requested", "_remove_motion_sequence_entry"],
+	["sequence_entry_rename_requested", "_rename_motion_sequence_entry"],
+	["sequence_path_selected", "_on_motion_sequence_path_selected"],
+	["sequence_rename_requested", "_rename_motion_sequence"],
+	["sequence_state_selected", "_on_motion_sequence_state_selected"],
+	["state_cycle_duration_changed", "_on_motion_state_cycle_duration_changed"],
+	["state_remove_requested", "_request_motion_state_removal"],
+	["state_rename_requested", "_rename_motion_state"],
+	["transition_entry_mode_selected", "_on_transition_entry_mode_selected"],
+	["transition_exit_policy_selected", "_on_transition_exit_policy_selected"],
+	["transition_move_requested", "_move_transition"],
+	["transition_number_changed", "_on_transition_number_changed"],
+	["transition_rule_add_requested", "_add_transition_rule"],
+	["transition_rule_operator_selected", "_on_transition_rule_operator_selected"],
+	["transition_rule_parameter_selected", "_on_transition_rule_parameter_selected"],
+	["transition_rule_remove_requested", "_remove_transition_rule"],
+	["transition_rule_value_changed", "_on_transition_rule_value_changed"],
+	["transition_target_selected", "_on_transition_target_selected"],
+]
+
+const MOTION_PROBE_CASES := ["asset", "state", "motion", "motion_inner", "transition",
+	"transition_seeded", "marker", "act", "act_jump", "act_blink", "path", "sequence",
+	"sequence_player"]
+
+
+func _prepare_motion_case(application: Control, case_name: String) -> String:
+	# Puts the editor into one Motion state and returns the submodule to render.
+	var asset: Dictionary = application.assets[0]
+	application.selected_asset_id = str(asset.get("id", ""))
+	application.motion_selection.select_asset(application.selected_asset_id)
+	application.motion_workspace.set_asset(application.selected_asset_id, str(asset.get("name", "Asset")),
+		asset.get("components", []), application._ensure_asset_animation(asset))
+	var states: Array = application.motion_workspace.get_states_for_asset(application.selected_asset_id)
+	var first_state_id := str(states[0].get("id", "")) if not states.is_empty() else ""
+	match case_name:
+		"state":
+			application.motion_selection.select_state(application.selected_asset_id, first_state_id)
+		"motion":
+			application.motion_workspace.add_motion(first_state_id)
+		"motion_inner":
+			application.motion_workspace.add_motion(first_state_id)
+			application.motion_workspace.set_motion_property(first_state_id,
+				str(application.motion_selection.item_id), "domain", MotionWorkspace.INNER)
+		"transition":
+			application.motion_workspace.add_transition(first_state_id)
+		"transition_seeded":
+			application.motion_selection.select_item(MotionSelection.TRANSITION,
+				application.selected_asset_id, first_state_id, "transition_idle_01")
+		"marker":
+			application.motion_workspace.add_marker(first_state_id)
+		"act", "act_jump", "act_blink":
+			var acts: Array[Dictionary] = [
+				WorldDocumentService.default_motion_act("act_1", "Slide", MotionActEvaluator.SLIDE),
+				WorldDocumentService.default_motion_act("act_2", "Jump", MotionActEvaluator.JUMP),
+				WorldDocumentService.default_motion_act("act_3", "Blink", MotionActEvaluator.BLINK)]
+			application.motion_acts = acts
+			# One Act per primitive: the Jump arc and the Blink timing controls only
+			# exist on their own primitive.
+			application.selected_motion_act_id = "act_2" if case_name == "act_jump" else ("act_3" if case_name == "act_blink" else "act_1")
+			return "Act"
+		"path":
+			var paths: Array[Dictionary] = [WorldDocumentService.default_motion_path("path_1", "Walk Path")]
+			application.motion_paths = paths
+			application.selected_motion_path_id = "path_1"
+			application.motion_path_preview_asset_id = application.selected_asset_id
+			return "Path"
+		"sequence", "sequence_player":
+			var sequence_paths: Array[Dictionary] = [WorldDocumentService.default_motion_path("path_1", "Walk Path")]
+			application.motion_paths = sequence_paths
+			application.selected_motion_path_id = "path_1"
+			var sequences: Array[Dictionary] = [WorldDocumentService.default_motion_sequence("sequence_1", "Walk Cycle")]
+			application.motion_sequences = sequences
+			application.selected_motion_sequence_id = "sequence_1"
+			application._add_motion_sequence_entry()
+			application.motion_sequence_view = MotionSequenceWorkspace.VIEW_PLAYER if case_name == "sequence_player" else MotionSequenceWorkspace.VIEW_COMPOSITION
+			return "Sequence"
+	return "Animation"
+
+
+func _record_motion_signal(signal_name: String, arguments: Array, values: Array) -> void:
+	motion_signals_emitted[signal_name] = true
+	for index in range(arguments.size()):
+		var declared_type: int = int(arguments[index].get("type", TYPE_NIL))
+		if declared_type == TYPE_NIL or index >= values.size():
+			continue
+		var value = values[index]
+		if declared_type == TYPE_FLOAT and typeof(value) == TYPE_INT:
+			continue
+		if typeof(value) != declared_type and value != null:
+			motion_signal_argument_failures.append("%s argument %d is %d, declared %d" % [
+				signal_name, index, typeof(value), declared_type])
+
+
+func _motion_signal_recorder(signal_name: String, arguments: Array) -> Callable:
+	# A signal can only be connected to a Callable of its own arity, so one
+	# recorder per arity. Six covers every Motion signal.
+	match arguments.size():
+		0:
+			return func() -> void: _record_motion_signal(signal_name, arguments, [])
+		1:
+			return func(a) -> void: _record_motion_signal(signal_name, arguments, [a])
+		2:
+			return func(a, b) -> void: _record_motion_signal(signal_name, arguments, [a, b])
+		3:
+			return func(a, b, c) -> void: _record_motion_signal(signal_name, arguments, [a, b, c])
+		4:
+			return func(a, b, c, d) -> void: _record_motion_signal(signal_name, arguments, [a, b, c, d])
+	return func(a, b, c, d, e) -> void: _record_motion_signal(signal_name, arguments, [a, b, c, d, e])
+
+
+func _exercise_control(control: Node) -> void:
+	# Fires what a user would fire on this control. Only the signal the view
+	# emits in response matters, so the values are the ones already there.
+	if control is OptionButton:
+		if control.item_count > 0:
+			control.item_selected.emit(0)
+	elif control is CheckBox or control is CheckButton:
+		control.toggled.emit(not control.button_pressed)
+	elif control is SpinBox:
+		control.value_changed.emit(control.value)
+		control.get_line_edit().text_submitted.emit(str(control.value))
+		control.get_line_edit().focus_exited.emit()
+	elif control is Slider:
+		control.value_changed.emit(control.value)
+	elif control is LineEdit:
+		control.text_submitted.emit(str(control.text))
+		control.focus_exited.emit()
+	elif control is Button:
+		control.pressed.emit()
+
+
 func _test_motion_inspector_wiring() -> void:
-	# The render comparison proves the Motion Inspector still draws the same
-	# controls; it cannot prove each control still reaches its own handler. This
-	# drives one representative dropdown and one representative toggle per
-	# submodule so the extraction's rewiring is not taken on trust.
+	# Two tables, two halves of one question. The render comparison in
+	# tools/inspector_render_probe.gd proves the Motion Inspector still draws the
+	# same controls; it says nothing about where those controls lead. The routing
+	# half checks that each of the fifty signals reaches the handler it names.
+	# The emission half drives every control the view builds across eleven Motion
+	# states and checks that each of those fifty is actually reachable from one,
+	# and arrives with the argument types its signature declares.
+	var body := _outliner_test_component("component_1", "body")
+	var motion_assets: Array[Dictionary] = [{"id": "asset_1", "name": "Wizard", "visibility": true,
+		"components": [body], "groups": [], "guides": []}]
 	var application: Control = load("res://scripts/main.gd").new()
 	application._build_ui()
-	var act := WorldDocumentService.default_motion_act("act_1", "Slide", MotionActEvaluator.SLIDE)
-	var acts: Array[Dictionary] = [act]
-	application.motion_acts = acts
-	application.selected_motion_act_id = "act_1"
+	application.assets = motion_assets
 	application.active_module = "Motion"
-	application.active_motion_submodule = "Act"
-	application._render_inspector()
+	var view: MotionInspectorView = application.motion_inspector_view
 
-	var easing_option := _inspector_option(application, MotionActEvaluator.easing_label(MotionActEvaluator.EASING_OPTIONS[0]))
-	_expect(easing_option != null, "The Act Inspector should expose its Easing dropdown.")
-	# Deliberately an entry the Act does not already carry, so a dropdown that
-	# writes nothing fails instead of matching the default.
-	var starting_easing := str(act.get("timing", {}).get("easing", ""))
-	var target_index := 0
-	for easing_index in range(MotionActEvaluator.EASING_OPTIONS.size()):
-		if str(MotionActEvaluator.EASING_OPTIONS[easing_index]) != starting_easing:
-			target_index = easing_index
-			break
-	_choose_option(easing_option, target_index)
-	_expect(str(act.get("timing", {}).get("easing", "")) == str(MotionActEvaluator.EASING_OPTIONS[target_index])
-		and str(MotionActEvaluator.EASING_OPTIONS[target_index]) != starting_easing,
-		"The Act Easing dropdown should write the Act timing.")
+	for route in MOTION_SIGNAL_ROUTES:
+		var signal_name := str(route[0])
+		var expected_handler := str(route[1])
+		var handlers: Array[String] = []
+		for connection in view.get_signal_connection_list(signal_name):
+			handlers.append(str((connection["callable"] as Callable).get_method()))
+		_expect(handlers.size() == 1 and handlers[0] == expected_handler,
+			"The Motion Inspector signal %s should reach %s, not %s." % [signal_name, expected_handler, str(handlers)])
 
-	var enabled_toggle := _inspector_toggle(application, "Enabled")
-	_expect(enabled_toggle != null, "The Act Inspector should expose its Enabled toggle.")
-	_press_inspector_toggle(enabled_toggle, false)
-	_expect(not bool(act.get("enabled", true)), "The Act Enabled toggle should write the Act.")
-
-	var path := WorldDocumentService.default_motion_path("path_1", "Walk Path")
-	var paths: Array[Dictionary] = [path]
-	application.motion_paths = paths
-	application.selected_motion_path_id = "path_1"
-	application.active_motion_submodule = "Path"
-	application._render_inspector()
-	var duration_field := _inspector_spin(application, "Duration (s)")
-	_expect(duration_field != null, "The Path Inspector should expose its Duration.")
-	_edit_inspector_value(duration_field, 3.5)
-	_expect(is_equal_approx(float(path.get("playback", {}).get("duration", 0.0)), 3.5), "The Path Duration field should write the Path playback.")
+	var declared_arguments: Dictionary = {}
+	for entry in view.get_signal_list():
+		declared_arguments[str(entry["name"])] = entry["args"]
+	motion_signals_emitted = {}
+	motion_signal_argument_failures = [] as Array[String]
+	for case_name in MOTION_PROBE_CASES:
+		var submodule := _prepare_motion_case(application, case_name)
+		application.active_motion_submodule = submodule
+		# A bare view, so the editor's own handlers cannot re-render the controls
+		# out from under the walk.
+		var probe := MotionInspectorView.new()
+		for route in MOTION_SIGNAL_ROUTES:
+			var signal_name := str(route[0])
+			probe.connect(signal_name, _motion_signal_recorder(signal_name, declared_arguments.get(signal_name, [])))
+		probe.set_models(application.motion_workspace, application.motion_player, application.motion_selection)
+		probe.set_context(application._motion_inspector_context())
+		probe.rebuild()
+		var controls: Array = []
+		_inspector_controls(probe, controls)
+		for control in controls:
+			_exercise_control(control)
+		probe.free()
+	var unreachable: Array[String] = []
+	for route in MOTION_SIGNAL_ROUTES:
+		if not motion_signals_emitted.has(str(route[0])):
+			unreachable.append(str(route[0]))
+	_expect(unreachable.is_empty(),
+		"Every Motion Inspector signal should be reachable from a control; unreachable: %s" % str(unreachable))
+	_expect(motion_signal_argument_failures.is_empty(),
+		"Motion Inspector signals should arrive with their declared argument types; %s" % str(motion_signal_argument_failures))
 	application.free()
 
 

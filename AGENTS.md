@@ -48,6 +48,16 @@ header has the commands. It has caught three real regressions that the suite did
 not. When a render function is added, add the state that reaches it — the header
 lists what each state is for.
 
+A view extracted from `main.gd` needs both halves checked, and the render probe
+is only one of them. It proves the same controls are still drawn; it says
+nothing about where a control leads. `_test_motion_inspector_wiring` is the
+pattern for the other half: one table of signal-to-handler pairs checked against
+`get_signal_connection_list`, and one walk that drives every control the view
+builds across every state and asserts each signal is reachable and arrives with
+its declared argument types. Both halves are needed — a control wired to the
+wrong signal passes the routing table, and a signal wired to the wrong handler
+passes the emission walk.
+
 The `--editor --quit` run is not a full parse check: it reported clean on a
 script with undeclared identifiers that the test run caught immediately. Treat
 the test run, not the editor run, as the parser of record.
