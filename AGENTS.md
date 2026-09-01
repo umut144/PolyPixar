@@ -43,8 +43,9 @@ emitting the signal. `_edit_inspector_value` in the suite does both.
 
 A `SCRIPT ERROR` in the test output is a failure even when the runner prints
 `All PolyTools tests passed`: a runtime error aborts that test function, so its
-remaining assertions never run and never increment the failure count. CI fails
-the job on any such line.
+remaining assertions never run and never increment the failure count. The
+GitHub Actions workflow in `.github/workflows/verify.yml` fails the job on any
+such line.
 
 `tools/inspector_render_probe.gd` renders the Inspector in 33 fixed states and
 prints one line per control. Run it before and after any change that is meant to
