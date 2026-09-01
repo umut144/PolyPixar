@@ -32,6 +32,7 @@ func _init() -> void:
 	_test_multi_component_inspector()
 	_test_multi_component_deletion()
 	_test_outliner_selection_wiring()
+	_test_inspector_field_wiring()
 	_test_geometry_outliner_rows()
 	_test_render_invalidation()
 	_test_atomic_document_writes()
@@ -109,6 +110,42 @@ func _control_text(root: Node) -> String:
 	for child in root.get_children():
 		values.append(_control_text(child))
 	return "\n".join(values)
+
+
+func _inspector_controls(root: Node, out: Array) -> void:
+	if root.is_queued_for_deletion():
+		return
+	out.append(root)
+	for child in root.get_children():
+		_inspector_controls(child, out)
+
+
+func _inspector_control_after(application: Control, label_text: String, type_name: String) -> Node:
+	# Finds the control that belongs to a caption, whether the two sit side by
+	# side in a grid or stacked in the Inspector column.
+	var controls: Array = []
+	_inspector_controls(application.inspector_content, controls)
+	var seen_label := false
+	for control in controls:
+		if not seen_label:
+			if control is Label and str(control.text) == label_text:
+				seen_label = true
+			continue
+		if control.get_class() == type_name or control.is_class(type_name):
+			return control
+	return null
+
+
+func _edit_inspector_value(field: SpinBox, value: float) -> void:
+	# Setting SpinBox.value programmatically does not emit value_changed in
+	# Godot 4 — only real input does — so an edit is simulated by doing both.
+	field.set_value_no_signal(value)
+	field.value_changed.emit(value)
+
+
+func _inspector_spin(application: Control, label_text: String) -> SpinBox:
+	var control := _inspector_control_after(application, label_text, "SpinBox")
+	return control as SpinBox
 
 
 func _outliner_button(application: Control, prefix: String) -> Button:
@@ -1517,6 +1554,64 @@ func _test_outliner_selection_wiring() -> void:
 	_expect(_press_outliner_button(application, str(created.get("name", "")) + " ·"), "The Style Outliner should offer a Style row.")
 	_expect(application.selected_weighting_style_id == str(created.get("id", "")), "Pressing a Style row should select that Style.")
 
+	application.free()
+
+
+func _test_inspector_field_wiring() -> void:
+	# Inspector fields reach the document through signal connections the parser
+	# cannot check. These drive the field and assert the document changed, so a
+	# field wired to the wrong property fails here rather than under the mouse.
+	var body := _outliner_test_component("component_1", "body")
+	body["transform"] = {"position": Vector2(3.0, 4.0), "rotation": 15.0, "scale": Vector2(1.5, 2.0), "pivot": Vector2.ZERO}
+	body["draw_mode"] = "contour"
+	var asset := {"id": "asset_1", "name": "Wizard", "visibility": true, "components": [body], "groups": [], "guides": [],
+		"asset_pivot": Vector2(5.0, 6.0), "root_position": Vector2.ZERO, "root_scale": Vector2.ONE}
+	var application: Control = load("res://scripts/main.gd").new()
+	application._build_ui()
+	var test_assets: Array[Dictionary] = [asset]
+	application.assets = test_assets
+	application.selected_asset_id = "asset_1"
+	application.active_module = "Create"
+
+	# Asset level: pivot and the authoring-only root transform.
+	application.selected_component_id = ""
+	application._render_inspector()
+	_expect(application.asset_pivot_fields.has("pivot_x"), "The Asset Inspector should expose its Pivot fields.")
+	_edit_inspector_value(application.asset_pivot_fields["pivot_x"], 9.0)
+	_expect(is_equal_approx(Vector2(asset["asset_pivot"]).x, application._world_to_editor_units(9.0)), "The Asset Pivot X field should write the Asset pivot.")
+	_edit_inspector_value(application.asset_root_position_fields["position_y"], 7.0)
+	_expect(is_equal_approx(Vector2(AssetScaleRebaseService.root_position(asset)).y, application._world_to_editor_units(7.0)), "The Root Position Y field should write the Asset root position.")
+	_edit_inspector_value(application.asset_root_scale_fields["scale_x"], 2.5)
+	_expect(is_equal_approx(Vector2(AssetScaleRebaseService.root_scale(asset)).x, 2.5), "The Root Scale X field should write the Asset root scale.")
+	_expect(is_instance_valid(application.asset_name_editor), "The Asset Inspector should expose its name editor.")
+	application._rename_selected_asset("Sorcerer")
+	_expect(str(asset["name"]) == "Sorcerer", "The Asset name editor should rename the Asset.")
+
+	# Component level: transform, then the properties that reach the document.
+	application.selected_component_id = "component_1"
+	application._render_inspector()
+	for entry in [["position_x", 11.0], ["position_y", 12.0]]:
+		_expect(application.transform_fields.has(entry[0]), "The Component Inspector should expose %s." % entry[0])
+		_edit_inspector_value(application.transform_fields[entry[0]], float(entry[1]))
+	var moved: Vector2 = body["transform"]["position"]
+	_expect(is_equal_approx(moved.x, application._world_to_editor_units(11.0)) and is_equal_approx(moved.y, application._world_to_editor_units(12.0)), "The Component position fields should write the Component transform.")
+	_edit_inspector_value(application.transform_fields["rotation"], 42.0)
+	_expect(is_equal_approx(float(body["transform"]["rotation"]), 42.0), "The Component rotation field should write the Component transform.")
+	_edit_inspector_value(application.transform_fields["scale_x"], 3.0)
+	_expect(is_equal_approx(Vector2(body["transform"]["scale"]).x, 3.0), "The Component scale field should write the Component transform.")
+
+	var depth_field := _inspector_spin(application, "Projection Depth (cm)")
+	_expect(depth_field != null, "A visible Component should expose its Projection Depth.")
+	_edit_inspector_value(depth_field, 24.0)
+	_expect(is_equal_approx(float(body.get("projection_depth_cm", 0.0)), 24.0), "The Projection Depth field should write the Component.")
+
+	var width_field := _inspector_spin(application, "Contour Stroke Width (px)")
+	_expect(width_field != null, "A Contour Component should expose its Stroke Width.")
+	_edit_inspector_value(width_field, application.world_contour_stroke_width_px + 3.0)
+	_expect(is_equal_approx(float(body.get("contour_stroke_width_px", 0.0)), application.world_contour_stroke_width_px + 3.0), "The Contour Stroke Width field should write the Component override.")
+
+	application._rename_selected_component("arm")
+	_expect(str(body["name"]) == "arm", "The Component name editor should rename the Component.")
 	application.free()
 
 

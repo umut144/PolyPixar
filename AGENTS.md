@@ -32,6 +32,10 @@ Run both commands after geometry changes:
 Also run `git diff --check`. Files below `worlds/` are user data and must
 not be rewritten as test fixtures.
 
+Setting `SpinBox.value` in a test does not emit `value_changed` — only real
+input does — so an Inspector edit is simulated by setting the value and
+emitting the signal. `_edit_inspector_value` in the suite does both.
+
 A `SCRIPT ERROR` in the test output is a failure even when the runner prints
 `All PolyTools tests passed`: a runtime error aborts that test function, so its
 remaining assertions never run and never increment the failure count. CI fails
