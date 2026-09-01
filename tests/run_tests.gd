@@ -737,7 +737,7 @@ func _test_contour_rotation_spinbox() -> void:
 	application.active_module = "Create"
 	application.active_create_submodule = "Character"
 	application._render_inspector()
-	var rotation_field: SpinBox = application.transform_fields.get("rotation")
+	var rotation_field: SpinBox = application.create_inspector_view.transform_fields.get("rotation")
 	_expect(is_instance_valid(rotation_field) and is_equal_approx(rotation_field.step, 1.0) and is_equal_approx(rotation_field.custom_arrow_step, 1.0), "Component Rotation arrows should always count in exact one-degree steps.")
 	if is_instance_valid(rotation_field):
 		rotation_field.value += rotation_field.custom_arrow_step
@@ -1293,9 +1293,9 @@ func _test_component_scale_rebase() -> void:
 	application.selected_asset_id = "ui_rebase"
 	application.selected_component_id = ""
 	application._render_inspector()
-	_expect(is_instance_valid(application.asset_scale_rebase_button) and not application.asset_scale_rebase_button.disabled and application.asset_scale_rebase_button.text.contains("(1)"), "The Asset Inspector should enable Rebase only when its compact candidate list is non-empty and unblocked.")
+	_expect(is_instance_valid(application.create_inspector_view.asset_scale_rebase_button) and not application.create_inspector_view.asset_scale_rebase_button.disabled and application.create_inspector_view.asset_scale_rebase_button.text.contains("(1)"), "The Asset Inspector should enable Rebase only when its compact candidate list is non-empty and unblocked.")
 	application._on_rebase_asset_scales_pressed()
-	_expect(Vector2(application._get_component(application._get_asset("ui_rebase"), "ui_component").get("transform", {}).get("scale", Vector2.ZERO)) == Vector2.ONE and application.asset_scale_rebase_button.disabled, "The Asset Inspector Rebase action should normalize the candidate and disable itself once no work remains.")
+	_expect(Vector2(application._get_component(application._get_asset("ui_rebase"), "ui_component").get("transform", {}).get("scale", Vector2.ZERO)) == Vector2.ONE and application.create_inspector_view.asset_scale_rebase_button.disabled, "The Asset Inspector Rebase action should normalize the candidate and disable itself once no work remains.")
 	application.free()
 
 
@@ -1371,9 +1371,9 @@ func _test_asset_scale_rebase() -> void:
 	application.selected_asset_id = "root_scale"
 	application.selected_component_id = ""
 	application._render_inspector()
-	_expect(is_instance_valid(application.asset_root_scale_fields["scale_x"]) and is_instance_valid(application.asset_root_scale_fields["scale_y"]) and is_equal_approx(application.asset_root_scale_fields["scale_x"].value, 3.6) and is_equal_approx(application.asset_root_scale_fields["scale_y"].value, 1.8) and is_equal_approx(application.asset_root_position_fields["position_x"].value, 2.5) and is_equal_approx(application.asset_root_position_fields["position_y"].value, -4.0) and is_instance_valid(application.asset_root_scale_rebase_button) and not application.asset_root_scale_rebase_button.disabled, "The Root Asset Inspector should expose independent X/Y Scale fields and enable its shared Rebase action.")
+	_expect(is_instance_valid(application.create_inspector_view.asset_root_scale_fields["scale_x"]) and is_instance_valid(application.create_inspector_view.asset_root_scale_fields["scale_y"]) and is_equal_approx(application.create_inspector_view.asset_root_scale_fields["scale_x"].value, 3.6) and is_equal_approx(application.create_inspector_view.asset_root_scale_fields["scale_y"].value, 1.8) and is_equal_approx(application.create_inspector_view.asset_root_position_fields["position_x"].value, 2.5) and is_equal_approx(application.create_inspector_view.asset_root_position_fields["position_y"].value, -4.0) and is_instance_valid(application.create_inspector_view.asset_root_scale_rebase_button) and not application.create_inspector_view.asset_root_scale_rebase_button.disabled, "The Root Asset Inspector should expose independent X/Y Scale fields and enable its shared Rebase action.")
 	application._on_rebase_asset_root_scale_pressed()
-	_expect(Vector2(application._get_asset("root_scale").get("root_position", Vector2.INF)) == Vector2.ZERO and Vector2(application._get_asset("root_scale").get("root_scale", Vector2.ZERO)).is_equal_approx(Vector2.ONE) and application.asset_root_scale_rebase_button.disabled, "The Root Asset Inspector Rebase action should bake Position and both Scale axes and normalize both fields.")
+	_expect(Vector2(application._get_asset("root_scale").get("root_position", Vector2.INF)) == Vector2.ZERO and Vector2(application._get_asset("root_scale").get("root_scale", Vector2.ZERO)).is_equal_approx(Vector2.ONE) and application.create_inspector_view.asset_root_scale_rebase_button.disabled, "The Root Asset Inspector Rebase action should bake Position and both Scale axes and normalize both fields.")
 	application._undo()
 	_expect(Vector2(application._get_asset("root_scale").get("root_position", Vector2.ZERO)) == Vector2(0.25, -0.4) and Vector2(application._get_asset("root_scale").get("root_scale", Vector2.ZERO)).is_equal_approx(Vector2(3.6, 1.8)), "Undo should restore the complete pre-Rebase Asset Root Transform authoring state.")
 	application._redo()
@@ -1398,9 +1398,9 @@ func _test_asset_authored_facing() -> void:
 	application.selected_asset_id = "pose_asset"
 	application._render_inspector()
 	var inspector_text := _control_text(application.inspector_content)
-	_expect(inspector_text.contains("Initial Pose") and is_instance_valid(application.asset_authored_facing_option) and str(application.asset_authored_facing_option.get_item_metadata(application.asset_authored_facing_option.selected)) == "neutral", "The Asset Inspector should expose Initial Pose and select Neutral for an older Asset.")
+	_expect(inspector_text.contains("Initial Pose") and is_instance_valid(application.create_inspector_view.asset_authored_facing_option) and str(application.create_inspector_view.asset_authored_facing_option.get_item_metadata(application.create_inspector_view.asset_authored_facing_option.selected)) == "neutral", "The Asset Inspector should expose Initial Pose and select Neutral for an older Asset.")
 	var down_index := AssetPresentation.SERIALIZED_VALUES.find("down")
-	application._on_asset_authored_facing_selected(down_index, application.asset_authored_facing_option)
+	application._on_asset_authored_facing_selected(down_index, application.create_inspector_view.asset_authored_facing_option)
 	_expect(AssetPresentation.serialize_authored_facing(application._get_asset("pose_asset").get("authored_facing")) == "down" and application.undo_history.size() == 1, "Changing Authored Facing in the Inspector should store the selected value and capture one Undo snapshot.")
 	application._undo()
 	_expect(AssetPresentation.authored_facing(application._get_asset("pose_asset")) == AssetPresentation.AuthoredFacing.NEUTRAL, "Undo should restore the previous Asset-level Authored Facing.")
@@ -1610,14 +1610,14 @@ func _test_inspector_field_wiring() -> void:
 	# Asset level: pivot and the authoring-only root transform.
 	application.selected_component_id = ""
 	application._render_inspector()
-	_expect(application.asset_pivot_fields.has("pivot_x"), "The Asset Inspector should expose its Pivot fields.")
-	_edit_inspector_value(application.asset_pivot_fields["pivot_x"], 9.0)
+	_expect(application.create_inspector_view.asset_pivot_fields.has("pivot_x"), "The Asset Inspector should expose its Pivot fields.")
+	_edit_inspector_value(application.create_inspector_view.asset_pivot_fields["pivot_x"], 9.0)
 	_expect(is_equal_approx(Vector2(asset["asset_pivot"]).x, application._world_to_editor_units(9.0)), "The Asset Pivot X field should write the Asset pivot.")
-	_edit_inspector_value(application.asset_root_position_fields["position_y"], 7.0)
+	_edit_inspector_value(application.create_inspector_view.asset_root_position_fields["position_y"], 7.0)
 	_expect(is_equal_approx(Vector2(AssetScaleRebaseService.root_position(asset)).y, application._world_to_editor_units(7.0)), "The Root Position Y field should write the Asset root position.")
-	_edit_inspector_value(application.asset_root_scale_fields["scale_x"], 2.5)
+	_edit_inspector_value(application.create_inspector_view.asset_root_scale_fields["scale_x"], 2.5)
 	_expect(is_equal_approx(Vector2(AssetScaleRebaseService.root_scale(asset)).x, 2.5), "The Root Scale X field should write the Asset root scale.")
-	_expect(is_instance_valid(application.asset_name_editor), "The Asset Inspector should expose its name editor.")
+	_expect(is_instance_valid(application.create_inspector_view.asset_name_editor), "The Asset Inspector should expose its name editor.")
 	application._rename_selected_asset("Sorcerer")
 	_expect(str(asset["name"]) == "Sorcerer", "The Asset name editor should rename the Asset.")
 
@@ -1625,13 +1625,13 @@ func _test_inspector_field_wiring() -> void:
 	application.selected_component_id = "component_1"
 	application._render_inspector()
 	for entry in [["position_x", 11.0], ["position_y", 12.0]]:
-		_expect(application.transform_fields.has(entry[0]), "The Component Inspector should expose %s." % entry[0])
-		_edit_inspector_value(application.transform_fields[entry[0]], float(entry[1]))
+		_expect(application.create_inspector_view.transform_fields.has(entry[0]), "The Component Inspector should expose %s." % entry[0])
+		_edit_inspector_value(application.create_inspector_view.transform_fields[entry[0]], float(entry[1]))
 	var moved: Vector2 = body["transform"]["position"]
 	_expect(is_equal_approx(moved.x, application._world_to_editor_units(11.0)) and is_equal_approx(moved.y, application._world_to_editor_units(12.0)), "The Component position fields should write the Component transform.")
-	_edit_inspector_value(application.transform_fields["rotation"], 42.0)
+	_edit_inspector_value(application.create_inspector_view.transform_fields["rotation"], 42.0)
 	_expect(is_equal_approx(float(body["transform"]["rotation"]), 42.0), "The Component rotation field should write the Component transform.")
-	_edit_inspector_value(application.transform_fields["scale_x"], 3.0)
+	_edit_inspector_value(application.create_inspector_view.transform_fields["scale_x"], 3.0)
 	_expect(is_equal_approx(Vector2(body["transform"]["scale"]).x, 3.0), "The Component scale field should write the Component transform.")
 
 	var depth_field := _inspector_spin(application, "Projection Depth (cm)")

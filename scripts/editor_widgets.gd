@@ -245,6 +245,14 @@ static func clear(container: Node) -> void:
 		child.queue_free()
 
 
+static func clear_except(container: Node, kept: Node) -> void:
+	# Used where a container holds one long-lived view next to content that is
+	# rebuilt on every render.
+	for child in container.get_children():
+		if child != kept:
+			child.queue_free()
+
+
 static func strikethrough_text(text: String) -> String:
 	var result := ""
 	var strike_mark := String.chr(0x0336)
@@ -282,6 +290,17 @@ static func create_number_field(value: float, minimum: float, maximum: float, st
 	if on_changed.is_valid():
 		field.value_changed.connect(on_changed)
 	return field
+
+static func format_scale_value(value: float) -> String:
+	# Two decimals with the trailing zeros trimmed, so 1.50 reads as 1.5 and
+	# 2.00 as 2.
+	var formatted := "%.2f" % value
+	while formatted.ends_with("0"):
+		formatted = formatted.substr(0, formatted.length() - 1)
+	if formatted.ends_with("."):
+		formatted = formatted.substr(0, formatted.length() - 1)
+	return formatted
+
 
 static func create_option_field(items: Array, selected_metadata: String, on_selected: Callable, sized := true) -> OptionButton:
 	# The Inspector's dropdown: a list of {label, metadata} entries, optionally

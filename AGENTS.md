@@ -41,6 +41,10 @@ A `SCRIPT ERROR` in the test output is a failure even when the runner prints
 remaining assertions never run and never increment the failure count. CI fails
 the job on any such line.
 
+The `--editor --quit` run is not a full parse check: it reported clean on a
+script with undeclared identifiers that the test run caught immediately. Treat
+the test run, not the editor run, as the parser of record.
+
 The same holds when `scripts/main.gd` fails to parse: every test that does
 `load("res://scripts/main.gd").new()` then skips its assertions and the runner
 still reports a pass. An unused local is a parse error here — warnings are

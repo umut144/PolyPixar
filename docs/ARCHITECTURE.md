@@ -53,6 +53,20 @@ export data.
   plus labels — and the view draws them without deciding what a row says. A
   `pipeline` row carries an `action_id` rather than a callback, so the view
   stays free of editor behaviour.
+- `CreateInspectorView` draws the Create module's Inspector under the same
+  contract as `OutlinerView`: `main.gd` pushes a snapshot in through `set_document`,
+  `set_selection`, `set_resolved_selection` and `set_mode`, `rebuild()` draws from
+  that snapshot alone, and every user action leaves as one of 43 intent signals.
+  The two lists that need the document to resolve — the Components of a multi
+  selection and the Point ids that still exist — are computed in `main.gd` and
+  handed over, so the view never resolves a stale id itself. The controls the
+  editor updates without a full rebuild (`transform_fields`, the name editors,
+  the two rebase buttons) belong to the view and are read from it.
+  The intent signals still carry the argument lists of the handlers they replaced,
+  `OptionButton` references included; giving them plain values is a separate step.
+  The Mesh, Style and Motion Inspectors still render into `inspector_content` in
+  `main.gd` and are extracted the same way, Motion only once the render
+  comparison covers its states.
 - `EditorWidgets` builds the shared widget vocabulary — panels, labels, section
   headers, buttons and their styling. It is static and purely constructive: it
   reads no editor state and knows nothing about Worlds, Assets or Components.

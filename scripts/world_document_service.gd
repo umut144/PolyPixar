@@ -878,6 +878,55 @@ static func asset_by_id(assets: Array, asset_id: String) -> Dictionary:
 	return {}
 
 
+static func edge_by_id(component: Dictionary, edge_id: String) -> Dictionary:
+	if component.is_empty():
+		return {}
+	for edge in component.get("edges", []):
+		if str(edge.get("id", "")) == edge_id:
+			return edge
+	return {}
+
+
+static func guide_by_id(asset: Dictionary, guide_id: String) -> Dictionary:
+	if asset.is_empty():
+		return {}
+	for guide in asset.get("guides", []):
+		if str(guide.get("id", "")) == guide_id:
+			return guide
+	return {}
+
+
+static func asset_pivot(asset: Dictionary) -> Vector2:
+	return deserialize_vector(asset.get("asset_pivot", [0.0, 0.0]), Vector2.ZERO)
+
+
+static func projection_depth_cm(component: Dictionary) -> float:
+	return deserialize_projection_depth_cm(component.get("projection_depth_cm", DEFAULT_PROJECTION_DEPTH_CM))
+
+
+static func draw_mode_display_name(draw_mode: String) -> String:
+	if draw_mode == "contour":
+		return "Contour"
+	if draw_mode == "primitive":
+		return "Primitive"
+	return "Closed Loop"
+
+
+static func has_contour_stroke_width_override(component: Dictionary, world_default: float) -> bool:
+	# An override only counts when the stored width is a usable positive number
+	# and actually differs from the world default.
+	if not component.has("contour_stroke_width_px"):
+		return false
+	var width: Variant = component.get("contour_stroke_width_px")
+	if not typeof(width) in [TYPE_INT, TYPE_FLOAT] or not is_finite(float(width)) or float(width) <= 0.0:
+		return false
+	return not is_equal_approx(float(width), world_default)
+
+
+static func effective_contour_stroke_width_px(component: Dictionary, world_default: float) -> float:
+	return float(component["contour_stroke_width_px"]) if has_contour_stroke_width_override(component, world_default) else world_default
+
+
 static func component_by_id(asset: Dictionary, component_id: String) -> Dictionary:
 	if asset.is_empty():
 		return {}
