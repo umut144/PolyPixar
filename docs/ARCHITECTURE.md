@@ -75,8 +75,20 @@ export data.
 - `StyleInspectorView` is the same thing at a much smaller scale: one context
   Dictionary holding the selected Component, its Weighting Style, the Mesh and
   Style status, the preview or baked result, and whether Bake is available.
-  The Motion Inspector still renders into `inspector_content` in `main.gd` and
-  is extracted the same way, once the render comparison covers its states.
+- `MotionInspectorView` completes the set, with one difference stated plainly:
+  it holds references to the Motion session models rather than only data.
+  `motion_workspace`, `motion_player` and `motion_selection` are queried in about
+  thirty places for the selected preview, display names, summaries, primitive
+  options and Transition order, and they are handed in through `set_models`.
+  Turning those queries into a row model, as the Mesh tree already has, is the
+  step that is still open. Everything that is a document lookup does go through
+  a context Dictionary, and the syncing that used to run halfway through the
+  Animation render — selecting the Asset, setting the Workspace Asset, syncing
+  the player document, refreshing the preview — now runs in `main.gd` around
+  `rebuild()`, in the same order.
+
+`main.gd` no longer draws an Inspector. It routes: it clears, decides which of
+the four views is visible, resolves that view's context and calls `rebuild()`.
 - `EditorWidgets` builds the shared widget vocabulary — panels, labels, section
   headers, buttons and their styling. It is static and purely constructive: it
   reads no editor state and knows nothing about Worlds, Assets or Components.

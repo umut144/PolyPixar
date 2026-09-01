@@ -60,6 +60,7 @@ func _init() -> void:
 	_test_motion_asset_preview_geometry()
 	_test_motion_resource_shells()
 	_test_motion_path_topology_and_sampler()
+	_test_motion_inspector_wiring()
 	_test_motion_act_evaluator()
 	_test_motion_module_separators()
 	_test_motion_sequence_evaluator()
@@ -3767,6 +3768,54 @@ func _test_motion_path_topology_and_sampler() -> void:
 	canvas.path_document["topology"]["points"][0]["position"] = Vector2(99.0, 99.0)
 	_expect(Vector2(path_document["topology"]["points"][0]["position"]) != Vector2(99.0, 99.0), "MotionPathWorkspace must render an immutable document copy rather than mutating World topology.")
 	canvas.free()
+
+
+func _test_motion_inspector_wiring() -> void:
+	# The render comparison proves the Motion Inspector still draws the same
+	# controls; it cannot prove each control still reaches its own handler. This
+	# drives one representative dropdown and one representative toggle per
+	# submodule so the extraction's rewiring is not taken on trust.
+	var application: Control = load("res://scripts/main.gd").new()
+	application._build_ui()
+	var act := WorldDocumentService.default_motion_act("act_1", "Slide", MotionActEvaluator.SLIDE)
+	var acts: Array[Dictionary] = [act]
+	application.motion_acts = acts
+	application.selected_motion_act_id = "act_1"
+	application.active_module = "Motion"
+	application.active_motion_submodule = "Act"
+	application._render_inspector()
+
+	var easing_option := _inspector_option(application, MotionActEvaluator.easing_label(MotionActEvaluator.EASING_OPTIONS[0]))
+	_expect(easing_option != null, "The Act Inspector should expose its Easing dropdown.")
+	# Deliberately an entry the Act does not already carry, so a dropdown that
+	# writes nothing fails instead of matching the default.
+	var starting_easing := str(act.get("timing", {}).get("easing", ""))
+	var target_index := 0
+	for easing_index in range(MotionActEvaluator.EASING_OPTIONS.size()):
+		if str(MotionActEvaluator.EASING_OPTIONS[easing_index]) != starting_easing:
+			target_index = easing_index
+			break
+	_choose_option(easing_option, target_index)
+	_expect(str(act.get("timing", {}).get("easing", "")) == str(MotionActEvaluator.EASING_OPTIONS[target_index])
+		and str(MotionActEvaluator.EASING_OPTIONS[target_index]) != starting_easing,
+		"The Act Easing dropdown should write the Act timing.")
+
+	var enabled_toggle := _inspector_toggle(application, "Enabled")
+	_expect(enabled_toggle != null, "The Act Inspector should expose its Enabled toggle.")
+	_press_inspector_toggle(enabled_toggle, false)
+	_expect(not bool(act.get("enabled", true)), "The Act Enabled toggle should write the Act.")
+
+	var path := WorldDocumentService.default_motion_path("path_1", "Walk Path")
+	var paths: Array[Dictionary] = [path]
+	application.motion_paths = paths
+	application.selected_motion_path_id = "path_1"
+	application.active_motion_submodule = "Path"
+	application._render_inspector()
+	var duration_field := _inspector_spin(application, "Duration (s)")
+	_expect(duration_field != null, "The Path Inspector should expose its Duration.")
+	_edit_inspector_value(duration_field, 3.5)
+	_expect(is_equal_approx(float(path.get("playback", {}).get("duration", 0.0)), 3.5), "The Path Duration field should write the Path playback.")
+	application.free()
 
 
 func _test_motion_act_evaluator() -> void:
