@@ -30,7 +30,12 @@ Run both commands after geometry changes:
 ```
 
 Also run `git diff --check`. Files below `worlds/` are user data and must
-not be rewritten as test fixtures.
+not be rewritten as test fixtures. Two things below `worlds/` are the
+exception because they are generated rather than authored: `catalog.json` and
+`PolyToolsRuntimeExports/` are produced by `Export Runtime`, are read by the
+consumers from the working directory through `POLYTOOLS_WORLD_DIR`, and are not
+tracked. A fresh clone needs one `Export Runtime` before the first Consumer
+Sync.
 
 Setting `SpinBox.value` in a test does not emit `value_changed` — only real
 input does — so an Inspector edit is simulated by setting the value and

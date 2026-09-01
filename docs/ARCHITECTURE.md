@@ -263,7 +263,10 @@ and Undo/Redo for this property. It has no geometry, Canvas, or transform
 behavior.
 
 The World-root `catalog.json` is an independently versioned derived index, not
-an authored identity store. It lists currently runtime-exportable visible Assets
+an authored identity store, and it is not tracked by Git: together with
+`PolyToolsRuntimeExports/` it forms one generated publication unit that the
+consumers read from the working directory. A fresh clone has neither until
+`Export Runtime` has run once. It lists currently runtime-exportable visible Assets
 by the `asset_key` mechanically derived from each complete display name. A
 visible Asset blocked by Runtime validation is omitted, so it cannot prevent
 valid siblings from publishing; its retained package remains unadvertised until

@@ -19,6 +19,14 @@ res://worlds/<world_key>/
         └── manifest.json
 ```
 
+Both `catalog.json` and `PolyToolsRuntimeExports/` are generated, and both are
+outside the source history: consumers read them from the working directory
+through `POLYTOOLS_WORLD_DIR`, not from Git. **A fresh clone therefore has
+neither. Run `Export Runtime` once before the first Consumer Sync**, otherwise
+the sync finds no Catalog and no packages. The Export preflight names what is
+missing — a fresh clone lists every Asset plus `World Catalog — catalog.json
+missing or stale` as pending.
+
 `asset_key` is the deterministic lower-snake-case derivation of the complete
 Asset display name. Internal editor Asset IDs never enter the contract.
 `catalog.json` schema 1 is the closed authoritative Asset set; consumers must
