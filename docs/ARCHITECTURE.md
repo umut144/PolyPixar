@@ -64,7 +64,15 @@ export data.
   the two rebase buttons) belong to the view and are read from it.
   The intent signals still carry the argument lists of the handlers they replaced,
   `OptionButton` references included; giving them plain values is a separate step.
-  The Mesh, Style and Motion Inspectors still render into `inspector_content` in
+- `GeometryInspectorView` does the same for the Mesh module, with one difference
+  that follows from what it draws: nearly everything on screen is derived from
+  the Geometry documents and the preview caches, so `main.gd` resolves each
+  submodule into one context Dictionary — `_geometry_sampling_inspector_context`,
+  `_geometry_seeding_inspector_context`, `_geometry_meshing_inspector_context` —
+  and the view renders that. Boundary rows and Sampler Spine rows arrive as row
+  models with their labels already resolved, the same way the Outliner gets its
+  Mesh tree.
+  The Style and Motion Inspectors still render into `inspector_content` in
   `main.gd` and are extracted the same way, Motion only once the render
   comparison covers its states.
 - `EditorWidgets` builds the shared widget vocabulary — panels, labels, section

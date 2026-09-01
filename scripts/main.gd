@@ -48,6 +48,7 @@ var outliner_asset_type_filters: Dictionary = {
 }
 var inspector_content: VBoxContainer
 var create_inspector_view: CreateInspectorView
+var geometry_inspector_view: GeometryInspectorView
 var module_sections: Array[ModuleSection] = []
 var assets: Array[Dictionary] = []
 var motion_paths: Array[Dictionary] = []
@@ -1064,6 +1065,39 @@ func _build_ui() -> void:
 	create_inspector_view.transform_value_changed.connect(_on_transform_value_changed)
 	create_inspector_view.weapon_frame_value_changed.connect(_on_weapon_frame_value_changed)
 	inspector_content.add_child(create_inspector_view)
+	geometry_inspector_view = GeometryInspectorView.new()
+	geometry_inspector_view.add_theme_constant_override("separation", 2)
+	geometry_inspector_view.meshing_advanced_relaxation_toggled.connect(_on_geometry_meshing_advanced_relaxation_toggled)
+	geometry_inspector_view.meshing_bake_requested.connect(_bake_geometry_meshing)
+	geometry_inspector_view.meshing_float_focus_exited.connect(_on_geometry_meshing_float_focus_exited)
+	geometry_inspector_view.meshing_float_text_submitted.connect(_on_geometry_meshing_float_text_submitted)
+	geometry_inspector_view.meshing_override_changed.connect(_on_geometry_meshing_override_changed)
+	geometry_inspector_view.meshing_parameter_changed.connect(_on_geometry_meshing_parameter_changed)
+	geometry_inspector_view.meshing_seed_source_selected.connect(_on_geometry_meshing_seed_source_selected)
+	geometry_inspector_view.meshing_view_option_changed.connect(_on_geometry_meshing_view_option_changed)
+	geometry_inspector_view.sampling_bake_requested.connect(_bake_geometry_sampling)
+	geometry_inspector_view.sampling_feature_detail_changed.connect(_on_geometry_sampling_feature_detail_changed)
+	geometry_inspector_view.sampling_parameter_changed.connect(_on_geometry_sampling_parameter_changed)
+	geometry_inspector_view.sampling_refinement_changed.connect(_on_geometry_sampling_refinement_changed)
+	geometry_inspector_view.sampling_refinement_toggled.connect(_on_geometry_sampling_refinement_toggled)
+	geometry_inspector_view.sampling_spacing_focus_exited.connect(_on_geometry_spacing_focus_exited)
+	geometry_inspector_view.sampling_spacing_text_submitted.connect(_on_geometry_spacing_text_submitted)
+	geometry_inspector_view.section_toggled.connect(_on_inspector_section_toggled)
+	geometry_inspector_view.seeding_advanced_pattern_toggled.connect(_on_geometry_seeding_advanced_pattern_toggled)
+	geometry_inspector_view.seeding_bake_requested.connect(_bake_geometry_seeding)
+	geometry_inspector_view.seeding_boundary_override_changed.connect(_on_geometry_seeding_boundary_override_changed)
+	geometry_inspector_view.seeding_fill_gaps_changed.connect(_on_geometry_seeding_fill_gaps_changed)
+	geometry_inspector_view.seeding_float_focus_exited.connect(_on_geometry_seeding_float_focus_exited)
+	geometry_inspector_view.seeding_float_text_submitted.connect(_on_geometry_seeding_float_text_submitted)
+	geometry_inspector_view.seeding_method_selected.connect(_on_geometry_seeding_method_selected)
+	geometry_inspector_view.seeding_parameter_changed.connect(_on_geometry_seeding_parameter_changed)
+	geometry_inspector_view.seeding_spine_enabled_changed.connect(_on_geometry_seeding_spine_enabled)
+	geometry_inspector_view.seeding_stagger_override_changed.connect(_on_geometry_seeding_stagger_override_changed)
+	geometry_inspector_view.sampling_reference_selected.connect(func(reference_id: String) -> void:
+		_select_geometry_sampling_reference(selected_asset_id, selected_component_id, reference_id))
+	geometry_inspector_view.sampling_cut_selected.connect(func(guide_id: String) -> void:
+		_select_guide(selected_asset_id, guide_id))
+	inspector_content.add_child(geometry_inspector_view)
 	_create_export_workspace(canvas_panel)
 
 	var status_bar := EditorWidgets.create_panel()
@@ -9098,123 +9132,6 @@ func _on_geometry_sampling_refinement_changed(value: float, input_id: String) ->
 	_set_geometry_sampling_refinement(input_id, value)
 
 
-func _render_geometry_sampling_inspector() -> void:
-	var asset := _get_asset(selected_asset_id)
-	var component := _get_component(asset, selected_component_id)
-	if component.is_empty():
-		inspector_content.add_child(EditorWidgets.create_inspector_section("Sampling", _on_inspector_section_toggled))
-		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Select one Component to configure its boundary sampling."))
-		return
-	inspector_content.add_child(EditorWidgets.create_inspector_section("Boundary Sampling · %s" % str(component.get("name", "Component")), _on_inspector_section_toggled))
-	inspector_content.add_child(EditorWidgets.create_inspector_field_label("One adaptive Body recipe shared by Outer, Holes, and Cuts."))
-	var base_recipe := _geometry_sampling_recipe(selected_asset_id, selected_component_id)
-	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Target Edge Length (Body units)"))
-	var spacing := SpinBox.new()
-	spacing.min_value = GeometrySamplingService.MIN_SPACING
-	spacing.max_value = 10000.0
-	spacing.step = 0.01
-	spacing.custom_arrow_step = 0.01
-	spacing.set_value_no_signal(float(base_recipe.get("parameters", {}).get("spacing", GeometrySamplingService.DEFAULT_SPACING)))
-	spacing.value_changed.connect(_on_geometry_sampling_parameter_changed.bind("spacing"))
-	spacing.get_line_edit().text_submitted.connect(_on_geometry_spacing_text_submitted.bind(spacing))
-	spacing.get_line_edit().focus_exited.connect(_on_geometry_spacing_focus_exited.bind(spacing))
-	inspector_content.add_child(spacing)
-	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Curve Detail"))
-	var feature_detail := SpinBox.new()
-	feature_detail.min_value = 0.0
-	feature_detail.max_value = 100.0
-	feature_detail.step = 5.0
-	feature_detail.suffix = "%"
-	feature_detail.set_value_no_signal(float(base_recipe.get("parameters", {}).get("feature_detail", GeometrySamplingService.DEFAULT_FEATURE_DETAIL)) * 100.0)
-	feature_detail.value_changed.connect(_on_geometry_sampling_feature_detail_changed)
-	inspector_content.add_child(feature_detail)
-
-	var display_result := geometry_sampling_preview if _geometry_sampling_preview_matches(selected_asset_id, selected_component_id, component) else _geometry_sampling_bake(selected_asset_id, selected_component_id)
-	inspector_content.add_child(EditorWidgets.create_inspector_section("Boundary Inputs", _on_inspector_section_toggled))
-	_render_geometry_sampling_boundary_row("Outer · %s" % str(component.get("name", "Component")), "", "outer", display_result, Callable())
-
-	var references: Array = []
-	for reference in asset.get("components", []):
-		if _is_reference_component(reference) and str(reference.get("parent_component_id", "")) == selected_component_id and str(reference.get("topology_role", "outer")) == "hole":
-			references.append(reference)
-	for reference in references:
-		var reference_id := str(reference.get("id", ""))
-		var reference_name := WorldDocumentService.component_outliner_name(assets, reference)
-		_render_geometry_sampling_boundary_row("Hole · %s" % reference_name, reference_id, "hole", display_result, _select_geometry_sampling_reference.bind(selected_asset_id, selected_component_id, reference_id))
-
-	for guide in asset.get("guides", []):
-		if str(guide.get("scope", {}).get("component_id", "")) != selected_component_id or str(guide.get("guide_type", "")) != AssetGuide.CUT:
-			continue
-		var guide_id := str(guide.get("id", ""))
-		_render_geometry_sampling_boundary_row("Cut · %s" % WorldDocumentService.guide_display_name(asset, guide), guide_id, "cut", display_result, _select_guide.bind(selected_asset_id, guide_id))
-
-	if not selected_sampling_input_id.is_empty():
-		_render_geometry_sampling_refinement_controls(base_recipe)
-
-	var status := _geometry_sampling_status(selected_asset_id, selected_component_id, component)
-	inspector_content.add_child(EditorWidgets.create_inspector_section("Result", _on_inspector_section_toggled))
-	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Status: %s" % status))
-	if not display_result.is_empty():
-		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Constraint Samples: %d" % int(display_result.get("constraint_sample_count", display_result.get("sample_count", 0)))))
-		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Preserved Points: %d" % int(display_result.get("preserve_count", 0))))
-	var actions := HBoxContainer.new()
-	var bake_button := Button.new()
-	bake_button.text = "Calculating…" if status == "Calculating" else "Baked" if status == "Baked" else "Bake Preview"
-	bake_button.custom_minimum_size = Vector2(96, 28)
-	bake_button.focus_mode = Control.FOCUS_NONE
-	bake_button.disabled = status != "Preview Ready"
-	bake_button.pressed.connect(_bake_geometry_sampling)
-	geometry_sampling_bake_button = bake_button
-	actions.add_child(bake_button)
-	inspector_content.add_child(actions)
-
-
-func _render_geometry_sampling_boundary_row(title: String, input_id: String, role: String, result: Dictionary, select_action: Callable) -> void:
-	var count := 0
-	for stat in result.get("boundary_stats", []):
-		if str(stat.get("input_id", "")) == input_id and str(stat.get("role", "")) == role:
-			count += int(stat.get("sample_count", 0))
-	var recipe := _geometry_sampling_recipe(selected_asset_id, selected_component_id)
-	var refinement: Dictionary = recipe.get("parameters", {}).get("boundary_refinements", {}).get(input_id, {})
-	var factor := float(refinement.get("factor", 1.0))
-	var has_adjustment := _geometry_sampling_input_has_override(recipe, input_id)
-	var button := Button.new()
-	button.text = "%s  ·  %s%s" % [title, "Density %s×" % _format_scale_value(factor) if has_adjustment else "Inherited", "  ·  %d" % count if count > 0 else ""]
-	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	button.focus_mode = Control.FOCUS_NONE
-	button.disabled = not select_action.is_valid()
-	if select_action.is_valid():
-		button.pressed.connect(select_action)
-	inspector_content.add_child(button)
-
-
-func _render_geometry_sampling_refinement_controls(recipe: Dictionary) -> void:
-	var input := _get_sampling_input(_get_asset(selected_asset_id), selected_sampling_input_id, selected_sampling_input_kind)
-	if input.is_empty():
-		return
-	inspector_content.add_child(EditorWidgets.create_inspector_section("Boundary Density · %s" % _sampling_input_display_name(_get_asset(selected_asset_id), _get_component(_get_asset(selected_asset_id), selected_component_id), input, selected_sampling_input_kind), _on_inspector_section_toggled))
-	var refinement: Dictionary = recipe.get("parameters", {}).get("boundary_refinements", {}).get(selected_sampling_input_id, {})
-	var factor := float(refinement.get("factor", 1.0))
-	var has_adjustment := _geometry_sampling_input_has_override(recipe, selected_sampling_input_id)
-	var toggle := CheckBox.new()
-	toggle.text = "Adjust this Boundary"
-	toggle.button_pressed = has_adjustment
-	toggle.toggled.connect(_on_geometry_sampling_refinement_toggled.bind(selected_sampling_input_id))
-	inspector_content.add_child(toggle)
-	var effective_spacing := float(recipe.get("parameters", {}).get("spacing", GeometrySamplingService.DEFAULT_SPACING)) / factor
-	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Effective Edge Length: %.2f" % effective_spacing))
-	if has_adjustment:
-		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Density Factor · below 1× is coarser"))
-		var factor_input := SpinBox.new()
-		factor_input.min_value = GeometrySamplingService.MIN_REFINEMENT_FACTOR
-		factor_input.max_value = GeometrySamplingService.MAX_REFINEMENT_FACTOR
-		factor_input.step = 0.25
-		factor_input.suffix = "×"
-		factor_input.set_value_no_signal(factor)
-		factor_input.value_changed.connect(_on_geometry_sampling_refinement_changed.bind(selected_sampling_input_id))
-		inspector_content.add_child(factor_input)
-
-
 func _on_geometry_sampling_parameter_changed(value: float, parameter_name: String) -> void:
 	if selected_asset_id.is_empty() or selected_component_id.is_empty():
 		return
@@ -9466,147 +9383,6 @@ func _geometry_sampling_overlays(asset: Dictionary, component_id: String) -> Dic
 		local_guide["points"] = guide.get("points", []).duplicate(true)
 		overlays["guides"].append(local_guide)
 	return overlays
-
-
-func _render_geometry_seeding_inspector() -> void:
-	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	if component.is_empty():
-		inspector_content.add_child(EditorWidgets.create_inspector_section("Seeding", _on_inspector_section_toggled))
-		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Select one Component to configure its interior seeding."))
-		return
-	inspector_content.add_child(EditorWidgets.create_inspector_section("Seeding · %s" % str(component.get("name", "Component")), _on_inspector_section_toggled))
-	inspector_content.add_child(EditorWidgets.create_inspector_field_label("One derived Seed set from the accepted Sampling constraints."))
-	var upstream_current := _geometry_sampling_bake_is_current(selected_asset_id, selected_component_id, component)
-	inspector_content.add_child(EditorWidgets.create_inspector_section("Input", _on_inspector_section_toggled))
-	var input_label := EditorWidgets.create_inspector_field_label("Sampling · Adaptive: %s" % ("Baked" if upstream_current else "Required / Stale"))
-	input_label.add_theme_color_override("font_color", Color("#75b88a") if upstream_current else Color("#ef8354"))
-	inspector_content.add_child(input_label)
-	var recipe := _geometry_seeding_recipe(selected_asset_id, selected_component_id)
-	var sampling_bake := _geometry_sampling_bake(selected_asset_id, selected_component_id)
-	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Method"))
-	# Anything that is not Poisson Fill is shown as Spine Flow, which is what the
-	# original index arithmetic did.
-	var seeding_method := GeometrySeedingService.POISSON_FILL if str(recipe.get("method", "")) == GeometrySeedingService.POISSON_FILL else GeometrySeedingService.SPINE_FLOW
-	inspector_content.add_child(EditorWidgets.create_option_field([
-		{"label": "Poisson Fill", "metadata": GeometrySeedingService.POISSON_FILL},
-		{"label": "Spine Flow", "metadata": GeometrySeedingService.SPINE_FLOW},
-	], seeding_method, _on_geometry_seeding_method_selected, false))
-	inspector_content.add_child(EditorWidgets.create_inspector_section("Parameters", _on_inspector_section_toggled))
-	if str(recipe.get("method", "")) == GeometrySeedingService.SPINE_FLOW:
-		var sampler_guides := _sampler_spines_for_component(_get_asset(selected_asset_id), selected_component_id)
-		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Active Sampler Spines"))
-		for guide in sampler_guides:
-			var guide_id := str(guide.get("id", ""))
-			var enabled := _geometry_seeding_spine_enabled(recipe, guide_id)
-			var toggle := CheckBox.new()
-			toggle.text = WorldDocumentService.guide_display_name(_get_asset(selected_asset_id), guide)
-			toggle.button_pressed = enabled
-			toggle.toggled.connect(_on_geometry_seeding_spine_enabled.bind(guide_id))
-			inspector_content.add_child(toggle)
-		if sampler_guides.is_empty():
-			var missing_guide := EditorWidgets.create_inspector_field_label("Create and author a Sampler Spine on this Component.")
-			missing_guide.add_theme_color_override("font_color", Color("#ef8354"))
-			inspector_content.add_child(missing_guide)
-		_add_geometry_seeding_float_parameter("Seed Spacing (Body units)", recipe, "spacing", GeometrySeedingService.MIN_SPACING, 10000.0)
-		_add_geometry_seeding_float_parameter("Flow Stretch", recipe, "flow_stretch", GeometrySeedingService.MIN_FLOW_STRETCH, GeometrySeedingService.MAX_FLOW_STRETCH, "×")
-		var fill_gaps := CheckBox.new()
-		fill_gaps.text = "Fill Gaps"
-		fill_gaps.button_pressed = bool(recipe.get("parameters", {}).get("fill_gaps", GeometrySeedingService.DEFAULT_FILL_GAPS))
-		fill_gaps.toggled.connect(_on_geometry_seeding_fill_gaps_changed)
-		inspector_content.add_child(fill_gaps)
-		var parameters: Dictionary = recipe.get("parameters", {})
-		var boundary_override := bool(parameters.get("boundary_clearance_override", false))
-		var boundary_clearance := float(parameters.get("boundary_clearance", GeometrySeedingService.DEFAULT_BOUNDARY_CLEARANCE))
-		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Boundary Margin: %s · %s" % ["Refined" if boundary_override else "Auto", _format_scale_value(boundary_clearance)]))
-		var refine_boundary := CheckBox.new()
-		refine_boundary.text = "Refine Boundary Margin"
-		refine_boundary.button_pressed = boundary_override
-		refine_boundary.toggled.connect(_on_geometry_seeding_boundary_override_changed)
-		inspector_content.add_child(refine_boundary)
-		if boundary_override:
-			_add_geometry_seeding_float_parameter("Boundary Margin Override", recipe, "boundary_clearance", 0.0, 10000.0)
-		var advanced_pattern := Button.new()
-		advanced_pattern.text = "%s Advanced Pattern" % ("▾" if geometry_seeding_advanced_pattern_expanded else "▸")
-		advanced_pattern.toggle_mode = true
-		advanced_pattern.button_pressed = geometry_seeding_advanced_pattern_expanded
-		advanced_pattern.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		advanced_pattern.focus_mode = Control.FOCUS_NONE
-		advanced_pattern.toggled.connect(_on_geometry_seeding_advanced_pattern_toggled)
-		inspector_content.add_child(advanced_pattern)
-		if geometry_seeding_advanced_pattern_expanded:
-			inspector_content.add_child(EditorWidgets.create_inspector_field_label("Along Spacing: Derived · %s" % _format_scale_value(float(parameters.get("along_spacing", GeometrySeedingService.DEFAULT_ALONG_SPACING)))))
-			inspector_content.add_child(EditorWidgets.create_inspector_field_label("Across Spacing: Derived · %s" % _format_scale_value(float(parameters.get("across_spacing", GeometrySeedingService.DEFAULT_ACROSS_SPACING)))))
-			var stagger_override := bool(parameters.get("stagger_override", false))
-			var stagger := float(parameters.get("stagger", GeometrySeedingService.DEFAULT_ARTISTIC_STAGGER))
-			inspector_content.add_child(EditorWidgets.create_inspector_field_label("Stagger: %s · %s" % ["Refined" if stagger_override else "Auto", _format_scale_value(stagger)]))
-			var refine_stagger := CheckBox.new()
-			refine_stagger.text = "Refine Stagger"
-			refine_stagger.button_pressed = stagger_override
-			refine_stagger.toggled.connect(_on_geometry_seeding_stagger_override_changed)
-			inspector_content.add_child(refine_stagger)
-			if stagger_override:
-				_add_geometry_seeding_float_parameter("Stagger Override", recipe, "stagger", 0.0, 1.0)
-	else:
-		_add_geometry_seeding_float_parameter("Seed Spacing (Body units)", recipe, "spacing", GeometrySeedingService.MIN_SPACING, 10000.0)
-		var clearance := float(recipe.get("parameters", {}).get("spacing", GeometrySeedingService.DEFAULT_SPACING)) * float(recipe.get("parameters", {}).get("constraint_clearance_factor", GeometrySeedingService.DEFAULT_CONSTRAINT_CLEARANCE_FACTOR))
-		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Constraint Clearance: Auto · %.2f" % clearance))
-	if str(recipe.get("method", "")) == GeometrySeedingService.POISSON_FILL or (geometry_seeding_advanced_pattern_expanded and bool(recipe.get("parameters", {}).get("fill_gaps", false))):
-		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Random Seed"))
-		var random_seed := SpinBox.new()
-		random_seed.min_value = 0.0
-		random_seed.max_value = 2147483647.0
-		random_seed.step = 1.0
-		random_seed.set_value_no_signal(float(recipe.get("parameters", {}).get("seed", GeometrySeedingService.DEFAULT_SEED)))
-		random_seed.value_changed.connect(_on_geometry_seeding_parameter_changed.bind("seed"))
-		inspector_content.add_child(random_seed)
-	inspector_content.add_child(EditorWidgets.create_inspector_section("Constraints", _on_inspector_section_toggled))
-	var outer_count := 0
-	var hole_count := 0
-	var cut_count := 0
-	for stat in sampling_bake.get("boundary_stats", []):
-		var role := str(stat.get("role", ""))
-		if role == "outer":
-			outer_count += int(stat.get("sample_count", 0))
-		elif role == "hole":
-			hole_count += int(stat.get("sample_count", 0))
-		elif role == "cut":
-			cut_count += int(stat.get("sample_count", 0))
-	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Outer · inward clearance · %d points" % outer_count))
-	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Holes · excluded + clearance · %d points" % hole_count))
-	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Cuts · barrier + clearance · %d points" % cut_count))
-	var status := _geometry_seeding_status(selected_asset_id, selected_component_id, component)
-	inspector_content.add_child(EditorWidgets.create_inspector_section("Result", _on_inspector_section_toggled))
-	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Status: %s" % status))
-	var result := geometry_seeding_preview if _geometry_seeding_preview_matches(selected_asset_id, selected_component_id, component) else _geometry_seeding_bake(selected_asset_id, selected_component_id)
-	if not result.is_empty():
-		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Seeds: %d" % int(result.get("seed_count", result.get("seeds", []).size()))))
-		if str(result.get("method", "")) == GeometrySeedingService.SPINE_FLOW:
-			inspector_content.add_child(EditorWidgets.create_inspector_field_label("Flow: %d · Gap Fill: %d" % [int(result.get("flow_seed_count", 0)), int(result.get("gap_seed_count", 0))]))
-	var actions := HBoxContainer.new()
-	var bake_button := Button.new()
-	bake_button.text = "Calculating…" if status == "Calculating" else "Baked" if status in ["Baked", "Edited"] else "Bake Preview"
-	bake_button.custom_minimum_size = Vector2(96, 28)
-	bake_button.focus_mode = Control.FOCUS_NONE
-	bake_button.disabled = status != "Preview Ready"
-	bake_button.pressed.connect(_bake_geometry_seeding)
-	geometry_seeding_bake_button = bake_button
-	actions.add_child(bake_button)
-	inspector_content.add_child(actions)
-
-
-func _add_geometry_seeding_float_parameter(label_text: String, recipe: Dictionary, parameter_name: String, minimum: float, maximum: float, suffix := "") -> void:
-	inspector_content.add_child(EditorWidgets.create_inspector_field_label(label_text))
-	var field := SpinBox.new()
-	field.min_value = minimum
-	field.max_value = maximum
-	field.step = 0.01
-	field.custom_arrow_step = 0.01
-	field.suffix = suffix
-	field.set_value_no_signal(float(recipe.get("parameters", {}).get(parameter_name, minimum)))
-	field.value_changed.connect(_on_geometry_seeding_parameter_changed.bind(parameter_name))
-	field.get_line_edit().text_submitted.connect(_on_geometry_seeding_float_text_submitted.bind(field, parameter_name))
-	field.get_line_edit().focus_exited.connect(_on_geometry_seeding_float_focus_exited.bind(field, parameter_name))
-	inspector_content.add_child(field)
 
 
 func _geometry_seeding_spine_enabled(recipe: Dictionary, guide_id: String) -> bool:
@@ -9944,213 +9720,6 @@ func _mark_geometry_seeding_bake_edited(bake: Dictionary) -> void:
 	_refresh_geometry_seeding_workspace()
 
 
-func _render_geometry_meshing_inspector() -> void:
-	inspector_content.add_child(EditorWidgets.create_inspector_section("Meshing", _on_inspector_section_toggled))
-	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	if component.is_empty():
-		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Select one Component to generate its derived Mesh."))
-		return
-	if str(component.get("draw_mode", "")) == "contour":
-		_render_contour_meshing_inspector(component)
-		return
-	inspector_content.add_child(EditorWidgets.create_inspector_field_label(str(component.get("name", "Component"))))
-	var source_issues := _component_mesh_source_validation_issues(_get_asset(selected_asset_id), component)
-	if not source_issues.is_empty():
-		inspector_content.add_child(EditorWidgets.create_inspector_section("Source Validation", _on_inspector_section_toggled))
-		var source_status := EditorWidgets.create_inspector_field_label("Invalid source topology")
-		source_status.add_theme_color_override("font_color", Color("#ef8354"))
-		inspector_content.add_child(source_status)
-		for issue in source_issues:
-			var issue_label := EditorWidgets.create_inspector_field_label(str(issue))
-			issue_label.add_theme_color_override("font_color", Color("#ef8354"))
-			inspector_content.add_child(issue_label)
-	var recipe := _geometry_meshing_recipe(selected_asset_id, selected_component_id)
-	inspector_content.add_child(EditorWidgets.create_inspector_section("Input", _on_inspector_section_toggled))
-	var sampling_current := _geometry_sampling_bake_is_current(selected_asset_id, selected_component_id, component)
-	var sampling_label := EditorWidgets.create_inspector_field_label("Sampling · Adaptive: %s" % ("Baked" if sampling_current else "Required / Stale"))
-	sampling_label.add_theme_color_override("font_color", Color("#75b88a") if sampling_current else Color("#ef8354"))
-	inspector_content.add_child(sampling_label)
-	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Seeding Source"))
-	var seeding_bakes := _geometry_seeding_bakes(selected_asset_id, selected_component_id)
-	var seed_items: Array = []
-	for method in GeometrySeedingService.VALID_METHODS:
-		var available := seeding_bakes.has(method)
-		seed_items.append({
-			"label": _geometry_bake_method_label(method) if available else "%s · Required" % _geometry_bake_method_label(method),
-			"metadata": method, "disabled": not available})
-	var seed_option := EditorWidgets.create_option_field(seed_items,
-		str(recipe.get("parameters", {}).get("seeding_method", "")),
-		_on_geometry_meshing_seed_source_selected, false)
-	seed_option.disabled = seeding_bakes.is_empty()
-	inspector_content.add_child(seed_option)
-	if seed_option.item_count == 0:
-		var missing_seed := EditorWidgets.create_inspector_field_label("Bake at least one Seeding method first.")
-		missing_seed.add_theme_color_override("font_color", Color("#ef8354"))
-		inspector_content.add_child(missing_seed)
-	var input_current := _geometry_meshing_input_is_current(selected_asset_id, selected_component_id, component, recipe)
-	var input_label := EditorWidgets.create_inspector_field_label("Input Status: %s" % ("Ready" if input_current else "Required / Stale"))
-	input_label.add_theme_color_override("font_color", Color("#75b88a") if input_current else Color("#ef8354"))
-	inspector_content.add_child(input_label)
-	inspector_content.add_child(EditorWidgets.create_inspector_section("Method", _on_inspector_section_toggled))
-	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Constrained Mesh · Automatic"))
-	inspector_content.add_child(EditorWidgets.create_inspector_section("Parameters", _on_inspector_section_toggled))
-	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Mesh Character"))
-	var character_row := HBoxContainer.new()
-	character_row.add_child(EditorWidgets.create_inspector_field_label("Structured"))
-	var character := HSlider.new()
-	character.min_value = 0.0
-	character.max_value = 100.0
-	character.step = 1.0
-	character.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	character.set_value_no_signal(float(recipe.get("parameters", {}).get("mesh_character", GeometryMeshingService.DEFAULT_MESH_CHARACTER)) * 100.0)
-	character.value_changed.connect(func(value: float) -> void: _on_geometry_meshing_parameter_changed(value / 100.0, "mesh_character"))
-	character_row.add_child(character)
-	character_row.add_child(EditorWidgets.create_inspector_field_label("Organic"))
-	inspector_content.add_child(character_row)
-	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Character: %d%%" % roundi(character.value)))
-	inspector_content.add_child(EditorWidgets.create_inspector_section("Optimization", _on_inspector_section_toggled))
-	var optimize_mesh := CheckBox.new()
-	optimize_mesh.text = "Optimize Mesh"
-	optimize_mesh.button_pressed = bool(recipe.get("parameters", {}).get("optimize_mesh", GeometryMeshingService.DEFAULT_OPTIMIZE_MESH))
-	optimize_mesh.tooltip_text = "Move only free Interior Seeds and accept a pass only when measured Mesh quality improves."
-	optimize_mesh.toggled.connect(_on_geometry_meshing_override_changed.bind("optimize_mesh"))
-	inspector_content.add_child(optimize_mesh)
-	var advanced := Button.new()
-	advanced.text = "%s Advanced Optimization" % ("▾" if geometry_meshing_advanced_relaxation_expanded else "▸")
-	advanced.toggle_mode = true
-	advanced.button_pressed = geometry_meshing_advanced_relaxation_expanded
-	advanced.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	advanced.focus_mode = Control.FOCUS_NONE
-	advanced.toggled.connect(_on_geometry_meshing_advanced_relaxation_toggled)
-	inspector_content.add_child(advanced)
-	if geometry_meshing_advanced_relaxation_expanded:
-		var parameters: Dictionary = recipe.get("parameters", {})
-		var relaxation_override := bool(parameters.get("relaxation_override", false))
-		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Relaxation Strength: %s · %s" % ["Refined" if relaxation_override else "Derived", _format_scale_value(float(parameters.get("relaxation", 0.0)))]))
-		var refine_relaxation := CheckBox.new()
-		refine_relaxation.text = "Refine Relaxation Strength"
-		refine_relaxation.button_pressed = relaxation_override
-		refine_relaxation.toggled.connect(_on_geometry_meshing_override_changed.bind("relaxation_override"))
-		inspector_content.add_child(refine_relaxation)
-		if relaxation_override:
-			var relaxation := SpinBox.new()
-			relaxation.min_value = 0.0
-			relaxation.max_value = 1.0
-			relaxation.step = 0.01
-			relaxation.custom_arrow_step = 0.01
-			relaxation.set_value_no_signal(float(parameters.get("relaxation", GeometryMeshingService.DEFAULT_RELAXATION)))
-			relaxation.value_changed.connect(_on_geometry_meshing_parameter_changed.bind("relaxation"))
-			relaxation.get_line_edit().text_submitted.connect(_on_geometry_meshing_float_text_submitted.bind(relaxation, "relaxation"))
-			relaxation.get_line_edit().focus_exited.connect(_on_geometry_meshing_float_focus_exited.bind(relaxation, "relaxation"))
-			inspector_content.add_child(relaxation)
-		var passes_override := bool(parameters.get("passes_override", false))
-		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Relaxation Passes: %s · %d" % ["Refined" if passes_override else "Derived", int(parameters.get("passes", 0))]))
-		var refine_passes := CheckBox.new()
-		refine_passes.text = "Refine Relaxation Passes"
-		refine_passes.button_pressed = passes_override
-		refine_passes.toggled.connect(_on_geometry_meshing_override_changed.bind("passes_override"))
-		inspector_content.add_child(refine_passes)
-		if passes_override:
-			var passes := SpinBox.new()
-			passes.min_value = 1.0
-			passes.max_value = GeometryMeshingService.MAX_PASSES
-			passes.step = 1.0
-			passes.set_value_no_signal(float(parameters.get("passes", GeometryMeshingService.DEFAULT_PASSES)))
-			passes.value_changed.connect(_on_geometry_meshing_parameter_changed.bind("passes"))
-			inspector_content.add_child(passes)
-	inspector_content.add_child(EditorWidgets.create_inspector_section("Constraints", _on_inspector_section_toggled))
-	var input := _geometry_meshing_input(selected_asset_id, selected_component_id, recipe)
-	var sampling_bake: Dictionary = input.get("sampling", {})
-	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Outer · Preserved"))
-	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Holes · Preserved · %d" % int(sampling_bake.get("hole_count", 0))))
-	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Cuts · Seam · %d" % sampling_bake.get("cuts", []).size()))
-	inspector_content.add_child(EditorWidgets.create_inspector_section("View", _on_inspector_section_toggled))
-	if is_instance_valid(geometry_meshing_workspace):
-		for view_option in [
-			{"key": "mesh_edges", "label": "Mesh Edges", "value": geometry_meshing_workspace.show_mesh_edges},
-			{"key": "seed_points", "label": "Seed Points", "value": geometry_meshing_workspace.show_seed_points},
-			{"key": "triangle_fill", "label": "Triangle Fill", "value": geometry_meshing_workspace.show_triangle_fill},
-			{"key": "constraints", "label": "Constraints", "value": geometry_meshing_workspace.show_constraints},
-			{"key": "optimization", "label": "Optimization", "value": geometry_meshing_workspace.show_optimization},
-			{"key": "quality", "label": "Quality", "value": geometry_meshing_workspace.show_quality}
-		]:
-			var view_toggle := CheckBox.new()
-			view_toggle.text = str(view_option["label"])
-			view_toggle.button_pressed = bool(view_option["value"])
-			view_toggle.toggled.connect(_on_geometry_meshing_view_option_changed.bind(str(view_option["key"])))
-			inspector_content.add_child(view_toggle)
-	var build_diagnostic_lines := _component_mesh_build_diagnostic_lines(selected_asset_id, selected_component_id)
-	if not build_diagnostic_lines.is_empty():
-		inspector_content.add_child(EditorWidgets.create_inspector_section("Auto Build Diagnostics", _on_inspector_section_toggled))
-		for diagnostic_line in build_diagnostic_lines:
-			inspector_content.add_child(EditorWidgets.create_inspector_field_label(diagnostic_line))
-	var status := _geometry_meshing_status(selected_asset_id, selected_component_id, component)
-	inspector_content.add_child(EditorWidgets.create_inspector_section("Result", _on_inspector_section_toggled))
-	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Status: %s" % status))
-	var auto_build_error := str(_component_mesh_reference(selected_asset_id, selected_component_id).get("last_error", ""))
-	if not auto_build_error.is_empty():
-		var error_label := EditorWidgets.create_inspector_field_label("Update Meshes: %s" % auto_build_error)
-		error_label.add_theme_color_override("font_color", Color("#ef8354"))
-		inspector_content.add_child(error_label)
-	var result := geometry_meshing_preview if _geometry_meshing_preview_matches(selected_asset_id, selected_component_id, component) else _geometry_meshing_bake(selected_asset_id, selected_component_id)
-	if not result.is_empty():
-		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Vertices: %d" % int(result.get("vertex_count", 0))))
-		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Triangles: %d" % int(result.get("triangle_count", 0))))
-		var optimization: Dictionary = result.get("optimization", {})
-		var quality_before: Dictionary = optimization.get("quality_before", {})
-		var quality_after: Dictionary = optimization.get("quality_after", {})
-		if not quality_before.is_empty() and not quality_after.is_empty():
-			inspector_content.add_child(EditorWidgets.create_inspector_field_label("Minimum Angle: %.1f° → %.1f°" % [float(quality_before.get("minimum_angle", 0.0)), float(quality_after.get("minimum_angle", 0.0))]))
-			inspector_content.add_child(EditorWidgets.create_inspector_field_label("Worst Aspect Ratio: %.2f → %.2f" % [float(quality_before.get("worst_aspect_ratio", 0.0)), float(quality_after.get("worst_aspect_ratio", 0.0))]))
-			inspector_content.add_child(EditorWidgets.create_inspector_field_label("Moved Seeds: %d · Removed: %d" % [int(optimization.get("moved_seed_count", 0)), int(optimization.get("removed_seed_count", 0))]))
-		else:
-			inspector_content.add_child(EditorWidgets.create_inspector_field_label("Minimum Angle: %.1f°" % float(result.get("minimum_angle", 0.0))))
-		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Constraints: %s" % ("Valid" if bool(result.get("constraints_valid", false)) else "Invalid")))
-		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Cut Seam Vertices: %d" % int(result.get("cut_seam_vertex_count", 0))))
-	var actions := HBoxContainer.new()
-	var bake_button := Button.new()
-	bake_button.text = "Calculating…" if status == "Calculating" else "Baked · Component Mesh" if status == "Baked" else "Bake Preview"
-	bake_button.custom_minimum_size = Vector2(96, 28)
-	bake_button.focus_mode = Control.FOCUS_NONE
-	bake_button.disabled = status != "Preview Ready"
-	bake_button.pressed.connect(_bake_geometry_meshing)
-	geometry_meshing_bake_button = bake_button
-	actions.add_child(bake_button)
-	inspector_content.add_child(actions)
-
-
-func _render_contour_meshing_inspector(component: Dictionary) -> void:
-	inspector_content.add_child(EditorWidgets.create_inspector_field_label(str(component.get("name", "Contour"))))
-	inspector_content.add_child(EditorWidgets.create_inspector_section("Contour Stroke · Automatic", _on_inspector_section_toggled))
-	var stroke_width_px := _effective_contour_stroke_width_px(component)
-	var source_label := "Component override" if _component_has_contour_stroke_width_override(component) else "World Settings"
-	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Width: %.1f px (%.5f m) · %s" % [stroke_width_px, ContourStrokeService.stroke_width_meters(stroke_width_px), source_label]))
-	var issues := ContourMeshService.validation_issues(component, stroke_width_px)
-	var input_status := EditorWidgets.create_inspector_field_label("Input: Ready" if issues.is_empty() else "Input: Draft · %s" % issues[0])
-	input_status.add_theme_color_override("font_color", Color("#75b88a") if issues.is_empty() else Color("#ef8354"))
-	inspector_content.add_child(input_status)
-	var status := _geometry_meshing_status(selected_asset_id, selected_component_id, component)
-	inspector_content.add_child(EditorWidgets.create_inspector_section("Result", _on_inspector_section_toggled))
-	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Status: %s" % status))
-	var auto_build_error := str(_component_mesh_reference(selected_asset_id, selected_component_id).get("last_error", ""))
-	if not auto_build_error.is_empty():
-		var error_label := EditorWidgets.create_inspector_field_label("Update Meshes: %s" % auto_build_error)
-		error_label.add_theme_color_override("font_color", Color("#ef8354"))
-		inspector_content.add_child(error_label)
-	var result := geometry_meshing_preview if _geometry_meshing_preview_matches(selected_asset_id, selected_component_id, component) else _geometry_meshing_bake(selected_asset_id, selected_component_id, ContourMeshService.METHOD)
-	if not result.is_empty():
-		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Vertices: %d" % int(result.get("vertex_count", 0))))
-		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Triangles: %d" % int(result.get("triangle_count", 0))))
-	var actions := HBoxContainer.new()
-	var bake_button := Button.new()
-	bake_button.text = "Calculating…" if status == "Calculating" else "Baked · Component Mesh" if status == "Baked" else "Bake Preview"
-	bake_button.disabled = status != "Preview Ready"
-	bake_button.pressed.connect(_bake_geometry_meshing)
-	geometry_meshing_bake_button = bake_button
-	actions.add_child(bake_button)
-	inspector_content.add_child(actions)
-
-
 func _on_geometry_seeding_method_selected(index: int, option: OptionButton) -> void:
 	_set_geometry_seeding_method(str(option.get_item_metadata(index)))
 
@@ -10351,10 +9920,108 @@ func _refresh_geometry_meshing_workspace() -> void:
 	geometry_meshing_workspace.set_context(input.get("sampling", {}), input.get("seeding", {}), result, _geometry_meshing_status(selected_asset_id, selected_component_id, component))
 
 
+func _clear_inspector_content() -> void:
+	# The two extracted views live inside inspector_content and outlive a render;
+	# everything the not-yet-extracted modules draw does not.
+	for child in inspector_content.get_children():
+		if child != create_inspector_view and child != geometry_inspector_view:
+			child.queue_free()
+
+
+func _geometry_sampling_inspector_context(component: Dictionary) -> Dictionary:
+	# Everything the Sampling Inspector shows, resolved against the Geometry
+	# document and the preview cache here so the view holds no document access.
+	if component.is_empty():
+		return {}
+	var asset := _get_asset(selected_asset_id)
+	var display_result := geometry_sampling_preview if _geometry_sampling_preview_matches(selected_asset_id, selected_component_id, component) else _geometry_sampling_bake(selected_asset_id, selected_component_id)
+	var boundary_rows: Array = []
+	for reference in asset.get("components", []):
+		if _is_reference_component(reference) and str(reference.get("parent_component_id", "")) == selected_component_id and str(reference.get("topology_role", "outer")) == "hole":
+			boundary_rows.append({"title": "Hole · %s" % WorldDocumentService.component_outliner_name(assets, reference),
+				"input_id": str(reference.get("id", "")), "role": "hole", "kind": "hole"})
+	for guide in asset.get("guides", []):
+		if str(guide.get("scope", {}).get("component_id", "")) != selected_component_id or str(guide.get("guide_type", "")) != AssetGuide.CUT:
+			continue
+		boundary_rows.append({"title": "Cut · %s" % WorldDocumentService.guide_display_name(asset, guide),
+			"input_id": str(guide.get("id", "")), "role": "cut", "kind": "cut"})
+	var selected_input_title := ""
+	if not selected_sampling_input_id.is_empty():
+		var input := _get_sampling_input(asset, selected_sampling_input_id, selected_sampling_input_kind)
+		if not input.is_empty():
+			selected_input_title = _sampling_input_display_name(asset, component, input, selected_sampling_input_kind)
+	return {
+		"component": component,
+		"recipe": _geometry_sampling_recipe(selected_asset_id, selected_component_id),
+		"display_result": display_result,
+		"status": _geometry_sampling_status(selected_asset_id, selected_component_id, component),
+		"boundary_rows": boundary_rows,
+		"selected_input_id": selected_sampling_input_id,
+		"selected_input_title": selected_input_title,
+	}
+
+
+func _geometry_seeding_inspector_context(component: Dictionary) -> Dictionary:
+	if component.is_empty():
+		return {}
+	var asset := _get_asset(selected_asset_id)
+	var recipe := _geometry_seeding_recipe(selected_asset_id, selected_component_id)
+	var spine_rows: Array = []
+	for guide in _sampler_spines_for_component(asset, selected_component_id):
+		spine_rows.append({"guide_id": str(guide.get("id", "")),
+			"label": WorldDocumentService.guide_display_name(asset, guide)})
+	return {
+		"component": component,
+		"recipe": recipe,
+		"sampling_bake": _geometry_sampling_bake(selected_asset_id, selected_component_id),
+		"sampling_bake_is_current": _geometry_sampling_bake_is_current(selected_asset_id, selected_component_id, component),
+		"status": _geometry_seeding_status(selected_asset_id, selected_component_id, component),
+		"result": geometry_seeding_preview if _geometry_seeding_preview_matches(selected_asset_id, selected_component_id, component) else _geometry_seeding_bake(selected_asset_id, selected_component_id),
+		"spine_rows": spine_rows,
+		"advanced_pattern_expanded": geometry_seeding_advanced_pattern_expanded,
+	}
+
+
+func _geometry_meshing_inspector_context(component: Dictionary) -> Dictionary:
+	if component.is_empty():
+		return {}
+	var recipe := _geometry_meshing_recipe(selected_asset_id, selected_component_id)
+	var view_options: Array = []
+	if is_instance_valid(geometry_meshing_workspace):
+		view_options = [
+			{"key": "mesh_edges", "label": "Mesh Edges", "value": geometry_meshing_workspace.show_mesh_edges},
+			{"key": "seed_points", "label": "Seed Points", "value": geometry_meshing_workspace.show_seed_points},
+			{"key": "triangle_fill", "label": "Triangle Fill", "value": geometry_meshing_workspace.show_triangle_fill},
+			{"key": "constraints", "label": "Constraints", "value": geometry_meshing_workspace.show_constraints},
+			{"key": "optimization", "label": "Optimization", "value": geometry_meshing_workspace.show_optimization},
+			{"key": "quality", "label": "Quality", "value": geometry_meshing_workspace.show_quality},
+		]
+	var preview_matches := _geometry_meshing_preview_matches(selected_asset_id, selected_component_id, component)
+	return {
+		"component": component,
+		"recipe": recipe,
+		"source_issues": _component_mesh_source_validation_issues(_get_asset(selected_asset_id), component),
+		"sampling_bake_is_current": _geometry_sampling_bake_is_current(selected_asset_id, selected_component_id, component),
+		"seeding_bakes": _geometry_seeding_bakes(selected_asset_id, selected_component_id),
+		"input_is_current": _geometry_meshing_input_is_current(selected_asset_id, selected_component_id, component, recipe),
+		"meshing_input": _geometry_meshing_input(selected_asset_id, selected_component_id, recipe),
+		"view_options": view_options,
+		"build_diagnostic_lines": _component_mesh_build_diagnostic_lines(selected_asset_id, selected_component_id),
+		"status": _geometry_meshing_status(selected_asset_id, selected_component_id, component),
+		"contour_status": _geometry_meshing_status(selected_asset_id, selected_component_id, component),
+		"auto_build_error": str(_component_mesh_reference(selected_asset_id, selected_component_id).get("last_error", "")),
+		"result": geometry_meshing_preview if preview_matches else _geometry_meshing_bake(selected_asset_id, selected_component_id),
+		"contour_result": geometry_meshing_preview if preview_matches else _geometry_meshing_bake(selected_asset_id, selected_component_id, ContourMeshService.METHOD),
+		"advanced_relaxation_expanded": geometry_meshing_advanced_relaxation_expanded,
+	}
+
+
 func _render_inspector() -> void:
-	EditorWidgets.clear_except(inspector_content, create_inspector_view)
+	_clear_inspector_content()
 	EditorWidgets.clear(create_inspector_view)
+	EditorWidgets.clear(geometry_inspector_view)
 	create_inspector_view.visible = false
+	geometry_inspector_view.visible = false
 	if active_module == "Export":
 		return
 	if active_module == "Motion":
@@ -10371,16 +10038,16 @@ func _render_inspector() -> void:
 		_render_weighting_inspector()
 		return
 	if active_module == "Mesh":
+		geometry_inspector_view.visible = true
+		geometry_inspector_view.set_submodule(active_geometry_submodule, world_contour_stroke_width_px)
+		var mesh_component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 		if active_geometry_submodule == "Sampling":
-			_render_geometry_sampling_inspector()
+			geometry_inspector_view.set_sampling_context(_geometry_sampling_inspector_context(mesh_component))
 		elif active_geometry_submodule == "Seeding":
-			_render_geometry_seeding_inspector()
+			geometry_inspector_view.set_seeding_context(_geometry_seeding_inspector_context(mesh_component))
 		elif active_geometry_submodule == "Meshing":
-			_render_geometry_meshing_inspector()
-		else:
-			inspector_content.add_child(EditorWidgets.create_inspector_section(active_geometry_submodule, _on_inspector_section_toggled))
-			inspector_content.add_child(EditorWidgets.create_inspector_field_label("Placeholder module"))
-			inspector_content.add_child(EditorWidgets.create_inspector_field_label("Mesh pipeline tooling is planned for a later phase."))
+			geometry_inspector_view.set_meshing_context(_geometry_meshing_inspector_context(mesh_component))
+		geometry_inspector_view.rebuild()
 		return
 	var asset := _get_asset(selected_asset_id)
 	if asset.is_empty():
