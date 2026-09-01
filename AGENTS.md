@@ -41,6 +41,12 @@ A `SCRIPT ERROR` in the test output is a failure even when the runner prints
 remaining assertions never run and never increment the failure count. CI fails
 the job on any such line.
 
+The same holds when `scripts/main.gd` fails to parse: every test that does
+`load("res://scripts/main.gd").new()` then skips its assertions and the runner
+still reports a pass. An unused local is a parse error here — warnings are
+treated as errors — so check the `SCRIPT ERROR` count on *every* run, including
+the deliberately broken one in a mutation test.
+
 ## Commits
 
 After every change, create a Git commit automatically with a concise,

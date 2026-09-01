@@ -21,8 +21,8 @@
 		"asset_18"
 	],
 	"editor_state": {
-		"active_create_submodule": "Character",
-		"active_geometry_submodule": "Meshing",
+		"active_create_submodule": "Props",
+		"active_geometry_submodule": "Sampling",
 		"active_module": "Export",
 		"active_motion_submodule": "Animation",
 		"active_style_submodule": "Weighting",
@@ -37,7 +37,7 @@
 			"asset_10": {
 				"position": [
 					-4.22662162780762,
-					69.8274002075195
+					13.048978805542
 				],
 				"zoom": 15.6221838725203
 			},
@@ -156,7 +156,7 @@
 		},
 		"expanded_assets": {
 			"asset_1": false,
-			"asset_10": false,
+			"asset_10": true,
 			"asset_11": false,
 			"asset_12": false,
 			"asset_13": false,
@@ -185,9 +185,9 @@
 			],
 			"visible": false
 		},
-		"motion_act_preview_asset_id": "asset_1",
+		"motion_act_preview_asset_id": "",
 		"motion_act_preview_loop": true,
-		"motion_path_preview_asset_id": "asset_1",
+		"motion_path_preview_asset_id": "",
 		"motion_sequence_preview_loop": true,
 		"motion_sequence_view": "composition",
 		"outliner_asset_type_filters": {
@@ -198,8 +198,8 @@
 			"terrain": false,
 			"weapons": false
 		},
-		"selected_asset_id": "asset_2",
-		"selected_component_id": "component_145",
+		"selected_asset_id": "asset_10",
+		"selected_component_id": "component_155",
 		"selected_edge_ids": [],
 		"selected_guide_id": "",
 		"selected_motion_act_id": "",
@@ -208,9 +208,9 @@
 		"selected_motion_sequence_id": "",
 		"selected_weighting_style_id": "",
 		"snap": {
-			"enabled": false,
-			"grid_step": 0.5,
-			"mode": "none",
+			"enabled": true,
+			"grid_step": 0.1,
+			"mode": "fine",
 			"rotation_step": 15.0
 		},
 		"world_scale": {

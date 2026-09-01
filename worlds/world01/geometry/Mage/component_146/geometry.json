@@ -4,26 +4,26 @@
 	"component_mesh": {
 		"bake_id": "meshing_bake_3084009253157770035",
 		"build_provenance": {
-			"attempts": 1,
-			"auto_recipe_version": 0,
+			"attempts": 1.0,
+			"auto_recipe_version": 0.0,
 			"automatic_diagnostics": {},
 			"exact_input_hash": "7c1c874f79b4d34f6bd1412a61375078cef782563e1a608b06856358a0b0b2d3",
 			"pipeline_recipe_hash": "",
 			"recipe_mode": "derived",
-			"schema_version": 1,
+			"schema_version": 1.0,
 			"source_signature": {
 				"geometry_tolerance": 0.00055,
-				"meshing_algorithm": 5,
+				"meshing_algorithm": 5.0,
 				"recipe_hash": "434c5bf9607c731efa01481664980536853f0a3f9801ea86920d7cb3ad0fd4f7",
-				"recipe_version": 2,
-				"sampling_algorithm": 3,
+				"recipe_version": 2.0,
+				"sampling_algorithm": 3.0,
 				"scalars": [
 					4.0,
 					5.0,
 					1.0,
 					1.0
 				],
-				"seeding_algorithm": 2,
+				"seeding_algorithm": 2.0,
 				"topology_hash": "cd96ee9b7b14c11a10b234f66a559eb80c20ca6d69b8c4c6e543f40ad37c5008",
 				"vectors": [
 					[
@@ -111,7 +111,7 @@
 						0.0
 					]
 				],
-				"version": 1
+				"version": 1.0
 			}
 		},
 		"last_error": "",
@@ -128,8 +128,8 @@
 				"errors": [],
 				"geometry_diagnostics": {
 					"minimum_nonadjacent_clearance_meters": 0.00374694690108299,
-					"narrow_overlap_pair_count": 15,
-					"self_intersection_count": 0,
+					"narrow_overlap_pair_count": 15.0,
+					"self_intersection_count": 0.0,
 					"triangle_validation": "complete"
 				},
 				"has_outline": true,
@@ -150,7 +150,7 @@
 				},
 				"runs": [
 					{
-						"bevel_join_count": 0,
+						"bevel_join_count": 0.0,
 						"centerline": [
 							{
 								"curve_t": 0.0,
@@ -244,19 +244,19 @@
 						],
 						"end_cap": "butt",
 						"geometry_diagnostics": {
-							"centerline_segment_count": 8,
+							"centerline_segment_count": 8.0,
 							"minimum_nonadjacent_clearance_tool_units": 0.0374694690108299,
-							"narrow_overlap_pair_count": 15,
-							"self_intersection_count": 0
+							"narrow_overlap_pair_count": 15.0,
+							"self_intersection_count": 0.0
 						},
-						"index_count": 90,
-						"index_offset": 0,
-						"miter_join_count": 7,
+						"index_count": 90.0,
+						"index_offset": 0.0,
+						"miter_join_count": 7.0,
 						"run_id": "chain_3932074740527106594:run:0",
 						"start_cap": "butt",
-						"triangle_count": 30,
-						"vertex_count": 60,
-						"vertex_offset": 0
+						"triangle_count": 30.0,
+						"vertex_count": 60.0,
+						"vertex_offset": 0.0
 					}
 				],
 				"source_chain_closed": false,

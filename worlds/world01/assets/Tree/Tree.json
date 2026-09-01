@@ -2571,6 +2571,157 @@
 			"type": "component",
 			"visibility": true,
 			"z_index": 1
+		},
+		{
+			"catch_parent_component_id": "",
+			"chains": [
+				{
+					"closed": true,
+					"edge_ids": [
+						"edge_6501184160846880817",
+						"edge_3043318815762634789",
+						"edge_5143521789447067751",
+						"edge_7108348981594705586"
+					],
+					"id": "chain_276194903141680766",
+					"point_ids": [
+						"point_1654275448713813210",
+						"point_7510312213968821890",
+						"point_8395052524297037953",
+						"point_7763431384666808590"
+					],
+					"topology_role": "outer"
+				}
+			],
+			"draw_mode": "closed_loop",
+			"edges": [
+				{
+					"end_point_id": "point_7510312213968821890",
+					"id": "edge_6501184160846880817",
+					"render_outline": true,
+					"start_point_id": "point_1654275448713813210"
+				},
+				{
+					"end_point_id": "point_8395052524297037953",
+					"id": "edge_3043318815762634789",
+					"render_outline": true,
+					"start_point_id": "point_7510312213968821890"
+				},
+				{
+					"end_point_id": "point_7763431384666808590",
+					"id": "edge_5143521789447067751",
+					"render_outline": true,
+					"start_point_id": "point_8395052524297037953"
+				},
+				{
+					"end_point_id": "point_1654275448713813210",
+					"id": "edge_7108348981594705586",
+					"render_outline": true,
+					"start_point_id": "point_7763431384666808590"
+				}
+			],
+			"group_id": "",
+			"id": "component_155",
+			"name": "collision_region",
+			"parent_component_id": "component_141",
+			"points": [
+				{
+					"handle_in": [
+						0.0,
+						0.0
+					],
+					"handle_out": [
+						0.0,
+						0.0
+					],
+					"handle_source": "auto",
+					"id": "point_7763431384666808590",
+					"mode": "linear",
+					"position": [
+						-11.1999998092651,
+						0.0000019073486328125
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						0.0,
+						0.0
+					],
+					"handle_out": [
+						0.0,
+						0.0
+					],
+					"handle_source": "auto",
+					"id": "point_8395052524297037953",
+					"mode": "linear",
+					"position": [
+						11.1999988555908,
+						0.0000019073486328125
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.0,
+						0.0
+					],
+					"handle_out": [
+						0.0,
+						0.0
+					],
+					"handle_source": "auto",
+					"id": "point_7510312213968821890",
+					"mode": "linear",
+					"position": [
+						11.1999998092651,
+						22.3999996185303
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.0,
+						0.0
+					],
+					"handle_out": [
+						0.0,
+						0.0
+					],
+					"handle_source": "auto",
+					"id": "point_1654275448713813210",
+					"mode": "linear",
+					"position": [
+						-11.1999998092651,
+						22.3999996185303
+					],
+					"preserve_point": true
+				}
+			],
+			"primitive": {},
+			"projection_depth_cm": 10.0,
+			"region_type": "collision",
+			"show_point_numbers": false,
+			"source_asset_id": "",
+			"topology_role": "outer",
+			"transform": {
+				"pivot": [
+					0.0,
+					0.0
+				],
+				"position": [
+					0.0,
+					0.0
+				],
+				"rotation": 0.0,
+				"scale": [
+					1.0,
+					1.0
+				]
+			},
+			"type": "region",
+			"visibility": true,
+			"z_index": 0
 		}
 	],
 	"groups": [],

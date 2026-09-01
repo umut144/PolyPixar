@@ -1612,6 +1612,39 @@ func _test_inspector_field_wiring() -> void:
 
 	application._rename_selected_component("arm")
 	_expect(str(body["name"]) == "arm", "The Component name editor should rename the Component.")
+
+	# Point level: a single selection edits absolute positions, a multi selection
+	# offsets every selected Point by the same delta and resets its field.
+	application.active_state = "edit"
+	application.active_edit_mode = "point"
+	var point_ids: Array[String] = []
+	for point in body["points"]:
+		point_ids.append(str(point["id"]))
+	var single_selection: Array[String] = [point_ids[0]]
+	application.selected_point_ids = single_selection
+	application.selected_point_id = point_ids[0]
+	application._render_inspector()
+	var point_position_field := _inspector_spin(application, "Position X (cm)")
+	_expect(point_position_field != null, "A selected Point should expose its Position X.")
+	_edit_inspector_value(point_position_field, 17.0)
+	_expect(is_equal_approx(Vector2(BezierTopology.point_by_id(body["points"], point_ids[0])["position"]).x,
+		application._world_to_editor_units(17.0)), "The Point Position X field should move the selected Point.")
+
+	var multi_selection: Array[String] = [point_ids[0], point_ids[1]]
+	application.selected_point_ids = multi_selection
+	application._render_inspector()
+	var first_before: Vector2 = BezierTopology.point_by_id(body["points"], point_ids[0])["position"]
+	var second_before: Vector2 = BezierTopology.point_by_id(body["points"], point_ids[1])["position"]
+	var delta_field := _inspector_spin(application, "Delta X (cm)")
+	_expect(delta_field != null, "A multi-Point selection should expose its Delta X.")
+	_edit_inspector_value(delta_field, 5.0)
+	var expected_delta: float = application._world_to_editor_units(5.0)
+	var first_after: Vector2 = BezierTopology.point_by_id(body["points"], point_ids[0])["position"]
+	var second_after: Vector2 = BezierTopology.point_by_id(body["points"], point_ids[1])["position"]
+	_expect(is_equal_approx(first_after.x - first_before.x, expected_delta)
+		and is_equal_approx(second_after.x - second_before.x, expected_delta),
+		"The Delta X field should offset every selected Point by the same amount.")
+	_expect(is_zero_approx(delta_field.value), "The Delta field should reset itself after applying the offset.")
 	application.free()
 
 

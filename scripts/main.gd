@@ -10653,9 +10653,16 @@ func _render_inspector() -> void:
 			reference_transform_grid.add_theme_constant_override("h_separation", 8)
 			reference_transform_grid.add_theme_constant_override("v_separation", 4)
 			var reference_position: Vector2 = reference_image.get("position", Vector2.ZERO)
-			_add_reference_image_field(reference_transform_grid, "Position X (cm)", _editor_units_to_world(reference_position.x), "position_x")
-			_add_reference_image_field(reference_transform_grid, "Position Y (cm)", _editor_units_to_world(reference_position.y), "position_y")
-			_add_reference_image_field(reference_transform_grid, "Scale", float(reference_image.get("scale", 1.0)), "scale")
+			# Arrows move in tenths while the text field keeps hundredth precision.
+			# Scale is clamped positive; the offsets are free.
+			EditorWidgets.build_number_grid(reference_transform_grid, [
+				{"caption": "Position X (cm)", "property": "position_x",
+					"value": _editor_units_to_world(reference_position.x), "silent": false},
+				{"caption": "Position Y (cm)", "property": "position_y",
+					"value": _editor_units_to_world(reference_position.y), "silent": false},
+				{"caption": "Scale", "property": "scale",
+					"value": float(reference_image.get("scale", 1.0)), "min": 0.01, "silent": false},
+			], _on_reference_image_property_changed)
 			inspector_content.add_child(reference_transform_grid)
 		return
 	var component := _get_component(asset, selected_component_id)
@@ -10679,13 +10686,25 @@ func _render_inspector() -> void:
 		point_transform_grid.add_theme_constant_override("h_separation", 8)
 		point_transform_grid.add_theme_constant_override("v_separation", 4)
 		if is_multi_point_selection:
-			_add_selected_points_delta_field(point_transform_grid, "Delta X (cm)", "position_x")
-			_add_selected_points_delta_field(point_transform_grid, "Delta Y (cm)", "position_y")
+			# The delta handler needs the field it belongs to, so the fields are
+			# built unconnected and wired from the returned map.
+			var delta_fields := EditorWidgets.build_number_grid(point_transform_grid, [
+				{"caption": "Delta X (cm)", "property": "position_x", "value": 0.0},
+				{"caption": "Delta Y (cm)", "property": "position_y", "value": 0.0},
+			], Callable())
+			for delta_property in delta_fields:
+				var delta_field: SpinBox = delta_fields[delta_property]
+				delta_field.value_changed.connect(
+					_on_selected_points_delta_changed.bind(str(delta_property), delta_field))
 		else:
 			var selected_point := BezierTopology.point_by_id(component.get("points", []), point_ids[0])
 			var point_position: Vector2 = selected_point.get("position", Vector2.ZERO)
-			_add_point_position_field(point_transform_grid, "Position X (cm)", _editor_units_to_world(point_position.x), "position_x")
-			_add_point_position_field(point_transform_grid, "Position Y (cm)", _editor_units_to_world(point_position.y), "position_y")
+			EditorWidgets.build_number_grid(point_transform_grid, [
+				{"caption": "Position X (cm)", "property": "position_x",
+					"value": _editor_units_to_world(point_position.x)},
+				{"caption": "Position Y (cm)", "property": "position_y",
+					"value": _editor_units_to_world(point_position.y)},
+			], _on_point_position_changed)
 		inspector_content.add_child(point_transform_grid)
 		inspector_content.add_child(EditorWidgets.create_inspector_section("Point Settings", _on_inspector_section_toggled))
 		_add_selected_point_settings(component, point_ids)
@@ -12550,15 +12569,6 @@ func _on_selected_points_preserve_changed(enabled: bool, _point_ids: Array) -> v
 	_invalidate_render(RENDER_INSPECTOR)
 
 
-func _add_reference_image_field(grid: GridContainer, label_text: String, value: float, property_name: String) -> void:
-	grid.add_child(EditorWidgets.create_field_caption(label_text))
-	# Use tenths for the arrow buttons while retaining hundredth precision in
-	# the editable text field.
-	var field := EditorWidgets.create_number_field(value, 0.01 if property_name == "scale" else -100000.0,
-		100000.0, 0.01, 0.1, _on_reference_image_property_changed.bind(property_name), "", false)
-	grid.add_child(field)
-
-
 func _component_transform_descriptors(position_x: float, position_y: float, rotation: float, scale: Vector2) -> Array:
 	# One shape for the local and the global transform block. Rotation steps and
 	# arrows in whole degrees; the other fields keep hundredth text precision with
@@ -12572,22 +12582,6 @@ func _component_transform_descriptors(position_x: float, position_y: float, rota
 		{"caption": "Scale X", "property": "scale_x", "value": scale.x, "silent": false},
 		{"caption": "Scale Y", "property": "scale_y", "value": scale.y, "silent": false},
 	]
-
-
-func _add_point_position_field(grid: GridContainer, label_text: String, value: float, property_name: String) -> void:
-	grid.add_child(EditorWidgets.create_field_caption(label_text))
-	# The arrows move in tenths while text input still supports hundredths.
-	var field := EditorWidgets.create_number_field(value, -100000.0, 100000.0, 0.01, 0.1,
-		_on_point_position_changed.bind(property_name))
-	grid.add_child(field)
-
-
-func _add_selected_points_delta_field(grid: GridContainer, label_text: String, property_name: String) -> void:
-	grid.add_child(EditorWidgets.create_field_caption(label_text))
-	var field := EditorWidgets.create_number_field(0.0, -100000.0, 100000.0, 0.01, 0.1, Callable())
-	# Connected after construction: the handler needs the field it belongs to.
-	field.value_changed.connect(_on_selected_points_delta_changed.bind(property_name, field))
-	grid.add_child(field)
 
 
 func _on_selected_points_delta_changed(value: float, property_name: String, field: SpinBox) -> void:
