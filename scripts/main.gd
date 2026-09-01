@@ -23,6 +23,9 @@ const RENDER_DOCUMENT := RENDER_OUTLINER | RENDER_INSPECTOR | RENDER_CANVAS_CONT
 const GRID_BOX_TOOL_UNITS := 0.5
 const GAME_TILE_CENTIMETERS := 100.0
 const EYE_COMPONENT_NAME_TOKEN := "eye"
+const CONTOUR_STROKE_WIDTH_OVERRIDE_TOOLTIP := "Overrides every Contour part of the referenced source Asset without changing that Asset."
+const PROJECTION_DEPTH_TOOLTIP := "Visible component depth used by runtime presentation; independent of Scale, Z Order, and Contour Stroke Width."
+const Z_ORDER_TOOLTIP := "Orders Components only inside this Asset; Runtime consumers choose the Asset's contextual game layer."
 const ASSET_ROOT_POSITION_TOOLTIP := "Preview translation for the complete Asset. Rebase before Runtime Export."
 const ASSET_ROOT_SCALE_TOOLTIP := "Positive preview Scale on the %s axis around the Asset Pivot. Rebase before Runtime Export."
 # Kept available for a later Outliner presentation, but processed outputs are
@@ -10605,16 +10608,10 @@ func _render_inspector() -> void:
 			var reference_file_label := EditorWidgets.create_inspector_field_label(str(reference_image.get("file", "")))
 			reference_file_label.add_theme_color_override("font_color", Color("#9aa3b2"))
 			inspector_content.add_child(reference_file_label)
-		var target_height := SpinBox.new()
-		target_height.min_value = 0.01
-		target_height.max_value = 100000.0
-		target_height.step = 0.01
-		target_height.custom_arrow_step = 0.1
-		target_height.custom_minimum_size = Vector2(0, 26)
-		target_height.value = float(reference_image.get("target_height_cm", 13.0))
-		target_height.value_changed.connect(_on_reference_image_target_height_changed)
-		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Target Height (cm)"))
-		inspector_content.add_child(target_height)
+		EditorWidgets.add_stacked_number_field(inspector_content, {
+			"caption": "Target Height (cm)", "value": float(reference_image.get("target_height_cm", 13.0)),
+			"min": 0.01, "max": 100000.0, "arrow_step": 0.1,
+		}, _on_reference_image_target_height_changed)
 		var pivot_label := EditorWidgets.create_inspector_field_label("Pivot")
 		inspector_content.add_child(pivot_label)
 		var pivot_option := OptionButton.new()
@@ -10637,17 +10634,12 @@ func _render_inspector() -> void:
 			reference_visibility.button_pressed = bool(reference_image.get("visible", true))
 			reference_visibility.toggled.connect(_on_reference_image_visibility_changed)
 			inspector_content.add_child(reference_visibility)
-			var reference_opacity := SpinBox.new()
-			reference_opacity.name = "ReferenceImageOpacity"
-			reference_opacity.min_value = 0.0
-			reference_opacity.max_value = 1.0
-			reference_opacity.step = 0.01
-			reference_opacity.custom_arrow_step = 0.1
-			reference_opacity.custom_minimum_size = Vector2(0, 26)
-			reference_opacity.value = float(reference_image.get("opacity", 0.5))
-			reference_opacity.value_changed.connect(_on_reference_image_property_changed.bind("opacity"))
-			inspector_content.add_child(EditorWidgets.create_inspector_field_label("Opacity"))
-			inspector_content.add_child(reference_opacity)
+			# The node name is carried over from the original field; nothing reads
+			# it back, so it stays only to keep the scene tree identical.
+			EditorWidgets.add_stacked_number_field(inspector_content, {
+				"caption": "Opacity", "value": float(reference_image.get("opacity", 0.5)),
+				"min": 0.0, "max": 1.0, "arrow_step": 0.1, "node_name": "ReferenceImageOpacity",
+			}, _on_reference_image_property_changed.bind("opacity"))
 			var reference_transform_grid := GridContainer.new()
 			reference_transform_grid.columns = 2
 			reference_transform_grid.add_theme_constant_override("h_separation", 8)
@@ -10727,15 +10719,11 @@ func _render_inspector() -> void:
 			edge_hint.add_theme_color_override("font_color", Color("#9aa3b2"))
 			inspector_content.add_child(edge_hint)
 		else:
-			var render_outline := CheckButton.new()
-			render_outline.text = "Render Outline"
-			render_outline.custom_minimum_size = Vector2(0, 26)
 			var all_rendered := true
 			for edge in selected_edges:
 				all_rendered = all_rendered and bool(edge.get("render_outline", true))
-			render_outline.button_pressed = all_rendered
-			render_outline.toggled.connect(_on_edge_render_outline_changed)
-			inspector_content.add_child(render_outline)
+			inspector_content.add_child(EditorWidgets.create_toggle_field(
+				"Render Outline", all_rendered, _on_edge_render_outline_changed))
 		return
 	if active_state == "edit" and active_edit_mode == "face":
 		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Face"))
@@ -10749,12 +10737,9 @@ func _render_inspector() -> void:
 		if not selected_edge.is_empty():
 			inspector_content.add_child(EditorWidgets.create_inspector_field_label("Edge"))
 			inspector_content.add_child(EditorWidgets.create_inspector_section("Edge Settings", _on_inspector_section_toggled))
-			var render_outline := CheckButton.new()
-			render_outline.text = "Render Outline"
-			render_outline.custom_minimum_size = Vector2(0, 26)
-			render_outline.button_pressed = bool(selected_edge.get("render_outline", true))
-			render_outline.toggled.connect(_on_edge_render_outline_changed)
-			inspector_content.add_child(render_outline)
+			inspector_content.add_child(EditorWidgets.create_toggle_field(
+				"Render Outline", bool(selected_edge.get("render_outline", true)),
+				_on_edge_render_outline_changed))
 			return
 	inspector_content.add_child(EditorWidgets.create_inspector_section("Component", _on_inspector_section_toggled))
 	component_name_editor = EditorWidgets.create_name_editor(_normalized_component_name(component), "Component name")
@@ -10878,48 +10863,23 @@ func _render_inspector() -> void:
 			"step": 0.001, "silent": false},
 	], _on_transform_value_changed), true)
 	inspector_content.add_child(EditorWidgets.create_inspector_section("Visibility / Layer", _on_inspector_section_toggled))
-	var visibility_toggle := CheckButton.new()
-	visibility_toggle.text = "Visible"
-	visibility_toggle.custom_minimum_size = Vector2(0, 26)
-	visibility_toggle.add_theme_font_size_override("font_size", 11)
-	visibility_toggle.button_pressed = bool(component.get("visibility", true))
-	visibility_toggle.toggled.connect(_on_component_visibility_changed)
-	inspector_content.add_child(visibility_toggle)
-	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Contour Stroke Width (px)"))
-	var contour_width_field := SpinBox.new()
-	contour_width_field.min_value = 0.1
-	contour_width_field.max_value = 1024.0
-	contour_width_field.step = 0.1
-	contour_width_field.value = _effective_contour_stroke_width_px(component)
-	contour_width_field.custom_minimum_size = Vector2(0, 26)
-	contour_width_field.add_theme_font_size_override("font_size", 11)
-	contour_width_field.tooltip_text = "Overrides every Contour part of the referenced source Asset without changing that Asset." if _is_reference_component(component) else ""
-	contour_width_field.value_changed.connect(_on_component_contour_stroke_width_changed)
-	inspector_content.add_child(contour_width_field)
-	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Projection Depth (cm)"))
-	var projection_depth_field := SpinBox.new()
-	projection_depth_field.min_value = 0.0
-	projection_depth_field.max_value = 1000.0
-	projection_depth_field.step = 0.1
-	projection_depth_field.value = _component_projection_depth_cm(component)
-	projection_depth_field.custom_minimum_size = Vector2(0, 26)
-	projection_depth_field.add_theme_font_size_override("font_size", 11)
-	projection_depth_field.tooltip_text = "Visible component depth used by runtime presentation; independent of Scale, Z Order, and Contour Stroke Width."
-	projection_depth_field.value_changed.connect(_on_component_projection_depth_changed)
-	inspector_content.add_child(projection_depth_field)
-	var z_order_label := EditorWidgets.create_inspector_field_label("Z Order (Asset-local)")
-	z_order_label.tooltip_text = "Orders Components only inside this Asset; Runtime consumers choose the Asset's contextual game layer."
-	inspector_content.add_child(z_order_label)
-	var z_index_field := SpinBox.new()
-	z_index_field.min_value = -10000
-	z_index_field.max_value = 10000
-	z_index_field.step = 1
-	z_index_field.value = int(component.get("z_index", 0))
-	z_index_field.custom_minimum_size = Vector2(0, 26)
-	z_index_field.add_theme_font_size_override("font_size", 11)
-	z_index_field.tooltip_text = z_order_label.tooltip_text
-	z_index_field.value_changed.connect(_on_component_z_index_changed)
-	inspector_content.add_child(z_index_field)
+	inspector_content.add_child(EditorWidgets.create_toggle_field(
+		"Visible", bool(component.get("visibility", true)), _on_component_visibility_changed, 11))
+	EditorWidgets.add_stacked_number_field(inspector_content, {
+		"caption": "Contour Stroke Width (px)", "value": _effective_contour_stroke_width_px(component),
+		"min": 0.1, "max": 1024.0, "step": 0.1, "font_size": 11,
+		"tooltip": CONTOUR_STROKE_WIDTH_OVERRIDE_TOOLTIP if _is_reference_component(component) else "",
+	}, _on_component_contour_stroke_width_changed)
+	EditorWidgets.add_stacked_number_field(inspector_content, {
+		"caption": "Projection Depth (cm)", "value": _component_projection_depth_cm(component),
+		"min": 0.0, "max": 1000.0, "step": 0.1, "font_size": 11,
+		"tooltip": PROJECTION_DEPTH_TOOLTIP,
+	}, _on_component_projection_depth_changed)
+	EditorWidgets.add_stacked_number_field(inspector_content, {
+		"caption": "Z Order (Asset-local)", "value": int(component.get("z_index", 0)),
+		"min": -10000.0, "max": 10000.0, "step": 1.0, "font_size": 11,
+		"caption_tooltip": Z_ORDER_TOOLTIP, "tooltip": Z_ORDER_TOOLTIP,
+	}, _on_component_z_index_changed)
 
 
 func _selected_components_for_inspector(asset: Dictionary) -> Array[Dictionary]:

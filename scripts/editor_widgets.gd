@@ -283,6 +283,54 @@ static func create_number_field(value: float, minimum: float, maximum: float, st
 		field.value_changed.connect(on_changed)
 	return field
 
+static func add_stacked_number_field(container: Node, descriptor: Dictionary, on_changed: Callable) -> SpinBox:
+	# The Inspector's other numeric shape: a caption line above a full-width
+	# field, rather than the caption/field pairs a grid holds.
+	#
+	# Descriptor keys: caption, value, and optionally min, max, step, arrow_step
+	# (0.0 lets the arrows follow step), tooltip, caption_tooltip, font_size
+	# (0 keeps the inherited size) and node_name.
+	var caption := create_inspector_field_label(str(descriptor.get("caption", "")))
+	var caption_tooltip := str(descriptor.get("caption_tooltip", ""))
+	if not caption_tooltip.is_empty():
+		caption.tooltip_text = caption_tooltip
+	container.add_child(caption)
+	var field := create_number_field(
+		float(descriptor.get("value", 0.0)),
+		float(descriptor.get("min", -100000.0)),
+		float(descriptor.get("max", 100000.0)),
+		float(descriptor.get("step", 0.01)),
+		float(descriptor.get("arrow_step", 0.0)),
+		on_changed,
+		"",
+		false,
+		false)
+	var node_name := str(descriptor.get("node_name", ""))
+	if not node_name.is_empty():
+		field.name = node_name
+	field.custom_minimum_size = Vector2(0, 26)
+	var font_size := int(descriptor.get("font_size", 0))
+	if font_size > 0:
+		field.add_theme_font_size_override("font_size", font_size)
+	field.tooltip_text = str(descriptor.get("tooltip", ""))
+	container.add_child(field)
+	return field
+
+
+static func create_toggle_field(text: String, pressed: bool, on_toggled: Callable, font_size := 0) -> CheckButton:
+	# The Inspector's boolean row: a full-width CheckButton on the standard line
+	# height. The initial state is set before connecting, so it fires nothing.
+	var toggle := CheckButton.new()
+	toggle.text = text
+	toggle.custom_minimum_size = Vector2(0, 26)
+	if font_size > 0:
+		toggle.add_theme_font_size_override("font_size", font_size)
+	toggle.button_pressed = pressed
+	if on_toggled.is_valid():
+		toggle.toggled.connect(on_toggled)
+	return toggle
+
+
 static func build_number_grid(grid: GridContainer, descriptors: Array, on_changed: Callable) -> Dictionary:
 	# Builds a caption/field row per descriptor and returns the fields by
 	# property name. The caller keeps that map rather than the builder writing
