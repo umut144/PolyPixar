@@ -62,6 +62,7 @@ func _init() -> void:
 	_test_motion_asset_preview_geometry()
 	_test_motion_resource_shells()
 	_test_motion_path_topology_and_sampler()
+	_test_outliner_wiring()
 	_test_motion_inspector_wiring()
 	_test_motion_act_evaluator()
 	_test_motion_module_separators()
@@ -3937,6 +3938,231 @@ func _exercise_control(control: Node) -> void:
 		control.focus_exited.emit()
 	elif control is Button:
 		control.pressed.emit()
+
+
+const OUTLINER_SIGNAL_ROUTES := [
+	["asset_selected", "_select_asset"],
+	["component_selected", "_on_outliner_component_selected"],
+	["group_selected", "_select_group"],
+	["guide_selected", "_select_guide"],
+	["region_selected", "_on_outliner_component_selected"],
+	["weighting_asset_selected", "_select_weighting_asset"],
+	["weighting_component_selected", "_select_weighting_component"],
+	["weighting_style_selected", "_select_weighting_style"],
+	["weighting_style_add_requested", "_create_weighting_style"],
+	["motion_asset_selected", "_select_motion_asset"],
+	["motion_path_selected", "_select_motion_path"],
+	["motion_sequence_selected", "_select_motion_sequence"],
+	["motion_act_preview_asset_selected", "_select_motion_act_preview_asset"],
+	["component_add_requested", "_open_component_add_menu"],
+	["group_add_requested", "_open_group_add_menu"],
+	["component_dialog_requested", "_open_component_dialog"],
+	["row_context_menu_requested", "_on_outliner_row_context_menu"],
+	["drop_requested", "_outliner_drop_data_from_view"],
+	["visibility_toggle_requested", "_on_outliner_visibility_toggled"],
+	["geometry_asset_selected", "_select_geometry_asset"],
+	["geometry_component_selected", "_select_geometry_component"],
+	["geometry_reference_selected", "_select_geometry_sampling_reference"],
+	["geometry_input_selected", "_select_geometry_seeding_input"],
+	["geometry_pipeline_action", "_on_geometry_pipeline_action"],
+]
+
+# Declared on the view but neither emitted nor connected. Expansion is not an
+# intent the Outliner reports: main.gd sets it in _select_asset through
+# _set_outliner_asset_expanded and pushes the result back in through
+# set_expansion. The signal is a leftover of the extraction. It is listed here
+# rather than quietly ignored, so connecting it, emitting it or removing it all
+# make this test speak up.
+const OUTLINER_UNCONNECTED_SIGNALS := ["expansion_toggle_requested"]
+
+# Routed and checked as such, but not drivable from a walk: reparenting arrives
+# through set_drag_forwarding, and Godot exposes neither the virtuals
+# (_can_drop_data, _drop_data) nor public methods for them, so a test cannot
+# make a Control run its own drop callbacks. What the drop does is covered by
+# the Group reparenting test, which calls the view's can_drop_data helper and
+# main.gd's _outliner_drop_data directly; the binding between the two is the
+# part no test can reach.
+const OUTLINER_UNDRIVABLE_SIGNALS := ["drop_requested"]
+
+const OUTLINER_PROBE_CASES := ["create", "create_expanded", "style", "motion_animation",
+	"motion_path", "motion_sequence", "motion_act", "mesh_sampling", "mesh_seeding",
+	"mesh_meshing"]
+
+
+func _outliner_wiring_assets() -> Array[Dictionary]:
+	# One Asset carrying every row kind the Create tree can draw, plus a second
+	# one so an Asset row is reachable while nothing is expanded.
+	var body := _outliner_test_component("component_1", "body")
+	body["topology_role"] = "outer"
+	var arm := _outliner_test_component("component_2", "arm")
+	arm["parent_component_id"] = "component_1"
+	var hole := {"points": [], "edges": [], "chains": [], "id": "component_3", "name": "eye",
+		"visibility": true, "type": "reference", "parent_component_id": "component_1",
+		"topology_role": "hole", "source_asset_id": "asset_2"}
+	var region := {"points": [], "edges": [], "chains": [], "id": "component_4", "name": "hitbox",
+		"visibility": true, "type": "region", "region_type": "attack",
+		"parent_component_id": "component_1"}
+	var guide := {"id": "guide_1", "guide_type": AssetGuide.CUT, "ordinal": 1, "visibility": true,
+		"scope": {"kind": "component", "component_id": "component_1"},
+		"points": [], "edges": [], "chains": []}
+	var spine := {"id": "guide_2", "guide_type": AssetGuide.SAMPLER_SPINE, "ordinal": 1,
+		"visibility": true, "scope": {"kind": "component", "component_id": "component_1"},
+		"points": [], "edges": [], "chains": []}
+	var group := {"id": "group_1", "name": "torso", "transform": {}, "visibility": true,
+		"parent_component_id": ""}
+	return [
+		{"id": "asset_1", "name": "Wizard", "visibility": true,
+			"components": [body, arm, hole, region], "groups": [group], "guides": [guide, spine]},
+		{"id": "asset_2", "name": "Orb", "visibility": true,
+			"components": [], "groups": [], "guides": []},
+	] as Array[Dictionary]
+
+
+func _prepare_outliner_case(application: Control, case_name: String) -> void:
+	# Puts the editor into one Outliner state. Only what the tree reads is set.
+	application.expanded_assets.clear()
+	application.selected_asset_id = "asset_1"
+	application.selected_component_id = ""
+	application.selected_weighting_style_id = ""
+	match case_name:
+		"create":
+			application.active_module = "Create"
+			application.active_create_submodule = "Character"
+		"create_expanded":
+			application.active_module = "Create"
+			application.active_create_submodule = "Character"
+			application.expanded_assets["asset_1"] = true
+		"style":
+			application.active_module = "Style"
+			application.active_style_submodule = "Weighting"
+			application.selected_component_id = "component_1"
+			application.expanded_assets["asset_1"] = true
+			var document: Dictionary = application._mutable_geometry_document("asset_1", "component_1")
+			document["weighting"]["styles"] = [WeightingService.default_style(
+				"weight_1", "Uniform", "component_1")]
+		"motion_animation", "motion_path", "motion_sequence", "motion_act":
+			application.active_module = "Motion"
+			application.active_motion_submodule = {
+				"motion_animation": "Animation", "motion_path": "Path",
+				"motion_sequence": "Sequence", "motion_act": "Act"}[case_name]
+			var paths: Array[Dictionary] = [WorldDocumentService.default_motion_path("path_1", "Walk Path")]
+			application.motion_paths = paths
+			var sequences: Array[Dictionary] = [WorldDocumentService.default_motion_sequence("sequence_1", "Walk Cycle")]
+			application.motion_sequences = sequences
+		"mesh_sampling", "mesh_seeding", "mesh_meshing":
+			application.active_module = "Mesh"
+			application.active_geometry_submodule = {
+				"mesh_sampling": "Sampling", "mesh_seeding": "Seeding",
+				"mesh_meshing": "Meshing"}[case_name]
+			application.selected_component_id = "component_1"
+			application.expanded_assets["asset_1"] = true
+			var seeding_document: Dictionary = application._mutable_geometry_document("asset_1", "component_1")
+			seeding_document["seeding"]["recipe"]["method"] = GeometrySeedingService.SPINE_FLOW
+			seeding_document["seeding"]["recipe"]["parameters"]["spine_inputs"] = [
+				{"guide_id": "guide_2", "enabled": true}]
+	# The Mesh rows are resolved by main.gd against its own view, so that view
+	# needs the same context before the probe can be given the result.
+	application._render_outliner()
+
+
+func _build_outliner_probe(application: Control) -> OutlinerView:
+	# A bare view fed the same context _render_outliner pushes, so the walk can
+	# fire rows without the editor's own handlers re-rendering them away.
+	var probe := OutlinerView.new()
+	probe.set_documents(application.assets, application.motion_paths, application.motion_sequences)
+	probe.set_module(application.active_module, application.active_create_submodule,
+		application.active_geometry_submodule, application.active_motion_submodule)
+	probe.set_selection(application.selected_asset_id, application.selected_component_id,
+		application.selected_component_ids, application.selected_group_id,
+		application.selected_guide_id, application.selected_motion_path_id,
+		application.selected_motion_sequence_id, application.selected_weighting_style_id,
+		application.motion_act_preview_asset_id)
+	probe.set_filters("", application.outliner_asset_type_filters)
+	probe.set_expansion(application.expanded_assets, application._outliner_focus_asset_id())
+	probe.set_row_status(application._outliner_row_status())
+	probe.set_geometry_rows(application._geometry_outliner_rows())
+	return probe
+
+
+func _exercise_outliner_control(control: Node) -> void:
+	# Rows report three further intents that no plain press reaches: the context
+	# menu rides on gui_input, visibility on a checkbox, and reparenting on the
+	# drag-and-drop forwarding.
+	if control is CheckBox or control is CheckButton:
+		control.toggled.emit(not control.button_pressed)
+		return
+	if control is Button:
+		control.pressed.emit()
+		if control.gui_input.get_connections().size() > 0:
+			var click := InputEventMouseButton.new()
+			click.button_index = MOUSE_BUTTON_RIGHT
+			click.pressed = true
+			control.gui_input.emit(click)
+
+
+func _test_outliner_wiring() -> void:
+	# The same two tables the Motion Inspector carries, for the view that was
+	# extracted before the render comparison existed and has had the least
+	# verification of the five. The routing half checks that each connected
+	# signal reaches the handler it names; the emission half renders ten Outliner
+	# states, fires every row the view builds, and checks that each signal is
+	# reachable and arrives with its declared argument types.
+	var application: Control = load("res://scripts/main.gd").new()
+	application._build_ui()
+	application.assets = _outliner_wiring_assets()
+	var view: OutlinerView = application.outliner_view
+
+	for route in OUTLINER_SIGNAL_ROUTES:
+		var signal_name := str(route[0])
+		var expected_handler := str(route[1])
+		var handlers: Array[String] = []
+		for connection in view.get_signal_connection_list(signal_name):
+			handlers.append(str((connection["callable"] as Callable).get_method()))
+		_expect(handlers.size() == 1 and handlers[0] == expected_handler,
+			"The Outliner signal %s should reach %s, not %s." % [signal_name, expected_handler, str(handlers)])
+	for signal_name in OUTLINER_UNCONNECTED_SIGNALS:
+		_expect(view.get_signal_connection_list(str(signal_name)).is_empty(),
+			"The Outliner signal %s is documented as unconnected; connecting it should update that list." % signal_name)
+	var routed: Array[String] = []
+	for route in OUTLINER_SIGNAL_ROUTES:
+		routed.append(str(route[0]))
+	# The script's own signals only. get_signal_list() also reports what Control
+	# and Node bring with them, and those carry engine-internal connections.
+	var declared_arguments: Dictionary = {}
+	for entry in view.get_script().get_script_signal_list():
+		var declared := str(entry["name"])
+		declared_arguments[declared] = entry["args"]
+		if declared in routed or declared in OUTLINER_UNCONNECTED_SIGNALS:
+			continue
+		_expect(false, "The Outliner declares %s, which is in neither the routing table nor the unconnected list." % declared)
+	motion_signals_emitted = {}
+	motion_signal_argument_failures = [] as Array[String]
+	for case_name in OUTLINER_PROBE_CASES:
+		_prepare_outliner_case(application, case_name)
+		var probe := _build_outliner_probe(application)
+		for route in OUTLINER_SIGNAL_ROUTES:
+			var signal_name := str(route[0])
+			probe.connect(signal_name, _motion_signal_recorder(signal_name, declared_arguments.get(signal_name, [])))
+		probe.rebuild()
+		var controls: Array = []
+		_inspector_controls(probe, controls)
+		for control in controls:
+			_exercise_outliner_control(control)
+		probe.free()
+	var unreachable: Array[String] = []
+	for route in OUTLINER_SIGNAL_ROUTES:
+		var signal_name := str(route[0])
+		if signal_name in OUTLINER_UNDRIVABLE_SIGNALS:
+			_expect(not motion_signals_emitted.has(signal_name),
+				"%s is listed as undrivable but the walk reached it; move it out of that list." % signal_name)
+			continue
+		if not motion_signals_emitted.has(signal_name):
+			unreachable.append(signal_name)
+	_expect(unreachable.is_empty(),
+		"Every connected Outliner signal should be reachable from a row; unreachable: %s" % str(unreachable))
+	_expect(motion_signal_argument_failures.is_empty(),
+		"Outliner signals should arrive with their declared argument types; %s" % str(motion_signal_argument_failures))
+	application.free()
 
 
 func _test_motion_inspector_wiring() -> void:
