@@ -143,6 +143,15 @@ func _edit_inspector_value(field: SpinBox, value: float) -> void:
 	field.value_changed.emit(value)
 
 
+func _inspector_label_starting_with(application: Control, prefix: String) -> Label:
+	var controls: Array = []
+	_inspector_controls(application.inspector_content, controls)
+	for control in controls:
+		if control is Label and str(control.text).begins_with(prefix):
+			return control
+	return null
+
+
 func _inspector_option(application: Control, first_item_text: String) -> OptionButton:
 	# Inspector dropdowns sit under section headers rather than captions, so they
 	# are identified by their first entry, which is unique per dropdown.
@@ -3210,6 +3219,15 @@ func _test_weighting_service_and_ui() -> void:
 	_expect(str(gradient_style.get("method", "")) == WeightingService.UNIFORM and application.active_context_command.is_empty(), "Selecting a Weighting Method from CMD+1 must apply the method and clear the transient Context command instead of leaving the menu stuck.")
 	application._bake_weighting_preview()
 	_expect(application._weighting_status("asset_weighting", "component_weighting", component, gradient_style) == "Baked" and not gradient_style.get("bake", {}).is_empty(), "Weighting Bake should persist one derived result on its Style.")
+	# The Inspector's own Result block is not reachable by the render comparison,
+	# which has no baked Component Mesh, so the status it prints is pinned here.
+	application._render_inspector()
+	var weighting_status_label := _inspector_label_starting_with(application, "Status: ")
+	_expect(weighting_status_label != null and str(weighting_status_label.text) == "Status: Baked",
+		"The Weighting Inspector should print the Style's own status.")
+	var weighting_vertices_label := _inspector_label_starting_with(application, "Vertices: ")
+	_expect(weighting_vertices_label != null and str(weighting_vertices_label.text) == "Vertices: %d" % int(mesh.get("vertex_count", 0)),
+		"The Weighting Inspector should print the Vertex count of the baked result.")
 	var round_trip: Dictionary = WorldDocumentService.normalize_geometry_document(WorldDocumentService.serialize_geometry_document(document), "asset_weighting", "component_weighting")
 	_expect(round_trip.get("weighting", {}).get("styles", []).size() == 1 and int(round_trip.get("weighting", {}).get("styles", [])[0].get("bake", {}).get("weight_count", 0)) == int(mesh.get("vertex_count", 0)), "Weighting Styles and per-Vertex Bakes should survive Geometry persistence.")
 	application.free()

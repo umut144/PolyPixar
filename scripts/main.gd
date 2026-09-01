@@ -49,6 +49,7 @@ var outliner_asset_type_filters: Dictionary = {
 var inspector_content: VBoxContainer
 var create_inspector_view: CreateInspectorView
 var geometry_inspector_view: GeometryInspectorView
+var style_inspector_view: StyleInspectorView
 var module_sections: Array[ModuleSection] = []
 var assets: Array[Dictionary] = []
 var motion_paths: Array[Dictionary] = []
@@ -1098,6 +1099,19 @@ func _build_ui() -> void:
 	geometry_inspector_view.sampling_cut_selected.connect(func(guide_id: String) -> void:
 		_select_guide(selected_asset_id, guide_id))
 	inspector_content.add_child(geometry_inspector_view)
+	style_inspector_view = StyleInspectorView.new()
+	style_inspector_view.add_theme_constant_override("separation", 2)
+	style_inspector_view.bake_requested.connect(_bake_weighting_preview)
+	style_inspector_view.curve_selected.connect(_on_weighting_curve_selected)
+	style_inspector_view.direction_selected.connect(_on_weighting_direction_selected)
+	style_inspector_view.invert_changed.connect(_on_weighting_invert_changed)
+	style_inspector_view.method_selected.connect(_on_weighting_method_selected)
+	style_inspector_view.preview_requested.connect(_generate_weighting_preview)
+	style_inspector_view.section_toggled.connect(_on_inspector_section_toggled)
+	style_inspector_view.strength_changed.connect(_on_weighting_strength_changed)
+	style_inspector_view.style_delete_requested.connect(_delete_selected_weighting_style)
+	style_inspector_view.style_rename_requested.connect(_rename_weighting_style)
+	inspector_content.add_child(style_inspector_view)
 	_create_export_workspace(canvas_panel)
 
 	var status_bar := EditorWidgets.create_panel()
@@ -8819,85 +8833,6 @@ func _on_weapon_frame_value_changed(value: float, property_name: String) -> void
 	_invalidate_render(RENDER_CANVAS_CONTEXT)
 
 
-func _render_weighting_inspector() -> void:
-	inspector_content.add_child(EditorWidgets.create_inspector_section("Weighting", _on_inspector_section_toggled))
-	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	if component.is_empty():
-		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Select a Component to create or inspect Weighting Styles."))
-		return
-	inspector_content.add_child(EditorWidgets.create_inspector_field_label(str(component.get("name", "Component"))))
-	var mesh_status := _component_mesh_status(selected_asset_id, selected_component_id, component)
-	var mesh_label := EditorWidgets.create_inspector_field_label("Component Mesh: %s" % mesh_status)
-	mesh_label.add_theme_color_override("font_color", Color("#75b88a") if mesh_status == "Ready" else Color("#ef8354"))
-	inspector_content.add_child(mesh_label)
-	var style := _weighting_style(selected_asset_id, selected_component_id, selected_weighting_style_id)
-	if style.is_empty():
-		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Create or select a Weighting Style."))
-		return
-	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Name"))
-	var name_editor := EditorWidgets.create_name_editor(str(style.get("name", "Weighting Style")), "Weighting Style name")
-	name_editor.text_submitted.connect(_rename_weighting_style)
-	name_editor.focus_exited.connect(func() -> void: _rename_weighting_style(name_editor.text))
-	inspector_content.add_child(name_editor)
-	inspector_content.add_child(EditorWidgets.create_inspector_section("Method", _on_inspector_section_toggled))
-	inspector_content.add_child(EditorWidgets.create_option_field([
-		{"label": "Uniform", "metadata": WeightingService.UNIFORM},
-		{"label": "Axis Gradient", "metadata": WeightingService.AXIS_GRADIENT},
-	], str(style.get("method", "")), _on_weighting_method_selected, false))
-	inspector_content.add_child(EditorWidgets.create_inspector_section("Parameters", _on_inspector_section_toggled))
-	if str(style.get("method", "")) == WeightingService.AXIS_GRADIENT:
-		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Direction"))
-		inspector_content.add_child(EditorWidgets.create_option_field([
-			{"label": "Bottom → Top", "metadata": WeightingService.BOTTOM_TO_TOP},
-			{"label": "Top → Bottom", "metadata": WeightingService.TOP_TO_BOTTOM},
-			{"label": "Left → Right", "metadata": WeightingService.LEFT_TO_RIGHT},
-			{"label": "Right → Left", "metadata": WeightingService.RIGHT_TO_LEFT},
-		], str(style.get("parameters", {}).get("direction", "")), _on_weighting_direction_selected, false))
-		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Curve"))
-		inspector_content.add_child(EditorWidgets.create_option_field([
-			{"label": "Linear", "metadata": WeightingService.LINEAR},
-			{"label": "Ease In", "metadata": WeightingService.EASE_IN},
-			{"label": "Ease Out", "metadata": WeightingService.EASE_OUT},
-			{"label": "Smooth", "metadata": WeightingService.SMOOTH},
-		], str(style.get("parameters", {}).get("curve", "")), _on_weighting_curve_selected, false))
-		var invert := CheckBox.new()
-		invert.text = "Invert"
-		invert.button_pressed = bool(style.get("parameters", {}).get("invert", false))
-		invert.toggled.connect(_on_weighting_invert_changed)
-		inspector_content.add_child(invert)
-	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Strength"))
-	var strength := SpinBox.new()
-	strength.min_value = 0.0
-	strength.max_value = 1.0
-	strength.step = 0.01
-	strength.set_value_no_signal(float(style.get("parameters", {}).get("strength", 1.0)))
-	strength.value_changed.connect(_on_weighting_strength_changed)
-	inspector_content.add_child(strength)
-	var status := _weighting_status(selected_asset_id, selected_component_id, component, style)
-	inspector_content.add_child(EditorWidgets.create_inspector_section("Result", _on_inspector_section_toggled))
-	inspector_content.add_child(EditorWidgets.create_inspector_field_label("Status: %s" % status))
-	var result: Dictionary = weighting_preview if weighting_preview_key == _weighting_preview_id(selected_asset_id, selected_component_id, selected_weighting_style_id) else style.get("bake", {})
-	if not result.is_empty():
-		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Vertices: %d" % int(result.get("weight_count", 0))))
-		inspector_content.add_child(EditorWidgets.create_inspector_field_label("Range: %.2f → %.2f" % [float(result.get("minimum_weight", 0.0)), float(result.get("maximum_weight", 0.0))]))
-	var actions := HBoxContainer.new()
-	var generate_button := Button.new()
-	generate_button.text = "Generate"
-	generate_button.disabled = mesh_status != "Ready"
-	generate_button.pressed.connect(_generate_weighting_preview)
-	actions.add_child(generate_button)
-	var bake_button := Button.new()
-	bake_button.text = "Bake"
-	bake_button.disabled = not WeightingService.result_matches(weighting_preview, _component_mesh_bake(selected_asset_id, selected_component_id), style)
-	bake_button.pressed.connect(_bake_weighting_preview)
-	actions.add_child(bake_button)
-	inspector_content.add_child(actions)
-	var delete_button := Button.new()
-	delete_button.text = "Delete Weighting Style"
-	delete_button.pressed.connect(_delete_selected_weighting_style)
-	inspector_content.add_child(delete_button)
-
-
 func _rename_weighting_style(new_name: String) -> void:
 	var style := _weighting_style(selected_asset_id, selected_component_id, selected_weighting_style_id)
 	var style_name := new_name.strip_edges()
@@ -9920,11 +9855,29 @@ func _refresh_geometry_meshing_workspace() -> void:
 	geometry_meshing_workspace.set_context(input.get("sampling", {}), input.get("seeding", {}), result, _geometry_meshing_status(selected_asset_id, selected_component_id, component))
 
 
+func _weighting_inspector_context() -> Dictionary:
+	# The Weighting Inspector shows one Style of one Component plus the state of
+	# its Mesh and preview; all of that is resolved here.
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if component.is_empty():
+		return {}
+	var style := _weighting_style(selected_asset_id, selected_component_id, selected_weighting_style_id)
+	var result: Dictionary = weighting_preview if weighting_preview_key == _weighting_preview_id(selected_asset_id, selected_component_id, selected_weighting_style_id) else style.get("bake", {})
+	return {
+		"component": component,
+		"style": style,
+		"mesh_status": _component_mesh_status(selected_asset_id, selected_component_id, component),
+		"status": _weighting_status(selected_asset_id, selected_component_id, component, style),
+		"result": result,
+		"bake_enabled": WeightingService.result_matches(weighting_preview, _component_mesh_bake(selected_asset_id, selected_component_id), style),
+	}
+
+
 func _clear_inspector_content() -> void:
 	# The two extracted views live inside inspector_content and outlive a render;
 	# everything the not-yet-extracted modules draw does not.
 	for child in inspector_content.get_children():
-		if child != create_inspector_view and child != geometry_inspector_view:
+		if child != create_inspector_view and child != geometry_inspector_view and child != style_inspector_view:
 			child.queue_free()
 
 
@@ -10020,8 +9973,10 @@ func _render_inspector() -> void:
 	_clear_inspector_content()
 	EditorWidgets.clear(create_inspector_view)
 	EditorWidgets.clear(geometry_inspector_view)
+	EditorWidgets.clear(style_inspector_view)
 	create_inspector_view.visible = false
 	geometry_inspector_view.visible = false
+	style_inspector_view.visible = false
 	if active_module == "Export":
 		return
 	if active_module == "Motion":
@@ -10035,7 +9990,9 @@ func _render_inspector() -> void:
 			_render_motion_inspector()
 		return
 	if active_module == "Style":
-		_render_weighting_inspector()
+		style_inspector_view.visible = true
+		style_inspector_view.set_context(_weighting_inspector_context())
+		style_inspector_view.rebuild()
 		return
 	if active_module == "Mesh":
 		geometry_inspector_view.visible = true

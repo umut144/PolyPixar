@@ -72,9 +72,11 @@ export data.
   and the view renders that. Boundary rows and Sampler Spine rows arrive as row
   models with their labels already resolved, the same way the Outliner gets its
   Mesh tree.
-  The Style and Motion Inspectors still render into `inspector_content` in
-  `main.gd` and are extracted the same way, Motion only once the render
-  comparison covers its states.
+- `StyleInspectorView` is the same thing at a much smaller scale: one context
+  Dictionary holding the selected Component, its Weighting Style, the Mesh and
+  Style status, the preview or baked result, and whether Bake is available.
+  The Motion Inspector still renders into `inspector_content` in `main.gd` and
+  is extracted the same way, once the render comparison covers its states.
 - `EditorWidgets` builds the shared widget vocabulary — panels, labels, section
   headers, buttons and their styling. It is static and purely constructive: it
   reads no editor state and knows nothing about Worlds, Assets or Components.
