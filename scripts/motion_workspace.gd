@@ -96,6 +96,7 @@ var board: HBoxContainer
 var heading: Label
 var preview_documents: Dictionary = {}
 var asset_components: Array = []
+var retired_children_owner: Node
 
 
 func _ready() -> void:
@@ -947,8 +948,17 @@ func _has_state_name(states: Array, candidate_state_name: String, excluded_state
 
 
 func _rebuild() -> void:
+	if not is_instance_valid(retired_children_owner):
+		retired_children_owner = Node.new()
+		retired_children_owner.name = "RetiredChildren"
+		add_child(retired_children_owner)
 	for child in get_children():
+		if child == retired_children_owner:
+			continue
 		remove_child(child)
+		if child is CanvasItem:
+			child.hide()
+		retired_children_owner.add_child(child)
 		child.queue_free()
 	heading = Label.new()
 	heading.text = _heading_text()

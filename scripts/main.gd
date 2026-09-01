@@ -816,8 +816,8 @@ func _build_ui() -> void:
 	world_popup.add_item("Set Eye Contour Width…", 4)
 	world_popup.id_pressed.connect(_on_world_menu_id)
 	_create_world_scale_popup()
-	# Batch commands live in the Export module. Keep these detached controls for
-	# the existing command implementations, but never update them while editing.
+	# Batch commands live in the Export module. Keep these hidden controls owned
+	# by the application for the existing command implementations.
 	update_meshes_button = BatchStatusButton.new()
 	update_meshes_button.text = "Update Meshes (0)"
 	update_meshes_button.tooltip_text = "All Meshes current"
@@ -825,6 +825,8 @@ func _build_ui() -> void:
 	update_meshes_button.focus_mode = Control.FOCUS_NONE
 	update_meshes_button.disabled = true
 	update_meshes_button.pressed.connect(_on_update_meshes_pressed)
+	update_meshes_button.hide()
+	add_child(update_meshes_button)
 	runtime_export_button = BatchStatusButton.new()
 	runtime_export_button.text = "Export Runtime (0)"
 	runtime_export_button.tooltip_text = "No pending runtime exports"
@@ -832,6 +834,8 @@ func _build_ui() -> void:
 	runtime_export_button.focus_mode = Control.FOCUS_NONE
 	runtime_export_button.disabled = true
 	runtime_export_button.pressed.connect(_on_runtime_export_pressed)
+	runtime_export_button.hide()
+	add_child(runtime_export_button)
 	toolbar.add_child(world_scale_menu)
 	toolbar.add_child(world_menu)
 
@@ -5998,10 +6002,6 @@ func _render_info_bar() -> void:
 				{"label": "3: Remove", "id": "remove"}
 			], geometry_seeding_edit_tool)
 			_add_info_option("Delete: Remove selected")
-			info_bar.add_child(geometry_state_label)
-			_add_info_mode_group([
-				{"label": "1: Bounds / Planar", "id": GeometryUVMappingService.BOUNDS_PLANAR}
-			], GeometryUVMappingService.BOUNDS_PLANAR)
 		else:
 			geometry_state_label.text = "State: Default"
 			info_bar.add_child(geometry_state_label)
@@ -7246,15 +7246,18 @@ func _select_geometry_component(asset_id: String, component_id: String) -> void:
 	_set_outliner_asset_expanded(asset_id, true)
 	_invalidate_render(RENDER_DOCUMENT)
 	if active_geometry_submodule == "Sampling" and is_instance_valid(geometry_sampling_workspace):
-		geometry_sampling_workspace.grab_focus()
+		if geometry_sampling_workspace.is_inside_tree():
+			geometry_sampling_workspace.grab_focus()
 		if not _geometry_sampling_bake_is_current(asset_id, component_id, _get_component(_get_asset(asset_id), component_id)):
 			_schedule_geometry_sampling_preview()
 	elif active_geometry_submodule == "Seeding" and is_instance_valid(geometry_seeding_workspace):
-		geometry_seeding_workspace.grab_focus()
+		if geometry_seeding_workspace.is_inside_tree():
+			geometry_seeding_workspace.grab_focus()
 		if _geometry_seeding_status(asset_id, component_id, _get_component(_get_asset(asset_id), component_id)) == "Ready to Preview":
 			_schedule_geometry_seeding_preview()
 	elif active_geometry_submodule == "Meshing" and is_instance_valid(geometry_meshing_workspace):
-		geometry_meshing_workspace.grab_focus()
+		if geometry_meshing_workspace.is_inside_tree():
+			geometry_meshing_workspace.grab_focus()
 
 
 func _select_geometry_sampling_reference(asset_id: String, parent_component_id: String, reference_id := "") -> void:
@@ -8589,7 +8592,7 @@ func _select_component(asset_id: String, component_id: String, focus_outliner :=
 	canvas_view.set_interaction_state("")
 	_set_outliner_asset_expanded(asset_id, true)
 	_invalidate_render(RENDER_DOCUMENT)
-	if is_instance_valid(canvas_view):
+	if is_instance_valid(canvas_view) and canvas_view.is_inside_tree():
 		canvas_view.grab_focus()
 
 
@@ -12672,6 +12675,9 @@ func _get_edge(component: Dictionary, edge_id: String) -> Dictionary:
 func _clear_context_bar() -> void:
 	for child in context_bar.get_children():
 		context_bar.remove_child(child)
+		if child is CanvasItem:
+			child.hide()
+		add_child(child)
 		child.queue_free()
 
 

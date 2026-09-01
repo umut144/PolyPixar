@@ -2280,6 +2280,7 @@ func _test_geometry_sampling_ui_shell() -> void:
 	var application: Control = application_script.new()
 	application._build_ui()
 	_expect(application.world_menu.text == "World  ▼" and application.world_name_dialog.title == "New World" and application.load_world_dialog.title == "Load World", "The persisted top-level document should be presented consistently as a World in the toolbar and dialogs.")
+	_expect(application.update_meshes_button.get_parent() == application and application.runtime_export_button.get_parent() == application and not application.update_meshes_button.visible and not application.runtime_export_button.visible, "Legacy batch command controls should remain hidden but owned by the application lifecycle.")
 	var visible_categories: Array[String] = []
 	var every_category_expanded := true
 	for module_section in application.module_sections:
@@ -2550,6 +2551,8 @@ func _test_geometry_seeding_service() -> void:
 	_expect(application._geometry_seeding_status("asset_1", "component_1", component) == "Baked" and bool(application._geometry_seeding_bake("asset_1", "component_1").get("accepted_preview_marker", false)), "Bake Preview should copy the exact current Seeding Preview without regenerating it.")
 	application._toggle_geometry_seeding_edit()
 	_expect(application.geometry_seeding_edit_active and application.geometry_seeding_workspace.editing_enabled and not normalized["seeding"]["bakes"][GeometrySeedingService.POISSON_FILL].is_empty(), "Entering Edit Seeds from a baked result should enable mouse editing immediately.")
+	var seeding_edit_info_text := _control_text(application.info_bar)
+	_expect(seeding_edit_info_text.contains("State: Edit Seeds") and seeding_edit_info_text.contains("1: Select / Move") and not seeding_edit_info_text.contains("Bounds / Planar"), "Edit Seeds should render only its current Seeding controls in the Info Bar.")
 	application._activate_geometry_seeding_method_choice()
 	_expect(application.active_context_command == "geometry.seeding.method" and application.geometry_seeding_method_choice_active and not application.geometry_seeding_edit_active, "Entering Seeding Method must atomically select its central command and deactivate Edit Seeds.")
 	application._toggle_geometry_seeding_edit()
