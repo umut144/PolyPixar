@@ -12530,63 +12530,27 @@ func _on_selected_points_preserve_changed(enabled: bool, _point_ids: Array) -> v
 
 
 func _add_reference_image_field(grid: GridContainer, label_text: String, value: float, property_name: String) -> void:
-	var label := Label.new()
-	label.text = label_text
-	label.add_theme_font_size_override("font_size", 10)
-	label.add_theme_color_override("font_color", Color("#7f8a9b"))
-	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	grid.add_child(label)
-	var field := SpinBox.new()
-	field.min_value = 0.01 if property_name == "scale" else -100000.0
-	field.max_value = 100000.0
+	grid.add_child(EditorWidgets.create_field_caption(label_text))
 	# Use tenths for the arrow buttons while retaining hundredth precision in
 	# the editable text field.
-	field.step = 0.01
-	field.custom_arrow_step = 0.1
-	field.value = value
-	field.custom_minimum_size = Vector2(96, 26)
-	field.add_theme_font_size_override("font_size", 11)
-	field.value_changed.connect(_on_reference_image_property_changed.bind(property_name))
+	var field := EditorWidgets.create_number_field(value, 0.01 if property_name == "scale" else -100000.0,
+		100000.0, 0.01, 0.1, _on_reference_image_property_changed.bind(property_name), "", false)
 	grid.add_child(field)
 
 
 func _add_asset_pivot_field(grid: GridContainer, label_text: String, value: float, property_name: String) -> void:
-	var label := Label.new()
-	label.text = label_text
-	label.add_theme_font_size_override("font_size", 10)
-	label.add_theme_color_override("font_color", Color("#7f8a9b"))
-	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	grid.add_child(label)
-	var field := SpinBox.new()
-	field.min_value = -100000.0
-	field.max_value = 100000.0
-	field.step = 0.01
-	field.custom_arrow_step = 0.1
-	field.set_value_no_signal(value)
-	field.custom_minimum_size = Vector2(96, 26)
-	field.add_theme_font_size_override("font_size", 11)
-	field.value_changed.connect(_on_asset_pivot_property_changed.bind(property_name))
+	grid.add_child(EditorWidgets.create_field_caption(label_text))
+	var field := EditorWidgets.create_number_field(value, -100000.0, 100000.0, 0.01, 0.1,
+		_on_asset_pivot_property_changed.bind(property_name))
 	asset_pivot_fields[property_name] = field
 	grid.add_child(field)
 
 
 func _add_asset_root_position_field(grid: GridContainer, label_text: String, value: float, property_name: String) -> void:
-	var label := Label.new()
-	label.text = label_text
-	label.add_theme_font_size_override("font_size", 10)
-	label.add_theme_color_override("font_color", Color("#7f8a9b"))
-	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	grid.add_child(label)
-	var field := SpinBox.new()
-	field.min_value = -100000.0
-	field.max_value = 100000.0
-	field.step = 0.01
-	field.custom_arrow_step = 0.1
-	field.set_value_no_signal(value)
-	field.custom_minimum_size = Vector2(96, 26)
-	field.add_theme_font_size_override("font_size", 11)
+	grid.add_child(EditorWidgets.create_field_caption(label_text))
+	var field := EditorWidgets.create_number_field(value, -100000.0, 100000.0, 0.01, 0.1,
+		_on_asset_root_position_changed.bind(property_name))
 	field.tooltip_text = "Preview translation for the complete Asset. Rebase before Runtime Export."
-	field.value_changed.connect(_on_asset_root_position_changed.bind(property_name))
 	asset_root_position_fields[property_name] = field
 	grid.add_child(field)
 
@@ -12597,22 +12561,10 @@ func _add_asset_root_scale_field(grid: GridContainer, value: Vector2) -> void:
 
 
 func _add_asset_root_scale_axis_field(grid: GridContainer, label_text: String, value: float, property_name: String) -> void:
-	var label := Label.new()
-	label.text = label_text
-	label.add_theme_font_size_override("font_size", 10)
-	label.add_theme_color_override("font_color", Color("#7f8a9b"))
-	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	grid.add_child(label)
-	var field := SpinBox.new()
-	field.min_value = 0.01
-	field.max_value = 100.0
-	field.step = 0.01
-	field.custom_arrow_step = 0.1
-	field.set_value_no_signal(value)
-	field.custom_minimum_size = Vector2(96, 26)
-	field.add_theme_font_size_override("font_size", 11)
+	grid.add_child(EditorWidgets.create_field_caption(label_text))
+	var field := EditorWidgets.create_number_field(value, 0.01, 100.0, 0.01, 0.1,
+		_on_asset_root_scale_changed.bind(property_name))
 	field.tooltip_text = "Positive preview Scale on the %s axis around the Asset Pivot. Rebase before Runtime Export." % ("X" if property_name == "scale_x" else "Y")
-	field.value_changed.connect(_on_asset_root_scale_changed.bind(property_name))
 	asset_root_scale_fields[property_name] = field
 	if property_name == "scale_x":
 		asset_root_scale_field = field
@@ -12620,81 +12572,36 @@ func _add_asset_root_scale_axis_field(grid: GridContainer, label_text: String, v
 
 
 func _add_transform_field(grid: GridContainer, label_text: String, value: float, property_name: String, step: float) -> void:
-	var label := Label.new()
-	label.text = label_text
-	label.add_theme_font_size_override("font_size", 10)
-	label.add_theme_color_override("font_color", Color("#7f8a9b"))
-	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	grid.add_child(label)
-	var field := SpinBox.new()
-	field.min_value = -100000.0
-	field.max_value = 100000.0
+	grid.add_child(EditorWidgets.create_field_caption(label_text))
 	# Rotation arrows use exact whole degrees. Other transform fields keep
 	# tenth-unit arrows while preserving their configured text precision.
-	field.step = step
-	field.custom_arrow_step = 1.0 if property_name == "rotation" else 0.1
-	field.value = value
-	field.custom_minimum_size = Vector2(96, 26)
-	field.add_theme_font_size_override("font_size", 11)
-	field.value_changed.connect(_on_transform_value_changed.bind(property_name))
+	var field := EditorWidgets.create_number_field(value, -100000.0, 100000.0, step,
+		1.0 if property_name == "rotation" else 0.1,
+		_on_transform_value_changed.bind(property_name), "", false)
 	transform_fields[property_name] = field
 	grid.add_child(field)
 
 
 func _add_global_transform_field(grid: GridContainer, label_text: String, value: float, property_name: String, step: float) -> void:
-	var label := Label.new()
-	label.text = label_text
-	label.add_theme_font_size_override("font_size", 10)
-	label.add_theme_color_override("font_color", Color("#7f8a9b"))
-	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	grid.add_child(label)
-	var field := SpinBox.new()
-	field.min_value = -100000.0
-	field.max_value = 100000.0
-	field.step = step
-	field.custom_arrow_step = 1.0 if property_name == "rotation" else 0.1
-	field.value = value
-	field.custom_minimum_size = Vector2(96, 26)
-	field.add_theme_font_size_override("font_size", 11)
-	field.value_changed.connect(_on_global_transform_value_changed.bind(property_name))
+	grid.add_child(EditorWidgets.create_field_caption(label_text))
+	var field := EditorWidgets.create_number_field(value, -100000.0, 100000.0, step,
+		1.0 if property_name == "rotation" else 0.1,
+		_on_global_transform_value_changed.bind(property_name), "", false)
 	grid.add_child(field)
 
 
 func _add_point_position_field(grid: GridContainer, label_text: String, value: float, property_name: String) -> void:
-	var label := Label.new()
-	label.text = label_text
-	label.add_theme_font_size_override("font_size", 10)
-	label.add_theme_color_override("font_color", Color("#7f8a9b"))
-	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	grid.add_child(label)
-	var field := SpinBox.new()
-	field.min_value = -100000.0
-	field.max_value = 100000.0
+	grid.add_child(EditorWidgets.create_field_caption(label_text))
 	# The arrows move in tenths while text input still supports hundredths.
-	field.step = 0.01
-	field.custom_arrow_step = 0.1
-	field.set_value_no_signal(value)
-	field.custom_minimum_size = Vector2(96, 26)
-	field.add_theme_font_size_override("font_size", 11)
-	field.value_changed.connect(_on_point_position_changed.bind(property_name))
+	var field := EditorWidgets.create_number_field(value, -100000.0, 100000.0, 0.01, 0.1,
+		_on_point_position_changed.bind(property_name))
 	grid.add_child(field)
 
 
 func _add_selected_points_delta_field(grid: GridContainer, label_text: String, property_name: String) -> void:
-	var label := Label.new()
-	label.text = label_text
-	label.add_theme_font_size_override("font_size", 10)
-	label.add_theme_color_override("font_color", Color("#7f8a9b"))
-	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	grid.add_child(label)
-	var field := SpinBox.new()
-	field.min_value = -100000.0
-	field.max_value = 100000.0
-	field.step = 0.01
-	field.custom_arrow_step = 0.1
-	field.set_value_no_signal(0.0)
-	field.custom_minimum_size = Vector2(96, 26)
-	field.add_theme_font_size_override("font_size", 11)
+	grid.add_child(EditorWidgets.create_field_caption(label_text))
+	var field := EditorWidgets.create_number_field(0.0, -100000.0, 100000.0, 0.01, 0.1, Callable())
+	# Connected after construction: the handler needs the field it belongs to.
 	field.value_changed.connect(_on_selected_points_delta_changed.bind(property_name, field))
 	grid.add_child(field)
 

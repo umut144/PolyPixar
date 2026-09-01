@@ -251,3 +251,34 @@ static func strikethrough_text(text: String) -> String:
 	for character in text:
 		result += character + strike_mark
 	return result
+
+static func create_field_caption(text: String) -> Label:
+	# The small grey caption that sits beside a numeric field in a grid.
+	var label := Label.new()
+	label.text = text
+	label.add_theme_font_size_override("font_size", 10)
+	label.add_theme_color_override("font_color", Color("#7f8a9b"))
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	return label
+
+
+static func create_number_field(value: float, minimum: float, maximum: float, step: float, arrow_step: float, on_changed: Callable, suffix := "", silent := true, sized := true) -> SpinBox:
+	# One numeric field for the whole Inspector. `silent` decides whether setting
+	# the initial value fires value_changed, which a few callers rely on.
+	var field := SpinBox.new()
+	field.min_value = minimum
+	field.max_value = maximum
+	field.step = step
+	field.custom_arrow_step = arrow_step
+	if not suffix.is_empty():
+		field.suffix = suffix
+	if silent:
+		field.set_value_no_signal(value)
+	else:
+		field.value = value
+	if sized:
+		field.custom_minimum_size = Vector2(96, 26)
+		field.add_theme_font_size_override("font_size", 11)
+	if on_changed.is_valid():
+		field.value_changed.connect(on_changed)
+	return field
