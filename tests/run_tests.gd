@@ -3967,13 +3967,14 @@ const OUTLINER_SIGNAL_ROUTES := [
 	["geometry_pipeline_action", "_on_geometry_pipeline_action"],
 ]
 
-# Declared on the view but neither emitted nor connected. Expansion is not an
-# intent the Outliner reports: main.gd sets it in _select_asset through
+# Signals the view declares without connecting them. There are none: every
+# signal OutlinerView declares is routed. A new entry here needs a reason,
+# because the completeness check below otherwise fails on it — which is how
+# expansion_toggle_requested was found and removed. Expansion is not an intent
+# the Outliner reports: main.gd sets it in _select_asset through
 # _set_outliner_asset_expanded and pushes the result back in through
-# set_expansion. The signal is a leftover of the extraction. It is listed here
-# rather than quietly ignored, so connecting it, emitting it or removing it all
-# make this test speak up.
-const OUTLINER_UNCONNECTED_SIGNALS := ["expansion_toggle_requested"]
+# set_expansion.
+const OUTLINER_UNCONNECTED_SIGNALS: Array[String] = []
 
 # Routed and checked as such, but not drivable from a walk: reparenting arrives
 # through set_drag_forwarding, and Godot exposes neither the virtuals
