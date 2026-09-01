@@ -6,10 +6,9 @@ extends VBoxContainer
 # editor state directly and never mutates a document, the same contract
 # ComponentCanvas follows.
 #
-# The Mesh tree is not here yet. It reads the whole derived geometry state —
-# bakes, recipes, statuses and previews across all three stages — and moving it
-# would drag that state into a view. Until it has a view model of its own,
-# main.gd renders that one branch through geometry_tree_builder below.
+# The Mesh tree arrives as data rather than as code. It reads the whole derived
+# geometry state — bakes, recipes, statuses and previews across all three stages
+# — so main.gd resolves that into a flat list of rows and this view renders it.
 
 signal asset_selected(asset_id: String)
 signal component_selected(asset_id: String, component_id: String)
@@ -31,6 +30,11 @@ signal row_context_menu_requested(kind: String, asset_id: String, target_id: Str
 signal drop_requested(asset_id: String, target_id: String, payload: Variant)
 signal expansion_toggle_requested(asset_id: String, expanded: bool)
 signal visibility_toggle_requested(kind: String, asset_id: String, target_id: String, visible: bool)
+signal geometry_asset_selected(asset_id: String)
+signal geometry_component_selected(asset_id: String, component_id: String)
+signal geometry_reference_selected(asset_id: String, component_id: String, reference_id: String)
+signal geometry_input_selected(asset_id: String, component_id: String, input_id: String, role: String)
+signal geometry_pipeline_action(action_id: String, asset_id: String, component_id: String)
 
 # Context, pushed in before each rebuild. The names match main.gd's so the
 # moved render code reads the same way it did there.
@@ -57,8 +61,9 @@ var focus_asset_id := ""
 # Derived state the rows display, computed by main.gd so this view never has to
 # reach into the geometry documents itself.
 var row_status: Dictionary = {}
-# Temporary: renders the Mesh branch. See the note at the top of this file.
-var geometry_tree_builder: Callable = Callable()
+# The Mesh tree as a flat list of rows, built by main.gd. Its shape is
+# documented at _render_geometry_rows below.
+var geometry_rows: Array = []
 
 const CREATE_SUBMODULES := ["Character", "Props", "Weapons", "Terrain", "Icon", "Symbols"]
 const GEOMETRY_SUBMODULES := ["Sampling", "Seeding", "Meshing"]
@@ -110,6 +115,10 @@ func set_row_status(status: Dictionary) -> void:
 	row_status = status
 
 
+func set_geometry_rows(rows: Array) -> void:
+	geometry_rows = rows
+
+
 func _emit_visibility(visible: bool, kind: String, asset_id: String, target_id: String) -> void:
 	visibility_toggle_requested.emit(kind, asset_id, target_id, visible)
 
@@ -156,8 +165,7 @@ func rebuild() -> void:
 		return
 	if active_module == "Mesh":
 		if active_geometry_submodule in GEOMETRY_SUBMODULES:
-			if geometry_tree_builder.is_valid():
-				geometry_tree_builder.call()
+			_render_geometry_rows()
 		else:
 			self.add_child(EditorWidgets.create_outliner_group_label("Mesh · Placeholder"))
 			self.add_child(EditorWidgets.create_inspector_field_label("%s authoring will be introduced in a later phase." % active_geometry_submodule))
@@ -171,6 +179,101 @@ func rebuild() -> void:
 		self.add_child(EditorWidgets.create_outliner_group_label(active_create_submodule))
 		for asset in visible_assets:
 			_render_asset_outliner_entry(asset, not search_text.is_empty())
+
+func _render_geometry_rows() -> void:
+	# Renders the Mesh tree from the row list main.gd built. Every row is an
+	# indent plus a button, optionally followed by a role badge, a status dot and
+	# a count. The view decides nothing about what a row says.
+	for row_data in geometry_rows:
+		if not row_data is Dictionary:
+			continue
+		var kind := str(row_data.get("kind", ""))
+		match kind:
+			"section":
+				add_child(EditorWidgets.create_outliner_group_label(str(row_data.get("label", ""))))
+			"child_section":
+				add_child(EditorWidgets.create_outliner_child_group_label(str(row_data.get("label", ""))))
+			"note":
+				add_child(EditorWidgets.create_inspector_field_label(str(row_data.get("label", ""))))
+			"asset":
+				add_child(_geometry_asset_button(row_data))
+			_:
+				add_child(_geometry_row(kind, row_data))
+
+
+func _geometry_asset_button(row_data: Dictionary) -> Button:
+	var asset_id := str(row_data.get("asset_id", ""))
+	var button := Button.new()
+	button.text = str(row_data.get("label", ""))
+	button.custom_minimum_size = Vector2(0, 30)
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	button.focus_mode = Control.FOCUS_NONE
+	EditorWidgets.style_outliner_button(button, bool(row_data.get("selected", false)))
+	button.pressed.connect(geometry_asset_selected.emit.bind(asset_id))
+	return button
+
+
+func _geometry_row(kind: String, row_data: Dictionary) -> HBoxContainer:
+	var asset_id := str(row_data.get("asset_id", ""))
+	var component_id := str(row_data.get("component_id", ""))
+	var target_id := str(row_data.get("target_id", ""))
+	var selected := bool(row_data.get("selected", false))
+	var row := HBoxContainer.new()
+	if kind in ["reference", "guide"]:
+		row.add_theme_constant_override("separation", 2)
+	var indent := Control.new()
+	indent.custom_minimum_size = Vector2(int(row_data.get("indent", 16)), 0)
+	row.add_child(indent)
+	var button := Button.new()
+	button.text = str(row_data.get("label", ""))
+	button.tooltip_text = str(row_data.get("tooltip", ""))
+	button.custom_minimum_size = Vector2(0, int(row_data.get("height", 30)))
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	button.focus_mode = Control.FOCUS_NONE
+	match kind:
+		"component":
+			EditorWidgets.style_outliner_button(button, selected)
+			button.pressed.connect(geometry_component_selected.emit.bind(asset_id, component_id))
+		"reference":
+			EditorWidgets.style_outliner_button(button, selected, str(row_data.get("style_role", "outer")))
+			button.pressed.connect(geometry_reference_selected.emit.bind(asset_id, component_id, target_id))
+		"guide":
+			EditorWidgets.style_guide_outliner_button(button, selected, str(row_data.get("guide_type", "")))
+			button.pressed.connect(guide_selected.emit.bind(asset_id, target_id))
+		"input":
+			EditorWidgets.style_outliner_button(button, selected)
+			button.pressed.connect(geometry_input_selected.emit.bind(asset_id, component_id, target_id, str(row_data.get("role", ""))))
+		"pipeline", "dependency":
+			var action_id := str(row_data.get("action_id", ""))
+			button.disabled = action_id.is_empty()
+			if not action_id.is_empty():
+				button.pressed.connect(geometry_pipeline_action.emit.bind(action_id, asset_id, component_id))
+	row.add_child(button)
+	if row_data.has("badge"):
+		row.add_child(EditorWidgets.create_geometry_role_badge(str(row_data["badge"])))
+	if row_data.has("status_color"):
+		var status_dot := Label.new()
+		status_dot.text = "●"
+		status_dot.custom_minimum_size = Vector2(28, 30)
+		status_dot.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		status_dot.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		status_dot.add_theme_font_size_override("font_size", 23)
+		status_dot.add_theme_color_override("font_color", row_data["status_color"])
+		status_dot.tooltip_text = str(row_data.get("tooltip", ""))
+		row.add_child(status_dot)
+	if int(row_data.get("status_count", 0)) >= 2:
+		var count_label := Label.new()
+		count_label.text = str(int(row_data["status_count"]))
+		count_label.custom_minimum_size = Vector2(20, 30)
+		count_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		count_label.add_theme_font_size_override("font_size", 12)
+		count_label.add_theme_color_override("font_color", Color("#9aa3b2"))
+		count_label.tooltip_text = str(row_data.get("tooltip", ""))
+		row.add_child(count_label)
+	return row
+
 
 func asset_type_filter_matches(asset: Dictionary) -> bool:
 	return bool(outliner_asset_type_filters.get(WorldDocumentService.asset_type(asset), false))

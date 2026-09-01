@@ -32,6 +32,7 @@ func _init() -> void:
 	_test_multi_component_inspector()
 	_test_multi_component_deletion()
 	_test_outliner_selection_wiring()
+	_test_geometry_outliner_rows()
 	_test_render_invalidation()
 	_test_atomic_document_writes()
 	_test_geometry_document_history_isolation()
@@ -1486,6 +1487,13 @@ func _test_outliner_selection_wiring() -> void:
 	_expect(_press_outliner_button(application, "body"), "The Mesh Outliner should offer a Component row.")
 	_expect(application.selected_component_id == "component_1" and application.selected_guide_id.is_empty(), "Pressing a Mesh Component row should select that Component.")
 
+	# The Mesh tree renders from a row model, so its rows reach their handlers
+	# through their own signals and need the same cover.
+	application.active_geometry_submodule = "Seeding"
+	application._render_outliner()
+	_expect(_press_outliner_button(application, "Outer · body"), "The Seeding tree should offer the Outer input row.")
+	_expect(application.selected_sampling_input_kind == "outer", "Pressing a Seeding input row should select that input.")
+
 	# Style
 	application.active_module = "Style"
 	application.active_style_submodule = "Weighting"
@@ -1510,6 +1518,83 @@ func _test_outliner_selection_wiring() -> void:
 	_expect(application.selected_weighting_style_id == str(created.get("id", "")), "Pressing a Style row should select that Style.")
 
 	application.free()
+
+
+func _test_geometry_outliner_rows() -> void:
+	# The Mesh tree is built as data and rendered generically, so the row model is
+	# what has to be right. These pin the strings each row kind produces.
+	var body := _outliner_test_component("component_1", "body")
+	body["topology_role"] = "outer"
+	var hole := {"points": [], "edges": [], "chains": [], "id": "component_2", "name": "eye",
+		"visibility": true, "type": "reference", "parent_component_id": "component_1",
+		"topology_role": "hole", "source_asset_id": "asset_2"}
+	var cut := {"id": "guide_1", "guide_type": AssetGuide.CUT, "ordinal": 1, "visibility": true,
+		"scope": {"kind": "component", "component_id": "component_1"}, "points": [], "edges": [], "chains": []}
+	var spine := {"id": "guide_2", "guide_type": AssetGuide.SAMPLER_SPINE, "ordinal": 1, "visibility": true,
+		"scope": {"kind": "component", "component_id": "component_1"}, "points": [], "edges": [], "chains": []}
+	var application: Control = load("res://scripts/main.gd").new()
+	application._build_ui()
+	var test_assets: Array[Dictionary] = [
+		{"id": "asset_1", "name": "Wizard", "visibility": true, "components": [body, hole], "groups": [], "guides": [cut, spine]},
+		{"id": "asset_2", "name": "Orb", "visibility": true, "components": [], "groups": [], "guides": []}]
+	application.assets = test_assets
+	application.active_module = "Mesh"
+	application.expanded_assets["asset_1"] = true
+
+	application.active_geometry_submodule = "Sampling"
+	application._render_outliner()
+	var sampling_rows: Array = application.outliner_view.geometry_rows
+	_expect(_geometry_row_label(sampling_rows, "asset") == "Wizard", "The Mesh tree should open with a row per visible Asset.")
+	_expect(_geometry_row_label(sampling_rows, "component") == "body", "The Mesh tree should list meshable Components.")
+	_expect(_geometry_row_label(sampling_rows, "reference").begins_with("Hole · eye ← Orb"), "A Sampling Hole row should name the referenced Asset.")
+	_expect(_geometry_row_label(sampling_rows, "guide").begins_with("Cut · "), "A Sampling Cut row should name its Guide.")
+
+	application.active_geometry_submodule = "Seeding"
+	var doc: Dictionary = application._mutable_geometry_document("asset_1", "component_1")
+	doc["seeding"]["recipe"]["method"] = GeometrySeedingService.SPINE_FLOW
+	doc["seeding"]["recipe"]["parameters"]["spine_inputs"] = [{"guide_id": "guide_2", "enabled": true}]
+	application._render_outliner()
+	var seeding_rows: Array = application.outliner_view.geometry_rows
+	var treatments: Array[String] = []
+	for row_data in seeding_rows:
+		if str(row_data.get("kind", "")) == "input":
+			treatments.append(str(row_data.get("label", "")))
+	_expect(treatments.size() == 4, "Seeding should list the Outer, Hole, Cut and Spine inputs of the Component.")
+	_expect(treatments[0].contains("Outer · body") and treatments[0].contains("Clearance"), "The Outer input row should be shown with Clearance.")
+	_expect(treatments[1].contains("Hole · eye ← Orb") and treatments[1].contains("Excluded"), "A Hole input row should be shown as Excluded, not as Clearance.")
+	_expect(treatments[2].contains("Cut · ") and treatments[2].contains("Barrier"), "A Cut input row should be shown as a Barrier.")
+	_expect(treatments[3].contains("Spine · ") and treatments[3].contains("Enabled"), "An enabled Spine input row should be shown as Enabled.")
+	doc["seeding"]["recipe"]["parameters"]["spine_inputs"] = [{"guide_id": "guide_2", "enabled": false}]
+	application._render_outliner()
+	var disabled_rows: Array = application.outliner_view.geometry_rows
+	var spine_label := ""
+	for row_data in disabled_rows:
+		if str(row_data.get("kind", "")) == "input" and str(row_data.get("role", "")) == "spine":
+			spine_label = str(row_data.get("label", ""))
+	_expect(spine_label.contains("Disabled"), "A disabled Spine input row should be shown as Disabled.")
+
+	application.active_geometry_submodule = "Meshing"
+	application._render_outliner()
+	var meshing_rows: Array = application.outliner_view.geometry_rows
+	var pipeline: Array[String] = []
+	for row_data in meshing_rows:
+		if str(row_data.get("kind", "")) == "pipeline":
+			pipeline.append(str(row_data.get("label", "")))
+	_expect(pipeline.size() == 4, "Meshing should list its four pipeline rows.")
+	_expect(pipeline[0].begins_with("Sampling · Adaptive") and pipeline[3].begins_with("Mesh · Constrained Mesh"), "The Meshing pipeline rows should run from Sampling to the Mesh result.")
+	var mesh_action := ""
+	for row_data in meshing_rows:
+		if str(row_data.get("kind", "")) == "pipeline" and str(row_data.get("label", "")).begins_with("Mesh · "):
+			mesh_action = str(row_data.get("action_id", ""))
+	_expect(mesh_action.is_empty(), "The Mesh result row carries no action, so the view renders it disabled.")
+	application.free()
+
+
+func _geometry_row_label(rows: Array, kind: String) -> String:
+	for row_data in rows:
+		if str(row_data.get("kind", "")) == kind:
+			return str(row_data.get("label", ""))
+	return ""
 
 
 func _test_render_invalidation() -> void:

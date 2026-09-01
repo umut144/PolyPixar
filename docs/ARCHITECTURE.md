@@ -47,10 +47,12 @@ export data.
   and mutates no document: a drop reports intent and `main.gd` applies it.
   Derived row state, such as Weighting status, is resolved by `main.gd` and
   handed over, so the view never reaches into the geometry documents. The Mesh
-  tree is the exception and still lives in `main.gd`: it reads the whole
-  derived geometry state across Sampling, Seeding and Meshing, and it renders
-  through the view's `geometry_tree_builder` until it has a view model of its
-  own.
+  tree follows the same rule as data: `main.gd` resolves the derived geometry
+  state across Sampling, Seeding and Meshing into a flat list of typed rows —
+  `asset`, `component`, `reference`, `guide`, `input`, `dependency`, `pipeline`
+  plus labels — and the view draws them without deciding what a row says. A
+  `pipeline` row carries an `action_id` rather than a callback, so the view
+  stays free of editor behaviour.
 - `EditorWidgets` builds the shared widget vocabulary — panels, labels, section
   headers, buttons and their styling. It is static and purely constructive: it
   reads no editor state and knows nothing about Worlds, Assets or Components.

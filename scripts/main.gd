@@ -923,7 +923,6 @@ func _build_ui() -> void:
 	outliner_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	outliner_content.add_child(outliner_scroll)
 	outliner_view = OutlinerView.new()
-	outliner_view.geometry_tree_builder = _render_geometry_component_outliner
 	outliner_view.asset_selected.connect(_select_asset)
 	outliner_view.component_selected.connect(_on_outliner_component_selected)
 	outliner_view.group_selected.connect(_select_group)
@@ -943,6 +942,11 @@ func _build_ui() -> void:
 	outliner_view.row_context_menu_requested.connect(_on_outliner_row_context_menu)
 	outliner_view.drop_requested.connect(_outliner_drop_data_from_view)
 	outliner_view.visibility_toggle_requested.connect(_on_outliner_visibility_toggled)
+	outliner_view.geometry_asset_selected.connect(_select_geometry_asset)
+	outliner_view.geometry_component_selected.connect(_select_geometry_component)
+	outliner_view.geometry_reference_selected.connect(_select_geometry_sampling_reference)
+	outliner_view.geometry_input_selected.connect(_select_geometry_seeding_input)
+	outliner_view.geometry_pipeline_action.connect(_on_geometry_pipeline_action)
 	outliner_scroll.add_child(outliner_view)
 
 	var canvas_split := HSplitContainer.new()
@@ -6310,7 +6314,190 @@ func _render_outliner() -> void:
 	outliner_view.set_filters(outliner_search_input.text.strip_edges().to_lower() if is_instance_valid(outliner_search_input) else "", outliner_asset_type_filters)
 	outliner_view.set_expansion(expanded_assets, _outliner_focus_asset_id())
 	outliner_view.set_row_status(_outliner_row_status())
+	outliner_view.set_geometry_rows(_geometry_outliner_rows())
 	outliner_view.rebuild()
+
+
+func _geometry_outliner_rows() -> Array:
+	# The Mesh tree as data. Every derived value the rows show is resolved here,
+	# where the geometry documents live, so OutlinerView only has to draw it.
+	var rows: Array = []
+	if active_module != "Mesh" or not active_geometry_submodule in GEOMETRY_SUBMODULES:
+		return rows
+	var search_text := outliner_search_input.text.strip_edges().to_lower() if is_instance_valid(outliner_search_input) else ""
+	var visible_assets: Array = []
+	for asset in assets:
+		if outliner_view.asset_is_visible(asset) and outliner_view.asset_type_filter_matches(asset) and outliner_view.asset_matches_search(asset, search_text):
+			visible_assets.append(asset)
+	visible_assets.sort_custom(_sort_named_documents)
+	rows.append({"kind": "section", "label": "%s · Components" % active_geometry_submodule})
+	for asset in visible_assets:
+		_append_geometry_asset_rows(rows, asset, not search_text.is_empty())
+	if visible_assets.is_empty():
+		rows.append({"kind": "note", "label": "No Assets match the selected types."})
+	return rows
+
+
+func _append_geometry_asset_rows(rows: Array, asset: Dictionary, force_expand: bool) -> void:
+	var asset_id := str(asset.get("id", ""))
+	rows.append({
+		"kind": "asset",
+		"asset_id": asset_id,
+		"label": str(asset.get("name", "Asset")),
+		"selected": selected_asset_id == asset_id and selected_component_id.is_empty()
+	})
+	if not force_expand and not bool(expanded_assets.get(asset_id, false)):
+		return
+	rows.append({"kind": "child_section", "label": "Components"})
+	var components: Array = []
+	var references: Array = []
+	var guides: Array = asset.get("guides", []).duplicate(true)
+	for component in asset.get("components", []):
+		if str(component.get("type", "component")) == "guide":
+			guides.append(component)
+		elif _is_region(component):
+			continue
+		elif _is_reference_component(component):
+			references.append(component)
+		else:
+			components.append(component)
+	components.sort_custom(_sort_named_documents)
+	references.sort_custom(_sort_named_documents)
+	guides.sort_custom(func(left: Dictionary, right: Dictionary) -> bool: return WorldDocumentService.guide_display_name(asset, left).naturalnocasecmp_to(WorldDocumentService.guide_display_name(asset, right)) < 0)
+	for component in components:
+		var draw_mode := str(component.get("draw_mode", "closed_loop"))
+		if active_geometry_submodule in ["Sampling", "Seeding"] and draw_mode == "contour":
+			continue
+		var component_id := str(component.get("id", ""))
+		var summary := _geometry_outliner_status_summary(asset_id, component_id, component)
+		rows.append({
+			"kind": "component",
+			"asset_id": asset_id,
+			"component_id": component_id,
+			"label": str(component.get("name", "Component")),
+			"tooltip": str(summary.get("tooltip", "")),
+			"selected": selected_asset_id == asset_id and selected_component_id == component_id and selected_geometry_bake_method.is_empty(),
+			"badge": str(component.get("topology_role", "outer")),
+			"status_color": summary.get("color", Color("#737f91")),
+			"status_count": int(summary.get("count", 0))
+		})
+		match active_geometry_submodule:
+			"Sampling":
+				_append_geometry_sampling_rows(rows, asset, component_id, references, guides)
+			"Seeding":
+				_append_geometry_seeding_rows(rows, asset, component, references, guides)
+			"Meshing":
+				_append_geometry_meshing_rows(rows, asset, component)
+
+
+func _append_geometry_sampling_rows(rows: Array, asset: Dictionary, component_id: String, references: Array, guides: Array) -> void:
+	var asset_id := str(asset.get("id", ""))
+	for reference in references:
+		if str(reference.get("parent_component_id", "")) != component_id or str(reference.get("topology_role", "outer")) != "hole":
+			continue
+		var reference_id := str(reference.get("id", ""))
+		var summary := _geometry_sampling_input_summary(asset_id, component_id, reference_id, "hole")
+		rows.append({
+			"kind": "reference", "asset_id": asset_id, "component_id": component_id, "target_id": reference_id,
+			"indent": 34,
+			"label": "Hole · %s  %s" % [WorldDocumentService.component_outliner_name(assets, reference), str(summary.get("label", "↳"))],
+			"tooltip": "Sampling dependency · select the parent Component to edit this contour",
+			"selected": selected_sampling_input_id == reference_id,
+			"style_role": str(reference.get("topology_role", "outer")),
+			"badge": str(reference.get("topology_role", "outer"))
+		})
+	for guide in guides:
+		if str(guide.get("scope", {}).get("component_id", "")) != component_id or str(guide.get("guide_type", "")) != AssetGuide.CUT:
+			continue
+		var guide_id := str(guide.get("id", ""))
+		var guide_summary := _geometry_sampling_input_summary(asset_id, component_id, guide_id, "cut")
+		rows.append({
+			"kind": "guide", "asset_id": asset_id, "target_id": guide_id,
+			"indent": 34,
+			"label": "Cut · %s  %s" % [WorldDocumentService.guide_display_name(asset, guide), str(guide_summary.get("label", "↳"))],
+			"tooltip": "Sampling constraint · %s" % AssetGuide.display_name(str(guide.get("guide_type", AssetGuide.SAMPLER_SPINE))),
+			"selected": guide_id == selected_guide_id,
+			"guide_type": str(guide.get("guide_type", AssetGuide.SAMPLER_SPINE)),
+			"badge": "Cut" if str(guide.get("guide_type", "")) == AssetGuide.CUT else "Guide"
+		})
+
+
+func _geometry_seeding_input_row(asset_id: String, component_id: String, input_id: String, role: String, title: String, treatment: String, badge: String) -> Dictionary:
+	var count := 0
+	for stat in _geometry_sampling_bake(asset_id, component_id).get("boundary_stats", []):
+		if str(stat.get("input_id", "")) == input_id and str(stat.get("role", "")) == role:
+			count += int(stat.get("sample_count", 0))
+	if role == "spine":
+		var component := _get_component(_get_asset(asset_id), component_id)
+		var seeding_result := geometry_seeding_preview if _geometry_seeding_preview_matches(asset_id, component_id, component) else _geometry_seeding_bake(asset_id, component_id)
+		for stat in seeding_result.get("guide_stats", []):
+			if str(stat.get("guide_id", "")) == input_id:
+				count = int(stat.get("seed_count", 0))
+	return {
+		"kind": "input", "asset_id": asset_id, "component_id": component_id, "target_id": input_id, "role": role,
+		"indent": 34, "height": 26,
+		"label": "%s  ·  %s%s" % [title, treatment, "  ·  %d" % count if count > 0 else ""],
+		"selected": not input_id.is_empty() and selected_sampling_input_id == input_id,
+		"badge": badge
+	}
+
+
+func _append_geometry_seeding_rows(rows: Array, asset: Dictionary, component: Dictionary, references: Array, guides: Array) -> void:
+	var asset_id := str(asset.get("id", ""))
+	var component_id := str(component.get("id", ""))
+	rows.append({
+		"kind": "dependency", "asset_id": asset_id, "component_id": component_id,
+		"indent": 34, "height": 26,
+		"label": "Sampling · Adaptive  ·  %s" % ("Baked" if _geometry_sampling_bake_is_current(asset_id, component_id, component) else "Required"),
+		"action_id": "open_sampling"
+	})
+	rows.append(_geometry_seeding_input_row(asset_id, component_id, "", "outer", "Outer · %s" % str(component.get("name", "Component")), "Clearance", "Outer"))
+	for reference in references:
+		if str(reference.get("parent_component_id", "")) == component_id and str(reference.get("topology_role", "outer")) == "hole":
+			rows.append(_geometry_seeding_input_row(asset_id, component_id, str(reference.get("id", "")), "hole", "Hole · %s" % WorldDocumentService.component_outliner_name(assets, reference), "Excluded", "Hole"))
+	for guide in guides:
+		if str(guide.get("scope", {}).get("component_id", "")) != component_id:
+			continue
+		var guide_type := str(guide.get("guide_type", ""))
+		var guide_name := WorldDocumentService.guide_display_name(asset, guide)
+		if guide_type == AssetGuide.CUT:
+			rows.append(_geometry_seeding_input_row(asset_id, component_id, str(guide.get("id", "")), "cut", "Cut · %s" % guide_name, "Barrier", "Cut"))
+		elif guide_type == AssetGuide.SAMPLER_SPINE:
+			var enabled := _geometry_seeding_spine_enabled(_geometry_seeding_recipe(asset_id, component_id), str(guide.get("id", "")))
+			rows.append(_geometry_seeding_input_row(asset_id, component_id, str(guide.get("id", "")), "spine", "Spine · %s" % guide_name, "Enabled" if enabled else "Disabled", "Spine"))
+
+
+func _append_geometry_meshing_rows(rows: Array, asset: Dictionary, component: Dictionary) -> void:
+	var asset_id := str(asset.get("id", ""))
+	var component_id := str(component.get("id", ""))
+	var sampling := _geometry_sampling_bake(asset_id, component_id)
+	var sampling_ready := _geometry_sampling_bake_is_current(asset_id, component_id, component)
+	var hole_count := int(sampling.get("hole_count", 0))
+	var cut_count := int(sampling.get("cut_count", 0))
+	var recipe := _geometry_meshing_recipe(asset_id, component_id)
+	var seed_method := str(recipe.get("parameters", {}).get("seeding_method", GeometrySeedingService.POISSON_FILL))
+	var seeding := _geometry_seeding_bake(asset_id, component_id, seed_method)
+	var seeding_ready := _geometry_meshing_input_is_current(asset_id, component_id, component, recipe)
+	var result := geometry_meshing_preview if _geometry_meshing_preview_matches(asset_id, component_id, component) else _geometry_meshing_bake(asset_id, component_id)
+	for entry in [
+		{"label": "Sampling · Adaptive · %s · %d Points" % ["Baked" if sampling_ready else "Required", int(sampling.get("constraint_sample_count", sampling.get("sample_count", 0)))], "action_id": "open_sampling"},
+		{"label": "Seeding · %s · %s · %d Seeds" % [_geometry_bake_method_label(seed_method), "Baked" if seeding_ready else "Required", int(seeding.get("seed_count", 0))], "action_id": "open_seeding"},
+		{"label": "Constraints · Outer Preserved · %d Hole%s · %d Cut%s" % [hole_count, "" if hole_count == 1 else "s", cut_count, "" if cut_count == 1 else "s"], "action_id": "open_sampling"},
+		{"label": "Mesh · Constrained Mesh · %s%s" % [_geometry_meshing_status(asset_id, component_id, component), " · %d Triangles" % int(result.get("triangle_count", 0)) if not result.is_empty() else ""], "action_id": ""}
+	]:
+		rows.append({
+			"kind": "pipeline", "asset_id": asset_id, "component_id": component_id,
+			"indent": 34, "height": 26,
+			"label": str(entry["label"]), "action_id": str(entry["action_id"])
+		})
+
+
+func _on_geometry_pipeline_action(action_id: String, asset_id: String, component_id: String) -> void:
+	match action_id:
+		"open_sampling":
+			_open_sampling_dependency(asset_id, component_id)
+		"open_seeding":
+			_open_seeding_dependency(asset_id, component_id)
 
 
 func _outliner_row_status() -> Dictionary:
@@ -6678,190 +6865,6 @@ func _sort_named_documents(a: Dictionary, b: Dictionary) -> bool:
 	return WorldDocumentService.sort_named_documents(a, b)
 
 
-func _render_geometry_component_outliner() -> void:
-	var search_text := outliner_search_input.text.strip_edges().to_lower() if is_instance_valid(outliner_search_input) else ""
-	var visible_assets: Array = []
-	for asset in assets:
-		if outliner_view.asset_is_visible(asset) and outliner_view.asset_type_filter_matches(asset) and outliner_view.asset_matches_search(asset, search_text):
-			visible_assets.append(asset)
-	visible_assets.sort_custom(_sort_named_documents)
-	outliner_view.add_child(EditorWidgets.create_outliner_group_label("%s · Components" % active_geometry_submodule))
-	for asset in visible_assets:
-		_render_geometry_component_asset_entry(asset, not search_text.is_empty())
-	if visible_assets.is_empty():
-		outliner_view.add_child(EditorWidgets.create_inspector_field_label("No Assets match the selected types."))
-
-
-func _render_geometry_component_asset_entry(asset: Dictionary, force_expand := false) -> void:
-	var asset_id := str(asset.get("id", ""))
-	var container := VBoxContainer.new()
-	container.add_theme_constant_override("separation", 0)
-	outliner_view.add_child(container)
-	var asset_button := Button.new()
-	asset_button.text = str(asset.get("name", "Asset"))
-	asset_button.custom_minimum_size = Vector2(0, 30)
-	asset_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	asset_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	asset_button.focus_mode = Control.FOCUS_NONE
-	EditorWidgets.style_outliner_button(asset_button, selected_asset_id == asset_id and selected_component_id.is_empty())
-	asset_button.pressed.connect(_select_geometry_asset.bind(asset_id))
-	container.add_child(asset_button)
-	if not force_expand and not bool(expanded_assets.get(asset_id, false)):
-		return
-	container.add_child(EditorWidgets.create_outliner_child_group_label("Components"))
-	var components: Array = asset.get("components", []).duplicate()
-	var references: Array = []
-	var guides: Array = asset.get("guides", []).duplicate(true) if active_geometry_submodule in ["Sampling", "Seeding", "Meshing"] else []
-	if active_geometry_submodule in ["Sampling", "Seeding", "Meshing"]:
-		components.clear()
-		for component in asset.get("components", []):
-			if str(component.get("type", "component")) == "guide":
-				guides.append(component)
-			elif _is_region(component):
-				continue
-			elif _is_reference_component(component):
-				references.append(component)
-			else:
-				components.append(component)
-	components.sort_custom(_sort_named_documents)
-	references.sort_custom(_sort_named_documents)
-	guides.sort_custom(func(left: Dictionary, right: Dictionary) -> bool: return WorldDocumentService.guide_display_name(asset, left).naturalnocasecmp_to(WorldDocumentService.guide_display_name(asset, right)) < 0)
-	for component in components:
-		if str(component.get("type", "component")) == "guide":
-			continue
-		var draw_mode := str(component.get("draw_mode", "closed_loop"))
-		if active_geometry_submodule in ["Sampling", "Seeding"] and draw_mode == "contour":
-			continue
-		var component_id := str(component.get("id", ""))
-		var row := HBoxContainer.new()
-		var indent := Control.new()
-		indent.custom_minimum_size = Vector2(16, 0)
-		row.add_child(indent)
-		var summary := _geometry_outliner_status_summary(asset_id, component_id, component)
-		var button := Button.new()
-		button.text = str(component.get("name", "Component"))
-		button.tooltip_text = str(summary.get("tooltip", ""))
-		button.custom_minimum_size = Vector2(0, 30)
-		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		button.focus_mode = Control.FOCUS_NONE
-		EditorWidgets.style_outliner_button(button, selected_asset_id == asset_id and selected_component_id == component_id and selected_geometry_bake_method.is_empty())
-		button.pressed.connect(_select_geometry_component.bind(asset_id, component_id))
-		row.add_child(button)
-		row.add_child(EditorWidgets.create_geometry_role_badge(str(component.get("topology_role", "outer"))))
-		var status_dot := Label.new()
-		status_dot.text = "●"
-		status_dot.custom_minimum_size = Vector2(28, 30)
-		status_dot.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		status_dot.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		status_dot.add_theme_font_size_override("font_size", 23)
-		status_dot.add_theme_color_override("font_color", summary.get("color", Color("#737f91")))
-		status_dot.tooltip_text = str(summary.get("tooltip", ""))
-		row.add_child(status_dot)
-		var result_count := int(summary.get("count", 0))
-		if result_count >= 2:
-			var count_label := Label.new()
-			count_label.text = str(result_count)
-			count_label.custom_minimum_size = Vector2(20, 30)
-			count_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-			count_label.add_theme_font_size_override("font_size", 12)
-			count_label.add_theme_color_override("font_color", Color("#9aa3b2"))
-			count_label.tooltip_text = str(summary.get("tooltip", ""))
-			row.add_child(count_label)
-		container.add_child(row)
-		if active_geometry_submodule == "Sampling":
-			for reference in references:
-				if str(reference.get("parent_component_id", "")) == component_id and str(reference.get("topology_role", "outer")) == "hole":
-					_render_geometry_reference_row(container, asset, reference)
-			for guide in guides:
-				if str(guide.get("scope", {}).get("component_id", "")) == component_id and str(guide.get("guide_type", "")) == AssetGuide.CUT:
-					_render_geometry_sampling_guide_row(container, asset, guide)
-		elif active_geometry_submodule == "Seeding":
-			_render_geometry_seeding_dependency_row(container, asset_id, component_id, component)
-			_render_geometry_seeding_input_row(container, asset_id, component_id, "", "outer", "Outer · %s" % str(component.get("name", "Component")), "Clearance", "Outer")
-			for reference in references:
-				if str(reference.get("parent_component_id", "")) == component_id and str(reference.get("topology_role", "outer")) == "hole":
-					_render_geometry_seeding_input_row(container, asset_id, component_id, str(reference.get("id", "")), "hole", "Hole · %s" % WorldDocumentService.component_outliner_name(assets, reference), "Excluded", "Hole")
-			for guide in guides:
-				if str(guide.get("scope", {}).get("component_id", "")) != component_id:
-					continue
-				var guide_type := str(guide.get("guide_type", ""))
-				if guide_type == AssetGuide.CUT:
-					_render_geometry_seeding_input_row(container, asset_id, component_id, str(guide.get("id", "")), "cut", "Cut · %s" % WorldDocumentService.guide_display_name(asset, guide), "Barrier", "Cut")
-				elif guide_type == AssetGuide.SAMPLER_SPINE:
-					var enabled := _geometry_seeding_spine_enabled(_geometry_seeding_recipe(asset_id, component_id), str(guide.get("id", "")))
-					_render_geometry_seeding_input_row(container, asset_id, component_id, str(guide.get("id", "")), "spine", "Spine · %s" % WorldDocumentService.guide_display_name(asset, guide), "Enabled" if enabled else "Disabled", "Spine")
-		elif active_geometry_submodule == "Meshing":
-			_render_geometry_meshing_pipeline_rows(container, asset, component)
-	if active_geometry_submodule != "Sampling":
-		return
-
-
-func _render_geometry_reference_row(container: VBoxContainer, asset: Dictionary, reference: Dictionary) -> void:
-	var asset_id := str(asset.get("id", ""))
-	var reference_id := str(reference.get("id", ""))
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 2)
-	var indent := Control.new()
-	indent.custom_minimum_size = Vector2(34, 0)
-	row.add_child(indent)
-	var button := Button.new()
-	var summary := _geometry_sampling_input_summary(asset_id, str(reference.get("parent_component_id", "")), reference_id, "hole")
-	button.text = "Hole · %s  %s" % [WorldDocumentService.component_outliner_name(assets, reference), str(summary.get("label", "↳"))]
-	button.tooltip_text = "Sampling dependency · select the parent Component to edit this contour"
-	button.custom_minimum_size = Vector2(0, 30)
-	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	button.focus_mode = Control.FOCUS_NONE
-	EditorWidgets.style_outliner_button(button, selected_sampling_input_id == reference_id, str(reference.get("topology_role", "outer")))
-	button.pressed.connect(_select_geometry_sampling_reference.bind(asset_id, str(reference.get("parent_component_id", "")), reference_id))
-	row.add_child(button)
-	row.add_child(EditorWidgets.create_geometry_role_badge(str(reference.get("topology_role", "outer"))))
-	container.add_child(row)
-
-
-func _render_geometry_sampling_guide_row(container: VBoxContainer, asset: Dictionary, guide: Dictionary) -> void:
-	var asset_id := str(asset.get("id", ""))
-	var guide_id := str(guide.get("id", ""))
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 2)
-	var indent := Control.new()
-	indent.custom_minimum_size = Vector2(34, 0)
-	row.add_child(indent)
-	var button := Button.new()
-	var guide_name := WorldDocumentService.guide_display_name(asset, guide)
-	var parent_component_id := str(guide.get("scope", {}).get("component_id", ""))
-	var summary := _geometry_sampling_input_summary(asset_id, parent_component_id, guide_id, "cut")
-	button.text = "Cut · %s  %s" % [guide_name, str(summary.get("label", "↳"))]
-	button.tooltip_text = "Sampling constraint · %s" % AssetGuide.display_name(str(guide.get("guide_type", AssetGuide.SAMPLER_SPINE)))
-	button.custom_minimum_size = Vector2(0, 30)
-	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	button.focus_mode = Control.FOCUS_NONE
-	EditorWidgets.style_guide_outliner_button(button, str(guide.get("id", "")) == selected_guide_id, str(guide.get("guide_type", AssetGuide.SAMPLER_SPINE)))
-	button.pressed.connect(_select_guide.bind(asset_id, guide_id))
-	row.add_child(button)
-	row.add_child(EditorWidgets.create_geometry_role_badge("Cut" if str(guide.get("guide_type", "")) == AssetGuide.CUT else "Guide"))
-	container.add_child(row)
-
-
-func _render_geometry_seeding_dependency_row(container: VBoxContainer, asset_id: String, component_id: String, component: Dictionary) -> void:
-	var row := HBoxContainer.new()
-	var indent := Control.new()
-	indent.custom_minimum_size = Vector2(34, 0)
-	row.add_child(indent)
-	var button := Button.new()
-	var sampling_ready := _geometry_sampling_bake_is_current(asset_id, component_id, component)
-	button.text = "Sampling · Adaptive  ·  %s" % ("Baked" if sampling_ready else "Required")
-	button.custom_minimum_size = Vector2(0, 26)
-	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	button.focus_mode = Control.FOCUS_NONE
-	button.pressed.connect(_open_sampling_dependency.bind(asset_id, component_id))
-	row.add_child(button)
-	container.add_child(row)
-
-
 func _open_sampling_dependency(asset_id: String, component_id: String) -> void:
 	active_geometry_submodule = "Sampling"
 	_set_active_module_visual("Mesh", "Sampling")
@@ -6872,69 +6875,6 @@ func _open_seeding_dependency(asset_id: String, component_id: String) -> void:
 	active_geometry_submodule = "Seeding"
 	_set_active_module_visual("Mesh", "Seeding")
 	_select_geometry_component(asset_id, component_id)
-
-
-func _render_geometry_meshing_pipeline_rows(container: VBoxContainer, asset: Dictionary, component: Dictionary) -> void:
-	var asset_id := str(asset.get("id", ""))
-	var component_id := str(component.get("id", ""))
-	var sampling := _geometry_sampling_bake(asset_id, component_id)
-	var sampling_ready := _geometry_sampling_bake_is_current(asset_id, component_id, component)
-	_render_geometry_meshing_pipeline_row(container, "Sampling · Adaptive · %s · %d Points" % ["Baked" if sampling_ready else "Required", int(sampling.get("constraint_sample_count", sampling.get("sample_count", 0)))], _open_sampling_dependency.bind(asset_id, component_id))
-	var recipe := _geometry_meshing_recipe(asset_id, component_id)
-	var seed_method := str(recipe.get("parameters", {}).get("seeding_method", GeometrySeedingService.POISSON_FILL))
-	var seeding := _geometry_seeding_bake(asset_id, component_id, seed_method)
-	var seeding_ready := _geometry_meshing_input_is_current(asset_id, component_id, component, recipe)
-	_render_geometry_meshing_pipeline_row(container, "Seeding · %s · %s · %d Seeds" % [_geometry_bake_method_label(seed_method), "Baked" if seeding_ready else "Required", int(seeding.get("seed_count", 0))], _open_seeding_dependency.bind(asset_id, component_id))
-	_render_geometry_meshing_pipeline_row(container, "Constraints · Outer Preserved · %d Hole%s · %d Cut%s" % [int(sampling.get("hole_count", 0)), "" if int(sampling.get("hole_count", 0)) == 1 else "s", sampling.get("cuts", []).size(), "" if sampling.get("cuts", []).size() == 1 else "s"], _open_sampling_dependency.bind(asset_id, component_id))
-	var result := geometry_meshing_preview if _geometry_meshing_preview_matches(asset_id, component_id, component) else _geometry_meshing_bake(asset_id, component_id)
-	_render_geometry_meshing_pipeline_row(container, "Mesh · Constrained Mesh · %s%s" % [_geometry_meshing_status(asset_id, component_id, component), " · %d Triangles" % int(result.get("triangle_count", 0)) if not result.is_empty() else ""], Callable())
-
-
-func _render_geometry_meshing_pipeline_row(container: VBoxContainer, title: String, action: Callable) -> void:
-	var row := HBoxContainer.new()
-	var indent := Control.new()
-	indent.custom_minimum_size = Vector2(34, 0)
-	row.add_child(indent)
-	var button := Button.new()
-	button.text = title
-	button.custom_minimum_size = Vector2(0, 26)
-	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	button.focus_mode = Control.FOCUS_NONE
-	button.disabled = not action.is_valid()
-	if action.is_valid():
-		button.pressed.connect(action)
-	row.add_child(button)
-	container.add_child(row)
-
-
-func _render_geometry_seeding_input_row(container: VBoxContainer, asset_id: String, component_id: String, input_id: String, role: String, title: String, treatment: String, badge: String) -> void:
-	var count := 0
-	var sampling_bake := _geometry_sampling_bake(asset_id, component_id)
-	for stat in sampling_bake.get("boundary_stats", []):
-		if str(stat.get("input_id", "")) == input_id and str(stat.get("role", "")) == role:
-			count += int(stat.get("sample_count", 0))
-	if role == "spine":
-		var component := _get_component(_get_asset(asset_id), component_id)
-		var seeding_result := geometry_seeding_preview if _geometry_seeding_preview_matches(asset_id, component_id, component) else _geometry_seeding_bake(asset_id, component_id)
-		for stat in seeding_result.get("guide_stats", []):
-			if str(stat.get("guide_id", "")) == input_id:
-				count = int(stat.get("seed_count", 0))
-	var row := HBoxContainer.new()
-	var indent := Control.new()
-	indent.custom_minimum_size = Vector2(34, 0)
-	row.add_child(indent)
-	var button := Button.new()
-	button.text = "%s  ·  %s%s" % [title, treatment, "  ·  %d" % count if count > 0 else ""]
-	button.custom_minimum_size = Vector2(0, 26)
-	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	button.focus_mode = Control.FOCUS_NONE
-	EditorWidgets.style_outliner_button(button, not input_id.is_empty() and selected_sampling_input_id == input_id)
-	button.pressed.connect(_select_geometry_seeding_input.bind(asset_id, component_id, input_id, role))
-	row.add_child(button)
-	row.add_child(EditorWidgets.create_geometry_role_badge(badge))
-	container.add_child(row)
 
 
 func _select_geometry_seeding_input(asset_id: String, component_id: String, input_id: String, role: String) -> void:
