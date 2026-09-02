@@ -2353,31 +2353,28 @@ func _asset_catalog_build() -> Dictionary:
 	return build
 
 
+func _current_world_root() -> String:
+	# The one place the active World's directory is spelled out for the Runtime
+	# export file service, which is not allowed to know about world_name.
+	return "" if world_name.is_empty() else "%s/%s" % [WORLDS_ROOT, world_name]
+
+
 func _asset_catalog_path() -> String:
-	if world_name.is_empty():
-		return ""
-	return "%s/%s/catalog.json" % [WORLDS_ROOT, world_name]
+	return RuntimeExportFileService.catalog_path(_current_world_root())
 
 
 func _asset_catalog_is_stale(build: Dictionary = {}) -> bool:
 	var expected := build if not build.is_empty() else _asset_catalog_build()
 	if not bool(expected.get("valid", false)):
 		return true
-	var path := _asset_catalog_path()
-	if path.is_empty() or not FileAccess.file_exists(path):
-		return true
-	return FileAccess.get_file_as_string(path) != JSON.stringify(expected.get("catalog", {}), "\t")
+	return RuntimeExportFileService.catalog_is_stale(_current_world_root(), expected.get("catalog", {}))
 
 
 func _write_asset_catalog(build: Dictionary = {}) -> bool:
 	var expected := build if not build.is_empty() else _asset_catalog_build()
 	if not bool(expected.get("valid", false)):
 		return false
-	var resource_path := _asset_catalog_path()
-	if resource_path.is_empty():
-		return false
-	var target := ProjectSettings.globalize_path(resource_path)
-	return WorldDocumentService.write_text_atomically(target, JSON.stringify(expected.get("catalog", {}), "\t"))
+	return RuntimeExportFileService.write_catalog(_current_world_root(), expected.get("catalog", {}))
 
 
 func _read_asset_data(world_root: String, asset_id: String):
@@ -4320,9 +4317,7 @@ func _on_update_meshes_pressed() -> void:
 
 
 func _runtime_export_root() -> String:
-	if world_name.is_empty():
-		return ""
-	return ProjectSettings.globalize_path("%s/%s/PolyToolsRuntimeExports" % [WORLDS_ROOT, world_name])
+	return RuntimeExportFileService.export_root(_current_world_root())
 
 
 func _runtime_export_build(asset: Dictionary) -> Dictionary:
@@ -4365,15 +4360,8 @@ func _runtime_export_is_stale(asset: Dictionary, build: Dictionary = {}) -> bool
 	var expected := build if not build.is_empty() else _runtime_export_build(asset)
 	if not bool(expected.get("valid", false)):
 		return true
-	var export_root := _runtime_export_root()
-	if export_root.is_empty():
-		return true
-	var target := export_root.path_join(_asset_key(asset))
-	var manifest_path := target.path_join("manifest.json")
-	var expected_manifest_text := JSON.stringify(expected.get("manifest", {}), "\t")
-	if not FileAccess.file_exists(manifest_path) or not _runtime_manifest_text_matches(expected_manifest_text, FileAccess.get_file_as_string(manifest_path)):
-		return true
-	return false
+	return RuntimeExportFileService.package_is_stale(
+		_runtime_export_root(), _asset_key(asset), expected.get("manifest", {}))
 
 
 func _all_runtime_package_candidates() -> Array[Dictionary]:
@@ -4470,52 +4458,19 @@ func _on_runtime_export_pressed() -> void:
 
 
 func _write_runtime_export_package(asset: Dictionary, build: Dictionary) -> bool:
-	var export_root := _runtime_export_root()
-	var asset_id := str(asset.get("id", ""))
-	var asset_key := _asset_key(asset)
-	if export_root.is_empty() or asset_id.is_empty() or asset_key.is_empty():
+	if str(asset.get("id", "")).is_empty():
 		return false
-	DirAccess.make_dir_recursive_absolute(export_root)
-	var target := export_root.path_join(asset_key)
-	var staging := export_root.path_join(".%s.staging" % asset_key)
-	var backup := export_root.path_join(".%s.backup" % asset_key)
-	_remove_runtime_export_tree(staging)
-	_remove_runtime_export_tree(backup)
-	if DirAccess.make_dir_recursive_absolute(staging) != OK:
-		return false
-	var manifest_text := JSON.stringify(build.get("manifest", {}), "\t")
-	var manifest_file := FileAccess.open(staging.path_join("manifest.json"), FileAccess.WRITE)
-	if manifest_file == null:
-		_remove_runtime_export_tree(staging)
-		return false
-	manifest_file.store_string(manifest_text)
-	manifest_file.close()
-	if not _runtime_manifest_text_matches(manifest_text, FileAccess.get_file_as_string(staging.path_join("manifest.json"))):
-		_remove_runtime_export_tree(staging)
-		return false
-	if DirAccess.dir_exists_absolute(target) and DirAccess.rename_absolute(target, backup) != OK:
-		_remove_runtime_export_tree(staging)
-		return false
-	if DirAccess.rename_absolute(staging, target) != OK:
-		if DirAccess.dir_exists_absolute(backup):
-			DirAccess.rename_absolute(backup, target)
-		_remove_runtime_export_tree(staging)
-		return false
-	_remove_runtime_export_tree(backup)
-	return true
+	return RuntimeExportFileService.write_package(
+		_runtime_export_root(), _asset_key(asset), build.get("manifest", {}))
 
 
 func _runtime_manifest_text_matches(expected_text: String, staged_text: String) -> bool:
-	if staged_text.is_empty() or staged_text != expected_text:
-		return false
-	var parsed = JSON.parse_string(staged_text)
-	return parsed is Dictionary and RuntimeExportService.manifest_validation_issues(parsed).is_empty()
+	return RuntimeExportFileService.manifest_text_matches(expected_text, staged_text)
 
 
 func _prune_uncataloged_runtime_packages() -> void:
-	var export_root := _runtime_export_root()
 	var catalog_build := _asset_catalog_build()
-	if export_root.is_empty() or not bool(catalog_build.get("valid", false)) or not DirAccess.dir_exists_absolute(export_root):
+	if not bool(catalog_build.get("valid", false)):
 		return
 	var allowed_keys: Dictionary = {}
 	for entry in catalog_build.get("catalog", {}).get("assets", []):
@@ -4526,27 +4481,7 @@ func _prune_uncataloged_runtime_packages() -> void:
 	for asset in assets:
 		if asset is Dictionary and bool(asset.get("visibility", true)):
 			allowed_keys[_asset_key(asset)] = true
-	var directory := DirAccess.open(export_root)
-	if directory == null:
-		return
-	for directory_name in directory.get_directories():
-		if str(directory_name).begins_with(".") or allowed_keys.has(str(directory_name)):
-			continue
-		_remove_runtime_export_tree(export_root.path_join(str(directory_name)))
-
-
-func _remove_runtime_export_tree(path: String) -> void:
-	var export_root := _runtime_export_root().trim_suffix("/")
-	if export_root.is_empty() or path.is_empty() or not path.begins_with(export_root + "/") or not DirAccess.dir_exists_absolute(path):
-		return
-	var directory := DirAccess.open(path)
-	if directory == null:
-		return
-	for file_name in directory.get_files():
-		DirAccess.remove_absolute(path.path_join(file_name))
-	for directory_name in directory.get_directories():
-		_remove_runtime_export_tree(path.path_join(directory_name))
-	DirAccess.remove_absolute(path)
+	RuntimeExportFileService.prune_packages(_runtime_export_root(), allowed_keys)
 
 
 func _weighting_styles(asset_id: String, component_id: String) -> Array:

@@ -113,6 +113,18 @@ the four views is visible, resolves that view's context and calls `rebuild()`.
   which records exist, when they are read and written, and what the editor does
   with them — including `_serialize_editor_state` and `_serialize_world_settings`,
   which read editor state by definition.
+- `RuntimeExportFileService` owns the file-system mechanics behind Runtime
+  Export: the Catalog and package paths below a given World root, whether what
+  is on disk still matches what was built, the staged replacement of one
+  package, and the removal of package directories. It is static, holds no
+  editor state, and resolves nothing from the World document: the World root,
+  the Asset Key, the already built Catalog or Manifest, and the set of package
+  names that may stay are all passed in. Its removal is bounded strictly below
+  the export root it is given, so neither that root nor anything beside it can
+  be reached. `main.gd` keeps every decision that needs the document —
+  `_asset_catalog_build`, `_runtime_export_build`, `_asset_key`, and which
+  visible Assets keep their last valid package — plus the batch, the toolbar
+  and the Consumer Sync.
 
 Rendering is invalidation-driven. A mutation calls `_invalidate_render` with the
 targets that became stale — `RENDER_OUTLINER`, `RENDER_INSPECTOR`,

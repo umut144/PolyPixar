@@ -52,6 +52,7 @@ func _init() -> void:
 	_test_component_clipboard()
 	_test_asset_catalog_service()
 	_test_runtime_export_service()
+	_test_runtime_export_file_service()
 	_test_weighting_service_and_ui()
 	_test_component_hierarchy_model()
 	_test_group_outliner_workflows()
@@ -3021,6 +3022,221 @@ func _test_asset_catalog_service() -> void:
 	application.assets = assets
 	_expect(application._asset_name_validation_error("Magic-Orb") == "Asset Key 'magic_orb' is already used by 'Magic Orb'.", "Asset creation and rename validation should explain the exact derived-key collision.")
 	application.free()
+
+
+func _runtime_export_file_test_manifest(display_name: String) -> Dictionary:
+	# A Manifest the contract actually accepts, so write_package really exercises
+	# its staged read-back instead of validating a placeholder.
+	var mesh := {"valid": true,
+		"vertices": [{"id": "v0", "position": Vector2(0.0, 0.0)},
+			{"id": "v1", "position": Vector2(10.0, 0.0)},
+			{"id": "v2", "position": Vector2(0.0, 10.0)}],
+		"triangles": [{"vertex_ids": ["v0", "v1", "v2"]}]}
+	var contour_stroke: Dictionary = mesh.duplicate(true)
+	contour_stroke.merge({"method": ContourMeshService.METHOD, "has_outline": true,
+		"topology_role": "outer",
+		"runs": [{"run_id": "boundary:run:0", "edge_ids": ["edge_0"], "closed": true,
+			"start_cap": "none", "end_cap": "none", "vertex_offset": 0, "vertex_count": 3,
+			"index_offset": 0, "index_count": 3}],
+		"parameters": {"reference_pixels_per_meter": 192.0, "stroke_width_px": 4.0,
+			"stroke_width_meters": 0.020833333333333332, "join": "miter",
+			"miter_limit": 4.0, "cap": "butt"}}, true)
+	var body := {"id": "component_1", "name": "body", "visibility": true, "z_index": 0,
+		"parent_component_id": "",
+		"transform": {"position": Vector2.ZERO, "pivot": Vector2.ZERO, "rotation": 0.0,
+			"scale": Vector2.ONE},
+		"points": []}
+	var asset := {"id": "asset_1", "name": display_name, "asset_type": "character",
+		"authored_facing": AssetPresentation.AuthoredFacing.NEUTRAL, "visibility": true,
+		"asset_pivot": Vector2.ZERO, "components": [body]}
+	var result := RuntimeExportService.build_manifest(asset,
+		{"component_1": {"mesh": mesh, "contour_stroke": contour_stroke}})
+	_expect(bool(result.get("valid", false)),
+		"The Runtime export file fixture should build a valid Manifest; otherwise the file tests prove nothing.")
+	return result.get("manifest", {})
+
+
+func _remove_runtime_export_file_test_tree(path: String) -> void:
+	# The test's own cleanup, deliberately not the service under test, so a
+	# mutation of remove_tree shows up as a failing assertion rather than as
+	# leftover files. It refuses anything outside the one temporary root.
+	var allowed_root := ProjectSettings.globalize_path("user://").trim_suffix("/")
+	if not path.begins_with(allowed_root + "/polytools_runtime_export_file_test"):
+		return
+	if not DirAccess.dir_exists_absolute(path):
+		return
+	var directory := DirAccess.open(path)
+	if directory == null:
+		return
+	# DirAccess skips hidden entries by default; the temporary root may hold the
+	# service's dot-prefixed staging directories, so cleanup has to see them.
+	directory.include_hidden = true
+	for file_name in directory.get_files():
+		DirAccess.remove_absolute(path.path_join(file_name))
+	for directory_name in directory.get_directories():
+		_remove_runtime_export_file_test_tree(path.path_join(directory_name))
+	DirAccess.remove_absolute(path)
+
+
+func _test_runtime_export_file_service() -> void:
+	# RuntimeExportFileService owns only the file mechanics behind Runtime
+	# Export: where the Catalog and the packages live, whether what is on disk
+	# still matches what was built, how a package is replaced without losing the
+	# previous one, and what may be removed again. It is driven here through its
+	# public API against one temporary root under user://, never against worlds/.
+
+	# The thin wrappers in main.gd must keep the existing path semantics.
+	var application = load("res://scripts/main.gd").new()
+	application.world_name = "world01"
+	_expect(application._runtime_export_root() == ProjectSettings.globalize_path("res://worlds/world01/PolyToolsRuntimeExports"),
+		"The Runtime export root wrapper should still resolve the World-local PolyToolsRuntimeExports directory.")
+	_expect(application._asset_catalog_path() == "res://worlds/world01/catalog.json",
+		"The Asset Catalog wrapper should still resolve the World-root catalog.json resource path.")
+	application.world_name = ""
+	_expect(application._runtime_export_root().is_empty() and application._asset_catalog_path().is_empty(),
+		"Without an active World neither the export root nor the Catalog path should resolve.")
+	application.free()
+
+	var world_root := "user://polytools_runtime_export_file_test"
+	var absolute_world_root := ProjectSettings.globalize_path(world_root)
+	_remove_runtime_export_file_test_tree(absolute_world_root)
+	DirAccess.make_dir_recursive_absolute(absolute_world_root)
+	var export_root := RuntimeExportFileService.export_root(world_root)
+	_expect(export_root == absolute_world_root.path_join("PolyToolsRuntimeExports"),
+		"The export root should be the absolute PolyToolsRuntimeExports directory below the given World root.")
+	_expect(RuntimeExportFileService.export_root("").is_empty() and RuntimeExportFileService.catalog_path("").is_empty(),
+		"Without a World root the service should resolve no paths at all.")
+
+	# Catalog: missing, written, unchanged, changed.
+	var catalog := {"schema_version": 1, "world_key": "test_world", "world_name": "Test World", "assets": []}
+	_expect(RuntimeExportFileService.catalog_is_stale(world_root, catalog),
+		"A Catalog that has never been written should be stale.")
+	_expect(RuntimeExportFileService.write_catalog(world_root, catalog),
+		"Writing the Catalog to a writable World root should report success.")
+	_expect(not RuntimeExportFileService.catalog_is_stale(world_root, catalog),
+		"A Catalog whose bytes match the build should be current.")
+	var changed_catalog: Dictionary = catalog.duplicate(true)
+	changed_catalog["assets"] = [{"asset_key": "wizard", "display_name": "Wizard",
+		"asset_type": "character", "runtime_package": "PolyToolsRuntimeExports/wizard/manifest.json"}]
+	_expect(RuntimeExportFileService.catalog_is_stale(world_root, changed_catalog),
+		"A Catalog build that differs from the file on disk should be stale.")
+	_expect(not FileAccess.file_exists(absolute_world_root.path_join(".catalog.json.staging"))
+		and not FileAccess.file_exists(absolute_world_root.path_join(".catalog.json.backup")),
+		"A completed Catalog write should leave no staging or backup residue.")
+
+	# Package: missing, written, unchanged, changed, invalid on disk.
+	var manifest := _runtime_export_file_test_manifest("Wizard")
+	_expect(RuntimeExportFileService.package_is_stale(export_root, "wizard", manifest),
+		"A package that has never been written should be stale.")
+	_expect(RuntimeExportFileService.write_package(export_root, "wizard", manifest),
+		"Writing a valid package should report success.")
+	var package_path := export_root.path_join("wizard")
+	_expect(FileAccess.file_exists(package_path.path_join("manifest.json")),
+		"A written package should contain its manifest.json.")
+	_expect(not DirAccess.dir_exists_absolute(export_root.path_join(".wizard.staging"))
+		and not DirAccess.dir_exists_absolute(export_root.path_join(".wizard.backup")),
+		"A completed package write should leave no staging or backup directory behind.")
+	_expect(not RuntimeExportFileService.package_is_stale(export_root, "wizard", manifest),
+		"A package whose manifest bytes match the build should be current.")
+	var other_manifest := _runtime_export_file_test_manifest("Orb")
+	_expect(RuntimeExportFileService.package_is_stale(export_root, "wizard", other_manifest),
+		"A package whose manifest differs from the build should be stale.")
+
+	# Byte-identical is not enough: what is on disk must still be a Manifest the
+	# contract accepts, so an obsolete schema stays stale even when it matches.
+	var obsolete := {"schema_version": 7, "values": [0, 1.0, 0.25]}
+	var obsolete_file := FileAccess.open(package_path.path_join("manifest.json"), FileAccess.WRITE)
+	_expect(obsolete_file != null, "Preparing the obsolete-schema case should be able to write the manifest.")
+	if obsolete_file != null:
+		obsolete_file.store_string(JSON.stringify(obsolete, "\t"))
+		obsolete_file.close()
+	_expect(RuntimeExportFileService.package_is_stale(export_root, "wizard", obsolete),
+		"A package holding an obsolete Manifest schema should be stale even though its bytes match the build.")
+
+	# Replacing a package delivers the new state completely, without merging.
+	_expect(RuntimeExportFileService.write_package(export_root, "wizard", manifest),
+		"Restoring the package before the replacement case should succeed.")
+	var stale_file := FileAccess.open(package_path.path_join("leftover.json"), FileAccess.WRITE)
+	if stale_file != null:
+		stale_file.store_string("{}")
+		stale_file.close()
+	_expect(RuntimeExportFileService.write_package(export_root, "wizard", other_manifest),
+		"Replacing an existing package should report success.")
+	_expect(not RuntimeExportFileService.package_is_stale(export_root, "wizard", other_manifest)
+		and RuntimeExportFileService.package_is_stale(export_root, "wizard", manifest),
+		"A replaced package should hold exactly the new Manifest.")
+	_expect(not FileAccess.file_exists(package_path.path_join("leftover.json")),
+		"Replacing a package should not keep a file from the previous package.")
+
+	# A package that cannot be validated after staging must leave the previous
+	# one complete rather than half-replaced.
+	_expect(not RuntimeExportFileService.write_package(export_root, "wizard", obsolete),
+		"A package whose staged Manifest fails validation must report failure.")
+	_expect(not RuntimeExportFileService.package_is_stale(export_root, "wizard", other_manifest),
+		"A failed package write must leave the previously written package intact.")
+	_expect(not DirAccess.dir_exists_absolute(export_root.path_join(".wizard.staging"))
+		and not DirAccess.dir_exists_absolute(export_root.path_join(".wizard.backup")),
+		"A failed package write must not leave staging or backup residue behind.")
+	_expect(not RuntimeExportFileService.write_package(export_root, "", manifest)
+		and not RuntimeExportFileService.write_package("", "wizard", manifest),
+		"Without an export root or an Asset Key no package may be written.")
+	_expect(not RuntimeExportFileService.write_package(export_root, "../escaped", manifest)
+		and not RuntimeExportFileService.write_package(export_root, "nested/package", manifest)
+		and RuntimeExportFileService.package_path(export_root, "../escaped").is_empty(),
+		"An Asset Key must never be interpreted as a relative package path.")
+	_expect(not DirAccess.dir_exists_absolute(absolute_world_root.path_join("escaped")),
+		"An invalid Asset Key must not create a package outside the export root.")
+
+	# Pruning removes only package directories the caller did not allow.
+	_expect(RuntimeExportFileService.write_package(export_root, "orb", other_manifest),
+		"Preparing the pruning case should write a second package.")
+	_expect(RuntimeExportFileService.write_package(export_root, "ghost", manifest),
+		"Preparing the pruning case should write a package that is no longer allowed.")
+	var hidden_directory := export_root.path_join(".wizard.staging")
+	DirAccess.make_dir_recursive_absolute(hidden_directory)
+	var outside_directory := absolute_world_root.path_join("outside_package")
+	DirAccess.make_dir_recursive_absolute(outside_directory)
+	var sibling_directory := export_root + "_sibling"
+	DirAccess.make_dir_recursive_absolute(sibling_directory)
+	_expect(RuntimeExportFileService.prune_packages(export_root, {"wizard": true, "orb": true}) == 1,
+		"Pruning should remove exactly the one package directory that is not allowed.")
+	_expect(DirAccess.dir_exists_absolute(export_root.path_join("wizard"))
+		and DirAccess.dir_exists_absolute(export_root.path_join("orb")),
+		"Pruning must keep every allowed package, including one whose Asset is currently invalid.")
+	_expect(not DirAccess.dir_exists_absolute(export_root.path_join("ghost")),
+		"Pruning should remove a package directory that the caller did not allow.")
+	_expect(DirAccess.dir_exists_absolute(hidden_directory),
+		"Pruning must not treat a staging or backup directory as an ordinary package.")
+	_expect(DirAccess.dir_exists_absolute(outside_directory) and DirAccess.dir_exists_absolute(sibling_directory),
+		"Pruning must not reach outside the export root.")
+	_expect(RuntimeExportFileService.prune_packages(export_root.path_join("missing"), {}) == 0,
+		"Pruning a directory that does not exist should do nothing.")
+
+	# The removal bound, stated as its own assertions.
+	RuntimeExportFileService.remove_tree(export_root, export_root)
+	_expect(DirAccess.dir_exists_absolute(export_root)
+		and DirAccess.dir_exists_absolute(export_root.path_join("wizard"))
+		and DirAccess.dir_exists_absolute(export_root.path_join("orb")),
+		"The export root itself must never be removed, and its packages must survive with it.")
+	RuntimeExportFileService.remove_tree(export_root, outside_directory)
+	_expect(DirAccess.dir_exists_absolute(outside_directory),
+		"A path outside the export root must never be removed.")
+	RuntimeExportFileService.remove_tree(export_root, export_root.path_join("../outside_package"))
+	_expect(DirAccess.dir_exists_absolute(outside_directory),
+		"A path that escapes through parent traversal must never be removed.")
+	RuntimeExportFileService.remove_tree(export_root, sibling_directory)
+	_expect(DirAccess.dir_exists_absolute(sibling_directory),
+		"A sibling directory that merely shares the export root's prefix must never be removed.")
+	RuntimeExportFileService.remove_tree("", export_root.path_join("orb"))
+	_expect(DirAccess.dir_exists_absolute(export_root.path_join("orb")),
+		"Without an export root nothing may be removed.")
+	RuntimeExportFileService.remove_tree(export_root, export_root.path_join("orb"))
+	_expect(not DirAccess.dir_exists_absolute(export_root.path_join("orb")),
+		"A package directory below the export root should be removable.")
+
+	_remove_runtime_export_file_test_tree(absolute_world_root)
+	_expect(not DirAccess.dir_exists_absolute(absolute_world_root),
+		"The Runtime export file test should leave no temporary directory behind.")
 
 
 func _test_runtime_export_service() -> void:
