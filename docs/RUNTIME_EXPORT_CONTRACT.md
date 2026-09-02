@@ -1,10 +1,10 @@
 # PolyTools Runtime Export Contract
 
 **Status:** Normative consumer contract for Asset Catalog schema `1` and
-runtime Manifest schema `15`.
+runtime Manifest schema `16`.
 
 This document is the sole field-level contract for PolyTools Runtime packages.
-Manifest schema 15 replaces schema 14. Consumers must reject older schemas; there is
+Manifest schema 16 replaces schema 15. Consumers must reject older schemas; there is
 no SDF/Carrier/UV compatibility fallback.
 
 ## Package boundary
@@ -45,15 +45,15 @@ Root Transform instead of silently changing package placement or dimensions.
 ## Compatibility policy
 
 Catalog `schema_version` must equal `1`; Manifest `schema_version` must equal
-`15`. Missing, non-integer, older, or newer versions are rejected as complete
+`16`. Missing, non-integer, older, or newer versions are rejected as complete
 packages. Missing required geometry is an error. Consumers must not synthesize
 Fill Meshes, strokes, closed Contour regions, Semantic Keys, hierarchy links,
 or referenced Assets.
 
-Schema 15 contains no UV, SDF, mask, contour-domain, padding, or Carrier field.
-Its optional `regions` array contains authored Attack, Hurt, and Collision
-geometry; consumers may use it and must retain their Component fallback when it
-is empty.
+Schema 16 contains no UV, SDF, mask, contour-domain, padding, or Carrier field.
+Its optional `regions` array contains authored or Component-bound Attack, Hurt,
+and Collision geometry; consumers may use it and must retain their Component
+fallback when it is empty.
 
 ## Catalog
 
@@ -64,11 +64,11 @@ The Catalog requires `world_key`, `world_name`, and `assets`, sorted by
 
 ## Top-level Manifest
 
-Schema 15 requires:
+Schema 16 requires:
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `schema_version` | integer | Exactly `15`. |
+| `schema_version` | integer | Exactly `16`. |
 | `asset_key` | non-empty lower-snake-case string | Runtime identity. |
 | `display_name` | string | Informational authored name. |
 | `asset_type` | string | `character`, `props`, `weapons`, `terrain`, `icon`, or `symbols`. |
@@ -78,7 +78,7 @@ Schema 15 requires:
 | `asset_pivot` | two floats | Asset anchor in meters. |
 | `components` | array | Sorted ordinary Components and References. |
 | `attachment_frames` | array | Oriented Asset-local Weapon attachment frames. |
-| `regions` | array | Optional triangulated authored gameplay Regions. |
+| `regions` | array | Optional authored or Component-bound gameplay Regions. |
 
 ```json
 {
@@ -142,13 +142,27 @@ contains a two-float meter `position` and counter-clockwise
 to Asset space during export; scale is inherited while authoring but is not an
 independent Frame property.
 
-## Authored Gameplay Regions
+## Gameplay Regions
 
-`regions` is always present in schema 15 and may be empty. Each record contains
-`region_id`, `name`, `role`, `vertices`, and `indices`; `role` is one of
-`attack`, `hurt`, or `collision`. Vertices are triangulated Asset-local meter
-coordinates. A consumer should use authored Regions when the relevant role is
-present and retain its existing Component-based geometry fallback otherwise.
+`regions` is always present in schema 16 and may be empty. Every record contains
+`region_id`, `name`, `role`, `geometry_source`, and `source_component_id`;
+`role` is one of `attack`, `hurt`, or `collision`.
+
+With `geometry_source: "authored"`, the record additionally contains
+`vertices` and `indices`. Vertices are triangulated Asset-local meter
+coordinates from the Region's own Bézier topology.
+
+With `geometry_source: "component"`, the record contains no vertices or
+indices. `source_component_id` identifies an ordinary Component in the same
+Manifest. The consumer uses that Component's `mesh`, or its
+`closed_region_mesh` when it is a closed Contour, after applying the same
+current animation and deformation evaluation used for presentation. This is a
+live binding rather than an exported geometry snapshot; collision and gameplay
+systems must therefore consume the CPU-visible deformed result when visual
+deformation is implemented in a shader.
+
+A consumer should use Regions when the relevant role is present and retain its
+existing Component-based geometry fallback otherwise.
 
 ## Common Component fields
 

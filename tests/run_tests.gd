@@ -648,10 +648,10 @@ func _test_closed_contour_region_mesh() -> void:
 	var export_result := RuntimeExportService.build_manifest(export_asset, {"convex_contour": {"contour_stroke": export_bake}})
 	var exported_component: Dictionary = export_result.get("manifest", {}).get("components", [])[0] if bool(export_result.get("valid", false)) else {}
 	var exported_region: Dictionary = exported_component.get("closed_region_mesh", {})
-	_expect(bool(export_result.get("valid", false)) and int(export_result.get("manifest", {}).get("schema_version", 0)) == 15 and str(exported_region.get("role", "")) == "closed_contour_region" and not exported_region.get("indices", []).is_empty(), "Schema 15 must export a non-empty closed_region_mesh for a valid closed Contour.")
+	_expect(bool(export_result.get("valid", false)) and int(export_result.get("manifest", {}).get("schema_version", 0)) == 16 and str(exported_region.get("role", "")) == "closed_contour_region" and not exported_region.get("indices", []).is_empty(), "Schema 16 must export a non-empty closed_region_mesh for a valid closed Contour.")
 	_expect(exported_region.keys().size() == 3 and exported_region.has("role") and exported_region.has("vertices") and exported_region.has("indices") and not exported_region.has("material") and not exported_component.has("mesh"), "closed_region_mesh must contain only engine-neutral geometry and must not introduce a Contour Fill Mesh.")
 	_expect(exported_region.get("vertices", [])[0] == [-0.2, -0.30000000000000004], "Closed region vertices must subtract the authored Component pivot and convert Tool units to meters.")
-	_expect(RuntimeExportService.manifest_validation_issues(export_result.get("manifest", {})).is_empty(), "A generated schema-15 Runtime Manifest must pass strict validation.")
+	_expect(RuntimeExportService.manifest_validation_issues(export_result.get("manifest", {})).is_empty(), "A generated schema-16 Runtime Manifest must pass strict validation.")
 	var old_schema_manifest: Dictionary = export_result.get("manifest", {}).duplicate(true)
 	old_schema_manifest["schema_version"] = 10
 	_expect(not RuntimeExportService.manifest_validation_issues(old_schema_manifest).is_empty(), "Runtime validation must strictly reject an older Runtime Manifest schema.")
@@ -685,7 +685,7 @@ func _test_closed_contour_region_mesh() -> void:
 
 	var application = load("res://scripts/main.gd").new()
 	var runtime_manifest_text := JSON.stringify(export_result.get("manifest", {}), "\t")
-	_expect(application._runtime_manifest_text_matches(runtime_manifest_text, runtime_manifest_text), "Runtime package staging must strictly accept the generated schema-15 closed-region payload after JSON round-trip.")
+	_expect(application._runtime_manifest_text_matches(runtime_manifest_text, runtime_manifest_text), "Runtime package staging must strictly accept the generated schema-16 closed-region payload after JSON round-trip.")
 	var document: Dictionary = WorldDocumentService.default_geometry_document("region_asset", "convex_contour")
 	export_bake["bake_id"] = "closed_region_bake"
 	document["meshing"]["bakes"] = {ContourMeshService.METHOD: export_bake}
@@ -2039,7 +2039,7 @@ func _test_geometry_sampling_service() -> void:
 	_expect(not bool(GeometrySamplingService.generate(open_component).get("valid", true)), "An open contour should fail visibly at the mesh-pipeline Sampling boundary.")
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
-	_expect(WorldDocumentService.has_supported_schema({"schema_version": 60}) and WorldDocumentService.has_supported_schema({"schema_version": 59}) and not WorldDocumentService.has_supported_schema({"schema_version": 61}), "Schema 60 should keep current and older World documents readable and reject unknown future schemas.")
+	_expect(WorldDocumentService.has_supported_schema({"schema_version": 61}) and WorldDocumentService.has_supported_schema({"schema_version": 60}) and not WorldDocumentService.has_supported_schema({"schema_version": 62}), "Schema 61 should keep current and older World documents readable and reject unknown future schemas.")
 	_expect(WorldDocumentService.normalize_component_draw_mode("ribbon", 39) == "contour" and WorldDocumentService.normalize_component_draw_mode("contour", 42) == "contour", "Schema-42 loading must retain the explicit legacy Ribbon-to-Contour migration boundary.")
 	_expect(WorldDocumentService.normalize_component_draw_mode("ribbon", 42) == "ribbon", "Current-schema Ribbon data must remain visibly invalid instead of receiving a silent backward fallback.")
 	var arranged_round_trip: Dictionary = WorldDocumentService.normalize_sampling_bake(WorldDocumentService.serialize_sampling_bake(arranged_result))
@@ -2050,7 +2050,7 @@ func _test_geometry_sampling_service() -> void:
 	baked_result["bake_id"] = "bake_test"
 	geometry_document["sampling"]["bakes"][GeometrySamplingService.ADAPTIVE] = baked_result
 	var serialized_geometry: Dictionary = WorldDocumentService.serialize_geometry_document(geometry_document)
-	_expect(int(serialized_geometry.get("schema_version", 0)) == 60 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-60 JSON arrays.")
+	_expect(int(serialized_geometry.get("schema_version", 0)) == 61 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-61 JSON arrays.")
 	var normalized_geometry: Dictionary = WorldDocumentService.normalize_geometry_document(serialized_geometry, "asset_1", "component_1")
 	_expect(normalized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Vector2, "Sampling bake loading should restore local sample positions as Vector2 values.")
 	_expect(normalized_geometry["sampling"]["bakes"].size() == 1, "Sampling should retain one Adaptive Bake.")
@@ -3630,14 +3630,14 @@ func _test_runtime_export_service() -> void:
 	var result := RuntimeExportService.build_manifest(asset, {"component_a": source, "component_b": source})
 	var manifest: Dictionary = result.get("manifest", {})
 	var components: Array = manifest.get("components", [])
-	_expect(bool(result.get("valid", false)) and int(manifest.get("schema_version", 0)) == 15 and str(manifest.get("asset_key", "")) == "wizard" and not manifest.has("asset_id"), "Runtime export schema 15 should identify packages only by the Asset Key derived from their display name.")
-	_expect(str(manifest.get("presentation", {}).get("authored_facing", "")) == "right", "Runtime export schema 15 should publish the selected authored facing under presentation.authored_facing.")
+	_expect(bool(result.get("valid", false)) and int(manifest.get("schema_version", 0)) == 16 and str(manifest.get("asset_key", "")) == "wizard" and not manifest.has("asset_id"), "Runtime export schema 16 should identify packages only by the Asset Key derived from their display name.")
+	_expect(str(manifest.get("presentation", {}).get("authored_facing", "")) == "right", "Runtime export schema 16 should publish the selected authored facing under presentation.authored_facing.")
 	var neutral_asset: Dictionary = asset.duplicate(true)
 	neutral_asset.erase("authored_facing")
 	var neutral_manifest: Dictionary = RuntimeExportService.build_manifest(neutral_asset, {"component_a": source, "component_b": source}).get("manifest", {})
-	_expect(str(neutral_manifest.get("presentation", {}).get("authored_facing", "")) == "neutral", "Runtime export schema 15 should explicitly publish neutral for an older Asset without authored_facing.")
+	_expect(str(neutral_manifest.get("presentation", {}).get("authored_facing", "")) == "neutral", "Runtime export schema 16 should explicitly publish neutral for an older Asset without authored_facing.")
 	var manifest_text := JSON.stringify(manifest, "\t")
-	_expect(application._runtime_manifest_text_matches(manifest_text, manifest_text), "Runtime staging should verify exact schema-11 JSON bytes without rejecting numeric JSON round-trip types.")
+	_expect(application._runtime_manifest_text_matches(manifest_text, manifest_text), "Runtime staging should verify exact schema-16 JSON bytes without rejecting numeric JSON round-trip types.")
 	_expect(components.size() == 2 and str(components[0].get("component_id", "")) == "component_a" and str(components[1].get("component_id", "")) == "component_b", "Runtime Components should sort globally by ascending z_index and lexicographic Component ID.")
 	var socket := AssetGuide.create_weapon_frame("guide_socket", AssetGuide.WEAPON_SOCKET_PRIMARY, "component", "component_b")
 	socket["transform"]["position"] = Vector2(3.0, 4.0)
@@ -3650,7 +3650,7 @@ func _test_runtime_export_service() -> void:
 	var combat_result := RuntimeExportService.build_manifest(combat_asset, {"component_a": source, "component_b": source})
 	var combat_manifest: Dictionary = combat_result.get("manifest", {})
 	var exported_frame_roles: Array = combat_manifest.get("attachment_frames", []).map(func(frame: Dictionary): return str(frame.get("role", "")))
-	_expect(bool(combat_result.get("valid", false)) and int(combat_manifest.get("schema_version", 0)) == 15 and combat_manifest.get("attachment_frames", []).size() == 3 and AssetGuide.WEAPON_SOCKET_PRIMARY in exported_frame_roles and AssetGuide.GRIP_SECONDARY in exported_frame_roles and AssetGuide.REACH_LIMIT_PRIMARY in exported_frame_roles and combat_manifest.has("regions") and combat_manifest.get("regions", []).is_empty(), "Schema 15 should export every oriented Weapon Guide and an optional empty Regions array.")
+	_expect(bool(combat_result.get("valid", false)) and int(combat_manifest.get("schema_version", 0)) == 16 and combat_manifest.get("attachment_frames", []).size() == 3 and AssetGuide.WEAPON_SOCKET_PRIMARY in exported_frame_roles and AssetGuide.GRIP_SECONDARY in exported_frame_roles and AssetGuide.REACH_LIMIT_PRIMARY in exported_frame_roles and combat_manifest.has("regions") and combat_manifest.get("regions", []).is_empty(), "Schema 16 should export every oriented Weapon Guide and an optional empty Regions array.")
 	var authored_region := {"id": "region_attack", "type": "region", "region_type": "attack", "name": "attack_region", "visibility": true, "parent_component_id": "component_b", "group_id": "", "transform": {"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}, "points": [], "edges": [], "chains": [], "draw_mode": "closed_loop"}
 	for region_position in [Vector2.ZERO, Vector2(2.0, 0.0), Vector2(1.0, 2.0)]:
 		BezierTopology.add_point(authored_region, region_position, "linear")
@@ -3658,7 +3658,18 @@ func _test_runtime_export_service() -> void:
 	var region_asset: Dictionary = combat_asset.duplicate(true)
 	region_asset["components"].append(authored_region)
 	var region_result := RuntimeExportService.build_manifest(region_asset, {"component_a": source, "component_b": source})
-	_expect(bool(region_result.get("valid", false)) and region_result.get("manifest", {}).get("regions", []).size() == 1 and region_result.get("manifest", {}).get("regions", [])[0].get("role", "") == "attack", "Authored Attack Regions should export separately from ordinary Components.")
+	var exported_authored_region: Dictionary = region_result.get("manifest", {}).get("regions", [])[0] if bool(region_result.get("valid", false)) else {}
+	_expect(bool(region_result.get("valid", false)) and region_result.get("manifest", {}).get("regions", []).size() == 1 and exported_authored_region.get("role", "") == "attack" and exported_authored_region.get("geometry_source", "") == "authored" and exported_authored_region.get("source_component_id", "") == "component_b", "Authored Attack Regions should export their retained topology separately from ordinary Components.")
+	var inherited_region: Dictionary = authored_region.duplicate(true)
+	inherited_region["id"] = "region_hurt"
+	inherited_region["name"] = "hurt_region"
+	inherited_region["region_type"] = "hurt"
+	inherited_region["region_geometry_source"] = WorldDocumentService.REGION_GEOMETRY_COMPONENT
+	var inherited_asset: Dictionary = combat_asset.duplicate(true)
+	inherited_asset["components"].append(inherited_region)
+	var inherited_result := RuntimeExportService.build_manifest(inherited_asset, {"component_a": source, "component_b": source})
+	var exported_inherited_region: Dictionary = inherited_result.get("manifest", {}).get("regions", [])[0] if bool(inherited_result.get("valid", false)) else {}
+	_expect(bool(inherited_result.get("valid", false)) and exported_inherited_region.get("geometry_source", "") == "component" and exported_inherited_region.get("source_component_id", "") == "component_b" and not exported_inherited_region.has("vertices") and not exported_inherited_region.has("indices"), "Component Geometry Regions should export a live Component binding without duplicating geometry.")
 	_expect(components[1].get("mesh", {}).get("vertices", []) == [[-0.2, -0.30000000000000004], [0.8, -0.30000000000000004], [-0.2, 0.7000000000000001]] and components[1].get("mesh", {}).get("indices", []) == [0, 1, 2] and not components[1].has("closed_region_mesh"), "Runtime Meshes should preserve accepted Vertex order, convert Tool units to meters, compact Triangle IDs, and remain unchanged for non-Contour Components.")
 	_expect(not components[1].get("mesh", {}).has("uvs") and not components[1].has("contour_carrier") and not components[1].has("contour_mask"), "Schema 5 must remove UV, Carrier, and SDF fields rather than retaining a silent compatibility payload.")
 	var exported_stroke: Dictionary = components[1].get("contour_stroke_mesh", {})
@@ -4053,6 +4064,31 @@ func _test_asset_guides() -> void:
 	_expect(application.component_add_child_menu.item_count == 3 and application.component_add_guide_menu.item_count >= 4 and application.component_add_weapon_guide_menu.item_count == 5 and application.component_add_region_menu.item_count == 3 and add_menu_labels.has("Region"), "Every scoped add menu should expose Child, Guide, and optional Region types.")
 	test_asset = application._get_asset("asset_1")
 	test_asset["groups"] = [{"id": "group_head", "name": "head", "parent_component_id": "component_1", "transform": {"position": Vector2(2.0, 3.0), "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}, "visibility": true}]
+	var component_count_before_group_region: int = test_asset.get("components", []).size()
+	application._create_region("asset_1", "group", "group_head", "attack")
+	_expect(test_asset.get("components", []).size() == component_count_before_group_region, "Regions should only be creatable from a Component + menu, never from a Group or Asset root.")
+	application._create_region("asset_1", "component", "component_1", "attack")
+	var region: Dictionary = application._get_component(test_asset, application.selected_component_id)
+	for region_position in [Vector2.ZERO, Vector2(2.0, 0.0), Vector2(1.0, 2.0)]:
+		BezierTopology.add_point(region, region_position, "linear")
+	BezierTopology.close_active_chain(region)
+	var retained_region_points: Array = region.get("points", []).duplicate(true)
+	var geometry_source_option := OptionButton.new()
+	geometry_source_option.add_item("Free Draw")
+	geometry_source_option.set_item_metadata(0, WorldDocumentService.REGION_GEOMETRY_AUTHORED)
+	geometry_source_option.add_item("Component Geometry")
+	geometry_source_option.set_item_metadata(1, WorldDocumentService.REGION_GEOMETRY_COMPONENT)
+	application._on_region_geometry_source_selected(1, geometry_source_option)
+	application._render_context_bar()
+	var locked_draw_button := _button_starting_with(application.context_bar, "⌘1  Draw Point")
+	var locked_edit_button := _button_starting_with(application.context_bar, "⌘2  Edit Point")
+	application._render_canvas_context()
+	_expect(WorldDocumentService.region_uses_component_geometry(region) and locked_draw_button != null and locked_draw_button.disabled and locked_edit_button != null and locked_edit_button.disabled, "A Component Geometry Region should visibly disable its Draw and Edit tools.")
+	_expect(application.canvas_view.bezier_points.size() == parent_component.get("points", []).size(), "A Component Geometry Region should preview the attached Component geometry 1:1.")
+	application._activate_draw_state()
+	_expect(application.active_state.is_empty(), "Disabled Region drawing must also be guarded against keyboard or direct command activation.")
+	application._on_region_geometry_source_selected(0, geometry_source_option)
+	_expect(region.get("points", []) == retained_region_points, "Switching through Component Geometry should retain the inactive Free Draw topology without copying Component geometry into it.")
 	application._create_weapon_guide("asset_1", "component", "component_1", AssetGuide.WEAPON_SOCKET_PRIMARY)
 	var socket_guide: Dictionary = application._get_guide(test_asset, application.selected_guide_id)
 	_expect(AssetGuide.is_weapon_frame(str(socket_guide.get("guide_type", ""))) and str(socket_guide.get("scope", {}).get("component_id", "")) == "component_1" and application.canvas_view.interaction_state == "transform", "Weapon Socket Primary should be a Component-scoped oriented transform Guide.")
@@ -4958,6 +4994,7 @@ const CREATE_SIGNAL_ROUTES := [
 	["component_hierarchy_parent_selected", "_on_component_hierarchy_parent_selected"],
 	["component_projection_depth_changed", "_on_component_projection_depth_changed"],
 	["component_rename_requested", "_rename_selected_component"],
+	["region_geometry_source_selected", "_on_region_geometry_source_selected"],
 	["component_topology_role_selected", "_on_component_topology_role_selected"],
 	["component_visibility_changed", "_on_component_visibility_changed"],
 	["component_z_index_changed", "_on_component_z_index_changed"],
@@ -4991,7 +5028,7 @@ const CREATE_SIGNAL_ROUTES := [
 
 const CREATE_PROBE_CASES := ["asset", "asset_reference", "component", "component_grouped",
 	"component_contour", "primitive_circle", "primitive_ellipse", "group", "guide",
-	"guide_weapon", "multi_component", "point_none", "point_one", "point_many",
+	"guide_weapon", "region_authored", "region_component", "multi_component", "point_none", "point_one", "point_many",
 	"edge_none", "edge_one", "edge_many", "face"]
 
 
@@ -5021,8 +5058,12 @@ func _create_wiring_asset() -> Dictionary:
 		"points": [], "edges": [], "chains": []}
 	var group := {"id": "group_1", "name": "torso", "transform": {}, "visibility": true,
 		"parent_component_id": ""}
+	var authored_region := _outliner_test_component("component_6", "attack_region")
+	authored_region.merge({"type": "region", "region_type": "attack", "parent_component_id": "component_1", "region_geometry_source": "authored"}, true)
+	var inherited_region := authored_region.duplicate(true)
+	inherited_region.merge({"id": "component_7", "name": "hurt_region", "region_type": "hurt", "region_geometry_source": "component"}, true)
 	return {"id": "asset_1", "name": "Wizard", "visibility": true,
-		"components": [body, arm, outline, circle, ellipse], "groups": [group],
+		"components": [body, arm, outline, circle, ellipse, authored_region, inherited_region], "groups": [group],
 		"guides": [guide, weapon], "asset_pivot": Vector2(5.0, 6.0),
 		"root_position": Vector2.ZERO, "root_scale": Vector2.ONE}
 
@@ -5074,6 +5115,10 @@ func _prepare_create_case(application: Control, case_name: String) -> void:
 			application.selected_guide_id = "guide_1"
 		"guide_weapon":
 			application.selected_guide_id = "guide_2"
+		"region_authored":
+			application.selected_component_id = "component_6"
+		"region_component":
+			application.selected_component_id = "component_7"
 		"multi_component":
 			var many: Array[String] = ["component_1", "component_2"]
 			application.selected_component_ids = many
@@ -5599,7 +5644,7 @@ func _test_motion_act_evaluator() -> void:
 	var normalized: Dictionary = WorldDocumentService.normalize_motion_act({"id": "act_7", "parameters": {"direction": [0.0, 2.0], "distance": 12.0}}, "fallback")
 	_expect(Vector2(normalized.get("parameters", {}).get("direction", Vector2.ZERO)) == Vector2(0.0, 2.0), "Persisted Slide direction arrays should normalize back to Vector2 values.")
 	var serialized: Dictionary = WorldDocumentService.serialize_motion_act(normalized)
-	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 60, "Act persistence should serialize vectors as JSON arrays using schema 60.")
+	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 61, "Act persistence should serialize vectors as JSON arrays using schema 61.")
 	var normalized_jump: Dictionary = WorldDocumentService.normalize_motion_act({"id": "act_8", "primitive": "jump", "parameters": {"direction": [1.0, 0.0], "distance": 7.0, "height": 2.5, "arc": "snappy"}}, "fallback")
 	var serialized_jump: Dictionary = WorldDocumentService.serialize_motion_act(normalized_jump)
 	_expect(str(serialized_jump.get("primitive", "")) == MotionActEvaluator.JUMP and is_equal_approx(float(serialized_jump.get("parameters", {}).get("height", 0.0)), 2.5) and str(serialized_jump.get("parameters", {}).get("arc", "")) == MotionActEvaluator.JUMP_ARC_SNAPPY, "Jump-specific parameters should survive normalization and serialization.")

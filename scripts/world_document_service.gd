@@ -10,7 +10,10 @@ extends RefCounted
 # functions that do read editor state, _serialize_editor_state and
 # _serialize_world_settings, stay in main.gd for that reason.
 
-const SCHEMA_VERSION := 60
+const SCHEMA_VERSION := 61
+const REGION_GEOMETRY_AUTHORED := "authored"
+const REGION_GEOMETRY_COMPONENT := "component"
+const REGION_GEOMETRY_SOURCES := [REGION_GEOMETRY_AUTHORED, REGION_GEOMETRY_COMPONENT]
 const DEFAULT_PROJECTION_DEPTH_CM := 10.0
 const DRAW_MODES := ["closed_loop", "contour", "primitive"]
 
@@ -949,6 +952,15 @@ static func asset_type(asset: Dictionary) -> String:
 
 static func is_region(component: Dictionary) -> bool:
 	return str(component.get("type", "component")) == "region"
+
+
+static func normalize_region_geometry_source(value) -> String:
+	var source := str(value)
+	return source if source in REGION_GEOMETRY_SOURCES else REGION_GEOMETRY_AUTHORED
+
+
+static func region_uses_component_geometry(component: Dictionary) -> bool:
+	return is_region(component) and normalize_region_geometry_source(component.get("region_geometry_source", REGION_GEOMETRY_AUTHORED)) == REGION_GEOMETRY_COMPONENT
 
 
 static func is_reference_component(component: Dictionary) -> bool:

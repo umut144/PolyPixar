@@ -1,6 +1,6 @@
 # Inspector render probe.
 #
-# Renders the Inspector in 46 fixed states and prints one line per control with
+# Renders the Inspector in 48 fixed states and prints one line per control with
 # the properties a reader would notice: values, ranges, item lists, selections,
 # pressed state, disabled state, captions, colours and tooltips. It asserts
 # nothing on its own. It is run before and after a change that is meant to leave
@@ -16,7 +16,8 @@
 # nothing.
 #
 # The state list covers Create (Asset, Component, Group, Guide, weapon Guide,
-# grouped Component, Contour Component, Circle and Ellipse Primitive, two
+# grouped Component, Contour Component, Circle and Ellipse Primitive, authored
+# and Component-geometry Regions, two
 # selected Components, Reference Image, Point mode with none, one and two
 # Points, Edge mode with none, one and two Edges, Face mode), Mesh
 # (Sampling, Seeding and Meshing, each unbaked and against a Geometry document
@@ -109,8 +110,15 @@ func _init() -> void:
 	var weapon_guide := {"id": "guide_3", "guide_type": AssetGuide.WEAPON_TYPES[0], "ordinal": 1,
 		"visibility": true, "scope": {"kind": "component", "component_id": "component_1"},
 		"points": [], "edges": [], "chains": []}
+	var authored_region := comp.duplicate(true)
+	authored_region.merge({"id": "component_8", "name": "attack_region", "visibility": true,
+		"type": "region", "region_type": "attack", "parent_component_id": "component_1",
+		"region_geometry_source": WorldDocumentService.REGION_GEOMETRY_AUTHORED}, true)
+	var inherited_region := authored_region.duplicate(true)
+	inherited_region.merge({"id": "component_9", "name": "hurt_region", "region_type": "hurt",
+		"region_geometry_source": WorldDocumentService.REGION_GEOMETRY_COMPONENT}, true)
 	var assets: Array[Dictionary] = [{"id": "asset_1", "name": "Wizard", "visibility": true,
-		"components": [comp, arm, outline, circle, ellipse, mesh_body, hole_reference],
+		"components": [comp, arm, outline, circle, ellipse, mesh_body, hole_reference, authored_region, inherited_region],
 		"groups": [group], "guides": [guide, weapon_guide, cut_guide, spine_guide],
 		"asset_pivot": Vector2(5, 6), "root_position": Vector2(1, 2), "root_scale": Vector2(1, 1)},
 		{"id": "asset_2", "name": "Orb", "visibility": true,
@@ -178,6 +186,8 @@ func _init() -> void:
 		{"m": "Create", "sub": "Character", "comp": "component_3", "grp": "", "gd": ""},
 		{"m": "Create", "sub": "Character", "comp": "component_4", "grp": "", "gd": ""},
 		{"m": "Create", "sub": "Character", "comp": "component_5", "grp": "", "gd": ""},
+		{"m": "Create", "sub": "Character", "comp": "component_8", "grp": "", "gd": ""},
+		{"m": "Create", "sub": "Character", "comp": "component_9", "grp": "", "gd": ""},
 		{"m": "Create", "sub": "Character", "comp": "", "grp": "", "gd": "guide_3"},
 		{"m": "Create", "sub": "Character", "comp": "component_1", "grp": "", "gd": "", "multi": true},
 	]

@@ -524,6 +524,13 @@ World schema 60 restores optional semantic gameplay Region records. Existing
 documents without Regions remain valid and consumers retain their existing
 Component-based fallback behavior.
 
+World schema 61 makes every Region Component-scoped and adds the normalized
+`region_geometry_source` discriminator. `authored` reads the Region's own
+canonical topology; `component` resolves `parent_component_id` as the live
+geometry owner while leaving the authored topology dormant and intact. The
+Canvas receives only the resolved view copy, authoring commands are guarded in
+`main.gd`, and Runtime export emits a binding rather than copied geometry.
+
 World schema 59 persists Asset-root `root_scale` as a two-axis vector and
 exposes separate `Scale X` and `Scale Y` Inspector controls. Legacy scalar
 root scales load as equal axes; Runtime Export requires both axes to be `1`.
@@ -539,7 +546,7 @@ The normative serialized package and consumer contract is
 [`RUNTIME_EXPORT_CONTRACT.md`](RUNTIME_EXPORT_CONTRACT.md). The summary below
 describes how the editor produces that contract.
 
-`RuntimeExportService` builds Manifest schema 15 exclusively from current
+`RuntimeExportService` builds Manifest schema 16 exclusively from current
 accepted Fill and Contour Stroke Mesh Bakes. For a closed Contour, the current
 Stroke Bake must also contain its current complete-Boundary region
 triangulation. It rejects missing or stale inputs,
@@ -549,10 +556,12 @@ Components never derive replacement geometry during export. References emit an
 `asset_reference` record containing the local `name`, signed placement
 transform, and actual `source_asset_key`, without copying geometry into the owner.
 
-Every schema-15 Manifest also exports the Asset-level presentation metadata as
+Every schema-16 Manifest also exports the Asset-level presentation metadata as
 `presentation.authored_facing`, oriented Asset-local Weapon Attachment Frames,
-and geometry-only closed Contour boundaries. Authored semantic Regions are
-exported separately as optional triangulated Asset-local meter geometry.
+and geometry-only closed Contour boundaries. Free semantic Regions are exported
+as triangulated Asset-local meter geometry. Component-geometry Regions instead
+export `source_component_id` without vertices, preserving the canonical
+Component geometry and its Runtime deformation path.
 
 The contract is engine-neutral: X points right, Y points up, lengths are meters,
 positive rotations are counter-clockwise radians, and one Tool unit equals
@@ -569,8 +578,8 @@ while fill-less Contours do not invent one. A closed Contour additionally
 exports `closed_region_mesh` as local-meter vertices and triangle indices. That
 field is engine-neutral geometry only and has no material, color, alpha, UV,
 rendering, or Fill semantics. Open Contours and Asset References omit it.
-Schema 15 contains no UV/SDF/Carrier fields and carries an optional authored
-semantic gameplay Region array.
+Schema 16 contains no UV/SDF/Carrier fields and carries an optional semantic
+gameplay Region array.
 
 Each visible Asset is exported to the active World-local
 `res://worlds/<world_key>/PolyToolsRuntimeExports/<asset_key>/` directory as

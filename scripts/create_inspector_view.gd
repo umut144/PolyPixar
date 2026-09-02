@@ -25,6 +25,7 @@ signal component_debug_point_numbers_toggled(enabled: bool)
 signal component_hierarchy_parent_selected(index: int, option: OptionButton)
 signal component_projection_depth_changed(value: float)
 signal component_rename_requested(new_name: String)
+signal region_geometry_source_selected(index: int, option: OptionButton)
 signal component_topology_role_selected(index: int, option: OptionButton)
 signal component_visibility_changed(visibility_enabled: bool)
 signal component_z_index_changed(value: float)
@@ -255,7 +256,8 @@ func rebuild() -> void:
 	var component := WorldDocumentService.component_by_id(asset, selected_component_id)
 	if component.is_empty():
 		return
-	if active_state == "edit" and active_edit_mode == "point":
+	var inherited_region_geometry := WorldDocumentService.region_uses_component_geometry(component)
+	if not inherited_region_geometry and active_state == "edit" and active_edit_mode == "point":
 		var point_ids := valid_point_ids
 		if point_ids.is_empty():
 			add_child(EditorWidgets.create_inspector_field_label("Edit Point"))
@@ -297,7 +299,7 @@ func rebuild() -> void:
 		_add_selected_point_settings(component, point_ids)
 		_add_component_debug_inspector(component)
 		return
-	if active_state == "edit" and active_edit_mode == "edge":
+	if not inherited_region_geometry and active_state == "edit" and active_edit_mode == "edge":
 		var selected_edges: Array[Dictionary] = []
 		for edge_id in selected_edge_ids:
 			var candidate := WorldDocumentService.edge_by_id(component, edge_id)
@@ -320,14 +322,14 @@ func rebuild() -> void:
 			add_child(EditorWidgets.create_toggle_field(
 				"Render Outline", all_rendered, edge_render_outline_changed.emit))
 		return
-	if active_state == "edit" and active_edit_mode == "face":
+	if not inherited_region_geometry and active_state == "edit" and active_edit_mode == "face":
 		add_child(EditorWidgets.create_inspector_field_label("Face"))
 		add_child(EditorWidgets.create_inspector_section("Face Settings", section_toggled.emit))
 		var face_hint := EditorWidgets.create_inspector_field_label("Face selected." if face_selected else "Select the face to edit it.")
 		face_hint.add_theme_color_override("font_color", Color("#8fd8f8") if face_selected else Color("#9aa3b2"))
 		add_child(face_hint)
 		return
-	if not selected_edge_id.is_empty():
+	if not inherited_region_geometry and not selected_edge_id.is_empty():
 		var selected_edge := WorldDocumentService.edge_by_id(component, selected_edge_id)
 		if not selected_edge.is_empty():
 			add_child(EditorWidgets.create_inspector_field_label("Edge"))
@@ -341,19 +343,31 @@ func rebuild() -> void:
 	component_name_editor.text_submitted.connect(component_rename_requested.emit)
 	component_name_editor.focus_exited.connect(func() -> void: component_rename_requested.emit(component_name_editor.text))
 	add_child(component_name_editor)
-	add_child(EditorWidgets.create_inspector_section("Hierarchy", section_toggled.emit))
-	add_child(EditorWidgets.create_inspector_field_label("Parent Component"))
-	var hierarchy_parent_items: Array = [{"label": "Root", "metadata": ""}]
-	for candidate in asset.get("components", []):
-		var candidate_id := str(candidate.get("id", ""))
-		if candidate_id == selected_component_id or not ComponentHierarchy.can_parent(asset, selected_component_id, candidate_id):
-			continue
-		hierarchy_parent_items.append({"label": str(candidate.get("name", "Component")), "metadata": candidate_id})
-	add_child(EditorWidgets.create_option_field(hierarchy_parent_items,
-		str(component.get("parent_component_id", "")), component_hierarchy_parent_selected.emit))
+	if WorldDocumentService.is_region(component):
+		add_child(EditorWidgets.create_inspector_section("Geometry", section_toggled.emit))
+		add_child(EditorWidgets.create_inspector_field_label("Geometry Source"))
+		var geometry_source_option := EditorWidgets.create_option_field([
+			{"label": "Free Draw", "metadata": WorldDocumentService.REGION_GEOMETRY_AUTHORED},
+			{"label": "Component Geometry", "metadata": WorldDocumentService.REGION_GEOMETRY_COMPONENT},
+		], WorldDocumentService.normalize_region_geometry_source(component.get("region_geometry_source", "")), region_geometry_source_selected.emit)
+		geometry_source_option.tooltip_text = "Component Geometry follows the attached Component permanently; the retained Free Draw topology is inactive."
+		add_child(geometry_source_option)
+		var source_component := WorldDocumentService.component_by_id(asset, str(component.get("parent_component_id", "")))
+		add_child(EditorWidgets.create_inspector_field_label("Attached Component: %s" % str(source_component.get("name", "Missing Component"))))
+	else:
+		add_child(EditorWidgets.create_inspector_section("Hierarchy", section_toggled.emit))
+		add_child(EditorWidgets.create_inspector_field_label("Parent Component"))
+		var hierarchy_parent_items: Array = [{"label": "Root", "metadata": ""}]
+		for candidate in asset.get("components", []):
+			var candidate_id := str(candidate.get("id", ""))
+			if candidate_id == selected_component_id or not ComponentHierarchy.can_parent(asset, selected_component_id, candidate_id):
+				continue
+			hierarchy_parent_items.append({"label": str(candidate.get("name", "Component")), "metadata": candidate_id})
+		add_child(EditorWidgets.create_option_field(hierarchy_parent_items,
+			str(component.get("parent_component_id", "")), component_hierarchy_parent_selected.emit))
 	var draw_mode := str(component.get("draw_mode", "closed_loop"))
 	add_child(EditorWidgets.create_inspector_field_label("Draw Mode: %s" % WorldDocumentService.draw_mode_display_name(draw_mode)))
-	if WorldDocumentService.is_reference_component(component) or draw_mode == "closed_loop":
+	if not WorldDocumentService.is_region(component) and (WorldDocumentService.is_reference_component(component) or draw_mode == "closed_loop"):
 		add_child(EditorWidgets.create_inspector_section("Topology", section_toggled.emit))
 		add_child(EditorWidgets.create_option_field([
 			{"label": "Outer", "metadata": "outer"},
@@ -376,7 +390,13 @@ func rebuild() -> void:
 		else:
 			_add_ellipse_diameter_field("Diameter X (cm)", float(primitive.get("diameter_x_cm", 1.0)), "diameter_x_cm")
 			_add_ellipse_diameter_field("Diameter Y (cm)", float(primitive.get("diameter_y_cm", 1.0)), "diameter_y_cm")
-	var mode_issues := PrimitiveGeometryService.validation_issues(component) if draw_mode == "primitive" else BezierTopology.mode_validation_issues(component, true)
+	var validation_component := component
+	if inherited_region_geometry:
+		validation_component = WorldDocumentService.component_by_id(asset, str(component.get("parent_component_id", "")))
+	var validation_draw_mode := str(validation_component.get("draw_mode", "closed_loop"))
+	var mode_issues := ["Attached Component is missing."] if validation_component.is_empty() else PrimitiveGeometryService.validation_issues(validation_component) if validation_draw_mode == "primitive" else BezierTopology.mode_validation_issues(validation_component, true)
+	if inherited_region_geometry and validation_draw_mode == "contour" and (validation_component.get("chains", []).size() != 1 or not bool(validation_component.get("chains", [])[0].get("closed", false))):
+		mode_issues.append("Component Geometry requires a closed Component boundary.")
 	var configured_catch_parent_id := str(component.get("catch_parent_component_id", ""))
 	if not configured_catch_parent_id.is_empty() and (configured_catch_parent_id == selected_component_id or WorldDocumentService.component_by_id(asset, configured_catch_parent_id).is_empty()):
 		mode_issues.append("Catch Parent references a missing Component.")
@@ -397,17 +417,24 @@ func rebuild() -> void:
 			str(component.get("catch_parent_component_id", "")), component_catch_parent_selected.emit))
 	var component_group_id := ComponentHierarchy.membership_group_id(asset, selected_component_id)
 	var show_global_transform := not component_group_id.is_empty()
-	add_child(EditorWidgets.create_inspector_section("Global Transform" if show_global_transform else "Transform", section_toggled.emit))
+	if inherited_region_geometry:
+		add_child(EditorWidgets.create_inspector_section("Transform", section_toggled.emit))
+		add_child(EditorWidgets.create_inspector_field_label("Inherited 1:1 from the attached Component"))
+	else:
+		add_child(EditorWidgets.create_inspector_section("Global Transform" if show_global_transform else "Transform", section_toggled.emit))
 	var transform_grid := GridContainer.new()
 	transform_grid.columns = 2
 	transform_grid.add_theme_constant_override("h_separation", 8)
 	transform_grid.add_theme_constant_override("v_separation", 4)
-	add_child(transform_grid)
+	if not inherited_region_geometry:
+		add_child(transform_grid)
 	var transform: Dictionary = component.get("transform", WorldDocumentService.default_component_transform())
 	var transform_position: Vector2 = transform.get("position", Vector2.ZERO)
 	var transform_scale: Vector2 = transform.get("scale", Vector2.ONE)
 	var pivot: Vector2 = transform.get("pivot", Vector2.ZERO)
-	if show_global_transform:
+	if inherited_region_geometry:
+		pass
+	elif show_global_transform:
 		var displayed_transform: Dictionary = ComponentHierarchy.world_transform_record(asset, selected_component_id)
 		var displayed_position: Vector2 = displayed_transform.get("position", Vector2.ZERO)
 		var global_scale: Vector2 = displayed_transform.get("scale", Vector2.ONE)

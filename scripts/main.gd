@@ -1036,6 +1036,7 @@ func _build_ui() -> void:
 	create_inspector_view.component_hierarchy_parent_selected.connect(_on_component_hierarchy_parent_selected)
 	create_inspector_view.component_projection_depth_changed.connect(_on_component_projection_depth_changed)
 	create_inspector_view.component_rename_requested.connect(_rename_selected_component)
+	create_inspector_view.region_geometry_source_selected.connect(_on_region_geometry_source_selected)
 	create_inspector_view.component_topology_role_selected.connect(_on_component_topology_role_selected)
 	create_inspector_view.component_visibility_changed.connect(_on_component_visibility_changed)
 	create_inspector_view.component_z_index_changed.connect(_on_component_z_index_changed)
@@ -2464,6 +2465,7 @@ func _save_world() -> void:
 			}
 			if _is_region(component):
 				serialized_component["region_type"] = str(component.get("region_type", "attack"))
+				serialized_component["region_geometry_source"] = WorldDocumentService.normalize_region_geometry_source(component.get("region_geometry_source", ""))
 			if _is_reference_component(component):
 				serialized_component["reference_instance_scale"] = WorldDocumentService.serialize_vector(Vector2(component.get("reference_instance_scale", Vector2.ONE)))
 			if _component_has_contour_stroke_width_override(component):
@@ -2891,6 +2893,7 @@ func _load_world(world_entry: String, persist_as_last := true) -> bool:
 			}
 			if component_type == "region":
 				component["region_type"] = str(component_data.get("region_type", "attack")) if str(component_data.get("region_type", "attack")) in REGION_TYPES else "attack"
+				component["region_geometry_source"] = WorldDocumentService.normalize_region_geometry_source(component_data.get("region_geometry_source", ""))
 			if component_type == "reference":
 				component["reference_instance_scale"] = WorldDocumentService.deserialize_vector(component_data.get("reference_instance_scale", [1.0, 1.0]), Vector2.ONE)
 			if _serialized_component_contour_stroke_width_is_valid(component_data):
@@ -4866,6 +4869,10 @@ func _render_context_bar() -> void:
 	draw_menu.get_popup().add_item("5: Corner", 4)
 	EditorWidgets.style_popup_menu(draw_menu.get_popup())
 	draw_menu.get_popup().id_pressed.connect(_on_draw_menu_id)
+	var geometry_locked := _region_uses_component_geometry(primitive_component)
+	draw_menu.disabled = geometry_locked
+	if geometry_locked:
+		draw_menu.tooltip_text = "Disabled: this Region permanently uses its Component Geometry."
 	context_bar.add_child(draw_menu)
 	var edit_point_menu := MenuButton.new()
 	edit_point_menu.text = "⌘2  Edit Point  ▼"
@@ -4878,6 +4885,9 @@ func _render_context_bar() -> void:
 	edit_point_menu.get_popup().add_item("4: Fuse Point", 3)
 	EditorWidgets.style_popup_menu(edit_point_menu.get_popup())
 	edit_point_menu.get_popup().id_pressed.connect(_on_edit_menu_id)
+	edit_point_menu.disabled = geometry_locked
+	if geometry_locked:
+		edit_point_menu.tooltip_text = draw_menu.tooltip_text
 	context_bar.add_child(edit_point_menu)
 	var edit_edge_menu := MenuButton.new()
 	edit_edge_menu.text = "⌘3  Edit Edge  ▼"
@@ -4887,6 +4897,9 @@ func _render_context_bar() -> void:
 	edit_edge_menu.get_popup().add_item("Select Edge", 0)
 	EditorWidgets.style_popup_menu(edit_edge_menu.get_popup())
 	edit_edge_menu.get_popup().id_pressed.connect(_on_edit_edge_menu_id)
+	edit_edge_menu.disabled = geometry_locked
+	if geometry_locked:
+		edit_edge_menu.tooltip_text = draw_menu.tooltip_text
 	context_bar.add_child(edit_edge_menu)
 	var selected_component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	if str(selected_component.get("draw_mode", "closed_loop")) == "closed_loop":
@@ -4898,6 +4911,9 @@ func _render_context_bar() -> void:
 		edit_face_menu.get_popup().add_item("Move Face", 0)
 		EditorWidgets.style_popup_menu(edit_face_menu.get_popup())
 		edit_face_menu.get_popup().id_pressed.connect(_on_edit_face_menu_id)
+		edit_face_menu.disabled = geometry_locked
+		if geometry_locked:
+			edit_face_menu.tooltip_text = draw_menu.tooltip_text
 		context_bar.add_child(edit_face_menu)
 		var mirror_spacer := Control.new()
 		mirror_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -4906,6 +4922,7 @@ func _render_context_bar() -> void:
 		flip_x_button.text = "Flip X"
 		flip_x_button.tooltip_text = "Flip the complete Closed Loop around the Component Pivot's vertical axis"
 		flip_x_button.focus_mode = Control.FOCUS_NONE
+		flip_x_button.disabled = geometry_locked
 		EditorWidgets.style_context_command_button(flip_x_button, false)
 		flip_x_button.pressed.connect(_flip_selected_component_geometry_x)
 		context_bar.add_child(flip_x_button)
@@ -4913,7 +4930,7 @@ func _render_context_bar() -> void:
 		mirror_button.text = "Mirror Y"
 		mirror_button.tooltip_text = "Mirror a contiguous selection from the open source Chain across an interactively defined axis"
 		mirror_button.focus_mode = Control.FOCUS_NONE
-		mirror_button.disabled = not _can_activate_selection_mirror(selected_component)
+		mirror_button.disabled = geometry_locked or not _can_activate_selection_mirror(selected_component)
 		EditorWidgets.style_context_command_button(mirror_button, _context_command_is("asset.mirror"))
 		mirror_button.pressed.connect(_activate_selection_mirror)
 		context_bar.add_child(mirror_button)
@@ -5586,6 +5603,9 @@ func _on_transform_menu_id(id: int) -> void:
 
 
 func _activate_draw_state() -> void:
+	if not _selected_geometry_is_editable():
+		_show_status_message("Drawing is disabled while the Region uses Component Geometry.")
+		return
 	_set_active_context_command("asset.draw_point")
 	_set_active_state("draw")
 	canvas_view.set_draw_point_mode(active_draw_point_mode)
@@ -5622,6 +5642,8 @@ func _set_draw_point_mode(mode: String) -> void:
 
 
 func _set_edit_mode(mode: String) -> void:
+	if not _selected_geometry_is_editable():
+		return
 	active_edit_mode = mode
 	if mode != "edge":
 		selected_edge_id = ""
@@ -5685,6 +5707,9 @@ func _activate_guide_edit_state(handle_editing := false, set_mode := false) -> v
 
 
 func _activate_edit_point_state(handle_editing := false, set_mode := false) -> void:
+	if not _selected_geometry_is_editable():
+		_show_status_message("Editing is disabled while the Region uses Component Geometry.")
+		return
 	_set_active_context_command("asset.edit_point")
 	edit_bezier_handles = handle_editing
 	edit_point_set_mode = set_mode
@@ -5727,19 +5752,23 @@ func _fuse_selected_point(point_id: String) -> void:
 
 
 func _activate_edit_edge_state() -> void:
+	if not _selected_geometry_is_editable():
+		return
 	_set_active_context_command("asset.edit_edge")
 	_set_active_state("edit")
 	_set_edit_mode("edge")
 
 
 func _activate_edit_face_state() -> void:
+	if not _selected_geometry_is_editable():
+		return
 	_set_active_context_command("asset.edit_face")
 	_set_active_state("edit")
 	_set_edit_mode("face")
 
 
 func _can_activate_selection_mirror(component: Dictionary) -> bool:
-	if component.is_empty() or str(component.get("draw_mode", "closed_loop")) != "closed_loop":
+	if component.is_empty() or _region_uses_component_geometry(component) or str(component.get("draw_mode", "closed_loop")) != "closed_loop":
 		return false
 	return SELECTION_MIRROR_SERVICE_SCRIPT.validation_issues(component, selected_point_ids, Vector2.ZERO, Vector2.RIGHT).is_empty()
 
@@ -5751,7 +5780,7 @@ func _flip_selected_component_geometry_x() -> void:
 func _flip_component_geometry_x(asset_id: String, component_id: String) -> void:
 	var asset := _get_asset(asset_id)
 	var component := _get_component(asset, component_id)
-	if asset.is_empty() or component.is_empty() or str(component.get("draw_mode", "")) != "closed_loop":
+	if asset.is_empty() or component.is_empty() or _region_uses_component_geometry(component) or str(component.get("draw_mode", "")) != "closed_loop":
 		return
 	var points: Array = component.get("points", [])
 	if points.is_empty():
@@ -5850,6 +5879,8 @@ func _set_transform_mode(mode: String) -> void:
 
 func _set_active_state(state: String) -> void:
 	if selected_component_id.is_empty():
+		return
+	if state in ["draw", "edit"] and not _selected_geometry_is_editable():
 		return
 	active_state = state
 	if state == "draw":
@@ -7472,6 +7503,7 @@ func _open_component_add_menu(asset_id: String, parent_component_id: String, anc
 	component_add_menu.set_meta("parent_component_id", parent_component_id)
 	component_add_menu.set_meta("scope_kind", "component")
 	component_add_menu.set_meta("scope_id", parent_component_id)
+	component_add_menu.set_item_disabled(component_add_menu.get_item_index(2), false)
 	component_add_reference_menu.clear()
 	for source_asset in assets:
 		if _asset_type(source_asset) != "symbols" or str(source_asset.get("id", "")) == asset_id:
@@ -7489,6 +7521,7 @@ func _open_group_add_menu(asset_id: String, group_id: String, anchor: Control) -
 	component_add_menu.set_meta("parent_component_id", "")
 	component_add_menu.set_meta("scope_kind", "group")
 	component_add_menu.set_meta("scope_id", group_id)
+	component_add_menu.set_item_disabled(component_add_menu.get_item_index(2), true)
 	component_add_reference_menu.clear()
 	component_add_menu.position = Vector2i(anchor.global_position + Vector2(0.0, anchor.size.y))
 	component_add_menu.popup()
@@ -7520,7 +7553,7 @@ func _on_component_add_weapon_guide_selected(index: int) -> void:
 
 
 func _on_component_add_region_selected(index: int) -> void:
-	if index < 0 or index >= REGION_TYPES.size():
+	if index < 0 or index >= REGION_TYPES.size() or str(component_add_menu.get_meta("scope_kind", "component")) != "component":
 		return
 	_create_region(
 		str(component_add_menu.get_meta("asset_id", "")),
@@ -7601,7 +7634,7 @@ func _update_draw_mode_status() -> void:
 	if not is_instance_valid(draw_mode_status):
 		return
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	var has_editable_component := active_module == "Create" and not component.is_empty() and not _is_reference_component(component)
+	var has_editable_component := active_module == "Create" and not component.is_empty() and not _is_reference_component(component) and not _is_region(component)
 	var current_mode := str(component.get("draw_mode", "closed_loop")) if not component.is_empty() else ""
 	draw_mode_status.text = "Draw Mode: %s  ▾" % _draw_mode_display_name(current_mode) if not current_mode.is_empty() else "Draw Mode: —  ▾"
 	draw_mode_status.disabled = not has_editable_component
@@ -7763,8 +7796,8 @@ func _create_weapon_guide(asset_id: String, scope_kind: String, scope_id: String
 
 func _create_region(asset_id: String, scope_kind: String, scope_id: String, region_type: String) -> void:
 	var asset := _get_asset(asset_id)
-	var valid_scope := not ComponentHierarchy.group_by_id(asset, scope_id).is_empty() if scope_kind == "group" else not _get_component(asset, scope_id).is_empty()
-	if asset.is_empty() or not valid_scope or region_type not in REGION_TYPES:
+	var source_component := _get_component(asset, scope_id)
+	if asset.is_empty() or scope_kind != "component" or source_component.is_empty() or _is_region(source_component) or region_type not in REGION_TYPES:
 		return
 	_record_direct_change()
 	var component_id := "component_%d" % next_component_id
@@ -7777,8 +7810,9 @@ func _create_region(asset_id: String, scope_kind: String, scope_id: String, regi
 		suffix += 1
 	asset["components"].append({
 		"id": component_id, "type": "region", "region_type": region_type, "name": region_name,
-		"source_asset_id": "", "parent_component_id": scope_id if scope_kind == "component" else "",
-		"group_id": scope_id if scope_kind == "group" else "", "points": [], "edges": [], "chains": [],
+		"region_geometry_source": WorldDocumentService.REGION_GEOMETRY_AUTHORED,
+		"source_asset_id": "", "parent_component_id": scope_id,
+		"group_id": "", "points": [], "edges": [], "chains": [],
 		"transform": WorldDocumentService.default_component_transform(), "visibility": true, "z_index": 0,
 		"projection_depth_cm": WorldDocumentService.DEFAULT_PROJECTION_DEPTH_CM, "draw_mode": "closed_loop",
 		"topology_role": "outer", "geometry_source": "bezier", "primitive": {},
@@ -7798,6 +7832,15 @@ func _create_region(asset_id: String, scope_kind: String, scope_id: String, regi
 
 func _is_region(component: Dictionary) -> bool:
 	return WorldDocumentService.is_region(component)
+
+
+func _region_uses_component_geometry(component: Dictionary) -> bool:
+	return WorldDocumentService.region_uses_component_geometry(component)
+
+
+func _selected_geometry_is_editable() -> bool:
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	return not component.is_empty() and not _region_uses_component_geometry(component)
 
 
 func _component_local_visual_center(component: Dictionary) -> Vector2:
@@ -10912,6 +10955,27 @@ func _on_component_visibility_changed(visibility_enabled: bool) -> void:
 		_invalidate_render(RENDER_OUTLINER | RENDER_CANVAS_CONTEXT)
 
 
+func _on_region_geometry_source_selected(index: int, option: OptionButton) -> void:
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if not _is_region(component) or index < 0 or index >= option.item_count:
+		return
+	var source := WorldDocumentService.normalize_region_geometry_source(option.get_item_metadata(index))
+	if source == WorldDocumentService.normalize_region_geometry_source(component.get("region_geometry_source", "")):
+		return
+	_record_direct_change()
+	component["region_geometry_source"] = source
+	active_state = ""
+	active_draw_tool = ""
+	active_context_command = ""
+	selected_point_id = ""
+	selected_point_ids.clear()
+	selected_edge_id = ""
+	selected_edge_ids.clear()
+	canvas_view.clear_selection()
+	_show_status_message("Region Geometry: %s" % ("Component Geometry" if source == WorldDocumentService.REGION_GEOMETRY_COMPONENT else "Free Draw"))
+	_invalidate_render(RENDER_DOCUMENT)
+
+
 func _on_multi_component_visibility_selected(index: int) -> void:
 	if index < 0 or index > 1:
 		return
@@ -11771,10 +11835,23 @@ func _render_canvas_context() -> void:
 		canvas_view.set_display_polygon([])
 		canvas_view.set_bezier_geometry([], [], [])
 		return
-	canvas_context_label.text = "%s Region: %s" % [str(component.get("region_type", "attack")).capitalize(), str(component["name"])] if _is_region(component) else "Component: %s" % str(component["name"])
+	var inherited_region_geometry := _region_uses_component_geometry(component)
+	var display_component := _get_component(asset, str(component.get("parent_component_id", ""))) if inherited_region_geometry else component
+	if display_component.is_empty():
+		display_component = component
+	canvas_context_label.text = "%s Region: %s%s" % [str(component.get("region_type", "attack")).capitalize(), str(component["name"]), " · Component Geometry" if inherited_region_geometry else ""] if _is_region(component) else "Component: %s" % str(component["name"])
 	canvas_view.set_context(str(component["name"]))
-	canvas_view.set_interaction_state(active_state)
-	if active_state == "edit":
+	if inherited_region_geometry:
+		active_state = ""
+		active_draw_tool = ""
+		active_context_command = ""
+		selected_point_id = ""
+		selected_point_ids.clear()
+		selected_edge_id = ""
+		selected_edge_ids.clear()
+		canvas_view.clear_selection()
+	canvas_view.set_interaction_state("" if inherited_region_geometry else active_state)
+	if active_state == "edit" and not inherited_region_geometry:
 		canvas_view.set_edit_mode(active_edit_mode)
 		canvas_view.set_edit_handles_enabled(edit_bezier_handles)
 		canvas_view.set_edit_point_set_enabled(edit_point_set_mode)
@@ -11786,21 +11863,22 @@ func _render_canvas_context() -> void:
 		canvas_view.set_draw_point_mode(active_draw_point_mode)
 	else:
 		canvas_view.set_tool_mode("")
-	var component_transform := _asset_preview_world_record(asset, ComponentHierarchy.world_transform_record(asset, selected_component_id))
+	var display_component_id := str(display_component.get("id", selected_component_id))
+	var component_transform := _asset_preview_world_record(asset, ComponentHierarchy.world_transform_record(asset, display_component_id))
 	component_transform["visibility"] = bool(asset.get("visibility", true)) and _effective_component_visibility(asset, component)
 	component_transform["z_index"] = _effective_component_z_index(asset, component)
 	canvas_view.set_component_transform(component_transform)
-	canvas_view.set_reference_shapes(_build_reference_shapes(asset, selected_component_id))
+	canvas_view.set_reference_shapes(_build_reference_shapes(asset, display_component_id))
 	if _is_region(component):
 		canvas_view.set_bezier_color_override(EditorWidgets.REGION_COLORS.get(str(component.get("region_type", "attack")), EditorWidgets.REGION_COLORS["attack"]))
-	canvas_view.set_component_draw_mode(str(component.get("draw_mode", "closed_loop")))
+	canvas_view.set_component_draw_mode(str(display_component.get("draw_mode", "closed_loop")))
 	canvas_view.set_point_numbers_visible(bool(component.get("show_point_numbers", false)))
-	var catch_parent_id := str(component.get("parent_component_id", ""))
-	if catch_parent_id.is_empty() and str(component.get("draw_mode", "closed_loop")) == "contour":
-		catch_parent_id = str(component.get("catch_parent_component_id", ""))
+	var catch_parent_id := str(display_component.get("parent_component_id", ""))
+	if catch_parent_id.is_empty() and str(display_component.get("draw_mode", "closed_loop")) == "contour":
+		catch_parent_id = str(display_component.get("catch_parent_component_id", ""))
 	canvas_view.set_catch_parent_component(catch_parent_id)
-	BezierGeometry.resolve_auto_handles(component.get("points", []), component.get("chains", []))
-	_refresh_component_geometry(component)
+	BezierGeometry.resolve_auto_handles(display_component.get("points", []), display_component.get("chains", []))
+	_refresh_component_geometry(display_component)
 	canvas_view.set_selected_point_ids(selected_point_ids)
 	canvas_view.set_selected_edge_id(selected_edge_id)
 	canvas_view.call_deferred("grab_focus")

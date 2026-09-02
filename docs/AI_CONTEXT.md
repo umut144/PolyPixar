@@ -211,13 +211,17 @@ includes command output on failure. Export and synchronization are deliberately
 separate actions: a downstream failure does not alter the already published
 PolyTools Runtime packages, and each consumer script remains responsible for
 its own atomic target update.
-Runtime Manifest schema 15 exports `contour_stroke_mesh` independently from the
+Runtime Manifest schema 16 exports `contour_stroke_mesh` independently from the
 unchanged Fill Mesh and adds geometry-only `closed_region_mesh` to closed
 Contours. It also exports Asset-local Weapon Attachment Frames and the ordered
 local-meter positions of authored `corner` points as `projection_depth_corners`.
-It additionally exports an optional `regions` array for authored Attack, Hurt,
-and Collision Regions. Missing or empty Regions preserve the consumer's
-Component-based fallback behavior.
+It additionally exports an optional `regions` array for Attack, Hurt, and
+Collision Regions. A Region is always attached to a Component. Its active
+geometry source is either retained authored Bézier topology or a permanent
+Component binding. Component-bound Runtime Regions reference the source
+Component without duplicating vertices, so consumers apply the same animated
+transform or deformation result. Missing or empty Regions preserve the
+consumer's Component-based fallback behavior.
 It contains no UV, SDF, mask, or Carrier compatibility fields;
 older consumers must reject it.
 The normative field-level package and consumer rules live in
@@ -284,6 +288,13 @@ point positions for projection-depth contour edges.
 World schema 60 restores optional semantic gameplay Regions. They reuse the
 canonical `points`/`edges`/`chains` Bézier topology, remain outside visual Mesh
 processing, and are exported separately from ordinary Components.
+
+World schema 61 restricts Region creation to a Component's `+` menu and adds
+`region_geometry_source`. `authored` activates the Region's retained editable
+Bézier topology. `component` displays and exports the attached Component's
+geometry by stable ID; the inactive authored topology remains stored so
+switching back is lossless. Drawing and Bézier editing are disabled while the
+Component source is active.
 
 World schema 58 adds `root_position` to the Asset root's `Asset Transform`
 Inspector. It previews a translation of the complete Asset independently from

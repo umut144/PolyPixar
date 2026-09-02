@@ -8,7 +8,11 @@ does not serialize generated Bézier topology.
 Optional Attack, Hurt, and Collision Regions reuse the same canonical
 `points`/`edges`/`chains` representation as Bézier Components. They are
 nonvisual records and their sampled polygon/triangulation is derived only for
-validation and Runtime Export.
+validation and Runtime Export when `region_geometry_source` is `authored`.
+Every Region is attached to one Component. With `region_geometry_source =
+component`, the attached Component is the active geometry owner and the
+Region's own topology remains dormant but persisted for a lossless switch back
+to Free Draw. No Component geometry is copied into the Region.
 Weapon Guides are instead oriented transform frames and intentionally contain
 no Bézier topology.
 

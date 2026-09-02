@@ -1,7 +1,7 @@
 class_name RuntimeExportService
 extends RefCounted
 
-const MANIFEST_SCHEMA_VERSION := 15
+const MANIFEST_SCHEMA_VERSION := 16
 const DEFAULT_PROJECTION_DEPTH_CM := 10.0
 static func build_manifest(asset: Dictionary, sources: Dictionary) -> Dictionary:
 	var errors: Array[String] = []
@@ -175,6 +175,29 @@ static func _build_regions(asset: Dictionary) -> Dictionary:
 			continue
 		if not _effective_visibility(asset, region):
 			continue
+		var geometry_source := WorldDocumentService.normalize_region_geometry_source(region.get("region_geometry_source", ""))
+		var source_component_id := str(region.get("parent_component_id", ""))
+		var source_component := ComponentHierarchy.component_by_id(asset, source_component_id)
+		if source_component.is_empty() or WorldDocumentService.is_region(source_component):
+			errors.append("Region '%s' requires an attached source Component." % name)
+			continue
+		if geometry_source == WorldDocumentService.REGION_GEOMETRY_COMPONENT:
+			if WorldDocumentService.is_reference_component(source_component):
+				errors.append("Region '%s' cannot inherit geometry from an Asset Reference." % name)
+				continue
+			var draw_mode := str(source_component.get("draw_mode", "closed_loop"))
+			var chains: Array = source_component.get("chains", [])
+			if draw_mode == "contour" and (chains.size() != 1 or not bool(chains[0].get("closed", false))):
+				errors.append("Region '%s' requires a closed source Component boundary." % name)
+				continue
+			items.append({
+				"region_id": region_id,
+				"name": name,
+				"role": role,
+				"geometry_source": WorldDocumentService.REGION_GEOMETRY_COMPONENT,
+				"source_component_id": source_component_id
+			})
+			continue
 		var mesh := ClosedRegionMeshService.generate({"draw_mode": "contour", "points": region.get("points", []), "edges": region.get("edges", []), "chains": region.get("chains", [])})
 		if not bool(mesh.get("valid", false)):
 			var mesh_errors: Array = mesh.get("errors", [])
@@ -192,7 +215,15 @@ static func _build_regions(asset: Dictionary) -> Dictionary:
 		for triangle in mesh.get("triangles", []):
 			for vertex_id in triangle.get("vertex_ids", []):
 				indices.append(int(vertex_indices.get(str(vertex_id), -1)))
-		items.append({"region_id": region_id, "name": name, "role": role, "vertices": vertices, "indices": indices})
+		items.append({
+			"region_id": region_id,
+			"name": name,
+			"role": role,
+			"geometry_source": WorldDocumentService.REGION_GEOMETRY_AUTHORED,
+			"source_component_id": source_component_id,
+			"vertices": vertices,
+			"indices": indices
+		})
 	items.sort_custom(func(left: Dictionary, right: Dictionary) -> bool: return str(left.get("region_id", "")) < str(right.get("region_id", "")))
 	return {"items": items, "errors": errors}
 
@@ -375,6 +406,13 @@ static func _triangle_geometry_validation_issues(vertices: Array, indices: Array
 	return errors
 
 
+static func _runtime_component_by_id(components: Array, component_id: String) -> Dictionary:
+	for raw_component in components:
+		if raw_component is Dictionary and str(raw_component.get("component_id", "")) == component_id:
+			return raw_component
+	return {}
+
+
 static func manifest_validation_issues(manifest: Dictionary) -> Array[String]:
 	var errors: Array[String] = []
 	var schema_version = manifest.get("schema_version")
@@ -384,10 +422,10 @@ static func manifest_validation_issues(manifest: Dictionary) -> Array[String]:
 		errors.append("Runtime Manifest requires an Asset Key and Component array.")
 		return errors
 	if not manifest.get("attachment_frames", null) is Array:
-		errors.append("Runtime Manifest schema 15 requires an attachment_frames array.")
+		errors.append("Runtime Manifest schema 16 requires an attachment_frames array.")
 		return errors
 	if not manifest.get("regions", null) is Array:
-		errors.append("Runtime Manifest schema 15 requires an optional regions array.")
+		errors.append("Runtime Manifest schema 16 requires an optional regions array.")
 	else:
 		var region_ids: Dictionary = {}
 		for raw_region in manifest.get("regions", []):
@@ -397,13 +435,27 @@ static func manifest_validation_issues(manifest: Dictionary) -> Array[String]:
 			var region: Dictionary = raw_region
 			var region_id := str(region.get("region_id", ""))
 			var role := str(region.get("role", ""))
-			var vertices = region.get("vertices", null)
-			var indices = region.get("indices", null)
-			if region_id.is_empty() or region_ids.has(region_id) or role not in ["attack", "hurt", "collision"] or not _is_lower_snake_case(str(region.get("name", ""))) or not vertices is Array or not indices is Array:
+			var geometry_source := str(region.get("geometry_source", ""))
+			var source_component_id := str(region.get("source_component_id", ""))
+			if region_id.is_empty() or region_ids.has(region_id) or role not in ["attack", "hurt", "collision"] or geometry_source not in WorldDocumentService.REGION_GEOMETRY_SOURCES or not _is_lower_snake_case(str(region.get("name", ""))) or source_component_id.is_empty():
 				errors.append("Runtime Manifest contains an invalid Region record.")
 				continue
 			region_ids[region_id] = true
-			errors.append_array(_triangle_geometry_validation_issues(vertices, indices, str(region.get("name", region_id)), "Region"))
+			var source_runtime_component := _runtime_component_by_id(manifest.get("components", []), source_component_id)
+			if source_runtime_component.is_empty():
+				errors.append("Runtime Region '%s' references a missing Component." % str(region.get("name", region_id)))
+			if geometry_source == WorldDocumentService.REGION_GEOMETRY_COMPONENT:
+				if source_runtime_component.is_empty() or str(source_runtime_component.get("kind", "")) == "asset_reference" or not source_runtime_component.has("mesh") and not source_runtime_component.has("closed_region_mesh"):
+					errors.append("Runtime Region '%s' references a Component without closed geometry." % str(region.get("name", region_id)))
+				if region.has("vertices") or region.has("indices"):
+					errors.append("Component-geometry Runtime Regions must not duplicate Vertex data.")
+			else:
+				var vertices = region.get("vertices", null)
+				var indices = region.get("indices", null)
+				if not vertices is Array or not indices is Array:
+					errors.append("Authored Runtime Regions require Vertex and index arrays.")
+				else:
+					errors.append_array(_triangle_geometry_validation_issues(vertices, indices, str(region.get("name", region_id)), "Region"))
 	var presentation = manifest.get("presentation")
 	if not presentation is Dictionary or presentation.keys() != ["authored_facing"] \
 		or str(presentation.get("authored_facing", "")) not in AssetPresentation.SERIALIZED_VALUES:
