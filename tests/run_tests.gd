@@ -53,6 +53,7 @@ func _init() -> void:
 	_test_asset_catalog_service()
 	_test_runtime_export_service()
 	_test_runtime_export_file_service()
+	_test_runtime_export_surface()
 	_test_weighting_service_and_ui()
 	_test_component_hierarchy_model()
 	_test_group_outliner_workflows()
@@ -3076,6 +3077,268 @@ func _remove_runtime_export_file_test_tree(path: String) -> void:
 	for directory_name in directory.get_directories():
 		_remove_runtime_export_file_test_tree(path.path_join(directory_name))
 	DirAccess.remove_absolute(path)
+
+
+func _export_surface_summary(pending: PackedStringArray, attention: PackedStringArray) -> Dictionary:
+	return {"pending": pending, "attention": attention}
+
+
+func _export_surface_stage(candidates: Array, pending: PackedStringArray,
+		attention: PackedStringArray) -> Dictionary:
+	return {"candidates": candidates, "summary": _export_surface_summary(pending, attention)}
+
+
+func _export_surface_package(asset_id: String, valid: bool, error: String) -> Dictionary:
+	return {"kind": "package", "asset_id": asset_id,
+		"build": {"valid": valid, "errors": [] if error.is_empty() else [error], "manifest": {}}}
+
+
+func _export_surface_mesh_candidate(asset_id: String, component_id: String) -> Dictionary:
+	return {"asset_id": asset_id, "component_id": component_id}
+
+
+func _export_surface_apply(application: Control, preflight: Dictionary, current: bool,
+		batch_mesh_candidates: Array, batch_attention: PackedStringArray) -> void:
+	application.export_preflight = preflight
+	application.batch_status_revision += 1
+	application.export_preflight_revision = application.batch_status_revision if current \
+		else application.batch_status_revision - 1
+	application.batch_status_snapshot = {
+		"mesh": _export_surface_stage(batch_mesh_candidates, PackedStringArray(), batch_attention),
+		"uv": _export_surface_stage([], PackedStringArray(), PackedStringArray()),
+		"sdf": _export_surface_stage([], PackedStringArray(), PackedStringArray()),
+		"runtime": _export_surface_stage([], PackedStringArray(), PackedStringArray()),
+	}
+	application.batch_status_snapshot_revision = application.batch_status_revision
+	application._render_export_preflight()
+	application._update_meshes_button()
+
+
+func _export_surface_observation(application: Control) -> String:
+	# The same observation the render probe prints, reduced to one comparable
+	# string. Two states that produce the same string are the same state.
+	var parts: Array[String] = []
+	for pair in [["export_workspace", application.export_workspace],
+			["outliner_panel", application.outliner_panel],
+			["inspector_panel", application.inspector_panel],
+			["context_bar_panel", application.context_bar_panel],
+			["canvas_view", application.canvas_view]]:
+		parts.append("%s=%s" % [str(pair[0]), str((pair[1] as Control).visible)])
+	parts.append("summary=%s" % str(application.export_summary_label.text))
+	parts.append("sync=%s" % str(application.export_consumer_sync_label.text))
+	for pair in [["build_all", application.export_run_button],
+			["export_all_valid", application.export_valid_button],
+			["sync_consumers", application.export_sync_button],
+			["update_meshes", application.update_meshes_button]]:
+		var button := pair[1] as Button
+		parts.append("%s=%s/%s/%s" % [str(pair[0]), str(button.text),
+			str(button.visible), str(button.disabled)])
+	parts.append("update_meshes_attention=%d" % (application.update_meshes_button as BatchStatusButton).attention_count)
+	parts.append("running=%s/%s" % [str(application.export_running), str(application.mesh_batch_running)])
+	parts.append("preflight_current=%s" % str(
+		application.export_preflight_revision == application.batch_status_revision))
+	parts.append("batch_mesh=%d" % (application.batch_status_snapshot.get("mesh", {}).get("candidates", []) as Array).size())
+	parts.append("log=%s" % str(application.export_log.get_parsed_text()))
+	return "|".join(parts)
+
+
+func _test_runtime_export_surface() -> void:
+	# The Export module replaces the central work surface: it hides the Outliner,
+	# the Inspector and the Context Bar, and it drives three toolbar Buttons from
+	# a Preflight snapshot. tools/runtime_export_render_probe.gd photographs those
+	# states; this test asserts that each state really reaches the path it stands
+	# for, so a probe snapshot cannot quietly record two identical fixtures.
+	#
+	# Everything is synthetic. world_name stays empty, so every staleness check
+	# resolves to an empty path and the file system is never touched, and no
+	# Button is pressed, so no batch, Export, Save or Consumer Sync can start.
+	var application: Control = load("res://scripts/main.gd").new()
+	application._build_ui()
+	application.world_name = ""
+	application.world_title = ""
+	application.assets = [] as Array[Dictionary]
+	application.active_module = "Export"
+	application.export_workspace.visible = true
+	application.outliner_panel.visible = false
+	application.inspector_panel.visible = false
+	application.context_bar_panel.visible = false
+	application.canvas_view.visible = false
+
+	var pending_preflight := {
+		"mesh": _export_surface_stage([_export_surface_mesh_candidate("asset_1", "component_1"),
+			_export_surface_mesh_candidate("asset_1", "component_2")],
+			PackedStringArray(["Wizard / body", "Wizard / arm"]), PackedStringArray()),
+		"runtime": _export_surface_stage([_export_surface_package("asset_1", true, ""),
+			_export_surface_package("asset_2", true, ""),
+			{"kind": "catalog", "asset_id": "", "build": {"valid": true, "errors": [], "catalog": {}}}],
+			PackedStringArray(["Wizard — package missing or stale"]), PackedStringArray()),
+	}
+	var blocked_preflight := {
+		"mesh": _export_surface_stage([], PackedStringArray(),
+			PackedStringArray(["Wizard / body — The Component needs one Chain."])),
+		"runtime": _export_surface_stage([], PackedStringArray(),
+			PackedStringArray(["Orb — Component name is not unique.",
+				"World Catalog — Asset Key 'orb' is already used."])),
+	}
+	var mixed_preflight := {
+		"mesh": _export_surface_stage([_export_surface_mesh_candidate("asset_1", "component_1")],
+			PackedStringArray(["Wizard / body"]),
+			PackedStringArray(["Wizard / arm — The Component needs one Chain."])),
+		"runtime": _export_surface_stage([_export_surface_package("asset_1", true, ""),
+			_export_surface_package("asset_2", false, "Component name is not unique.")],
+			PackedStringArray(["Wizard — package missing or stale"]),
+			PackedStringArray(["Orb — Component name is not unique."])),
+	}
+	var empty_preflight := {
+		"mesh": _export_surface_stage([], PackedStringArray(), PackedStringArray()),
+		"runtime": _export_surface_stage([], PackedStringArray(), PackedStringArray()),
+	}
+	var busy_candidates: Array = [_export_surface_mesh_candidate("asset_1", "component_1"),
+		_export_surface_mesh_candidate("asset_1", "component_2")]
+	var busy_attention := PackedStringArray(["Wizard / arm — The Component needs one Chain."])
+	var observations: Dictionary = {}
+
+	# 1 · A Preflight older than the last document change. The snapshot still
+	# holds candidates, but the toolbar must refuse to act on a stale one.
+	application.export_running = false
+	application.mesh_batch_running = false
+	_export_surface_apply(application, pending_preflight, false, [], PackedStringArray())
+	_expect((application.export_preflight.get("mesh", {}).get("candidates", []) as Array).size() == 2
+		and application._export_build_count() == 2,
+		"The stale case should start from a Preflight that does hold candidates.")
+	_expect(application.export_run_button.text == "Build All (0)"
+		and application.export_run_button.disabled
+		and application.export_valid_button.text == "Export All Valid (0)"
+		and application.export_valid_button.disabled,
+		"A Preflight that is stale against the last change must not offer its candidates.")
+	observations["preflight_stale"] = _export_surface_observation(application)
+
+	# 2 · Everything current: no work, no attention, both actions disabled.
+	_export_surface_apply(application, empty_preflight, true, [], PackedStringArray())
+	_expect(str(application.export_summary_label.text).contains("0 ausstehende Arbeitsschritte")
+		and str(application.export_summary_label.text).contains("0 Auffälligkeiten"),
+		"A fully current Preflight should summarise no work and no attention.")
+	_expect(str(application.export_log.get_parsed_text()).contains("Alles ist aktuell und exportbereit."),
+		"A fully current Preflight should say so in the log.")
+	_expect(application.export_run_button.disabled and application.export_valid_button.disabled
+		and application.export_sync_button.disabled,
+		"A fully current state must leave every Export action disabled.")
+	observations["all_current"] = _export_surface_observation(application)
+
+	# 3 · Valid pending Mesh and Runtime work enables the matching Buttons.
+	_export_surface_apply(application, pending_preflight, true, busy_candidates, busy_attention)
+	_expect(application.export_run_button.text == "Build All (2)"
+		and not application.export_run_button.disabled,
+		"Pending Mesh work should enable Build All with its Component count.")
+	_expect(application.export_valid_button.text == "Export All Valid (3)"
+		and not application.export_valid_button.disabled,
+		"Pending valid Runtime work should enable Export All Valid with its candidate count.")
+	_expect(application.export_sync_button.disabled,
+		"Without a published Catalog the Consumer Sync must stay disabled.")
+	_expect(str(application.export_log.get_parsed_text()).contains("Wizard — package missing or stale"),
+		"The Preflight log should list the pending Runtime entries.")
+	_expect((application.update_meshes_button as BatchStatusButton).attention_count == 1,
+		"The persistent Update Meshes Button should carry the attention count of its own snapshot.")
+	observations["pending_work"] = _export_surface_observation(application)
+
+	# 4 · Blocked candidates: attention is counted and shown, nothing is offered.
+	_export_surface_apply(application, blocked_preflight, true, [], PackedStringArray())
+	_expect(application._export_attention_count(blocked_preflight["mesh"]) == 1
+		and application._export_attention_count(blocked_preflight["runtime"]) == 2,
+		"Attention entries should be counted per stage.")
+	_expect(str(application.export_summary_label.text).contains("3 Auffälligkeiten"),
+		"The summary should report the combined attention count.")
+	_expect(str(application.export_log.get_parsed_text()).contains("Orb — Component name is not unique."),
+		"The Preflight log should name every blocked entry.")
+	_expect(application.export_run_button.disabled and application.export_valid_button.disabled,
+		"Blocked entries alone must not enable an Export action.")
+	observations["blocked_only"] = _export_surface_observation(application)
+
+	# 5 · Executable work beside blocked entries: both are visible at once.
+	_export_surface_apply(application, mixed_preflight, true, busy_candidates, busy_attention)
+	_expect(str(application.export_summary_label.text).contains("3 ausstehende Arbeitsschritte")
+		and str(application.export_summary_label.text).contains("2 Auffälligkeiten"),
+		"A mixed state should report pending work and attention side by side.")
+	_expect(not application.export_run_button.disabled
+		and application.export_valid_button.text == "Export All Valid (1)",
+		"A mixed state should still offer the work that is executable.")
+	observations["mixed"] = _export_surface_observation(application)
+
+	# 6 · A running Export disables every action although candidates exist.
+	application.export_running = true
+	_export_surface_apply(application, mixed_preflight, true, busy_candidates, busy_attention)
+	_expect(application._export_build_count() > 0 and application._export_valid_count() > 0,
+		"The running case should start from a state that would otherwise be actionable.")
+	_expect(application.export_run_button.disabled and application.export_valid_button.disabled
+		and application.export_sync_button.disabled,
+		"While an Export runs no Export action may be offered.")
+	observations["export_running"] = _export_surface_observation(application)
+
+	# 7 · A running Mesh batch freezes the persistent Update Meshes Button: its
+	# snapshot is empty again, but caption and attention point stay as they were.
+	application.export_running = false
+	application.mesh_batch_running = true
+	_export_surface_apply(application, pending_preflight, true, [], PackedStringArray())
+	_expect(application.update_meshes_button.text == "Update Meshes (2)"
+		and (application.update_meshes_button as BatchStatusButton).attention_count == 1,
+		"A running Mesh batch should leave the Update Meshes Button at its previous caption.")
+	_expect((application.batch_status_snapshot.get("mesh", {}).get("candidates", []) as Array).is_empty(),
+		"The frozen case should be driven by a snapshot that has since become empty.")
+	observations["mesh_batch_running"] = _export_surface_observation(application)
+
+	# 8 · A completed Consumer Sync reports itself in its own line.
+	application.mesh_batch_running = false
+	_export_surface_apply(application, empty_preflight, true, [], PackedStringArray())
+	application._present_consumer_sync_result({"success": true, "output": "", "exit_code": 0})
+	_expect(str(application.export_consumer_sync_label.text).contains("erfolgreich"),
+		"A successful Consumer Sync should be reported beside the summary.")
+	observations["consumer_sync_done"] = _export_surface_observation(application)
+
+	# 9 · Leaving the module has to give the ordinary work surfaces back.
+	application.active_module = "Create"
+	application.active_create_submodule = "Character"
+	application._render_canvas_context()
+	application._render_context_bar()
+	_expect(not application.export_workspace.visible,
+		"Leaving Export should hide the Export workspace.")
+	_expect(application.outliner_panel.visible and application.inspector_panel.visible
+		and application.context_bar_panel.visible and application.canvas_view.visible,
+		"Leaving Export should show the Outliner, the Inspector, the Context Bar and the Canvas again.")
+	_expect(not application.export_run_button.visible and not application.export_valid_button.visible
+		and not application.export_sync_button.visible,
+		"Leaving Export should hide the Export toolbar Buttons.")
+	observations["left_for_create"] = _export_surface_observation(application)
+
+	# 10 · Motion leaves the canvas render before the branch that shows the
+	# Outliner and the Inspector unconditionally, so only there is the
+	# Export-specific restore the sole reason they come back.
+	application.active_module = "Export"
+	application._render_canvas_context()
+	_expect(not application.outliner_panel.visible and not application.inspector_panel.visible
+		and not application.context_bar_panel.visible,
+		"Entering Export should hide the Outliner, the Inspector and the Context Bar.")
+	application.active_module = "Motion"
+	application.active_motion_submodule = "Path"
+	application._render_canvas_context()
+	application._render_context_bar()
+	_expect(not application.export_workspace.visible,
+		"Leaving Export for Motion should hide the Export workspace.")
+	_expect(application.outliner_panel.visible and application.inspector_panel.visible
+		and application.context_bar_panel.visible,
+		"Leaving Export for Motion should restore the Outliner, the Inspector and the Context Bar.")
+	observations["left_for_motion"] = _export_surface_observation(application)
+
+	# No two states may render the same; otherwise the probe photographs one
+	# state twice and a missing path stays invisible.
+	var seen: Dictionary = {}
+	for name in observations:
+		var observation := str(observations[name])
+		_expect(not seen.has(observation),
+			"The Export surface states should all differ; %s renders like %s." % [
+				name, str(seen.get(observation, ""))])
+		seen[observation] = name
+	_expect(seen.size() == 10, "The Export surface test should cover ten distinct states.")
+	application.free()
 
 
 func _test_runtime_export_file_service() -> void:
