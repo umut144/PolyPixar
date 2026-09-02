@@ -7012,11 +7012,25 @@ func _open_seeding_dependency(asset_id: String, component_id: String) -> void:
 	_select_geometry_component(asset_id, component_id)
 
 
+func _sampling_input_kind_for_seeding_role(role: String) -> String:
+	# The Seeding tree names its rows by treatment — outer, hole, cut, spine —
+	# while a Sampling boundary input is identified by what the document holds:
+	# a reference Component or a Guide. Only Holes and Cuts are Sampling
+	# boundaries at all; the Outer contour has no input record of its own and a
+	# Spine is a Seeding input, so both map to no Sampling input rather than to a
+	# kind the lookup would then fail on silently.
+	if role == "hole":
+		return "reference"
+	if role == "cut":
+		return "guide"
+	return ""
+
+
 func _select_geometry_seeding_input(asset_id: String, component_id: String, input_id: String, role: String) -> void:
 	if selected_asset_id != asset_id or selected_component_id != component_id:
 		_select_geometry_component(asset_id, component_id)
 	selected_sampling_input_id = input_id
-	selected_sampling_input_kind = role
+	selected_sampling_input_kind = _sampling_input_kind_for_seeding_role(role)
 	selected_guide_id = input_id if role in ["cut", "spine"] else ""
 	_invalidate_render(RENDER_OUTLINER | RENDER_INSPECTOR)
 	_refresh_geometry_seeding_workspace()

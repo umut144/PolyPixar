@@ -64,6 +64,7 @@ func _init() -> void:
 	_test_motion_path_topology_and_sampler()
 	_test_outliner_wiring()
 	_test_geometry_inspector_wiring()
+	_test_sampling_input_kind_from_seeding_selection()
 	_test_motion_inspector_wiring()
 	_test_motion_act_evaluator()
 	_test_motion_module_separators()
@@ -1577,7 +1578,13 @@ func _test_outliner_selection_wiring() -> void:
 	application.active_geometry_submodule = "Seeding"
 	application._render_outliner()
 	_expect(_press_outliner_button(application, "Outer · body"), "The Seeding tree should offer the Outer input row.")
-	_expect(application.selected_sampling_input_kind == "outer", "Pressing a Seeding input row should select that input.")
+	# The Outer contour has no input record of its own: its row carries an empty
+	# input id and the tree never marks it selected. Pressing it therefore
+	# selects no Sampling input. Which rows do is asserted for Hole, Cut and
+	# Spine in _test_sampling_input_kind_from_seeding_selection.
+	_expect(application.selected_sampling_input_id.is_empty()
+		and application.selected_sampling_input_kind.is_empty(),
+		"Pressing the Outer row should leave no Sampling input selected.")
 
 	# Style
 	application.active_module = "Style"
@@ -4244,6 +4251,66 @@ func _build_geometry_probe(application: Control, submodule: String) -> GeometryI
 	elif submodule == "Meshing":
 		probe.set_meshing_context(application._geometry_meshing_inspector_context(component))
 	return probe
+
+
+func _test_sampling_input_kind_from_seeding_selection() -> void:
+	# The Seeding tree names its rows by treatment, the Sampling Inspector looks
+	# an input up by what the document holds. Selecting a Seeding input and then
+	# switching to Sampling is the path where the two vocabularies meet, so it is
+	# driven here end to end: press the real row, switch submodule, render, and
+	# look for the Boundary Density block.
+	var body := _outliner_test_component("component_1", "body")
+	body["topology_role"] = "outer"
+	var hole := {"points": [], "edges": [], "chains": [], "id": "component_2", "name": "eye",
+		"visibility": true, "type": "reference", "parent_component_id": "component_1",
+		"topology_role": "hole", "source_asset_id": "asset_2"}
+	var cut := {"id": "guide_1", "guide_type": AssetGuide.CUT, "ordinal": 1, "visibility": true,
+		"scope": {"kind": "component", "component_id": "component_1"},
+		"points": [], "edges": [], "chains": []}
+	var spine := {"id": "guide_2", "guide_type": AssetGuide.SAMPLER_SPINE, "ordinal": 1,
+		"visibility": true, "scope": {"kind": "component", "component_id": "component_1"},
+		"points": [], "edges": [], "chains": []}
+	var application: Control = load("res://scripts/main.gd").new()
+	application._build_ui()
+	var kind_assets: Array[Dictionary] = [
+		{"id": "asset_1", "name": "Wizard", "visibility": true, "components": [body, hole],
+			"groups": [], "guides": [cut, spine]},
+		{"id": "asset_2", "name": "Orb", "visibility": true, "components": [], "groups": [], "guides": []}]
+	application.assets = kind_assets
+	application.active_module = "Mesh"
+	application.expanded_assets["asset_1"] = true
+	application.selected_asset_id = "asset_1"
+	application.selected_component_id = "component_1"
+	var document: Dictionary = application._mutable_geometry_document("asset_1", "component_1")
+	document["seeding"]["recipe"]["method"] = GeometrySeedingService.SPINE_FLOW
+	document["seeding"]["recipe"]["parameters"]["spine_inputs"] = [{"guide_id": "guide_2", "enabled": true}]
+	# A refinement on each Sampling boundary, so the block has something to show.
+	document["sampling"]["recipe"]["parameters"]["boundary_refinements"] = {
+		"component_2": {"factor": 2.0}, "guide_1": {"factor": 2.5}}
+
+	for expectation in [
+		{"row": "Outer · ", "role": "outer", "kind": "", "block": false},
+		{"row": "Hole · ", "role": "hole", "kind": "reference", "block": true},
+		{"row": "Cut · ", "role": "cut", "kind": "guide", "block": true},
+		{"row": "Spine · ", "role": "spine", "kind": "", "block": false},
+	]:
+		application.active_geometry_submodule = "Seeding"
+		application._render_outliner()
+		_expect(_press_outliner_button(application, str(expectation["row"])),
+			"The Seeding tree should offer its %srow." % str(expectation["row"]))
+		_expect(application.selected_sampling_input_kind == str(expectation["kind"]),
+			"Selecting the %srow should store the Sampling input kind %s, not %s." % [
+				str(expectation["row"]), str(expectation["kind"]), application.selected_sampling_input_kind])
+		application.active_geometry_submodule = "Sampling"
+		application._render_inspector()
+		var block := _button_starting_with(application.geometry_inspector_view, "▾  Boundary Density")
+		if bool(expectation["block"]):
+			_expect(block != null,
+				"After selecting the %srow, Sampling should show its Boundary Density block." % str(expectation["row"]))
+		else:
+			_expect(block == null,
+				"The %srow is not a Sampling boundary, so Sampling should show no Boundary Density block." % str(expectation["row"]))
+	application.free()
 
 
 func _test_geometry_inspector_wiring() -> void:
