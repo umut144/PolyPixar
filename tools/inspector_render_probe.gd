@@ -1,6 +1,6 @@
 # Inspector render probe.
 #
-# Renders the Inspector in 44 fixed states and prints one line per control with
+# Renders the Inspector in 46 fixed states and prints one line per control with
 # the properties a reader would notice: values, ranges, item lists, selections,
 # pressed state, disabled state, captions, colours and tooltips. It asserts
 # nothing on its own. It is run before and after a change that is meant to leave
@@ -20,9 +20,10 @@
 # selected Components, Reference Image, Point mode with none, one and two
 # Points, Edge mode with none, one and two Edges, Face mode), Mesh
 # (Sampling, Seeding and Meshing, each unbaked and against a Geometry document
-# with baked results and expanded advanced blocks), Style (Weighting without a
-# Component, without a Style, Uniform, Axis Gradient, and a generated Axis
-# Gradient preview) and Motion (Asset contract, State, Motion, inner
+# with baked results and expanded advanced blocks, the baked Sampling state
+# also with its Hole and with its Cut boundary selected), Style (Weighting
+# without a Component, without a Style, Uniform, Axis Gradient, and a
+# generated Axis Gradient preview) and Motion (Asset contract, State, Motion, inner
 # Motion, Transition, seeded Transition with Rules, Marker, Act empty / Slide /
 # Blink, Path empty / authored, Sequence empty / composition / player). Between
 # them they reach every Inspector render function. When a render function is
@@ -67,6 +68,34 @@ func _init() -> void:
 		"transform": {"position": Vector2(3, 4), "rotation": 15.0, "scale": Vector2(1.5, 2.0), "pivot": Vector2(1, 1)}})
 	var guide := {"id": "guide_1", "guide_type": AssetGuide.SAMPLE, "ordinal": 1, "visibility": true,
 		"scope": {"kind": "component", "component_id": "component_1"}, "points": [], "edges": [], "chains": []}
+	# The Mesh states run on a Component of their own so the Create and Style
+	# states keep the Component they had. It carries the two Sampling boundaries
+	# the Inspector resolves from different places -- a Hole is a reference
+	# Component parented to it, a Cut is an AssetGuide.CUT scoped to it -- plus
+	# its own Sampler Spine for the Seeding rows. AssetGuide.SAMPLER_SPINE is
+	# AssetGuide.SAMPLE: a Spine is a Seeding input, never a Cut boundary, and
+	# a plain Component is never a Hole; only a reference Component is.
+	var mesh_body := {"points": [], "edges": [], "chains": []}
+	BezierTopology.add_point(mesh_body, Vector2.ZERO, "corner")
+	BezierTopology.add_point(mesh_body, Vector2(12, 0), "linear")
+	BezierTopology.add_point(mesh_body, Vector2(12, 9), "linear")
+	BezierTopology.close_active_chain(mesh_body)
+	mesh_body.merge({"id": "component_7", "name": "torso", "visibility": true,
+		"topology_role": "outer"})
+	var hole_reference := {"points": [], "edges": [], "chains": [], "id": "component_6",
+		"name": "eye", "visibility": true, "type": "reference",
+		"parent_component_id": "component_7", "topology_role": "hole",
+		"source_asset_id": "asset_2"}
+	var cut_guide := {"id": "guide_4", "guide_type": AssetGuide.CUT, "ordinal": 1,
+		"visibility": true, "scope": {"kind": "component", "component_id": "component_7"},
+		"points": [], "edges": [], "chains": []}
+	BezierTopology.add_point(cut_guide, Vector2(2, 2), "corner")
+	BezierTopology.add_point(cut_guide, Vector2(10, 7), "linear")
+	var spine_guide := {"id": "guide_5", "guide_type": AssetGuide.SAMPLER_SPINE, "ordinal": 1,
+		"visibility": true, "scope": {"kind": "component", "component_id": "component_7"},
+		"points": [], "edges": [], "chains": []}
+	BezierTopology.add_point(spine_guide, Vector2(3, 1), "corner")
+	BezierTopology.add_point(spine_guide, Vector2(11, 8), "linear")
 	var group := {"id": "group_1", "name": "torso", "transform": {"position": Vector2(2, 2), "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}, "visibility": true, "parent_component_id": ""}
 	var arm := {"points": [], "edges": [], "chains": [], "id": "component_2", "name": "arm",
 		"visibility": true, "parent_component_id": "component_1"}
@@ -81,9 +110,11 @@ func _init() -> void:
 		"visibility": true, "scope": {"kind": "component", "component_id": "component_1"},
 		"points": [], "edges": [], "chains": []}
 	var assets: Array[Dictionary] = [{"id": "asset_1", "name": "Wizard", "visibility": true,
-		"components": [comp, arm, outline, circle, ellipse], "groups": [group],
-		"guides": [guide, weapon_guide],
-		"asset_pivot": Vector2(5, 6), "root_position": Vector2(1, 2), "root_scale": Vector2(1, 1)}]
+		"components": [comp, arm, outline, circle, ellipse, mesh_body, hole_reference],
+		"groups": [group], "guides": [guide, weapon_guide, cut_guide, spine_guide],
+		"asset_pivot": Vector2(5, 6), "root_position": Vector2(1, 2), "root_scale": Vector2(1, 1)},
+		{"id": "asset_2", "name": "Orb", "visibility": true,
+			"components": [], "groups": [], "guides": []}]
 	app.assets = assets
 	app.selected_asset_id = "asset_1"
 	app.expanded_assets["asset_1"] = true
@@ -107,12 +138,14 @@ func _init() -> void:
 		{"m": "Create", "sub": "Character", "comp": "component_1", "grp": "", "gd": ""},
 		{"m": "Create", "sub": "Character", "comp": "", "grp": "group_1", "gd": ""},
 		{"m": "Create", "sub": "Character", "comp": "", "grp": "", "gd": "guide_1"},
-		{"m": "Mesh", "sub": "Sampling", "comp": "component_1", "grp": "", "gd": ""},
-		{"m": "Mesh", "sub": "Sampling", "comp": "component_1", "grp": "", "gd": "", "baked": true},
-		{"m": "Mesh", "sub": "Seeding", "comp": "component_1", "grp": "", "gd": "", "baked": true},
-		{"m": "Mesh", "sub": "Meshing", "comp": "component_1", "grp": "", "gd": "", "baked": true},
-		{"m": "Mesh", "sub": "Seeding", "comp": "component_1", "grp": "", "gd": ""},
-		{"m": "Mesh", "sub": "Meshing", "comp": "component_1", "grp": "", "gd": ""},
+		{"m": "Mesh", "sub": "Sampling", "comp": "component_7", "grp": "", "gd": ""},
+		{"m": "Mesh", "sub": "Sampling", "comp": "component_7", "grp": "", "gd": "", "baked": true},
+		{"m": "Mesh", "sub": "Sampling", "comp": "component_7", "grp": "", "gd": "", "baked": true, "input": "hole"},
+		{"m": "Mesh", "sub": "Sampling", "comp": "component_7", "grp": "", "gd": "", "baked": true, "input": "cut"},
+		{"m": "Mesh", "sub": "Seeding", "comp": "component_7", "grp": "", "gd": "", "baked": true},
+		{"m": "Mesh", "sub": "Meshing", "comp": "component_7", "grp": "", "gd": "", "baked": true},
+		{"m": "Mesh", "sub": "Seeding", "comp": "component_7", "grp": "", "gd": ""},
+		{"m": "Mesh", "sub": "Meshing", "comp": "component_7", "grp": "", "gd": ""},
 		{"m": "Style", "sub": "Weighting", "comp": "", "grp": "", "gd": ""},
 		{"m": "Style", "sub": "Weighting", "comp": "component_1", "grp": "", "gd": ""},
 		{"m": "Style", "sub": "Weighting", "comp": "component_1", "grp": "", "gd": "", "style": "uniform"},
@@ -241,20 +274,23 @@ func _init() -> void:
 					if motion_case == "sequence_player":
 						app.motion_sequence_view = MotionSequenceWorkspace.VIEW_PLAYER
 		if bool(c.get("baked", false)):
-			var doc: Dictionary = WorldDocumentService.default_geometry_document("asset_1", "component_1")
+			var doc: Dictionary = WorldDocumentService.default_geometry_document("asset_1", "component_7")
+			# The refinement and the statistics name the Hole reference and the
+			# Cut Guide the Inspector actually builds rows for, so the Hole row
+			# reads its Density override and the Cut row stays Inherited.
 			doc["sampling"]["recipe"] = {"method": GeometrySamplingService.ADAPTIVE,
 				"parameters": {"spacing": 2.0, "feature_detail": 0.4,
-					"boundary_refinements": {"guide_1": {"factor": 2.5}}}}
+					"boundary_refinements": {"component_6": {"factor": 2.5}}}}
 			doc["sampling"]["bakes"][GeometrySamplingService.ADAPTIVE] = {"sample_count": 42,
-				"constraint_sample_count": 40, "preserve_count": 3, "hole_count": 2, "cuts": [{}],
+				"constraint_sample_count": 40, "preserve_count": 3, "hole_count": 1, "cuts": [{}],
 				"boundary_stats": [{"input_id": "", "role": "outer", "sample_count": 20},
-					{"input_id": "guide_1", "role": "cut", "sample_count": 12},
-					{"input_id": "component_2", "role": "hole", "sample_count": 10}]}
+					{"input_id": "guide_4", "role": "cut", "sample_count": 12},
+					{"input_id": "component_6", "role": "hole", "sample_count": 10}]}
 			doc["seeding"]["recipe"] = {"method": GeometrySeedingService.SPINE_FLOW,
 				"parameters": {"spacing": 2.5, "flow_stretch": 1.5, "fill_gaps": true,
 					"boundary_clearance_override": true, "boundary_clearance": 0.8,
 					"stagger_override": true, "stagger": 0.25, "seed": 7,
-					"spine_inputs": [{"guide_id": "guide_1", "enabled": true}]}}
+					"spine_inputs": [{"guide_id": "guide_5", "enabled": true}]}}
 			doc["seeding"]["bakes"][GeometrySeedingService.SPINE_FLOW] = {"seed_count": 33,
 				"method": GeometrySeedingService.SPINE_FLOW, "flow_seed_count": 30, "gap_seed_count": 3}
 			doc["meshing"]["recipe"] = {"method": GeometryMeshingService.CONSTRAINED_MESH,
@@ -264,13 +300,25 @@ func _init() -> void:
 			doc["meshing"]["bakes"][GeometryMeshingService.CONSTRAINED_MESH] = {"vertex_count": 55,
 				"triangle_count": 66, "minimum_angle": 24.5, "constraints_valid": true,
 				"cut_seam_vertex_count": 4}
-			app.geometry_documents["asset_1/component_1"] = doc
-			app.selected_sampling_input_id = "guide_1"
-			app.selected_sampling_input_kind = "cut"
+			app.geometry_documents["asset_1/component_7"] = doc
+			# Only "reference" and "guide" are input kinds the Sampling path
+			# stores; anything else resolves to nothing and the Boundary Density
+			# block silently disappears.
+			match str(c.get("input", "")):
+				"hole":
+					app.selected_sampling_input_id = "component_6"
+					app.selected_sampling_input_kind = "reference"
+				"cut":
+					app.selected_sampling_input_id = "guide_4"
+					app.selected_sampling_input_kind = "guide"
+				_:
+					app.selected_sampling_input_id = ""
+					app.selected_sampling_input_kind = ""
 			app.geometry_seeding_advanced_pattern_expanded = true
 			app.geometry_meshing_advanced_relaxation_expanded = true
 		else:
 			app.geometry_documents.erase("asset_1/component_1")
+			app.geometry_documents.erase("asset_1/component_7")
 			app.selected_sampling_input_id = ""
 			app.selected_sampling_input_kind = ""
 			app.geometry_seeding_advanced_pattern_expanded = false
