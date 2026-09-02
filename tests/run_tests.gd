@@ -54,6 +54,7 @@ func _init() -> void:
 	_test_runtime_export_service()
 	_test_runtime_export_file_service()
 	_test_runtime_export_surface()
+	_test_runtime_export_view_wiring()
 	_test_weighting_service_and_ui()
 	_test_component_hierarchy_model()
 	_test_group_outliner_workflows()
@@ -2317,13 +2318,13 @@ func _test_geometry_sampling_ui_shell() -> void:
 	application._render_canvas_context()
 	_expect(application.batch_status_snapshot_build_count == 0, "Editing workspaces must not calculate Batch status for detached toolbar controls.")
 	application._on_category_pressed("Export")
-	_expect(application.export_workspace.visible and application.export_summary_label.text.contains("Preflight abgeschlossen") and application.export_log.get_parsed_text().contains("Wizard / Body"), "Export should run one preflight on entry and list affected Asset / Component data in its read-only log.")
-	_expect(application.export_consumer_sync_label.text.contains("noch nicht ausgeführt") and FileAccess.file_exists(application._consumer_sync_script_path()), "Export should expose persistent downstream Consumer Sync feedback backed by the PolyTools-owned orchestration script.")
+	_expect(application.runtime_export_view.visible and application.runtime_export_view.summary_label.text.contains("Preflight abgeschlossen") and application.runtime_export_view.log_label.get_parsed_text().contains("Wizard / Body"), "Export should run one preflight on entry and list affected Asset / Component data in its read-only log.")
+	_expect(application.runtime_export_view.consumer_sync_label.text.contains("noch nicht ausgeführt") and FileAccess.file_exists(application._consumer_sync_script_path()), "Export should expose persistent downstream Consumer Sync feedback backed by the PolyTools-owned orchestration script.")
 	application._present_consumer_sync_result({"success": true, "exit_code": 0, "output": "POLYTOOLS CONSUMER SYNC SUCCESS"})
-	_expect(application.export_consumer_sync_label.text.contains("erfolgreich") and application.export_log.get_parsed_text().contains("SceneMaker und world01 wurden synchronisiert"), "Successful downstream synchronization should be visible in the Export workspace.")
+	_expect(application.runtime_export_view.consumer_sync_label.text.contains("erfolgreich") and application.runtime_export_view.log_label.get_parsed_text().contains("SceneMaker und world01 wurden synchronisiert"), "Successful downstream synchronization should be visible in the Export workspace.")
 	application._present_consumer_sync_result({"success": false, "exit_code": 7, "output": "test failure"})
-	_expect(application.export_consumer_sync_label.text.contains("fehlgeschlagen") and application.export_log.get_parsed_text().contains("Runtime Export bleibt erhalten"), "Consumer Sync failures should remain visible without presenting the Runtime export as rolled back.")
-	_expect(not application.export_log.get_parsed_text().contains("UV ·") and not application.export_log.get_parsed_text().contains("SDF ·"), "Schema-4 Build/Export preflight must not retain legacy UV or SDF stages.")
+	_expect(application.runtime_export_view.consumer_sync_label.text.contains("fehlgeschlagen") and application.runtime_export_view.log_label.get_parsed_text().contains("Runtime Export bleibt erhalten"), "Consumer Sync failures should remain visible without presenting the Runtime export as rolled back.")
+	_expect(not application.runtime_export_view.log_label.get_parsed_text().contains("UV ·") and not application.runtime_export_view.log_label.get_parsed_text().contains("SDF ·"), "Schema-4 Build/Export preflight must not retain legacy UV or SDF stages.")
 	_expect(application.export_run_button.visible and application.export_run_button.text == "Build All (1)" and application.export_valid_button.visible and application.export_sync_button.visible and application.export_sync_button.get_index() == application.export_valid_button.get_index() + 1 and application.context_bar_panel.visible == false and application.draw_mode_status.visible == false, "Export should replace Create context controls with Build, valid-only Export, and a separate adjacent Consumer Sync action in the top toolbar.")
 	var batch_snapshot_builds: int = application.batch_status_snapshot_build_count
 	application._record_direct_change()
@@ -3118,14 +3119,14 @@ func _export_surface_observation(application: Control) -> String:
 	# The same observation the render probe prints, reduced to one comparable
 	# string. Two states that produce the same string are the same state.
 	var parts: Array[String] = []
-	for pair in [["export_workspace", application.export_workspace],
+	for pair in [["export_workspace", application.runtime_export_view],
 			["outliner_panel", application.outliner_panel],
 			["inspector_panel", application.inspector_panel],
 			["context_bar_panel", application.context_bar_panel],
 			["canvas_view", application.canvas_view]]:
 		parts.append("%s=%s" % [str(pair[0]), str((pair[1] as Control).visible)])
-	parts.append("summary=%s" % str(application.export_summary_label.text))
-	parts.append("sync=%s" % str(application.export_consumer_sync_label.text))
+	parts.append("summary=%s" % str(application.runtime_export_view.summary_label.text))
+	parts.append("sync=%s" % str(application.runtime_export_view.consumer_sync_label.text))
 	for pair in [["build_all", application.export_run_button],
 			["export_all_valid", application.export_valid_button],
 			["sync_consumers", application.export_sync_button],
@@ -3138,8 +3139,102 @@ func _export_surface_observation(application: Control) -> String:
 	parts.append("preflight_current=%s" % str(
 		application.export_preflight_revision == application.batch_status_revision))
 	parts.append("batch_mesh=%d" % (application.batch_status_snapshot.get("mesh", {}).get("candidates", []) as Array).size())
-	parts.append("log=%s" % str(application.export_log.get_parsed_text()))
+	parts.append("log=%s" % str(application.runtime_export_view.log_label.get_parsed_text()))
 	return "|".join(parts)
+
+
+const RUNTIME_EXPORT_SIGNAL_ROUTES := [
+	["build_all_requested", "_on_build_all_pressed"],
+	["export_all_valid_requested", "_on_export_all_valid_pressed"],
+	["sync_consumers_requested", "_on_sync_consumers_pressed"],
+]
+
+
+func _test_runtime_export_view_wiring() -> void:
+	# The two tables the other views carry, for the Runtime Export view. The
+	# routing half checks that each of the three signals reaches the handler
+	# main.gd names and that the view declares nothing the table misses; the
+	# emission half drives a bare view's toolbar Buttons and checks that each
+	# signal is reachable and arrives with its declared argument list.
+	var application: Control = load("res://scripts/main.gd").new()
+	application._build_ui()
+	var view: RuntimeExportView = application.runtime_export_view
+
+	var routed: Array[String] = []
+	for route in RUNTIME_EXPORT_SIGNAL_ROUTES:
+		var signal_name := str(route[0])
+		var expected_handler := str(route[1])
+		routed.append(signal_name)
+		var handlers: Array[String] = []
+		for connection in view.get_signal_connection_list(signal_name):
+			handlers.append(str((connection["callable"] as Callable).get_method()))
+		_expect(handlers.size() == 1 and handlers[0] == expected_handler,
+			"The Runtime Export view signal %s should reach %s, not %s." % [
+				signal_name, expected_handler, str(handlers)])
+	var declared_arguments: Dictionary = {}
+	for entry in view.get_script().get_script_signal_list():
+		var declared := str(entry["name"])
+		declared_arguments[declared] = entry["args"]
+		if declared in routed:
+			continue
+		_expect(false, "The Runtime Export view declares %s, which is missing from the routing table." % declared)
+
+	# The Buttons stay in the shared toolbar, so the view is the only thing that
+	# may turn a press into an intent. A bare view gets its own Buttons here, so
+	# firing them cannot reach the editor's handlers and start a batch.
+	view_signals_emitted = {}
+	view_signal_argument_failures = [] as Array[String]
+	var probe := RuntimeExportView.new()
+	var probe_buttons: Array[Button] = [Button.new(), Button.new(), Button.new()]
+	probe.set_toolbar_buttons(probe_buttons[0], probe_buttons[1], probe_buttons[2])
+	for route in RUNTIME_EXPORT_SIGNAL_ROUTES:
+		var signal_name := str(route[0])
+		probe.connect(signal_name, _view_signal_recorder(signal_name, declared_arguments.get(signal_name, [])))
+	probe.set_context({
+		"summary": "Preflight abgeschlossen · 1 ausstehende Arbeitsschritte · 0 Auffälligkeiten",
+		"consumer_sync": "",
+		"stages": [{"title": "Mesh", "candidate_count": 1,
+			"pending": PackedStringArray(["Wizard / body"]), "attention": PackedStringArray()}],
+		"all_current": false,
+		"toolbar": {
+			"build_all": {"visible": true, "text": "Build All (1)", "disabled": false},
+			"export_all_valid": {"visible": true, "text": "Export All Valid (1)", "disabled": false},
+			"sync_consumers": {"visible": true, "text": "Sync Consumers", "disabled": false},
+		},
+	})
+	probe.rebuild()
+	_expect(probe_buttons[0].text == "Build All (1)" and not probe_buttons[0].disabled
+		and probe_buttons[2].visible,
+		"A bare view should apply the toolbar state it was given before the walk fires the Buttons.")
+	var controls: Array = []
+	_inspector_controls(probe, controls)
+	for button in probe_buttons:
+		controls.append(button)
+	for control in controls:
+		_exercise_control(control)
+	var unreachable: Array[String] = []
+	for route in RUNTIME_EXPORT_SIGNAL_ROUTES:
+		if not view_signals_emitted.has(str(route[0])):
+			unreachable.append(str(route[0]))
+	_expect(unreachable.is_empty(),
+		"Every Runtime Export view signal should be reachable from a control; unreachable: %s" % str(unreachable))
+	_expect(view_signal_argument_failures.is_empty(),
+		"Runtime Export view signals should arrive with their declared argument types; %s" % str(view_signal_argument_failures))
+	for button in probe_buttons:
+		button.free()
+	probe.free()
+
+	# The view renders from its context alone: it must not read the editor's
+	# Preflight, and a context it was handed must survive a later mutation of the
+	# Dictionary the caller kept.
+	var pushed := {"summary": "first", "consumer_sync": "", "stages": [], "all_current": false,
+		"toolbar": {}}
+	application.runtime_export_view.set_context(pushed)
+	pushed["summary"] = "second"
+	application.runtime_export_view.rebuild()
+	_expect(application.runtime_export_view.summary_label.text == "first",
+		"The Runtime Export view should render the context it was given, not the caller's later edits.")
+	application.free()
 
 
 func _test_runtime_export_surface() -> void:
@@ -3158,7 +3253,7 @@ func _test_runtime_export_surface() -> void:
 	application.world_title = ""
 	application.assets = [] as Array[Dictionary]
 	application.active_module = "Export"
-	application.export_workspace.visible = true
+	application.runtime_export_view.visible = true
 	application.outliner_panel.visible = false
 	application.inspector_panel.visible = false
 	application.context_bar_panel.visible = false
@@ -3215,10 +3310,10 @@ func _test_runtime_export_surface() -> void:
 
 	# 2 · Everything current: no work, no attention, both actions disabled.
 	_export_surface_apply(application, empty_preflight, true, [], PackedStringArray())
-	_expect(str(application.export_summary_label.text).contains("0 ausstehende Arbeitsschritte")
-		and str(application.export_summary_label.text).contains("0 Auffälligkeiten"),
+	_expect(str(application.runtime_export_view.summary_label.text).contains("0 ausstehende Arbeitsschritte")
+		and str(application.runtime_export_view.summary_label.text).contains("0 Auffälligkeiten"),
 		"A fully current Preflight should summarise no work and no attention.")
-	_expect(str(application.export_log.get_parsed_text()).contains("Alles ist aktuell und exportbereit."),
+	_expect(str(application.runtime_export_view.log_label.get_parsed_text()).contains("Alles ist aktuell und exportbereit."),
 		"A fully current Preflight should say so in the log.")
 	_expect(application.export_run_button.disabled and application.export_valid_button.disabled
 		and application.export_sync_button.disabled,
@@ -3235,8 +3330,11 @@ func _test_runtime_export_surface() -> void:
 		"Pending valid Runtime work should enable Export All Valid with its candidate count.")
 	_expect(application.export_sync_button.disabled,
 		"Without a published Catalog the Consumer Sync must stay disabled.")
-	_expect(str(application.export_log.get_parsed_text()).contains("Wizard — package missing or stale"),
+	_expect(str(application.runtime_export_view.log_label.get_parsed_text()).contains("Wizard — package missing or stale"),
 		"The Preflight log should list the pending Runtime entries.")
+	_expect(str(application.runtime_export_view.log_label.get_parsed_text()).contains("Mesh · 2 ausstehend · 0 Auffälligkeiten")
+		and str(application.runtime_export_view.log_label.get_parsed_text()).contains("Runtime Export · 3 ausstehend · 0 Auffälligkeiten"),
+		"Each Preflight stage heading should count its own candidates, not its summary lines.")
 	_expect((application.update_meshes_button as BatchStatusButton).attention_count == 1,
 		"The persistent Update Meshes Button should carry the attention count of its own snapshot.")
 	observations["pending_work"] = _export_surface_observation(application)
@@ -3246,18 +3344,21 @@ func _test_runtime_export_surface() -> void:
 	_expect(application._export_attention_count(blocked_preflight["mesh"]) == 1
 		and application._export_attention_count(blocked_preflight["runtime"]) == 2,
 		"Attention entries should be counted per stage.")
-	_expect(str(application.export_summary_label.text).contains("3 Auffälligkeiten"),
+	_expect(str(application.runtime_export_view.summary_label.text).contains("3 Auffälligkeiten"),
 		"The summary should report the combined attention count.")
-	_expect(str(application.export_log.get_parsed_text()).contains("Orb — Component name is not unique."),
+	_expect(str(application.runtime_export_view.log_label.get_parsed_text()).contains("Orb — Component name is not unique."),
 		"The Preflight log should name every blocked entry.")
+	_expect(str(application.runtime_export_view.log_label.get_parsed_text()).contains("Mesh · 0 ausstehend · 1 Auffälligkeiten")
+		and str(application.runtime_export_view.log_label.get_parsed_text()).contains("Runtime Export · 0 ausstehend · 2 Auffälligkeiten"),
+		"Each Preflight stage heading should count its own attention entries.")
 	_expect(application.export_run_button.disabled and application.export_valid_button.disabled,
 		"Blocked entries alone must not enable an Export action.")
 	observations["blocked_only"] = _export_surface_observation(application)
 
 	# 5 · Executable work beside blocked entries: both are visible at once.
 	_export_surface_apply(application, mixed_preflight, true, busy_candidates, busy_attention)
-	_expect(str(application.export_summary_label.text).contains("3 ausstehende Arbeitsschritte")
-		and str(application.export_summary_label.text).contains("2 Auffälligkeiten"),
+	_expect(str(application.runtime_export_view.summary_label.text).contains("3 ausstehende Arbeitsschritte")
+		and str(application.runtime_export_view.summary_label.text).contains("2 Auffälligkeiten"),
 		"A mixed state should report pending work and attention side by side.")
 	_expect(not application.export_run_button.disabled
 		and application.export_valid_button.text == "Export All Valid (1)",
@@ -3290,7 +3391,7 @@ func _test_runtime_export_surface() -> void:
 	application.mesh_batch_running = false
 	_export_surface_apply(application, empty_preflight, true, [], PackedStringArray())
 	application._present_consumer_sync_result({"success": true, "output": "", "exit_code": 0})
-	_expect(str(application.export_consumer_sync_label.text).contains("erfolgreich"),
+	_expect(str(application.runtime_export_view.consumer_sync_label.text).contains("erfolgreich"),
 		"A successful Consumer Sync should be reported beside the summary.")
 	observations["consumer_sync_done"] = _export_surface_observation(application)
 
@@ -3299,7 +3400,7 @@ func _test_runtime_export_surface() -> void:
 	application.active_create_submodule = "Character"
 	application._render_canvas_context()
 	application._render_context_bar()
-	_expect(not application.export_workspace.visible,
+	_expect(not application.runtime_export_view.visible,
 		"Leaving Export should hide the Export workspace.")
 	_expect(application.outliner_panel.visible and application.inspector_panel.visible
 		and application.context_bar_panel.visible and application.canvas_view.visible,
@@ -3321,7 +3422,7 @@ func _test_runtime_export_surface() -> void:
 	application.active_motion_submodule = "Path"
 	application._render_canvas_context()
 	application._render_context_bar()
-	_expect(not application.export_workspace.visible,
+	_expect(not application.runtime_export_view.visible,
 		"Leaving Export for Motion should hide the Export workspace.")
 	_expect(application.outliner_panel.visible and application.inspector_panel.visible
 		and application.context_bar_panel.visible,

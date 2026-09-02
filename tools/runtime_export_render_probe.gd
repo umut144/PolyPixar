@@ -62,13 +62,13 @@ func _visibility_line(label: String, node) -> String:
 
 func _observe(app: Control) -> Array:
 	var out: Array = []
-	out.append(_visibility_line("export_workspace", app.export_workspace))
+	out.append(_visibility_line("export_workspace", app.runtime_export_view))
 	out.append(_visibility_line("outliner_panel", app.outliner_panel))
 	out.append(_visibility_line("inspector_panel", app.inspector_panel))
 	out.append(_visibility_line("context_bar_panel", app.context_bar_panel))
 	out.append(_visibility_line("canvas_view", app.canvas_view))
-	out.append("L|summary|%s" % _flat(app.export_summary_label.text))
-	out.append("L|consumer_sync|%s" % _flat(app.export_consumer_sync_label.text))
+	out.append("L|summary|%s" % _flat(app.runtime_export_view.summary_label.text))
+	out.append("L|consumer_sync|%s" % _flat(app.runtime_export_view.consumer_sync_label.text))
 	out.append(_button_line("build_all", app.export_run_button))
 	out.append(_button_line("export_all_valid", app.export_valid_button))
 	out.append(_button_line("sync_consumers", app.export_sync_button))
@@ -88,7 +88,7 @@ func _observe(app: Control) -> Array:
 	out.append("N|preflight_current|%s" % str(app.export_preflight_revision == app.batch_status_revision))
 	out.append("N|batch_mesh_candidates|%d" % (
 		app.batch_status_snapshot.get("mesh", {}).get("candidates", []) as Array).size())
-	for line in str(app.export_log.get_parsed_text()).split("\n"):
+	for line in str(app.runtime_export_view.log_label.get_parsed_text()).split("\n"):
 		out.append("P|%s" % line)
 	return out
 
@@ -191,7 +191,7 @@ func _init() -> void:
 	app.world_title = ""
 	app.assets = [] as Array[Dictionary]
 	app.active_module = "Export"
-	app.export_workspace.visible = true
+	app.runtime_export_view.visible = true
 	app.outliner_panel.visible = false
 	app.inspector_panel.visible = false
 	app.context_bar_panel.visible = false

@@ -113,6 +113,20 @@ the four views is visible, resolves that view's context and calls `rebuild()`.
   which records exist, when they are read and written, and what the editor does
   with them — including `_serialize_editor_state` and `_serialize_world_settings`,
   which read editor state by definition.
+- `RuntimeExportView` is the Runtime Export module's work surface under the same
+  contract as the Inspector views: `main.gd` resolves the Preflight into one
+  context Dictionary — summary line, Consumer Sync hint, the two stages with
+  their candidate counts and their pending and attention lines, and the state of
+  the three action Buttons — and `rebuild()` draws that snapshot alone. It reads
+  no Assets or Geometry documents, counts no candidates, checks no files, and
+  runs no Export, Mesh build, Save or Consumer Sync. The three Buttons stay
+  children of the shared toolbar, because re-parenting them under the view would
+  nest a container inside that flat toolbar and shift the spacing of unrelated
+  neighbours; `main.gd` hands them over once and from then on the view owns what
+  they say and what a press means, reporting it as `build_all_requested`,
+  `export_all_valid_requested` or `sync_consumers_requested`. The batch runs stay
+  in `main.gd` and write their progress through the view rather than into its
+  controls.
 - `RuntimeExportFileService` owns the file-system mechanics behind Runtime
   Export: the Catalog and package paths below a given World root, whether what
   is on disk still matches what was built, the staged replacement of one
