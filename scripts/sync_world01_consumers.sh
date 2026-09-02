@@ -8,7 +8,8 @@ world01_project_dir="${WORLD01_PROJECT_DIR:-$project_root/../../BevyProjects/wor
 
 scenemaker_sync="$scenemaker_project_dir/scripts/sync_polytools_world.sh"
 scenemaker_export="$scenemaker_project_dir/scripts/export_scene.sh"
-scenemaker_scene_export="$scenemaker_project_dir/workspaces/world01/exports/world01.scene_export.json"
+scenemaker_scene_id="overworld01"
+scenemaker_scene_export="$scenemaker_project_dir/workspaces/world01/exports/$scenemaker_scene_id.scene_export.json"
 world01_asset_sync="$world01_project_dir/scripts/sync_polytools_characters.sh"
 world01_map_sync="$world01_project_dir/scripts/sync_scenemaker_world.sh"
 
@@ -27,7 +28,7 @@ printf 'Consumer Sync 1/4: PolyTools -> SceneMaker\n'
 POLYTOOLS_WORLD_DIR="$polytools_world_dir" "$scenemaker_sync"
 
 printf 'Consumer Sync 2/4: SceneMaker scene export\n'
-"$scenemaker_export" "$scenemaker_project_dir/workspaces/world01" world01
+"$scenemaker_export" "$scenemaker_project_dir/workspaces/world01" "$scenemaker_scene_id"
 
 printf 'Consumer Sync 3/4: PolyTools -> world01 content\n'
 POLYTOOLS_WORLD_DIR="$polytools_world_dir" "$world01_asset_sync"
