@@ -1,6 +1,6 @@
 # Inspector render probe.
 #
-# Renders the Inspector in 33 fixed states and prints one line per control with
+# Renders the Inspector in 41 fixed states and prints one line per control with
 # the properties a reader would notice: values, ranges, item lists, selections,
 # pressed state, disabled state, captions, colours and tooltips. It asserts
 # nothing on its own. It is run before and after a change that is meant to leave
@@ -15,8 +15,10 @@
 # a parse error here means the probe rendered nothing and the empty diff means
 # nothing.
 #
-# The state list covers Create (Asset, Component, Group, Guide, grouped
-# Component, Reference Image, one and two Points, one and two Edges), Mesh
+# The state list covers Create (Asset, Component, Group, Guide, weapon Guide,
+# grouped Component, Contour Component, Circle and Ellipse Primitive, two
+# selected Components, Reference Image, Point mode with none, one and two
+# Points, Edge mode with none, one and two Edges, Face mode), Mesh
 # (Sampling, Seeding and Meshing, each unbaked and against a Geometry document
 # with baked results and expanded advanced blocks), Style (Weighting, with and
 # without an Axis Gradient) and Motion (Asset contract, State, Motion, inner
@@ -65,8 +67,21 @@ func _init() -> void:
 	var guide := {"id": "guide_1", "guide_type": AssetGuide.SAMPLE, "ordinal": 1, "visibility": true,
 		"scope": {"kind": "component", "component_id": "component_1"}, "points": [], "edges": [], "chains": []}
 	var group := {"id": "group_1", "name": "torso", "transform": {"position": Vector2(2, 2), "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}, "visibility": true, "parent_component_id": ""}
+	var arm := {"points": [], "edges": [], "chains": [], "id": "component_2", "name": "arm",
+		"visibility": true, "parent_component_id": "component_1"}
+	var outline := {"points": [], "edges": [], "chains": [], "id": "component_3", "name": "outline",
+		"visibility": true, "draw_mode": "contour"}
+	var circle := {"points": [], "edges": [], "chains": [], "id": "component_4", "name": "orb",
+		"visibility": true, "draw_mode": "primitive", "primitive": {"type": "circle", "diameter_cm": 4.0}}
+	var ellipse := {"points": [], "edges": [], "chains": [], "id": "component_5", "name": "egg",
+		"visibility": true, "draw_mode": "primitive",
+		"primitive": {"type": PrimitiveGeometryService.ELLIPSE, "diameter_x_cm": 3.0, "diameter_y_cm": 5.0}}
+	var weapon_guide := {"id": "guide_3", "guide_type": AssetGuide.WEAPON_TYPES[0], "ordinal": 1,
+		"visibility": true, "scope": {"kind": "component", "component_id": "component_1"},
+		"points": [], "edges": [], "chains": []}
 	var assets: Array[Dictionary] = [{"id": "asset_1", "name": "Wizard", "visibility": true,
-		"components": [comp], "groups": [group], "guides": [guide],
+		"components": [comp, arm, outline, circle, ellipse], "groups": [group],
+		"guides": [guide, weapon_guide],
 		"asset_pivot": Vector2(5, 6), "root_position": Vector2(1, 2), "root_scale": Vector2(1, 1)}]
 	app.assets = assets
 	app.selected_asset_id = "asset_1"
@@ -106,6 +121,14 @@ func _init() -> void:
 		{"m": "Create", "sub": "Character", "comp": "component_1", "grp": "", "gd": "", "pts": 2},
 			{"m": "Create", "sub": "Character", "comp": "component_1", "grp": "", "gd": "", "edges": 2},
 		{"m": "Create", "sub": "Character", "comp": "component_1", "grp": "", "gd": "", "edges": 1},
+		{"m": "Create", "sub": "Character", "comp": "component_1", "grp": "", "gd": "", "pts": 0, "point_mode": true},
+		{"m": "Create", "sub": "Character", "comp": "component_1", "grp": "", "gd": "", "edges": 0, "edge_mode": true},
+		{"m": "Create", "sub": "Character", "comp": "component_1", "grp": "", "gd": "", "face": true},
+		{"m": "Create", "sub": "Character", "comp": "component_3", "grp": "", "gd": ""},
+		{"m": "Create", "sub": "Character", "comp": "component_4", "grp": "", "gd": ""},
+		{"m": "Create", "sub": "Character", "comp": "component_5", "grp": "", "gd": ""},
+		{"m": "Create", "sub": "Character", "comp": "", "grp": "", "gd": "guide_3"},
+		{"m": "Create", "sub": "Character", "comp": "component_1", "grp": "", "gd": "", "multi": true},
 	]
 	for c in cases:
 		app.active_module = str(c["m"])
@@ -131,8 +154,19 @@ func _init() -> void:
 		var chosen_point_ids: Array[String] = []
 		for i in range(point_count): chosen_point_ids.append(all_point_ids[i])
 		app.selected_point_ids = chosen_point_ids
+		var multi_ids: Array[String] = []
+		if bool(c.get("multi", false)):
+			multi_ids.append("component_1")
+			multi_ids.append("component_2")
+		app.selected_component_ids = multi_ids
+		if bool(c.get("face", false)):
+			app.active_state = "edit"
+			app.active_edit_mode = "face"
+		elif bool(c.get("point_mode", false)):
+			app.active_state = "edit"
+			app.active_edit_mode = "point"
 		var edge_count := int(c.get("edges", 0))
-		if edge_count > 0:
+		if edge_count > 0 or bool(c.get("edge_mode", false)):
 			app.active_state = "edit"
 			app.active_edit_mode = "edge"
 		var all_edge_ids: Array[String] = []

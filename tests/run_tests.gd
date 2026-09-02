@@ -64,6 +64,7 @@ func _init() -> void:
 	_test_motion_path_topology_and_sampler()
 	_test_outliner_wiring()
 	_test_geometry_inspector_wiring()
+	_test_create_inspector_wiring()
 	_test_sampling_input_kind_from_seeding_selection()
 	_test_motion_inspector_wiring()
 	_test_motion_act_evaluator()
@@ -4358,6 +4359,245 @@ func _test_sampling_input_kind_from_seeding_selection() -> void:
 	application._render_inspector()
 	_expect(_button_starting_with(application.geometry_inspector_view, "▾  Boundary Density") == null,
 		"A selected Spine should not produce a Boundary Density block in Sampling.")
+	application.free()
+
+
+const CREATE_SIGNAL_ROUTES := [
+	["asset_authored_facing_selected", "_on_asset_authored_facing_selected"],
+	["asset_pivot_property_changed", "_on_asset_pivot_property_changed"],
+	["asset_rename_requested", "_rename_selected_asset"],
+	["asset_root_position_changed", "_on_asset_root_position_changed"],
+	["asset_root_scale_changed", "_on_asset_root_scale_changed"],
+	["asset_root_scale_rebase_requested", "_on_rebase_asset_root_scale_pressed"],
+	["asset_scales_rebase_requested", "_on_rebase_asset_scales_pressed"],
+	["circle_primitive_diameter_changed", "_on_circle_primitive_diameter_changed"],
+	["component_catch_parent_selected", "_on_component_catch_parent_selected"],
+	["component_contour_stroke_width_changed", "_on_component_contour_stroke_width_changed"],
+	["component_debug_point_numbers_toggled", "_on_component_debug_point_numbers_toggled"],
+	["component_hierarchy_parent_selected", "_on_component_hierarchy_parent_selected"],
+	["component_projection_depth_changed", "_on_component_projection_depth_changed"],
+	["component_rename_requested", "_rename_selected_component"],
+	["component_topology_role_selected", "_on_component_topology_role_selected"],
+	["component_visibility_changed", "_on_component_visibility_changed"],
+	["component_z_index_changed", "_on_component_z_index_changed"],
+	["edge_render_outline_changed", "_on_edge_render_outline_changed"],
+	["ellipse_primitive_diameter_changed", "_on_ellipse_primitive_diameter_changed"],
+	["global_transform_value_changed", "_on_global_transform_value_changed"],
+	["group_hierarchy_parent_selected", "_on_group_hierarchy_parent_selected"],
+	["group_rename_requested", "_rename_selected_group"],
+	["group_transform_value_changed", "_on_group_transform_value_changed"],
+	["group_visibility_changed", "_on_group_visibility_changed"],
+	["guide_delete_requested", "_delete_selected_guide"],
+	["guide_type_selected", "_on_guide_type_selected"],
+	["guide_visibility_changed", "_on_selected_guide_visibility_changed"],
+	["multi_component_field_focus_exited", "_on_multi_component_field_focus_exited"],
+	["multi_component_field_submitted", "_on_multi_component_field_submitted"],
+	["multi_component_visibility_selected", "_on_multi_component_visibility_selected"],
+	["point_position_changed", "_on_point_position_changed"],
+	["reference_image_clear_requested", "_clear_reference_image"],
+	["reference_image_load_requested", "_open_reference_image_dialog"],
+	["reference_image_pivot_selected", "_on_reference_image_pivot_selected"],
+	["reference_image_property_changed", "_on_reference_image_property_changed"],
+	["reference_image_target_height_changed", "_on_reference_image_target_height_changed"],
+	["reference_image_visibility_changed", "_on_reference_image_visibility_changed"],
+	["section_toggled", "_on_inspector_section_toggled"],
+	["selected_points_delta_changed", "_on_selected_points_delta_changed"],
+	["selected_points_mode_selected", "_on_selected_points_mode_selected"],
+	["selected_points_preserve_changed", "_on_selected_points_preserve_changed"],
+	["transform_value_changed", "_on_transform_value_changed"],
+	["weapon_frame_value_changed", "_on_weapon_frame_value_changed"],
+]
+
+const CREATE_PROBE_CASES := ["asset", "asset_reference", "component", "component_grouped",
+	"component_contour", "primitive_circle", "primitive_ellipse", "group", "guide",
+	"guide_weapon", "multi_component", "point_none", "point_one", "point_many",
+	"edge_none", "edge_one", "edge_many", "face"]
+
+
+func _create_wiring_asset() -> Dictionary:
+	# One Asset carrying every Create row: a plain Component, a child, a Contour,
+	# a circle and an ellipse primitive, a Group, a plain Guide and a weapon
+	# frame Guide.
+	var body := _outliner_test_component("component_1", "body")
+	body["transform"] = {"position": Vector2(3.0, 4.0), "rotation": 15.0,
+		"scale": Vector2(1.5, 2.0), "pivot": Vector2(1.0, 1.0)}
+	var arm := _outliner_test_component("component_2", "arm")
+	arm["parent_component_id"] = "component_1"
+	var outline := _outliner_test_component("component_3", "outline")
+	outline["draw_mode"] = "contour"
+	var circle := _outliner_test_component("component_4", "orb")
+	circle["draw_mode"] = "primitive"
+	circle["primitive"] = {"type": "circle", "diameter_cm": 4.0}
+	var ellipse := _outliner_test_component("component_5", "egg")
+	ellipse["draw_mode"] = "primitive"
+	ellipse["primitive"] = {"type": PrimitiveGeometryService.ELLIPSE,
+		"diameter_x_cm": 3.0, "diameter_y_cm": 5.0}
+	var guide := {"id": "guide_1", "guide_type": AssetGuide.SAMPLE, "ordinal": 1,
+		"visibility": true, "scope": {"kind": "component", "component_id": "component_1"},
+		"points": [], "edges": [], "chains": []}
+	var weapon := {"id": "guide_2", "guide_type": AssetGuide.WEAPON_TYPES[0], "ordinal": 1,
+		"visibility": true, "scope": {"kind": "component", "component_id": "component_1"},
+		"points": [], "edges": [], "chains": []}
+	var group := {"id": "group_1", "name": "torso", "transform": {}, "visibility": true,
+		"parent_component_id": ""}
+	return {"id": "asset_1", "name": "Wizard", "visibility": true,
+		"components": [body, arm, outline, circle, ellipse], "groups": [group],
+		"guides": [guide, weapon], "asset_pivot": Vector2(5.0, 6.0),
+		"root_position": Vector2.ZERO, "root_scale": Vector2.ONE}
+
+
+func _prepare_create_case(application: Control, case_name: String) -> void:
+	var asset: Dictionary = application.assets[0]
+	application.active_module = "Create"
+	application.selected_asset_id = "asset_1"
+	application.selected_component_id = ""
+	application.selected_group_id = ""
+	application.selected_guide_id = ""
+	application.selected_edge_id = ""
+	application.selected_edge_ids = [] as Array[String]
+	application.selected_point_id = ""
+	application.selected_point_ids = [] as Array[String]
+	application.selected_component_ids = [] as Array[String]
+	application.active_state = ""
+	application.active_edit_mode = ""
+	asset.erase("reference_image")
+	var body: Dictionary = WorldDocumentService.component_by_id(asset, "component_1")
+	body.erase("group_id")
+	var point_ids: Array[String] = []
+	for point in body["points"]:
+		point_ids.append(str(point["id"]))
+	var edge_ids: Array[String] = []
+	for edge in body["edges"]:
+		edge_ids.append(str(edge["id"]))
+	match case_name:
+		"asset":
+			pass
+		"asset_reference":
+			asset["reference_image"] = {"file": "res://ref.png", "target_height_cm": 21.5,
+				"pivot_mode": "center", "visible": true, "opacity": 0.35,
+				"position": Vector2(2.5, -3.5), "scale": 1.25}
+		"component":
+			application.selected_component_id = "component_1"
+		"component_grouped":
+			application.selected_component_id = "component_1"
+			body["group_id"] = "group_1"
+		"component_contour":
+			application.selected_component_id = "component_3"
+		"primitive_circle":
+			application.selected_component_id = "component_4"
+		"primitive_ellipse":
+			application.selected_component_id = "component_5"
+		"group":
+			application.selected_group_id = "group_1"
+		"guide":
+			application.selected_guide_id = "guide_1"
+		"guide_weapon":
+			application.selected_guide_id = "guide_2"
+		"multi_component":
+			var many: Array[String] = ["component_1", "component_2"]
+			application.selected_component_ids = many
+			application.selected_component_id = "component_1"
+		"point_none", "point_one", "point_many":
+			application.selected_component_id = "component_1"
+			application.active_state = "edit"
+			application.active_edit_mode = "point"
+			var chosen: Array[String] = []
+			if case_name == "point_one":
+				chosen.append(point_ids[0])
+			elif case_name == "point_many":
+				chosen.append(point_ids[0])
+				chosen.append(point_ids[1])
+			application.selected_point_ids = chosen
+			application.selected_point_id = chosen[0] if not chosen.is_empty() else ""
+		"edge_none", "edge_many":
+			application.selected_component_id = "component_1"
+			application.active_state = "edit"
+			application.active_edit_mode = "edge"
+			var chosen_edges: Array[String] = []
+			if case_name == "edge_many":
+				chosen_edges.append(edge_ids[0])
+				chosen_edges.append(edge_ids[1])
+			application.selected_edge_ids = chosen_edges
+		"edge_one":
+			# Not the edit mode: a single Edge selected outside it takes its own
+			# branch further down rebuild().
+			application.selected_component_id = "component_1"
+			application.selected_edge_id = edge_ids[0]
+		"face":
+			application.selected_component_id = "component_1"
+			application.active_state = "edit"
+			application.active_edit_mode = "face"
+
+
+func _build_create_probe(application: Control) -> CreateInspectorView:
+	# A bare view fed exactly what the router pushes, so the walk can fire
+	# controls without the editor's handlers re-rendering them away.
+	var probe := CreateInspectorView.new()
+	var asset: Dictionary = application._get_asset(application.selected_asset_id)
+	probe.set_document(asset, application.world_contour_stroke_width_px)
+	probe.set_selection(application.selected_component_id, application.selected_group_id,
+		application.selected_guide_id, application.selected_edge_id,
+		application.selected_edge_ids.duplicate())
+	probe.set_resolved_selection(application._selected_components_for_inspector(asset),
+		application._valid_selected_point_ids(
+			WorldDocumentService.component_by_id(asset, application.selected_component_id)))
+	probe.set_mode(application.active_state, application.active_edit_mode,
+		application.canvas_view.face_selected)
+	return probe
+
+
+func _test_create_inspector_wiring() -> void:
+	# The two tables the other views carry, for the Create Inspector. The routing
+	# half checks that each of the 43 signals reaches the handler it names; the
+	# emission half renders eighteen Create states, fires every control the view
+	# builds, and checks that each signal is reachable and arrives with its
+	# declared argument types.
+	var create_assets: Array[Dictionary] = [_create_wiring_asset()]
+	var application: Control = load("res://scripts/main.gd").new()
+	application._build_ui()
+	application.assets = create_assets
+	var view: CreateInspectorView = application.create_inspector_view
+
+	var routed: Array[String] = []
+	for route in CREATE_SIGNAL_ROUTES:
+		var signal_name := str(route[0])
+		var expected_handler := str(route[1])
+		routed.append(signal_name)
+		var handlers: Array[String] = []
+		for connection in view.get_signal_connection_list(signal_name):
+			handlers.append(str((connection["callable"] as Callable).get_method()))
+		_expect(handlers.size() == 1 and handlers[0] == expected_handler,
+			"The Create Inspector signal %s should reach %s, not %s." % [signal_name, expected_handler, str(handlers)])
+	var declared_arguments: Dictionary = {}
+	for entry in view.get_script().get_script_signal_list():
+		var declared := str(entry["name"])
+		declared_arguments[declared] = entry["args"]
+		if declared in routed:
+			continue
+		_expect(false, "The Create Inspector declares %s, which is missing from the routing table." % declared)
+
+	view_signals_emitted = {}
+	view_signal_argument_failures = [] as Array[String]
+	for case_name in CREATE_PROBE_CASES:
+		_prepare_create_case(application, case_name)
+		var probe := _build_create_probe(application)
+		for route in CREATE_SIGNAL_ROUTES:
+			var signal_name := str(route[0])
+			probe.connect(signal_name, _view_signal_recorder(signal_name, declared_arguments.get(signal_name, [])))
+		probe.rebuild()
+		var controls: Array = []
+		_inspector_controls(probe, controls)
+		for control in controls:
+			_exercise_control(control)
+		probe.free()
+	var unreachable: Array[String] = []
+	for route in CREATE_SIGNAL_ROUTES:
+		if not view_signals_emitted.has(str(route[0])):
+			unreachable.append(str(route[0]))
+	_expect(unreachable.is_empty(),
+		"Every Create Inspector signal should be reachable from a control; unreachable: %s" % str(unreachable))
+	_expect(view_signal_argument_failures.is_empty(),
+		"Create Inspector signals should arrive with their declared argument types; %s" % str(view_signal_argument_failures))
 	application.free()
 
 
