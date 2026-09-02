@@ -4086,11 +4086,17 @@ func _test_asset_guides() -> void:
 	var locked_edit_button := _button_starting_with(application.context_bar, "⌘2  Edit Point")
 	application._render_canvas_context()
 	_expect(WorldDocumentService.region_uses_component_geometry(region) and locked_draw_button != null and locked_draw_button.disabled and locked_edit_button != null and locked_edit_button.disabled, "A Component Geometry Region should visibly disable its Draw and Edit tools.")
+	application._render_inspector()
+	_expect(application.create_inspector_view.transform_fields.is_empty(),
+		"A Component Geometry Region should leave no Transform field references from an earlier render behind.")
 	_expect(application.canvas_view.bezier_points.size() == parent_component.get("points", []).size(), "A Component Geometry Region should preview the attached Component geometry 1:1.")
 	application._activate_draw_state()
 	_expect(application.active_state.is_empty(), "Disabled Region drawing must also be guarded against keyboard or direct command activation.")
 	application._on_region_geometry_source_selected(0, geometry_source_option)
 	_expect(region.get("points", []) == retained_region_points, "Switching through Component Geometry should retain the inactive Free Draw topology without copying Component geometry into it.")
+	# Built with .new() and never given a Scene Tree parent, so nothing else
+	# would ever free it; queue_free() does not run in a script test.
+	geometry_source_option.free()
 	application._create_weapon_guide("asset_1", "component", "component_1", AssetGuide.WEAPON_SOCKET_PRIMARY)
 	var socket_guide: Dictionary = application._get_guide(test_asset, application.selected_guide_id)
 	_expect(AssetGuide.is_weapon_frame(str(socket_guide.get("guide_type", ""))) and str(socket_guide.get("scope", {}).get("component_id", "")) == "component_1" and application.canvas_view.interaction_state == "transform", "Weapon Socket Primary should be a Component-scoped oriented transform Guide.")

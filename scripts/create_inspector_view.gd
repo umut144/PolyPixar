@@ -418,45 +418,45 @@ func rebuild() -> void:
 	var component_group_id := ComponentHierarchy.membership_group_id(asset, selected_component_id)
 	var show_global_transform := not component_group_id.is_empty()
 	if inherited_region_geometry:
+		# A Region that follows its Component owns no transform, so nothing is
+		# built here. A grid created for this case would never get a parent, and
+		# nothing in the editor would ever free it again.
 		add_child(EditorWidgets.create_inspector_section("Transform", section_toggled.emit))
 		add_child(EditorWidgets.create_inspector_field_label("Inherited 1:1 from the attached Component"))
 	else:
 		add_child(EditorWidgets.create_inspector_section("Global Transform" if show_global_transform else "Transform", section_toggled.emit))
-	var transform_grid := GridContainer.new()
-	transform_grid.columns = 2
-	transform_grid.add_theme_constant_override("h_separation", 8)
-	transform_grid.add_theme_constant_override("v_separation", 4)
-	if not inherited_region_geometry:
+		var transform_grid := GridContainer.new()
+		transform_grid.columns = 2
+		transform_grid.add_theme_constant_override("h_separation", 8)
+		transform_grid.add_theme_constant_override("v_separation", 4)
 		add_child(transform_grid)
-	var transform: Dictionary = component.get("transform", WorldDocumentService.default_component_transform())
-	var transform_position: Vector2 = transform.get("position", Vector2.ZERO)
-	var transform_scale: Vector2 = transform.get("scale", Vector2.ONE)
-	var pivot: Vector2 = transform.get("pivot", Vector2.ZERO)
-	if inherited_region_geometry:
-		pass
-	elif show_global_transform:
-		var displayed_transform: Dictionary = ComponentHierarchy.world_transform_record(asset, selected_component_id)
-		var displayed_position: Vector2 = displayed_transform.get("position", Vector2.ZERO)
-		var global_scale: Vector2 = displayed_transform.get("scale", Vector2.ONE)
-		# Global values are read-only echoes of the hierarchy, so the returned
-		# fields are not kept: only local transform fields get live updates.
-		EditorWidgets.build_number_grid(transform_grid,
-			_component_transform_descriptors(ToolUnits.to_centimeters(displayed_position.x),
-				ToolUnits.to_centimeters(displayed_position.y),
-				float(displayed_transform.get("rotation", 0.0)), global_scale),
-			global_transform_value_changed.emit)
-	else:
-		transform_fields = EditorWidgets.build_number_grid(transform_grid,
-			_component_transform_descriptors(ToolUnits.to_centimeters(transform_position.x),
-				ToolUnits.to_centimeters(transform_position.y),
-				float(transform.get("rotation", 0.0)), transform_scale),
-			transform_value_changed.emit)
-	transform_fields.merge(EditorWidgets.build_number_grid(transform_grid, [
-		{"caption": "Pivot X (cm)", "property": "pivot_x", "value": ToolUnits.to_centimeters(pivot.x),
-			"step": 0.001, "silent": false},
-		{"caption": "Pivot Y (cm)", "property": "pivot_y", "value": ToolUnits.to_centimeters(pivot.y),
-			"step": 0.001, "silent": false},
-	], transform_value_changed.emit), true)
+		var transform: Dictionary = component.get("transform", WorldDocumentService.default_component_transform())
+		var transform_position: Vector2 = transform.get("position", Vector2.ZERO)
+		var transform_scale: Vector2 = transform.get("scale", Vector2.ONE)
+		var pivot: Vector2 = transform.get("pivot", Vector2.ZERO)
+		if show_global_transform:
+			var displayed_transform: Dictionary = ComponentHierarchy.world_transform_record(asset, selected_component_id)
+			var displayed_position: Vector2 = displayed_transform.get("position", Vector2.ZERO)
+			var global_scale: Vector2 = displayed_transform.get("scale", Vector2.ONE)
+			# Global values are read-only echoes of the hierarchy, so the returned
+			# fields are not kept: only local transform fields get live updates.
+			EditorWidgets.build_number_grid(transform_grid,
+				_component_transform_descriptors(ToolUnits.to_centimeters(displayed_position.x),
+					ToolUnits.to_centimeters(displayed_position.y),
+					float(displayed_transform.get("rotation", 0.0)), global_scale),
+				global_transform_value_changed.emit)
+		else:
+			transform_fields = EditorWidgets.build_number_grid(transform_grid,
+				_component_transform_descriptors(ToolUnits.to_centimeters(transform_position.x),
+					ToolUnits.to_centimeters(transform_position.y),
+					float(transform.get("rotation", 0.0)), transform_scale),
+				transform_value_changed.emit)
+		transform_fields.merge(EditorWidgets.build_number_grid(transform_grid, [
+			{"caption": "Pivot X (cm)", "property": "pivot_x", "value": ToolUnits.to_centimeters(pivot.x),
+				"step": 0.001, "silent": false},
+			{"caption": "Pivot Y (cm)", "property": "pivot_y", "value": ToolUnits.to_centimeters(pivot.y),
+				"step": 0.001, "silent": false},
+		], transform_value_changed.emit), true)
 	add_child(EditorWidgets.create_inspector_section("Visibility / Layer", section_toggled.emit))
 	add_child(EditorWidgets.create_toggle_field(
 		"Visible", bool(component.get("visibility", true)), component_visibility_changed.emit, 11))

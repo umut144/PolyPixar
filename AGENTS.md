@@ -41,6 +41,13 @@ Setting `SpinBox.value` in a test does not emit `value_changed` — only real
 input does — so an Inspector edit is simulated by setting the value and
 emitting the signal. `_edit_inspector_value` in the suite does both.
 
+A Control created with `.new()` that never gets a Scene Tree parent must be
+released with `free()`. `queue_free()` is not enough here: the deletion queue is
+drained at the end of a frame and a `-s` run never ends one, so the object
+survives to exit and the workflow fails on the leak report. This applies to test
+helpers as much as to render code — a grid or field built for a branch that then
+does not add it leaks on every render.
+
 A `SCRIPT ERROR` in the test output is a failure even when the runner prints
 `All PolyTools tests passed`: a runtime error aborts that test function, so its
 remaining assertions never run and never increment the failure count. The
