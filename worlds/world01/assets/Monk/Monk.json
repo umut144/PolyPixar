@@ -2737,6 +2737,78 @@
 			"type": "component",
 			"visibility": true,
 			"z_index": 3
+		},
+		{
+			"catch_parent_component_id": "",
+			"chains": [],
+			"draw_mode": "closed_loop",
+			"edges": [],
+			"group_id": "",
+			"id": "component_163",
+			"name": "collision_region",
+			"parent_component_id": "component_105",
+			"points": [],
+			"primitive": {},
+			"projection_depth_cm": 10.0,
+			"region_geometry_source": "component",
+			"region_type": "collision",
+			"show_point_numbers": false,
+			"source_asset_id": "",
+			"topology_role": "outer",
+			"transform": {
+				"pivot": [
+					0.0,
+					0.0
+				],
+				"position": [
+					0.0,
+					0.0
+				],
+				"rotation": 0.0,
+				"scale": [
+					1.0,
+					1.0
+				]
+			},
+			"type": "region",
+			"visibility": true,
+			"z_index": 0
+		},
+		{
+			"catch_parent_component_id": "",
+			"chains": [],
+			"draw_mode": "closed_loop",
+			"edges": [],
+			"group_id": "",
+			"id": "component_167",
+			"name": "collision_region_2",
+			"parent_component_id": "component_106",
+			"points": [],
+			"primitive": {},
+			"projection_depth_cm": 10.0,
+			"region_geometry_source": "component",
+			"region_type": "collision",
+			"show_point_numbers": false,
+			"source_asset_id": "",
+			"topology_role": "outer",
+			"transform": {
+				"pivot": [
+					0.0,
+					0.0
+				],
+				"position": [
+					0.0,
+					0.0
+				],
+				"rotation": 0.0,
+				"scale": [
+					1.0,
+					1.0
+				]
+			},
+			"type": "region",
+			"visibility": true,
+			"z_index": 0
 		}
 	],
 	"groups": [
@@ -2785,6 +2857,6 @@
 		1.0,
 		1.0
 	],
-	"schema_version": 60,
+	"schema_version": 61,
 	"visibility": true
 }

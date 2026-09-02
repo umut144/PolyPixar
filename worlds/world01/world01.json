@@ -22,18 +22,18 @@
 		"asset_19"
 	],
 	"editor_state": {
-		"active_create_submodule": "Terrain",
+		"active_create_submodule": "Symbols",
 		"active_geometry_submodule": "Sampling",
-		"active_module": "Export",
+		"active_module": "Create",
 		"active_motion_submodule": "Animation",
 		"active_style_submodule": "Weighting",
 		"asset_cameras": {
 			"asset_1": {
 				"position": [
-					-0.138385653495789,
-					6.83554983139038
+					0.612534761428833,
+					5.56628227233887
 				],
-				"zoom": 77.9983278721739
+				"zoom": 55.5063188614788
 			},
 			"asset_10": {
 				"position": [
@@ -73,16 +73,16 @@
 			"asset_15": {
 				"position": [
 					-0.644003391265869,
-					11.526349067688
+					4.39576148986816
 				],
-				"zoom": 107.088237072938
+				"zoom": 55.2775299439515
 			},
 			"asset_16": {
 				"position": [
 					0.11108523607254,
-					9.7988862991333
+					5.94021511077881
 				],
-				"zoom": 318.136427414235
+				"zoom": 51.9494714010339
 			},
 			"asset_17": {
 				"position": [
@@ -122,9 +122,9 @@
 			"asset_4": {
 				"position": [
 					-0.138385653495789,
-					2.80151462554932
+					2.01355910301208
 				],
-				"zoom": 207.696858537802
+				"zoom": 130.369403476037
 			},
 			"asset_5": {
 				"position": [
@@ -159,13 +159,13 @@
 					0.447075188159943,
 					9.54303169250488
 				],
-				"zoom": 226.113677086489
+				"zoom": 66.1502153351448
 			}
 		},
 		"expanded_assets": {
 			"asset_1": false,
 			"asset_10": true,
-			"asset_11": false,
+			"asset_11": true,
 			"asset_12": false,
 			"asset_13": false,
 			"asset_14": false,
@@ -179,7 +179,7 @@
 			"asset_4": false,
 			"asset_5": false,
 			"asset_6": false,
-			"asset_7": false,
+			"asset_7": true,
 			"asset_8": false,
 			"asset_9": false
 		},
@@ -192,7 +192,7 @@
 				0.0,
 				0.0
 			],
-			"visible": true
+			"visible": false
 		},
 		"motion_act_preview_asset_id": "",
 		"motion_act_preview_loop": true,
@@ -207,7 +207,7 @@
 			"terrain": false,
 			"weapons": false
 		},
-		"selected_asset_id": "asset_19",
+		"selected_asset_id": "asset_7",
 		"selected_component_id": "",
 		"selected_edge_ids": [],
 		"selected_guide_id": "",
@@ -229,7 +229,7 @@
 	},
 	"name": "world01",
 	"paths": [],
-	"schema_version": 60,
+	"schema_version": 61,
 	"sequences": [],
 	"world_name": "Secrets, Room's & Travels'",
 	"world_settings": {
