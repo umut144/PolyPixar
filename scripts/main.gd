@@ -7810,7 +7810,7 @@ func _create_region(asset_id: String, scope_kind: String, scope_id: String, regi
 		suffix += 1
 	asset["components"].append({
 		"id": component_id, "type": "region", "region_type": region_type, "name": region_name,
-		"region_geometry_source": WorldDocumentService.REGION_GEOMETRY_AUTHORED,
+		"region_geometry_source": WorldDocumentService.REGION_GEOMETRY_COMPONENT,
 		"source_asset_id": "", "parent_component_id": scope_id,
 		"group_id": "", "points": [], "edges": [], "chains": [],
 		"transform": WorldDocumentService.default_component_transform(), "visibility": true, "z_index": 0,
@@ -7823,10 +7823,10 @@ func _create_region(asset_id: String, scope_kind: String, scope_id: String, regi
 	selected_component_ids = [component_id]
 	selected_group_id = ""
 	selected_guide_id = ""
-	active_state = "draw"
-	active_draw_tool = "point"
+	active_state = ""
+	active_draw_tool = ""
 	_set_outliner_asset_expanded(asset_id, true)
-	_show_status_message("Created %s Region · draw and close its boundary." % region_type.capitalize())
+	_show_status_message("Created %s Region · using Component Geometry." % region_type.capitalize())
 	_invalidate_render(RENDER_DOCUMENT)
 
 

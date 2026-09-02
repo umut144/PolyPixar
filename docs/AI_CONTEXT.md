@@ -290,9 +290,10 @@ canonical `points`/`edges`/`chains` Bézier topology, remain outside visual Mesh
 processing, and are exported separately from ordinary Components.
 
 World schema 61 restricts Region creation to a Component's `+` menu and adds
-`region_geometry_source`. `authored` activates the Region's retained editable
-Bézier topology. `component` displays and exports the attached Component's
-geometry by stable ID; the inactive authored topology remains stored so
+`region_geometry_source`. Newly created Regions default to `component`; missing
+legacy values still normalize to `authored`. `authored` activates the Region's
+retained editable Bézier topology. `component` displays and exports the attached
+Component's geometry by stable ID; the inactive authored topology remains stored so
 switching back is lossless. Drawing and Bézier editing are disabled while the
 Component source is active.
 
