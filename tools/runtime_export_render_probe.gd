@@ -3,7 +3,7 @@
 # The Export module is not an Inspector state: it replaces the central work
 # surface and hides the Outliner, the Inspector and the Context Bar, so it
 # cannot be captured by tools/inspector_render_probe.gd. This probe renders the
-# Export surface in nine fixed states and prints one line per observation --
+# Export surface in ten fixed states and prints one line per observation --
 # workspace and panel visibility, the summary line, the Consumer Sync hint, the
 # Preflight log, and every toolbar Button with its caption, visibility, disabled
 # state and attention count. It asserts nothing on its own. It is run before and
