@@ -4288,28 +4288,76 @@ func _test_sampling_input_kind_from_seeding_selection() -> void:
 	document["sampling"]["recipe"]["parameters"]["boundary_refinements"] = {
 		"component_2": {"factor": 2.0}, "guide_1": {"factor": 2.5}}
 
+	# sampling_id empty means the row is no Sampling boundary; seeding_id is what
+	# the Seeding tree and its Workspace highlight, which every row can be.
 	for expectation in [
-		{"row": "Outer · ", "role": "outer", "kind": "", "block": false},
-		{"row": "Hole · ", "role": "hole", "kind": "reference", "block": true},
-		{"row": "Cut · ", "role": "cut", "kind": "guide", "block": true},
-		{"row": "Spine · ", "role": "spine", "kind": "", "block": false},
+		{"row": "Outer · ", "sampling_id": "", "kind": "", "seeding_id": "", "block": false},
+		{"row": "Hole · ", "sampling_id": "component_2", "kind": "reference", "seeding_id": "component_2", "block": true},
+		{"row": "Cut · ", "sampling_id": "guide_1", "kind": "guide", "seeding_id": "guide_1", "block": true},
+		{"row": "Spine · ", "sampling_id": "", "kind": "", "seeding_id": "guide_2", "block": false},
 	]:
+		var row_name := str(expectation["row"])
 		application.active_geometry_submodule = "Seeding"
 		application._render_outliner()
-		_expect(_press_outliner_button(application, str(expectation["row"])),
-			"The Seeding tree should offer its %srow." % str(expectation["row"]))
-		_expect(application.selected_sampling_input_kind == str(expectation["kind"]),
-			"Selecting the %srow should store the Sampling input kind %s, not %s." % [
-				str(expectation["row"]), str(expectation["kind"]), application.selected_sampling_input_kind])
+		_expect(_press_outliner_button(application, row_name),
+			"The Seeding tree should offer its %srow." % row_name)
+
+		# The invariant: a resolvable id/kind pair, or both empty. Never one of
+		# the two on its own.
+		_expect(application.selected_sampling_input_id == str(expectation["sampling_id"])
+			and application.selected_sampling_input_kind == str(expectation["kind"]),
+			"Selecting the %srow should store the Sampling input (%s, %s), not (%s, %s)." % [
+				row_name, str(expectation["sampling_id"]), str(expectation["kind"]),
+				application.selected_sampling_input_id, application.selected_sampling_input_kind])
+		_expect(application.selected_sampling_input_id.is_empty() == application.selected_sampling_input_kind.is_empty(),
+			"The Sampling input id and kind should be set together or not at all, after the %srow." % row_name)
+		if not application.selected_sampling_input_id.is_empty():
+			_expect(not application._get_sampling_input(application._get_asset("asset_1"),
+				application.selected_sampling_input_id, application.selected_sampling_input_kind).is_empty(),
+				"A stored Sampling input should resolve, after the %srow." % row_name)
+
+		# The Seeding selection survives independently, which is what keeps the
+		# Spine row and its stroke highlighted.
+		_expect(application.selected_seeding_input_id == str(expectation["seeding_id"]),
+			"Selecting the %srow should keep it as the Seeding selection (%s), not %s." % [
+				row_name, str(expectation["seeding_id"]), application.selected_seeding_input_id])
+		application._render_outliner()
+		var highlighted := false
+		for row_data in application.outliner_view.geometry_rows:
+			if str(row_data.get("kind", "")) == "input" and bool(row_data.get("selected", false)):
+				highlighted = str(row_data.get("target_id", "")) == str(expectation["seeding_id"])
+		_expect(highlighted == not str(expectation["seeding_id"]).is_empty(),
+			"The Seeding tree should mark the %srow selected exactly when it carries an input id." % row_name)
+		_expect(application.geometry_seeding_workspace.selected_input_id == str(expectation["seeding_id"]),
+			"The Seeding Workspace should highlight the same input as the tree, after the %srow." % row_name)
+
 		application.active_geometry_submodule = "Sampling"
 		application._render_inspector()
 		var block := _button_starting_with(application.geometry_inspector_view, "▾  Boundary Density")
 		if bool(expectation["block"]):
 			_expect(block != null,
-				"After selecting the %srow, Sampling should show its Boundary Density block." % str(expectation["row"]))
+				"After selecting the %srow, Sampling should show its Boundary Density block." % row_name)
 		else:
 			_expect(block == null,
-				"The %srow is not a Sampling boundary, so Sampling should show no Boundary Density block." % str(expectation["row"]))
+				"The %srow is not a Sampling boundary, so Sampling should show no Boundary Density block." % row_name)
+
+	# The other way into the same state: selecting a Guide directly. A Cut is a
+	# Sampling boundary, a Spine is not, and _select_guide does not distinguish
+	# them on its own.
+	application.active_geometry_submodule = "Sampling"
+	application._select_guide("asset_1", "guide_1")
+	_expect(application.selected_sampling_input_id == "guide_1"
+		and application.selected_sampling_input_kind == "guide",
+		"Selecting a Cut Guide should store it as the Sampling input.")
+	application._select_guide("asset_1", "guide_2")
+	_expect(application.selected_sampling_input_id.is_empty()
+		and application.selected_sampling_input_kind.is_empty(),
+		"Selecting a Spine Guide should store no Sampling input, since a Spine is not a Sampling boundary.")
+	_expect(application.selected_guide_id == "guide_2",
+		"Selecting a Spine Guide should still select the Guide itself.")
+	application._render_inspector()
+	_expect(_button_starting_with(application.geometry_inspector_view, "▾  Boundary Density") == null,
+		"A selected Spine should not produce a Boundary Density block in Sampling.")
 	application.free()
 
 

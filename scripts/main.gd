@@ -141,6 +141,11 @@ var selected_group_id := ""
 var selected_guide_id := ""
 var selected_sampling_input_id := ""
 var selected_sampling_input_kind := ""
+# The row the Seeding tree has selected. Every Seeding input can be selected —
+# Outer, Hole, Cut and Spine — while only Holes and Cuts are Sampling
+# boundaries, so this is not the same thing as the Sampling input above and the
+# two are kept apart rather than one field meaning both.
+var selected_seeding_input_id := ""
 var geometry_sampling_input_refresh_pending := false
 var geometry_sampling_bake_button: Button
 var selected_edge_id := ""
@@ -6572,7 +6577,7 @@ func _geometry_seeding_input_row(asset_id: String, component_id: String, input_i
 		"kind": "input", "asset_id": asset_id, "component_id": component_id, "target_id": input_id, "role": role,
 		"indent": 34, "height": 26,
 		"label": "%s  ·  %s%s" % [title, treatment, "  ·  %d" % count if count > 0 else ""],
-		"selected": not input_id.is_empty() and selected_sampling_input_id == input_id,
+		"selected": not input_id.is_empty() and selected_seeding_input_id == input_id,
 		"badge": badge
 	}
 
@@ -7012,6 +7017,30 @@ func _open_seeding_dependency(asset_id: String, component_id: String) -> void:
 	_select_geometry_component(asset_id, component_id)
 
 
+func _set_sampling_input(asset_id: String, input_id: String, kind: String) -> void:
+	# The only writer of the Sampling input pair. A Sampling boundary is a Hole
+	# reference or a Cut Guide; anything else stores nothing at all, so the two
+	# fields are either a resolvable pair or both empty. Without this an id can
+	# survive with a kind that does not describe it — a Spine reached through
+	# _select_guide used to be stored as a Guide, and the Boundary Density block
+	# then rendered for something that is not a Sampling boundary.
+	var asset := _get_asset(asset_id)
+	if kind == "reference":
+		var reference := _get_component(asset, input_id)
+		if not reference.is_empty() and _is_reference_component(reference):
+			selected_sampling_input_id = input_id
+			selected_sampling_input_kind = "reference"
+			return
+	elif kind == "guide":
+		var guide := _get_guide(asset, input_id)
+		if not guide.is_empty() and str(guide.get("guide_type", "")) == AssetGuide.CUT:
+			selected_sampling_input_id = input_id
+			selected_sampling_input_kind = "guide"
+			return
+	selected_sampling_input_id = ""
+	selected_sampling_input_kind = ""
+
+
 func _sampling_input_kind_for_seeding_role(role: String) -> String:
 	# The Seeding tree names its rows by treatment — outer, hole, cut, spine —
 	# while a Sampling boundary input is identified by what the document holds:
@@ -7029,8 +7058,8 @@ func _sampling_input_kind_for_seeding_role(role: String) -> String:
 func _select_geometry_seeding_input(asset_id: String, component_id: String, input_id: String, role: String) -> void:
 	if selected_asset_id != asset_id or selected_component_id != component_id:
 		_select_geometry_component(asset_id, component_id)
-	selected_sampling_input_id = input_id
-	selected_sampling_input_kind = _sampling_input_kind_for_seeding_role(role)
+	selected_seeding_input_id = input_id
+	_set_sampling_input(asset_id, input_id, _sampling_input_kind_for_seeding_role(role))
 	selected_guide_id = input_id if role in ["cut", "spine"] else ""
 	_invalidate_render(RENDER_OUTLINER | RENDER_INSPECTOR)
 	_refresh_geometry_seeding_workspace()
@@ -7251,8 +7280,8 @@ func _select_geometry_component(asset_id: String, component_id: String) -> void:
 	selected_asset_id = asset_id
 	selected_component_id = component_id
 	selected_guide_id = ""
-	selected_sampling_input_id = ""
-	selected_sampling_input_kind = ""
+	selected_seeding_input_id = ""
+	_set_sampling_input(asset_id, "", "")
 	active_module = "Mesh"
 	active_state = ""
 	selected_geometry_bake_method = ""
@@ -7283,14 +7312,14 @@ func _select_geometry_sampling_reference(asset_id: String, parent_component_id: 
 	else:
 		selected_guide_id = ""
 	if not reference_id.is_empty():
-		selected_sampling_input_id = reference_id
-		selected_sampling_input_kind = "reference"
+		selected_seeding_input_id = reference_id
+		_set_sampling_input(asset_id, reference_id, "reference")
 		_invalidate_render(RENDER_DOCUMENT)
 		return
 	for reference in _get_asset(asset_id).get("components", []):
 		if _is_reference_component(reference) and str(reference.get("parent_component_id", "")) == parent_component_id:
-			selected_sampling_input_id = str(reference.get("id", ""))
-			selected_sampling_input_kind = "reference"
+			selected_seeding_input_id = str(reference.get("id", ""))
+			_set_sampling_input(asset_id, str(reference.get("id", "")), "reference")
 			_invalidate_render(RENDER_DOCUMENT)
 			return
 
@@ -8622,8 +8651,8 @@ func _select_guide(asset_id: String, guide_id: String) -> void:
 			selected_asset_id = asset_id
 			selected_component_id = parent_component_id
 			selected_guide_id = guide_id
-			selected_sampling_input_id = guide_id
-			selected_sampling_input_kind = "guide"
+			selected_seeding_input_id = guide_id
+			_set_sampling_input(asset_id, guide_id, "guide")
 			selected_edge_id = ""
 			selected_point_id = ""
 			selected_point_ids.clear()
@@ -8638,8 +8667,8 @@ func _select_guide(asset_id: String, guide_id: String) -> void:
 	selected_component_ids.clear()
 	selected_group_id = ""
 	selected_guide_id = guide_id
-	selected_sampling_input_id = ""
-	selected_sampling_input_kind = ""
+	selected_seeding_input_id = ""
+	_set_sampling_input(asset_id, "", "")
 	selected_edge_id = ""
 	selected_point_id = ""
 	selected_point_ids.clear()
@@ -9609,7 +9638,7 @@ func _refresh_geometry_seeding_workspace() -> void:
 	var status := _geometry_seeding_status(selected_asset_id, selected_component_id, component)
 	var result := geometry_seeding_preview if _geometry_seeding_preview_matches(selected_asset_id, selected_component_id, component) else _geometry_seeding_bake(selected_asset_id, selected_component_id)
 	var guides := _geometry_seeding_sampler_spines(selected_asset_id, selected_component_id)
-	geometry_seeding_workspace.set_context(_geometry_sampling_bake(selected_asset_id, selected_component_id), result, guides, status, geometry_seeding_edit_active and status in ["Baked", "Edited"], geometry_seeding_edit_tool, selected_sampling_input_id)
+	geometry_seeding_workspace.set_context(_geometry_sampling_bake(selected_asset_id, selected_component_id), result, guides, status, geometry_seeding_edit_active and status in ["Baked", "Edited"], geometry_seeding_edit_tool, selected_seeding_input_id)
 
 
 func _editable_geometry_seeding_bake() -> Dictionary:
