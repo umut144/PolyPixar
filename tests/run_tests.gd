@@ -65,6 +65,7 @@ func _init() -> void:
 	_test_outliner_wiring()
 	_test_geometry_inspector_wiring()
 	_test_create_inspector_wiring()
+	_test_style_inspector_wiring()
 	_test_sampling_input_kind_from_seeding_selection()
 	_test_motion_inspector_wiring()
 	_test_motion_act_evaluator()
@@ -4598,6 +4599,167 @@ func _test_create_inspector_wiring() -> void:
 		"Every Create Inspector signal should be reachable from a control; unreachable: %s" % str(unreachable))
 	_expect(view_signal_argument_failures.is_empty(),
 		"Create Inspector signals should arrive with their declared argument types; %s" % str(view_signal_argument_failures))
+	application.free()
+
+
+const STYLE_SIGNAL_ROUTES := [
+	["bake_requested", "_bake_weighting_preview"],
+	["curve_selected", "_on_weighting_curve_selected"],
+	["direction_selected", "_on_weighting_direction_selected"],
+	["invert_changed", "_on_weighting_invert_changed"],
+	["method_selected", "_on_weighting_method_selected"],
+	["preview_requested", "_generate_weighting_preview"],
+	["section_toggled", "_on_inspector_section_toggled"],
+	["strength_changed", "_on_weighting_strength_changed"],
+	["style_delete_requested", "_delete_selected_weighting_style"],
+	["style_rename_requested", "_rename_weighting_style"],
+]
+
+const STYLE_PROBE_CASES := ["no_component", "no_style", "uniform", "gradient",
+	"gradient_previewed", "gradient_baked"]
+
+
+func _weighting_wiring_document(application: Control) -> void:
+	# A Component Mesh that really is Ready: the Sampling, Seeding and Meshing
+	# bakes come from the services, and component_mesh carries the fingerprint
+	# _component_mesh_status compares against. Without that the Inspector never
+	# leaves "Missing" and the Result block is never drawn.
+	var component: Dictionary = application.assets[0]["components"][0]
+	var sampling: Dictionary = GeometrySamplingService.generate(component,
+		{"method": GeometrySamplingService.ADAPTIVE, "parameters": {"spacing": 2.0}})
+	sampling["bake_id"] = "sampling_style"
+	var seeding: Dictionary = GeometrySeedingService.generate(sampling,
+		{"method": GeometrySeedingService.POISSON_FILL, "parameters": {"spacing": 2.5, "seed": 5}})
+	seeding["bake_id"] = "seeding_style"
+	var mesh: Dictionary = GeometryMeshingService.generate(sampling, seeding,
+		{"method": GeometryMeshingService.CONSTRAINED_MESH,
+			"parameters": {"seeding_method": GeometrySeedingService.POISSON_FILL}})
+	mesh["bake_id"] = "mesh_style"
+	var document: Dictionary = application._mutable_geometry_document("asset_1", "component_1")
+	document["sampling"]["recipe"] = {"method": GeometrySamplingService.ADAPTIVE,
+		"parameters": {"spacing": 2.0}}
+	document["sampling"]["bakes"][GeometrySamplingService.ADAPTIVE] = sampling
+	document["seeding"]["recipe"] = {"method": GeometrySeedingService.POISSON_FILL,
+		"parameters": {"spacing": 2.5, "seed": 5}}
+	document["seeding"]["bakes"][GeometrySeedingService.POISSON_FILL] = seeding
+	document["meshing"]["recipe"] = {"method": GeometryMeshingService.CONSTRAINED_MESH,
+		"parameters": {"seeding_method": GeometrySeedingService.POISSON_FILL}}
+	document["meshing"]["bakes"][GeometryMeshingService.CONSTRAINED_MESH] = mesh
+	document["component_mesh"] = {"bake_id": "mesh_style",
+		"method": GeometryMeshingService.CONSTRAINED_MESH,
+		"mesh_fingerprint": GeometryUVMappingService.mesh_fingerprint(mesh)}
+
+
+func _style_wiring_asset() -> Dictionary:
+	# A closed Component the meshing services can actually bake.
+	var body := _component()
+	body.merge({"id": "component_1", "name": "body", "visibility": true})
+	for position in [Vector2.ZERO, Vector2(10.0, 0.0), Vector2(10.0, 10.0), Vector2(0.0, 10.0)]:
+		BezierTopology.add_point(body, position, "linear")
+	BezierTopology.close_active_chain(body)
+	return {"id": "asset_1", "name": "Wizard", "visibility": true,
+		"components": [body], "groups": [], "guides": []}
+
+
+func _prepare_style_case(application: Control, case_name: String) -> void:
+	application.active_module = "Style"
+	application.active_style_submodule = "Weighting"
+	application.selected_asset_id = "asset_1"
+	application.selected_component_id = "component_1"
+	application.selected_weighting_style_id = ""
+	application.weighting_preview = {}
+	application.weighting_preview_key = ""
+	var document: Dictionary = application._mutable_geometry_document("asset_1", "component_1")
+	document["weighting"]["styles"] = []
+	if case_name == "no_component":
+		application.selected_component_id = ""
+		return
+	if case_name == "no_style":
+		return
+	var style: Dictionary = WeightingService.default_style("style_1", "Weighting Style 01", "component_1")
+	if case_name != "uniform":
+		style["method"] = WeightingService.AXIS_GRADIENT
+		style["parameters"] = WeightingService.default_parameters(WeightingService.AXIS_GRADIENT)
+	document["weighting"]["styles"].append(style)
+	application.selected_weighting_style_id = "style_1"
+	if case_name == "gradient_previewed":
+		# Result rows and an enabled Bake button only exist once a preview that
+		# matches the Component Mesh has been generated.
+		application._generate_weighting_preview()
+	elif case_name == "gradient_baked":
+		application._generate_weighting_preview()
+		application._bake_weighting_preview()
+
+
+func _build_style_probe(application: Control) -> StyleInspectorView:
+	# A bare view fed exactly what the router pushes, so the walk can fire
+	# controls without the editor's handlers re-rendering them away.
+	var probe := StyleInspectorView.new()
+	probe.set_context(application._weighting_inspector_context())
+	return probe
+
+
+func _test_style_inspector_wiring() -> void:
+	# The two tables the other four views carry, for the Style Inspector. The
+	# routing half checks that each of the ten signals reaches the handler it
+	# names and that the view declares nothing the table misses; the emission
+	# half renders six Weighting states, fires every control the view builds,
+	# and checks that each signal is reachable and arrives with its declared
+	# argument types.
+	var style_assets: Array[Dictionary] = [_style_wiring_asset()]
+	var application: Control = load("res://scripts/main.gd").new()
+	application._build_ui()
+	application.assets = style_assets
+	_weighting_wiring_document(application)
+	var view: StyleInspectorView = application.style_inspector_view
+
+	var routed: Array[String] = []
+	for route in STYLE_SIGNAL_ROUTES:
+		var signal_name := str(route[0])
+		var expected_handler := str(route[1])
+		routed.append(signal_name)
+		var handlers: Array[String] = []
+		for connection in view.get_signal_connection_list(signal_name):
+			handlers.append(str((connection["callable"] as Callable).get_method()))
+		_expect(handlers.size() == 1 and handlers[0] == expected_handler,
+			"The Style Inspector signal %s should reach %s, not %s." % [signal_name, expected_handler, str(handlers)])
+	var declared_arguments: Dictionary = {}
+	for entry in view.get_script().get_script_signal_list():
+		var declared := str(entry["name"])
+		declared_arguments[declared] = entry["args"]
+		if declared in routed:
+			continue
+		_expect(false, "The Style Inspector declares %s, which is missing from the routing table." % declared)
+
+	# The Component Mesh has to be Ready for the states below to differ at all.
+	application.selected_asset_id = "asset_1"
+	application.selected_component_id = "component_1"
+	_expect(application._component_mesh_status("asset_1", "component_1",
+		application.assets[0]["components"][0]) == "Ready",
+		"The Weighting wiring fixture should present a Ready Component Mesh.")
+
+	view_signals_emitted = {}
+	view_signal_argument_failures = [] as Array[String]
+	for case_name in STYLE_PROBE_CASES:
+		_prepare_style_case(application, case_name)
+		var probe := _build_style_probe(application)
+		for route in STYLE_SIGNAL_ROUTES:
+			var signal_name := str(route[0])
+			probe.connect(signal_name, _view_signal_recorder(signal_name, declared_arguments.get(signal_name, [])))
+		probe.rebuild()
+		var controls: Array = []
+		_inspector_controls(probe, controls)
+		for control in controls:
+			_exercise_control(control)
+		probe.free()
+	var unreachable: Array[String] = []
+	for route in STYLE_SIGNAL_ROUTES:
+		if not view_signals_emitted.has(str(route[0])):
+			unreachable.append(str(route[0]))
+	_expect(unreachable.is_empty(),
+		"Every Style Inspector signal should be reachable from a control; unreachable: %s" % str(unreachable))
+	_expect(view_signal_argument_failures.is_empty(),
+		"Style Inspector signals should arrive with their declared argument types; %s" % str(view_signal_argument_failures))
 	application.free()
 
 

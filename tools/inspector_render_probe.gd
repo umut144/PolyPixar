@@ -1,6 +1,6 @@
 # Inspector render probe.
 #
-# Renders the Inspector in 41 fixed states and prints one line per control with
+# Renders the Inspector in 44 fixed states and prints one line per control with
 # the properties a reader would notice: values, ranges, item lists, selections,
 # pressed state, disabled state, captions, colours and tooltips. It asserts
 # nothing on its own. It is run before and after a change that is meant to leave
@@ -20,8 +20,9 @@
 # selected Components, Reference Image, Point mode with none, one and two
 # Points, Edge mode with none, one and two Edges, Face mode), Mesh
 # (Sampling, Seeding and Meshing, each unbaked and against a Geometry document
-# with baked results and expanded advanced blocks), Style (Weighting, with and
-# without an Axis Gradient) and Motion (Asset contract, State, Motion, inner
+# with baked results and expanded advanced blocks), Style (Weighting without a
+# Component, without a Style, Uniform, Axis Gradient, and a generated Axis
+# Gradient preview) and Motion (Asset contract, State, Motion, inner
 # Motion, Transition, seeded Transition with Rules, Marker, Act empty / Slide /
 # Blink, Path empty / authored, Sequence empty / composition / player). Between
 # them they reach every Inspector render function. When a render function is
@@ -87,6 +88,20 @@ func _init() -> void:
 	app.selected_asset_id = "asset_1"
 	app.expanded_assets["asset_1"] = true
 
+	# The Weighting Inspector only leaves "Component Mesh: Missing" for a Mesh
+	# that is really Ready, so the Style states are backed by real service bakes
+	# and a component_mesh fingerprint. They are computed once and reused.
+	var style_sampling: Dictionary = GeometrySamplingService.generate(comp,
+		{"method": GeometrySamplingService.ADAPTIVE, "parameters": {"spacing": 2.0}})
+	style_sampling["bake_id"] = "sampling_style"
+	var style_seeding: Dictionary = GeometrySeedingService.generate(style_sampling,
+		{"method": GeometrySeedingService.POISSON_FILL, "parameters": {"spacing": 2.5, "seed": 5}})
+	style_seeding["bake_id"] = "seeding_style"
+	var style_mesh: Dictionary = GeometryMeshingService.generate(style_sampling, style_seeding,
+		{"method": GeometryMeshingService.CONSTRAINED_MESH,
+			"parameters": {"seeding_method": GeometrySeedingService.POISSON_FILL}})
+	style_mesh["bake_id"] = "mesh_style"
+
 	var cases := [
 		{"m": "Create", "sub": "Character", "comp": "", "grp": "", "gd": ""},
 		{"m": "Create", "sub": "Character", "comp": "component_1", "grp": "", "gd": ""},
@@ -98,8 +113,11 @@ func _init() -> void:
 		{"m": "Mesh", "sub": "Meshing", "comp": "component_1", "grp": "", "gd": "", "baked": true},
 		{"m": "Mesh", "sub": "Seeding", "comp": "component_1", "grp": "", "gd": ""},
 		{"m": "Mesh", "sub": "Meshing", "comp": "component_1", "grp": "", "gd": ""},
+		{"m": "Style", "sub": "Weighting", "comp": "", "grp": "", "gd": ""},
 		{"m": "Style", "sub": "Weighting", "comp": "component_1", "grp": "", "gd": ""},
-		{"m": "Style", "sub": "Weighting", "comp": "component_1", "grp": "", "gd": "", "gradient": true},
+		{"m": "Style", "sub": "Weighting", "comp": "component_1", "grp": "", "gd": "", "style": "uniform"},
+		{"m": "Style", "sub": "Weighting", "comp": "component_1", "grp": "", "gd": "", "style": "gradient"},
+		{"m": "Style", "sub": "Weighting", "comp": "component_1", "grp": "", "gd": "", "style": "gradient_previewed"},
 		{"m": "Create", "sub": "Character", "comp": "component_1", "grp": "", "gd": "", "grouped": true},
 		{"m": "Motion", "sub": "Animation", "comp": "", "grp": "", "gd": "", "motion": "asset"},
 		{"m": "Motion", "sub": "Animation", "comp": "", "grp": "", "gd": "", "motion": "state"},
@@ -257,12 +275,37 @@ func _init() -> void:
 			app.selected_sampling_input_kind = ""
 			app.geometry_seeding_advanced_pattern_expanded = false
 			app.geometry_meshing_advanced_relaxation_expanded = false
-		if bool(c.get("gradient", false)):
-			comp["weighting"] = {"method": WeightingService.AXIS_GRADIENT,
-				"parameters": {"direction": WeightingService.LEFT_TO_RIGHT,
-					"curve": WeightingService.EASE_OUT, "invert": true, "strength": 0.75}}
-		else:
-			comp.erase("weighting")
+		# Weighting Styles live on the Geometry document, not on the Component,
+		# so the Style states install a document with a Ready Component Mesh and
+		# one Style; "gradient_previewed" additionally runs the real preview so
+		# the Result rows and the enabled Bake button are drawn.
+		var style_case := str(c.get("style", ""))
+		app.selected_weighting_style_id = ""
+		app.weighting_preview = {}
+		app.weighting_preview_key = ""
+		if not style_case.is_empty():
+			var style_doc: Dictionary = WorldDocumentService.default_geometry_document("asset_1", "component_1")
+			style_doc["sampling"]["recipe"] = {"method": GeometrySamplingService.ADAPTIVE,
+				"parameters": {"spacing": 2.0}}
+			style_doc["sampling"]["bakes"][GeometrySamplingService.ADAPTIVE] = style_sampling
+			style_doc["seeding"]["recipe"] = {"method": GeometrySeedingService.POISSON_FILL,
+				"parameters": {"spacing": 2.5, "seed": 5}}
+			style_doc["seeding"]["bakes"][GeometrySeedingService.POISSON_FILL] = style_seeding
+			style_doc["meshing"]["recipe"] = {"method": GeometryMeshingService.CONSTRAINED_MESH,
+				"parameters": {"seeding_method": GeometrySeedingService.POISSON_FILL}}
+			style_doc["meshing"]["bakes"][GeometryMeshingService.CONSTRAINED_MESH] = style_mesh
+			style_doc["component_mesh"] = {"bake_id": "mesh_style",
+				"method": GeometryMeshingService.CONSTRAINED_MESH,
+				"mesh_fingerprint": GeometryUVMappingService.mesh_fingerprint(style_mesh)}
+			var style: Dictionary = WeightingService.default_style("style_1", "Weighting Style 01", "component_1")
+			if style_case != "uniform":
+				style["method"] = WeightingService.AXIS_GRADIENT
+				style["parameters"] = WeightingService.default_parameters(WeightingService.AXIS_GRADIENT)
+			style_doc["weighting"]["styles"].append(style)
+			app.geometry_documents["asset_1/component_1"] = style_doc
+			app.selected_weighting_style_id = "style_1"
+			if style_case == "gradient_previewed":
+				app._generate_weighting_preview()
 		app._render_inspector()
 		var out: Array = []
 		_collect(app.inspector_content, out)
