@@ -214,6 +214,22 @@ static func _merge_coincident_open_endpoints(component: Dictionary, source_ids: 
 
 
 static func validation_issues(component: Dictionary, selected_point_ids: Array, axis_start: Vector2, axis_end: Vector2) -> Array[String]:
+	var errors := selection_issues(component, selected_point_ids)
+	if axis_start.distance_squared_to(axis_end) <= 0.00000001:
+		errors.append("Mirror axis requires two distinct Points.")
+	else:
+		for point_id in _selected_run(component, selected_point_ids):
+			var point := BezierTopology.point_by_id(component.get("points", []), point_id)
+			var position: Vector2 = point.get("position", Vector2.ZERO)
+			if position.distance_squared_to(_reflect_position(position, axis_start, axis_end)) <= COINCIDENT_ENDPOINT_EPSILON * COINCIDENT_ENDPOINT_EPSILON and not BezierTopology.is_open_endpoint(component, point_id):
+				errors.append("Points on the mirror axis must be open Chain endpoints.")
+				break
+	return errors
+
+
+## Checks only the source topology and selection. The interactive Mirror command
+## uses this before an axis exists; preview and apply add the axis-specific rules.
+static func selection_issues(component: Dictionary, selected_point_ids: Array) -> Array[String]:
 	var errors := BezierTopology.validate(component)
 	if str(component.get("draw_mode", "closed_loop")) != "closed_loop":
 		errors.append("Mirror is available only for Closed Loop Components.")
@@ -224,15 +240,6 @@ static func validation_issues(component: Dictionary, selected_point_ids: Array, 
 		errors.append("Mirror requires a selected Point run.")
 	if _selected_run(component, selected_point_ids).size() != selected_point_ids.size():
 		errors.append("Mirror selection must be one contiguous run on the open Chain.")
-	if axis_start.distance_squared_to(axis_end) <= 0.00000001:
-		errors.append("Mirror axis requires two distinct Points.")
-	else:
-		for point_id in _selected_run(component, selected_point_ids):
-			var point := BezierTopology.point_by_id(component.get("points", []), point_id)
-			var position: Vector2 = point.get("position", Vector2.ZERO)
-			if position.distance_squared_to(_reflect_position(position, axis_start, axis_end)) <= COINCIDENT_ENDPOINT_EPSILON * COINCIDENT_ENDPOINT_EPSILON and not BezierTopology.is_open_endpoint(component, point_id):
-				errors.append("Points on the mirror axis must be open Chain endpoints.")
-				break
 	return errors
 
 

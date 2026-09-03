@@ -520,6 +520,8 @@ static func fuse_point(component: Dictionary, point_id: String, tolerance := FUS
 	if selected_chain_id == nearest_chain_id:
 		var chain_ids: Array = selected_chain.get("point_ids", []).duplicate()
 		var selected_index := chain_ids.find(point_id)
+		if selected_index < 0:
+			return {"fused": false, "reason": "The selected Point is not ordered in its Chain."}
 		var chain_is_closed := bool(selected_chain.get("closed", false))
 		var is_open_endpoint_pair := not chain_is_closed \
 			and selected_index >= 0 and nearest_index >= 0 \
@@ -527,7 +529,10 @@ static func fuse_point(component: Dictionary, point_id: String, tolerance := FUS
 			or (nearest_index == 0 and selected_index == chain_ids.size() - 1))
 		var index_distance := absi(selected_index - nearest_index)
 		var points_are_adjacent := index_distance == 1 or (chain_is_closed and index_distance == chain_ids.size() - 1)
-		var can_collapse_adjacent := points_are_adjacent and (not chain_is_closed or chain_ids.size() > 3)
+		# An adjacent collapse must retain two open or three closed Points. The
+		# non-adjacent endpoints of a sufficiently large open Chain may close it.
+		var minimum_chain_size := 3 if chain_is_closed else 2
+		var can_collapse_adjacent := points_are_adjacent and chain_ids.size() > minimum_chain_size
 		var can_close_open_chain := is_open_endpoint_pair and chain_ids.size() > 3
 		if not can_collapse_adjacent and not can_close_open_chain:
 			return {"fused": false, "reason": "Points in the same Chain must be adjacent, or open endpoints that can form a valid closed Chain."}

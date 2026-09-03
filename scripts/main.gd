@@ -5785,7 +5785,7 @@ func _activate_edit_face_state() -> void:
 func _can_activate_selection_mirror(component: Dictionary) -> bool:
 	if component.is_empty() or _region_uses_component_geometry(component) or str(component.get("draw_mode", "closed_loop")) != "closed_loop":
 		return false
-	return SELECTION_MIRROR_SERVICE_SCRIPT.validation_issues(component, selected_point_ids, Vector2.ZERO, Vector2.RIGHT).is_empty()
+	return SELECTION_MIRROR_SERVICE_SCRIPT.selection_issues(component, selected_point_ids).is_empty()
 
 
 func _flip_selected_component_geometry_x() -> void:

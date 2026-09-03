@@ -422,6 +422,12 @@ func _test_fuse_point() -> void:
 	var minimum_closed_result := BezierTopology.fuse_point(minimum_closed, minimum_closed_ids[0])
 	_expect(not bool(minimum_closed_result.get("fused", true)) and minimum_closed == minimum_closed_original, "Same-Chain Fuse must not reduce a closed Chain below its three-Point structural minimum.")
 
+	var two_point_open := _component()
+	var two_point_open_ids := [BezierTopology.add_point(two_point_open, Vector2.ZERO, "linear"), BezierTopology.add_point(two_point_open, Vector2(0.0, 0.00005), "linear")]
+	var two_point_open_original := two_point_open.duplicate(true)
+	var two_point_open_result := BezierTopology.fuse_point(two_point_open, two_point_open_ids[0])
+	_expect(not bool(two_point_open_result.get("fused", true)) and two_point_open == two_point_open_original, "Same-Chain Fuse must not collapse a two-Point open Chain into an unusable single-Point Chain.")
+
 	var overlapping_chains := _component()
 	overlapping_chains["points"] = [{"id": "shared", "position": Vector2.ZERO}, {"id": "left", "position": Vector2.LEFT}, {"id": "right", "position": Vector2.RIGHT}]
 	overlapping_chains["chains"] = [{"id": "left_chain", "point_ids": ["left", "shared"], "edge_ids": [], "closed": false}, {"id": "right_chain", "point_ids": ["shared", "right"], "edge_ids": [], "closed": false}]
@@ -599,6 +605,17 @@ func _test_drawn_handle_direction_and_dead_zone() -> void:
 
 
 func _test_closed_loop_selection_mirror() -> void:
+	var activation_component := _component()
+	activation_component["draw_mode"] = "closed_loop"
+	var activation_ids: Array[String] = []
+	for point_position in [Vector2(-2.0, 1.0), Vector2(-1.0, 0.0), Vector2(0.0, 1.0)]:
+		activation_ids.append(BezierTopology.add_point(activation_component, point_position, "linear"))
+	var activation_application: Control = load("res://scripts/main.gd").new()
+	activation_application.selected_point_ids = activation_ids
+	_expect(activation_application._can_activate_selection_mirror(activation_component), "Mirror activation should validate only selection topology before the user has chosen an axis.")
+	_expect(not SelectionMirrorService.validation_issues(activation_component, activation_ids, Vector2.ZERO, Vector2.RIGHT).is_empty(), "Mirror preview should still reject an interior Point after the chosen axis makes it coincident.")
+	activation_application.free()
+
 	var component := _component()
 	component["draw_mode"] = "closed_loop"
 	var source_ids: Array[String] = []

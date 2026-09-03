@@ -60,6 +60,15 @@ first. A closed Chain requires at least three Points. A Point ID may occur only
 once across the complete Component topology; separate Chains never share a
 Point identity and must be joined explicitly before they share a seam.
 
+`Fuse Point` collapses Points in the same Chain only when they are direct
+neighbours, including the last/first pair of a closed Chain. The two endpoints
+of an open Chain may also fuse to close it when at least three Points remain.
+All other same-Chain matches are rejected before mutation, and a two-Point open
+Chain is never collapsed to one Point. When a manual seam Handle is contributed
+to a retained `mirrored` or `aligned` Point, the opposite Handle follows that
+Point's mode just as it does during a normal Handle edit; `free` and `corner`
+Handles remain independent, while `linear` Points remain handleless.
+
 Closed-loop Components and analytic Primitives also store
 `topology_role: outer | hole`. New Components default to `outer`; changing a
 Bézier Component to `hole` updates its closed contour Chain role as well, while
@@ -79,7 +88,10 @@ run of the sole open source Chain. If both mirrored endpoints coincide with
 the source endpoints, Mirror automatically joins and closes the two halves
 into the final single Chain. A single coincident endpoint remains an open
 joined Chain so the remaining endpoint can be authored manually. A closed
-Chain cannot be mirrored.
+Chain cannot be mirrored. Mirror command availability checks only source
+topology and the contiguous Point selection because no axis exists yet. Preview
+and apply validate the chosen axis separately and reject an interior selected
+Point on that axis; only open Chain endpoints may be coincident there.
 
 ## Fill boundary sampling
 
