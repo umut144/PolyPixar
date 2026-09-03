@@ -124,10 +124,12 @@ Scale is an instance placement transform rather than owned geometry Scale.
 
 Seeding consumes the complete accepted Sampling constraint set. Outer bounds
 the valid interior, Holes exclude regions, and Cuts are two-sided barriers with
-clearance. Poisson Fill and combined multi-Spine Flow generate deterministic
-previews; an explicit Bake accepts that exact result before manual Seed editing
-or downstream Meshing. Spine Flow presents Seed Spacing and Flow Stretch as its
-primary Artistic controls; exact lattice values and optional Boundary/Stagger
+clearance. A Hole may be a direct ordinary Closed Loop or Primitive Child, or a
+direct Asset Reference; it affects that Parent only and is not inherited by
+higher ancestors. Poisson Fill and combined multi-Spine Flow generate
+deterministic previews; an explicit Bake accepts that exact result before manual
+Seed editing or downstream Meshing. Spine Flow presents Seed Spacing and Flow
+Stretch as its primary Artistic controls; exact lattice values and optional Boundary/Stagger
 refinements remain available under Advanced Pattern.
 
 Meshing consumes one accepted Seeding Bake and exposes one closed-Body method:

@@ -6,8 +6,9 @@
 
 In `Mesh → Sampling`, the user selects one Body Component, adjusts one adaptive
 boundary recipe, inspects an automatically generated point preview, and
-explicitly bakes the accepted result. Outer, referenced Hole, and scoped Cut
-boundaries participate in one shared Bake.
+explicitly bakes the accepted result. Outer, direct ordinary or referenced
+Hole, and scoped Cut boundaries participate in one shared Bake. A direct Hole
+affects only its immediate Parent Body and does not propagate to ancestors.
 
 ## Ownership
 
@@ -32,7 +33,7 @@ tolerance is scale-aware: enlarging the same curved input eventually adds
 samples even when its tangent angles are unchanged. Closed Chains omit a
 duplicate copy of their first sample at the end.
 
-Outer, Hole, and Cut boundaries inherit the Body recipe. A Hole Reference or
+Outer, Hole, and Cut boundaries inherit the Body recipe. A Hole Component or
 Cut Guide may optionally store a boundary-density factor from `0.25×` through
 `16×`; its effective target length is `Body spacing / factor`. The factor also
 scales adaptive curve tolerances, so values below `1×` coarsen a boundary and
@@ -41,9 +42,10 @@ select a separate method or Curve Detail value. Schema-28 Even Spacing recipes
 and absolute boundary overrides normalize to the adaptive recipe and factors.
 
 Circle and Ellipse Primitives remain canonical as center plus axis diameters.
-Sampling evaluates their analytic curve directly, including a Reference transform into Body-local
-space, so their sample count follows Target Edge Length and Curve Detail rather
-than the fixed render-contour segment count.
+Sampling evaluates their analytic curve directly, including an ordinary Child
+or Reference transform into Body-local space, so their sample count follows
+Target Edge Length and Curve Detail rather than the fixed render-contour segment
+count.
 
 Before a Preview becomes a mesh-pipeline input, Sampling arranges its
 constraints into a planar straight-line graph (PSLG). Every Cut intersection

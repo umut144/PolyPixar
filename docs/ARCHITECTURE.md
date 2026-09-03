@@ -224,11 +224,12 @@ Seeding, Seeding feeds Meshing, and accepted Bakes remain separate from source
 Component geometry. Weighting styles reference accepted mesh data without
 becoming Component topology.
 
-Sampling owns one adaptive Body recipe. Its Outer boundary, referenced Hole
-inputs, and scoped Cut Guides inherit the Body target edge length and Curve
-Detail; Hole and Cut inputs may apply a boundary-density factor from `0.25×`
-through `16×`. Values below `1×` coarsen all adaptive criteria, while values
-above `1×` refine them. Primitive Circles and Ellipses
+Sampling owns one adaptive Body recipe. Its Outer boundary, direct Hole Child
+Components, and scoped Cut Guides inherit the Body target edge length and Curve
+Detail. A Hole Child may be an ordinary Closed Loop or Primitive, or an Asset
+Reference; its exclusion applies only to its direct Parent. Hole and Cut inputs
+may apply a boundary-density factor from `0.25×` through `16×`. Values below
+`1×` coarsen all adaptive criteria, while values above `1×` refine them. Primitive Circles and Ellipses
 remain analytic through sampling, including their transform into Body-local
 space. A debounced transient Preview is generated once per settled recipe and
 an explicit Bake copies that exact Preview without regenerating it.

@@ -2039,6 +2039,34 @@ func _test_geometry_sampling_service() -> void:
 	_expect(not bool(GeometrySamplingService.generate(open_component).get("valid", true)), "An open contour should fail visibly at the mesh-pipeline Sampling boundary.")
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
+	var direct_ancestor := {"id": "direct_ancestor", "name": "bottle", "type": "component", "draw_mode": "primitive", "topology_role": "outer", "parent_component_id": "", "group_id": "tier1", "visibility": true, "primitive": {"type": "circle", "center": Vector2.ZERO, "diameter_cm": 200.0}, "points": [], "edges": [], "chains": [], "transform": WorldDocumentService.default_component_transform()}
+	var direct_body := {"id": "direct_body", "name": "body_opening01", "type": "component", "draw_mode": "primitive", "topology_role": "outer", "parent_component_id": "direct_ancestor", "group_id": "tier1", "visibility": true, "primitive": {"type": "circle", "center": Vector2.ZERO, "diameter_cm": 100.0}, "points": [], "edges": [], "chains": [], "transform": WorldDocumentService.default_component_transform()}
+	var direct_hole := {"id": "direct_hole", "name": "body_opening_hole01", "type": "component", "draw_mode": "primitive", "topology_role": "hole", "parent_component_id": "direct_body", "group_id": "tier1", "visibility": true, "primitive": {"type": "circle", "center": Vector2.ZERO, "diameter_cm": 20.0}, "points": [], "edges": [], "chains": [], "transform": WorldDocumentService.default_component_transform()}
+	var direct_hole_asset := {"id": "direct_hole_asset", "name": "Potion", "visibility": true, "components": [direct_ancestor, direct_body, direct_hole], "groups": [{"id": "tier1", "name": "tier1", "visibility": true, "parent_component_id": "", "transform": {"position": Vector2(4.0, -3.0), "rotation": 12.0, "scale": Vector2(1.25, 0.8), "pivot": Vector2.ONE}}], "guides": []}
+	application.assets = [direct_hole_asset] as Array[Dictionary]
+	var resolved_direct_holes: Array = application._geometry_sampling_hole_components(direct_hole_asset, "direct_body")
+	var resolved_ancestor_holes: Array = application._geometry_sampling_hole_components(direct_hole_asset, "direct_ancestor")
+	var direct_hole_sampling: Dictionary = GeometrySamplingService.generate(direct_body, {"parameters": {"spacing": 0.5}}, [], resolved_direct_holes)
+	direct_hole_sampling["bake_id"] = "direct_hole_sampling"
+	var direct_hole_seeding: Dictionary = GeometrySeedingService.generate(direct_hole_sampling, {"method": GeometrySeedingService.POISSON_FILL, "parameters": {"spacing": 1.0, "seed": 7}})
+	direct_hole_seeding["bake_id"] = "direct_hole_seeding"
+	var direct_hole_mesh: Dictionary = GeometryMeshingService.generate(direct_hole_sampling, direct_hole_seeding, GeometryMeshingService.default_recipe())
+	var direct_mesh_positions: Dictionary = {}
+	for vertex in direct_hole_mesh.get("vertices", []):
+		direct_mesh_positions[str(vertex.get("id", ""))] = Vector2(vertex.get("position", Vector2.ZERO))
+	var direct_hole_was_filled := false
+	for triangle in direct_hole_mesh.get("triangles", []):
+		var ids: Array = triangle.get("vertex_ids", [])
+		var centroid: Vector2 = (direct_mesh_positions.get(str(ids[0]), Vector2.ZERO) + direct_mesh_positions.get(str(ids[1]), Vector2.ZERO) + direct_mesh_positions.get(str(ids[2]), Vector2.ZERO)) / 3.0
+		direct_hole_was_filled = direct_hole_was_filled or centroid.length() < 0.95
+	application.selected_asset_id = "direct_hole_asset"
+	application.selected_component_id = "direct_body"
+	var direct_hole_inspector_context: Dictionary = application._geometry_sampling_inspector_context(direct_body)
+	application._set_sampling_input("direct_hole_asset", "direct_hole", "component")
+	_expect(resolved_direct_holes.size() == 1 and str(resolved_direct_holes[0].get("sampling_input_id", "")) == "direct_hole" and int(direct_hole_sampling.get("hole_count", 0)) == 1 and str(direct_hole_sampling.get("chains", [])[1].get("topology_role", "")) == "hole", "A direct non-Reference Primitive Hole should enter exactly its Parent's Sampling domain.")
+	_expect(resolved_ancestor_holes.is_empty(), "A direct Primitive Hole should not propagate through its Parent into higher ancestors.")
+	_expect(bool(direct_hole_mesh.get("valid", false)) and not direct_hole_was_filled, "A direct Primitive Hole should remain empty in its Parent's final constrained Mesh.")
+	_expect(direct_hole_inspector_context.get("boundary_rows", []).size() == 1 and str(direct_hole_inspector_context.get("boundary_rows", [])[0].get("input_id", "")) == "direct_hole" and application.selected_sampling_input_kind == "component", "A direct Primitive Hole should appear as a selectable Sampling boundary with its own density override identity.")
 	_expect(WorldDocumentService.has_supported_schema({"schema_version": 62}) and WorldDocumentService.has_supported_schema({"schema_version": 61}) and not WorldDocumentService.has_supported_schema({"schema_version": 63}), "Schema 62 should keep current and older World documents readable and reject unknown future schemas.")
 	_expect(WorldDocumentService.normalize_component_draw_mode("ribbon", 39) == "contour" and WorldDocumentService.normalize_component_draw_mode("contour", 42) == "contour", "Schema-42 loading must retain the explicit legacy Ribbon-to-Contour migration boundary.")
 	_expect(WorldDocumentService.normalize_component_draw_mode("ribbon", 42) == "ribbon", "Current-schema Ribbon data must remain visibly invalid instead of receiving a silent backward fallback.")
@@ -4935,7 +4963,7 @@ func _test_sampling_input_kind_from_seeding_selection() -> void:
 	# the Seeding tree and its Workspace highlight, which every row can be.
 	for expectation in [
 		{"row": "Outer · ", "sampling_id": "", "kind": "", "seeding_id": "", "block": false},
-		{"row": "Hole · ", "sampling_id": "component_2", "kind": "reference", "seeding_id": "component_2", "block": true},
+		{"row": "Hole · ", "sampling_id": "component_2", "kind": "component", "seeding_id": "component_2", "block": true},
 		{"row": "Cut · ", "sampling_id": "guide_1", "kind": "guide", "seeding_id": "guide_1", "block": true},
 		{"row": "Spine · ", "sampling_id": "", "kind": "", "seeding_id": "guide_2", "block": false},
 	]:
@@ -5457,8 +5485,8 @@ func _test_geometry_inspector_wiring() -> void:
 	application.selected_sampling_input_id = ""
 	view.sampling_reference_selected.emit("component_3")
 	_expect(application.selected_sampling_input_id == "component_3"
-		and application.selected_sampling_input_kind == "reference",
-		"The Hole boundary row should select that reference as the Sampling input.")
+		and application.selected_sampling_input_kind == "component",
+		"The Hole boundary row should select that Component as the Sampling input.")
 	view.sampling_cut_selected.emit("guide_1")
 	_expect(application.selected_guide_id == "guide_1",
 		"The Cut boundary row should select that Guide.")
