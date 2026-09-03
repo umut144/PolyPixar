@@ -54,9 +54,9 @@ remaining assertions never run and never increment the failure count. The
 GitHub Actions workflow in `.github/workflows/verify.yml` fails the job on any
 such line.
 
-`tools/inspector_render_probe.gd` renders the Inspector in 33 fixed states and
-prints one line per control. Run it before and after any change that is meant to
-leave the Inspector looking the same, and diff the two outputs; the file's own
+`tools/inspector_render_probe.gd` renders the Inspector in a fixed state matrix
+and prints one line per control. Run it before and after any change that is
+meant to leave the Inspector looking the same, and diff the two outputs; the file's own
 header has the commands. It has caught three real regressions that the suite did
 not. When a render function is added, add the state that reaches it — the header
 lists what each state is for.
@@ -80,6 +80,17 @@ The same holds when `scripts/main.gd` fails to parse: every test that does
 still reports a pass. An unused local is a parse error here — warnings are
 treated as errors — so check the `SCRIPT ERROR` count on *every* run, including
 the deliberately broken one in a mutation test.
+
+## External reviews
+
+Claude or another external reviewer may run in an isolated Linux VM that cannot
+access the macOS `/Applications` path or execute this repository's configured
+Godot binary. That is a limitation of the review environment, not evidence that
+the commands cannot be run by Codex in the user's macOS workspace. External
+reviews are useful for static analysis, but they do not replace the required
+local verification above. Codex remains responsible for running those checks,
+checking their output for `SCRIPT ERROR`, and reporting the actual results to
+the user or reviewer.
 
 ## Commits
 
