@@ -2073,6 +2073,7 @@ func _test_geometry_sampling_service() -> void:
 	_expect(not bool(GeometrySamplingService.generate(open_component).get("valid", true)), "An open contour should fail visibly at the mesh-pipeline Sampling boundary.")
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
+	application._build_ui()
 	var direct_ancestor := {"id": "direct_ancestor", "name": "bottle", "type": "component", "draw_mode": "primitive", "topology_role": "outer", "parent_component_id": "", "group_id": "tier1", "visibility": true, "primitive": {"type": "circle", "center": Vector2.ZERO, "diameter_cm": 200.0}, "points": [], "edges": [], "chains": [], "transform": WorldDocumentService.default_component_transform()}
 	var direct_body := {"id": "direct_body", "name": "body_opening01", "type": "component", "draw_mode": "primitive", "topology_role": "outer", "parent_component_id": "direct_ancestor", "group_id": "tier1", "visibility": true, "primitive": {"type": "circle", "center": Vector2.ZERO, "diameter_cm": 100.0}, "points": [], "edges": [], "chains": [], "transform": WorldDocumentService.default_component_transform()}
 	var direct_hole := {"id": "direct_hole", "name": "body_opening_hole01", "type": "component", "draw_mode": "primitive", "topology_role": "hole", "parent_component_id": "direct_body", "group_id": "tier1", "visibility": true, "primitive": {"type": "circle", "center": Vector2.ZERO, "diameter_cm": 20.0}, "points": [], "edges": [], "chains": [], "transform": {"position": Vector2(1.5, -0.5), "rotation": 20.0, "scale": Vector2(1.2, 0.7), "pivot": Vector2.ZERO}}
@@ -2108,6 +2109,28 @@ func _test_geometry_sampling_service() -> void:
 	direct_hole["visibility"] = false
 	_expect(application._geometry_sampling_hole_components(direct_hole_asset, "direct_body").is_empty(), "Hiding a Hole Component should disable its constraint effect on the Parent.")
 	direct_hole["visibility"] = true
+	direct_hole["parent_component_id"] = ""
+	var orphan_hole_issue := WorldDocumentService.constraint_hole_parent_validation_issue(direct_hole_asset, direct_hole)
+	var orphan_hole_attention: PackedStringArray = application._mesh_batch_summary([] as Array[Dictionary]).get("attention", PackedStringArray())
+	_expect(orphan_hole_issue.contains("requires a direct outer Parent Body") and not ComponentHierarchy.can_parent(direct_hole_asset, "direct_hole", "") and str(orphan_hole_attention).contains("body_opening_hole01") and str(orphan_hole_attention).contains(orphan_hole_issue), "A visible ordinary Hole without a Parent must be rejected by hierarchy editing and reported in the Mesh batch instead of disappearing silently.")
+	direct_hole["parent_component_id"] = "direct_body"
+	direct_body["visibility"] = false
+	_expect(WorldDocumentService.constraint_hole_parent_validation_issue(direct_hole_asset, direct_hole).contains("must be visible"), "A visible ordinary Hole must report when its direct Parent Body is hidden.")
+	direct_body["visibility"] = true
+	_expect(not ComponentHierarchy.can_parent(direct_hole_asset, "direct_body", "direct_hole"), "An ordinary Hole must not accept Runtime Component children.")
+	var role_option := OptionButton.new()
+	role_option.add_item("Outer")
+	role_option.set_item_metadata(0, "outer")
+	role_option.add_item("Hole")
+	role_option.set_item_metadata(1, "hole")
+	application.selected_asset_id = "direct_hole_asset"
+	application.selected_component_id = "direct_ancestor"
+	application._on_component_topology_role_selected(1, role_option)
+	_expect(str(direct_ancestor.get("topology_role", "outer")) == "outer", "The Inspector must reject changing a root Component to an ordinary Hole.")
+	application.selected_component_id = "direct_body"
+	application._on_component_topology_role_selected(1, role_option)
+	_expect(str(direct_body.get("topology_role", "outer")) == "outer", "The Inspector must reject changing a Component with children to an ordinary Hole.")
+	role_option.free()
 	direct_hole["parent_component_id"] = "direct_ancestor"
 	_expect(application._get_sampling_input(direct_hole_asset, "direct_body", "direct_hole", "component").is_empty(), "A Hole selection should stop resolving as soon as the Component leaves the selected Parent.")
 	direct_hole["parent_component_id"] = "direct_body"
@@ -2119,6 +2142,11 @@ func _test_geometry_sampling_service() -> void:
 	var incomplete_holes: Array = application._geometry_sampling_hole_components(direct_hole_asset, "direct_body")
 	var incomplete_issues := GeometrySamplingService.validation_issues(direct_body, [], incomplete_holes)
 	_expect(incomplete_holes.size() == 2 and "unfinished_hole: Primitive Component needs a Circle or Ellipse." in incomplete_issues, "An unfinished Primitive Hole should remain visible as a named blocking constraint instead of being silently ignored.")
+	var invalid_hole_a: Dictionary = application._geometry_sampling_invalid_hole("invalid_hole", "invalid_hole", "Referenced source Asset is missing.")
+	var invalid_hole_b: Dictionary = application._geometry_sampling_invalid_hole("invalid_hole", "invalid_hole", "Referenced Asset has no visible closed Loop or Primitive Body.")
+	var invalid_recipes := GeometryAutoBuildService.automatic_recipes(direct_body, [], [invalid_hole_a])
+	_expect(str(invalid_hole_a.get("topology_role", "")) == "hole" and invalid_hole_a.get("transform", null) is Dictionary and invalid_hole_a.get("sampling_transform", null) is Transform2D, "An invalid Hole placeholder should retain the full Hole contract used by Sampling and provenance.")
+	_expect(not GeometryAutoBuildService.signatures_match(GeometryAutoBuildService.source_signature(direct_body, [], [invalid_hole_a], invalid_recipes), GeometryAutoBuildService.source_signature(direct_body, [], [invalid_hole_b], invalid_recipes)), "Changing an invalid Hole's diagnostic must invalidate automatic Mesh provenance.")
 	direct_hole_asset["components"].erase(incomplete_hole)
 	var bezier_body := direct_body.duplicate(true)
 	bezier_body.merge({"id": "bezier_body", "name": "bezier_body", "parent_component_id": "", "group_id": "", "transform": WorldDocumentService.default_component_transform()}, true)
@@ -2154,6 +2182,20 @@ func _test_geometry_sampling_service() -> void:
 			reference_sample_count += 1
 			reference_sample_ids[str(sample.get("id", ""))] = true
 	_expect(resolved_reference_holes.size() == 2 and bool(sampled_reference_holes.get("valid", false)) and reference_sample_ids.size() == reference_sample_count, "A Reference Hole should resolve every visible source body with collision-free analytic Sample IDs.")
+	var invalid_reference_primitive := source_circle_a.duplicate(true)
+	invalid_reference_primitive["primitive"] = {}
+	var invalid_reference_hole: Dictionary = application._geometry_sampling_hole_source(invalid_reference_primitive, "invalid_reference_hole", "hole_reference", "hole_reference", Transform2D.IDENTITY)
+	_expect(str(invalid_reference_hole.get("topology_role", "")) == "hole" and not str(invalid_reference_hole.get("sampling_error", "")).is_empty(), "An invalid Primitive resolved through a Hole Reference must still carry Hole topology and a visible diagnostic.")
+	hole_reference["source_asset_id"] = "missing_source"
+	var missing_reference_holes: Array = application._geometry_sampling_hole_components(reference_hole_asset, "reference_body")
+	_expect(missing_reference_holes.size() == 1 and str(missing_reference_holes[0].get("sampling_error", "")) == "Referenced source Asset is missing.", "A Hole Reference with a missing source Asset should remain a named blocking Sampling input.")
+	hole_reference["source_asset_id"] = "hole_source"
+	source_circle_a["visibility"] = false
+	source_circle_b["visibility"] = false
+	var hidden_reference_holes: Array = application._geometry_sampling_hole_components(reference_hole_asset, "reference_body")
+	_expect(hidden_reference_holes.size() == 1 and str(hidden_reference_holes[0].get("sampling_error", "")).contains("no visible Closed Loop or Primitive boundary"), "A Hole Reference whose source has no visible Body should remain a named blocking Sampling input.")
+	source_circle_a["visibility"] = true
+	source_circle_b["visibility"] = true
 	_expect(WorldDocumentService.has_supported_schema({"schema_version": 62}) and WorldDocumentService.has_supported_schema({"schema_version": 61}) and not WorldDocumentService.has_supported_schema({"schema_version": 63}), "Schema 62 should keep current and older World documents readable and reject unknown future schemas.")
 	_expect(WorldDocumentService.normalize_component_draw_mode("ribbon", 39) == "contour" and WorldDocumentService.normalize_component_draw_mode("contour", 42) == "contour", "Schema-42 loading must retain the explicit legacy Ribbon-to-Contour migration boundary.")
 	_expect(WorldDocumentService.normalize_component_draw_mode("ribbon", 42) == "ribbon", "Current-schema Ribbon data must remain visibly invalid instead of receiving a silent backward fallback.")
@@ -3771,6 +3813,16 @@ func _test_runtime_export_service() -> void:
 	var constraint_hole_result := RuntimeExportService.build_manifest(asset_with_constraint_hole, {"component_a": source, "component_b": source})
 	var constraint_hole_components: Array = constraint_hole_result.get("manifest", {}).get("components", [])
 	_expect(bool(constraint_hole_result.get("valid", false)) and constraint_hole_components.size() == 2 and not constraint_hole_components.any(func(entry: Dictionary) -> bool: return str(entry.get("component_id", "")) == "component_hole"), "An ordinary Hole should remain an authoring constraint and export neither Fill nor Contour Stroke geometry.")
+	var orphan_hole_asset: Dictionary = asset_with_constraint_hole.duplicate(true)
+	orphan_hole_asset["components"][2]["parent_component_id"] = ""
+	var orphan_hole_result := RuntimeExportService.build_manifest(orphan_hole_asset, {"component_a": source, "component_b": source})
+	_expect(not bool(orphan_hole_result.get("valid", true)) and str(orphan_hole_result.get("errors", [])).contains("requires a direct outer Parent Body"), "A visible ordinary Hole without a direct Parent Body must block Runtime export with its own validation issue instead of disappearing silently.")
+	var child_of_hole: Dictionary = eye.duplicate(true)
+	child_of_hole.merge({"id": "component_hole_child", "name": "hole_child", "parent_component_id": "component_hole"}, true)
+	var nested_hole_asset: Dictionary = asset_with_constraint_hole.duplicate(true)
+	nested_hole_asset["components"].append(child_of_hole)
+	var nested_hole_result := RuntimeExportService.build_manifest(nested_hole_asset, {"component_a": source, "component_b": source, "component_hole_child": source})
+	_expect(not bool(nested_hole_result.get("valid", true)) and str(nested_hole_result.get("errors", [])).contains("constraint-only Hole") and str(nested_hole_result.get("errors", [])).contains("body_hole"), "A Runtime Component below an ordinary Hole must fail with a tailored hierarchy error that names the Hole.")
 	var socket := AssetGuide.create_weapon_frame("guide_socket", AssetGuide.WEAPON_SOCKET_PRIMARY, "component", "component_b")
 	socket["transform"]["position"] = Vector2(3.0, 4.0)
 	var reach_limit := AssetGuide.create_weapon_frame("guide_reach_limit", AssetGuide.REACH_LIMIT_PRIMARY, "component", "component_b")
@@ -3919,7 +3971,8 @@ func _test_weighting_service_and_ui() -> void:
 	document["meshing"]["bakes"][GeometryMeshingService.CONSTRAINED_MESH] = mesh
 	document["component_mesh"] = {"bake_id": "mesh_weighting", "method": GeometryMeshingService.CONSTRAINED_MESH, "mesh_fingerprint": GeometryUVMappingService.mesh_fingerprint(mesh)}
 	document["weighting"]["styles"].append(gradient_style)
-	var weighting_assets: Array[Dictionary] = [{"id": "asset_weighting", "name": "Asset", "visibility": true, "components": [component], "guides": []}]
+	var constraint_hole := {"id": "component_weighting_hole", "name": "opening", "type": "component", "draw_mode": "primitive", "topology_role": "hole", "visibility": true, "parent_component_id": "component_weighting", "transform": WorldDocumentService.default_component_transform(), "primitive": {"type": "circle", "center": Vector2.ZERO, "diameter_cm": 2.0}, "points": [], "edges": [], "chains": []}
+	var weighting_assets: Array[Dictionary] = [{"id": "asset_weighting", "name": "Asset", "visibility": true, "components": [component], "groups": [], "guides": []}]
 	application.assets = weighting_assets
 	application.geometry_documents["asset_weighting/component_weighting"] = document
 	application._build_ui()
@@ -3930,7 +3983,6 @@ func _test_weighting_service_and_ui() -> void:
 	application.active_style_submodule = "Weighting"
 	application._generate_weighting_preview()
 	_expect(application.weighting_workspace.visible and WeightingService.result_matches(application.weighting_preview, mesh, gradient_style), "Style Weighting should show a generated Mesh heatmap from the explicit Component Mesh and selected Style.")
-
 	# The Weighting dropdowns are built from item descriptors, so what each entry
 	# writes back is only checked here.
 	application._render_inspector()
@@ -3971,6 +4023,18 @@ func _test_weighting_service_and_ui() -> void:
 		"The Weighting Inspector should print the Vertex count of the baked result.")
 	var round_trip: Dictionary = WorldDocumentService.normalize_geometry_document(WorldDocumentService.serialize_geometry_document(document), "asset_weighting", "component_weighting")
 	_expect(round_trip.get("weighting", {}).get("styles", []).size() == 1 and int(round_trip.get("weighting", {}).get("styles", [])[0].get("bake", {}).get("weight_count", 0)) == int(mesh.get("vertex_count", 0)), "Weighting Styles and per-Vertex Bakes should survive Geometry persistence.")
+	weighting_assets[0]["components"].append(constraint_hole)
+	application.expanded_assets["asset_weighting"] = true
+	application._render_outliner()
+	_expect(_button_starting_with(application.outliner_view, "opening ·") == null, "Style Weighting must omit ordinary constraint-only Holes from its Component rows.")
+	application._select_weighting_component("asset_weighting", "component_weighting_hole")
+	_expect(application.selected_component_id == "component_weighting", "Style Weighting must refuse navigation to an ordinary Hole.")
+	application.selected_component_id = "component_weighting_hole"
+	application.selected_weighting_style_id = ""
+	application._update_context_action_button()
+	_expect(application.create_action_button.disabled and application._weighting_inspector_context().is_empty(), "An ordinary Hole selection must disable Style creation and expose no Weighting Inspector context.")
+	application._create_weighting_style("asset_weighting", "component_weighting_hole")
+	_expect(not application.geometry_documents.has("asset_weighting/component_weighting_hole"), "Creating a Weighting Style must not create a Geometry document for an ordinary Hole.")
 	application.free()
 
 
@@ -5124,6 +5188,19 @@ func _test_sampling_input_kind_from_seeding_selection() -> void:
 	application._render_inspector()
 	_expect(_button_starting_with(application.geometry_inspector_view, "▾  Boundary Density") == null,
 		"A selected Spine should not produce a Boundary Density block in Sampling.")
+	application.selected_component_id = "component_1"
+	application.selected_sampling_input_id = "component_2"
+	application.selected_sampling_input_kind = "component"
+	hole["visibility"] = false
+	application._refresh_geometry_sampling_workspace()
+	_expect(application.geometry_sampling_workspace.selected_input_id.is_empty(), "The Sampling Workspace must clear a selected Hole highlight as soon as that input becomes hidden.")
+	hole["visibility"] = true
+	application.selected_sampling_input_id = "guide_1"
+	application.selected_sampling_input_kind = "guide"
+	cut["scope"]["component_id"] = "other_component"
+	application._refresh_geometry_sampling_workspace()
+	_expect(application.geometry_sampling_workspace.selected_input_id.is_empty(), "The Sampling Workspace must clear a selected Cut highlight when the Guide no longer belongs to the selected Body.")
+	cut["scope"]["component_id"] = "component_1"
 	application.free()
 
 
@@ -5177,7 +5254,7 @@ const CREATE_SIGNAL_ROUTES := [
 const CREATE_PROBE_CASES := ["asset", "asset_reference", "component", "component_grouped",
 	"component_contour", "primitive_circle", "primitive_hole", "primitive_ellipse", "group", "guide",
 	"guide_weapon", "region_authored", "region_component", "multi_component", "point_none", "point_one", "point_many",
-	"edge_none", "edge_one", "edge_many", "face"]
+	"edge_none", "edge_one", "edge_many", "hole_edge_one", "hole_edge_many", "face"]
 
 
 func _create_wiring_asset() -> Dictionary:
@@ -5199,6 +5276,11 @@ func _create_wiring_asset() -> Dictionary:
 	hole["primitive"] = {"type": "circle", "diameter_cm": 2.0}
 	hole["parent_component_id"] = "component_1"
 	hole["topology_role"] = "hole"
+	var bezier_hole := _outliner_test_component("component_9", "opening_curve")
+	bezier_hole["parent_component_id"] = "component_1"
+	bezier_hole["topology_role"] = "hole"
+	for chain in bezier_hole.get("chains", []):
+		chain["topology_role"] = "hole"
 	var ellipse := _outliner_test_component("component_5", "egg")
 	ellipse["draw_mode"] = "primitive"
 	ellipse["primitive"] = {"type": PrimitiveGeometryService.ELLIPSE,
@@ -5216,7 +5298,7 @@ func _create_wiring_asset() -> Dictionary:
 	var inherited_region := authored_region.duplicate(true)
 	inherited_region.merge({"id": "component_7", "name": "hurt_region", "region_type": "hurt", "region_geometry_source": "component"}, true)
 	return {"id": "asset_1", "name": "Wizard", "visibility": true,
-		"components": [body, arm, outline, circle, ellipse, authored_region, inherited_region, hole], "groups": [group],
+		"components": [body, arm, outline, circle, ellipse, authored_region, inherited_region, hole, bezier_hole], "groups": [group],
 		"guides": [guide, weapon], "asset_pivot": Vector2(5.0, 6.0),
 		"root_position": Vector2.ZERO, "root_scale": Vector2.ONE}
 
@@ -5304,6 +5386,18 @@ func _prepare_create_case(application: Control, case_name: String) -> void:
 			# branch further down rebuild().
 			application.selected_component_id = "component_1"
 			application.selected_edge_id = edge_ids[0]
+		"hole_edge_one", "hole_edge_many":
+			var bezier_hole: Dictionary = WorldDocumentService.component_by_id(asset, "component_9")
+			var hole_edge_ids: Array[String] = []
+			for edge in bezier_hole.get("edges", []):
+				hole_edge_ids.append(str(edge.get("id", "")))
+			application.selected_component_id = "component_9"
+			if case_name == "hole_edge_one":
+				application.selected_edge_id = hole_edge_ids[0]
+			else:
+				application.active_state = "edit"
+				application.active_edit_mode = "edge"
+				application.selected_edge_ids = [hole_edge_ids[0], hole_edge_ids[1]] as Array[String]
 		"face":
 			application.selected_component_id = "component_1"
 			application.active_state = "edit"

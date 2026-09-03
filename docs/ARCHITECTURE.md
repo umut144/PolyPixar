@@ -234,6 +234,8 @@ Detail. A Hole Child may be an ordinary Closed Loop or Primitive, or an Asset
 Reference; its exclusion applies only to its direct outer Parent and only while
 the Hole is effectively visible. Ordinary Hole Components are constraint-only:
 they receive no independent Mesh pipeline and are omitted from Runtime export.
+They cannot be rooted, own Component children, or receive Weighting Styles; a
+visible invalid Hole is surfaced as a Mesh/Runtime validation issue.
 A Hole Reference continues to export its source Asset instance, while owning no
 Fill or Contour Stroke Mesh itself. Hole and Cut inputs
 may apply a boundary-density factor from `0.25×` through `16×`. Values below
@@ -563,7 +565,9 @@ describes how the editor produces that contract.
 
 `RuntimeExportService` builds Manifest schema 16 exclusively from current
 accepted Fill and Contour Stroke Mesh Bakes. Ordinary Hole Components are
-authoring-only Sampling constraints and do not enter the Manifest. For a closed Contour, the current
+authoring-only Sampling constraints and do not enter the Manifest. A visible
+ordinary Hole with no valid direct outer Parent Body blocks export, as does a
+Runtime Component loaded beneath such a Hole. For a closed Contour, the current
 Stroke Bake must also contain its current complete-Boundary region
 triangulation. It rejects missing or stale inputs,
 invalid or duplicate Component Names, non-rebased Scale, unresolved

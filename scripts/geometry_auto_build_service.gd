@@ -359,6 +359,8 @@ static func _append_source_signature(prefix: String, source: Dictionary, topolog
 	var working := source.duplicate(true)
 	BezierGeometry.resolve_auto_handles(working.get("points", []), working.get("chains", []))
 	topology_parts.append("source|%s|%s|%s" % [prefix, str(working.get("draw_mode", "closed_loop")), str(working.get("topology_role", "outer"))])
+	if not str(working.get("sampling_error", "")).is_empty():
+		topology_parts.append("sampling_error|%s|%s" % [prefix, str(working.get("sampling_error", ""))])
 	for point in working.get("points", []):
 		if not point is Dictionary:
 			continue

@@ -967,6 +967,45 @@ static func is_reference_component(component: Dictionary) -> bool:
 	return str(component.get("type", "component")) == "reference"
 
 
+static func is_constraint_only_hole(component: Dictionary) -> bool:
+	return not is_reference_component(component) and not is_region(component) \
+		and str(component.get("topology_role", "outer")) == "hole"
+
+
+static func component_effectively_visible(asset: Dictionary, component: Dictionary) -> bool:
+	if component.is_empty() or not bool(component.get("visibility", true)):
+		return false
+	var group := ComponentHierarchy.group_by_id(asset,
+		ComponentHierarchy.membership_group_id(asset, str(component.get("id", ""))))
+	if group.is_empty():
+		return true
+	if not bool(group.get("visibility", true)):
+		return false
+	var group_parent_id := ComponentHierarchy.group_parent_id(group)
+	return group_parent_id.is_empty() or component_effectively_visible(asset,
+		ComponentHierarchy.component_by_id(asset, group_parent_id))
+
+
+static func constraint_hole_parent_validation_issue(asset: Dictionary, component: Dictionary) -> String:
+	if not is_constraint_only_hole(component):
+		return ""
+	var parent_id := str(component.get("parent_component_id", ""))
+	if parent_id.is_empty():
+		return "Hole Component requires a direct outer Parent Body."
+	var parent := component_by_id(asset, parent_id)
+	if parent.is_empty():
+		return "Hole Component references a missing Parent '%s'." % parent_id
+	if is_reference_component(parent) or is_region(parent) \
+		or str(parent.get("topology_role", "outer")) != "outer" \
+		or str(parent.get("draw_mode", "closed_loop")) not in ["closed_loop", "primitive"]:
+		return "Hole Component Parent '%s' must be an outer Closed Loop or Primitive Body." % normalized_component_name(parent)
+	if not component_effectively_visible(asset, parent):
+		return "Hole Component Parent '%s' must be visible." % normalized_component_name(parent)
+	if str(component.get("draw_mode", "closed_loop")) not in ["closed_loop", "primitive"]:
+		return "Hole Component must use Closed Loop or Primitive Draw Mode."
+	return ""
+
+
 static func normalized_component_name(component: Dictionary) -> String:
 	var normalized_name := str(component.get("name", "")).strip_edges()
 	return normalized_name if not normalized_name.is_empty() else "Component"

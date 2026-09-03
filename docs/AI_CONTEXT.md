@@ -131,7 +131,9 @@ clearance. A Hole may be a direct ordinary Closed Loop or Primitive Child, or a
 direct Asset Reference; it affects that Parent only and is not inherited by
 higher ancestors. Only effectively visible Hole inputs participate. An ordinary
 Hole Component is an authoring constraint: it owns no Fill or Contour Stroke
-Mesh and is omitted from Runtime export. A Hole Reference likewise owns no Mesh,
+Mesh, cannot own Component children or Weighting Styles, and is omitted from
+Runtime export. A visible ordinary Hole without a valid visible direct outer
+Parent Body is reported as a Mesh and Runtime blocker. A Hole Reference likewise owns no Mesh,
 but retains the existing Barde-style Runtime instance of its source Asset.
 Poisson Fill and combined multi-Spine Flow generate
 deterministic previews; an explicit Bake accepts that exact result before manual
@@ -199,7 +201,8 @@ records, and a load/save round trip returns them unchanged.
 
 The persistent `Export Runtime (N)` action automatically considers every visible
 Asset. Every exported Component must have one unique free-form `name`. Ordinary
-Hole Components are authoring-only constraints and are not exported. Other
+Hole Components are authoring-only constraints and are not exported; invalid
+visible Hole parenting blocks export explicitly. Other
 Closed Loop and Primitive ordinary Components require a current Fill Mesh and
 current centered Contour Stroke Mesh. Open Contours require only that Stroke and
 export no Fill or closed region. Closed Contours require the current Stroke Bake

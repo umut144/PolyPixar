@@ -65,7 +65,8 @@ changing a Primitive updates only its metadata and never creates Bézier topolog
 Symbol References own this role independently from the referenced Symbol. An
 ordinary Component authored as `hole` is a visible, editable constraint of its
 direct outer Parent rather than an independent Mesh body; hiding it disables
-the constraint. A Hole Reference still instances its source Asset at Runtime
+the constraint. It cannot live at Asset root, accept Component children, or
+participate in Style Weighting. A Hole Reference still instances its source Asset at Runtime
 but owns no Fill or Contour Stroke Mesh of its own.
 
 ## Closed Loop drafts

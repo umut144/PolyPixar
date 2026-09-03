@@ -257,9 +257,7 @@ func rebuild() -> void:
 	if component.is_empty():
 		return
 	var inherited_region_geometry := WorldDocumentService.region_uses_component_geometry(component)
-	var constraint_only_hole := not WorldDocumentService.is_reference_component(component) \
-		and not WorldDocumentService.is_region(component) \
-		and str(component.get("topology_role", "outer")) == "hole"
+	var constraint_only_hole := WorldDocumentService.is_constraint_only_hole(component)
 	if not inherited_region_geometry and active_state == "edit" and active_edit_mode == "point":
 		var point_ids := valid_point_ids
 		if point_ids.is_empty():
@@ -473,8 +471,9 @@ func rebuild() -> void:
 	add_child(EditorWidgets.create_toggle_field(
 		"Visible", bool(component.get("visibility", true)), component_visibility_changed.emit, 11))
 	if constraint_only_hole:
-		var hole_hint := EditorWidgets.create_inspector_field_label("Cuts only its direct Parent · no Fill, Contour Stroke, or Runtime body")
-		hole_hint.add_theme_color_override("font_color", Color("#9aa3b2"))
+		var hole_issue := WorldDocumentService.constraint_hole_parent_validation_issue(asset, component)
+		var hole_hint := EditorWidgets.create_inspector_field_label(hole_issue if not hole_issue.is_empty() else "Cuts only its direct Parent · no Fill, Contour Stroke, or Runtime body")
+		hole_hint.add_theme_color_override("font_color", Color("#ef8354") if not hole_issue.is_empty() else Color("#9aa3b2"))
 		add_child(hole_hint)
 		return
 	EditorWidgets.add_stacked_number_field(self, {

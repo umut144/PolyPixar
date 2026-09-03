@@ -12,7 +12,10 @@ affects only its immediate outer Parent Body and does not propagate to
 ancestors. Hiding a Hole disables that constraint. An ordinary Hole Component
 owns no independent Fill or Contour Stroke Mesh and is omitted from Runtime
 export; a Hole Reference remains a Runtime instance of its source Asset without
-owning duplicated Mesh geometry.
+owning duplicated Mesh geometry. An ordinary Hole must have one visible direct
+outer Closed Loop or Primitive Parent Body, cannot own Component children, and
+does not participate in Style Weighting. Invalid visible legacy arrangements
+are reported as explicit Mesh and Runtime blockers.
 
 ## Ownership
 

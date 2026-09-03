@@ -2051,7 +2051,9 @@ func _update_context_action_button() -> void:
 	if is_instance_valid(draw_mode_status):
 		draw_mode_status.visible = active_module != "Export"
 	create_action_button.visible = (active_module == "Create" and active_create_submodule in CREATE_SUBMODULES) or (active_module == "Style" and active_style_submodule == "Weighting")
-	create_action_button.disabled = active_module == "Style" and active_style_submodule == "Weighting" and selected_component_id.is_empty()
+	var selected_component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	create_action_button.disabled = active_module == "Style" and active_style_submodule == "Weighting" \
+		and (selected_component_id.is_empty() or _is_constraint_only_hole(selected_component))
 	var show_asset_create_controls := active_module == "Create" and active_create_submodule in CREATE_SUBMODULES
 	if is_instance_valid(snap_button):
 		snap_button.visible = show_asset_create_controls
@@ -4032,7 +4034,12 @@ func _mesh_batch_summary(candidates: Array[Dictionary]) -> Dictionary:
 			continue
 		var asset_id := str(asset.get("id", ""))
 		for component in asset.get("components", []):
-			if not component is Dictionary or not bool(component.get("visibility", true)) or _is_reference_component(component) or _is_region(component) or _is_constraint_only_hole(component):
+			if not component is Dictionary or not _effective_component_visibility(asset, component) or _is_reference_component(component) or _is_region(component):
+				continue
+			if _is_constraint_only_hole(component):
+				var hole_issue := WorldDocumentService.constraint_hole_parent_validation_issue(asset, component)
+				if not hole_issue.is_empty():
+					attention.append("%s / %s — %s" % [str(asset.get("name", "Asset")), str(component.get("name", "Component")), hole_issue])
 				continue
 			var issues := _component_mesh_source_validation_issues(asset, component)
 			var error_message := str(_component_mesh_reference(asset_id, str(component.get("id", ""))).get("last_error", ""))
@@ -4517,7 +4524,7 @@ func _weighting_status(asset_id: String, component_id: String, component: Dictio
 
 func _create_weighting_style(asset_id: String, component_id: String) -> void:
 	var component := _get_component(_get_asset(asset_id), component_id)
-	if component.is_empty():
+	if component.is_empty() or _is_constraint_only_hole(component):
 		_show_status_message("Select a Component before creating a Weighting Style.")
 		return
 	_record_direct_change()
@@ -4565,7 +4572,7 @@ func _refresh_weighting_workspace() -> void:
 	if not is_instance_valid(weighting_workspace):
 		return
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	if component.is_empty():
+	if component.is_empty() or _is_constraint_only_hole(component):
 		weighting_workspace.clear_context()
 		return
 	var style := _weighting_style(selected_asset_id, selected_component_id, selected_weighting_style_id)
@@ -6493,20 +6500,21 @@ func _append_geometry_asset_rows(rows: Array, asset: Dictionary, force_expand: b
 
 func _append_geometry_sampling_rows(rows: Array, asset: Dictionary, component_id: String, guides: Array) -> void:
 	var asset_id := str(asset.get("id", ""))
-	for hole_component in asset.get("components", []):
-		if not _is_geometry_hole_input(asset, hole_component, component_id):
-			continue
-		var hole_component_id := str(hole_component.get("id", ""))
-		var summary := _geometry_sampling_input_summary(asset_id, component_id, hole_component_id, "hole")
-		rows.append({
-			"kind": "hole", "asset_id": asset_id, "component_id": component_id, "target_id": hole_component_id,
-			"indent": 34,
-			"label": "Hole · %s  %s" % [WorldDocumentService.component_outliner_name(assets, hole_component), str(summary.get("label", "↳"))],
-			"tooltip": "Sampling constraint · select the parent Component to edit this boundary",
-			"selected": selected_sampling_input_id == hole_component_id,
-			"style_role": "hole",
-			"badge": "hole"
-		})
+	if _geometry_body_accepts_holes(asset, component_id):
+		for hole_component in asset.get("components", []):
+			if not _is_geometry_hole_candidate(asset, hole_component, component_id):
+				continue
+			var hole_component_id := str(hole_component.get("id", ""))
+			var summary := _geometry_sampling_input_summary(asset_id, component_id, hole_component_id, "hole")
+			rows.append({
+				"kind": "hole", "asset_id": asset_id, "component_id": component_id, "target_id": hole_component_id,
+				"indent": 34,
+				"label": "Hole · %s  %s" % [WorldDocumentService.component_outliner_name(assets, hole_component), str(summary.get("label", "↳"))],
+				"tooltip": "Sampling constraint · select the parent Component to edit this boundary",
+				"selected": selected_sampling_input_id == hole_component_id,
+				"style_role": "hole",
+				"badge": "hole"
+			})
 	for guide in guides:
 		if str(guide.get("scope", {}).get("component_id", "")) != component_id or str(guide.get("guide_type", "")) != AssetGuide.CUT:
 			continue
@@ -6553,9 +6561,10 @@ func _append_geometry_seeding_rows(rows: Array, asset: Dictionary, component: Di
 		"action_id": "open_sampling"
 	})
 	rows.append(_geometry_seeding_input_row(asset_id, component_id, "", "outer", "Outer · %s" % str(component.get("name", "Component")), "Clearance", "Outer"))
-	for hole_component in asset.get("components", []):
-		if _is_geometry_hole_input(asset, hole_component, component_id):
-			rows.append(_geometry_seeding_input_row(asset_id, component_id, str(hole_component.get("id", "")), "hole", "Hole · %s" % WorldDocumentService.component_outliner_name(assets, hole_component), "Excluded", "Hole"))
+	if _geometry_body_accepts_holes(asset, component_id):
+		for hole_component in asset.get("components", []):
+			if _is_geometry_hole_candidate(asset, hole_component, component_id):
+				rows.append(_geometry_seeding_input_row(asset_id, component_id, str(hole_component.get("id", "")), "hole", "Hole · %s" % WorldDocumentService.component_outliner_name(assets, hole_component), "Excluded", "Hole"))
 	for guide in guides:
 		if str(guide.get("scope", {}).get("component_id", "")) != component_id:
 			continue
@@ -6610,6 +6619,8 @@ func _outliner_row_status() -> Dictionary:
 	for asset in assets:
 		var asset_id := str(asset.get("id", ""))
 		for component in asset.get("components", []):
+			if _is_constraint_only_hole(component):
+				continue
 			var component_id := str(component.get("id", ""))
 			var styles: Array = _weighting_styles(asset_id, component_id)
 			var by_style: Dictionary = {}
@@ -6994,7 +7005,10 @@ func _set_sampling_input(asset_id: String, input_id: String, kind: String) -> vo
 			return
 	elif kind == "guide":
 		var guide := _get_guide(asset, input_id)
-		if not guide.is_empty() and str(guide.get("guide_type", "")) == AssetGuide.CUT:
+		var scope: Dictionary = guide.get("scope", {}) if not guide.is_empty() else {}
+		if not guide.is_empty() and str(guide.get("guide_type", "")) == AssetGuide.CUT \
+			and str(scope.get("kind", "component")) == "component" \
+			and str(scope.get("component_id", "")) == selected_component_id:
 			selected_sampling_input_id = input_id
 			selected_sampling_input_kind = "guide"
 			return
@@ -7962,20 +7976,8 @@ func _group_world_center(asset: Dictionary, component_ids: Array) -> Vector2:
 	return center / float(component_ids.size())
 
 
-func _component_group(asset: Dictionary, component: Dictionary) -> Dictionary:
-	return ComponentHierarchy.group_by_id(asset, ComponentHierarchy.membership_group_id(asset, str(component.get("id", ""))))
-
-
 func _effective_component_visibility(asset: Dictionary, component: Dictionary) -> bool:
-	var group := _component_group(asset, component)
-	if component.is_empty() or not bool(component.get("visibility", true)):
-		return false
-	if group.is_empty():
-		return true
-	if not bool(group.get("visibility", true)):
-		return false
-	var group_parent_id := ComponentHierarchy.group_parent_id(group)
-	return group_parent_id.is_empty() or _effective_component_visibility(asset, _get_component(asset, group_parent_id))
+	return WorldDocumentService.component_effectively_visible(asset, component)
 
 
 func _effective_component_z_index(_asset: Dictionary, component: Dictionary) -> int:
@@ -9062,7 +9064,11 @@ func _confirm_guide_deletion() -> void:
 
 func _get_sampling_input(asset: Dictionary, parent_component_id: String, input_id: String, input_kind: String) -> Dictionary:
 	if input_kind == "guide":
-		return _get_guide(asset, input_id)
+		var guide := _get_guide(asset, input_id)
+		var scope: Dictionary = guide.get("scope", {}) if not guide.is_empty() else {}
+		return guide if str(guide.get("guide_type", "")) == AssetGuide.CUT \
+			and str(scope.get("kind", "component")) == "component" \
+			and str(scope.get("component_id", "")) == parent_component_id else {}
 	if input_kind == "component":
 		for component in asset.get("components", []):
 			if str(component.get("id", "")) == input_id and _is_geometry_hole_input(asset, component, parent_component_id):
@@ -9310,14 +9316,19 @@ func _refresh_geometry_sampling_workspace() -> void:
 		and str(geometry_sampling_preview.get("source_fingerprint", "")) == GeometrySamplingService.source_fingerprint(component, cut_guides, hole_components) else {}
 	var bake := _geometry_sampling_bake(selected_asset_id, selected_component_id)
 	var overlays := _geometry_sampling_overlays(asset, selected_component_id)
-	geometry_sampling_workspace.set_context(component, preview, bake, _geometry_sampling_status(selected_asset_id, selected_component_id, component), overlays, selected_sampling_input_id)
+	var workspace_input_id := selected_sampling_input_id
+	if _get_sampling_input(asset, selected_component_id, workspace_input_id, selected_sampling_input_kind).is_empty():
+		workspace_input_id = ""
+	geometry_sampling_workspace.set_context(component, preview, bake, _geometry_sampling_status(selected_asset_id, selected_component_id, component), overlays, workspace_input_id)
 
 
 func _geometry_sampling_hole_components(asset: Dictionary, component_id: String) -> Array:
 	var result: Array = []
+	if not _geometry_body_accepts_holes(asset, component_id):
+		return result
 	var parent_inverse := ComponentHierarchy.world_transform(asset, component_id).affine_inverse()
 	for hole_input in asset.get("components", []):
-		if not _is_geometry_hole_input(asset, hole_input, component_id):
+		if not _is_geometry_hole_candidate(asset, hole_input, component_id):
 			continue
 		var input_id := str(hole_input.get("id", ""))
 		var input_label := WorldDocumentService.component_outliner_name(assets, hole_input)
@@ -9350,7 +9361,7 @@ func _geometry_sampling_hole_components(asset: Dictionary, component_id: String)
 
 
 func _is_constraint_only_hole(component: Variant) -> bool:
-	return component is Dictionary and not _is_reference_component(component) and not _is_region(component) and str(component.get("topology_role", "outer")) == "hole"
+	return component is Dictionary and WorldDocumentService.is_constraint_only_hole(component)
 
 
 func _geometry_body_accepts_holes(asset: Dictionary, component_id: String) -> bool:
@@ -9359,7 +9370,12 @@ func _geometry_body_accepts_holes(asset: Dictionary, component_id: String) -> bo
 
 
 func _is_geometry_hole_input(asset: Dictionary, component: Variant, parent_component_id: String) -> bool:
-	if not component is Dictionary or _is_region(component) or not _geometry_body_accepts_holes(asset, parent_component_id):
+	return _geometry_body_accepts_holes(asset, parent_component_id) \
+		and _is_geometry_hole_candidate(asset, component, parent_component_id)
+
+
+func _is_geometry_hole_candidate(asset: Dictionary, component: Variant, parent_component_id: String) -> bool:
+	if not component is Dictionary or _is_region(component):
 		return false
 	if str(component.get("parent_component_id", "")) != parent_component_id or str(component.get("topology_role", "outer")) != "hole" or not _effective_component_visibility(asset, component):
 		return false
@@ -9367,7 +9383,10 @@ func _is_geometry_hole_input(asset: Dictionary, component: Variant, parent_compo
 
 
 func _geometry_sampling_invalid_hole(input_id: String, input_label: String, error: String) -> Dictionary:
-	return {"id": input_id, "sampling_input_id": input_id, "sampling_input_label": input_label, "sampling_error": error, "draw_mode": "closed_loop", "points": [], "edges": [], "chains": []}
+	return {"id": input_id, "sampling_input_id": input_id, "sampling_input_label": input_label,
+		"sampling_error": error, "draw_mode": "closed_loop", "topology_role": "hole",
+		"transform": WorldDocumentService.default_component_transform(),
+		"sampling_transform": Transform2D.IDENTITY, "points": [], "edges": [], "chains": []}
 
 
 func _geometry_sampling_hole_source(source_component: Dictionary, hole_id: String, input_id: String, input_label: String, transform: Transform2D) -> Dictionary:
@@ -9384,6 +9403,7 @@ func _geometry_sampling_hole_source(source_component: Dictionary, hole_id: Strin
 		invalid_primitive["id"] = hole_id
 		invalid_primitive["sampling_input_id"] = input_id
 		invalid_primitive["sampling_input_label"] = input_label
+		invalid_primitive["topology_role"] = "hole"
 		invalid_primitive["sampling_transform"] = transform
 		var primitive_issues := PrimitiveGeometryService.validation_issues(invalid_primitive)
 		invalid_primitive["sampling_error"] = str(primitive_issues[0]) if not primitive_issues.is_empty() else "Primitive boundary is invalid."
@@ -9981,7 +10001,7 @@ func _weighting_inspector_context() -> Dictionary:
 	# The Weighting Inspector shows one Style of one Component plus the state of
 	# its Mesh and preview; all of that is resolved here.
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	if component.is_empty():
+	if component.is_empty() or _is_constraint_only_hole(component):
 		return {}
 	var style := _weighting_style(selected_asset_id, selected_component_id, selected_weighting_style_id)
 	var result: Dictionary = weighting_preview if weighting_preview_key == _weighting_preview_id(selected_asset_id, selected_component_id, selected_weighting_style_id) else style.get("bake", {})
@@ -10058,10 +10078,11 @@ func _geometry_sampling_inspector_context(component: Dictionary) -> Dictionary:
 	var asset := _get_asset(selected_asset_id)
 	var display_result := geometry_sampling_preview if _geometry_sampling_preview_matches(selected_asset_id, selected_component_id, component) else _geometry_sampling_bake(selected_asset_id, selected_component_id)
 	var boundary_rows: Array = []
-	for hole_component in asset.get("components", []):
-		if _is_geometry_hole_input(asset, hole_component, selected_component_id):
-			boundary_rows.append({"title": "Hole · %s" % WorldDocumentService.component_outliner_name(assets, hole_component),
-				"input_id": str(hole_component.get("id", "")), "role": "hole", "kind": "hole"})
+	if _geometry_body_accepts_holes(asset, selected_component_id):
+		for hole_component in asset.get("components", []):
+			if _is_geometry_hole_candidate(asset, hole_component, selected_component_id):
+				boundary_rows.append({"title": "Hole · %s" % WorldDocumentService.component_outliner_name(assets, hole_component),
+					"input_id": str(hole_component.get("id", "")), "role": "hole", "kind": "hole"})
 	for guide in asset.get("guides", []):
 		if str(guide.get("scope", {}).get("component_id", "")) != selected_component_id or str(guide.get("guide_type", "")) != AssetGuide.CUT:
 			continue
@@ -12331,12 +12352,23 @@ func _on_component_hierarchy_parent_selected(index: int, option: OptionButton) -
 
 
 func _on_component_topology_role_selected(index: int, option: OptionButton) -> void:
-	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	var asset := _get_asset(selected_asset_id)
+	var component := _get_component(asset, selected_component_id)
 	if component.is_empty() or index < 0 or index >= option.item_count:
 		return
 	var role := str(option.get_item_metadata(index))
 	if role not in ["outer", "hole"] or role == str(component.get("topology_role", "outer")):
 		return
+	if role == "hole" and not _is_reference_component(component):
+		var proposed_hole := component.duplicate(false)
+		proposed_hole["topology_role"] = "hole"
+		var hole_issue := WorldDocumentService.constraint_hole_parent_validation_issue(asset, proposed_hole)
+		if hole_issue.is_empty() and not ComponentHierarchy.children(asset, selected_component_id).is_empty():
+			hole_issue = "Detach child Components before changing this Component to Hole."
+		if not hole_issue.is_empty():
+			_show_status_message(hole_issue)
+			_invalidate_render(RENDER_INSPECTOR)
+			return
 	_record_direct_change()
 	component["topology_role"] = role
 	for chain in component.get("chains", []):
@@ -12950,6 +12982,8 @@ func _select_weighting_asset(asset_id: String) -> void:
 
 
 func _select_weighting_component(asset_id: String, component_id: String) -> void:
+	if _is_constraint_only_hole(_get_component(_get_asset(asset_id), component_id)):
+		return
 	selected_asset_id = asset_id
 	selected_component_id = component_id
 	selected_weighting_style_id = ""
@@ -12958,7 +12992,8 @@ func _select_weighting_component(asset_id: String, component_id: String) -> void
 
 
 func _select_weighting_style(asset_id: String, component_id: String, style_id: String) -> void:
-	if _weighting_style(asset_id, component_id, style_id).is_empty():
+	if _is_constraint_only_hole(_get_component(_get_asset(asset_id), component_id)) \
+		or _weighting_style(asset_id, component_id, style_id).is_empty():
 		return
 	selected_asset_id = asset_id
 	selected_component_id = component_id

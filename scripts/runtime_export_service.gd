@@ -23,10 +23,19 @@ static func build_manifest(asset: Dictionary, sources: Dictionary) -> Dictionary
 	var visible_components: Array[Dictionary] = []
 	var ids: Dictionary = {}
 	var names: Dictionary = {}
+	var all_components_by_id: Dictionary = {}
+	for raw_component in asset.get("components", []):
+		if raw_component is Dictionary:
+			var raw_component_id := str(raw_component.get("id", ""))
+			if not raw_component_id.is_empty():
+				all_components_by_id[raw_component_id] = raw_component
 	for raw_component in asset.get("components", []):
 		if not raw_component is Dictionary or str(raw_component.get("type", "component")) == "region" or not _effective_visibility(asset, raw_component):
 			continue
-		if str(raw_component.get("type", "component")) != "reference" and str(raw_component.get("topology_role", "outer")) == "hole":
+		if WorldDocumentService.is_constraint_only_hole(raw_component):
+			var hole_issue := WorldDocumentService.constraint_hole_parent_validation_issue(asset, raw_component)
+			if not hole_issue.is_empty():
+				errors.append("%s: %s" % [_component_label(raw_component), hole_issue])
 			continue
 		var component: Dictionary = raw_component.duplicate(true)
 		component["z_index"] = _effective_z_index(asset, component)
@@ -51,7 +60,11 @@ static func build_manifest(asset: Dictionary, sources: Dictionary) -> Dictionary
 	for component in visible_components:
 		var parent_id := str(component.get("parent_component_id", ""))
 		if not parent_id.is_empty() and not ids.has(parent_id):
-			errors.append("%s: parent '%s' is not part of the visible export set." % [_component_label(component), parent_id])
+			var omitted_parent: Dictionary = all_components_by_id.get(parent_id, {})
+			if WorldDocumentService.is_constraint_only_hole(omitted_parent):
+				errors.append("%s: Parent '%s' is a constraint-only Hole and cannot own Runtime Components." % [_component_label(component), _component_label(omitted_parent)])
+			else:
+				errors.append("%s: parent '%s' is not part of the visible export set." % [_component_label(component), parent_id])
 		var authored_transform = component.get("transform", {})
 		var authored_scale := Vector2.ONE
 		if authored_transform is Dictionary:
@@ -722,26 +735,8 @@ static func _component_less(a: Dictionary, b: Dictionary) -> bool:
 	return str(a.get("id", "")) < str(b.get("id", "")) if z_a == z_b else z_a < z_b
 
 
-static func _effective_group(asset: Dictionary, component: Dictionary) -> Dictionary:
-	var group_id := ComponentHierarchy.membership_group_id(asset, str(component.get("id", "")))
-	if group_id.is_empty():
-		return {}
-	for group in asset.get("groups", []):
-		if group is Dictionary and str(group.get("id", "")) == group_id:
-			return group
-	return {}
-
-
 static func _effective_visibility(asset: Dictionary, component: Dictionary) -> bool:
-	var group := _effective_group(asset, component)
-	if component.is_empty() or not bool(component.get("visibility", true)):
-		return false
-	if group.is_empty():
-		return true
-	if not bool(group.get("visibility", true)):
-		return false
-	var parent_component_id := ComponentHierarchy.group_parent_id(group)
-	return parent_component_id.is_empty() or _effective_visibility(asset, ComponentHierarchy.component_by_id(asset, parent_component_id))
+	return WorldDocumentService.component_effectively_visible(asset, component)
 
 
 static func _effective_z_index(_asset: Dictionary, component: Dictionary) -> int:

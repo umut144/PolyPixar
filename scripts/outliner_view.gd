@@ -355,6 +355,8 @@ func _render_weighting_outliner() -> void:
 		var asset_matches := search_text.is_empty() or str(asset.get("name", "")).to_lower().contains(search_text)
 		var component_matches := false
 		for component in asset.get("components", []):
+			if WorldDocumentService.is_constraint_only_hole(component):
+				continue
 			if str(component.get("name", "")).to_lower().contains(search_text):
 				component_matches = true
 				break
@@ -376,6 +378,8 @@ func _render_weighting_outliner() -> void:
 		if not bool(expanded_assets.get(asset_id, false)) and search_text.is_empty():
 			continue
 		for component in asset.get("components", []):
+			if WorldDocumentService.is_constraint_only_hole(component):
+				continue
 			var component_id := str(component.get("id", ""))
 			var component_row := HBoxContainer.new()
 			var indent := Control.new()

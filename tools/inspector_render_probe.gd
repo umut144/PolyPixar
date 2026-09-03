@@ -1,6 +1,6 @@
 # Inspector render probe.
 #
-# Renders the Inspector in 49 fixed states and prints one line per control with
+# Renders the Inspector in 52 fixed states and prints one line per control with
 # the properties a reader would notice: values, ranges, item lists, selections,
 # pressed state, disabled state, captions, colours and tooltips. It asserts
 # nothing on its own. It is run before and after a change that is meant to leave
@@ -16,7 +16,8 @@
 # nothing.
 #
 # The state list covers Create (Asset, Component, Group, Guide, weapon Guide,
-# grouped Component, Contour Component, Circle, Hole, and Ellipse Primitive, authored
+# grouped Component, Contour Component, Circle, valid and invalid Hole, Hole Edge
+# modes, and Ellipse Primitive, authored
 # and Component-geometry Regions, two
 # selected Components, Reference Image, Point mode with none, one and two
 # Points, Edge mode with none, one and two Edges, Face mode), Mesh
@@ -112,6 +113,11 @@ func _init() -> void:
 	var direct_hole := {"points": [], "edges": [], "chains": [], "id": "component_11", "name": "opening",
 		"visibility": true, "draw_mode": "primitive", "primitive": {"type": "circle", "diameter_cm": 2.0},
 		"parent_component_id": "component_1", "topology_role": "hole"}
+	var bezier_hole: Dictionary = comp.duplicate(true)
+	bezier_hole.merge({"id": "component_12", "name": "opening_curve", "parent_component_id": "component_1",
+		"topology_role": "hole", "transform": WorldDocumentService.default_component_transform()}, true)
+	for chain in bezier_hole.get("chains", []):
+		chain["topology_role"] = "hole"
 	var ellipse := {"points": [], "edges": [], "chains": [], "id": "component_5", "name": "egg",
 		"visibility": true, "draw_mode": "primitive",
 		"primitive": {"type": PrimitiveGeometryService.ELLIPSE, "diameter_x_cm": 3.0, "diameter_y_cm": 5.0}}
@@ -194,6 +200,9 @@ func _init() -> void:
 		{"m": "Create", "sub": "Character", "comp": "component_3", "grp": "", "gd": ""},
 		{"m": "Create", "sub": "Character", "comp": "component_4", "grp": "", "gd": ""},
 		{"m": "Create", "sub": "Character", "comp": "component_11", "grp": "", "gd": ""},
+		{"m": "Create", "sub": "Character", "comp": "component_11", "grp": "", "gd": "", "orphan_hole": true},
+		{"m": "Create", "sub": "Character", "comp": "component_12", "grp": "", "gd": "", "edges": 1},
+		{"m": "Create", "sub": "Character", "comp": "component_12", "grp": "", "gd": "", "edges": 2},
 		{"m": "Create", "sub": "Character", "comp": "component_5", "grp": "", "gd": ""},
 		{"m": "Create", "sub": "Character", "comp": "component_8", "grp": "", "gd": ""},
 		{"m": "Create", "sub": "Character", "comp": "component_9", "grp": "", "gd": ""},
@@ -204,8 +213,12 @@ func _init() -> void:
 		# Keep the new Hole fixture out of every pre-existing state so this probe
 		# still detects unrelated rendering changes byte-for-byte.
 		assets[0]["components"].erase(direct_hole)
+		assets[0]["components"].erase(bezier_hole)
+		direct_hole["parent_component_id"] = "" if bool(c.get("orphan_hole", false)) else "component_1"
 		if str(c["comp"]) == "component_11":
 			assets[0]["components"].append(direct_hole)
+		elif str(c["comp"]) == "component_12":
+			assets[0]["components"].append(bezier_hole)
 		app.active_module = str(c["m"])
 		if c["m"] == "Create": app.active_create_submodule = str(c["sub"])
 		elif c["m"] == "Mesh": app.active_geometry_submodule = str(c["sub"])

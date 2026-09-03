@@ -113,9 +113,17 @@ static func descendants(asset: Dictionary, parent_component_id: String) -> Array
 
 
 static func can_parent(asset: Dictionary, component_id: String, candidate_parent_id: String) -> bool:
+	var component := component_by_id(asset, component_id)
+	if component.is_empty():
+		return false
 	if candidate_parent_id.is_empty():
-		return not component_by_id(asset, component_id).is_empty()
-	if component_id == candidate_parent_id or component_by_id(asset, component_id).is_empty() or component_by_id(asset, candidate_parent_id).is_empty():
+		return not _is_constraint_only_hole(component)
+	var candidate_parent := component_by_id(asset, candidate_parent_id)
+	if component_id == candidate_parent_id or candidate_parent.is_empty() or _is_constraint_only_hole(candidate_parent):
+		return false
+	if _is_constraint_only_hole(component) and (str(candidate_parent.get("type", "component")) in ["reference", "region"] \
+		or str(candidate_parent.get("topology_role", "outer")) != "outer" \
+		or str(candidate_parent.get("draw_mode", "closed_loop")) not in ["closed_loop", "primitive"]):
 		return false
 	var cursor := candidate_parent_id
 	var visited: Dictionary = {}
@@ -125,6 +133,11 @@ static func can_parent(asset: Dictionary, component_id: String, candidate_parent
 		visited[cursor] = true
 		cursor = parent_id(component_by_id(asset, cursor))
 	return true
+
+
+static func _is_constraint_only_hole(component: Dictionary) -> bool:
+	return str(component.get("type", "component")) not in ["reference", "region"] \
+		and str(component.get("topology_role", "outer")) == "hole"
 
 
 static func can_parent_group(asset: Dictionary, group_id: String, candidate_parent_id: String) -> bool:
