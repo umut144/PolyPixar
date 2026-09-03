@@ -10,6 +10,7 @@ func _init() -> void:
 	_test_delete_edge_opens_closed_loop_draft()
 	_test_delete_exactly_one_point()
 	_test_fuse_point()
+	_test_endpoint_connection_history()
 	_test_delete_multiple_points_and_protect_closed_minimum()
 	_test_ids_are_not_reused()
 	_test_insert_preserves_curve()
@@ -297,9 +298,14 @@ func _test_fuse_point() -> void:
 	BezierTopology.add_point(component, Vector2(0.0, 13.5), "corner")
 	BezierTopology.add_point(component, Vector2(2.5, 15.0), "corner")
 	var duplicate_id := BezierTopology.add_point(component, Vector2(-2.5, 15.0), "corner")
+	var first_point := BezierTopology.point_by_id(component.get("points", []), first_id)
+	var duplicate_point := BezierTopology.point_by_id(component.get("points", []), duplicate_id)
+	first_point.merge({"mode": "free", "handle_source": "manual", "handle_in": Vector2.ZERO, "handle_out": Vector2(0.4, -0.2)}, true)
+	duplicate_point.merge({"mode": "free", "handle_source": "manual", "handle_in": Vector2(-0.3, 0.25), "handle_out": Vector2.ZERO}, true)
 	var result := BezierTopology.fuse_point(component, first_id)
 	_expect(bool(result.get("fused", false)) and str(result.get("removed_point_id", "")) == duplicate_id, "Fuse Point should remove the nearest coincident Point.")
 	_expect(component.get("points", []).size() == 3 and component.get("chains", []).size() == 1 and bool(component["chains"][0].get("closed", false)), "Fusing coincident open endpoints should close the Chain.")
+	_expect(Vector2(first_point.get("handle_in", Vector2.ZERO)).is_equal_approx(Vector2(-0.3, 0.25)) and Vector2(first_point.get("handle_out", Vector2.ZERO)).is_equal_approx(Vector2(0.4, -0.2)), "Same-Chain Fuse should retain both manually authored curve controls at the closed seam.")
 	_expect(BezierTopology.mode_validation_issues(component, true).is_empty(), "A fused Closed Loop should remain valid.")
 	var distant := _component()
 	var distant_id := BezierTopology.add_point(distant, Vector2.ZERO, "linear")
@@ -317,11 +323,21 @@ func _test_fuse_point() -> void:
 	_expect(bool(mirrored_result.get("valid", false)) and mirrored_component.get("chains", []).size() == 2, "A non-coincident Mirror should provide two valid open Chains for the cross-Chain Fuse regression.")
 	var source_top_id := str(mirrored_source_ids[0])
 	var mirrored_top_id := str(mirrored_ids.back())
-	BezierTopology.point_by_id(mirrored_component.get("points", []), mirrored_top_id)["position"] = BezierTopology.point_by_id(mirrored_component.get("points", []), source_top_id).get("position", Vector2.ZERO)
+	var interior_rejection := mirrored_component.duplicate(true)
+	var interior_id := str(mirrored_ids[1])
+	BezierTopology.point_by_id(interior_rejection.get("points", []), interior_id)["position"] = BezierTopology.point_by_id(interior_rejection.get("points", []), source_top_id).get("position", Vector2.ZERO)
+	var interior_result := BezierTopology.fuse_point(interior_rejection, source_top_id)
+	_expect(not bool(interior_result.get("fused", false)) and str(interior_result.get("reason", "")) == "Points in different Chains must both be open endpoints." and interior_rejection.get("chains", []).size() == 2, "Cross-Chain Fuse must reject an endpoint-to-interior match without changing either Chain.")
+	var source_top := BezierTopology.point_by_id(mirrored_component.get("points", []), source_top_id)
+	var mirrored_top := BezierTopology.point_by_id(mirrored_component.get("points", []), mirrored_top_id)
+	mirrored_top["position"] = source_top.get("position", Vector2.ZERO)
+	source_top.merge({"mode": "free", "handle_source": "manual", "handle_in": Vector2.ZERO, "handle_out": Vector2(0.25, -0.1)}, true)
+	mirrored_top.merge({"mode": "free", "handle_source": "manual", "handle_in": Vector2(-0.2, 0.3), "handle_out": Vector2.ZERO}, true)
 	var cross_chain_result := BezierTopology.fuse_point(mirrored_component, source_top_id)
 	_expect(bool(cross_chain_result.get("fused", false)) and mirrored_component.get("chains", []).size() == 1 and not bool(mirrored_component["chains"][0].get("closed", true)), "Fusing coincident endpoints from separate Mirror Chains should join them into one open Chain.")
 	var joined_point_ids: Array = mirrored_component["chains"][0].get("point_ids", [])
 	_expect(joined_point_ids.size() == 5 and joined_point_ids.count(source_top_id) == 1 and BezierTopology.validate(mirrored_component).is_empty(), "Cross-Chain Fuse must keep one canonical Point identity without duplicating it in the joined Chain.")
+	_expect(Vector2(source_top.get("handle_in", Vector2.ZERO)).is_equal_approx(Vector2(0.25, -0.1)) and Vector2(source_top.get("handle_out", Vector2.ZERO)).is_equal_approx(Vector2(-0.2, 0.3)), "Cross-Chain Fuse should preserve the active manual controls from both endpoint orientations at the joined seam.")
 	_expect(BezierTopology.close_chain(mirrored_component, str(mirrored_component["chains"][0].get("id", ""))) and BezierTopology.mode_validation_issues(mirrored_component, true).is_empty(), "The remaining Mirror endpoints should close normally after a cross-Chain Fuse.")
 
 	var overlapping_chains := _component()
@@ -329,7 +345,40 @@ func _test_fuse_point() -> void:
 	overlapping_chains["chains"] = [{"id": "left_chain", "point_ids": ["left", "shared"], "edge_ids": [], "closed": false}, {"id": "right_chain", "point_ids": ["shared", "right"], "edge_ids": [], "closed": false}]
 	BezierTopology.rebuild_chain_edges(overlapping_chains, overlapping_chains["chains"][0])
 	BezierTopology.rebuild_chain_edges(overlapping_chains, overlapping_chains["chains"][1])
-	_expect(not BezierTopology.join_open_chain_endpoints(overlapping_chains, "left", "right") and overlapping_chains.get("chains", []).size() == 2, "Joining Chains that already share a Point ID must be rejected before it can create an intra-Chain duplicate.")
+	_expect(not BezierTopology.join_open_chain_endpoints(overlapping_chains, "left", "right") and overlapping_chains.get("chains", []).size() == 2 and not BezierTopology.validate(overlapping_chains).is_empty(), "Joining Chains that already share a Point ID must be rejected and structural validation must expose the cross-Chain ownership violation.")
+
+
+func _test_endpoint_connection_history() -> void:
+	var application: Control = load("res://scripts/main.gd").new()
+	var status_label := Label.new()
+	application.program_status_label = status_label
+	var overlapping := _component()
+	overlapping.merge({"id": "overlapping", "name": "overlapping", "draw_mode": "closed_loop"}, true)
+	overlapping["points"] = [{"id": "shared", "position": Vector2.ZERO}, {"id": "left", "position": Vector2.LEFT}, {"id": "right", "position": Vector2.RIGHT}]
+	overlapping["chains"] = [{"id": "left_chain", "point_ids": ["left", "shared"], "edge_ids": [], "closed": false}, {"id": "right_chain", "point_ids": ["shared", "right"], "edge_ids": [], "closed": false}]
+	BezierTopology.rebuild_chain_edges(overlapping, overlapping["chains"][0])
+	BezierTopology.rebuild_chain_edges(overlapping, overlapping["chains"][1])
+	application.assets = [{"id": "endpoint_asset", "name": "Endpoint Asset", "components": [overlapping], "guides": []}] as Array[Dictionary]
+	application.selected_asset_id = "endpoint_asset"
+	application.selected_component_id = "overlapping"
+	application._on_bezier_endpoint_connection_requested("left", "right")
+	_expect(application.undo_history.is_empty() and overlapping.get("chains", []).size() == 2 and status_label.text.contains("could not be connected"), "A rejected Canvas endpoint connection should explain the failure without adding an empty Undo snapshot.")
+
+	var joinable := _component()
+	joinable.merge({"id": "joinable", "name": "joinable", "draw_mode": "closed_loop"}, true)
+	joinable["points"] = [{"id": "a0", "position": Vector2.LEFT}, {"id": "a1", "position": Vector2.ZERO}, {"id": "b0", "position": Vector2.ZERO}, {"id": "b1", "position": Vector2.RIGHT}]
+	joinable["chains"] = [{"id": "a_chain", "point_ids": ["a0", "a1"], "edge_ids": [], "closed": false}, {"id": "b_chain", "point_ids": ["b0", "b1"], "edge_ids": [], "closed": false}]
+	BezierTopology.rebuild_chain_edges(joinable, joinable["chains"][0])
+	BezierTopology.rebuild_chain_edges(joinable, joinable["chains"][1])
+	application.assets = [{"id": "endpoint_asset", "name": "Endpoint Asset", "components": [joinable], "guides": []}] as Array[Dictionary]
+	application.selected_component_id = "joinable"
+	application._on_bezier_endpoint_connection_requested("a1", "b0")
+	var snapshot_component: Dictionary = {}
+	if not application.undo_history.is_empty():
+		snapshot_component = application.undo_history[0].get("assets", [])[0].get("components", [])[0]
+	_expect(application.undo_history.size() == 1 and joinable.get("chains", []).size() == 1 and snapshot_component.get("chains", []).size() == 2, "A successful Canvas endpoint connection should record exactly one pre-mutation Undo snapshot.")
+	status_label.free()
+	application.free()
 
 
 func _test_ids_are_not_reused() -> void:

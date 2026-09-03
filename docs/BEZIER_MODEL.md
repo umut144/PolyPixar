@@ -56,7 +56,9 @@ topology_role: outer | hole | cut | seam
 
 For an open Chain, `edge_ids.size() == point_ids.size() - 1`. For a closed
 Chain, both sizes are equal and the final Edge connects the last Point to the
-first. A closed Chain requires at least three Points.
+first. A closed Chain requires at least three Points. A Point ID may occur only
+once across the complete Component topology; separate Chains never share a
+Point identity and must be joined explicitly before they share a seam.
 
 Closed-loop Components and analytic Primitives also store
 `topology_role: outer | hole`. New Components default to `outer`; changing a

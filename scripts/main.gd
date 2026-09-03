@@ -12250,9 +12250,17 @@ func _on_bezier_endpoint_connection_requested(anchor_point_id: String, target_po
 	if anchor_chain.is_empty() or target_chain.is_empty() or anchor_point_id == target_point_id:
 		return
 	if str(anchor_chain.get("id", "")) == str(target_chain.get("id", "")):
+		var close_preview := component.duplicate(true)
+		if not BezierTopology.close_chain(close_preview, str(anchor_chain.get("id", ""))):
+			_show_status_message("The open Chain could not be closed safely")
+			return
 		_record_direct_change()
 		if BezierTopology.close_chain(component, str(anchor_chain.get("id", ""))):
 			_refresh_component_geometry(component)
+		return
+	var join_preview := component.duplicate(true)
+	if not BezierTopology.join_open_chain_endpoints(join_preview, anchor_point_id, target_point_id):
+		_show_status_message("The open Chains could not be connected safely")
 		return
 	_record_direct_change()
 	if BezierTopology.join_open_chain_endpoints(component, anchor_point_id, target_point_id):

@@ -502,6 +502,9 @@ static func fuse_point(component: Dictionary, point_id: String, tolerance := FUS
 			nearest_distance = distance
 	if nearest_id.is_empty():
 		return {"fused": false, "reason": "No other Point found within the fuse tolerance."}
+	var nearest := point_by_id(points, nearest_id)
+	if nearest.is_empty():
+		return {"fused": false, "reason": "The nearby Point was not found."}
 
 	var selected_chain := chain_for_point(component.get("chains", []), point_id)
 	var nearest_chain := chain_for_point(component.get("chains", []), nearest_id)
@@ -521,6 +524,15 @@ static func fuse_point(component: Dictionary, point_id: String, tolerance := FUS
 			and selected_index >= 0 and nearest_index >= 0 \
 			and ((selected_index == 0 and nearest_index == chain_ids.size() - 1) \
 			or (nearest_index == 0 and selected_index == chain_ids.size() - 1))
+		if is_open_endpoint_pair and str(selected.get("handle_source", "auto")) == "manual":
+			# The removed endpoint already owns the control for the segment that
+			# becomes the kept endpoint's previously unused side after closing.
+			# Rebase the absolute control in case the fused positions differ by
+			# the small allowed tolerance.
+			if selected_index == 0:
+				selected["handle_in"] = _rebased_handle(nearest, "handle_in", selected)
+			else:
+				selected["handle_out"] = _rebased_handle(nearest, "handle_out", selected)
 		chain_ids.remove_at(nearest_index)
 		selected_chain["point_ids"] = chain_ids
 		if is_open_endpoint_pair:
@@ -529,9 +541,20 @@ static func fuse_point(component: Dictionary, point_id: String, tolerance := FUS
 	else:
 		if not is_open_endpoint(component, point_id) or not is_open_endpoint(component, nearest_id):
 			return {"fused": false, "reason": "Points in different Chains must both be open endpoints."}
+		var contributed_handle := Vector2.ZERO
+		var should_merge_manual_handle := str(selected.get("handle_source", "auto")) == "manual"
+		if should_merge_manual_handle:
+			var nearest_handle_key := "handle_out" if nearest_id == str(nearest_ids.front()) else "handle_in"
+			contributed_handle = _rebased_handle(nearest, nearest_handle_key, selected)
 		if not join_open_chain_endpoints(component, point_id, nearest_id):
 			return {"fused": false, "reason": "The open Chains could not be joined safely."}
 		selected_chain = chain_for_point(component.get("chains", []), point_id)
+		if should_merge_manual_handle:
+			# join_open_chain_endpoints orients the kept Point as the end of the
+			# first run and the removed Point as the start of the second. Once the
+			# duplicate anchor is erased, its outgoing control belongs to the kept
+			# Point so both authored curve halves survive the seam.
+			selected["handle_out"] = contributed_handle
 		var joined_ids: Array = selected_chain.get("point_ids", []).duplicate()
 		joined_ids.erase(nearest_id)
 		selected_chain["point_ids"] = joined_ids
@@ -544,6 +567,12 @@ static func fuse_point(component: Dictionary, point_id: String, tolerance := FUS
 	component["points"] = points
 	BezierGeometry.resolve_auto_handles(points, component.get("chains", []))
 	return {"fused": true, "kept_point_id": point_id, "removed_point_id": nearest_id, "closed_chain": bool(selected_chain.get("closed", false))}
+
+
+static func _rebased_handle(source_point: Dictionary, handle_key: String, target_point: Dictionary) -> Vector2:
+	var source_position: Vector2 = source_point.get("position", Vector2.ZERO)
+	var target_position: Vector2 = target_point.get("position", Vector2.ZERO)
+	return source_position + Vector2(source_point.get(handle_key, Vector2.ZERO)) - target_position
 
 
 static func delete_points(component: Dictionary, point_ids_to_delete: Array) -> Array[String]:
@@ -633,7 +662,9 @@ static func validate(component: Dictionary) -> Array[String]:
 		edge_ids[edge_id] = edge_data
 		if not point_ids.has(str(edge_data.get("start_point_id", ""))) or not point_ids.has(str(edge_data.get("end_point_id", ""))):
 			errors.append("Edge %s references a missing point." % edge_id)
-	for chain_data in chains:
+	var point_chain_owners: Dictionary = {}
+	for chain_index in range(chains.size()):
+		var chain_data = chains[chain_index]
 		if not chain_data is Dictionary:
 			errors.append("Chain entries must be dictionaries.")
 			continue
@@ -646,6 +677,10 @@ static func validate(component: Dictionary) -> Array[String]:
 			if chain_point_id_set.has(chain_point_id):
 				errors.append("Chain contains duplicate Point ID %s." % chain_point_id)
 			chain_point_id_set[chain_point_id] = true
+			if point_chain_owners.has(chain_point_id) and int(point_chain_owners[chain_point_id]) != chain_index:
+				errors.append("Point %s belongs to multiple Chains." % chain_point_id)
+			else:
+				point_chain_owners[chain_point_id] = chain_index
 		var chain_edge_id_set: Dictionary = {}
 		for edge_id_value in chain_edge_ids:
 			var chain_edge_id := str(edge_id_value)
