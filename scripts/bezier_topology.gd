@@ -524,15 +524,15 @@ static func fuse_point(component: Dictionary, point_id: String, tolerance := FUS
 			and selected_index >= 0 and nearest_index >= 0 \
 			and ((selected_index == 0 and nearest_index == chain_ids.size() - 1) \
 			or (nearest_index == 0 and selected_index == chain_ids.size() - 1))
-		if is_open_endpoint_pair and str(selected.get("handle_source", "auto")) == "manual":
+		if is_open_endpoint_pair and str(selected.get("handle_source", "auto")) == "manual" and str(selected.get("mode", "linear")) != "linear":
 			# The removed endpoint already owns the control for the segment that
 			# becomes the kept endpoint's previously unused side after closing.
 			# Rebase the absolute control in case the fused positions differ by
 			# the small allowed tolerance.
 			if selected_index == 0:
-				selected["handle_in"] = _rebased_handle(nearest, "handle_in", selected)
+				_apply_fused_manual_handle(selected, "handle_in", _rebased_handle(nearest, "handle_in", selected))
 			else:
-				selected["handle_out"] = _rebased_handle(nearest, "handle_out", selected)
+				_apply_fused_manual_handle(selected, "handle_out", _rebased_handle(nearest, "handle_out", selected))
 		chain_ids.remove_at(nearest_index)
 		selected_chain["point_ids"] = chain_ids
 		if is_open_endpoint_pair:
@@ -542,7 +542,7 @@ static func fuse_point(component: Dictionary, point_id: String, tolerance := FUS
 		if not is_open_endpoint(component, point_id) or not is_open_endpoint(component, nearest_id):
 			return {"fused": false, "reason": "Points in different Chains must both be open endpoints."}
 		var contributed_handle := Vector2.ZERO
-		var should_merge_manual_handle := str(selected.get("handle_source", "auto")) == "manual"
+		var should_merge_manual_handle := str(selected.get("handle_source", "auto")) == "manual" and str(selected.get("mode", "linear")) != "linear"
 		if should_merge_manual_handle:
 			var nearest_handle_key := "handle_out" if nearest_id == str(nearest_ids.front()) else "handle_in"
 			contributed_handle = _rebased_handle(nearest, nearest_handle_key, selected)
@@ -554,7 +554,7 @@ static func fuse_point(component: Dictionary, point_id: String, tolerance := FUS
 			# first run and the removed Point as the start of the second. Once the
 			# duplicate anchor is erased, its outgoing control belongs to the kept
 			# Point so both authored curve halves survive the seam.
-			selected["handle_out"] = contributed_handle
+			_apply_fused_manual_handle(selected, "handle_out", contributed_handle)
 		var joined_ids: Array = selected_chain.get("point_ids", []).duplicate()
 		joined_ids.erase(nearest_id)
 		selected_chain["point_ids"] = joined_ids
@@ -573,6 +573,23 @@ static func _rebased_handle(source_point: Dictionary, handle_key: String, target
 	var source_position: Vector2 = source_point.get("position", Vector2.ZERO)
 	var target_position: Vector2 = target_point.get("position", Vector2.ZERO)
 	return source_position + Vector2(source_point.get(handle_key, Vector2.ZERO)) - target_position
+
+
+## Applies the contributed seam control as a normal manual Handle edit would:
+## Free and Corner keep independent sides, while Mirrored and Aligned retain
+## their declared relationship after the previously unused side becomes active.
+static func _apply_fused_manual_handle(point: Dictionary, handle_key: String, value: Vector2) -> void:
+	point[handle_key] = value
+	var mode := str(point.get("mode", "linear"))
+	var opposite_key := "handle_out" if handle_key == "handle_in" else "handle_in"
+	if mode == "mirrored":
+		point[opposite_key] = -value
+	elif mode == "aligned" and not is_zero_approx(value.length_squared()):
+		var opposite: Vector2 = point.get(opposite_key, Vector2.ZERO)
+		var opposite_length := opposite.length()
+		if is_zero_approx(opposite_length):
+			opposite_length = value.length()
+		point[opposite_key] = -value.normalized() * opposite_length
 
 
 static func delete_points(component: Dictionary, point_ids_to_delete: Array) -> Array[String]:

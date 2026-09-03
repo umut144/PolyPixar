@@ -89,6 +89,26 @@ func _component() -> Dictionary:
 	return {"points": [], "edges": [], "chains": []}
 
 
+func _cross_chain_fuse_fixture(selected_at_start: bool, nearest_at_start: bool, selected_mode := "free") -> Dictionary:
+	var selected := {"id": "selected", "position": Vector2.ZERO, "mode": selected_mode, "preserve_point": false, "handle_source": "manual", "handle_in": Vector2(-0.8, 0.2), "handle_out": Vector2(0.6, -0.3)}
+	var selected_neighbor := {"id": "selected_neighbor", "position": Vector2(-2.0, 0.0), "mode": "linear", "preserve_point": false, "handle_source": "auto", "handle_in": Vector2.ZERO, "handle_out": Vector2.ZERO}
+	var nearest := {"id": "nearest", "position": Vector2(0.0, 0.00005), "mode": "free", "preserve_point": false, "handle_source": "manual", "handle_in": Vector2(-0.2, 0.4), "handle_out": Vector2(0.3, 0.5)}
+	var nearest_neighbor := {"id": "nearest_neighbor", "position": Vector2(2.0, 0.0), "mode": "linear", "preserve_point": false, "handle_source": "auto", "handle_in": Vector2.ZERO, "handle_out": Vector2.ZERO}
+	var selected_ids := ["selected", "selected_neighbor"] if selected_at_start else ["selected_neighbor", "selected"]
+	var nearest_ids := ["nearest", "nearest_neighbor"] if nearest_at_start else ["nearest_neighbor", "nearest"]
+	var component := {
+		"points": [selected, selected_neighbor, nearest, nearest_neighbor],
+		"edges": [],
+		"chains": [
+			{"id": "selected_chain", "point_ids": selected_ids, "edge_ids": [], "closed": false},
+			{"id": "nearest_chain", "point_ids": nearest_ids, "edge_ids": [], "closed": false}
+		]
+	}
+	BezierTopology.rebuild_chain_edges(component, component["chains"][0])
+	BezierTopology.rebuild_chain_edges(component, component["chains"][1])
+	return component
+
+
 func _expect(condition: bool, message: String) -> void:
 	if not condition:
 		failures += 1
@@ -297,7 +317,7 @@ func _test_fuse_point() -> void:
 	var first_id := BezierTopology.add_point(component, Vector2(-2.5, 15.0), "corner")
 	BezierTopology.add_point(component, Vector2(0.0, 13.5), "corner")
 	BezierTopology.add_point(component, Vector2(2.5, 15.0), "corner")
-	var duplicate_id := BezierTopology.add_point(component, Vector2(-2.5, 15.0), "corner")
+	var duplicate_id := BezierTopology.add_point(component, Vector2(-2.5, 15.00005), "corner")
 	var first_point := BezierTopology.point_by_id(component.get("points", []), first_id)
 	var duplicate_point := BezierTopology.point_by_id(component.get("points", []), duplicate_id)
 	first_point.merge({"mode": "free", "handle_source": "manual", "handle_in": Vector2.ZERO, "handle_out": Vector2(0.4, -0.2)}, true)
@@ -305,7 +325,7 @@ func _test_fuse_point() -> void:
 	var result := BezierTopology.fuse_point(component, first_id)
 	_expect(bool(result.get("fused", false)) and str(result.get("removed_point_id", "")) == duplicate_id, "Fuse Point should remove the nearest coincident Point.")
 	_expect(component.get("points", []).size() == 3 and component.get("chains", []).size() == 1 and bool(component["chains"][0].get("closed", false)), "Fusing coincident open endpoints should close the Chain.")
-	_expect(Vector2(first_point.get("handle_in", Vector2.ZERO)).is_equal_approx(Vector2(-0.3, 0.25)) and Vector2(first_point.get("handle_out", Vector2.ZERO)).is_equal_approx(Vector2(0.4, -0.2)), "Same-Chain Fuse should retain both manually authored curve controls at the closed seam.")
+	_expect(Vector2(first_point.get("handle_in", Vector2.ZERO)).is_equal_approx(Vector2(-0.3, 0.25005)) and Vector2(first_point.get("handle_out", Vector2.ZERO)).is_equal_approx(Vector2(0.4, -0.2)), "Same-Chain Fuse should rebase the removed Point's absolute control while retaining both manual curve sides at the closed seam.")
 	_expect(BezierTopology.mode_validation_issues(component, true).is_empty(), "A fused Closed Loop should remain valid.")
 	var distant := _component()
 	var distant_id := BezierTopology.add_point(distant, Vector2.ZERO, "linear")
@@ -339,6 +359,35 @@ func _test_fuse_point() -> void:
 	_expect(joined_point_ids.size() == 5 and joined_point_ids.count(source_top_id) == 1 and BezierTopology.validate(mirrored_component).is_empty(), "Cross-Chain Fuse must keep one canonical Point identity without duplicating it in the joined Chain.")
 	_expect(Vector2(source_top.get("handle_in", Vector2.ZERO)).is_equal_approx(Vector2(0.25, -0.1)) and Vector2(source_top.get("handle_out", Vector2.ZERO)).is_equal_approx(Vector2(-0.2, 0.3)), "Cross-Chain Fuse should preserve the active manual controls from both endpoint orientations at the joined seam.")
 	_expect(BezierTopology.close_chain(mirrored_component, str(mirrored_component["chains"][0].get("id", ""))) and BezierTopology.mode_validation_issues(mirrored_component, true).is_empty(), "The remaining Mirror endpoints should close normally after a cross-Chain Fuse.")
+
+	for selected_at_start in [false, true]:
+		for nearest_at_start in [false, true]:
+			var orientation_component := _cross_chain_fuse_fixture(selected_at_start, nearest_at_start)
+			var orientation_selected := BezierTopology.point_by_id(orientation_component.get("points", []), "selected")
+			var orientation_nearest := BezierTopology.point_by_id(orientation_component.get("points", []), "nearest")
+			var expected_in: Vector2 = orientation_selected.get("handle_out" if selected_at_start else "handle_in", Vector2.ZERO)
+			var nearest_handle_key := "handle_out" if nearest_at_start else "handle_in"
+			var expected_out := Vector2(orientation_nearest.get("position", Vector2.ZERO)) + Vector2(orientation_nearest.get(nearest_handle_key, Vector2.ZERO)) - Vector2(orientation_selected.get("position", Vector2.ZERO))
+			var orientation_result := BezierTopology.fuse_point(orientation_component, "selected")
+			_expect(bool(orientation_result.get("fused", false)) and orientation_component.get("chains", []).size() == 1 and BezierTopology.validate(orientation_component).is_empty(), "Cross-Chain Fuse should preserve valid topology for selected-start=%s and nearest-start=%s." % [selected_at_start, nearest_at_start])
+			_expect(Vector2(orientation_selected.get("handle_in", Vector2.ZERO)).is_equal_approx(expected_in) and Vector2(orientation_selected.get("handle_out", Vector2.ZERO)).is_equal_approx(expected_out), "Cross-Chain Fuse should preserve and rebase the correct directed controls for selected-start=%s and nearest-start=%s." % [selected_at_start, nearest_at_start])
+
+	for selected_mode in ["linear", "free", "mirrored", "aligned"]:
+		var mode_component := _cross_chain_fuse_fixture(false, true, selected_mode)
+		var mode_selected := BezierTopology.point_by_id(mode_component.get("points", []), "selected")
+		var original_in_length := Vector2(mode_selected.get("handle_in", Vector2.ZERO)).length()
+		var mode_result := BezierTopology.fuse_point(mode_component, "selected")
+		var fused_in: Vector2 = mode_selected.get("handle_in", Vector2.ZERO)
+		var fused_out: Vector2 = mode_selected.get("handle_out", Vector2.ZERO)
+		_expect(bool(mode_result.get("fused", false)) and BezierTopology.validate(mode_component).is_empty(), "Cross-Chain Fuse should remain structurally valid for %s Points." % selected_mode)
+		if selected_mode == "linear":
+			_expect(fused_in == Vector2.ZERO and fused_out == Vector2.ZERO, "Linear Fuse Points must retain zero Handles.")
+		elif selected_mode == "free":
+			_expect(fused_in.is_equal_approx(Vector2(-0.8, 0.2)) and fused_out.is_equal_approx(Vector2(0.3, 0.50005)), "Free Fuse Points should preserve both independent authored controls.")
+		elif selected_mode == "mirrored":
+			_expect(fused_in.is_equal_approx(-fused_out), "Mirrored Fuse Points must retain equal and opposite Handles.")
+		else:
+			_expect(is_equal_approx(fused_in.length(), original_in_length) and absf(fused_in.normalized().dot(fused_out.normalized()) + 1.0) < 0.000001, "Aligned Fuse Points must retain the existing opposite length on one shared tangent.")
 
 	var overlapping_chains := _component()
 	overlapping_chains["points"] = [{"id": "shared", "position": Vector2.ZERO}, {"id": "left", "position": Vector2.LEFT}, {"id": "right", "position": Vector2.RIGHT}]
