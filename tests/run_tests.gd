@@ -542,6 +542,17 @@ func _test_closed_loop_selection_mirror() -> void:
 	_expect(int(coincident_result.get("auto_connected_count", 0)) == 1, "Mirror should merge an endpoint that lands exactly on its source endpoint.")
 	_expect(coincident_mirror.get("points", []).size() == 5, "A coincident mirrored endpoint must be removed instead of leaving two overlapping Points.")
 	_expect(coincident_mirror.get("chains", []).size() == 1 and not bool(coincident_mirror["chains"][0].get("closed", false)), "A single coincident endpoint pair should join the two mirror Chains but leave the remaining endpoints open.")
+	var inner_axis_component := _component()
+	inner_axis_component["draw_mode"] = "closed_loop"
+	var inner_axis_ids: Array[String] = []
+	for point_position in [Vector2(-1.0, 0.0), Vector2(0.0, 2.0), Vector2(-1.0, 4.0)]:
+		inner_axis_ids.append(BezierTopology.add_point(inner_axis_component, point_position, "linear"))
+	var inner_axis_original := inner_axis_component.duplicate(true)
+	var inner_axis_preview := SelectionMirrorService.preview(inner_axis_component, inner_axis_ids, mirror_axis_start, mirror_axis_end)
+	var inner_axis_result := SelectionMirrorService.apply(inner_axis_component, inner_axis_ids, mirror_axis_start, mirror_axis_end)
+	_expect(not bool(inner_axis_preview.get("valid", true)) and "Points on the mirror axis must be open Chain endpoints." in inner_axis_preview.get("errors", []), "Mirror preview should explain why an interior source Point cannot lie on the mirror axis.")
+	_expect(not bool(inner_axis_result.get("valid", true)) and inner_axis_result.get("component", {}).is_empty(), "Mirror apply should reject an interior axis Point instead of sharing its ID across source and mirrored Chains.")
+	_expect(inner_axis_component == inner_axis_original, "Rejecting an interior mirror-axis Point must leave the authored Component unchanged.")
 	var multi_coincident_component := _component()
 	multi_coincident_component["draw_mode"] = "closed_loop"
 	var multi_source_ids: Array[String] = []
