@@ -625,13 +625,14 @@ func _render_component_outliner_tree(container: VBoxContainer, asset: Dictionary
 	component_row.add_child(component_button)
 	if WorldDocumentService.is_reference_component(component):
 		return
-	var add_button := Button.new()
-	add_button.text = "+"
-	add_button.custom_minimum_size = Vector2(28, 30)
-	add_button.focus_mode = Control.FOCUS_NONE
-	add_button.tooltip_text = "Add Child or Guide"
-	add_button.pressed.connect(component_add_requested.emit.bind(asset_id, component_id, add_button))
-	component_row.add_child(add_button)
+	if not WorldDocumentService.is_constraint_only_hole(component):
+		var add_button := Button.new()
+		add_button.text = "+"
+		add_button.custom_minimum_size = Vector2(28, 30)
+		add_button.focus_mode = Control.FOCUS_NONE
+		add_button.tooltip_text = "Add Child or Guide"
+		add_button.pressed.connect(component_add_requested.emit.bind(asset_id, component_id, add_button))
+		component_row.add_child(add_button)
 	var children := ComponentHierarchy.children(asset, component_id)
 	children.sort_custom(WorldDocumentService.sort_named_documents)
 	for child in children:

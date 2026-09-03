@@ -2300,6 +2300,10 @@ func _test_geometry_auto_build_service() -> void:
 	_expect(application._mesh_update_candidates("auto_asset") == ["auto_body"], "A valid unmeshed Component should appear exactly once in Update Meshes.")
 	_expect(application._all_mesh_update_candidates() == [{"asset_id": "auto_asset", "component_id": "auto_body"}, {"asset_id": "auto_symbol", "component_id": "auto_symbol_body"}], "Update Meshes should collect stable candidates globally across every Create Asset type, independent of the selected Asset.")
 	_expect((application._mesh_batch_summary(application._all_mesh_update_candidates()).get("attention", PackedStringArray()) as PackedStringArray).is_empty(), "All Components should be evaluated by Mesh batch attention and candidate collection.")
+	other_component["group_id"] = "hidden_group"
+	test_assets[1]["groups"] = [{"id": "hidden_group", "name": "hidden_group", "visibility": false, "parent_component_id": "", "transform": WorldDocumentService.default_component_transform()}]
+	_expect(application._mesh_update_candidates("auto_symbol").is_empty(), "A Component hidden by its Group must not remain an actionable Mesh batch candidate.")
+	test_assets[1]["groups"][0]["visibility"] = true
 	var build: Dictionary = application._generate_component_mesh_build("auto_asset", "auto_body")
 	_expect(bool(build.get("valid", false)) and int(build.get("meshing", {}).get("triangle_count", 0)) > 0 and int(build.get("contour_stroke", {}).get("triangle_count", 0)) > 0, "The automatic batch runner should atomically complete the Fill pipeline and the independent centered Contour Stroke Bake.")
 	application._commit_component_mesh_build("auto_asset", "auto_body", build)
@@ -3162,6 +3166,13 @@ func _test_component_clipboard() -> void:
 	_expect(str(pasted_guide.get("scope", {}).get("component_id", "")) == "component_100" and int(pasted_guide.get("ordinal", 0)) == 1, "Component-scoped Guides must paste with their copied Component and remapped scope ID.")
 	application._restore_history_snapshot(application.undo_history.back())
 	_expect(application.undo_history.size() == 1 and application._get_asset("chantres").get("components", []).size() == 1 and application._get_asset("chantres").get("guides", []).is_empty(), "Pasting Component Clipboard contents must capture one Undo snapshot.")
+	var restored_chantres: Dictionary = application._get_asset("chantres")
+	var paste_hole := {"id": "paste_hole", "type": "component", "name": "opening", "draw_mode": "primitive", "topology_role": "hole", "visibility": true, "parent_component_id": "chantres_head", "group_id": "", "transform": WorldDocumentService.default_component_transform(), "primitive": {"type": "circle", "center": Vector2.ZERO, "diameter_cm": 2.0}, "points": [], "edges": [], "chains": []}
+	restored_chantres["components"].append(paste_hole)
+	var component_count_before_rejected_paste: int = restored_chantres.get("components", []).size()
+	var next_component_before_rejected_paste: int = application.next_component_id
+	application._paste_component_clipboard("chantres", "paste_hole")
+	_expect(restored_chantres.get("components", []).size() == component_count_before_rejected_paste and application.next_component_id == next_component_before_rejected_paste, "Pasting onto an ordinary Hole must be rejected before allocating IDs or mutating the Asset.")
 	application.free()
 
 
@@ -4363,6 +4374,40 @@ func _test_asset_guides() -> void:
 	application._render_inspector()
 	_expect(str(pupil_component.get("topology_role", "")) == "hole" and pupil_component.get("chains", []).is_empty(), "Selecting Hole should persist Primitive topology semantics without generating Bezier topology.")
 	_expect(_inspector_toggle(application, "Visible") != null and _inspector_spin(application, "Contour Stroke Width (px)") == null and _inspector_spin(application, "Projection Depth (cm)") == null and _inspector_spin(application, "Z Order (Asset-local)") == null, "An ordinary Hole should expose only its constraint visibility, not visual Body properties.")
+	var inspector_controls: Array = []
+	_inspector_controls(application.inspector_content, inspector_controls)
+	var hole_parent_option: OptionButton = null
+	for control in inspector_controls:
+		if not control is OptionButton:
+			continue
+		for item_index in control.item_count:
+			if str(control.get_item_metadata(item_index)) == "component_1":
+				hole_parent_option = control
+	var hole_parent_offers_root := false
+	if hole_parent_option != null:
+		for item_index in hole_parent_option.item_count:
+			hole_parent_offers_root = hole_parent_offers_root or str(hole_parent_option.get_item_metadata(item_index)).is_empty()
+	_expect(hole_parent_option != null and not hole_parent_offers_root, "The Hole Parent dropdown must not offer the invalid Asset Root target.")
+	application._render_outliner()
+	var hole_row_button := _button_starting_with(application.outliner_view, "cloak")
+	var hole_row_has_add_button := false
+	if hole_row_button != null:
+		for sibling in hole_row_button.get_parent().get_children():
+			hole_row_has_add_button = hole_row_has_add_button or (sibling is Button and str(sibling.text) == "+")
+	_expect(hole_row_button != null and not hole_row_has_add_button, "An ordinary Hole row must not expose the scoped Add menu.")
+	var hole_parent_before_detach := str(pupil_component.get("parent_component_id", ""))
+	application._detach_component("asset_1", str(pupil_component.get("id", "")))
+	_expect(str(pupil_component.get("parent_component_id", "")) == hole_parent_before_detach, "Detaching an ordinary Hole must be rejected when it would promote the Hole to Asset Root.")
+	var hole_child_count_before: int = test_asset.get("components", []).size()
+	var next_component_before_hole_child: int = application.next_component_id
+	application.component_dialog.set_meta("asset_id", "asset_1")
+	application.component_dialog.set_meta("parent_component_id", str(pupil_component.get("id", "")))
+	application.component_dialog.set_meta("draw_mode", "closed_loop")
+	application.component_dialog.set_meta("source_asset_id", "")
+	application.component_name_input.text = "invalid_hole_child"
+	application._confirm_component_creation()
+	application._create_region("asset_1", "component", str(pupil_component.get("id", "")), "attack")
+	_expect(test_asset.get("components", []).size() == hole_child_count_before and application.next_component_id == next_component_before_hole_child, "Component and Region creation beneath an ordinary Hole must be rejected before mutating the Asset.")
 	_expect(WorldDocumentService.DRAW_MODES == ["closed_loop", "contour", "primitive"], "Components should expose only Closed Loop, Contour, and Primitive draw modes.")
 	var primitive_sampling := GeometrySamplingService.generate(pupil_component)
 	var refined_primitive_sampling := GeometrySamplingService.generate(pupil_component, {"parameters": {"spacing": 0.01, "feature_detail": 0.5}})

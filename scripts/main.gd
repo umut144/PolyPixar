@@ -3898,7 +3898,7 @@ func _component_mesh_source_validation_issues(asset: Dictionary, component: Dict
 
 func _component_mesh_needs_update(asset_id: String, component: Dictionary) -> bool:
 	var asset := _get_asset(asset_id)
-	if asset.is_empty() or not bool(asset.get("visibility", true)) or not bool(component.get("visibility", true)) or _is_constraint_only_hole(component):
+	if asset.is_empty() or not bool(asset.get("visibility", true)) or not _effective_component_visibility(asset, component) or _is_constraint_only_hole(component):
 		return false
 	if not _component_is_meshable_source(asset, component):
 		return false
@@ -7512,7 +7512,12 @@ func _open_component_dialog(asset_id: String, anchor: Control) -> void:
 
 
 func _open_component_add_menu(asset_id: String, parent_component_id: String, anchor: Control) -> void:
-	if _get_component(_get_asset(asset_id), parent_component_id).is_empty():
+	var parent := _get_component(_get_asset(asset_id), parent_component_id)
+	if parent.is_empty():
+		return
+	if _is_constraint_only_hole(parent):
+		component_add_menu.hide()
+		_show_status_message("Hole Components cannot own children, Guides, or Regions.")
 		return
 	component_add_menu.set_meta("asset_id", asset_id)
 	component_add_menu.set_meta("parent_component_id", parent_component_id)
@@ -7814,6 +7819,9 @@ func _create_region(asset_id: String, scope_kind: String, scope_id: String, regi
 	var source_component := _get_component(asset, scope_id)
 	if asset.is_empty() or scope_kind != "component" or source_component.is_empty() or _is_region(source_component) or region_type not in REGION_TYPES:
 		return
+	if _is_constraint_only_hole(source_component):
+		_show_status_message("Hole Components cannot own Regions.")
+		return
 	_record_direct_change()
 	var component_id := "component_%d" % next_component_id
 	next_component_id += 1
@@ -8104,9 +8112,14 @@ func _paste_component_clipboard(target_asset_id: String, target_parent_id := "")
 	var target_asset := _get_asset(target_asset_id)
 	if target_asset.is_empty() or component_clipboard.is_empty():
 		return
-	if not target_parent_id.is_empty() and _get_component(target_asset, target_parent_id).is_empty():
-		_show_status_message("Paste target is no longer available.")
-		return
+	if not target_parent_id.is_empty():
+		var target_parent := _get_component(target_asset, target_parent_id)
+		if target_parent.is_empty():
+			_show_status_message("Paste target is no longer available.")
+			return
+		if _is_constraint_only_hole(target_parent):
+			_show_status_message("Cannot paste Components beneath a Hole constraint.")
+			return
 	var source_components: Array = component_clipboard.get("components", [])
 	var source_root_ids: Array = component_clipboard.get("root_ids", [])
 	if source_components.is_empty() or source_root_ids.is_empty():
@@ -8489,17 +8502,24 @@ func _confirm_component_creation() -> void:
 		_update_component_name_dialog_validation()
 		_show_status_message(name_error)
 		return
-	_record_direct_change()
-	var component_id := "component_%d" % next_component_id
-	next_component_id += 1
 	var draw_mode := str(component_dialog.get_meta("draw_mode", "closed_loop"))
 	var is_reference := draw_mode == "reference"
 	var parent_component_id := str(component_dialog.get_meta("parent_component_id", ""))
 	var target_group_id := str(component_dialog.get_meta("group_id", ""))
 	if not target_group_id.is_empty() and ComponentHierarchy.group_by_id(asset, target_group_id).is_empty():
 		target_group_id = ""
-	if not parent_component_id.is_empty() and _get_component(asset, parent_component_id).is_empty():
-		parent_component_id = ""
+	if not parent_component_id.is_empty():
+		var parent_component := _get_component(asset, parent_component_id)
+		if parent_component.is_empty():
+			parent_component_id = ""
+		elif _is_constraint_only_hole(parent_component):
+			component_dialog.hide()
+			canvas_view.set_navigation_locked(false)
+			_show_status_message("Cannot create a Component beneath a Hole constraint.")
+			return
+	_record_direct_change()
+	var component_id := "component_%d" % next_component_id
+	next_component_id += 1
 	var component_transform := WorldDocumentService.default_component_transform()
 	if not parent_component_id.is_empty():
 		var parent_component := _get_component(asset, parent_component_id)
@@ -12339,10 +12359,14 @@ func _on_transform_changed(transform: Dictionary) -> void:
 func _on_component_hierarchy_parent_selected(index: int, option: OptionButton) -> void:
 	var asset := _get_asset(selected_asset_id)
 	var component := _get_component(asset, selected_component_id)
-	if asset.is_empty() or component.is_empty() or index < 0:
+	if asset.is_empty() or component.is_empty() or index < 0 or index >= option.item_count:
 		return
 	var new_parent_id := str(option.get_item_metadata(index))
-	if str(component.get("parent_component_id", "")) == new_parent_id or not ComponentHierarchy.can_parent(asset, selected_component_id, new_parent_id):
+	if str(component.get("parent_component_id", "")) == new_parent_id:
+		return
+	if not ComponentHierarchy.can_parent(asset, selected_component_id, new_parent_id):
+		_show_status_message("The selected Parent is not valid for this Component.")
+		_invalidate_render(RENDER_INSPECTOR)
 		return
 	var world_transform := ComponentHierarchy.world_transform_record(asset, selected_component_id)
 	_record_direct_change()
@@ -12387,6 +12411,9 @@ func _detach_component(asset_id: String, component_id: String) -> void:
 		return
 	var old_parent := _get_component(asset, old_parent_id)
 	var new_parent_id := str(old_parent.get("parent_component_id", ""))
+	if not ComponentHierarchy.can_parent(asset, component_id, new_parent_id):
+		_show_status_message("Cannot detach this Hole from its required direct Parent Body.")
+		return
 	var world_transform := ComponentHierarchy.world_transform_record(asset, component_id)
 	_record_direct_change()
 	component["parent_component_id"] = new_parent_id

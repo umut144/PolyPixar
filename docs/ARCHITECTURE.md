@@ -341,7 +341,7 @@ of 1 px.
 
 Schema 35 stores semantic Component Mesh build provenance in the derived
 Geometry document. The persistent `Update Meshes (N)` action rebuilds only
-meshable Components across all Create Asset types whose effective geometry,
+effectively visible meshable Components across all Create Asset types whose effective geometry,
 constraints, or recipes differ meaningfully from their last successful build.
 Automatic recipe version 3 retains version 2's Barde-derived Boundary and Seed
 Spacing at `0.55` through the measured normal Character/Symbol range. Beyond

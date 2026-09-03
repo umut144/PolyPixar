@@ -367,7 +367,9 @@ func rebuild() -> void:
 	else:
 		add_child(EditorWidgets.create_inspector_section("Hierarchy", section_toggled.emit))
 		add_child(EditorWidgets.create_inspector_field_label("Parent Component"))
-		var hierarchy_parent_items: Array = [{"label": "Root", "metadata": ""}]
+		var hierarchy_parent_items: Array = []
+		if ComponentHierarchy.can_parent(asset, selected_component_id, ""):
+			hierarchy_parent_items.append({"label": "Root", "metadata": ""})
 		for candidate in asset.get("components", []):
 			var candidate_id := str(candidate.get("id", ""))
 			if candidate_id == selected_component_id or not ComponentHierarchy.can_parent(asset, selected_component_id, candidate_id):

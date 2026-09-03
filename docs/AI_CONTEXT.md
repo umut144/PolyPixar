@@ -157,8 +157,8 @@ Selecting the Asset root in Meshing presents all current visible Component
 Meshes in Asset space; missing or stale Component Meshes are simply omitted.
 
 The persistent toolbar action `Update Meshes (N)` runs Adaptive Sampling,
-Poisson Seeding, Constrained Mesh, Optimization, and validation for valid
-out-of-date Components across every Create Asset type. Automatic recipe version
+Poisson Seeding, Constrained Mesh, Optimization, and validation for valid,
+effectively visible out-of-date Components across every Create Asset type. Automatic recipe version
 3 retains the Barde-scale density calibration introduced by version 2:
 Boundary and Seed Spacing remain `0.55` for ordinary Character/Symbol contours.
 Above that range, Boundary Spacing grows sublinearly with perimeter, while Seed
@@ -266,7 +266,8 @@ synchronization into Component topology. The former Godot-scene Export module
 is retired; runtime export is a batch operation over accepted derived data.
 
 World schema 52 adds transform-based Weapon Guides.
-Component and Group outliner rows both expose `+`; their shared add menu
+Ordinary outer Component and Group outliner rows expose `+`; constraint-only
+Hole rows do not, because Holes cannot own children, Guides, or Regions. The shared add menu
 contains `Guide → Weapon → weapon_socket_primary | grip_primary |
 grip_secondary | attack_point_primary | reach_limit_primary`. Weapon Guides
 may use Component or Group scope and author position plus rotation only.
