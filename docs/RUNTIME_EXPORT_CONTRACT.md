@@ -71,7 +71,7 @@ Schema 16 requires:
 | `schema_version` | integer | Exactly `16`. |
 | `asset_key` | non-empty lower-snake-case string | Runtime identity. |
 | `display_name` | string | Informational authored name. |
-| `asset_type` | string | `character`, `props`, `weapons`, `terrain`, `icon`, or `symbols`. |
+| `asset_type` | string | `character`, `props`, `weapons`, `terrain`, `items`, `icon`, or `symbols`. |
 | `presentation` | object | Required Asset-level presentation metadata. |
 | `coordinate_system` | object | Exact convention below. |
 | `z_order` | object | Exact convention below. |

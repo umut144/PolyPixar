@@ -2039,7 +2039,7 @@ func _test_geometry_sampling_service() -> void:
 	_expect(not bool(GeometrySamplingService.generate(open_component).get("valid", true)), "An open contour should fail visibly at the mesh-pipeline Sampling boundary.")
 	var application_script = load("res://scripts/main.gd")
 	var application: Control = application_script.new()
-	_expect(WorldDocumentService.has_supported_schema({"schema_version": 61}) and WorldDocumentService.has_supported_schema({"schema_version": 60}) and not WorldDocumentService.has_supported_schema({"schema_version": 62}), "Schema 61 should keep current and older World documents readable and reject unknown future schemas.")
+	_expect(WorldDocumentService.has_supported_schema({"schema_version": 62}) and WorldDocumentService.has_supported_schema({"schema_version": 61}) and not WorldDocumentService.has_supported_schema({"schema_version": 63}), "Schema 62 should keep current and older World documents readable and reject unknown future schemas.")
 	_expect(WorldDocumentService.normalize_component_draw_mode("ribbon", 39) == "contour" and WorldDocumentService.normalize_component_draw_mode("contour", 42) == "contour", "Schema-42 loading must retain the explicit legacy Ribbon-to-Contour migration boundary.")
 	_expect(WorldDocumentService.normalize_component_draw_mode("ribbon", 42) == "ribbon", "Current-schema Ribbon data must remain visibly invalid instead of receiving a silent backward fallback.")
 	var arranged_round_trip: Dictionary = WorldDocumentService.normalize_sampling_bake(WorldDocumentService.serialize_sampling_bake(arranged_result))
@@ -2050,7 +2050,7 @@ func _test_geometry_sampling_service() -> void:
 	baked_result["bake_id"] = "bake_test"
 	geometry_document["sampling"]["bakes"][GeometrySamplingService.ADAPTIVE] = baked_result
 	var serialized_geometry: Dictionary = WorldDocumentService.serialize_geometry_document(geometry_document)
-	_expect(int(serialized_geometry.get("schema_version", 0)) == 61 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-61 JSON arrays.")
+	_expect(int(serialized_geometry.get("schema_version", 0)) == 62 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-62 JSON arrays.")
 	var normalized_geometry: Dictionary = WorldDocumentService.normalize_geometry_document(serialized_geometry, "asset_1", "component_1")
 	_expect(normalized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Vector2, "Sampling bake loading should restore local sample positions as Vector2 values.")
 	_expect(normalized_geometry["sampling"]["bakes"].size() == 1, "Sampling should retain one Adaptive Bake.")
@@ -2376,7 +2376,12 @@ func _test_geometry_sampling_ui_shell() -> void:
 	application.asset_name_input.text = "Sword"
 	application._confirm_asset_creation()
 	_expect(str(application.assets[-1].get("asset_type", "")) == "weapons", "Create Weapons should persist the stable weapons Asset type.")
-	_expect(WorldDocumentService.normalize_asset_type("") == "character" and application._asset_type_create_submodule("icon") == "Icon" and application._asset_type_create_submodule("weapons") == "Weapons", "Missing Asset types should normalize to Character while valid types map back to their Create module.")
+	application._select_submodule("Create", "Items", create_section)
+	_expect(application.active_module == "Create" and application.active_create_submodule == "Items" and application.canvas_view.visible, "Selecting Create Items should immediately render the shared asset workspace.")
+	application.asset_name_input.text = "Potion"
+	application._confirm_asset_creation()
+	_expect(str(application.assets[-1].get("asset_type", "")) == "items", "Create Items should persist the stable items Asset type.")
+	_expect(WorldDocumentService.normalize_asset_type("") == "character" and application._asset_type_create_submodule("icon") == "Icon" and application._asset_type_create_submodule("weapons") == "Weapons" and application._asset_type_create_submodule("items") == "Items", "Missing Asset types should normalize to Character while valid types map back to their Create module.")
 	application._on_outliner_asset_type_filter_toggled(false, "character")
 	_expect(not application.outliner_asset_type_filters["character"] and application.outliner_asset_type_filters["props"], "Mesh and Style filters should support independent Asset type checkboxes.")
 	application.active_module = "Style"
@@ -3017,6 +3022,8 @@ func _test_asset_catalog_service() -> void:
 	_expect(bool(build.get("valid", false)) and int(catalog.get("schema_version", 0)) == 1 and str(catalog.get("world_key", "")) == "world01", "Every World should derive an independently versioned Asset Catalog.")
 	_expect(entries.size() == 3 and str(entries[0].get("asset_key", "")) == "ancient_orb" and str(entries[2].get("asset_key", "")) == "orb", "Catalog entries should be sorted alphabetically by Asset Key.")
 	_expect(not JSON.stringify(catalog).contains("asset_id") and str(entries[1].get("runtime_package", "")) == "PolyToolsRuntimeExports/magic_orb/manifest.json", "The public Asset Catalog should expose key-based package paths without internal Asset IDs.")
+	var item_catalog: Dictionary = AssetCatalogService.build_catalog("world01", "World", [{"id": "potion", "name": "Potion", "asset_type": "items", "visibility": true}]).get("catalog", {})
+	_expect(str(item_catalog.get("assets", [])[0].get("asset_type", "")) == "items", "The public Asset Catalog should retain the stable Items Asset type.")
 	var collision_assets: Array[Dictionary] = assets.duplicate(true)
 	collision_assets.append({"id": "internal_4", "name": "Magic-Orb", "asset_type": "props", "visibility": false})
 	_expect(not bool(AssetCatalogService.build_catalog("world01", "World", collision_assets).get("valid", true)), "Asset Key collisions should be rejected even when one conflicting Asset is hidden.")
@@ -3631,6 +3638,10 @@ func _test_runtime_export_service() -> void:
 	var manifest: Dictionary = result.get("manifest", {})
 	var components: Array = manifest.get("components", [])
 	_expect(bool(result.get("valid", false)) and int(manifest.get("schema_version", 0)) == 16 and str(manifest.get("asset_key", "")) == "wizard" and not manifest.has("asset_id"), "Runtime export schema 16 should identify packages only by the Asset Key derived from their display name.")
+	var item_asset: Dictionary = asset.duplicate(true)
+	item_asset["asset_type"] = "items"
+	var item_manifest: Dictionary = RuntimeExportService.build_manifest(item_asset, {"component_a": source, "component_b": source}).get("manifest", {})
+	_expect(str(item_manifest.get("asset_type", "")) == "items", "Runtime export should retain the stable Items Asset type.")
 	_expect(str(manifest.get("presentation", {}).get("authored_facing", "")) == "right", "Runtime export schema 16 should publish the selected authored facing under presentation.authored_facing.")
 	var neutral_asset: Dictionary = asset.duplicate(true)
 	neutral_asset.erase("authored_facing")
@@ -5652,7 +5663,7 @@ func _test_motion_act_evaluator() -> void:
 	var normalized: Dictionary = WorldDocumentService.normalize_motion_act({"id": "act_7", "parameters": {"direction": [0.0, 2.0], "distance": 12.0}}, "fallback")
 	_expect(Vector2(normalized.get("parameters", {}).get("direction", Vector2.ZERO)) == Vector2(0.0, 2.0), "Persisted Slide direction arrays should normalize back to Vector2 values.")
 	var serialized: Dictionary = WorldDocumentService.serialize_motion_act(normalized)
-	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 61, "Act persistence should serialize vectors as JSON arrays using schema 61.")
+	_expect(serialized.get("parameters", {}).get("direction", null) is Array and int(serialized.get("schema_version", 0)) == 62, "Act persistence should serialize vectors as JSON arrays using schema 62.")
 	var normalized_jump: Dictionary = WorldDocumentService.normalize_motion_act({"id": "act_8", "primitive": "jump", "parameters": {"direction": [1.0, 0.0], "distance": 7.0, "height": 2.5, "arc": "snappy"}}, "fallback")
 	var serialized_jump: Dictionary = WorldDocumentService.serialize_motion_act(normalized_jump)
 	_expect(str(serialized_jump.get("primitive", "")) == MotionActEvaluator.JUMP and is_equal_approx(float(serialized_jump.get("parameters", {}).get("height", 0.0)), 2.5) and str(serialized_jump.get("parameters", {}).get("arc", "")) == MotionActEvaluator.JUMP_ARC_SNAPPY, "Jump-specific parameters should survive normalization and serialization.")
@@ -5681,12 +5692,12 @@ func _test_motion_module_separators() -> void:
 	_expect(separator_count == 1 and separator_height == 6 and section.content_list.get_child_count() == 5, "Motion should use one thick non-interactive separator between its Core and Extended workspace groups.")
 	section.free()
 	var create_section := ModuleSection.new()
-	create_section.setup("Create", ["Character", "Props", "Weapons", "Terrain", "Icon", "Symbols"], true)
+	create_section.setup("Create", ["Character", "Props", "Weapons", "Terrain", "Items", "Icon", "Symbols"], true)
 	var create_separator_count := 0
 	for child in create_section.content_list.get_children():
 		if child is ColorRect:
 			create_separator_count += 1
-	_expect(create_separator_count == 0 and create_section.content_list.get_child_count() == 6, "Create should contain Character, Props, Weapons, Terrain, Icon, and Symbols.")
+	_expect(create_separator_count == 0 and create_section.content_list.get_child_count() == 7, "Create should contain Character, Props, Weapons, Terrain, Items, Icon, and Symbols.")
 	create_section._toggle()
 	_expect(create_section.expanded, "Product categories should remain expanded when their headers are pressed.")
 	create_section.free()

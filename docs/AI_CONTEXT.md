@@ -8,7 +8,7 @@ small and database-oriented.
 
 The left rail is always expanded and exposes exactly these categories:
 
-- `Create`: `Character`, `Props`, `Weapons`, `Terrain`, `Icon`, `Symbols`
+- `Create`: `Character`, `Props`, `Weapons`, `Terrain`, `Items`, `Icon`, `Symbols`
 - `Mesh`: `Sampling`, `Seeding`, `Meshing`
 - `Style`: `Weighting`
 
@@ -19,9 +19,9 @@ categories. Texture and Material authoring are not part of the application.
 
 ## Asset kinds
 
-All six Create modules use the same Asset, Component, Guide, canvas, and
+All seven Create modules use the same Asset, Component, Guide, canvas, and
 Inspector implementation. An Asset stores one stable `asset_type` value:
-`character`, `props`, `weapons`, `terrain`, `icon`, or `symbols`. Create views filter the Outliner by
+`character`, `props`, `weapons`, `terrain`, `items`, `icon`, or `symbols`. Create views filter the Outliner by
 that value. Documents without an `asset_type` normalize to `character`.
 
 The Asset-level `Initial Pose` Inspector group stores `authored_facing` as
@@ -32,7 +32,7 @@ This presentation metadata never mirrors geometry, changes the canvas, or
 modifies Component transforms.
 
 Mesh and Style show a shared multi-select Asset filter above the Outliner
-search field. Character, Props, Weapons, Terrain, Icon, and Symbols are checked by default;
+search field. Character, Props, Weapons, Terrain, Items, Icon, and Symbols are checked by default;
 search text and checked types are combined. The filter is an editor-state
 preference, not a document mutation.
 
@@ -296,6 +296,11 @@ retained editable Bézier topology. `component` displays and exports the attache
 Component's geometry by stable ID; the inactive authored topology remains stored so
 switching back is lossless. Drawing and Bézier editing are disabled while the
 Component source is active.
+
+World schema 62 adds `Items` as a seventh Create database view. Its stable
+`asset_type` value is `items`; it shares the existing Asset, Component, Guide,
+Canvas, Inspector, Mesh, Style, and Runtime Export paths without introducing a
+second geometry model.
 
 World schema 58 adds `root_position` to the Asset root's `Asset Transform`
 Inspector. It previews a translation of the complete Asset independently from

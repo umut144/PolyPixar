@@ -1,7 +1,7 @@
 extends Control
 
 const SELECTION_MIRROR_SERVICE_SCRIPT = preload("res://scripts/selection_mirror_service.gd")
-const CREATE_SUBMODULES := ["Character", "Props", "Weapons", "Terrain", "Icon", "Symbols"]
+const CREATE_SUBMODULES := ["Character", "Props", "Weapons", "Terrain", "Items", "Icon", "Symbols"]
 const GEOMETRY_SUBMODULES := ["Sampling", "Seeding", "Meshing"]
 const STYLE_SUBMODULES := ["Weighting"]
 const EXPORT_SUBMODULES: Array[String] = []
@@ -43,6 +43,7 @@ var outliner_asset_type_filters: Dictionary = {
 	"props": true,
 	"weapons": true,
 	"terrain": true,
+	"items": true,
 	"icon": true,
 	"symbols": true
 }
@@ -899,8 +900,8 @@ func _build_ui() -> void:
 	filter_grid.columns = 2
 	filter_grid.add_theme_constant_override("h_separation", 4)
 	filter_grid.add_theme_constant_override("v_separation", 0)
-	var asset_type_labels := {"character": "Character", "props": "Props", "weapons": "Weapons", "terrain": "Terrain", "icon": "Icon", "symbols": "Symbols"}
-	for asset_type in ["character", "props", "weapons", "terrain", "icon", "symbols"]:
+	var asset_type_labels := {"character": "Character", "props": "Props", "weapons": "Weapons", "terrain": "Terrain", "items": "Items", "icon": "Icon", "symbols": "Symbols"}
+	for asset_type in ["character", "props", "weapons", "terrain", "items", "icon", "symbols"]:
 		var type_checkbox := CheckBox.new()
 		type_checkbox.text = asset_type_labels[asset_type]
 		type_checkbox.button_pressed = bool(outliner_asset_type_filters.get(asset_type, true))
@@ -3087,7 +3088,7 @@ func _restore_editor_state(state) -> void:
 	frame_visible = false
 	frame_half_extent = Vector2(1.0, 1.0)
 	frame_offset = Vector2.ZERO
-	outliner_asset_type_filters = {"character": true, "props": true, "weapons": true, "terrain": true, "icon": true, "symbols": true}
+	outliner_asset_type_filters = {"character": true, "props": true, "weapons": true, "terrain": true, "items": true, "icon": true, "symbols": true}
 	_apply_outliner_asset_type_filter_checkboxes()
 	expanded_assets.clear()
 	asset_camera_states.clear()
@@ -12589,6 +12590,8 @@ func _asset_type_create_submodule(asset_type: String) -> String:
 			return "Weapons"
 		"terrain":
 			return "Terrain"
+		"items":
+			return "Items"
 		"icon":
 			return "Icon"
 		"symbols":

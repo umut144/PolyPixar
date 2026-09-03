@@ -64,7 +64,7 @@ var row_status: Dictionary = {}
 # documented at _render_geometry_rows below.
 var geometry_rows: Array = []
 
-const CREATE_SUBMODULES := ["Character", "Props", "Weapons", "Terrain", "Icon", "Symbols"]
+const CREATE_SUBMODULES := ["Character", "Props", "Weapons", "Terrain", "Items", "Icon", "Symbols"]
 const GEOMETRY_SUBMODULES := ["Sampling", "Seeding", "Meshing"]
 
 

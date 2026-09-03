@@ -10,7 +10,7 @@ extends RefCounted
 # functions that do read editor state, _serialize_editor_state and
 # _serialize_world_settings, stay in main.gd for that reason.
 
-const SCHEMA_VERSION := 61
+const SCHEMA_VERSION := 62
 const REGION_GEOMETRY_AUTHORED := "authored"
 const REGION_GEOMETRY_COMPONENT := "component"
 const REGION_GEOMETRY_SOURCES := [REGION_GEOMETRY_AUTHORED, REGION_GEOMETRY_COMPONENT]
@@ -1000,7 +1000,7 @@ static func normalize_component_draw_mode(raw_mode, source_schema_version: int) 
 
 static func normalize_asset_type(value) -> String:
 	var normalized := str(value).strip_edges().to_lower()
-	return normalized if normalized in ["character", "props", "weapons", "terrain", "icon", "symbols"] else "character"
+	return normalized if normalized in ["character", "props", "weapons", "terrain", "items", "icon", "symbols"] else "character"
 
 static func default_motion_path(path_id: String, path_name: String) -> Dictionary:
 	return {

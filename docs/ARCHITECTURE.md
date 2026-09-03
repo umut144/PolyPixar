@@ -8,11 +8,11 @@ contains always-expanded Create, Mesh, and Style categories. A single
 `active_module` plus its category-specific submodule identifies the one active
 workspace.
 
-Create has six database views over the same Asset implementation:
-`Character`, `Props`, `Weapons`, `Terrain`, `Icon`, and `Symbols`. Their stable persisted discriminator
+Create has seven database views over the same Asset implementation:
+`Character`, `Props`, `Weapons`, `Terrain`, `Items`, `Icon`, and `Symbols`. Their stable persisted discriminator
 is `asset_type`; missing or invalid values normalize to `character`.
 
-Mesh and Style share a multi-select Outliner Asset filter. Its six checkbox
+Mesh and Style share a multi-select Outliner Asset filter. Its seven checkbox
 states are persisted in `editor_state`; the filter is applied together with
 the Outliner search and does not alter the selected Asset or document data.
 
@@ -530,6 +530,10 @@ canonical topology; `component` resolves `parent_component_id` as the live
 geometry owner while leaving the authored topology dormant and intact. The
 Canvas receives only the resolved view copy, authoring commands are guarded in
 `main.gd`, and Runtime export emits a binding rather than copied geometry.
+
+World schema 62 adds the `items` Asset type and its `Items` Create view. Items
+use the same document, authoring, derived Mesh, Style, and Runtime Export paths
+as every other Asset type.
 
 World schema 59 persists Asset-root `root_scale` as a two-axis vector and
 exposes separate `Scale X` and `Scale Y` Inspector controls. Legacy scalar
