@@ -31,7 +31,7 @@ signal drop_requested(asset_id: String, target_id: String, payload: Variant)
 signal visibility_toggle_requested(kind: String, asset_id: String, target_id: String, visible: bool)
 signal geometry_asset_selected(asset_id: String)
 signal geometry_component_selected(asset_id: String, component_id: String)
-signal geometry_reference_selected(asset_id: String, component_id: String, reference_id: String)
+signal geometry_hole_selected(asset_id: String, component_id: String, hole_id: String)
 signal geometry_input_selected(asset_id: String, component_id: String, input_id: String, role: String)
 signal geometry_pipeline_action(action_id: String, asset_id: String, component_id: String)
 
@@ -219,7 +219,7 @@ func _geometry_row(kind: String, row_data: Dictionary) -> HBoxContainer:
 	var target_id := str(row_data.get("target_id", ""))
 	var selected := bool(row_data.get("selected", false))
 	var row := HBoxContainer.new()
-	if kind in ["reference", "guide"]:
+	if kind in ["hole", "guide"]:
 		row.add_theme_constant_override("separation", 2)
 	var indent := Control.new()
 	indent.custom_minimum_size = Vector2(int(row_data.get("indent", 16)), 0)
@@ -235,9 +235,9 @@ func _geometry_row(kind: String, row_data: Dictionary) -> HBoxContainer:
 		"component":
 			EditorWidgets.style_outliner_button(button, selected)
 			button.pressed.connect(geometry_component_selected.emit.bind(asset_id, component_id))
-		"reference":
+		"hole":
 			EditorWidgets.style_outliner_button(button, selected, str(row_data.get("style_role", "outer")))
-			button.pressed.connect(geometry_reference_selected.emit.bind(asset_id, component_id, target_id))
+			button.pressed.connect(geometry_hole_selected.emit.bind(asset_id, component_id, target_id))
 		"guide":
 			EditorWidgets.style_guide_outliner_button(button, selected, str(row_data.get("guide_type", "")))
 			button.pressed.connect(guide_selected.emit.bind(asset_id, target_id))

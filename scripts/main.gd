@@ -938,7 +938,7 @@ func _build_ui() -> void:
 	outliner_view.visibility_toggle_requested.connect(_on_outliner_visibility_toggled)
 	outliner_view.geometry_asset_selected.connect(_select_geometry_asset)
 	outliner_view.geometry_component_selected.connect(_select_geometry_component)
-	outliner_view.geometry_reference_selected.connect(_select_geometry_sampling_reference)
+	outliner_view.geometry_hole_selected.connect(_select_geometry_sampling_hole)
 	outliner_view.geometry_input_selected.connect(_select_geometry_seeding_input)
 	outliner_view.geometry_pipeline_action.connect(_on_geometry_pipeline_action)
 	outliner_scroll.add_child(outliner_view)
@@ -1096,8 +1096,8 @@ func _build_ui() -> void:
 	geometry_inspector_view.seeding_parameter_changed.connect(_on_geometry_seeding_parameter_changed)
 	geometry_inspector_view.seeding_spine_enabled_changed.connect(_on_geometry_seeding_spine_enabled)
 	geometry_inspector_view.seeding_stagger_override_changed.connect(_on_geometry_seeding_stagger_override_changed)
-	geometry_inspector_view.sampling_reference_selected.connect(func(reference_id: String) -> void:
-		_select_geometry_sampling_reference(selected_asset_id, selected_component_id, reference_id))
+	geometry_inspector_view.sampling_hole_selected.connect(func(hole_id: String) -> void:
+		_select_geometry_sampling_hole(selected_asset_id, selected_component_id, hole_id))
 	geometry_inspector_view.sampling_cut_selected.connect(func(guide_id: String) -> void:
 		_select_guide(selected_asset_id, guide_id))
 	inspector_content.add_child(geometry_inspector_view)
@@ -3768,7 +3768,7 @@ func _geometry_asset_mesh_overview(asset_id: String) -> Dictionary:
 	var mesh_component_count := 0
 	var asset_is_visible := bool(asset.get("visibility", true))
 	for component in asset.get("components", []):
-		if not component is Dictionary or str(component.get("type", "component")) in ["guide", "region"] or _is_reference_component(component):
+		if not component is Dictionary or str(component.get("type", "component")) in ["guide", "region"] or _is_reference_component(component) or _is_constraint_only_hole(component):
 			continue
 		if not asset_is_visible or not bool(component.get("visibility", true)):
 			continue
@@ -3870,6 +3870,8 @@ func _component_mesh_source_validation_issues(asset: Dictionary, component: Dict
 		return ["Reference Components use their source Asset Meshes."]
 	if _is_region(component):
 		return ["Semantic Regions do not enter the visual Mesh pipeline."]
+	if _is_constraint_only_hole(component):
+		return ["Hole Components are constraints of their direct Parent and do not own a Mesh."]
 	var draw_mode := str(component.get("draw_mode", "closed_loop"))
 	var stroke_width_px := _effective_contour_stroke_width_px(component)
 	if draw_mode == "contour":
@@ -3894,7 +3896,7 @@ func _component_mesh_source_validation_issues(asset: Dictionary, component: Dict
 
 func _component_mesh_needs_update(asset_id: String, component: Dictionary) -> bool:
 	var asset := _get_asset(asset_id)
-	if asset.is_empty() or not bool(asset.get("visibility", true)) or not bool(component.get("visibility", true)):
+	if asset.is_empty() or not bool(asset.get("visibility", true)) or not bool(component.get("visibility", true)) or _is_constraint_only_hole(component):
 		return false
 	if not _component_is_meshable_source(asset, component):
 		return false
@@ -4030,7 +4032,7 @@ func _mesh_batch_summary(candidates: Array[Dictionary]) -> Dictionary:
 			continue
 		var asset_id := str(asset.get("id", ""))
 		for component in asset.get("components", []):
-			if not component is Dictionary or not bool(component.get("visibility", true)) or _is_reference_component(component) or _is_region(component):
+			if not component is Dictionary or not bool(component.get("visibility", true)) or _is_reference_component(component) or _is_region(component) or _is_constraint_only_hole(component):
 				continue
 			var issues := _component_mesh_source_validation_issues(asset, component)
 			var error_message := str(_component_mesh_reference(asset_id, str(component.get("id", ""))).get("last_error", ""))
@@ -4322,7 +4324,7 @@ func _runtime_export_build(asset: Dictionary) -> Dictionary:
 	var sources: Dictionary = {}
 	var asset_id := str(asset.get("id", ""))
 	for component in asset.get("components", []):
-		if not component is Dictionary or not bool(component.get("visibility", true)) or _is_region(component):
+		if not component is Dictionary or not bool(component.get("visibility", true)) or _is_region(component) or _is_constraint_only_hole(component):
 			continue
 		var component_id := str(component.get("id", ""))
 		if _is_reference_component(component):
@@ -6457,9 +6459,7 @@ func _append_geometry_asset_rows(rows: Array, asset: Dictionary, force_expand: b
 			guides.append(component)
 		elif _is_region(component):
 			continue
-		elif _is_reference_component(component):
-			continue
-		elif _is_geometry_hole_input(component, str(component.get("parent_component_id", ""))) and not _get_component(asset, str(component.get("parent_component_id", ""))).is_empty():
+		elif _is_reference_component(component) or _is_constraint_only_hole(component):
 			continue
 		else:
 			components.append(component)
@@ -6494,12 +6494,12 @@ func _append_geometry_asset_rows(rows: Array, asset: Dictionary, force_expand: b
 func _append_geometry_sampling_rows(rows: Array, asset: Dictionary, component_id: String, guides: Array) -> void:
 	var asset_id := str(asset.get("id", ""))
 	for hole_component in asset.get("components", []):
-		if not _is_geometry_hole_input(hole_component, component_id):
+		if not _is_geometry_hole_input(asset, hole_component, component_id):
 			continue
 		var hole_component_id := str(hole_component.get("id", ""))
 		var summary := _geometry_sampling_input_summary(asset_id, component_id, hole_component_id, "hole")
 		rows.append({
-			"kind": "reference", "asset_id": asset_id, "component_id": component_id, "target_id": hole_component_id,
+			"kind": "hole", "asset_id": asset_id, "component_id": component_id, "target_id": hole_component_id,
 			"indent": 34,
 			"label": "Hole · %s  %s" % [WorldDocumentService.component_outliner_name(assets, hole_component), str(summary.get("label", "↳"))],
 			"tooltip": "Sampling constraint · select the parent Component to edit this boundary",
@@ -6554,7 +6554,7 @@ func _append_geometry_seeding_rows(rows: Array, asset: Dictionary, component: Di
 	})
 	rows.append(_geometry_seeding_input_row(asset_id, component_id, "", "outer", "Outer · %s" % str(component.get("name", "Component")), "Clearance", "Outer"))
 	for hole_component in asset.get("components", []):
-		if _is_geometry_hole_input(hole_component, component_id):
+		if _is_geometry_hole_input(asset, hole_component, component_id):
 			rows.append(_geometry_seeding_input_row(asset_id, component_id, str(hole_component.get("id", "")), "hole", "Hole · %s" % WorldDocumentService.component_outliner_name(assets, hole_component), "Excluded", "Hole"))
 	for guide in guides:
 		if str(guide.get("scope", {}).get("component_id", "")) != component_id:
@@ -6986,9 +6986,9 @@ func _set_sampling_input(asset_id: String, input_id: String, kind: String) -> vo
 	# _select_guide used to be stored as a Guide, and the Boundary Density block
 	# then rendered for something that is not a Sampling boundary.
 	var asset := _get_asset(asset_id)
-	if kind in ["component", "reference"]:
+	if kind == "component":
 		var hole_component := _get_component(asset, input_id)
-		if not hole_component.is_empty() and str(hole_component.get("topology_role", "outer")) == "hole":
+		if _is_geometry_hole_input(asset, hole_component, selected_component_id):
 			selected_sampling_input_id = input_id
 			selected_sampling_input_kind = "component"
 			return
@@ -7264,7 +7264,7 @@ func _select_geometry_component(asset_id: String, component_id: String) -> void:
 			geometry_meshing_workspace.grab_focus()
 
 
-func _select_geometry_sampling_reference(asset_id: String, parent_component_id: String, reference_id := "") -> void:
+func _select_geometry_sampling_hole(asset_id: String, parent_component_id: String, hole_id := "") -> void:
 	if parent_component_id.is_empty():
 		_select_geometry_asset(asset_id)
 		return
@@ -7272,13 +7272,13 @@ func _select_geometry_sampling_reference(asset_id: String, parent_component_id: 
 		_select_geometry_component(asset_id, parent_component_id)
 	else:
 		selected_guide_id = ""
-	if not reference_id.is_empty():
-		selected_seeding_input_id = reference_id
-		_set_sampling_input(asset_id, reference_id, "component")
+	if not hole_id.is_empty():
+		selected_seeding_input_id = hole_id
+		_set_sampling_input(asset_id, hole_id, "component")
 		_invalidate_render(RENDER_DOCUMENT)
 		return
 	for hole_component in _get_asset(asset_id).get("components", []):
-		if _is_geometry_hole_input(hole_component, parent_component_id):
+		if _is_geometry_hole_input(_get_asset(asset_id), hole_component, parent_component_id):
 			selected_seeding_input_id = str(hole_component.get("id", ""))
 			_set_sampling_input(asset_id, str(hole_component.get("id", "")), "component")
 			_invalidate_render(RENDER_DOCUMENT)
@@ -9060,12 +9060,12 @@ func _confirm_guide_deletion() -> void:
 			return
 
 
-func _get_sampling_input(asset: Dictionary, input_id: String, input_kind: String) -> Dictionary:
+func _get_sampling_input(asset: Dictionary, parent_component_id: String, input_id: String, input_kind: String) -> Dictionary:
 	if input_kind == "guide":
 		return _get_guide(asset, input_id)
-	if input_kind in ["component", "reference"]:
+	if input_kind == "component":
 		for component in asset.get("components", []):
-			if str(component.get("id", "")) == input_id and str(component.get("topology_role", "outer")) == "hole":
+			if str(component.get("id", "")) == input_id and _is_geometry_hole_input(asset, component, parent_component_id):
 				return component
 	return {}
 
@@ -9317,52 +9317,83 @@ func _geometry_sampling_hole_components(asset: Dictionary, component_id: String)
 	var result: Array = []
 	var parent_inverse := ComponentHierarchy.world_transform(asset, component_id).affine_inverse()
 	for hole_input in asset.get("components", []):
-		if not _is_geometry_hole_input(hole_input, component_id):
+		if not _is_geometry_hole_input(asset, hole_input, component_id):
 			continue
 		var input_id := str(hole_input.get("id", ""))
+		var input_label := WorldDocumentService.component_outliner_name(assets, hole_input)
 		if not _is_reference_component(hole_input):
 			var hole_transform := parent_inverse * ComponentHierarchy.world_transform(asset, input_id)
-			var direct_hole := _geometry_sampling_hole_source(hole_input, input_id, input_id, hole_transform)
+			var direct_hole := _geometry_sampling_hole_source(hole_input, input_id, input_id, input_label, hole_transform)
 			if not direct_hole.is_empty():
 				result.append(direct_hole)
 			continue
 		var source_asset := _get_asset(str(hole_input.get("source_asset_id", "")))
 		if source_asset.is_empty():
+			result.append(_geometry_sampling_invalid_hole(input_id, input_label, "Referenced source Asset is missing."))
 			continue
 		var reference_world := ComponentHierarchy.world_transform(asset, input_id)
+		var source_boundary_count := 0
 		for source_component in source_asset.get("components", []):
-			if not source_component is Dictionary or _is_reference_component(source_component) or str(source_component.get("draw_mode", "closed_loop")) not in ["closed_loop", "primitive"]:
+			if not source_component is Dictionary or _is_reference_component(source_component) or _is_constraint_only_hole(source_component) or not _effective_component_visibility(source_asset, source_component) or str(source_component.get("draw_mode", "closed_loop")) not in ["closed_loop", "primitive"]:
 				continue
+			source_boundary_count += 1
 			var hole_id := "%s:%s" % [input_id, str(source_component.get("id", ""))]
 			var source_world := ComponentHierarchy.world_transform(source_asset, str(source_component.get("id", "")))
 			var transform := parent_inverse * reference_world * source_world
-			var referenced_hole := _geometry_sampling_hole_source(source_component, hole_id, input_id, transform)
+			var source_label := "%s / %s" % [input_label, str(source_component.get("name", "Component"))]
+			var referenced_hole := _geometry_sampling_hole_source(source_component, hole_id, input_id, source_label, transform)
 			if not referenced_hole.is_empty():
 				result.append(referenced_hole)
+		if source_boundary_count == 0:
+			result.append(_geometry_sampling_invalid_hole(input_id, input_label, "Referenced Asset has no visible Closed Loop or Primitive boundary."))
 	return result
 
 
-func _is_geometry_hole_input(component: Variant, parent_component_id: String) -> bool:
-	if not component is Dictionary or _is_region(component):
+func _is_constraint_only_hole(component: Variant) -> bool:
+	return component is Dictionary and not _is_reference_component(component) and not _is_region(component) and str(component.get("topology_role", "outer")) == "hole"
+
+
+func _geometry_body_accepts_holes(asset: Dictionary, component_id: String) -> bool:
+	var component := _get_component(asset, component_id)
+	return not component.is_empty() and not _is_reference_component(component) and not _is_region(component) and str(component.get("topology_role", "outer")) == "outer" and str(component.get("draw_mode", "closed_loop")) in ["closed_loop", "primitive"] and _effective_component_visibility(asset, component)
+
+
+func _is_geometry_hole_input(asset: Dictionary, component: Variant, parent_component_id: String) -> bool:
+	if not component is Dictionary or _is_region(component) or not _geometry_body_accepts_holes(asset, parent_component_id):
 		return false
-	if str(component.get("parent_component_id", "")) != parent_component_id or str(component.get("topology_role", "outer")) != "hole":
+	if str(component.get("parent_component_id", "")) != parent_component_id or str(component.get("topology_role", "outer")) != "hole" or not _effective_component_visibility(asset, component):
 		return false
 	return _is_reference_component(component) or str(component.get("draw_mode", "closed_loop")) in ["closed_loop", "primitive"]
 
 
-func _geometry_sampling_hole_source(source_component: Dictionary, hole_id: String, input_id: String, transform: Transform2D) -> Dictionary:
+func _geometry_sampling_invalid_hole(input_id: String, input_label: String, error: String) -> Dictionary:
+	return {"id": input_id, "sampling_input_id": input_id, "sampling_input_label": input_label, "sampling_error": error, "draw_mode": "closed_loop", "points": [], "edges": [], "chains": []}
+
+
+func _geometry_sampling_hole_source(source_component: Dictionary, hole_id: String, input_id: String, input_label: String, transform: Transform2D) -> Dictionary:
 	if PrimitiveGeometryService.has_analytic_shape(source_component):
 		var primitive_hole: Dictionary = source_component.duplicate(true)
 		primitive_hole["id"] = hole_id
 		primitive_hole["sampling_input_id"] = input_id
+		primitive_hole["sampling_input_label"] = input_label
 		primitive_hole["topology_role"] = "hole"
 		primitive_hole["sampling_transform"] = transform
 		return primitive_hole
+	if str(source_component.get("draw_mode", "closed_loop")) == "primitive":
+		var invalid_primitive: Dictionary = source_component.duplicate(true)
+		invalid_primitive["id"] = hole_id
+		invalid_primitive["sampling_input_id"] = input_id
+		invalid_primitive["sampling_input_label"] = input_label
+		invalid_primitive["sampling_transform"] = transform
+		var primitive_issues := PrimitiveGeometryService.validation_issues(invalid_primitive)
+		invalid_primitive["sampling_error"] = str(primitive_issues[0]) if not primitive_issues.is_empty() else "Primitive boundary is invalid."
+		return invalid_primitive
 	if str(source_component.get("draw_mode", "closed_loop")) != "closed_loop":
 		return {}
 	var hole_component: Dictionary = source_component.duplicate(true)
 	hole_component["id"] = hole_id
 	hole_component["sampling_input_id"] = input_id
+	hole_component["sampling_input_label"] = input_label
 	hole_component["topology_role"] = "hole"
 	var point_id_map: Dictionary = {}
 	for point in hole_component.get("points", []):
@@ -9398,7 +9429,7 @@ func _geometry_sampling_overlays(asset: Dictionary, component_id: String) -> Dic
 			BezierGeometry.resolve_auto_handles(working_hole.get("points", []), working_hole.get("chains", []))
 			for chain in working_hole.get("chains", []):
 				if chain is Dictionary and bool(chain.get("closed", false)):
-					local_points = BezierGeometry.flatten_chain(working_hole, chain)
+					local_points.assign(BezierGeometry.flatten_chain(working_hole, chain))
 					break
 		if local_points.size() >= 3:
 			overlays["holes"].append({"points": local_points, "closed": true})
@@ -10028,7 +10059,7 @@ func _geometry_sampling_inspector_context(component: Dictionary) -> Dictionary:
 	var display_result := geometry_sampling_preview if _geometry_sampling_preview_matches(selected_asset_id, selected_component_id, component) else _geometry_sampling_bake(selected_asset_id, selected_component_id)
 	var boundary_rows: Array = []
 	for hole_component in asset.get("components", []):
-		if _is_geometry_hole_input(hole_component, selected_component_id):
+		if _is_geometry_hole_input(asset, hole_component, selected_component_id):
 			boundary_rows.append({"title": "Hole · %s" % WorldDocumentService.component_outliner_name(assets, hole_component),
 				"input_id": str(hole_component.get("id", "")), "role": "hole", "kind": "hole"})
 	for guide in asset.get("guides", []):
@@ -10038,7 +10069,7 @@ func _geometry_sampling_inspector_context(component: Dictionary) -> Dictionary:
 			"input_id": str(guide.get("id", "")), "role": "cut", "kind": "cut"})
 	var selected_input_title := ""
 	if not selected_sampling_input_id.is_empty():
-		var input := _get_sampling_input(asset, selected_sampling_input_id, selected_sampling_input_kind)
+		var input := _get_sampling_input(asset, selected_component_id, selected_sampling_input_id, selected_sampling_input_kind)
 		if not input.is_empty():
 			selected_input_title = _sampling_input_display_name(asset, component, input, selected_sampling_input_kind)
 	return {

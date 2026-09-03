@@ -76,7 +76,7 @@ Schema 16 requires:
 | `coordinate_system` | object | Exact convention below. |
 | `z_order` | object | Exact convention below. |
 | `asset_pivot` | two floats | Asset anchor in meters. |
-| `components` | array | Sorted ordinary Components and References. |
+| `components` | array | Sorted ordinary outer Components and References; ordinary Hole constraints are omitted. |
 | `attachment_frames` | array | Oriented Asset-local Weapon attachment frames. |
 | `regions` | array | Optional authored or Component-bound gameplay Regions. |
 
@@ -307,6 +307,12 @@ identifies the instanced source package. Consumers resolve References through
 the Catalog, retain the referenced Asset pivot/hierarchy, apply the complete
 signed Reference transform as placement, and reject missing packages or
 cross-Asset cycles.
+
+A Reference may act as a Sampling Hole for its direct Parent. It still exports
+the same `asset_reference` instance and owns no duplicated Fill, Contour Stroke,
+or closed-region geometry. In contrast, an ordinary Component with
+`topology_role: "hole"` is an authoring-only constraint and is omitted from the
+Runtime Component array.
 
 ## Minimal ordinary examples
 

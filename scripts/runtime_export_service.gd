@@ -26,6 +26,8 @@ static func build_manifest(asset: Dictionary, sources: Dictionary) -> Dictionary
 	for raw_component in asset.get("components", []):
 		if not raw_component is Dictionary or str(raw_component.get("type", "component")) == "region" or not _effective_visibility(asset, raw_component):
 			continue
+		if str(raw_component.get("type", "component")) != "reference" and str(raw_component.get("topology_role", "outer")) == "hole":
+			continue
 		var component: Dictionary = raw_component.duplicate(true)
 		component["z_index"] = _effective_z_index(asset, component)
 		var component_id := str(component.get("id", ""))
@@ -184,6 +186,9 @@ static func _build_regions(asset: Dictionary) -> Dictionary:
 		if geometry_source == WorldDocumentService.REGION_GEOMETRY_COMPONENT:
 			if WorldDocumentService.is_reference_component(source_component):
 				errors.append("Region '%s' cannot inherit geometry from an Asset Reference." % name)
+				continue
+			if str(source_component.get("topology_role", "outer")) == "hole":
+				errors.append("Region '%s' cannot inherit geometry from a constraint-only Hole Component." % name)
 				continue
 			var draw_mode := str(source_component.get("draw_mode", "closed_loop"))
 			var chains: Array = source_component.get("chains", [])

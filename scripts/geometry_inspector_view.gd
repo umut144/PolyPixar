@@ -47,7 +47,7 @@ signal seeding_method_selected(index: int, option: OptionButton)
 signal seeding_parameter_changed(value: float, parameter_name: String)
 signal seeding_spine_enabled_changed(enabled: bool, guide_id: String)
 signal seeding_stagger_override_changed(enabled: bool)
-signal sampling_reference_selected(reference_id: String)
+signal sampling_hole_selected(hole_id: String)
 signal sampling_cut_selected(guide_id: String)
 
 var active_submodule := ""
@@ -198,7 +198,7 @@ func _boundary_row(title: String, input_id: String, role: String, recipe: Dictio
 	# intent needs.
 	button.disabled = kind.is_empty()
 	if kind == "hole":
-		button.pressed.connect(sampling_reference_selected.emit.bind(input_id))
+		button.pressed.connect(sampling_hole_selected.emit.bind(input_id))
 	elif kind == "cut":
 		button.pressed.connect(sampling_cut_selected.emit.bind(input_id))
 	add_child(button)

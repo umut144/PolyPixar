@@ -129,7 +129,11 @@ Seeding consumes the complete accepted Sampling constraint set. Outer bounds
 the valid interior, Holes exclude regions, and Cuts are two-sided barriers with
 clearance. A Hole may be a direct ordinary Closed Loop or Primitive Child, or a
 direct Asset Reference; it affects that Parent only and is not inherited by
-higher ancestors. Poisson Fill and combined multi-Spine Flow generate
+higher ancestors. Only effectively visible Hole inputs participate. An ordinary
+Hole Component is an authoring constraint: it owns no Fill or Contour Stroke
+Mesh and is omitted from Runtime export. A Hole Reference likewise owns no Mesh,
+but retains the existing Barde-style Runtime instance of its source Asset.
+Poisson Fill and combined multi-Spine Flow generate
 deterministic previews; an explicit Bake accepts that exact result before manual
 Seed editing or downstream Meshing. Spine Flow presents Seed Spacing and Flow
 Stretch as its primary Artistic controls; exact lattice values and optional Boundary/Stagger
@@ -194,12 +198,13 @@ or schema-4 fields. PolyTools does not delete or silently reinterpret those
 records, and a load/save round trip returns them unchanged.
 
 The persistent `Export Runtime (N)` action automatically considers every visible
-Asset. Every visible Component must have one unique free-form `name`. Closed
-Loop and Primitive ordinary Components require a current Fill Mesh and current
-centered Contour Stroke Mesh. Open Contours require only that Stroke and export
-no Fill or closed region. Closed Contours require the current Stroke Bake plus
-its independent derived closed region, but still export no Fill Mesh. Asset
-References instead export
+Asset. Every exported Component must have one unique free-form `name`. Ordinary
+Hole Components are authoring-only constraints and are not exported. Other
+Closed Loop and Primitive ordinary Components require a current Fill Mesh and
+current centered Contour Stroke Mesh. Open Contours require only that Stroke and
+export no Fill or closed region. Closed Contours require the current Stroke Bake
+plus its independent derived closed region, but still export no Fill Mesh. Asset
+References, including Hole References, instead export
 their local Component name, signed instance transform, and the referenced
 Asset's derived `source_asset_key`; they do not duplicate the referenced
 geometry. The editor retains `source_asset_id` only as its internal source link.

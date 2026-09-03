@@ -8,7 +8,11 @@ In `Mesh → Sampling`, the user selects one Body Component, adjusts one adaptiv
 boundary recipe, inspects an automatically generated point preview, and
 explicitly bakes the accepted result. Outer, direct ordinary or referenced
 Hole, and scoped Cut boundaries participate in one shared Bake. A direct Hole
-affects only its immediate Parent Body and does not propagate to ancestors.
+affects only its immediate outer Parent Body and does not propagate to
+ancestors. Hiding a Hole disables that constraint. An ordinary Hole Component
+owns no independent Fill or Contour Stroke Mesh and is omitted from Runtime
+export; a Hole Reference remains a Runtime instance of its source Asset without
+owning duplicated Mesh geometry.
 
 ## Ownership
 
@@ -214,10 +218,11 @@ every Outer and Hole segment must bound exactly one retained Triangle and every
 Cut segment must have two-sided Triangle coverage. A missing final constraint is
 an invalid Mesh result rather than a successful Bake with an open boundary.
 
-Junction-aware Sampling Bakes identify Sampling algorithm version 2. Older
-flat Cut Bakes remain readable for inspection but become stale upstream, so the
-UI requests Sampling and Seeding rebakes instead of passing an unsplit PSLG to
-Meshing and reporting a misleading invalid Mesh.
+Sampling algorithm version 4 retains the junction-aware arrangement and gives
+every analytic boundary inside a multi-Component Hole Reference its own Sample
+ID namespace. Older Bakes remain readable for inspection but become stale
+upstream, so the UI requests Sampling and Seeding rebakes instead of passing
+ambiguous constraint identities to Meshing.
 
 ## Deferred
 

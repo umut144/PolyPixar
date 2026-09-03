@@ -1775,6 +1775,10 @@ func _test_geometry_outliner_rows() -> void:
 	var hole := {"points": [], "edges": [], "chains": [], "id": "component_2", "name": "eye",
 		"visibility": true, "type": "reference", "parent_component_id": "component_1",
 		"topology_role": "hole", "source_asset_id": "asset_2"}
+	var direct_hole := {"points": [], "edges": [], "chains": [], "id": "component_3", "name": "opening",
+		"visibility": true, "type": "component", "draw_mode": "primitive", "parent_component_id": "component_1",
+		"topology_role": "hole", "primitive": {"type": "circle", "center": Vector2.ZERO, "diameter_cm": 10.0},
+		"transform": WorldDocumentService.default_component_transform()}
 	var cut := {"id": "guide_1", "guide_type": AssetGuide.CUT, "ordinal": 1, "visibility": true,
 		"scope": {"kind": "component", "component_id": "component_1"}, "points": [], "edges": [], "chains": []}
 	var spine := {"id": "guide_2", "guide_type": AssetGuide.SAMPLER_SPINE, "ordinal": 1, "visibility": true,
@@ -1782,7 +1786,7 @@ func _test_geometry_outliner_rows() -> void:
 	var application: Control = load("res://scripts/main.gd").new()
 	application._build_ui()
 	var test_assets: Array[Dictionary] = [
-		{"id": "asset_1", "name": "Wizard", "visibility": true, "components": [body, hole], "groups": [], "guides": [cut, spine]},
+		{"id": "asset_1", "name": "Wizard", "visibility": true, "components": [body, hole, direct_hole], "groups": [], "guides": [cut, spine]},
 		{"id": "asset_2", "name": "Orb", "visibility": true, "components": [], "groups": [], "guides": []}]
 	application.assets = test_assets
 	application.active_module = "Mesh"
@@ -1793,7 +1797,9 @@ func _test_geometry_outliner_rows() -> void:
 	var sampling_rows: Array = application.outliner_view.geometry_rows
 	_expect(_geometry_row_label(sampling_rows, "asset") == "Wizard", "The Mesh tree should open with a row per visible Asset.")
 	_expect(_geometry_row_label(sampling_rows, "component") == "body", "The Mesh tree should list meshable Components.")
-	_expect(_geometry_row_label(sampling_rows, "reference").begins_with("Hole · eye ← Orb"), "A Sampling Hole row should name the referenced Asset.")
+	_expect(_geometry_row_label(sampling_rows, "hole").begins_with("Hole · eye ← Orb"), "A Sampling Hole row should name the referenced Asset.")
+	var sampling_hole_count := sampling_rows.filter(func(row: Dictionary) -> bool: return str(row.get("kind", "")) == "hole").size()
+	_expect(sampling_hole_count == 2, "Sampling should nest both Reference and ordinary Hole constraints beneath their Body.")
 	_expect(_geometry_row_label(sampling_rows, "guide").begins_with("Cut · "), "A Sampling Cut row should name its Guide.")
 
 	application.active_geometry_submodule = "Seeding"
@@ -1806,11 +1812,12 @@ func _test_geometry_outliner_rows() -> void:
 	for row_data in seeding_rows:
 		if str(row_data.get("kind", "")) == "input":
 			treatments.append(str(row_data.get("label", "")))
-	_expect(treatments.size() == 4, "Seeding should list the Outer, Hole, Cut and Spine inputs of the Component.")
+	_expect(treatments.size() == 5, "Seeding should list the Outer, both Holes, Cut and Spine inputs of the Component.")
 	_expect(treatments[0].contains("Outer · body") and treatments[0].contains("Clearance"), "The Outer input row should be shown with Clearance.")
 	_expect(treatments[1].contains("Hole · eye ← Orb") and treatments[1].contains("Excluded"), "A Hole input row should be shown as Excluded, not as Clearance.")
-	_expect(treatments[2].contains("Cut · ") and treatments[2].contains("Barrier"), "A Cut input row should be shown as a Barrier.")
-	_expect(treatments[3].contains("Spine · ") and treatments[3].contains("Enabled"), "An enabled Spine input row should be shown as Enabled.")
+	_expect(treatments[2].contains("Hole · opening") and treatments[2].contains("Excluded"), "An ordinary Hole Component should use the same excluded treatment as a Hole Reference.")
+	_expect(treatments[3].contains("Cut · ") and treatments[3].contains("Barrier"), "A Cut input row should be shown as a Barrier.")
+	_expect(treatments[4].contains("Spine · ") and treatments[4].contains("Enabled"), "An enabled Spine input row should be shown as Enabled.")
 	doc["seeding"]["recipe"]["parameters"]["spine_inputs"] = [{"guide_id": "guide_2", "enabled": false}]
 	application._render_outliner()
 	var disabled_rows: Array = application.outliner_view.geometry_rows
@@ -1823,11 +1830,12 @@ func _test_geometry_outliner_rows() -> void:
 	application.active_geometry_submodule = "Meshing"
 	application._render_outliner()
 	var meshing_rows: Array = application.outliner_view.geometry_rows
+	var meshing_component_count := meshing_rows.filter(func(row: Dictionary) -> bool: return str(row.get("kind", "")) == "component").size()
 	var pipeline: Array[String] = []
 	for row_data in meshing_rows:
 		if str(row_data.get("kind", "")) == "pipeline":
 			pipeline.append(str(row_data.get("label", "")))
-	_expect(pipeline.size() == 4, "Meshing should list its four pipeline rows.")
+	_expect(meshing_component_count == 1 and pipeline.size() == 4, "Meshing should list one Body and its four pipeline rows without presenting an ordinary Hole as its own Body.")
 	_expect(pipeline[0].begins_with("Sampling · Adaptive") and pipeline[3].begins_with("Mesh · Constrained Mesh"), "The Meshing pipeline rows should run from Sampling to the Mesh result.")
 	var mesh_action := ""
 	for row_data in meshing_rows:
@@ -2067,7 +2075,7 @@ func _test_geometry_sampling_service() -> void:
 	var application: Control = application_script.new()
 	var direct_ancestor := {"id": "direct_ancestor", "name": "bottle", "type": "component", "draw_mode": "primitive", "topology_role": "outer", "parent_component_id": "", "group_id": "tier1", "visibility": true, "primitive": {"type": "circle", "center": Vector2.ZERO, "diameter_cm": 200.0}, "points": [], "edges": [], "chains": [], "transform": WorldDocumentService.default_component_transform()}
 	var direct_body := {"id": "direct_body", "name": "body_opening01", "type": "component", "draw_mode": "primitive", "topology_role": "outer", "parent_component_id": "direct_ancestor", "group_id": "tier1", "visibility": true, "primitive": {"type": "circle", "center": Vector2.ZERO, "diameter_cm": 100.0}, "points": [], "edges": [], "chains": [], "transform": WorldDocumentService.default_component_transform()}
-	var direct_hole := {"id": "direct_hole", "name": "body_opening_hole01", "type": "component", "draw_mode": "primitive", "topology_role": "hole", "parent_component_id": "direct_body", "group_id": "tier1", "visibility": true, "primitive": {"type": "circle", "center": Vector2.ZERO, "diameter_cm": 20.0}, "points": [], "edges": [], "chains": [], "transform": WorldDocumentService.default_component_transform()}
+	var direct_hole := {"id": "direct_hole", "name": "body_opening_hole01", "type": "component", "draw_mode": "primitive", "topology_role": "hole", "parent_component_id": "direct_body", "group_id": "tier1", "visibility": true, "primitive": {"type": "circle", "center": Vector2.ZERO, "diameter_cm": 20.0}, "points": [], "edges": [], "chains": [], "transform": {"position": Vector2(1.5, -0.5), "rotation": 20.0, "scale": Vector2(1.2, 0.7), "pivot": Vector2.ZERO}}
 	var direct_hole_asset := {"id": "direct_hole_asset", "name": "Potion", "visibility": true, "components": [direct_ancestor, direct_body, direct_hole], "groups": [{"id": "tier1", "name": "tier1", "visibility": true, "parent_component_id": "", "transform": {"position": Vector2(4.0, -3.0), "rotation": 12.0, "scale": Vector2(1.25, 0.8), "pivot": Vector2.ONE}}], "guides": []}
 	application.assets = [direct_hole_asset] as Array[Dictionary]
 	var resolved_direct_holes: Array = application._geometry_sampling_hole_components(direct_hole_asset, "direct_body")
@@ -2081,18 +2089,71 @@ func _test_geometry_sampling_service() -> void:
 	for vertex in direct_hole_mesh.get("vertices", []):
 		direct_mesh_positions[str(vertex.get("id", ""))] = Vector2(vertex.get("position", Vector2.ZERO))
 	var direct_hole_was_filled := false
+	var direct_hole_transform: Transform2D = resolved_direct_holes[0].get("sampling_transform", Transform2D.IDENTITY)
 	for triangle in direct_hole_mesh.get("triangles", []):
 		var ids: Array = triangle.get("vertex_ids", [])
 		var centroid: Vector2 = (direct_mesh_positions.get(str(ids[0]), Vector2.ZERO) + direct_mesh_positions.get(str(ids[1]), Vector2.ZERO) + direct_mesh_positions.get(str(ids[2]), Vector2.ZERO)) / 3.0
-		direct_hole_was_filled = direct_hole_was_filled or centroid.length() < 0.95
+		direct_hole_was_filled = direct_hole_was_filled or (direct_hole_transform.affine_inverse() * centroid).length() < 0.95
 	application.selected_asset_id = "direct_hole_asset"
 	application.selected_component_id = "direct_body"
 	var direct_hole_inspector_context: Dictionary = application._geometry_sampling_inspector_context(direct_body)
 	application._set_sampling_input("direct_hole_asset", "direct_hole", "component")
-	_expect(resolved_direct_holes.size() == 1 and str(resolved_direct_holes[0].get("sampling_input_id", "")) == "direct_hole" and int(direct_hole_sampling.get("hole_count", 0)) == 1 and str(direct_hole_sampling.get("chains", [])[1].get("topology_role", "")) == "hole", "A direct non-Reference Primitive Hole should enter exactly its Parent's Sampling domain.")
+	var direct_hole_first_sample := Vector2(direct_hole_sampling.get("chains", [])[1].get("samples", [])[0].get("position", Vector2.INF))
+	_expect(resolved_direct_holes.size() == 1 and str(resolved_direct_holes[0].get("sampling_input_id", "")) == "direct_hole" and int(direct_hole_sampling.get("hole_count", 0)) == 1 and str(direct_hole_sampling.get("chains", [])[1].get("topology_role", "")) == "hole" and direct_hole_first_sample.is_equal_approx(direct_hole_transform * Vector2.RIGHT), "A transformed direct non-Reference Primitive Hole should enter exactly its Parent's Sampling domain in Body-local space.")
 	_expect(resolved_ancestor_holes.is_empty(), "A direct Primitive Hole should not propagate through its Parent into higher ancestors.")
+	_expect(application._geometry_sampling_hole_components(direct_hole_asset, "direct_hole").is_empty(), "A constraint-only Hole should not act as a Body or consume nested Hole children.")
 	_expect(bool(direct_hole_mesh.get("valid", false)) and not direct_hole_was_filled, "A direct Primitive Hole should remain empty in its Parent's final constrained Mesh.")
 	_expect(direct_hole_inspector_context.get("boundary_rows", []).size() == 1 and str(direct_hole_inspector_context.get("boundary_rows", [])[0].get("input_id", "")) == "direct_hole" and application.selected_sampling_input_kind == "component", "A direct Primitive Hole should appear as a selectable Sampling boundary with its own density override identity.")
+	_expect(not application._mesh_update_candidates("direct_hole_asset").has("direct_hole") and int(application._geometry_asset_mesh_overview("direct_hole_asset").get("visible_component_count", 0)) == 2, "A direct Hole Component should remain a constraint and never become its own Fill or Stroke Mesh body.")
+	direct_hole["visibility"] = false
+	_expect(application._geometry_sampling_hole_components(direct_hole_asset, "direct_body").is_empty(), "Hiding a Hole Component should disable its constraint effect on the Parent.")
+	direct_hole["visibility"] = true
+	direct_hole["parent_component_id"] = "direct_ancestor"
+	_expect(application._get_sampling_input(direct_hole_asset, "direct_body", "direct_hole", "component").is_empty(), "A Hole selection should stop resolving as soon as the Component leaves the selected Parent.")
+	direct_hole["parent_component_id"] = "direct_body"
+	var incomplete_hole := direct_hole.duplicate(true)
+	incomplete_hole["id"] = "incomplete_hole"
+	incomplete_hole["name"] = "unfinished_hole"
+	incomplete_hole["primitive"] = {}
+	direct_hole_asset["components"].append(incomplete_hole)
+	var incomplete_holes: Array = application._geometry_sampling_hole_components(direct_hole_asset, "direct_body")
+	var incomplete_issues := GeometrySamplingService.validation_issues(direct_body, [], incomplete_holes)
+	_expect(incomplete_holes.size() == 2 and "unfinished_hole: Primitive Component needs a Circle or Ellipse." in incomplete_issues, "An unfinished Primitive Hole should remain visible as a named blocking constraint instead of being silently ignored.")
+	direct_hole_asset["components"].erase(incomplete_hole)
+	var bezier_body := direct_body.duplicate(true)
+	bezier_body.merge({"id": "bezier_body", "name": "bezier_body", "parent_component_id": "", "group_id": "", "transform": WorldDocumentService.default_component_transform()}, true)
+	var bezier_hole := _component()
+	bezier_hole.merge({"id": "bezier_hole", "name": "bezier_hole", "parent_component_id": "bezier_body", "group_id": "", "topology_role": "hole", "transform": {"position": Vector2(2.0, -1.0), "rotation": 30.0, "scale": Vector2(1.5, 0.75), "pivot": Vector2.ZERO}}, true)
+	for hole_position in [Vector2(-1.0, -1.0), Vector2(1.0, -1.0), Vector2(1.0, 1.0), Vector2(-1.0, 1.0)]:
+		BezierTopology.add_point(bezier_hole, hole_position, "linear")
+	BezierTopology.close_active_chain(bezier_hole)
+	bezier_hole["chains"][0]["topology_role"] = "hole"
+	var bezier_hole_asset := {"id": "bezier_hole_asset", "name": "Bezier Hole", "visibility": true, "components": [bezier_body, bezier_hole], "groups": [], "guides": []}
+	application.assets.append(bezier_hole_asset)
+	var resolved_bezier_holes: Array = application._geometry_sampling_hole_components(bezier_hole_asset, "bezier_body")
+	var bezier_overlays: Dictionary = application._geometry_sampling_overlays(bezier_hole_asset, "bezier_body")
+	var expected_bezier_position := ComponentHierarchy.local_transform(bezier_hole["transform"]) * Vector2(-1.0, -1.0)
+	_expect(resolved_bezier_holes.size() == 1 and Vector2(resolved_bezier_holes[0]["points"][0].get("position", Vector2.INF)).is_equal_approx(expected_bezier_position) and bezier_overlays.get("holes", []).size() == 1, "A transformed direct Bezier Hole should resolve and render its Sampling overlay without changing collection types.")
+	var source_circle_a := {"id": "source_circle_a", "name": "circle_a", "type": "component", "draw_mode": "primitive", "topology_role": "outer", "parent_component_id": "", "group_id": "", "visibility": true, "primitive": {"type": "circle", "center": Vector2(-1.0, 0.0), "diameter_cm": 10.0}, "points": [], "edges": [], "chains": [], "transform": WorldDocumentService.default_component_transform()}
+	var source_circle_b := source_circle_a.duplicate(true)
+	source_circle_b.merge({"id": "source_circle_b", "name": "circle_b", "primitive": {"type": "circle", "center": Vector2(1.0, 0.0), "diameter_cm": 10.0}}, true)
+	var source_asset := {"id": "hole_source", "name": "Hole Source", "visibility": true, "components": [source_circle_a, source_circle_b], "groups": [], "guides": []}
+	var reference_body := direct_body.duplicate(true)
+	reference_body.merge({"id": "reference_body", "name": "reference_body", "parent_component_id": "", "group_id": ""}, true)
+	var hole_reference := {"id": "hole_reference", "name": "hole_reference", "type": "reference", "draw_mode": "closed_loop", "topology_role": "hole", "parent_component_id": "reference_body", "group_id": "", "visibility": true, "source_asset_id": "hole_source", "points": [], "edges": [], "chains": [], "transform": WorldDocumentService.default_component_transform()}
+	var reference_hole_asset := {"id": "reference_hole_asset", "name": "Reference Hole", "visibility": true, "components": [reference_body, hole_reference], "groups": [], "guides": []}
+	application.assets.append_array([source_asset, reference_hole_asset])
+	var resolved_reference_holes: Array = application._geometry_sampling_hole_components(reference_hole_asset, "reference_body")
+	var sampled_reference_holes := GeometrySamplingService.generate(reference_body, {"parameters": {"spacing": 0.25}}, [], resolved_reference_holes)
+	var reference_sample_ids: Dictionary = {}
+	var reference_sample_count := 0
+	for chain_data in sampled_reference_holes.get("chains", []):
+		if str(chain_data.get("topology_role", "outer")) != "hole":
+			continue
+		for sample in chain_data.get("samples", []):
+			reference_sample_count += 1
+			reference_sample_ids[str(sample.get("id", ""))] = true
+	_expect(resolved_reference_holes.size() == 2 and bool(sampled_reference_holes.get("valid", false)) and reference_sample_ids.size() == reference_sample_count, "A Reference Hole should resolve every visible source body with collision-free analytic Sample IDs.")
 	_expect(WorldDocumentService.has_supported_schema({"schema_version": 62}) and WorldDocumentService.has_supported_schema({"schema_version": 61}) and not WorldDocumentService.has_supported_schema({"schema_version": 63}), "Schema 62 should keep current and older World documents readable and reject unknown future schemas.")
 	_expect(WorldDocumentService.normalize_component_draw_mode("ribbon", 39) == "contour" and WorldDocumentService.normalize_component_draw_mode("contour", 42) == "contour", "Schema-42 loading must retain the explicit legacy Ribbon-to-Contour migration boundary.")
 	_expect(WorldDocumentService.normalize_component_draw_mode("ribbon", 42) == "ribbon", "Current-schema Ribbon data must remain visibly invalid instead of receiving a silent backward fallback.")
@@ -3704,6 +3765,12 @@ func _test_runtime_export_service() -> void:
 	var manifest_text := JSON.stringify(manifest, "\t")
 	_expect(application._runtime_manifest_text_matches(manifest_text, manifest_text), "Runtime staging should verify exact schema-16 JSON bytes without rejecting numeric JSON round-trip types.")
 	_expect(components.size() == 2 and str(components[0].get("component_id", "")) == "component_a" and str(components[1].get("component_id", "")) == "component_b", "Runtime Components should sort globally by ascending z_index and lexicographic Component ID.")
+	var constraint_hole := {"id": "component_hole", "name": "body_hole", "type": "component", "draw_mode": "primitive", "topology_role": "hole", "visibility": true, "parent_component_id": "component_b", "transform": WorldDocumentService.default_component_transform(), "primitive": {"type": "circle", "center": Vector2.ZERO, "diameter_cm": 10.0}, "points": [], "edges": [], "chains": []}
+	var asset_with_constraint_hole: Dictionary = asset.duplicate(true)
+	asset_with_constraint_hole["components"].append(constraint_hole)
+	var constraint_hole_result := RuntimeExportService.build_manifest(asset_with_constraint_hole, {"component_a": source, "component_b": source})
+	var constraint_hole_components: Array = constraint_hole_result.get("manifest", {}).get("components", [])
+	_expect(bool(constraint_hole_result.get("valid", false)) and constraint_hole_components.size() == 2 and not constraint_hole_components.any(func(entry: Dictionary) -> bool: return str(entry.get("component_id", "")) == "component_hole"), "An ordinary Hole should remain an authoring constraint and export neither Fill nor Contour Stroke geometry.")
 	var socket := AssetGuide.create_weapon_frame("guide_socket", AssetGuide.WEAPON_SOCKET_PRIMARY, "component", "component_b")
 	socket["transform"]["position"] = Vector2(3.0, 4.0)
 	var reach_limit := AssetGuide.create_weapon_frame("guide_reach_limit", AssetGuide.REACH_LIMIT_PRIMARY, "component", "component_b")
@@ -3796,6 +3863,7 @@ func _test_runtime_export_service() -> void:
 	var exported_eye_pivot: Array = exported_eye.get("component_pivot", [])
 	_expect(bool(nested_result.get("valid", false)) and exported_eye_pivot.size() == 2 and is_equal_approx(float(exported_eye_pivot[0]), -0.03) and is_equal_approx(float(exported_eye_pivot[1]), 0.85) and is_equal_approx(float(eye_local_position[0]), -0.03) and is_zero_approx(float(eye_local_position[1])) and reconstructed_eye.is_equal_approx(Vector2(-0.025, 0.85)), "Nested Wizard Head → Eye export should publish the global component pivot and reconstruct its intended asset-space world position exactly.")
 	var reference := {"id": "component_orb", "type": "reference", "name": "orb_reference", "source_asset_id": "orb", "visibility": true, "z_index": 3, "parent_component_id": "component_b", "transform": {"position": Vector2(3.0, 4.0), "pivot": Vector2.ZERO, "rotation": 0.0, "scale": Vector2(-1.0, 1.0)}}
+	reference["topology_role"] = "hole"
 	reference["contour_stroke_width_px"] = 3.0
 	var referenced_asset: Dictionary = asset.duplicate(true)
 	referenced_asset["components"].append(reference)
@@ -3804,7 +3872,7 @@ func _test_runtime_export_service() -> void:
 	var referenced_components: Array = referenced_result.get("manifest", {}).get("components", [])
 	var exported_reference: Dictionary = referenced_components[2] if referenced_components.size() == 3 else {}
 	var exported_reference_scale: Array = exported_reference.get("local_transform", {}).get("scale", [])
-	_expect(bool(referenced_result.get("valid", false)) and str(exported_reference.get("kind", "")) == "asset_reference" and str(exported_reference.get("source_asset_key", "")) == "orb" and is_equal_approx(float(exported_reference.get("contour_stroke_width_override_px", 0.0)), 3.0) and not exported_reference.has("source_asset_id") and str(exported_reference.get("name", "")) == "orb_reference" and not exported_reference.has("mesh") and not exported_reference.has("closed_region_mesh") and exported_reference_scale.size() == 2 and float(exported_reference_scale[0]) * float(exported_reference_scale[1]) < 0.0, "A Reference should export its local Stroke-width override without duplicating source geometry.")
+	_expect(bool(referenced_result.get("valid", false)) and str(exported_reference.get("kind", "")) == "asset_reference" and str(exported_reference.get("source_asset_key", "")) == "orb" and is_equal_approx(float(exported_reference.get("contour_stroke_width_override_px", 0.0)), 3.0) and not exported_reference.has("source_asset_id") and str(exported_reference.get("name", "")) == "orb_reference" and not exported_reference.has("mesh") and not exported_reference.has("contour_stroke_mesh") and not exported_reference.has("closed_region_mesh") and exported_reference_scale.size() == 2 and float(exported_reference_scale[0]) * float(exported_reference_scale[1]) < 0.0, "A Hole Reference should keep the Barde-style Runtime instance while owning no Fill or Contour Stroke geometry.")
 	reference_source["source_asset_exists"] = false
 	_expect(not bool(RuntimeExportService.build_manifest(referenced_asset, {"component_a": source, "component_b": source, "component_orb": reference_source}).get("valid", true)), "Runtime export should reject a Reference whose actual source Asset cannot be resolved.")
 	var duplicate_role_asset: Dictionary = asset.duplicate(true)
@@ -4228,8 +4296,9 @@ func _test_asset_guides() -> void:
 	var primitive_topology_option := _inspector_option(application, "Outer")
 	_expect(primitive_topology_option != null and primitive_topology_option.item_count == 2, "The Primitive Inspector should expose the Outer/Hole topology selector.")
 	_choose_option(primitive_topology_option, 1)
-	var primitive_hole_stroke := ContourMeshService.generate(pupil_component)
-	_expect(str(pupil_component.get("topology_role", "")) == "hole" and pupil_component.get("chains", []).is_empty() and bool(primitive_hole_stroke.get("valid", false)) and str(primitive_hole_stroke.get("topology_role", "")) == "hole", "Selecting Hole should persist Primitive topology semantics without generating Bezier topology and should carry them into the derived Contour Stroke.")
+	application._render_inspector()
+	_expect(str(pupil_component.get("topology_role", "")) == "hole" and pupil_component.get("chains", []).is_empty(), "Selecting Hole should persist Primitive topology semantics without generating Bezier topology.")
+	_expect(_inspector_toggle(application, "Visible") != null and _inspector_spin(application, "Contour Stroke Width (px)") == null and _inspector_spin(application, "Projection Depth (cm)") == null and _inspector_spin(application, "Z Order (Asset-local)") == null, "An ordinary Hole should expose only its constraint visibility, not visual Body properties.")
 	_expect(WorldDocumentService.DRAW_MODES == ["closed_loop", "contour", "primitive"], "Components should expose only Closed Loop, Contour, and Primitive draw modes.")
 	var primitive_sampling := GeometrySamplingService.generate(pupil_component)
 	var refined_primitive_sampling := GeometrySamplingService.generate(pupil_component, {"parameters": {"spacing": 0.01, "feature_detail": 0.5}})
@@ -4672,7 +4741,7 @@ const OUTLINER_SIGNAL_ROUTES := [
 	["visibility_toggle_requested", "_on_outliner_visibility_toggled"],
 	["geometry_asset_selected", "_select_geometry_asset"],
 	["geometry_component_selected", "_select_geometry_component"],
-	["geometry_reference_selected", "_select_geometry_sampling_reference"],
+	["geometry_hole_selected", "_select_geometry_sampling_hole"],
 	["geometry_input_selected", "_select_geometry_seeding_input"],
 	["geometry_pipeline_action", "_on_geometry_pipeline_action"],
 ]
@@ -4845,7 +4914,7 @@ const GEOMETRY_SIGNAL_ROUTES := [
 # around it. get_method() reports "<anonymous lambda>" for those, so the routing
 # table cannot name a target; what the adapter does is asserted directly below
 # instead, which is the stronger check of the two.
-const GEOMETRY_ADAPTER_SIGNALS := ["sampling_reference_selected", "sampling_cut_selected"]
+const GEOMETRY_ADAPTER_SIGNALS := ["sampling_hole_selected", "sampling_cut_selected"]
 
 const GEOMETRY_PROBE_CASES := ["sampling", "sampling_refined", "seeding_poisson",
 	"seeding_spine", "meshing", "meshing_contour"]
@@ -4916,7 +4985,7 @@ func _prepare_geometry_case(application: Control, case_name: String) -> String:
 			# The Boundary Density block only exists while an input is selected,
 			# and its factor field only while that input carries an override.
 			application.selected_sampling_input_id = "guide_1"
-			# _get_sampling_input knows "guide" and "reference"; selecting a Cut
+			# _get_sampling_input knows "guide" and "component"; selecting a Cut
 			# boundary row goes through _select_guide, which sets "guide".
 			application.selected_sampling_input_kind = "guide"
 			return "Sampling"
@@ -5010,7 +5079,7 @@ func _test_sampling_input_kind_from_seeding_selection() -> void:
 			"The Sampling input id and kind should be set together or not at all, after the %srow." % row_name)
 		if not application.selected_sampling_input_id.is_empty():
 			_expect(not application._get_sampling_input(application._get_asset("asset_1"),
-				application.selected_sampling_input_id, application.selected_sampling_input_kind).is_empty(),
+				"component_1", application.selected_sampling_input_id, application.selected_sampling_input_kind).is_empty(),
 				"A stored Sampling input should resolve, after the %srow." % row_name)
 
 		# The Seeding selection survives independently, which is what keeps the
@@ -5106,7 +5175,7 @@ const CREATE_SIGNAL_ROUTES := [
 ]
 
 const CREATE_PROBE_CASES := ["asset", "asset_reference", "component", "component_grouped",
-	"component_contour", "primitive_circle", "primitive_ellipse", "group", "guide",
+	"component_contour", "primitive_circle", "primitive_hole", "primitive_ellipse", "group", "guide",
 	"guide_weapon", "region_authored", "region_component", "multi_component", "point_none", "point_one", "point_many",
 	"edge_none", "edge_one", "edge_many", "face"]
 
@@ -5125,6 +5194,11 @@ func _create_wiring_asset() -> Dictionary:
 	var circle := _outliner_test_component("component_4", "orb")
 	circle["draw_mode"] = "primitive"
 	circle["primitive"] = {"type": "circle", "diameter_cm": 4.0}
+	var hole := _outliner_test_component("component_8", "opening")
+	hole["draw_mode"] = "primitive"
+	hole["primitive"] = {"type": "circle", "diameter_cm": 2.0}
+	hole["parent_component_id"] = "component_1"
+	hole["topology_role"] = "hole"
 	var ellipse := _outliner_test_component("component_5", "egg")
 	ellipse["draw_mode"] = "primitive"
 	ellipse["primitive"] = {"type": PrimitiveGeometryService.ELLIPSE,
@@ -5142,7 +5216,7 @@ func _create_wiring_asset() -> Dictionary:
 	var inherited_region := authored_region.duplicate(true)
 	inherited_region.merge({"id": "component_7", "name": "hurt_region", "region_type": "hurt", "region_geometry_source": "component"}, true)
 	return {"id": "asset_1", "name": "Wizard", "visibility": true,
-		"components": [body, arm, outline, circle, ellipse, authored_region, inherited_region], "groups": [group],
+		"components": [body, arm, outline, circle, ellipse, authored_region, inherited_region, hole], "groups": [group],
 		"guides": [guide, weapon], "asset_pivot": Vector2(5.0, 6.0),
 		"root_position": Vector2.ZERO, "root_scale": Vector2.ONE}
 
@@ -5186,6 +5260,8 @@ func _prepare_create_case(application: Control, case_name: String) -> void:
 			application.selected_component_id = "component_3"
 		"primitive_circle":
 			application.selected_component_id = "component_4"
+		"primitive_hole":
+			application.selected_component_id = "component_8"
 		"primitive_ellipse":
 			application.selected_component_id = "component_5"
 		"group":
@@ -5509,7 +5585,7 @@ func _test_geometry_inspector_wiring() -> void:
 	application.selected_asset_id = "asset_1"
 	application.selected_component_id = "component_1"
 	application.selected_sampling_input_id = ""
-	view.sampling_reference_selected.emit("component_3")
+	view.sampling_hole_selected.emit("component_3")
 	_expect(application.selected_sampling_input_id == "component_3"
 		and application.selected_sampling_input_kind == "component",
 		"The Hole boundary row should select that Component as the Sampling input.")

@@ -4,7 +4,7 @@ extends RefCounted
 const ADAPTIVE := "adaptive"
 const EVEN_SPACING := "even_spacing"
 const VALID_METHODS := [ADAPTIVE]
-const ALGORITHM_VERSION := 3
+const ALGORITHM_VERSION := 4
 const DEFAULT_SPACING := 1.0
 const DEFAULT_FEATURE_DETAIL := 0.5
 const MIN_SPACING := 0.01
@@ -151,17 +151,22 @@ static func generate(component: Dictionary, raw_recipe = {}, cut_guides: Array =
 
 static func validation_issues(component: Dictionary, cut_guides: Array = [], hole_components: Array = []) -> Array[String]:
 	var errors: Array[String] = []
-	if PrimitiveGeometryService.has_analytic_shape(component):
+	if PrimitiveGeometryService.is_primitive(component):
 		errors.append_array(PrimitiveGeometryService.validation_issues(component))
 	else:
 		errors.append_array(_validation_issues(component, false))
 	for hole in hole_components:
 		if not hole is Dictionary:
 			continue
-		if PrimitiveGeometryService.has_analytic_shape(hole):
-			errors.append_array(PrimitiveGeometryService.validation_issues(hole))
+		var hole_errors: Array = []
+		if not str(hole.get("sampling_error", "")).is_empty():
+			hole_errors.append(str(hole.get("sampling_error", "")))
+		elif PrimitiveGeometryService.is_primitive(hole):
+			hole_errors.append_array(PrimitiveGeometryService.validation_issues(hole))
 		else:
-			errors.append_array(_validation_issues(hole, false, false))
+			hole_errors.append_array(_validation_issues(hole, false, false))
+		for hole_error in hole_errors:
+			errors.append(_hole_error(hole, str(hole_error)))
 	for guide in cut_guides:
 		if not guide is Dictionary or str(guide.get("guide_type", "")) != AssetGuide.CUT:
 			continue
@@ -237,10 +242,14 @@ static func _sample_hole_components(hole_components: Array, recipe: Dictionary) 
 		var working_hole: Dictionary = hole_component.duplicate(true)
 		var input_id := str(hole_component.get("sampling_input_id", hole_component.get("id", "")))
 		var hole_recipe := _recipe_for_input(recipe, input_id)
+		if not str(working_hole.get("sampling_error", "")).is_empty():
+			errors.append(_hole_error(working_hole, str(working_hole.get("sampling_error", ""))))
+			continue
 		if PrimitiveGeometryService.has_analytic_shape(working_hole):
-			var sampled_circle := _sample_analytic_primitive(working_hole, hole_recipe, input_id, "hole")
+			var sampled_circle := _sample_analytic_primitive(working_hole, hole_recipe, input_id, "hole", str(hole_component.get("id", input_id)))
 			if not bool(sampled_circle.get("valid", false)):
-				errors.append_array(sampled_circle.get("errors", []))
+				for sampled_error in sampled_circle.get("errors", []):
+					errors.append(_hole_error(working_hole, str(sampled_error)))
 				continue
 			var circle_samples: Array = sampled_circle.get("samples", [])
 			sample_count += circle_samples.size()
@@ -249,12 +258,14 @@ static func _sample_hole_components(hole_components: Array, recipe: Dictionary) 
 		BezierGeometry.resolve_auto_handles(working_hole.get("points", []), working_hole.get("chains", []))
 		var hole_errors := _validation_issues(working_hole, false, false)
 		if not hole_errors.is_empty():
-			errors.append_array(hole_errors)
+			for hole_error in hole_errors:
+				errors.append(_hole_error(working_hole, str(hole_error)))
 			continue
 		for chain_data in working_hole.get("chains", []):
 			var sampled_chain := _sample_chain(working_hole, chain_data, hole_recipe)
 			if not bool(sampled_chain.get("valid", false)):
-				errors.append_array(sampled_chain.get("errors", []))
+				for sampled_error in sampled_chain.get("errors", []):
+					errors.append(_hole_error(working_hole, str(sampled_error)))
 				continue
 			var samples: Array = sampled_chain.get("samples", [])
 			sample_count += samples.size()
@@ -580,7 +591,7 @@ static func _sample_chain(component: Dictionary, chain_data: Dictionary, recipe:
 	return {"valid": true, "errors": [], "samples": samples}
 
 
-static func _sample_analytic_primitive(component: Dictionary, recipe: Dictionary, input_id: String, role: String) -> Dictionary:
+static func _sample_analytic_primitive(component: Dictionary, recipe: Dictionary, input_id: String, role: String, sample_namespace: String = "") -> Dictionary:
 	var spacing := float(recipe.get("parameters", {}).get("spacing", DEFAULT_SPACING))
 	var detail := float(recipe.get("parameters", {}).get("feature_detail", DEFAULT_FEATURE_DETAIL))
 	var density_factor := maxf(float(recipe.get("parameters", {}).get("density_factor", 1.0)), MIN_REFINEMENT_FACTOR)
@@ -601,9 +612,10 @@ static func _sample_analytic_primitive(component: Dictionary, recipe: Dictionary
 		samples.pop_back()
 	if samples.size() < 4:
 		return {"valid": false, "errors": ["A sampled analytic Primitive requires at least four boundary Points."]}
+	var resolved_namespace := sample_namespace if not sample_namespace.is_empty() else (input_id if not input_id.is_empty() else "outer")
 	for index in range(samples.size()):
 		samples[index] = {
-			"id": "sample:%s:%s:%d" % [primitive_type, input_id if not input_id.is_empty() else "outer", index],
+			"id": "sample:%s:%s:%d" % [primitive_type, resolved_namespace, index],
 			"position": Vector2(samples[index].get("position", Vector2.ZERO)),
 			"edge_id": "primitive:%s" % primitive_type,
 			"curve_t": float(index) / float(samples.size()),
@@ -611,6 +623,11 @@ static func _sample_analytic_primitive(component: Dictionary, recipe: Dictionary
 			"preserved": false
 		}
 	return {"valid": true, "errors": [], "samples": samples, "role": role, "effective_spacing": spacing}
+
+
+static func _hole_error(hole: Dictionary, error: String) -> String:
+	var label := str(hole.get("sampling_input_label", "")).strip_edges()
+	return error if label.is_empty() else "%s: %s" % [label, error]
 
 
 static func _append_adaptive_ellipse_segment(result: Array, transform: Transform2D, center: Vector2, radii: Vector2, angle_start: float, angle_end: float, spacing: float, flatness_tolerance: float, turn_tolerance: float, depth: int) -> void:

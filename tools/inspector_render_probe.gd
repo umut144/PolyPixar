@@ -1,6 +1,6 @@
 # Inspector render probe.
 #
-# Renders the Inspector in 48 fixed states and prints one line per control with
+# Renders the Inspector in 49 fixed states and prints one line per control with
 # the properties a reader would notice: values, ranges, item lists, selections,
 # pressed state, disabled state, captions, colours and tooltips. It asserts
 # nothing on its own. It is run before and after a change that is meant to leave
@@ -16,7 +16,7 @@
 # nothing.
 #
 # The state list covers Create (Asset, Component, Group, Guide, weapon Guide,
-# grouped Component, Contour Component, Circle and Ellipse Primitive, authored
+# grouped Component, Contour Component, Circle, Hole, and Ellipse Primitive, authored
 # and Component-geometry Regions, two
 # selected Components, Reference Image, Point mode with none, one and two
 # Points, Edge mode with none, one and two Edges, Face mode), Mesh
@@ -75,7 +75,7 @@ func _init() -> void:
 	# Component parented to it, a Cut is an AssetGuide.CUT scoped to it -- plus
 	# its own Sampler Spine for the Seeding rows. AssetGuide.SAMPLER_SPINE is
 	# AssetGuide.SAMPLE: a Spine is a Seeding input, never a Cut boundary, and
-	# a plain Component is never a Hole; only a reference Component is.
+	# the source Asset gives the Hole Reference one valid visible boundary.
 	var mesh_body := {"points": [], "edges": [], "chains": []}
 	BezierTopology.add_point(mesh_body, Vector2.ZERO, "corner")
 	BezierTopology.add_point(mesh_body, Vector2(12, 0), "linear")
@@ -87,6 +87,11 @@ func _init() -> void:
 		"name": "eye", "visibility": true, "type": "reference",
 		"parent_component_id": "component_7", "topology_role": "hole",
 		"source_asset_id": "asset_2"}
+	var hole_source := {"points": [], "edges": [], "chains": [], "id": "component_10",
+		"name": "orb", "visibility": true, "type": "component", "draw_mode": "primitive",
+		"topology_role": "outer", "parent_component_id": "",
+		"primitive": {"type": "circle", "center": Vector2.ZERO, "diameter_cm": 4.0},
+		"transform": WorldDocumentService.default_component_transform()}
 	var cut_guide := {"id": "guide_4", "guide_type": AssetGuide.CUT, "ordinal": 1,
 		"visibility": true, "scope": {"kind": "component", "component_id": "component_7"},
 		"points": [], "edges": [], "chains": []}
@@ -104,6 +109,9 @@ func _init() -> void:
 		"visibility": true, "draw_mode": "contour"}
 	var circle := {"points": [], "edges": [], "chains": [], "id": "component_4", "name": "orb",
 		"visibility": true, "draw_mode": "primitive", "primitive": {"type": "circle", "diameter_cm": 4.0}}
+	var direct_hole := {"points": [], "edges": [], "chains": [], "id": "component_11", "name": "opening",
+		"visibility": true, "draw_mode": "primitive", "primitive": {"type": "circle", "diameter_cm": 2.0},
+		"parent_component_id": "component_1", "topology_role": "hole"}
 	var ellipse := {"points": [], "edges": [], "chains": [], "id": "component_5", "name": "egg",
 		"visibility": true, "draw_mode": "primitive",
 		"primitive": {"type": PrimitiveGeometryService.ELLIPSE, "diameter_x_cm": 3.0, "diameter_y_cm": 5.0}}
@@ -122,7 +130,7 @@ func _init() -> void:
 		"groups": [group], "guides": [guide, weapon_guide, cut_guide, spine_guide],
 		"asset_pivot": Vector2(5, 6), "root_position": Vector2(1, 2), "root_scale": Vector2(1, 1)},
 		{"id": "asset_2", "name": "Orb", "visibility": true,
-			"components": [], "groups": [], "guides": []}]
+			"components": [hole_source], "groups": [], "guides": []}]
 	app.assets = assets
 	app.selected_asset_id = "asset_1"
 	app.expanded_assets["asset_1"] = true
@@ -185,6 +193,7 @@ func _init() -> void:
 		{"m": "Create", "sub": "Character", "comp": "component_1", "grp": "", "gd": "", "face": true},
 		{"m": "Create", "sub": "Character", "comp": "component_3", "grp": "", "gd": ""},
 		{"m": "Create", "sub": "Character", "comp": "component_4", "grp": "", "gd": ""},
+		{"m": "Create", "sub": "Character", "comp": "component_11", "grp": "", "gd": ""},
 		{"m": "Create", "sub": "Character", "comp": "component_5", "grp": "", "gd": ""},
 		{"m": "Create", "sub": "Character", "comp": "component_8", "grp": "", "gd": ""},
 		{"m": "Create", "sub": "Character", "comp": "component_9", "grp": "", "gd": ""},
@@ -192,6 +201,11 @@ func _init() -> void:
 		{"m": "Create", "sub": "Character", "comp": "component_1", "grp": "", "gd": "", "multi": true},
 	]
 	for c in cases:
+		# Keep the new Hole fixture out of every pre-existing state so this probe
+		# still detects unrelated rendering changes byte-for-byte.
+		assets[0]["components"].erase(direct_hole)
+		if str(c["comp"]) == "component_11":
+			assets[0]["components"].append(direct_hole)
 		app.active_module = str(c["m"])
 		if c["m"] == "Create": app.active_create_submodule = str(c["sub"])
 		elif c["m"] == "Mesh": app.active_geometry_submodule = str(c["sub"])
@@ -311,13 +325,13 @@ func _init() -> void:
 				"triangle_count": 66, "minimum_angle": 24.5, "constraints_valid": true,
 				"cut_seam_vertex_count": 4}
 			app.geometry_documents["asset_1/component_7"] = doc
-			# Only "reference" and "guide" are input kinds the Sampling path
+			# Only "component" and "guide" are input kinds the Sampling path
 			# stores; anything else resolves to nothing and the Boundary Density
 			# block silently disappears.
 			match str(c.get("input", "")):
 				"hole":
 					app.selected_sampling_input_id = "component_6"
-					app.selected_sampling_input_kind = "reference"
+					app.selected_sampling_input_kind = "component"
 				"cut":
 					app.selected_sampling_input_id = "guide_4"
 					app.selected_sampling_input_kind = "guide"

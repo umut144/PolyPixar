@@ -49,7 +49,7 @@ export data.
   handed over, so the view never reaches into the geometry documents. The Mesh
   tree follows the same rule as data: `main.gd` resolves the derived geometry
   state across Sampling, Seeding and Meshing into a flat list of typed rows —
-  `asset`, `component`, `reference`, `guide`, `input`, `dependency`, `pipeline`
+  `asset`, `component`, `hole`, `guide`, `input`, `dependency`, `pipeline`
   plus labels — and the view draws them without deciding what a row says. A
   `pipeline` row carries an `action_id` rather than a callback, so the view
   stays free of editor behaviour.
@@ -231,7 +231,11 @@ becoming Component topology.
 Sampling owns one adaptive Body recipe. Its Outer boundary, direct Hole Child
 Components, and scoped Cut Guides inherit the Body target edge length and Curve
 Detail. A Hole Child may be an ordinary Closed Loop or Primitive, or an Asset
-Reference; its exclusion applies only to its direct Parent. Hole and Cut inputs
+Reference; its exclusion applies only to its direct outer Parent and only while
+the Hole is effectively visible. Ordinary Hole Components are constraint-only:
+they receive no independent Mesh pipeline and are omitted from Runtime export.
+A Hole Reference continues to export its source Asset instance, while owning no
+Fill or Contour Stroke Mesh itself. Hole and Cut inputs
 may apply a boundary-density factor from `0.25×` through `16×`. Values below
 `1×` coarsen all adaptive criteria, while values above `1×` refine them. Primitive Circles and Ellipses
 remain analytic through sampling, including their transform into Body-local
@@ -546,9 +550,10 @@ exposes separate `Scale X` and `Scale Y` Inspector controls. Legacy scalar
 root scales load as equal axes; Runtime Export requires both axes to be `1`.
 
 Sampling results carry their own algorithm version independently of the
-World schema. The junction-aware version invalidates pre-arrangement flat
-Cut Bakes at Sampling, which in turn makes Seeding stale before Meshing can
-consume an incompatible PSLG.
+World schema. Version 4 retains junction-aware Cut arrangement and namespaces
+analytic Samples by resolved boundary, preventing collisions when one Hole
+Reference contains multiple Primitives. Older Sampling Bakes become stale
+before Seeding or Meshing can consume incompatible constraint identities.
 
 ## Export contract
 
@@ -557,7 +562,8 @@ The normative serialized package and consumer contract is
 describes how the editor produces that contract.
 
 `RuntimeExportService` builds Manifest schema 16 exclusively from current
-accepted Fill and Contour Stroke Mesh Bakes. For a closed Contour, the current
+accepted Fill and Contour Stroke Mesh Bakes. Ordinary Hole Components are
+authoring-only Sampling constraints and do not enter the Manifest. For a closed Contour, the current
 Stroke Bake must also contain its current complete-Boundary region
 triangulation. It rejects missing or stale inputs,
 invalid or duplicate Component Names, non-rebased Scale, unresolved

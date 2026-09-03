@@ -257,6 +257,9 @@ func rebuild() -> void:
 	if component.is_empty():
 		return
 	var inherited_region_geometry := WorldDocumentService.region_uses_component_geometry(component)
+	var constraint_only_hole := not WorldDocumentService.is_reference_component(component) \
+		and not WorldDocumentService.is_region(component) \
+		and str(component.get("topology_role", "outer")) == "hole"
 	if not inherited_region_geometry and active_state == "edit" and active_edit_mode == "point":
 		var point_ids := valid_point_ids
 		if point_ids.is_empty():
@@ -315,6 +318,10 @@ func rebuild() -> void:
 			var edge_hint := EditorWidgets.create_inspector_field_label("Select an edge to edit it.")
 			edge_hint.add_theme_color_override("font_color", Color("#9aa3b2"))
 			add_child(edge_hint)
+		elif constraint_only_hole:
+			var hole_edge_hint := EditorWidgets.create_inspector_field_label("Hole boundaries do not render their own outline.")
+			hole_edge_hint.add_theme_color_override("font_color", Color("#9aa3b2"))
+			add_child(hole_edge_hint)
 		else:
 			var all_rendered := true
 			for edge in selected_edges:
@@ -334,9 +341,14 @@ func rebuild() -> void:
 		if not selected_edge.is_empty():
 			add_child(EditorWidgets.create_inspector_field_label("Edge"))
 			add_child(EditorWidgets.create_inspector_section("Edge Settings", section_toggled.emit))
-			add_child(EditorWidgets.create_toggle_field(
-				"Render Outline", bool(selected_edge.get("render_outline", true)),
-				edge_render_outline_changed.emit))
+			if constraint_only_hole:
+				var hole_edge_hint := EditorWidgets.create_inspector_field_label("Hole boundaries do not render their own outline.")
+				hole_edge_hint.add_theme_color_override("font_color", Color("#9aa3b2"))
+				add_child(hole_edge_hint)
+			else:
+				add_child(EditorWidgets.create_toggle_field(
+					"Render Outline", bool(selected_edge.get("render_outline", true)),
+					edge_render_outline_changed.emit))
 			return
 	add_child(EditorWidgets.create_inspector_section("Component", section_toggled.emit))
 	component_name_editor = EditorWidgets.create_name_editor(WorldDocumentService.normalized_component_name(component), "Component name")
@@ -457,9 +469,14 @@ func rebuild() -> void:
 			{"caption": "Pivot Y (cm)", "property": "pivot_y", "value": ToolUnits.to_centimeters(pivot.y),
 				"step": 0.001, "silent": false},
 		], transform_value_changed.emit), true)
-	add_child(EditorWidgets.create_inspector_section("Visibility / Layer", section_toggled.emit))
+	add_child(EditorWidgets.create_inspector_section("Constraint" if constraint_only_hole else "Visibility / Layer", section_toggled.emit))
 	add_child(EditorWidgets.create_toggle_field(
 		"Visible", bool(component.get("visibility", true)), component_visibility_changed.emit, 11))
+	if constraint_only_hole:
+		var hole_hint := EditorWidgets.create_inspector_field_label("Cuts only its direct Parent · no Fill, Contour Stroke, or Runtime body")
+		hole_hint.add_theme_color_override("font_color", Color("#9aa3b2"))
+		add_child(hole_hint)
+		return
 	EditorWidgets.add_stacked_number_field(self, {
 		"caption": "Contour Stroke Width (px)", "value": WorldDocumentService.effective_contour_stroke_width_px(component, world_contour_stroke_width_px),
 		"min": 0.1, "max": 1024.0, "step": 0.1, "font_size": 11,
