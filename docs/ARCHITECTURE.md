@@ -172,10 +172,11 @@ primitive contours, samples, fill, and hit-test polygons are derived and are
 never persisted. Do not add `outer_shape`, Component-level `closed`, the old
 Line tool, or synchronization from a display polygon back into source geometry.
 
-Closed-loop Components also carry a persisted `topology_role`: `outer` by
-default or `hole` when authored as a hole. A Symbol Reference owns its role
-independently from the referenced Symbol, so the reference may be `hole` while
-the source Symbol remains `outer`.
+Closed-loop and Primitive Components also carry a persisted `topology_role`:
+`outer` by default or `hole` when authored as a hole. A Primitive retains its
+analytic source and does not create a Chain when its role changes. A Symbol
+Reference owns its role independently from the referenced Symbol, so the
+reference may be `hole` while the source Symbol remains `outer`.
 
 ## Documents
 

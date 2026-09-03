@@ -367,7 +367,7 @@ func rebuild() -> void:
 			str(component.get("parent_component_id", "")), component_hierarchy_parent_selected.emit))
 	var draw_mode := str(component.get("draw_mode", "closed_loop"))
 	add_child(EditorWidgets.create_inspector_field_label("Draw Mode: %s" % WorldDocumentService.draw_mode_display_name(draw_mode)))
-	if not WorldDocumentService.is_region(component) and (WorldDocumentService.is_reference_component(component) or draw_mode == "closed_loop"):
+	if not WorldDocumentService.is_region(component) and (WorldDocumentService.is_reference_component(component) or draw_mode in ["closed_loop", "primitive"]):
 		add_child(EditorWidgets.create_inspector_section("Topology", section_toggled.emit))
 		add_child(EditorWidgets.create_option_field([
 			{"label": "Outer", "metadata": "outer"},

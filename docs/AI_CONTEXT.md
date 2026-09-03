@@ -62,7 +62,10 @@ are fill-less and may use one open or closed Chain; simulation
 and construction
 paths are modeled as Guides. Primitive sampling evaluates analytic Circles and Ellipses at the selected Body's
 adaptive target edge length and scale-aware Curve Detail, so it has no fixed or
-user-editable sample count. Guides remain independent topology records scoped to an Asset or Component. Derived
+user-editable sample count. Closed Loops and Primitives expose the same authored
+`outer` or `hole` topology role in the Inspector; a Primitive keeps that role as
+metadata and never materializes a Bézier Chain. Guides remain independent
+topology records scoped to an Asset or Component. Derived
 Sampling, Seeding, Meshing, UV, and Weighting records are stored separately
 from source topology.
 
