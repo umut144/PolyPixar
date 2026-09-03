@@ -53,6 +53,57 @@ slice is currently required.
 - Keep correctness assertions based on invariants and broad ranges; do not use
   fragile exact Triangle snapshots or wall-clock pass/fail thresholds.
 
+## Optional Later — Editor diagnostics and topology hardening
+
+The recent Mirror, Fuse, Hole, and parent-to-child snapping work has no known
+functional blocker. These items are follow-up diagnostics, manual validation,
+or defensive hardening rather than current bug fixes.
+
+### DIAG-01 — Opt-in editor session trace
+
+- **Status:** Optional / Later
+- **Risk:** Medium — traces may contain authored document details
+- Record a bounded, opt-in sequence of editor intents, selected IDs, topology
+  validation results, and undo/redo transitions so a hard-to-reproduce session
+  can be reconstructed after an error.
+- Keep the trace diagnostic-only: it must not become a second document format
+  or change editor behaviour.
+- Provide an explicit export/reset action and document which authored data may
+  appear in the trace before enabling it.
+
+### TOPO-OPT-01 — Potion workflow smoke test
+
+- **Status:** Optional / Later
+- **Risk:** None; manual verification
+- Exercise Potion after save and reload through Mirror, Fuse, parent-to-child
+  Point snapping, ordinary Hole constraints, and Auto Mesh at its intended
+  smaller scale.
+- Confirm that topology and Mesh diagnostics remain clean without rewriting the
+  Asset as a test fixture.
+
+### TOPO-OPT-02 — Additional defensive interaction tests
+
+- **Status:** Optional / Later
+- **Risk:** None to the product; test-only
+- Add explicit rejected-action Redo coverage and Same-Chain Fuse coverage for
+  manual `mirrored` and `aligned` Points.
+- Strengthen the Cross-Chain orientation fixture with assertions on absolute
+  cubic control positions, independent of the implementation's Handle-key
+  selection.
+- Keep this optional unless a related regression appears; current topology and
+  Handle invariants are already covered by the main suite.
+
+### TOPO-OPT-03 — Transactional closed-loop Mirror merge
+
+- **Status:** Optional / Later; currently unreachable through validated input
+- **Risk:** Low
+- Remove the theoretical partial-mutation path in
+  `_merge_coincident_closed_loop`: if its Chain join ever becomes rejectable,
+  no reflected Handles may be applied before success is known.
+- Preserve the current directed Handle result after Chain reversal; merely
+  moving the existing Handle calls behind the join is insufficient because the
+  joined seam Point is no longer necessarily an endpoint.
+
 ## Optional Later — Architecture
 
 `main.gd` is 12.9k lines. Roughly 1.8k of that is router work that should stay
@@ -150,3 +201,13 @@ inventory.
   already untracked as one generated publication unit.
 - Files below `worlds/` are user data. Establish what is authored and what is
   derived before proposing anything, and never rewrite them as fixtures.
+
+### REPO-02 — Curate pending World and Item Asset changes
+
+- **Status:** User-controlled / Later
+- **Risk:** High if files are classified incorrectly
+- Review the pending authored and generated changes below `worlds/world01/`,
+  including the new Potion and Vial Asset data, before deciding what belongs in
+  version control.
+- Keep generated Geometry separate from authored Asset intent and do not let an
+  automated cleanup, test, or documentation commit absorb these files.
