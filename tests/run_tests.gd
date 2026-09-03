@@ -306,6 +306,31 @@ func _test_fuse_point() -> void:
 	BezierTopology.add_point(distant, Vector2(0.001, 0.0), "linear")
 	_expect(not bool(BezierTopology.fuse_point(distant, distant_id).get("fused", false)), "Fuse Point must reject points outside its safe tolerance.")
 
+	var mirrored_source := _component()
+	mirrored_source["draw_mode"] = "closed_loop"
+	var mirrored_source_ids: Array[String] = []
+	for point_position in [Vector2(-0.1, 2.0), Vector2(-1.0, 1.0), Vector2(-0.1, 0.0)]:
+		mirrored_source_ids.append(BezierTopology.add_point(mirrored_source, point_position, "linear"))
+	var mirrored_result := SelectionMirrorService.apply(mirrored_source, mirrored_source_ids, Vector2(0.0, -1.0), Vector2(0.0, 3.0))
+	var mirrored_component: Dictionary = mirrored_result.get("component", {})
+	var mirrored_ids: Array = mirrored_result.get("mirrored_point_ids", [])
+	_expect(bool(mirrored_result.get("valid", false)) and mirrored_component.get("chains", []).size() == 2, "A non-coincident Mirror should provide two valid open Chains for the cross-Chain Fuse regression.")
+	var source_top_id := str(mirrored_source_ids[0])
+	var mirrored_top_id := str(mirrored_ids.back())
+	BezierTopology.point_by_id(mirrored_component.get("points", []), mirrored_top_id)["position"] = BezierTopology.point_by_id(mirrored_component.get("points", []), source_top_id).get("position", Vector2.ZERO)
+	var cross_chain_result := BezierTopology.fuse_point(mirrored_component, source_top_id)
+	_expect(bool(cross_chain_result.get("fused", false)) and mirrored_component.get("chains", []).size() == 1 and not bool(mirrored_component["chains"][0].get("closed", true)), "Fusing coincident endpoints from separate Mirror Chains should join them into one open Chain.")
+	var joined_point_ids: Array = mirrored_component["chains"][0].get("point_ids", [])
+	_expect(joined_point_ids.size() == 5 and joined_point_ids.count(source_top_id) == 1 and BezierTopology.validate(mirrored_component).is_empty(), "Cross-Chain Fuse must keep one canonical Point identity without duplicating it in the joined Chain.")
+	_expect(BezierTopology.close_chain(mirrored_component, str(mirrored_component["chains"][0].get("id", ""))) and BezierTopology.mode_validation_issues(mirrored_component, true).is_empty(), "The remaining Mirror endpoints should close normally after a cross-Chain Fuse.")
+
+	var overlapping_chains := _component()
+	overlapping_chains["points"] = [{"id": "shared", "position": Vector2.ZERO}, {"id": "left", "position": Vector2.LEFT}, {"id": "right", "position": Vector2.RIGHT}]
+	overlapping_chains["chains"] = [{"id": "left_chain", "point_ids": ["left", "shared"], "edge_ids": [], "closed": false}, {"id": "right_chain", "point_ids": ["shared", "right"], "edge_ids": [], "closed": false}]
+	BezierTopology.rebuild_chain_edges(overlapping_chains, overlapping_chains["chains"][0])
+	BezierTopology.rebuild_chain_edges(overlapping_chains, overlapping_chains["chains"][1])
+	_expect(not BezierTopology.join_open_chain_endpoints(overlapping_chains, "left", "right") and overlapping_chains.get("chains", []).size() == 2, "Joining Chains that already share a Point ID must be rejected before it can create an intra-Chain duplicate.")
+
 
 func _test_ids_are_not_reused() -> void:
 	var component := _component()

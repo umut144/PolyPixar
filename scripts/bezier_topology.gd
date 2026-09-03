@@ -287,6 +287,9 @@ static func join_open_chain_endpoints(component: Dictionary, anchor_point_id: St
 		return false
 	var anchor_ids: Array = anchor_chain.get("point_ids", []).duplicate()
 	var target_ids: Array = target_chain.get("point_ids", []).duplicate()
+	for point_id_value in anchor_ids:
+		if str(point_id_value) in target_ids:
+			return false
 	if anchor_point_id == str(anchor_ids.front()):
 		_reverse_point_run(component.get("points", []), anchor_ids)
 	if target_point_id == str(target_ids.back()):
@@ -477,7 +480,8 @@ static func delete_edges(component: Dictionary, edge_ids_to_delete: Array) -> Ar
 ## Fuses a selected Point with the nearest other Point in this Component when
 ## their authored positions are within the deliberately small tolerance. The
 ## selected Point remains authoritative for handles and point settings.
-## Coincident endpoints of one open Chain become one closed Chain.
+## Coincident endpoints of one open Chain become one closed Chain. Endpoints
+## from separate open Chains are joined while the selected Point keeps its ID.
 static func fuse_point(component: Dictionary, point_id: String, tolerance := FUSE_POINT_TOLERANCE) -> Dictionary:
 	var points: Array = component.get("points", [])
 	var selected := point_by_id(points, point_id)
@@ -523,9 +527,15 @@ static func fuse_point(component: Dictionary, point_id: String, tolerance := FUS
 			selected_chain["closed"] = true
 		BezierTopology.rebuild_chain_edges(component, selected_chain)
 	else:
-		nearest_ids[nearest_index] = point_id
-		nearest_chain["point_ids"] = nearest_ids
-		BezierTopology.rebuild_chain_edges(component, nearest_chain)
+		if not is_open_endpoint(component, point_id) or not is_open_endpoint(component, nearest_id):
+			return {"fused": false, "reason": "Points in different Chains must both be open endpoints."}
+		if not join_open_chain_endpoints(component, point_id, nearest_id):
+			return {"fused": false, "reason": "The open Chains could not be joined safely."}
+		selected_chain = chain_for_point(component.get("chains", []), point_id)
+		var joined_ids: Array = selected_chain.get("point_ids", []).duplicate()
+		joined_ids.erase(nearest_id)
+		selected_chain["point_ids"] = joined_ids
+		BezierTopology.rebuild_chain_edges(component, selected_chain)
 
 	for point_index in range(points.size() - 1, -1, -1):
 		if str(points[point_index].get("id", "")) == nearest_id:
@@ -533,7 +543,7 @@ static func fuse_point(component: Dictionary, point_id: String, tolerance := FUS
 			break
 	component["points"] = points
 	BezierGeometry.resolve_auto_handles(points, component.get("chains", []))
-	return {"fused": true, "kept_point_id": point_id, "removed_point_id": nearest_id, "closed_chain": selected_chain_id == nearest_chain_id and bool(selected_chain.get("closed", false))}
+	return {"fused": true, "kept_point_id": point_id, "removed_point_id": nearest_id, "closed_chain": bool(selected_chain.get("closed", false))}
 
 
 static func delete_points(component: Dictionary, point_ids_to_delete: Array) -> Array[String]:
