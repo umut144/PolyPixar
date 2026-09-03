@@ -133,7 +133,9 @@ higher ancestors. Only effectively visible Hole inputs participate. An ordinary
 Hole Component is an authoring constraint: it owns no Fill or Contour Stroke
 Mesh, cannot own Component children or Weighting Styles, and is omitted from
 Runtime export. A visible ordinary Hole without a valid visible direct outer
-Parent Body is reported as a Mesh and Runtime blocker. A Hole Reference likewise owns no Mesh,
+Parent Body is reported as a Mesh and Runtime blocker, and its Inspector keeps
+the invalid current Parent visible as an explicit warning entry until repaired.
+A Hole Reference likewise owns no Mesh,
 but retains the existing Barde-style Runtime instance of its source Asset.
 Poisson Fill and combined multi-Spine Flow generate
 deterministic previews; an explicit Bake accepts that exact result before manual

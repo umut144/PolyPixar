@@ -2302,7 +2302,7 @@ func _test_geometry_auto_build_service() -> void:
 	_expect((application._mesh_batch_summary(application._all_mesh_update_candidates()).get("attention", PackedStringArray()) as PackedStringArray).is_empty(), "All Components should be evaluated by Mesh batch attention and candidate collection.")
 	other_component["group_id"] = "hidden_group"
 	test_assets[1]["groups"] = [{"id": "hidden_group", "name": "hidden_group", "visibility": false, "parent_component_id": "", "transform": WorldDocumentService.default_component_transform()}]
-	_expect(application._mesh_update_candidates("auto_symbol").is_empty(), "A Component hidden by its Group must not remain an actionable Mesh batch candidate.")
+	_expect(application._mesh_update_candidates("auto_symbol").is_empty() and int(application._geometry_asset_mesh_overview("auto_symbol").get("visible_component_count", -1)) == 0, "A Component hidden by its Group must leave both the actionable Mesh batch and the visible Asset overview.")
 	test_assets[1]["groups"][0]["visibility"] = true
 	var build: Dictionary = application._generate_component_mesh_build("auto_asset", "auto_body")
 	_expect(bool(build.get("valid", false)) and int(build.get("meshing", {}).get("triangle_count", 0)) > 0 and int(build.get("contour_stroke", {}).get("triangle_count", 0)) > 0, "The automatic batch runner should atomically complete the Fill pipeline and the independent centered Contour Stroke Bake.")
@@ -4388,6 +4388,13 @@ func _test_asset_guides() -> void:
 		for item_index in hole_parent_option.item_count:
 			hole_parent_offers_root = hole_parent_offers_root or str(hole_parent_option.get_item_metadata(item_index)).is_empty()
 	_expect(hole_parent_option != null and not hole_parent_offers_root, "The Hole Parent dropdown must not offer the invalid Asset Root target.")
+	var valid_hole_parent_id := str(pupil_component.get("parent_component_id", ""))
+	pupil_component["parent_component_id"] = ""
+	application._render_inspector()
+	var invalid_root_option := _inspector_option(application, "⚠ Root (invalid)")
+	_expect(invalid_root_option != null and invalid_root_option.selected == 0, "A loaded Hole at Asset Root must show its actual invalid Parent state instead of silently selecting the first valid Body.")
+	pupil_component["parent_component_id"] = valid_hole_parent_id
+	application._render_inspector()
 	application._render_outliner()
 	var hole_row_button := _button_starting_with(application.outliner_view, "cloak")
 	var hole_row_has_add_button := false

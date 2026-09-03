@@ -368,6 +368,12 @@ func rebuild() -> void:
 		add_child(EditorWidgets.create_inspector_section("Hierarchy", section_toggled.emit))
 		add_child(EditorWidgets.create_inspector_field_label("Parent Component"))
 		var hierarchy_parent_items: Array = []
+		var current_parent_id := str(component.get("parent_component_id", ""))
+		if not ComponentHierarchy.can_parent(asset, selected_component_id, current_parent_id):
+			var current_parent := WorldDocumentService.component_by_id(asset, current_parent_id)
+			var current_parent_label := "Root" if current_parent_id.is_empty() else WorldDocumentService.normalized_component_name(current_parent) if not current_parent.is_empty() else current_parent_id
+			hierarchy_parent_items.append({"label": "⚠ %s (invalid)" % current_parent_label,
+				"metadata": current_parent_id})
 		if ComponentHierarchy.can_parent(asset, selected_component_id, ""):
 			hierarchy_parent_items.append({"label": "Root", "metadata": ""})
 		for candidate in asset.get("components", []):
@@ -376,7 +382,7 @@ func rebuild() -> void:
 				continue
 			hierarchy_parent_items.append({"label": str(candidate.get("name", "Component")), "metadata": candidate_id})
 		add_child(EditorWidgets.create_option_field(hierarchy_parent_items,
-			str(component.get("parent_component_id", "")), component_hierarchy_parent_selected.emit))
+			current_parent_id, component_hierarchy_parent_selected.emit))
 	var draw_mode := str(component.get("draw_mode", "closed_loop"))
 	add_child(EditorWidgets.create_inspector_field_label("Draw Mode: %s" % WorldDocumentService.draw_mode_display_name(draw_mode)))
 	if not WorldDocumentService.is_region(component) and (WorldDocumentService.is_reference_component(component) or draw_mode in ["closed_loop", "primitive"]):

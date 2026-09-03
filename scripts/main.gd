@@ -3772,7 +3772,7 @@ func _geometry_asset_mesh_overview(asset_id: String) -> Dictionary:
 	for component in asset.get("components", []):
 		if not component is Dictionary or str(component.get("type", "component")) in ["guide", "region"] or _is_reference_component(component) or _is_constraint_only_hole(component):
 			continue
-		if not asset_is_visible or not bool(component.get("visibility", true)):
+		if not asset_is_visible or not _effective_component_visibility(asset, component):
 			continue
 		visible_component_count += 1
 		var component_id := str(component.get("id", ""))
