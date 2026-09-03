@@ -520,11 +520,18 @@ static func fuse_point(component: Dictionary, point_id: String, tolerance := FUS
 	if selected_chain_id == nearest_chain_id:
 		var chain_ids: Array = selected_chain.get("point_ids", []).duplicate()
 		var selected_index := chain_ids.find(point_id)
-		var is_open_endpoint_pair := not bool(selected_chain.get("closed", false)) \
+		var chain_is_closed := bool(selected_chain.get("closed", false))
+		var is_open_endpoint_pair := not chain_is_closed \
 			and selected_index >= 0 and nearest_index >= 0 \
 			and ((selected_index == 0 and nearest_index == chain_ids.size() - 1) \
 			or (nearest_index == 0 and selected_index == chain_ids.size() - 1))
-		if is_open_endpoint_pair and str(selected.get("handle_source", "auto")) == "manual" and str(selected.get("mode", "linear")) != "linear":
+		var index_distance := absi(selected_index - nearest_index)
+		var points_are_adjacent := index_distance == 1 or (chain_is_closed and index_distance == chain_ids.size() - 1)
+		var can_collapse_adjacent := points_are_adjacent and (not chain_is_closed or chain_ids.size() > 3)
+		var can_close_open_chain := is_open_endpoint_pair and chain_ids.size() > 3
+		if not can_collapse_adjacent and not can_close_open_chain:
+			return {"fused": false, "reason": "Points in the same Chain must be adjacent, or open endpoints that can form a valid closed Chain."}
+		if can_close_open_chain and str(selected.get("handle_source", "auto")) == "manual" and str(selected.get("mode", "linear")) != "linear":
 			# The removed endpoint already owns the control for the segment that
 			# becomes the kept endpoint's previously unused side after closing.
 			# Rebase the absolute control in case the fused positions differ by
@@ -535,7 +542,7 @@ static func fuse_point(component: Dictionary, point_id: String, tolerance := FUS
 				_apply_fused_manual_handle(selected, "handle_out", _rebased_handle(nearest, "handle_out", selected))
 		chain_ids.remove_at(nearest_index)
 		selected_chain["point_ids"] = chain_ids
-		if is_open_endpoint_pair:
+		if can_close_open_chain:
 			selected_chain["closed"] = true
 		BezierTopology.rebuild_chain_edges(component, selected_chain)
 	else:

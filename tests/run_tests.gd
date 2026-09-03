@@ -390,6 +390,38 @@ func _test_fuse_point() -> void:
 		else:
 			_expect(is_equal_approx(fused_in.length(), original_in_length) and absf(fused_in.normalized().dot(fused_out.normalized()) + 1.0) < 0.000001, "Aligned Fuse Points must retain the existing opposite length on one shared tangent.")
 
+	var non_adjacent := _component()
+	var non_adjacent_ids: Array[String] = []
+	for point_position in [Vector2(-2.0, 0.0), Vector2.ZERO, Vector2(2.0, 0.0), Vector2(0.0, 0.00005), Vector2(4.0, 0.0)]:
+		non_adjacent_ids.append(BezierTopology.add_point(non_adjacent, point_position, "linear"))
+	var non_adjacent_original := non_adjacent.duplicate(true)
+	var non_adjacent_result := BezierTopology.fuse_point(non_adjacent, non_adjacent_ids[1])
+	_expect(not bool(non_adjacent_result.get("fused", true)) and str(non_adjacent_result.get("reason", "")).contains("same Chain") and non_adjacent == non_adjacent_original, "Same-Chain Fuse must reject spatially coincident non-neighbours without changing topology.")
+
+	var adjacent := _component()
+	var adjacent_ids: Array[String] = []
+	for point_position in [Vector2(-2.0, 0.0), Vector2.ZERO, Vector2(0.0, 0.00005), Vector2(2.0, 0.0)]:
+		adjacent_ids.append(BezierTopology.add_point(adjacent, point_position, "linear"))
+	var adjacent_result := BezierTopology.fuse_point(adjacent, adjacent_ids[1])
+	_expect(bool(adjacent_result.get("fused", false)) and adjacent.get("points", []).size() == 3 and not bool(adjacent.get("chains", [])[0].get("closed", true)) and BezierTopology.validate(adjacent).is_empty(), "Adjacent Same-Chain Points should still collapse into one Point on a valid open Chain.")
+
+	var closed_wrap := _component()
+	var closed_wrap_ids: Array[String] = []
+	for point_position in [Vector2.ZERO, Vector2(2.0, 0.0), Vector2(2.0, 2.0), Vector2(0.0, 0.00005)]:
+		closed_wrap_ids.append(BezierTopology.add_point(closed_wrap, point_position, "linear"))
+	BezierTopology.close_active_chain(closed_wrap)
+	var closed_wrap_result := BezierTopology.fuse_point(closed_wrap, closed_wrap_ids[0])
+	_expect(bool(closed_wrap_result.get("fused", false)) and closed_wrap.get("points", []).size() == 3 and bool(closed_wrap.get("chains", [])[0].get("closed", false)) and BezierTopology.validate(closed_wrap).is_empty(), "The last and first Points of a closed Chain should remain cyclic neighbours that can be fused safely.")
+
+	var minimum_closed := _component()
+	var minimum_closed_ids: Array[String] = []
+	for point_position in [Vector2.ZERO, Vector2(2.0, 0.0), Vector2(0.0, 0.00005)]:
+		minimum_closed_ids.append(BezierTopology.add_point(minimum_closed, point_position, "linear"))
+	BezierTopology.close_active_chain(minimum_closed)
+	var minimum_closed_original := minimum_closed.duplicate(true)
+	var minimum_closed_result := BezierTopology.fuse_point(minimum_closed, minimum_closed_ids[0])
+	_expect(not bool(minimum_closed_result.get("fused", true)) and minimum_closed == minimum_closed_original, "Same-Chain Fuse must not reduce a closed Chain below its three-Point structural minimum.")
+
 	var overlapping_chains := _component()
 	overlapping_chains["points"] = [{"id": "shared", "position": Vector2.ZERO}, {"id": "left", "position": Vector2.LEFT}, {"id": "right", "position": Vector2.RIGHT}]
 	overlapping_chains["chains"] = [{"id": "left_chain", "point_ids": ["left", "shared"], "edge_ids": [], "closed": false}, {"id": "right_chain", "point_ids": ["shared", "right"], "edge_ids": [], "closed": false}]
