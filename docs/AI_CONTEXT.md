@@ -166,11 +166,12 @@ Boundary and Seed Spacing remain `0.55` for ordinary Character/Symbol contours.
 Above that range, Boundary Spacing grows sublinearly with perimeter, while Seed
 Spacing separately grows with area to bound unnecessary interior density. Small
 contours retain the existing minimum-boundary-sample behavior. Adaptive
-Sampling additionally balances the two derived segments meeting at an authored
-corner when their lengths differ by more than `3×`. It inserts deterministic
-curve samples only on the longer side, preserving the exact curve and authored
-topology while preventing narrow Item silhouettes from feeding abrupt Boundary
-edge-size jumps into Meshing.
+Sampling additionally attempts to balance the two derived segments meeting at
+an authored corner when their lengths differ by more than `3×`. It inserts up
+to 64 deterministic curve samples per Chain only on the longer side, preserving
+the exact curve and authored topology while preventing narrow Item silhouettes
+from feeding abrupt Boundary edge-size jumps into Meshing. An unresolvable
+interval or exhausted limit remains valid but is reported explicitly.
 
 Build provenance records automatic versus manual recipe ownership plus the
 effective pipeline-recipe hash. An unchanged automatic recipe may be

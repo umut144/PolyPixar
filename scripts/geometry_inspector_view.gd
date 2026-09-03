@@ -506,7 +506,7 @@ func _render_meshing() -> void:
 		add_child(EditorWidgets.create_inspector_section("Auto Build Diagnostics", section_toggled.emit))
 		for diagnostic_line in build_diagnostic_lines:
 			var diagnostic_label := EditorWidgets.create_inspector_field_label(diagnostic_line)
-			if str(diagnostic_line).begins_with("Quality Warning:"):
+			if str(diagnostic_line).begins_with("Quality Warning:") or str(diagnostic_line).begins_with("Boundary Refinement Warning:"):
 				diagnostic_label.add_theme_color_override("font_color", Color("#ef8354"))
 			add_child(diagnostic_label)
 	var status := str(meshing_context.get("status", ""))
@@ -531,12 +531,21 @@ func _render_meshing() -> void:
 		else:
 			add_child(EditorWidgets.create_inspector_field_label("Minimum Angle: %.1f°" % float(result.get("minimum_angle", 0.0))))
 		for warning in GeometryMeshingService.quality_warnings(result):
-			var warning_label := EditorWidgets.create_inspector_field_label("Quality Warning: %s" % warning)
+			var warning_line := "Quality Warning: %s" % warning
+			if build_diagnostic_lines.has(warning_line):
+				continue
+			var warning_label := EditorWidgets.create_inspector_field_label(warning_line)
 			warning_label.add_theme_color_override("font_color", Color("#ef8354"))
 			add_child(warning_label)
 		var boundary_refinement: Dictionary = result.get("boundary_refinement", {}) if result.get("boundary_refinement", {}) is Dictionary else {}
 		if int(boundary_refinement.get("added_vertex_count", 0)) > 0:
 			add_child(EditorWidgets.create_inspector_field_label("Boundary Refinement: %d local Vertices" % int(boundary_refinement.get("added_vertex_count", 0))))
+		var refinement_warning := GeometryMeshingService.boundary_refinement_warning(result)
+		var refinement_warning_line := "Boundary Refinement Warning: %s" % refinement_warning
+		if not refinement_warning.is_empty() and not build_diagnostic_lines.has(refinement_warning_line):
+			var refinement_warning_label := EditorWidgets.create_inspector_field_label(refinement_warning_line)
+			refinement_warning_label.add_theme_color_override("font_color", Color("#ef8354"))
+			add_child(refinement_warning_label)
 		add_child(EditorWidgets.create_inspector_field_label("Constraints: %s" % ("Valid" if bool(result.get("constraints_valid", false)) else "Invalid")))
 		add_child(EditorWidgets.create_inspector_field_label("Cut Seam Vertices: %d" % int(result.get("cut_seam_vertex_count", 0))))
 	var actions := HBoxContainer.new()

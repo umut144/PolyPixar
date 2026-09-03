@@ -81,6 +81,17 @@ into the final single Chain. A single coincident endpoint remains an open
 joined Chain so the remaining endpoint can be authored manually. A closed
 Chain cannot be mirrored.
 
+## Fill boundary sampling
+
+For closed fill boundaries, Adaptive Sampling may insert additional derived
+curve samples on the longer side of an authored corner when the two adjacent
+sampled segment lengths differ by more than `3×`. The deterministic pass uses
+the owning Chain to resolve source-to-source and closing intervals and rejects
+spatially degenerate insertions. It is best effort, with at most 64 additional
+samples per Chain and an explicit incomplete diagnostic. These samples preserve
+the exact cubic curve, are not authored Points, and exist only to give
+constrained Meshing a gradual Boundary edge-size transition on narrow geometry.
+
 ## Contour mesh derivation
 
 A Contour Component keeps its canonical source as one Bézier Chain, either open
@@ -95,12 +106,6 @@ The derived mesh never modifies Points, Edges, or Chains. Robustness analysis
 keeps intentional open-Contour crossings and narrow coverage overlaps visible
 and diagnosed, while ambiguous collinear overlap, exact reversals, and
 self-intersecting closed Chains fail explicitly without a topology fallback.
-
-For closed fill boundaries, Adaptive Sampling may insert additional derived
-curve samples on the longer side of an authored corner when the two adjacent
-sampled segment lengths differ by more than `3×`. These samples preserve the
-exact cubic curve, are not authored Points, and exist only to give constrained
-Meshing a gradual Boundary edge-size transition on narrow geometry.
 
 A closed Contour's accepted build also derives a deterministic triangulated
 region from the complete ordered, unoffset Boundary using the Stroke service's

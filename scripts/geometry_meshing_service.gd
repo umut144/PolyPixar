@@ -139,7 +139,9 @@ static func generate(sampling_bake: Dictionary, seeding_bake: Dictionary, raw_re
 	_duplicate_cut_seam_vertices(vertices, triangles, constraints)
 	var minimum_angle := float(quality_after.get("minimum_angle", 0.0))
 	var degenerate_count := _degenerate_triangle_count(vertices, triangles)
-	var quality_warning_lines := quality_warnings(quality_after)
+	var quality_metrics := quality_after.duplicate(true)
+	quality_metrics["triangle_count"] = triangles.size()
+	var quality_warning_lines := quality_warnings(quality_metrics)
 	return {
 		"valid": true,
 		"errors": [],
@@ -159,10 +161,7 @@ static func generate(sampling_bake: Dictionary, seeding_bake: Dictionary, raw_re
 		"worst_aspect_ratio": float(quality_after.get("worst_aspect_ratio", 0.0)),
 		"mean_quality": float(quality_after.get("mean_quality", 0.0)),
 		"quality_warnings": quality_warning_lines,
-		"boundary_refinement": {
-			"enabled": true,
-			"added_vertex_count": int(sampling_bake.get("boundary_refinement_count", 0))
-		},
+		"boundary_refinement": boundary_refinement_summary(sampling_bake),
 		"optimization": optimization,
 		"constraint_count": constraints.size(),
 		"constraints_valid": true,
@@ -175,7 +174,7 @@ static func generate(sampling_bake: Dictionary, seeding_bake: Dictionary, raw_re
 
 static func quality_warnings(metrics: Dictionary) -> PackedStringArray:
 	var warnings := PackedStringArray()
-	if metrics.has("triangle_count") and int(metrics.get("triangle_count", 0)) <= 0:
+	if not metrics.has("triangle_count") or int(metrics.get("triangle_count", 0)) <= 0:
 		return warnings
 	var minimum_angle := float(metrics.get("minimum_angle", 0.0))
 	var worst_aspect_ratio := float(metrics.get("worst_aspect_ratio", 0.0))
@@ -184,6 +183,27 @@ static func quality_warnings(metrics: Dictionary) -> PackedStringArray:
 	if worst_aspect_ratio > QUALITY_WARNING_MAX_ASPECT_RATIO:
 		warnings.append("Worst aspect ratio %.2f exceeds the %.2f quality target." % [worst_aspect_ratio, QUALITY_WARNING_MAX_ASPECT_RATIO])
 	return warnings
+
+
+static func boundary_refinement_summary(sampling_bake: Dictionary) -> Dictionary:
+	var enabled := int(sampling_bake.get("algorithm_version", 0)) >= GeometrySamplingService.CORNER_BALANCING_VERSION
+	return {
+		"enabled": enabled,
+		"added_vertex_count": maxi(int(sampling_bake.get("boundary_refinement_count", 0)), 0),
+		"complete": bool(sampling_bake.get("boundary_refinement_complete", true)) if enabled else true,
+		"unresolved_corner_count": maxi(int(sampling_bake.get("boundary_refinement_unresolved_corner_count", 0)), 0) if enabled else 0,
+		"limit_reached": bool(sampling_bake.get("boundary_refinement_limit_reached", false)) if enabled else false
+	}
+
+
+static func boundary_refinement_warning(metrics: Dictionary) -> String:
+	var refinement: Dictionary = metrics.get("boundary_refinement", {}) if metrics.get("boundary_refinement", {}) is Dictionary else {}
+	if not bool(refinement.get("enabled", false)) or bool(refinement.get("complete", true)):
+		return ""
+	if int(refinement.get("unresolved_corner_count", 0)) <= 0:
+		return ""
+	var limit_suffix := " The per-Chain refinement limit was reached." if bool(refinement.get("limit_reached", false)) else ""
+	return "%d authored corner transitions remain above the %.1f× target.%s" % [int(refinement.get("unresolved_corner_count", 0)), GeometrySamplingService.MAX_ADJACENT_CORNER_SEGMENT_RATIO, limit_suffix]
 
 
 static func validation_issues(sampling_bake: Dictionary, seeding_bake: Dictionary, recipe: Dictionary = {}) -> Array[String]:
@@ -795,7 +815,7 @@ static func _failed_result(sampling_bake: Dictionary, seeding_bake: Dictionary, 
 		"worst_aspect_ratio": 0.0,
 		"mean_quality": 0.0,
 		"quality_warnings": PackedStringArray(),
-		"boundary_refinement": {"enabled": true, "added_vertex_count": 0},
+		"boundary_refinement": boundary_refinement_summary(sampling_bake),
 		"optimization": {"enabled": bool(recipe.get("parameters", {}).get("optimize_mesh", DEFAULT_OPTIMIZE_MESH)), "applied": false, "attempted_passes": 0, "accepted_passes": 0, "moved_seed_count": 0, "removed_seed_count": 0, "movements": [], "baseline_triangles": [], "quality_before": {}, "quality_after": {}},
 		"constraint_count": 0,
 		"constraints_valid": false,

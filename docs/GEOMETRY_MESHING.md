@@ -88,7 +88,9 @@ global angle threshold would reject otherwise valid shape-dependent boundary
 features; complete Constraint coverage and zero degenerate Triangles remain the
 hard validity requirements. Closed Bézier Sampling reduces avoidable warnings
 before Meshing by balancing abrupt derived edge-length transitions at authored
-corners.
+corners. If Sampling cannot complete that best-effort pass within its per-Chain
+limit, the Result and Auto Build Diagnostics show a separate orange Boundary
+Refinement warning without changing Mesh validity.
 
 ## Preview, Bake, and Component Mesh
 

@@ -480,6 +480,10 @@ static func normalize_sampling_bake(raw_bake) -> Dictionary:
 	bake["cuts"] = normalized_cuts
 	bake["sample_count"] = int(raw_bake.get("sample_count", 0))
 	bake["boundary_refinement_count"] = maxi(int(raw_bake.get("boundary_refinement_count", 0)), 0)
+	var corner_balancing_enabled := int(bake.get("algorithm_version", 0)) >= GeometrySamplingService.CORNER_BALANCING_VERSION
+	bake["boundary_refinement_complete"] = bool(raw_bake.get("boundary_refinement_complete", not corner_balancing_enabled))
+	bake["boundary_refinement_unresolved_corner_count"] = maxi(int(raw_bake.get("boundary_refinement_unresolved_corner_count", 0)), 0)
+	bake["boundary_refinement_limit_reached"] = bool(raw_bake.get("boundary_refinement_limit_reached", false))
 	bake["preserve_count"] = int(raw_bake.get("preserve_count", 0))
 	bake["hole_count"] = normalized_chains.filter(func(chain: Dictionary) -> bool: return str(chain.get("topology_role", "outer")) == "hole").size()
 	var constraint_count := 0

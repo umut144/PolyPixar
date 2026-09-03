@@ -43,6 +43,7 @@ func _init() -> void:
 	_test_atomic_document_writes()
 	_test_geometry_document_history_isolation()
 	_test_geometry_sampling_service()
+	_test_geometry_sampling_corner_balancing()
 	_test_geometry_auto_build_service()
 	_test_geometry_auto_build_regression_corpus()
 	_test_create_outliner_expansion_scope()
@@ -2380,6 +2381,101 @@ func _test_geometry_sampling_service() -> void:
 	application.free()
 
 
+func _test_geometry_sampling_corner_balancing() -> void:
+	var component := _closed_linear_fixture("corner_balance", "Corner Balance", [
+		Vector2(0.0, 0.0), Vector2(0.01, 0.0), Vector2(4.0, 0.0),
+		Vector2(4.0, 0.01), Vector2(4.0, 4.0), Vector2(0.0, 4.0)
+	])
+	var chain: Dictionary = component.get("chains", [])[0]
+	var point_ids: Array = chain.get("point_ids", [])
+	var edge_ids: Array = chain.get("edge_ids", [])
+	var curve_start := BezierTopology.point_by_id(component.get("points", []), str(point_ids[1]))
+	var curve_end := BezierTopology.point_by_id(component.get("points", []), str(point_ids[2]))
+	curve_start["mode"] = "free"
+	curve_start["handle_source"] = "manual"
+	curve_start["handle_out"] = Vector2(1.0, 0.5)
+	curve_end["mode"] = "free"
+	curve_end["handle_source"] = "manual"
+	curve_end["handle_in"] = Vector2(-1.0, 0.5)
+	var authored_snapshot := component.duplicate(true)
+	var recipe := {"parameters": {"spacing": 100.0, "feature_detail": 0.0}}
+	var balanced := GeometrySamplingService.generate(component, recipe)
+	var repeated := GeometrySamplingService.generate(component, recipe)
+	var balanced_samples: Array = balanced.get("chains", [])[0].get("samples", [])
+	var internal_edge_id := str(edge_ids[1])
+	var closing_edge_id := str(edge_ids.back())
+	var has_internal_midpoint := false
+	var has_closing_midpoint := false
+	var expected_midpoint := BezierGeometry.cubic_position(BezierGeometry.cubic_controls(curve_start, curve_end), 0.5)
+	for sample in balanced_samples:
+		if str(sample.get("source_point_id", "")).is_empty() and str(sample.get("edge_id", "")) == internal_edge_id and is_equal_approx(float(sample.get("curve_t", -1.0)), 0.5):
+			has_internal_midpoint = Vector2(sample.get("position", Vector2.ZERO)).is_equal_approx(expected_midpoint)
+		if str(sample.get("source_point_id", "")).is_empty() and str(sample.get("edge_id", "")) == closing_edge_id:
+			has_closing_midpoint = true
+	_expect(bool(balanced.get("valid", false)) and bool(balanced.get("boundary_refinement_complete", false)) and int(balanced.get("boundary_refinement_count", 0)) > 0, "Single-interval authored edges should complete deterministic corner balancing instead of aborting the Chain.")
+	_expect(_maximum_authored_corner_sample_ratio(balanced) <= GeometrySamplingService.MAX_ADJACENT_CORNER_SEGMENT_RATIO + 0.0001, "Corner balancing should meet its ratio target when the per-Chain budget is sufficient.")
+	_expect(has_internal_midpoint and has_closing_midpoint, "Corner balancing should resolve both an internal source-to-source interval and the closed Chain's final Edge from explicit Chain topology.")
+	_expect(balanced == repeated, "Boundary corner refinement should be deterministic for identical topology and recipes.")
+	_expect(component == authored_snapshot, "Boundary corner refinement must not mutate authored Points, handles, Edges, or Chains.")
+	var source_sample_count := 0
+	for sample in balanced_samples:
+		if not str(sample.get("source_point_id", "")).is_empty():
+			source_sample_count += 1
+	_expect(source_sample_count == component.get("points", []).size() and int(balanced.get("preserve_count", 0)) == 2, "Derived corner samples must not replace authored source samples or change preserve-point accounting.")
+
+	var primitive_body := {"id": "primitive_balance_body", "draw_mode": "primitive", "topology_role": "outer", "primitive": {"type": "circle", "center": Vector2(2.0, 2.0), "diameter_cm": 20.0}}
+	var bezier_hole := component.duplicate(true)
+	bezier_hole["id"] = "balanced_bezier_hole"
+	bezier_hole["sampling_input_id"] = "balanced_bezier_hole"
+	bezier_hole["topology_role"] = "hole"
+	bezier_hole["chains"][0]["topology_role"] = "hole"
+	var primitive_with_hole := GeometrySamplingService.generate(primitive_body, recipe, [], [bezier_hole])
+	_expect(bool(primitive_with_hole.get("valid", false)) and bool(primitive_with_hole.get("boundary_refinement_complete", false)) and int(primitive_with_hole.get("boundary_refinement_count", 0)) > 0 and _maximum_authored_corner_sample_ratio(primitive_with_hole, "hole") <= GeometrySamplingService.MAX_ADJACENT_CORNER_SEGMENT_RATIO + 0.0001, "A Primitive Body should propagate completed Bézier-Hole refinement and its exact diagnostics.")
+
+	var guarded_component := _closed_linear_fixture("guarded_balance", "Guarded Balance", [
+		Vector2(0.0, 0.0), Vector2(4.0, 0.0), Vector2(4.0, 0.01),
+		Vector2(4.0, 4.0), Vector2(0.01, 4.0), Vector2(0.0, 4.0)
+	])
+	var guarded_chain: Dictionary = guarded_component.get("chains", [])[0]
+	var guarded_point_ids: Array = guarded_chain.get("point_ids", [])
+	var guarded_edge_ids: Array = guarded_chain.get("edge_ids", [])
+	var guarded_start := BezierTopology.point_by_id(guarded_component.get("points", []), str(guarded_point_ids[0]))
+	var guarded_end := BezierTopology.point_by_id(guarded_component.get("points", []), str(guarded_point_ids[1]))
+	guarded_start["mode"] = "free"
+	guarded_start["handle_source"] = "manual"
+	guarded_start["handle_out"] = Vector2(-2.0 / 3.0, 0.0)
+	guarded_end["mode"] = "free"
+	guarded_end["handle_source"] = "manual"
+	guarded_end["handle_in"] = Vector2(-14.0 / 3.0, 0.0)
+	var authored_samples: Array = []
+	for point_index in range(guarded_point_ids.size()):
+		var point_id := str(guarded_point_ids[point_index])
+		var incoming_edge_id := str(guarded_edge_ids[0]) if point_index == 0 else str(guarded_edge_ids[point_index - 1])
+		authored_samples.append({"id": "authored:%s" % point_id, "position": Vector2(BezierTopology.point_by_id(guarded_component.get("points", []), point_id).get("position", Vector2.ZERO)), "edge_id": incoming_edge_id, "curve_t": 0.0 if point_index == 0 else 1.0, "source_point_id": point_id, "preserved": false})
+	var guarded_result := GeometrySamplingService._balance_corner_segment_lengths(authored_samples, guarded_component, guarded_chain)
+	var guarded_samples: Array = guarded_result.get("samples", [])
+	var zero_length_segment := false
+	for sample_index in range(guarded_samples.size()):
+		zero_length_segment = zero_length_segment or Vector2(guarded_samples[sample_index].get("position", Vector2.ZERO)).distance_to(Vector2(guarded_samples[(sample_index + 1) % guarded_samples.size()].get("position", Vector2.ZERO))) <= GeometrySamplingService.ARRANGEMENT_EPSILON
+	_expect(int(guarded_result.get("added_sample_count", 0)) > 0 and not bool(guarded_result.get("complete", true)) and not bool(guarded_result.get("limit_reached", true)), "An unsplittable cubic interval should be skipped while other repairable Corners continue refining.")
+	_expect(not zero_length_segment, "Corner balancing must reject a cubic midpoint that would create a zero-length spatial Constraint.")
+
+	var budget_positions: Array = [Vector2.ZERO]
+	var budget_x := 0.0
+	for _pair_index in range(20):
+		budget_x += 0.001
+		budget_positions.append(Vector2(budget_x, 0.0))
+		budget_x += 1.0
+		budget_positions.append(Vector2(budget_x, 0.0))
+	budget_positions.append(Vector2(budget_x, 5.0))
+	budget_positions.append(Vector2(0.0, 5.0))
+	var budget_component := _closed_linear_fixture("budget_balance", "Budget Balance", budget_positions)
+	var budget_result := GeometrySamplingService.generate(budget_component, {"parameters": {"spacing": 1000.0, "feature_detail": 0.0}})
+	_expect(bool(budget_result.get("valid", false)) and int(budget_result.get("boundary_refinement_count", 0)) == GeometrySamplingService.MAX_CORNER_REFINEMENTS_PER_CHAIN and not bool(budget_result.get("boundary_refinement_complete", true)) and bool(budget_result.get("boundary_refinement_limit_reached", false)) and int(budget_result.get("boundary_refinement_unresolved_corner_count", 0)) > 0, "Corner balancing should remain valid but explicitly diagnose an exhausted per-Chain refinement budget.")
+	var budget_round_trip := WorldDocumentService.normalize_sampling_bake(WorldDocumentService.serialize_sampling_bake(budget_result))
+	_expect(int(budget_round_trip.get("boundary_refinement_count", -1)) == GeometrySamplingService.MAX_CORNER_REFINEMENTS_PER_CHAIN and not bool(budget_round_trip.get("boundary_refinement_complete", true)) and bool(budget_round_trip.get("boundary_refinement_limit_reached", false)) and int(budget_round_trip.get("boundary_refinement_unresolved_corner_count", 0)) == int(budget_result.get("boundary_refinement_unresolved_corner_count", -1)), "Sampling persistence should preserve Boundary-refinement completion and budget diagnostics.")
+
+
 func _test_geometry_auto_build_service() -> void:
 	var component := _component()
 	component.merge({"id": "auto_body", "name": "Body", "draw_mode": "closed_loop", "transform": {"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}})
@@ -2435,8 +2531,8 @@ func _test_geometry_auto_build_service() -> void:
 	_expect(not bool(seed_limited_assessment.get("accepted", true)) and str(seed_limited_assessment.get("retry_scope", "")) == "seed", "Excessive automatic interior complexity should request a Seed-only retry.")
 	_expect(not bool(boundary_limited_assessment.get("accepted", true)) and str(boundary_limited_assessment.get("retry_scope", "")) == "boundary", "Only excessive Boundary complexity should request a Boundary retry.")
 	_expect(not bool(invalid_quality_assessment.get("accepted", true)) and str(invalid_quality_assessment.get("retry_scope", "")) == "seed" and invalid_quality_assessment.get("issues", []).size() == 2, "Automatic acceptance must reject degenerate or Constraint-invalid Mesh quality without relaxing the Boundary first.")
-	_expect(bool(warned_quality_assessment.get("accepted", false)) and warned_quality_assessment.get("warnings", []).size() == 2, "Severe but non-degenerate shape-dependent quality should stay accepted while exposing explicit Auto Build warnings.")
-	_expect(GeometryMeshingService.quality_warnings({"triangle_count": 0, "minimum_angle": 0.0, "worst_aspect_ratio": 0.0}).is_empty(), "An empty failed Mesh should not report misleading shape-quality warnings.")
+	_expect(bool(warned_quality_assessment.get("accepted", false)) and GeometryMeshingService.quality_warnings(warned_quality_assessment).size() == 2, "Severe but non-degenerate shape-dependent quality should stay accepted while exposing explicit Auto Build warnings.")
+	_expect(GeometryMeshingService.quality_warnings({"triangle_count": 0, "minimum_angle": 0.0, "worst_aspect_ratio": 0.0}).is_empty() and GeometryMeshingService.quality_warnings({"minimum_angle": 0.0}).is_empty(), "An empty or incomplete Mesh metric record should not report misleading shape-quality warnings.")
 	var baked_signature := GeometryAutoBuildService.source_signature(component, [], [], recipes)
 	var previous_auto_model := recipes.duplicate(true)
 	previous_auto_model["auto_recipe_version"] = GeometryAutoBuildService.AUTO_RECIPE_VERSION - 1
@@ -2614,6 +2710,24 @@ func _closed_linear_fixture(component_id: String, component_name: String, positi
 		BezierTopology.add_point(component, Vector2(position), "linear")
 	BezierTopology.close_active_chain(component)
 	return component
+
+
+func _maximum_authored_corner_sample_ratio(sampling: Dictionary, topology_role := "") -> float:
+	var maximum_ratio := 0.0
+	for chain_data in sampling.get("chains", []):
+		if not topology_role.is_empty() and str(chain_data.get("topology_role", "")) != topology_role:
+			continue
+		var samples: Array = chain_data.get("samples", [])
+		for sample_index in range(samples.size()):
+			if str(samples[sample_index].get("source_point_id", "")).is_empty():
+				continue
+			var position := Vector2(samples[sample_index].get("position", Vector2.ZERO))
+			var previous_length := position.distance_to(Vector2(samples[posmod(sample_index - 1, samples.size())].get("position", Vector2.ZERO)))
+			var next_length := position.distance_to(Vector2(samples[(sample_index + 1) % samples.size()].get("position", Vector2.ZERO)))
+			var shorter := minf(previous_length, next_length)
+			if shorter > GeometrySamplingService.ARRANGEMENT_EPSILON:
+				maximum_ratio = maxf(maximum_ratio, maxf(previous_length, next_length) / shorter)
+	return maximum_ratio
 
 
 func _run_auto_mesh_fixture(component: Dictionary, cut_guides: Array = [], hole_components: Array = []) -> Dictionary:
@@ -2998,6 +3112,15 @@ func _test_geometry_meshing_service_and_ui() -> void:
 	_expect(bool(cdt.get("valid", false)) and int(cdt.get("vertex_count", 0)) > int(seeding.get("seed_count", 0)) and int(cdt.get("triangle_count", 0)) > 0, "Structured Constrained Mesh should generate a derived Mesh from sampled boundaries and Seeds.")
 	_expect(int(cdt.get("algorithm_version", 0)) == GeometryMeshingService.ALGORITHM_VERSION and int(cdt.get("diagnostics", {}).get("domain", {}).get("final_constraint_issue_count", -1)) == 0, "Constrained Mesh must classify final domain faces topologically and report zero final Constraint coverage issues.")
 	_expect(cdt == repeated, "Meshing must be deterministic for identical Sampling, Seeding, and recipe inputs.")
+	_expect(bool(cdt.get("boundary_refinement", {}).get("enabled", false)) and bool(cdt.get("boundary_refinement", {}).get("complete", false)), "A current Sampling Bake should expose its completed corner-refinement provenance in the Mesh result.")
+	_expect(not bool(GeometryMeshingService.boundary_refinement_summary({"algorithm_version": GeometrySamplingService.CORNER_BALANCING_VERSION - 1}).get("enabled", true)), "A legacy Sampling Bake should not claim that Boundary corner refinement was enabled.")
+	var mesh_round_trip_source := cdt.duplicate(true)
+	mesh_round_trip_source["boundary_refinement"] = {"enabled": true, "added_vertex_count": 64, "complete": false, "unresolved_corner_count": 7, "limit_reached": true}
+	var mesh_round_trip := WorldDocumentService.normalize_meshing_bake(WorldDocumentService.serialize_meshing_bake(mesh_round_trip_source))
+	_expect(mesh_round_trip.get("boundary_refinement", {}) == mesh_round_trip_source.get("boundary_refinement", {}), "Meshing persistence should preserve Boundary-refinement completion diagnostics.")
+	var warning_result := {"vertex_count": 30, "triangle_count": 28, "minimum_angle": 1.0, "worst_aspect_ratio": 60.0, "mean_quality": 0.4, "constraints_valid": true, "cut_seam_vertex_count": 0, "optimization": {}, "boundary_refinement": {"enabled": true, "added_vertex_count": 64, "complete": false, "unresolved_corner_count": 7, "limit_reached": true}}
+	var quality_diagnostic_line := "Quality Warning: %s" % GeometryMeshingService.quality_warnings(warning_result)[0]
+	var refinement_diagnostic_line := "Boundary Refinement Warning: %s" % GeometryMeshingService.boundary_refinement_warning(warning_result)
 	var warning_view := GeometryInspectorView.new()
 	warning_view.set_submodule("Meshing", 4.0)
 	warning_view.set_meshing_context({
@@ -3009,14 +3132,16 @@ func _test_geometry_meshing_service_and_ui() -> void:
 		"input_is_current": true,
 		"meshing_input": {"sampling": sampling},
 		"view_options": [],
-		"build_diagnostic_lines": [],
+		"build_diagnostic_lines": [quality_diagnostic_line, refinement_diagnostic_line],
 		"status": "Baked",
 		"auto_build_error": "",
-		"result": {"vertex_count": 30, "triangle_count": 28, "minimum_angle": 1.0, "worst_aspect_ratio": 60.0, "mean_quality": 0.4, "constraints_valid": true, "cut_seam_vertex_count": 0, "optimization": {}},
+		"result": warning_result,
 		"advanced_relaxation_expanded": false
 	})
 	warning_view.rebuild()
-	_expect(_control_text(warning_view).contains("Quality Warning: Minimum angle") and _control_text(warning_view).contains("Quality Warning: Worst aspect ratio"), "The Meshing Inspector should visibly distinguish severe accepted quality diagnostics from validity failures.")
+	var warning_view_text := _control_text(warning_view)
+	_expect(warning_view_text.contains("Quality Warning: Minimum angle") and warning_view_text.contains("Quality Warning: Worst aspect ratio") and warning_view_text.contains("Boundary Refinement Warning:"), "The Meshing Inspector should visibly distinguish accepted quality and incomplete-refinement diagnostics from validity failures.")
+	_expect(warning_view_text.count(quality_diagnostic_line) == 1 and warning_view_text.count(refinement_diagnostic_line) == 1, "Auto Build and Result sections should not duplicate identical quality or Boundary-refinement warnings.")
 	warning_view.free()
 	var pslg_diagnostics := GeometryMeshingService._pslg_validation_issues(PackedVector2Array([Vector2.ZERO, Vector2(2.0, 0.0), Vector2(1.0, 0.0)]), [[0, 1]], [{"topology_role": "cut", "chain_id": "cut:test", "fragment_index": 0, "segment_index": 10}])
 	_expect(not pslg_diagnostics.is_empty() and str(pslg_diagnostics[0]).contains("Cut fragment 1, segment 11") and str(pslg_diagnostics[0]).contains("shared sampled junction"), "PSLG diagnostics should identify the exact Cut fragment and local segment that passes through an unsplit vertex.")

@@ -151,7 +151,7 @@ static func automatic_build_assessment(sampling: Dictionary, seeding: Dictionary
 		"minimum_angle": float(meshing.get("minimum_angle", 0.0)),
 		"mean_quality": float(meshing.get("mean_quality", 0.0)),
 		"worst_aspect_ratio": float(meshing.get("worst_aspect_ratio", 0.0)),
-		"warnings": GeometryMeshingService.quality_warnings(meshing) if not meshing.is_empty() else PackedStringArray(),
+		"boundary_refinement": meshing.get("boundary_refinement", {}).duplicate(true) if meshing.get("boundary_refinement", {}) is Dictionary else {},
 		"limits": automatic_complexity_limits()
 	}
 

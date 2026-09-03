@@ -231,11 +231,16 @@ ID namespace. Older Bakes remain readable for inspection but become stale
 upstream, so the UI requests Sampling and Seeding rebakes instead of passing
 ambiguous constraint identities to Meshing.
 
-Sampling algorithm version 5 adds scale-invariant corner transition balancing
-for closed Bézier boundaries. When the two derived sample segments beside an
-authored corner differ by more than `3×`, the longer curve interval is split
-deterministically until the transition is bounded. Authored Points, cubic
-curves, Primitives, and the selected spacing recipe remain unchanged.
+Sampling algorithm version 6 hardens the scale-invariant corner transition
+balancing introduced in version 5 for closed Bézier boundaries. When the two
+derived sample segments beside an authored corner differ by more than `3×`, the
+longer curve interval is split deterministically toward that target. The owning
+Chain resolves source-to-source and closing intervals, and a spatially
+degenerate midpoint is skipped while other Corners continue. The pass is best
+effort within the supported numeric scale and adds at most 64 samples per Chain;
+an unresolved transition or exhausted limit remains valid and is recorded as
+an explicit diagnostic. Authored Points, cubic curves, Primitives, and the
+selected spacing recipe remain unchanged.
 
 ## Deferred
 

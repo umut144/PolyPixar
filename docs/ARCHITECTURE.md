@@ -241,9 +241,11 @@ Fill or Contour Stroke Mesh itself. Hole and Cut inputs
 may apply a boundary-density factor from `0.25×` through `16×`. Values below
 `1×` coarsen all adaptive criteria, while values above `1×` refine them. Primitive Circles and Ellipses
 remain analytic through sampling, including their transform into Body-local
-space. On Bézier boundaries, a deterministic post-pass splits only the longer
-derived curve segment beside an authored corner until adjacent segment lengths
-differ by at most `3×`; it never adds authored Points or changes the curve.
+space. On Bézier boundaries, a deterministic best-effort post-pass splits only
+the longer derived curve segment beside an authored corner toward a maximum
+adjacent-length ratio of `3×`; it never adds authored Points or changes the
+curve. At most 64 derived samples are added per Chain. Untreatable intervals
+and exhausted limits remain non-blocking and are exposed in diagnostics.
 A debounced transient Preview is generated once per settled recipe and
 an explicit Bake copies that exact Preview without regenerating it.
 
@@ -558,11 +560,13 @@ exposes separate `Scale X` and `Scale Y` Inspector controls. Legacy scalar
 root scales load as equal axes; Runtime Export requires both axes to be `1`.
 
 Sampling results carry their own algorithm version independently of the
-World schema. Version 5 retains junction-aware Cut arrangement and namespaces
+World schema. Version 6 retains junction-aware Cut arrangement and namespaces
 analytic Samples by resolved boundary, preventing collisions when one Hole
 Reference contains multiple Primitives. It additionally balances abrupt
-derived segment-length transitions at authored Bézier corners without changing
-canonical topology. Older Sampling Bakes become stale
+derived segment-length transitions at authored Bézier corners, resolves
+source-to-source and closing intervals from explicit Chain topology, and
+rejects spatially degenerate midpoint insertions without changing canonical
+topology. Older Sampling Bakes become stale
 before Seeding or Meshing can consume incompatible constraint identities.
 
 ## Export contract

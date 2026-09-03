@@ -4,7 +4,8 @@ extends RefCounted
 const ADAPTIVE := "adaptive"
 const EVEN_SPACING := "even_spacing"
 const VALID_METHODS := [ADAPTIVE]
-const ALGORITHM_VERSION := 5
+const ALGORITHM_VERSION := 6
+const CORNER_BALANCING_VERSION := 5
 const DEFAULT_SPACING := 1.0
 const DEFAULT_FEATURE_DETAIL := 0.5
 const MIN_SPACING := 0.01
@@ -70,6 +71,9 @@ static func generate(component: Dictionary, raw_recipe = {}, cut_guides: Array =
 			"algorithm_version": ALGORITHM_VERSION,
 			"source_fingerprint": source_fingerprint(component, cut_guides, hole_components), "chains": [{"chain_id": "primitive:%s" % str(component.get("primitive", {}).get("type", "")), "input_id": "", "topology_role": "outer", "closed": true, "effective_spacing": sampled_circle["effective_spacing"], "samples": samples}], "cuts": [],
 			"boundary_refinement_count": 0,
+			"boundary_refinement_complete": true,
+			"boundary_refinement_unresolved_corner_count": 0,
+			"boundary_refinement_limit_reached": false,
 			"sample_count": samples.size(), "preserve_count": 0
 		}
 		var primitive_holes := _sample_hole_components(hole_components, recipe)
@@ -78,6 +82,9 @@ static func generate(component: Dictionary, raw_recipe = {}, cut_guides: Array =
 		primitive_result["chains"].append_array(primitive_holes["chains"])
 		primitive_result["sample_count"] += int(primitive_holes["sample_count"])
 		primitive_result["boundary_refinement_count"] += int(primitive_holes.get("boundary_refinement_count", 0))
+		primitive_result["boundary_refinement_complete"] = bool(primitive_holes.get("boundary_refinement_complete", true))
+		primitive_result["boundary_refinement_unresolved_corner_count"] = int(primitive_holes.get("boundary_refinement_unresolved_corner_count", 0))
+		primitive_result["boundary_refinement_limit_reached"] = bool(primitive_holes.get("boundary_refinement_limit_reached", false))
 		primitive_result["preserve_count"] += int(primitive_holes["preserve_count"])
 		primitive_result["hole_count"] = primitive_holes["chains"].size()
 		var primitive_cuts := _sample_cut_guides(cut_guides, recipe)
@@ -98,6 +105,9 @@ static func generate(component: Dictionary, raw_recipe = {}, cut_guides: Array =
 	var sampled_chains: Array = []
 	var sample_count := 0
 	var boundary_refinement_count := 0
+	var boundary_refinement_complete := true
+	var boundary_refinement_unresolved_corner_count := 0
+	var boundary_refinement_limit_reached := false
 	var preserved_ids: Dictionary = {}
 	for chain_data in working_component.get("chains", []):
 		var sampled_chain := _sample_chain(working_component, chain_data, recipe)
@@ -107,6 +117,9 @@ static func generate(component: Dictionary, raw_recipe = {}, cut_guides: Array =
 		var samples: Array = sampled_chain.get("samples", [])
 		sample_count += samples.size()
 		boundary_refinement_count += int(sampled_chain.get("boundary_refinement_count", 0))
+		boundary_refinement_complete = boundary_refinement_complete and bool(sampled_chain.get("boundary_refinement_complete", true))
+		boundary_refinement_unresolved_corner_count += int(sampled_chain.get("boundary_refinement_unresolved_corner_count", 0))
+		boundary_refinement_limit_reached = boundary_refinement_limit_reached or bool(sampled_chain.get("boundary_refinement_limit_reached", false))
 		for sample in samples:
 			var source_point_id := str(sample.get("source_point_id", ""))
 			if bool(sample.get("preserved", false)) and not source_point_id.is_empty():
@@ -127,6 +140,9 @@ static func generate(component: Dictionary, raw_recipe = {}, cut_guides: Array =
 	sampled_chains.append_array(sampled_holes["chains"])
 	sample_count += int(sampled_holes["sample_count"])
 	boundary_refinement_count += int(sampled_holes.get("boundary_refinement_count", 0))
+	boundary_refinement_complete = boundary_refinement_complete and bool(sampled_holes.get("boundary_refinement_complete", true))
+	boundary_refinement_unresolved_corner_count += int(sampled_holes.get("boundary_refinement_unresolved_corner_count", 0))
+	boundary_refinement_limit_reached = boundary_refinement_limit_reached or bool(sampled_holes.get("boundary_refinement_limit_reached", false))
 	var hole_preserved_ids: Dictionary = sampled_holes["preserved_ids"]
 	for preserved_id in hole_preserved_ids:
 		preserved_ids[str(preserved_id)] = true
@@ -147,6 +163,9 @@ static func generate(component: Dictionary, raw_recipe = {}, cut_guides: Array =
 		"cuts": cuts,
 		"sample_count": sample_count,
 		"boundary_refinement_count": boundary_refinement_count,
+		"boundary_refinement_complete": boundary_refinement_complete,
+		"boundary_refinement_unresolved_corner_count": boundary_refinement_unresolved_corner_count,
+		"boundary_refinement_limit_reached": boundary_refinement_limit_reached,
 		"preserve_count": preserved_ids.size(),
 		"hole_count": sampled_holes["chains"].size()
 	}
@@ -244,6 +263,9 @@ static func _sample_hole_components(hole_components: Array, recipe: Dictionary) 
 	var errors: Array[String] = []
 	var sample_count := 0
 	var boundary_refinement_count := 0
+	var boundary_refinement_complete := true
+	var boundary_refinement_unresolved_corner_count := 0
+	var boundary_refinement_limit_reached := false
 	var preserved_ids: Dictionary = {}
 	for hole_component in hole_components:
 		if not hole_component is Dictionary:
@@ -279,6 +301,9 @@ static func _sample_hole_components(hole_components: Array, recipe: Dictionary) 
 			var samples: Array = sampled_chain.get("samples", [])
 			sample_count += samples.size()
 			boundary_refinement_count += int(sampled_chain.get("boundary_refinement_count", 0))
+			boundary_refinement_complete = boundary_refinement_complete and bool(sampled_chain.get("boundary_refinement_complete", true))
+			boundary_refinement_unresolved_corner_count += int(sampled_chain.get("boundary_refinement_unresolved_corner_count", 0))
+			boundary_refinement_limit_reached = boundary_refinement_limit_reached or bool(sampled_chain.get("boundary_refinement_limit_reached", false))
 			for sample in samples:
 				var source_point_id := str(sample.get("source_point_id", ""))
 				if bool(sample.get("preserved", false)) and not source_point_id.is_empty():
@@ -291,7 +316,7 @@ static func _sample_hole_components(hole_components: Array, recipe: Dictionary) 
 				"effective_spacing": float(hole_recipe["parameters"]["spacing"]),
 				"samples": samples
 			})
-	return {"chains": sampled_chains, "errors": errors, "sample_count": sample_count, "preserve_count": preserved_ids.size(), "preserved_ids": preserved_ids, "boundary_refinement_count": boundary_refinement_count}
+	return {"chains": sampled_chains, "errors": errors, "sample_count": sample_count, "preserve_count": preserved_ids.size(), "preserved_ids": preserved_ids, "boundary_refinement_count": boundary_refinement_count, "boundary_refinement_complete": boundary_refinement_complete, "boundary_refinement_unresolved_corner_count": boundary_refinement_unresolved_corner_count, "boundary_refinement_limit_reached": boundary_refinement_limit_reached}
 
 
 static func _sample_cut_guides(cut_guides: Array, recipe: Dictionary) -> Array:
@@ -599,16 +624,23 @@ static func _sample_chain(component: Dictionary, chain_data: Dictionary, recipe:
 		if not first_source.is_empty() and first_source == last_source:
 			samples.pop_back()
 	var boundary_refinement_count := 0
+	var boundary_refinement_complete := true
+	var boundary_refinement_unresolved_corner_count := 0
+	var boundary_refinement_limit_reached := false
 	if bool(chain_data.get("closed", false)):
-		var balanced := _balance_corner_segment_lengths(samples, component)
+		var balanced := _balance_corner_segment_lengths(samples, component, chain_data)
 		samples = balanced.get("samples", samples)
 		boundary_refinement_count = int(balanced.get("added_sample_count", 0))
-	return {"valid": true, "errors": [], "samples": samples, "boundary_refinement_count": boundary_refinement_count}
+		boundary_refinement_complete = bool(balanced.get("complete", true))
+		boundary_refinement_unresolved_corner_count = int(balanced.get("unresolved_corner_count", 0))
+		boundary_refinement_limit_reached = bool(balanced.get("limit_reached", false))
+	return {"valid": true, "errors": [], "samples": samples, "boundary_refinement_count": boundary_refinement_count, "boundary_refinement_complete": boundary_refinement_complete, "boundary_refinement_unresolved_corner_count": boundary_refinement_unresolved_corner_count, "boundary_refinement_limit_reached": boundary_refinement_limit_reached}
 
 
-static func _balance_corner_segment_lengths(source_samples: Array, component: Dictionary) -> Dictionary:
+static func _balance_corner_segment_lengths(source_samples: Array, component: Dictionary, chain_data: Dictionary) -> Dictionary:
 	var samples: Array = source_samples.duplicate(true)
 	var added_sample_count := 0
+	var blocked_segments: Dictionary = {}
 	while samples.size() >= 3 and samples.size() < MAX_SAMPLES_PER_CHAIN and added_sample_count < MAX_CORNER_REFINEMENTS_PER_CHAIN:
 		var selected_segment := -1
 		var selected_ratio := MAX_ADJACENT_CORNER_SEGMENT_RATIO
@@ -626,37 +658,76 @@ static func _balance_corner_segment_lengths(source_samples: Array, component: Di
 			var ratio := maxf(previous_length, next_length) / shorter
 			if ratio <= selected_ratio:
 				continue
+			var candidate_segment := previous_index if previous_length > next_length else corner_index
+			var candidate_end := (candidate_segment + 1) % samples.size()
+			if blocked_segments.has(_sample_segment_key(samples[candidate_segment], samples[candidate_end])):
+				continue
 			selected_ratio = ratio
-			selected_segment = previous_index if previous_length > next_length else corner_index
+			selected_segment = candidate_segment
 		if selected_segment < 0:
 			break
 		var end_index := (selected_segment + 1) % samples.size()
-		var inserted := _curve_midpoint_sample(samples[selected_segment], samples[end_index], component)
+		var segment_key := _sample_segment_key(samples[selected_segment], samples[end_index])
+		var inserted := _curve_midpoint_sample(samples[selected_segment], samples[end_index], component, chain_data)
 		if inserted.is_empty():
-			break
+			blocked_segments[segment_key] = true
+			continue
 		if end_index == 0:
 			samples.append(inserted)
 		else:
 			samples.insert(end_index, inserted)
 		added_sample_count += 1
-	return {"samples": samples, "added_sample_count": added_sample_count}
+	var unresolved_corner_count := _unbalanced_corner_count(samples)
+	return {
+		"samples": samples,
+		"added_sample_count": added_sample_count,
+		"complete": unresolved_corner_count == 0,
+		"unresolved_corner_count": unresolved_corner_count,
+		"limit_reached": unresolved_corner_count > 0 and (samples.size() >= MAX_SAMPLES_PER_CHAIN or added_sample_count >= MAX_CORNER_REFINEMENTS_PER_CHAIN)
+	}
 
 
-static func _curve_midpoint_sample(first_sample: Dictionary, second_sample: Dictionary, component: Dictionary) -> Dictionary:
+static func _sample_segment_key(first_sample: Dictionary, second_sample: Dictionary) -> String:
+	return "%s>%s" % [str(first_sample.get("id", "")), str(second_sample.get("id", ""))]
+
+
+static func _unbalanced_corner_count(samples: Array) -> int:
+	var count := 0
+	for corner_index in range(samples.size()):
+		if str(samples[corner_index].get("source_point_id", "")).is_empty():
+			continue
+		var corner_position := Vector2(samples[corner_index].get("position", Vector2.ZERO))
+		var previous_length := corner_position.distance_to(Vector2(samples[posmod(corner_index - 1, samples.size())].get("position", Vector2.ZERO)))
+		var next_length := corner_position.distance_to(Vector2(samples[(corner_index + 1) % samples.size()].get("position", Vector2.ZERO)))
+		var shorter := minf(previous_length, next_length)
+		if shorter > ARRANGEMENT_EPSILON and maxf(previous_length, next_length) / shorter > MAX_ADJACENT_CORNER_SEGMENT_RATIO:
+			count += 1
+	return count
+
+
+static func _curve_midpoint_sample(first_sample: Dictionary, second_sample: Dictionary, component: Dictionary, chain_data: Dictionary) -> Dictionary:
 	var first_edge_id := str(first_sample.get("edge_id", ""))
 	var second_edge_id := str(second_sample.get("edge_id", ""))
+	var first_source_id := str(first_sample.get("source_point_id", ""))
+	var second_source_id := str(second_sample.get("source_point_id", ""))
 	var edge_id := ""
 	var first_t := 0.0
 	var second_t := 1.0
-	if not first_edge_id.is_empty() and first_edge_id == second_edge_id:
+	if not first_source_id.is_empty() and not second_source_id.is_empty():
+		for chain_edge_id in chain_data.get("edge_ids", []):
+			var candidate := BezierTopology.edge_by_id(component.get("edges", []), str(chain_edge_id))
+			if str(candidate.get("start_point_id", "")) == first_source_id and str(candidate.get("end_point_id", "")) == second_source_id:
+				edge_id = str(chain_edge_id)
+				break
+	elif not first_edge_id.is_empty() and first_edge_id == second_edge_id:
 		edge_id = first_edge_id
 		first_t = float(first_sample.get("curve_t", 0.0))
 		second_t = float(second_sample.get("curve_t", 1.0))
-	elif not str(second_sample.get("source_point_id", "")).is_empty() and not first_edge_id.is_empty():
+	elif not second_source_id.is_empty() and not first_edge_id.is_empty():
 		edge_id = first_edge_id
 		first_t = float(first_sample.get("curve_t", 0.0))
 		second_t = 1.0
-	elif not str(first_sample.get("source_point_id", "")).is_empty() and not second_edge_id.is_empty():
+	elif not first_source_id.is_empty() and not second_edge_id.is_empty():
 		edge_id = second_edge_id
 		first_t = 0.0
 		second_t = float(second_sample.get("curve_t", 1.0))
@@ -671,6 +742,9 @@ static func _curve_midpoint_sample(first_sample: Dictionary, second_sample: Dict
 		return {}
 	var curve_t := (first_t + second_t) * 0.5
 	var position := BezierGeometry.cubic_position(BezierGeometry.cubic_controls(start_point, end_point), curve_t)
+	if position.distance_to(Vector2(first_sample.get("position", Vector2.ZERO))) <= ARRANGEMENT_EPSILON \
+		or position.distance_to(Vector2(second_sample.get("position", Vector2.ZERO))) <= ARRANGEMENT_EPSILON:
+		return {}
 	return _curve_sample(edge_id, curve_t, position)
 
 
@@ -811,5 +885,8 @@ static func _failed_result(recipe: Dictionary, errors: Array[String], fingerprin
 		"chains": [],
 		"sample_count": 0,
 		"boundary_refinement_count": 0,
+		"boundary_refinement_complete": false,
+		"boundary_refinement_unresolved_corner_count": 0,
+		"boundary_refinement_limit_reached": false,
 		"preserve_count": 0
 	}

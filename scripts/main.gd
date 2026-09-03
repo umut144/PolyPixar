@@ -3710,6 +3710,9 @@ func _component_mesh_build_diagnostic_lines(asset_id: String, component_id: Stri
 		])
 		for warning in GeometryMeshingService.quality_warnings(accepted):
 			lines.append("Quality Warning: %s" % warning)
+		var refinement_warning := GeometryMeshingService.boundary_refinement_warning(accepted)
+		if not refinement_warning.is_empty():
+			lines.append("Boundary Refinement Warning: %s" % refinement_warning)
 	return lines
 
 

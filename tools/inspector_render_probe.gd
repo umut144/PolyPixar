@@ -338,7 +338,11 @@ func _init() -> void:
 			doc["meshing"]["bakes"][GeometryMeshingService.CONSTRAINED_MESH] = {"vertex_count": 55,
 				"triangle_count": 66, "minimum_angle": 1.0 if bool(c.get("quality_warning", false)) else 24.5,
 				"worst_aspect_ratio": 60.0 if bool(c.get("quality_warning", false)) else 3.0, "constraints_valid": true,
-				"cut_seam_vertex_count": 4}
+				"cut_seam_vertex_count": 4, "boundary_refinement": {"enabled": true,
+					"added_vertex_count": 64 if bool(c.get("quality_warning", false)) else 0,
+					"complete": not bool(c.get("quality_warning", false)),
+					"unresolved_corner_count": 7 if bool(c.get("quality_warning", false)) else 0,
+					"limit_reached": bool(c.get("quality_warning", false))}}
 			app.geometry_documents["asset_1/component_7"] = doc
 			# Only "component" and "guide" are input kinds the Sampling path
 			# stores; anything else resolves to nothing and the Boundary Density
