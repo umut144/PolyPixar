@@ -82,6 +82,14 @@ vectors. Its yellow baseline is deliberately translucent so dense final edges
 remain legible. The Quality view colors final triangles from poor to strong. Identical
 inputs and recipes produce identical output.
 
+Minimum angles below `5°` and worst aspect ratios above `25` are displayed as
+orange quality warnings in the Inspector. They remain diagnostic because a
+global angle threshold would reject otherwise valid shape-dependent boundary
+features; complete Constraint coverage and zero degenerate Triangles remain the
+hard validity requirements. Closed Bézier Sampling reduces avoidable warnings
+before Meshing by balancing abrupt derived edge-length transitions at authored
+corners.
+
 ## Preview, Bake, and Component Mesh
 
 Parameter changes schedule one debounced transient Preview. Preview generation

@@ -2366,10 +2366,17 @@ func _test_geometry_auto_build_service() -> void:
 		{"valid": true, "seed_count": 200},
 		{"valid": true, "triangle_count": 500, "constraints_valid": false, "degenerate_triangle_count": 1}
 	)
+	var warned_quality_assessment := GeometryAutoBuildService.automatic_build_assessment(
+		{"valid": true, "sample_count": 30},
+		{"valid": true, "seed_count": 0},
+		{"valid": true, "triangle_count": 28, "constraints_valid": true, "degenerate_triangle_count": 0, "minimum_angle": 1.0, "mean_quality": 0.4, "worst_aspect_ratio": 60.0}
+	)
 	_expect(bool(accepted_assessment.get("accepted", false)) and is_equal_approx(float(accepted_assessment.get("minimum_angle", 0.0)), 12.0), "Automatic acceptance should retain fixed complexity and reported quality diagnostics for a valid Build.")
 	_expect(not bool(seed_limited_assessment.get("accepted", true)) and str(seed_limited_assessment.get("retry_scope", "")) == "seed", "Excessive automatic interior complexity should request a Seed-only retry.")
 	_expect(not bool(boundary_limited_assessment.get("accepted", true)) and str(boundary_limited_assessment.get("retry_scope", "")) == "boundary", "Only excessive Boundary complexity should request a Boundary retry.")
 	_expect(not bool(invalid_quality_assessment.get("accepted", true)) and str(invalid_quality_assessment.get("retry_scope", "")) == "seed" and invalid_quality_assessment.get("issues", []).size() == 2, "Automatic acceptance must reject degenerate or Constraint-invalid Mesh quality without relaxing the Boundary first.")
+	_expect(bool(warned_quality_assessment.get("accepted", false)) and warned_quality_assessment.get("warnings", []).size() == 2, "Severe but non-degenerate shape-dependent quality should stay accepted while exposing explicit Auto Build warnings.")
+	_expect(GeometryMeshingService.quality_warnings({"triangle_count": 0, "minimum_angle": 0.0, "worst_aspect_ratio": 0.0}).is_empty(), "An empty failed Mesh should not report misleading shape-quality warnings.")
 	var baked_signature := GeometryAutoBuildService.source_signature(component, [], [], recipes)
 	var previous_auto_model := recipes.duplicate(true)
 	previous_auto_model["auto_recipe_version"] = GeometryAutoBuildService.AUTO_RECIPE_VERSION - 1
@@ -2481,11 +2488,26 @@ func _test_geometry_auto_build_regression_corpus() -> void:
 		Vector2(0.0, 34.0), Vector2(-8.0, 19.0), Vector2(-24.0, 24.0), Vector2(-19.0, 8.0),
 		Vector2(-32.0, 0.0), Vector2(-19.0, -8.0), Vector2(-24.0, -24.0), Vector2(-8.0, -19.0)
 	])
+	var narrow_item := _closed_linear_fixture("corpus_narrow_item", "Narrow Concave Item", [
+		Vector2(-0.19, 1.36), Vector2(-0.19, 0.21), Vector2(-0.18, 0.14), Vector2(-0.15, 0.08),
+		Vector2(-0.11, 0.03), Vector2(-0.05, 0.0), Vector2(0.0, 0.0), Vector2(0.05, 0.0),
+		Vector2(0.11, 0.03), Vector2(0.15, 0.08), Vector2(0.18, 0.14), Vector2(0.19, 0.21),
+		Vector2(0.19, 1.36), Vector2(0.184, 1.327), Vector2(0.17, 1.304), Vector2(0.15, 1.29),
+		Vector2(0.10, 1.27), Vector2(0.05, 1.25), Vector2(0.0, 1.24), Vector2(-0.05, 1.25),
+		Vector2(-0.10, 1.27), Vector2(-0.15, 1.29), Vector2(-0.17, 1.304), Vector2(-0.184, 1.327)
+	])
+	var half_narrow_item := narrow_item.duplicate(true)
+	half_narrow_item["id"] = "corpus_narrow_item_half"
+	half_narrow_item["name"] = "Half Narrow Concave Item"
+	for point in half_narrow_item.get("points", []):
+		point["position"] = Vector2(point.get("position", Vector2.ZERO)) * 0.5
 	var tiny_result := _run_auto_mesh_fixture(tiny_symbol)
 	var barde_result := _run_auto_mesh_fixture(barde_body)
 	var trunk_result := _run_auto_mesh_fixture(tree_trunk)
 	var crown_result := _run_auto_mesh_fixture(concave_crown)
-	for fixture_result in [tiny_result, barde_result, trunk_result, crown_result]:
+	var narrow_result := _run_auto_mesh_fixture(narrow_item)
+	var half_narrow_result := _run_auto_mesh_fixture(half_narrow_item)
+	for fixture_result in [tiny_result, barde_result, trunk_result, crown_result, narrow_result, half_narrow_result]:
 		var fixture_name := str(fixture_result.get("fixture_name", "Fixture"))
 		var assessment: Dictionary = fixture_result.get("assessment", {})
 		var mesh: Dictionary = fixture_result.get("meshing", {})
@@ -2495,6 +2517,22 @@ func _test_geometry_auto_build_regression_corpus() -> void:
 	_expect(is_equal_approx(float(barde_result.get("boundary_spacing", 0.0)), 0.55) and is_equal_approx(float(barde_result.get("seed_spacing", 0.0)), 0.55), "The corpus should lock the Barde-scale 0.55 reference calibration.")
 	_expect(float(trunk_result.get("boundary_spacing", 0.0)) > 0.7 and float(trunk_result.get("seed_spacing", 0.0)) > float(trunk_result.get("boundary_spacing", 0.0)) and int(trunk_result.get("meshing", {}).get("triangle_count", 0)) < 2000, "The corpus should keep Tree-Trunk density bounded while retaining a finer Boundary than interior Seed spacing.")
 	_expect(float(crown_result.get("boundary_spacing", 0.0)) > 0.9 and float(crown_result.get("seed_spacing", 0.0)) >= float(crown_result.get("boundary_spacing", 0.0)) and int(crown_result.get("meshing", {}).get("triangle_count", 0)) < 5000, "The corpus should keep a large concave Crown valid and within a broad non-fragile Triangle range.")
+	var narrow_mesh: Dictionary = narrow_result.get("meshing", {})
+	var half_narrow_mesh: Dictionary = half_narrow_result.get("meshing", {})
+	var narrow_sampling: Dictionary = narrow_result.get("sampling", {})
+	var half_narrow_sampling: Dictionary = half_narrow_result.get("sampling", {})
+	_expect(int(narrow_mesh.get("boundary_refinement", {}).get("added_vertex_count", 0)) > 0 and int(half_narrow_mesh.get("boundary_refinement", {}).get("added_vertex_count", 0)) > 0, "Narrow concave Item bodies should receive deterministic local Boundary refinement at both authored scales.")
+	_expect(int(narrow_sampling.get("boundary_refinement_count", 0)) == int(narrow_mesh.get("boundary_refinement", {}).get("added_vertex_count", -1)) and int(half_narrow_sampling.get("boundary_refinement_count", 0)) == int(half_narrow_mesh.get("boundary_refinement", {}).get("added_vertex_count", -1)), "Meshing diagnostics should report the exact derived Boundary samples inserted upstream.")
+	_expect(int(narrow_mesh.get("vertex_count", 0)) == int(half_narrow_mesh.get("vertex_count", -1)) and int(narrow_mesh.get("triangle_count", 0)) == int(half_narrow_mesh.get("triangle_count", -1)) and is_equal_approx(float(narrow_mesh.get("minimum_angle", 0.0)), float(half_narrow_mesh.get("minimum_angle", -1.0))), "Narrow concave Item refinement should remain scale invariant when the automatic spacing model scales with the complete shape.")
+	_expect(float(narrow_mesh.get("minimum_angle", 0.0)) >= GeometryMeshingService.QUALITY_WARNING_MINIMUM_ANGLE and GeometryMeshingService.quality_warnings(narrow_mesh).is_empty(), "Local Boundary refinement should clear the severe-quality warning on the narrow concave Item fixture without turning the warning into a hard validity gate.")
+	for sampling_result in [narrow_sampling, half_narrow_sampling]:
+		var samples: Array = sampling_result.get("chains", [])[0].get("samples", [])
+		for sample_index in range(samples.size()):
+			if str(samples[sample_index].get("source_point_id", "")).is_empty():
+				continue
+			var previous_length := Vector2(samples[sample_index].get("position", Vector2.ZERO)).distance_to(Vector2(samples[posmod(sample_index - 1, samples.size())].get("position", Vector2.ZERO)))
+			var next_length := Vector2(samples[sample_index].get("position", Vector2.ZERO)).distance_to(Vector2(samples[(sample_index + 1) % samples.size()].get("position", Vector2.ZERO)))
+			_expect(maxf(previous_length, next_length) / minf(previous_length, next_length) <= GeometrySamplingService.MAX_ADJACENT_CORNER_SEGMENT_RATIO + 0.0001, "Derived Boundary refinement should bound the sample-length transition on both sides of every authored corner.")
 	var constrained_body := _closed_linear_fixture("corpus_constraints", "Hole and Cut", [Vector2.ZERO, Vector2(20.0, 0.0), Vector2(20.0, 20.0), Vector2(0.0, 20.0)])
 	var hole := _closed_linear_fixture("corpus_hole", "Hole", [Vector2(8.0, 8.0), Vector2(8.0, 12.0), Vector2(12.0, 12.0), Vector2(12.0, 8.0)])
 	hole["sampling_input_id"] = "corpus_hole_input"
@@ -2898,8 +2936,28 @@ func _test_geometry_meshing_service_and_ui() -> void:
 	var cdt := GeometryMeshingService.generate(sampling, seeding, cdt_recipe)
 	var repeated := GeometryMeshingService.generate(sampling, seeding, cdt_recipe)
 	_expect(bool(cdt.get("valid", false)) and int(cdt.get("vertex_count", 0)) > int(seeding.get("seed_count", 0)) and int(cdt.get("triangle_count", 0)) > 0, "Structured Constrained Mesh should generate a derived Mesh from sampled boundaries and Seeds.")
-	_expect(int(cdt.get("algorithm_version", 0)) == 5 and int(cdt.get("diagnostics", {}).get("domain", {}).get("final_constraint_issue_count", -1)) == 0, "Constrained Mesh must classify final domain faces topologically and report zero final Constraint coverage issues.")
+	_expect(int(cdt.get("algorithm_version", 0)) == GeometryMeshingService.ALGORITHM_VERSION and int(cdt.get("diagnostics", {}).get("domain", {}).get("final_constraint_issue_count", -1)) == 0, "Constrained Mesh must classify final domain faces topologically and report zero final Constraint coverage issues.")
 	_expect(cdt == repeated, "Meshing must be deterministic for identical Sampling, Seeding, and recipe inputs.")
+	var warning_view := GeometryInspectorView.new()
+	warning_view.set_submodule("Meshing", 4.0)
+	warning_view.set_meshing_context({
+		"component": component,
+		"recipe": cdt_recipe,
+		"source_issues": [],
+		"sampling_bake_is_current": true,
+		"seeding_bakes": {},
+		"input_is_current": true,
+		"meshing_input": {"sampling": sampling},
+		"view_options": [],
+		"build_diagnostic_lines": [],
+		"status": "Baked",
+		"auto_build_error": "",
+		"result": {"vertex_count": 30, "triangle_count": 28, "minimum_angle": 1.0, "worst_aspect_ratio": 60.0, "mean_quality": 0.4, "constraints_valid": true, "cut_seam_vertex_count": 0, "optimization": {}},
+		"advanced_relaxation_expanded": false
+	})
+	warning_view.rebuild()
+	_expect(_control_text(warning_view).contains("Quality Warning: Minimum angle") and _control_text(warning_view).contains("Quality Warning: Worst aspect ratio"), "The Meshing Inspector should visibly distinguish severe accepted quality diagnostics from validity failures.")
+	warning_view.free()
 	var pslg_diagnostics := GeometryMeshingService._pslg_validation_issues(PackedVector2Array([Vector2.ZERO, Vector2(2.0, 0.0), Vector2(1.0, 0.0)]), [[0, 1]], [{"topology_role": "cut", "chain_id": "cut:test", "fragment_index": 0, "segment_index": 10}])
 	_expect(not pslg_diagnostics.is_empty() and str(pslg_diagnostics[0]).contains("Cut fragment 1, segment 11") and str(pslg_diagnostics[0]).contains("shared sampled junction"), "PSLG diagnostics should identify the exact Cut fragment and local segment that passes through an unsplit vertex.")
 	var complete_constraint_issues := GeometryMeshingService._final_constraint_issues([[0, 1, 2]], [[0, 1], [1, 2], [2, 0]], [

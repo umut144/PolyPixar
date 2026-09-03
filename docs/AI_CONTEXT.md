@@ -165,7 +165,12 @@ effectively visible out-of-date Components across every Create Asset type. Autom
 Boundary and Seed Spacing remain `0.55` for ordinary Character/Symbol contours.
 Above that range, Boundary Spacing grows sublinearly with perimeter, while Seed
 Spacing separately grows with area to bound unnecessary interior density. Small
-contours retain the existing minimum-boundary-sample behavior.
+contours retain the existing minimum-boundary-sample behavior. Adaptive
+Sampling additionally balances the two derived segments meeting at an authored
+corner when their lengths differ by more than `3×`. It inserts deterministic
+curve samples only on the longer side, preserving the exact curve and authored
+topology while preventing narrow Item silhouettes from feeding abrupt Boundary
+edge-size jumps into Meshing.
 
 Build provenance records automatic versus manual recipe ownership plus the
 effective pipeline-recipe hash. An unchanged automatic recipe may be
@@ -190,8 +195,11 @@ The Meshing Inspector's read-only `Auto Build Diagnostics` section explains the
 resolved recipe ownership, model version, and geometry metrics before a build,
 then reports effective Boundary/Seed Spacing, fixed budget usage, every automatic attempt
 and retry reason, plus the accepted minimum angle, mean quality, and worst
-aspect ratio. It reads build provenance only and never changes a recipe or Mesh.
-Geometry regression tests use synthetic tiny-Symbol, Barde-scale, Tree-scale,
+aspect ratio. Accepted results below `5°` minimum angle or above `25` worst
+aspect ratio receive an orange quality warning without becoming invalid; the
+hard gates remain complete Constraints and zero degenerates. It reads build
+provenance only and never changes a recipe or Mesh. Geometry regression tests
+use synthetic tiny-Symbol, narrow Item at two scales, Barde-scale, Tree-scale,
 concave, Hole, and Cut fixtures with invariant/range assertions; files under
 `worlds/` remain user data and are not test fixtures.
 

@@ -479,6 +479,7 @@ static func normalize_sampling_bake(raw_bake) -> Dictionary:
 		normalized_cuts.append({"valid": bool(raw_cut.get("valid", true)), "errors": raw_cut.get("errors", []).duplicate(), "guide_id": str(raw_cut.get("guide_id", "")), "input_id": str(raw_cut.get("input_id", raw_cut.get("guide_id", ""))), "effective_spacing": maxf(float(raw_cut.get("effective_spacing", raw_bake.get("parameters", {}).get("spacing", GeometrySamplingService.DEFAULT_SPACING))), GeometrySamplingService.MIN_SPACING), "samples": cut_samples, "fragments": normalized_fragments})
 	bake["cuts"] = normalized_cuts
 	bake["sample_count"] = int(raw_bake.get("sample_count", 0))
+	bake["boundary_refinement_count"] = maxi(int(raw_bake.get("boundary_refinement_count", 0)), 0)
 	bake["preserve_count"] = int(raw_bake.get("preserve_count", 0))
 	bake["hole_count"] = normalized_chains.filter(func(chain: Dictionary) -> bool: return str(chain.get("topology_role", "outer")) == "hole").size()
 	var constraint_count := 0

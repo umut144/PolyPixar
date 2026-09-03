@@ -3708,6 +3708,8 @@ func _component_mesh_build_diagnostic_lines(asset_id: String, component_id: Stri
 			float(accepted.get("mean_quality", 0.0)),
 			float(accepted.get("worst_aspect_ratio", 0.0))
 		])
+		for warning in GeometryMeshingService.quality_warnings(accepted):
+			lines.append("Quality Warning: %s" % warning)
 	return lines
 
 

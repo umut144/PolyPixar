@@ -1,6 +1,6 @@
 # Inspector render probe.
 #
-# Renders the Inspector in 52 fixed states and prints one line per control with
+# Renders the Inspector in 53 fixed states and prints one line per control with
 # the properties a reader would notice: values, ranges, item lists, selections,
 # pressed state, disabled state, captions, colours and tooltips. It asserts
 # nothing on its own. It is run before and after a change that is meant to leave
@@ -22,8 +22,8 @@
 # selected Components, Reference Image, Point mode with none, one and two
 # Points, Edge mode with none, one and two Edges, Face mode), Mesh
 # (Sampling, Seeding and Meshing, each unbaked and against a Geometry document
-# with baked results and expanded advanced blocks, the baked Sampling state
-# also with its Hole and with its Cut boundary selected), Style (Weighting
+# with baked results and expanded advanced blocks, a baked Meshing quality
+# warning, the baked Sampling state also with its Hole and with its Cut boundary selected), Style (Weighting
 # without a Component, without a Style, Uniform, Axis Gradient, and a
 # generated Axis Gradient preview) and Motion (Asset contract, State, Motion, inner
 # Motion, Transition, seeded Transition with Rules, Marker, Act empty / Slide /
@@ -166,6 +166,7 @@ func _init() -> void:
 		{"m": "Mesh", "sub": "Sampling", "comp": "component_7", "grp": "", "gd": "", "baked": true, "input": "cut"},
 		{"m": "Mesh", "sub": "Seeding", "comp": "component_7", "grp": "", "gd": "", "baked": true},
 		{"m": "Mesh", "sub": "Meshing", "comp": "component_7", "grp": "", "gd": "", "baked": true},
+		{"m": "Mesh", "sub": "Meshing", "comp": "component_7", "grp": "", "gd": "", "baked": true, "quality_warning": true},
 		{"m": "Mesh", "sub": "Seeding", "comp": "component_7", "grp": "", "gd": ""},
 		{"m": "Mesh", "sub": "Meshing", "comp": "component_7", "grp": "", "gd": ""},
 		{"m": "Style", "sub": "Weighting", "comp": "", "grp": "", "gd": ""},
@@ -335,7 +336,8 @@ func _init() -> void:
 					"mesh_character": 0.6, "optimize_mesh": true, "relaxation_override": true,
 					"relaxation": 0.4, "passes_override": true, "passes": 3}}
 			doc["meshing"]["bakes"][GeometryMeshingService.CONSTRAINED_MESH] = {"vertex_count": 55,
-				"triangle_count": 66, "minimum_angle": 24.5, "constraints_valid": true,
+				"triangle_count": 66, "minimum_angle": 1.0 if bool(c.get("quality_warning", false)) else 24.5,
+				"worst_aspect_ratio": 60.0 if bool(c.get("quality_warning", false)) else 3.0, "constraints_valid": true,
 				"cut_seam_vertex_count": 4}
 			app.geometry_documents["asset_1/component_7"] = doc
 			# Only "component" and "guide" are input kinds the Sampling path

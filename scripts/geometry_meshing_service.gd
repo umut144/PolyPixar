@@ -15,6 +15,8 @@ const DEFAULT_PASSES := 2
 const MAX_PASSES := 8
 const MAX_VERTICES := 40000
 const EPSILON := 0.000001
+const QUALITY_WARNING_MINIMUM_ANGLE := 5.0
+const QUALITY_WARNING_MAX_ASPECT_RATIO := 25.0
 
 
 static func default_recipe() -> Dictionary:
@@ -137,6 +139,7 @@ static func generate(sampling_bake: Dictionary, seeding_bake: Dictionary, raw_re
 	_duplicate_cut_seam_vertices(vertices, triangles, constraints)
 	var minimum_angle := float(quality_after.get("minimum_angle", 0.0))
 	var degenerate_count := _degenerate_triangle_count(vertices, triangles)
+	var quality_warning_lines := quality_warnings(quality_after)
 	return {
 		"valid": true,
 		"errors": [],
@@ -155,6 +158,11 @@ static func generate(sampling_bake: Dictionary, seeding_bake: Dictionary, raw_re
 		"minimum_angle": minimum_angle,
 		"worst_aspect_ratio": float(quality_after.get("worst_aspect_ratio", 0.0)),
 		"mean_quality": float(quality_after.get("mean_quality", 0.0)),
+		"quality_warnings": quality_warning_lines,
+		"boundary_refinement": {
+			"enabled": true,
+			"added_vertex_count": int(sampling_bake.get("boundary_refinement_count", 0))
+		},
 		"optimization": optimization,
 		"constraint_count": constraints.size(),
 		"constraints_valid": true,
@@ -163,6 +171,19 @@ static func generate(sampling_bake: Dictionary, seeding_bake: Dictionary, raw_re
 		"triangulation_backend": "artem-ogre/CDT 1.4.5",
 		"diagnostics": triangulation_diagnostics
 	}
+
+
+static func quality_warnings(metrics: Dictionary) -> PackedStringArray:
+	var warnings := PackedStringArray()
+	if metrics.has("triangle_count") and int(metrics.get("triangle_count", 0)) <= 0:
+		return warnings
+	var minimum_angle := float(metrics.get("minimum_angle", 0.0))
+	var worst_aspect_ratio := float(metrics.get("worst_aspect_ratio", 0.0))
+	if minimum_angle < QUALITY_WARNING_MINIMUM_ANGLE:
+		warnings.append("Minimum angle %.1f° is below the %.1f° quality target." % [minimum_angle, QUALITY_WARNING_MINIMUM_ANGLE])
+	if worst_aspect_ratio > QUALITY_WARNING_MAX_ASPECT_RATIO:
+		warnings.append("Worst aspect ratio %.2f exceeds the %.2f quality target." % [worst_aspect_ratio, QUALITY_WARNING_MAX_ASPECT_RATIO])
+	return warnings
 
 
 static func validation_issues(sampling_bake: Dictionary, seeding_bake: Dictionary, recipe: Dictionary = {}) -> Array[String]:
@@ -773,6 +794,8 @@ static func _failed_result(sampling_bake: Dictionary, seeding_bake: Dictionary, 
 		"minimum_angle": 0.0,
 		"worst_aspect_ratio": 0.0,
 		"mean_quality": 0.0,
+		"quality_warnings": PackedStringArray(),
+		"boundary_refinement": {"enabled": true, "added_vertex_count": 0},
 		"optimization": {"enabled": bool(recipe.get("parameters", {}).get("optimize_mesh", DEFAULT_OPTIMIZE_MESH)), "applied": false, "attempted_passes": 0, "accepted_passes": 0, "moved_seed_count": 0, "removed_seed_count": 0, "movements": [], "baseline_triangles": [], "quality_before": {}, "quality_after": {}},
 		"constraint_count": 0,
 		"constraints_valid": false,

@@ -241,7 +241,10 @@ Fill or Contour Stroke Mesh itself. Hole and Cut inputs
 may apply a boundary-density factor from `0.25×` through `16×`. Values below
 `1×` coarsen all adaptive criteria, while values above `1×` refine them. Primitive Circles and Ellipses
 remain analytic through sampling, including their transform into Body-local
-space. A debounced transient Preview is generated once per settled recipe and
+space. On Bézier boundaries, a deterministic post-pass splits only the longer
+derived curve segment beside an authored corner until adjacent segment lengths
+differ by at most `3×`; it never adds authored Points or changes the curve.
+A debounced transient Preview is generated once per settled recipe and
 an explicit Bake copies that exact Preview without regenerating it.
 
 Seeding derives a shared constraint domain from that accepted Sampling Bake.
@@ -357,7 +360,9 @@ only Seed Spacing. Boundary Spacing and Curve Detail may increase only after
 Sampling exceeds its hard safety limit or automatic Boundary budget. Complete
 final Constraint coverage and zero degenerate Triangles remain hard quality
 gates; minimum angle, mean quality, and worst aspect ratio are recorded for
-diagnostics rather than imposing a shape-dependent global threshold. Every
+diagnostics rather than imposing a shape-dependent global threshold. Minimum
+angles below `5°` and worst aspect ratios above `25` are surfaced as non-blocking
+quality warnings. Every
 attempt and effective recipe is retained in automatic build provenance. Manual
 recipes are evaluated exactly once and never use these fallback adjustments.
 
@@ -367,8 +372,9 @@ pending model migration, Area/Perimeter/Feature metrics, current effective
 spacings, fixed limits and last
 usage, per-attempt scope/outcome/reason, and accepted quality metrics. This is a
 read-only projection and introduces no second source of pipeline state.
-Regression coverage uses canonical synthetic Components and broad invariant or
-range checks rather than exact mesh snapshots or documents below `worlds/`.
+Regression coverage uses canonical synthetic Components — including a narrow
+concave Item at two proportional scales — and broad invariant or range checks
+rather than exact mesh snapshots or documents below `worlds/`.
 
 Build provenance records `recipe_mode`, automatic recipe version, and a hash of
 the normalized Sampling/Seeding/Meshing recipes. Matching automatic recipes can
@@ -552,9 +558,11 @@ exposes separate `Scale X` and `Scale Y` Inspector controls. Legacy scalar
 root scales load as equal axes; Runtime Export requires both axes to be `1`.
 
 Sampling results carry their own algorithm version independently of the
-World schema. Version 4 retains junction-aware Cut arrangement and namespaces
+World schema. Version 5 retains junction-aware Cut arrangement and namespaces
 analytic Samples by resolved boundary, preventing collisions when one Hole
-Reference contains multiple Primitives. Older Sampling Bakes become stale
+Reference contains multiple Primitives. It additionally balances abrupt
+derived segment-length transitions at authored Bézier corners without changing
+canonical topology. Older Sampling Bakes become stale
 before Seeding or Meshing can consume incompatible constraint identities.
 
 ## Export contract

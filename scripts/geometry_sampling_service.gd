@@ -4,7 +4,7 @@ extends RefCounted
 const ADAPTIVE := "adaptive"
 const EVEN_SPACING := "even_spacing"
 const VALID_METHODS := [ADAPTIVE]
-const ALGORITHM_VERSION := 4
+const ALGORITHM_VERSION := 5
 const DEFAULT_SPACING := 1.0
 const DEFAULT_FEATURE_DETAIL := 0.5
 const MIN_SPACING := 0.01
@@ -13,6 +13,8 @@ const MAX_REFINEMENT_FACTOR := 16.0
 const MAX_SAMPLES_PER_CHAIN := 20000
 const MAX_ADAPTIVE_DEPTH := 18
 const ARRANGEMENT_EPSILON := 0.000001
+const MAX_ADJACENT_CORNER_SEGMENT_RATIO := 3.0
+const MAX_CORNER_REFINEMENTS_PER_CHAIN := 64
 
 
 static func default_recipe() -> Dictionary:
@@ -67,6 +69,7 @@ static func generate(component: Dictionary, raw_recipe = {}, cut_guides: Array =
 			"valid": true, "errors": [], "method": recipe["method"], "parameters": recipe["parameters"].duplicate(true),
 			"algorithm_version": ALGORITHM_VERSION,
 			"source_fingerprint": source_fingerprint(component, cut_guides, hole_components), "chains": [{"chain_id": "primitive:%s" % str(component.get("primitive", {}).get("type", "")), "input_id": "", "topology_role": "outer", "closed": true, "effective_spacing": sampled_circle["effective_spacing"], "samples": samples}], "cuts": [],
+			"boundary_refinement_count": 0,
 			"sample_count": samples.size(), "preserve_count": 0
 		}
 		var primitive_holes := _sample_hole_components(hole_components, recipe)
@@ -74,6 +77,7 @@ static func generate(component: Dictionary, raw_recipe = {}, cut_guides: Array =
 			return _failed_result(recipe, primitive_holes["errors"], source_fingerprint(component, cut_guides, hole_components))
 		primitive_result["chains"].append_array(primitive_holes["chains"])
 		primitive_result["sample_count"] += int(primitive_holes["sample_count"])
+		primitive_result["boundary_refinement_count"] += int(primitive_holes.get("boundary_refinement_count", 0))
 		primitive_result["preserve_count"] += int(primitive_holes["preserve_count"])
 		primitive_result["hole_count"] = primitive_holes["chains"].size()
 		var primitive_cuts := _sample_cut_guides(cut_guides, recipe)
@@ -93,6 +97,7 @@ static func generate(component: Dictionary, raw_recipe = {}, cut_guides: Array =
 		return _failed_result(recipe, errors, source_fingerprint(component, cut_guides, hole_components))
 	var sampled_chains: Array = []
 	var sample_count := 0
+	var boundary_refinement_count := 0
 	var preserved_ids: Dictionary = {}
 	for chain_data in working_component.get("chains", []):
 		var sampled_chain := _sample_chain(working_component, chain_data, recipe)
@@ -101,6 +106,7 @@ static func generate(component: Dictionary, raw_recipe = {}, cut_guides: Array =
 			continue
 		var samples: Array = sampled_chain.get("samples", [])
 		sample_count += samples.size()
+		boundary_refinement_count += int(sampled_chain.get("boundary_refinement_count", 0))
 		for sample in samples:
 			var source_point_id := str(sample.get("source_point_id", ""))
 			if bool(sample.get("preserved", false)) and not source_point_id.is_empty():
@@ -120,6 +126,7 @@ static func generate(component: Dictionary, raw_recipe = {}, cut_guides: Array =
 		return _failed_result(recipe, sampled_holes["errors"], source_fingerprint(component, cut_guides, hole_components))
 	sampled_chains.append_array(sampled_holes["chains"])
 	sample_count += int(sampled_holes["sample_count"])
+	boundary_refinement_count += int(sampled_holes.get("boundary_refinement_count", 0))
 	var hole_preserved_ids: Dictionary = sampled_holes["preserved_ids"]
 	for preserved_id in hole_preserved_ids:
 		preserved_ids[str(preserved_id)] = true
@@ -139,6 +146,7 @@ static func generate(component: Dictionary, raw_recipe = {}, cut_guides: Array =
 		"chains": sampled_chains,
 		"cuts": cuts,
 		"sample_count": sample_count,
+		"boundary_refinement_count": boundary_refinement_count,
 		"preserve_count": preserved_ids.size(),
 		"hole_count": sampled_holes["chains"].size()
 	}
@@ -235,6 +243,7 @@ static func _sample_hole_components(hole_components: Array, recipe: Dictionary) 
 	var sampled_chains: Array = []
 	var errors: Array[String] = []
 	var sample_count := 0
+	var boundary_refinement_count := 0
 	var preserved_ids: Dictionary = {}
 	for hole_component in hole_components:
 		if not hole_component is Dictionary:
@@ -269,6 +278,7 @@ static func _sample_hole_components(hole_components: Array, recipe: Dictionary) 
 				continue
 			var samples: Array = sampled_chain.get("samples", [])
 			sample_count += samples.size()
+			boundary_refinement_count += int(sampled_chain.get("boundary_refinement_count", 0))
 			for sample in samples:
 				var source_point_id := str(sample.get("source_point_id", ""))
 				if bool(sample.get("preserved", false)) and not source_point_id.is_empty():
@@ -281,7 +291,7 @@ static func _sample_hole_components(hole_components: Array, recipe: Dictionary) 
 				"effective_spacing": float(hole_recipe["parameters"]["spacing"]),
 				"samples": samples
 			})
-	return {"chains": sampled_chains, "errors": errors, "sample_count": sample_count, "preserve_count": preserved_ids.size(), "preserved_ids": preserved_ids}
+	return {"chains": sampled_chains, "errors": errors, "sample_count": sample_count, "preserve_count": preserved_ids.size(), "preserved_ids": preserved_ids, "boundary_refinement_count": boundary_refinement_count}
 
 
 static func _sample_cut_guides(cut_guides: Array, recipe: Dictionary) -> Array:
@@ -588,7 +598,80 @@ static func _sample_chain(component: Dictionary, chain_data: Dictionary, recipe:
 		var last_source := str(samples.back().get("source_point_id", ""))
 		if not first_source.is_empty() and first_source == last_source:
 			samples.pop_back()
-	return {"valid": true, "errors": [], "samples": samples}
+	var boundary_refinement_count := 0
+	if bool(chain_data.get("closed", false)):
+		var balanced := _balance_corner_segment_lengths(samples, component)
+		samples = balanced.get("samples", samples)
+		boundary_refinement_count = int(balanced.get("added_sample_count", 0))
+	return {"valid": true, "errors": [], "samples": samples, "boundary_refinement_count": boundary_refinement_count}
+
+
+static func _balance_corner_segment_lengths(source_samples: Array, component: Dictionary) -> Dictionary:
+	var samples: Array = source_samples.duplicate(true)
+	var added_sample_count := 0
+	while samples.size() >= 3 and samples.size() < MAX_SAMPLES_PER_CHAIN and added_sample_count < MAX_CORNER_REFINEMENTS_PER_CHAIN:
+		var selected_segment := -1
+		var selected_ratio := MAX_ADJACENT_CORNER_SEGMENT_RATIO
+		for corner_index in range(samples.size()):
+			if str(samples[corner_index].get("source_point_id", "")).is_empty():
+				continue
+			var previous_index := posmod(corner_index - 1, samples.size())
+			var next_index := (corner_index + 1) % samples.size()
+			var corner_position := Vector2(samples[corner_index].get("position", Vector2.ZERO))
+			var previous_length := corner_position.distance_to(Vector2(samples[previous_index].get("position", Vector2.ZERO)))
+			var next_length := corner_position.distance_to(Vector2(samples[next_index].get("position", Vector2.ZERO)))
+			var shorter := minf(previous_length, next_length)
+			if shorter <= ARRANGEMENT_EPSILON:
+				continue
+			var ratio := maxf(previous_length, next_length) / shorter
+			if ratio <= selected_ratio:
+				continue
+			selected_ratio = ratio
+			selected_segment = previous_index if previous_length > next_length else corner_index
+		if selected_segment < 0:
+			break
+		var end_index := (selected_segment + 1) % samples.size()
+		var inserted := _curve_midpoint_sample(samples[selected_segment], samples[end_index], component)
+		if inserted.is_empty():
+			break
+		if end_index == 0:
+			samples.append(inserted)
+		else:
+			samples.insert(end_index, inserted)
+		added_sample_count += 1
+	return {"samples": samples, "added_sample_count": added_sample_count}
+
+
+static func _curve_midpoint_sample(first_sample: Dictionary, second_sample: Dictionary, component: Dictionary) -> Dictionary:
+	var first_edge_id := str(first_sample.get("edge_id", ""))
+	var second_edge_id := str(second_sample.get("edge_id", ""))
+	var edge_id := ""
+	var first_t := 0.0
+	var second_t := 1.0
+	if not first_edge_id.is_empty() and first_edge_id == second_edge_id:
+		edge_id = first_edge_id
+		first_t = float(first_sample.get("curve_t", 0.0))
+		second_t = float(second_sample.get("curve_t", 1.0))
+	elif not str(second_sample.get("source_point_id", "")).is_empty() and not first_edge_id.is_empty():
+		edge_id = first_edge_id
+		first_t = float(first_sample.get("curve_t", 0.0))
+		second_t = 1.0
+	elif not str(first_sample.get("source_point_id", "")).is_empty() and not second_edge_id.is_empty():
+		edge_id = second_edge_id
+		first_t = 0.0
+		second_t = float(second_sample.get("curve_t", 1.0))
+	if edge_id.is_empty() or second_t <= first_t + ARRANGEMENT_EPSILON:
+		return {}
+	var edge := BezierTopology.edge_by_id(component.get("edges", []), edge_id)
+	if edge.is_empty():
+		return {}
+	var start_point := BezierTopology.point_by_id(component.get("points", []), str(edge.get("start_point_id", "")))
+	var end_point := BezierTopology.point_by_id(component.get("points", []), str(edge.get("end_point_id", "")))
+	if start_point.is_empty() or end_point.is_empty():
+		return {}
+	var curve_t := (first_t + second_t) * 0.5
+	var position := BezierGeometry.cubic_position(BezierGeometry.cubic_controls(start_point, end_point), curve_t)
+	return _curve_sample(edge_id, curve_t, position)
 
 
 static func _sample_analytic_primitive(component: Dictionary, recipe: Dictionary, input_id: String, role: String, sample_namespace: String = "") -> Dictionary:
@@ -727,5 +810,6 @@ static func _failed_result(recipe: Dictionary, errors: Array[String], fingerprin
 		"source_fingerprint": fingerprint,
 		"chains": [],
 		"sample_count": 0,
+		"boundary_refinement_count": 0,
 		"preserve_count": 0
 	}

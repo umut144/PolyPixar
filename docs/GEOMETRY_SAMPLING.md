@@ -153,8 +153,9 @@ when Sampling itself exceeds its hard safety limit or the 4096-Sample automatic
 Boundary budget. At most four automatic attempts are allowed. Complete final
 Constraint coverage and zero degenerate Triangles remain mandatory; minimum
 angle, mean quality, and worst aspect ratio are recorded with the attempt
-history for diagnosis. Manually owned recipes receive one exact attempt and no
-automatic density adjustment.
+history for diagnosis. A minimum angle below `5°` or worst aspect ratio above
+`25` produces an explicit non-blocking quality warning. Manually owned recipes
+receive one exact attempt and no automatic density adjustment.
 
 `Mesh → Meshing → Auto Build Diagnostics` presents this state without mutating
 it. Before the first build it shows resolved ownership, model version,
@@ -164,8 +165,9 @@ budget usage, each attempt's Initial/Seed/Boundary scope and retry reason, plus
 the accepted quality readings. A recipe edit is immediately labeled Manual and
 the automatic budgets are shown as not applied.
 
-The automatic regression corpus is synthetic: tiny Symbol, Barde-scale body,
-Tree-scale trunk, large concave Crown, and a Body combining a Hole with a Cut.
+The automatic regression corpus is synthetic: tiny Symbol, a narrow concave
+Item body at two proportional scales, Barde-scale body, Tree-scale trunk, large
+concave Crown, and a Body combining a Hole with a Cut.
 Assertions protect topology, complete Constraint coverage, density transitions,
 and broad complexity ranges without pinning exact Triangle layouts or reading
 mutable World documents.
@@ -188,6 +190,8 @@ Cut as a two-sided seam. Cut vertices are duplicated
 only after the final optimization and constrained retriangulation, preventing the
 seam from being invalidated by a later topology pass. The result reports
 constraint, seam, before/after quality, and degenerate-triangle diagnostics.
+Accepted severe-quality diagnostics are shown in orange rather than being
+misreported as topology or Constraint failures.
 
 Recipe changes schedule one debounced transient Preview. The states are
 `Seeding Required`, `Ready to Preview`, `Calculating`, `Preview Ready`,
@@ -226,6 +230,12 @@ every analytic boundary inside a multi-Component Hole Reference its own Sample
 ID namespace. Older Bakes remain readable for inspection but become stale
 upstream, so the UI requests Sampling and Seeding rebakes instead of passing
 ambiguous constraint identities to Meshing.
+
+Sampling algorithm version 5 adds scale-invariant corner transition balancing
+for closed Bézier boundaries. When the two derived sample segments beside an
+authored corner differ by more than `3×`, the longer curve interval is split
+deterministically until the transition is bounded. Authored Points, cubic
+curves, Primitives, and the selected spacing recipe remain unchanged.
 
 ## Deferred
 

@@ -96,6 +96,12 @@ keeps intentional open-Contour crossings and narrow coverage overlaps visible
 and diagnosed, while ambiguous collinear overlap, exact reversals, and
 self-intersecting closed Chains fail explicitly without a topology fallback.
 
+For closed fill boundaries, Adaptive Sampling may insert additional derived
+curve samples on the longer side of an authored corner when the two adjacent
+sampled segment lengths differ by more than `3×`. These samples preserve the
+exact cubic curve, are not authored Points, and exist only to give constrained
+Meshing a gradual Boundary edge-size transition on narrow geometry.
+
 A closed Contour's accepted build also derives a deterministic triangulated
 region from the complete ordered, unoffset Boundary using the Stroke service's
 adaptive centerline sampling before visibility splitting and width/join/cap
