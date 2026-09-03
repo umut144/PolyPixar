@@ -21,6 +21,7 @@ func _init() -> void:
 	_test_catch_parent_snapping()
 	_test_background_point_snapping_without_grid()
 	_test_parent_point_snapping_to_child()
+	_test_parent_point_snapping_to_primitive_child()
 	_test_pivot_point_snapping_without_grid()
 	_test_canvas_navigation_key_reset()
 	_test_pivot_shortcut_robustness()
@@ -751,6 +752,31 @@ func _test_parent_point_snapping_to_child() -> void:
 	var near_child_delta := ComponentHierarchy.world_transform(asset, "parent").basis_xform(Vector2(7.2, 0.1))
 	application._on_bezier_points_moved(["parent_point"], near_child_delta)
 	_expect(Vector2(parent["points"][0].get("position", Vector2.ZERO)).distance_to(Vector2(7.0, 0.0)) < 0.01, "An existing Parent point should snap to a visible Child point through the composed hierarchy transform even when Grid Snap is disabled.")
+	application.free()
+
+
+func _test_parent_point_snapping_to_primitive_child() -> void:
+	var parent := _component()
+	parent.merge({"id": "parent", "name": "parent", "type": "component", "parent_component_id": "", "visibility": true, "transform": {"position": Vector2(10.0, -4.0), "rotation": 90.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}})
+	parent["points"] = [{"id": "parent_point", "position": Vector2.ZERO, "mode": "linear", "handle_in": Vector2.ZERO, "handle_out": Vector2.ZERO}]
+	var child := _component()
+	child.merge({"id": "child", "name": "child", "type": "component", "parent_component_id": "parent", "visibility": true, "draw_mode": "primitive", "primitive": {"type": "circle", "center": Vector2(2.0, 0.0), "diameter_cm": 20.0}, "points": [], "edges": [], "chains": [], "transform": {"position": Vector2(5.0, 0.0), "rotation": 0.0, "scale": Vector2(2.0, 0.5), "pivot": Vector2(2.0, 0.0)}})
+	var asset := {"id": "asset", "name": "Asset", "asset_type": "character", "visibility": true, "asset_pivot": Vector2.ZERO, "components": [parent, child], "groups": [], "guides": []}
+	var application: Control = load("res://scripts/main.gd").new()
+	application._build_ui()
+	application.assets = [asset] as Array[Dictionary]
+	application.selected_asset_id = "asset"
+	application.selected_component_id = "parent"
+	application.active_module = "Create"
+	application.active_state = "edit"
+	application.active_edit_mode = "point"
+	application._render_canvas_context()
+	application.canvas_view.set_snap_settings(false, 16.0, 15.0)
+	application._on_bezier_points_move_started(["parent_point"])
+	var near_child_delta := ComponentHierarchy.world_transform(asset, "parent").basis_xform(Vector2(7.05, 0.01))
+	application._on_bezier_points_moved(["parent_point"], near_child_delta)
+	var snapped_position: Vector2 = parent["points"][0].get("position", Vector2.ZERO)
+	_expect(snapped_position.distance_to(Vector2(7.0, 0.0)) < 0.01, "An existing Parent point should snap to a visible derived Primitive Child contour point even when Grid Snap is disabled (actual: %s)." % snapped_position)
 	application.free()
 
 

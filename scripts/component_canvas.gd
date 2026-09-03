@@ -1877,9 +1877,13 @@ func _nearest_reference_point(local_position: Vector2) -> Dictionary:
 		if points.is_empty():
 			points = shape.get("points", [])
 		for point in points:
-			if not point is Dictionary:
+			var point_position := Vector2.ZERO
+			if point is Dictionary:
+				point_position = point.get("position", Vector2.ZERO)
+			elif point is Vector2:
+				point_position = point
+			else:
 				continue
-			var point_position: Vector2 = point.get("position", point)
 			var point_screen := _world_to_screen(_local_to_world_with_transform(point_position, transform))
 			var point_distance := cursor_screen.distance_to(point_screen)
 			if point_distance <= best_distance:
