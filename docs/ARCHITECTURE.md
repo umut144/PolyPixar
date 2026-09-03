@@ -162,7 +162,11 @@ input phase because focused Inspector controls may consume printable keys
 before unhandled input. Routing requires the pointer inside the visible Canvas
 and a selected Asset, Group, or Component. `ComponentCanvas` converts the
 pointer to the appropriate snapped coordinate and emits intent; Draw state and
-Guide selection reject the command.
+Guide selection reject the command. Reference-point snapping also lets a
+Parent's newly drawn or moved authored Point align to a visible Child point
+after converting the Child's composed world transform into Parent-local space.
+Whole Parent transforms exclude descendant snapping because those targets
+inherit and move with the Parent.
 
 Each Component declares a geometry source. Bézier sources contain only
 `points`, `edges`, and `chains`; primitive sources contain one typed primitive

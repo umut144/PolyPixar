@@ -54,8 +54,11 @@ derive `{ type: "ellipse", center, diameter_x_cm, diameter_y_cm }`.
 `ComponentCanvas` receives immutable view copies, renders them, and emits user
 intent; it never mutates World geometry directly. Polygon arrays for fill,
 hit testing, sampling, meshing, and export are derived on demand from either
-source. A Primitive's center handle moves its `primitive.center`; its Component
-pivot remains an independent transform handle.
+source. While drawing or editing individual authored Points, a Parent may snap
+to visible Points of its Child Components; hierarchy transforms are resolved
+into the Parent's local space. Whole-Component Parent transforms do not snap to
+their moving descendants. A Primitive's center handle moves its
+`primitive.center`; its Component pivot remains an independent transform handle.
 
 Components support `closed_loop`, `contour`, and `primitive` draw modes. Contours
 are fill-less and may use one open or closed Chain; simulation
