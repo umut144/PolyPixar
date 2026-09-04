@@ -189,7 +189,7 @@ static func _bake_group_guides(asset: Dictionary, group_id: String, group_world_
 	var group_world_after := ComponentHierarchy.group_world_transform(asset, group_id)
 	var local_affine := group_world_after.affine_inverse() * group_world_before
 	for guide in asset.get("guides", []):
-		if not guide is Dictionary or str(guide.get("scope", {}).get("kind", "component")) != "group" or str(guide.get("scope", {}).get("group_id", "")) != group_id:
+		if not guide is Dictionary or not AssetGuide.is_group_scoped(guide) or AssetGuide.scope_group_id(guide) != group_id:
 			continue
 		if AssetGuide.is_weapon_frame(str(guide.get("guide_type", ""))):
 			var frame_world := group_world_before * ComponentHierarchy.local_transform(guide.get("transform", {}))

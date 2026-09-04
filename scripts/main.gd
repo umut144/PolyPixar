@@ -6916,10 +6916,9 @@ func _set_sampling_input(asset_id: String, input_id: String, kind: String) -> vo
 			return
 	elif kind == "guide":
 		var guide := _get_guide(asset, input_id)
-		var scope: Dictionary = guide.get("scope", {}) if not guide.is_empty() else {}
 		if not guide.is_empty() and str(guide.get("guide_type", "")) == AssetGuide.CUT \
-			and str(scope.get("kind", "component")) == "component" \
-			and str(scope.get("component_id", "")) == selected_component_id:
+			and not AssetGuide.is_group_scoped(guide) \
+			and AssetGuide.scope_component_id(guide) == selected_component_id:
 			selected_sampling_input_id = input_id
 			selected_sampling_input_kind = "guide"
 			return
@@ -8695,8 +8694,7 @@ func _delete_selected_group() -> void:
 			component["group_id"] = ""
 	var surviving_guides: Array = []
 	for guide in asset.get("guides", []):
-		var scope: Dictionary = guide.get("scope", {}) if guide is Dictionary else {}
-		if str(scope.get("kind", "component")) == "group" and str(scope.get("group_id", "")) == group_id:
+		if guide is Dictionary and AssetGuide.is_group_scoped(guide) and AssetGuide.scope_group_id(guide) == group_id:
 			continue
 		surviving_guides.append(guide)
 	asset["guides"] = surviving_guides
@@ -8999,10 +8997,9 @@ func _confirm_guide_deletion() -> void:
 func _get_sampling_input(asset: Dictionary, parent_component_id: String, input_id: String, input_kind: String) -> Dictionary:
 	if input_kind == "guide":
 		var guide := _get_guide(asset, input_id)
-		var scope: Dictionary = guide.get("scope", {}) if not guide.is_empty() else {}
 		return guide if str(guide.get("guide_type", "")) == AssetGuide.CUT \
-			and str(scope.get("kind", "component")) == "component" \
-			and str(scope.get("component_id", "")) == parent_component_id else {}
+			and not AssetGuide.is_group_scoped(guide) \
+			and AssetGuide.scope_component_id(guide) == parent_component_id else {}
 	if input_kind == "component":
 		for component in asset.get("components", []):
 			if str(component.get("id", "")) == input_id and _is_geometry_hole_input(asset, component, parent_component_id):
@@ -11931,15 +11928,8 @@ func _render_spine_canvas(asset: Dictionary, guide: Dictionary, drawing: bool) -
 	canvas_view.call_deferred("grab_focus")
 
 
-func _weapon_guide_scope_world_transform(asset: Dictionary, guide: Dictionary) -> Transform2D:
-	var scope: Dictionary = guide.get("scope", {})
-	if str(scope.get("kind", "component")) == "group":
-		return ComponentHierarchy.group_world_transform(asset, str(scope.get("group_id", "")))
-	return ComponentHierarchy.world_transform(asset, str(scope.get("component_id", "")))
-
-
 func _weapon_guide_world_transform_record(asset: Dictionary, guide: Dictionary) -> Dictionary:
-	var affine := _weapon_guide_scope_world_transform(asset, guide) * ComponentHierarchy.local_transform(guide.get("transform", {}))
+	var affine := ComponentHierarchy.guide_world_transform(asset, guide) * ComponentHierarchy.local_transform(guide.get("transform", {}))
 	return _asset_preview_world_record(asset, ComponentHierarchy.transform_record_from_affine(affine, Vector2.ZERO))
 
 
@@ -12237,7 +12227,7 @@ func _on_transform_changed(transform: Dictionary) -> void:
 		if guide.is_empty() or not AssetGuide.is_weapon_frame(str(guide.get("guide_type", ""))):
 			return
 		_record_coalesced_change()
-		var local_affine := _weapon_guide_scope_world_transform(asset, guide).affine_inverse() * ComponentHierarchy.local_transform(authored_world_transform)
+		var local_affine := ComponentHierarchy.guide_world_transform(asset, guide).affine_inverse() * ComponentHierarchy.local_transform(authored_world_transform)
 		var local_record := ComponentHierarchy.transform_record_from_affine(local_affine, Vector2.ZERO)
 		local_record["scale"] = Vector2.ONE
 		local_record["pivot"] = Vector2.ZERO

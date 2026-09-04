@@ -20,6 +20,8 @@ const SAMPLE_COLOR := Color("#f2c94c")
 const MOTION_COLOR := Color("#c084fc")
 const SAMPLER_SPINE_COLOR := SAMPLE_COLOR
 const ANIMATION_SPINE_COLOR := MOTION_COLOR
+const SCOPE_COMPONENT := "component"
+const SCOPE_GROUP := "group"
 
 
 static func create(guide_id: String, guide_name: String, guide_type: String, component_id: String, ordinal := 1) -> Dictionary:
@@ -30,17 +32,17 @@ static func create(guide_id: String, guide_name: String, guide_type: String, com
 		"name": guide_name,
 		"ordinal": maxi(1, ordinal),
 		"visibility": true,
-		"scope": {"kind": "component", "component_id": component_id},
+		"scope": {"kind": SCOPE_COMPONENT, "component_id": component_id},
 		"points": [],
 		"edges": [],
 		"chains": []
 	}
 
 
-static func create_weapon_frame(guide_id: String, guide_type: String, scope_kind: String, scope_id: String) -> Dictionary:
+static func create_weapon_frame(guide_id: String, guide_type: String, raw_scope_kind: String, scope_id: String) -> Dictionary:
 	var normalized_type := canonical_type(guide_type)
-	var scope := {"kind": scope_kind if scope_kind == "group" else "component"}
-	if scope["kind"] == "group":
+	var scope := {"kind": raw_scope_kind if raw_scope_kind == SCOPE_GROUP else SCOPE_COMPONENT}
+	if scope["kind"] == SCOPE_GROUP:
 		scope["group_id"] = scope_id
 	else:
 		scope["component_id"] = scope_id
@@ -59,12 +61,39 @@ static func create_weapon_frame(guide_id: String, guide_type: String, scope_kind
 	}
 
 
+# Whether a Guide's scope is a Group rather than a Component. Guides always
+# carry one of the two kinds once normalized; SCOPE_COMPONENT is the default
+# for a scope that predates the field or was malformed on disk.
+static func is_group_scoped(guide: Dictionary) -> bool:
+	return scope_kind(guide) == SCOPE_GROUP
+
+
+static func scope_kind(guide: Dictionary) -> String:
+	var scope = guide.get("scope", {})
+	if not scope is Dictionary:
+		return SCOPE_COMPONENT
+	return str(scope.get("kind", SCOPE_COMPONENT))
+
+
 # The Component a Component-scoped Guide belongs to; empty for Group scope.
 static func scope_component_id(guide: Dictionary) -> String:
 	var scope = guide.get("scope", {})
 	if not scope is Dictionary:
 		return ""
 	return str(scope.get("component_id", ""))
+
+
+# The Group a Group-scoped Guide belongs to; empty for Component scope.
+static func scope_group_id(guide: Dictionary) -> String:
+	var scope = guide.get("scope", {})
+	if not scope is Dictionary:
+		return ""
+	return str(scope.get("group_id", ""))
+
+
+# The id of whichever record the Guide is scoped to, Component or Group.
+static func scope_target_id(guide: Dictionary) -> String:
+	return scope_group_id(guide) if is_group_scoped(guide) else scope_component_id(guide)
 
 
 static func normalize(raw_guide) -> Dictionary:
@@ -78,11 +107,11 @@ static func normalize(raw_guide) -> Dictionary:
 		"edges": source.get("edges", []).duplicate(true) if source.get("edges", []) is Array else [],
 		"chains": source.get("chains", []).duplicate(true) if source.get("chains", []) is Array else []
 	}
-	var scope_kind := str(scope_source.get("kind", "component"))
-	if scope_kind not in ["component", "group"]:
-		scope_kind = "component"
-	var normalized_scope := {"kind": scope_kind}
-	if scope_kind == "group":
+	var raw_scope_kind := str(scope_source.get("kind", SCOPE_COMPONENT))
+	if raw_scope_kind not in [SCOPE_COMPONENT, SCOPE_GROUP]:
+		raw_scope_kind = SCOPE_COMPONENT
+	var normalized_scope := {"kind": raw_scope_kind}
+	if raw_scope_kind == SCOPE_GROUP:
 		normalized_scope["group_id"] = str(scope_source.get("group_id", ""))
 	else:
 		normalized_scope["component_id"] = str(scope_source.get("component_id", source.get("component_id", "")))
@@ -172,8 +201,7 @@ static func validation_issues(guide: Dictionary) -> Array[String]:
 	var errors: Array[String] = []
 	if str(guide.get("guide_type", "")) not in VALID_TYPES:
 		errors.append("Unknown Guide type.")
-	var scope: Dictionary = guide.get("scope", {})
-	var scope_id := str(scope.get("group_id", "")) if str(scope.get("kind", "component")) == "group" else str(scope.get("component_id", ""))
+	var scope_id := scope_target_id(guide)
 	if scope_id.is_empty():
 		errors.append("The Guide needs a target Component or Group.")
 	if is_weapon_frame(str(guide.get("guide_type", ""))):

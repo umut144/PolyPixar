@@ -122,8 +122,12 @@ the four views is visible, resolves that view's context and calls `rebuild()`.
   `is_contour`, `is_primitive`, `topology_role` and `is_outer_body`. Code
   compares against those names, never against the literal strings, so a
   misspelled discriminator is a parse error rather than a silent fall into
-  the default branch; `AssetGuide` owns the Guide types and
-  `scope_component_id` the same way. `main.gd` keeps the orchestration — which records
+  the default branch; `AssetGuide` owns the Guide types the same way, plus
+  the Guide scope vocabulary — `SCOPE_COMPONENT`, `SCOPE_GROUP`,
+  `is_group_scoped`, `scope_component_id`, `scope_group_id`,
+  `scope_target_id` — read by `ComponentHierarchy.guide_world_transform`,
+  the one place a Guide's scope resolves to a world Transform. `main.gd`
+  keeps the orchestration — which records
   exist, when they are read and written, and what the editor does with them —
   including `_serialize_editor_state` and `_serialize_world_settings`, which
   read editor state by definition, and the Asset serialization in `_save_world`,

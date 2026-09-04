@@ -159,32 +159,22 @@ static func _affine_transform_component_source(component: Dictionary, affine: Tr
 
 
 static func _rebase_guide(guide: Dictionary, scale: Vector2, root_offset: Vector2, asset_pivot: Vector2) -> void:
-	var scope: Dictionary = guide.get("scope", {})
-	var scoped := str(scope.get("kind", "component")) in ["component", "group"]
 	if AssetGuide.is_weapon_frame(str(guide.get("guide_type", ""))):
-		guide["transform"] = _rebased_transform(guide.get("transform", {}), scale, root_offset, asset_pivot, not scoped)
+		# Every normalized Guide carries a scope, so this is never the
+		# unscoped branch; kept as an explicit false rather than assumed true.
+		guide["transform"] = _rebased_transform(guide.get("transform", {}), scale, root_offset, asset_pivot, false)
 
 
 static func _affine_transform_guide_points(old_asset: Dictionary, new_asset: Dictionary, guide: Dictionary) -> void:
-	var scope: Dictionary = guide.get("scope", {})
-	var scope_kind := str(scope.get("kind", "component"))
-	var old_scope := _guide_scope_world_transform(old_asset, scope_kind, scope)
-	var new_scope := _guide_scope_world_transform(new_asset, scope_kind, scope)
-	var affine := new_scope.affine_inverse() * root_transform(old_asset) * old_scope if scope_kind in ["component", "group"] else root_transform(old_asset)
+	var old_scope := ComponentHierarchy.guide_world_transform(old_asset, guide)
+	var new_scope := ComponentHierarchy.guide_world_transform(new_asset, guide)
+	var affine := new_scope.affine_inverse() * root_transform(old_asset) * old_scope
 	for point in guide.get("points", []):
 		if not point is Dictionary:
 			continue
 		point["position"] = affine * Vector2(point.get("position", Vector2.ZERO))
 		point["handle_in"] = affine.basis_xform(Vector2(point.get("handle_in", Vector2.ZERO)))
 		point["handle_out"] = affine.basis_xform(Vector2(point.get("handle_out", Vector2.ZERO)))
-
-
-static func _guide_scope_world_transform(asset: Dictionary, scope_kind: String, scope: Dictionary) -> Transform2D:
-	if scope_kind == "group":
-		return ComponentHierarchy.group_world_transform(asset, str(scope.get("group_id", "")))
-	if scope_kind == "component":
-		return ComponentHierarchy.world_transform(asset, str(scope.get("component_id", "")))
-	return Transform2D.IDENTITY
 
 
 static func _motion_is_default(asset: Dictionary) -> bool:

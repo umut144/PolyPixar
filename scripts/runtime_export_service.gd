@@ -149,14 +149,13 @@ static func _build_attachment_frames(asset: Dictionary) -> Dictionary:
 		if not issues.is_empty():
 			errors.append("%s: %s" % [role, issues[0]])
 			continue
-		var scope: Dictionary = guide.get("scope", {})
-		var is_group_scope := str(scope.get("kind", "component")) == "group"
-		var scope_id := str(scope.get("group_id", "")) if is_group_scope else str(scope.get("component_id", ""))
+		var is_group_scope := AssetGuide.is_group_scoped(guide)
+		var scope_id := AssetGuide.scope_target_id(guide)
 		var scope_exists := not ComponentHierarchy.group_by_id(asset, scope_id).is_empty() if is_group_scope else not ComponentHierarchy.component_by_id(asset, scope_id).is_empty()
 		if not scope_exists:
 			errors.append("%s: authored scope '%s' does not exist." % [role, scope_id])
 			continue
-		var scope_world := ComponentHierarchy.group_world_transform(asset, scope_id) if is_group_scope else ComponentHierarchy.world_transform(asset, scope_id)
+		var scope_world := ComponentHierarchy.guide_world_transform(asset, guide)
 		var world := scope_world * ComponentHierarchy.local_transform(guide.get("transform", {}))
 		items.append({
 			"frame_id": str(guide.get("id", "")),

@@ -1007,8 +1007,8 @@ static func write_text_atomically(path: String, text: String) -> bool:
 # view needs them too, and one home beats two copies.
 
 static func guide_display_name(asset: Dictionary, guide: Dictionary) -> String:
-	var scope: Dictionary = guide.get("scope", {})
-	var scope_record := ComponentHierarchy.group_by_id(asset, str(scope.get("group_id", ""))) if str(scope.get("kind", "component")) == "group" else WorldDocumentService.component_by_id(asset, str(scope.get("component_id", "")))
+	var is_group_scope := AssetGuide.is_group_scoped(guide)
+	var scope_record := ComponentHierarchy.group_by_id(asset, AssetGuide.scope_group_id(guide)) if is_group_scope else WorldDocumentService.component_by_id(asset, AssetGuide.scope_component_id(guide))
 	var scope_name := str(scope_record.get("name", "Unassigned"))
 	if AssetGuide.is_weapon_frame(str(guide.get("guide_type", ""))):
 		return "%s → %s" % [scope_name, str(guide.get("guide_type", ""))]

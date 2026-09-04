@@ -224,6 +224,15 @@ static func group_world_transform_record(asset: Dictionary, group_id: String) ->
 	return transform_record_from_affine(group_world_transform(asset, group_id), _vector(group.get("transform", {}).get("pivot", Vector2.ZERO), Vector2.ZERO))
 
 
+# The world Transform of whichever record a Guide is scoped to, Component or
+# Group. The one home for what every Guide-scope caller used to compute by
+# hand from guide.scope.
+static func guide_world_transform(asset: Dictionary, guide: Dictionary) -> Transform2D:
+	if AssetGuide.is_group_scoped(guide):
+		return group_world_transform(asset, AssetGuide.scope_group_id(guide))
+	return world_transform(asset, AssetGuide.scope_component_id(guide))
+
+
 static func world_transform_record(asset: Dictionary, component_id: String) -> Dictionary:
 	var current := component_by_id(asset, component_id)
 	if current.is_empty():

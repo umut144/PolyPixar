@@ -622,11 +622,11 @@ func _render_guide_inspector(asset: Dictionary, guide: Dictionary) -> void:
 
 func _render_weapon_guide_inspector(asset: Dictionary, guide: Dictionary) -> void:
 	add_child(EditorWidgets.create_inspector_field_label(str(guide.get("guide_type", ""))))
-	var scope: Dictionary = guide.get("scope", {})
-	var scope_kind := str(scope.get("kind", "component"))
-	var scope_id := str(scope.get("group_id", "")) if scope_kind == "group" else str(scope.get("component_id", ""))
-	var scope_record := ComponentHierarchy.group_by_id(asset, scope_id) if scope_kind == "group" else WorldDocumentService.component_by_id(asset, scope_id)
-	add_child(EditorWidgets.create_inspector_field_label("Parent %s: %s" % [scope_kind.capitalize(), str(scope_record.get("name", "Missing"))]))
+	var is_group_scope := AssetGuide.is_group_scoped(guide)
+	var scope_id := AssetGuide.scope_target_id(guide)
+	var scope_record := ComponentHierarchy.group_by_id(asset, scope_id) if is_group_scope else WorldDocumentService.component_by_id(asset, scope_id)
+	var scope_label := AssetGuide.SCOPE_GROUP if is_group_scope else AssetGuide.SCOPE_COMPONENT
+	add_child(EditorWidgets.create_inspector_field_label("Parent %s: %s" % [scope_label.capitalize(), str(scope_record.get("name", "Missing"))]))
 	add_child(EditorWidgets.create_inspector_section("Local Frame", section_toggled.emit))
 	var transform: Dictionary = guide.get("transform", WorldDocumentService.default_component_transform())
 	var grid := GridContainer.new()
