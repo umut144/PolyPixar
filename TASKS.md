@@ -150,6 +150,84 @@ inventory.
   `main.gd` would have to hold the run state it currently does not. Do not treat
   the view as fully stateless when reworking the context.
 
+## Optional Later — Discriminator vocabulary cleanup
+
+Three slices already landed: Component draw-mode/topology-role constants in
+`WorldDocumentService` (commit 82fd3af), the Guide scope vocabulary in
+`AssetGuide` plus `ComponentHierarchy.guide_world_transform` (d929665), and
+the `ASSET_TYPE_*` constants in `WorldDocumentService` (d12d314). Each
+replaced a literal string discriminator, hand-compared at every call site,
+with named constants and predicates so a misspelling is a parse error
+instead of a silent fallback. What follows is what the same pass over the
+codebase turned up as still open, ordered by how it was found rather than
+by size.
+
+### DISC-01 — Guide scope-kind literals left in `main.gd`
+
+- **Status:** Ready
+- **Risk:** Low
+- `_create_weapon_guide` and `_create_region` (`main.gd:7704`, `7729`) take a
+  `scope_kind: String` parameter and compare it against raw `"component"` /
+  `"group"` literals instead of `AssetGuide.SCOPE_COMPONENT` /
+  `AssetGuide.SCOPE_GROUP`.
+- `component_add_menu.set_meta("scope_kind", "component"/"group")`
+  (`main.gd:7434`, `7452`) and every `get_meta("scope_kind", "component")`
+  reader (`7463`, `7479`, `7486`, `7490`) do the same.
+- `main.gd:8940` builds `guide["scope"] = {"kind": "component",
+  "component_id": component_id}` by hand — missed during the d929665 slice.
+  Should read `{"kind": AssetGuide.SCOPE_COMPONENT, "component_id":
+  component_id}`, or go through `AssetGuide.create()`/`create_weapon_frame()`
+  if the surrounding code allows it.
+- Rename the local `scope_kind` parameters only if needed to avoid shadowing
+  `AssetGuide.scope_kind()` — they are on a different class (`main.gd`), so
+  no shadowing risk today, but check again if any of this logic ever moves
+  into `AssetGuide` itself.
+
+### DISC-02 — Component `type` discriminator (`component`/`guide`/`region`/`reference`)
+
+- **Status:** Optional / Later
+- **Risk:** Medium — largest of the four, touches ~10 files and 30+ call sites
+- `WorldDocumentService.is_region()` and `is_reference_component()` already
+  exist, but the `"guide"` check (components arrays can still hold
+  migrated-legacy Guide records; see `AI_CONTEXT.md` on the
+  Guides-once-stored-among-Components migration) is hand-rolled as
+  `str(x.get("type", "component")) == "guide"` / `!= "guide"` throughout
+  `component_hierarchy.gd`, `asset_scale_rebase_service.gd`,
+  `component_scale_rebase_service.gd`, `main.gd`, `outliner_view.gd`,
+  `create_inspector_view.gd` and `world_document_service.gd` itself.
+- Candidate shape: `COMPONENT_TYPE_COMPONENT`/`_GUIDE`/`_REGION`/`_REFERENCE`
+  constants on `WorldDocumentService`, plus an `is_guide_record()` predicate
+  next to the existing `is_region()`/`is_reference_component()`, with call
+  sites switched over one file at a time.
+- Comparable in size to the original draw-mode/topology-role slice; do this
+  one in its own session rather than folding it into a smaller slice.
+
+### DISC-03 — Region type literal (`region_type`: attack/hurt/collision)
+
+- **Status:** Ready
+- **Risk:** Low
+- `WorldDocumentService.REGION_TYPES` already exists, but
+  `runtime_export_service.gd:187` and `:457` re-declare
+  `["attack", "hurt", "collision"]` instead of referencing it.
+- The `"attack"` default literal is duplicated five times:
+  `editor_widgets.gd:173-174` (twice), `main.gd:2461`, `11846`, `11877`, and
+  `outliner_view.gd:686`, `691`.
+- Straightforward: add `REGION_TYPE_ATTACK`/`_HURT`/`_COLLISION` constants
+  (or reuse `REGION_TYPES[0]` for the default) and point every site at them.
+
+### DISC-04 — Sampling input kind (`"component"` vs `"guide"`)
+
+- **Status:** Optional / Later; may not be worth its own slice
+- **Risk:** Low
+- `selected_sampling_input_kind` and the `input_kind` parameter threaded
+  through `_get_sampling_input`, `_sampling_input_display_name`, and
+  `_sampling_input_kind_for_seeding_role` (`main.gd`, around lines
+  6909-6945, 8995-9010) compare against raw `"component"`/`"guide"`
+  strings.
+- Confined to `main.gd`, unlike the other three items here. Consider folding
+  this into DISC-02 rather than doing it alone, since both concern the same
+  Component-vs-Guide distinction from different entry points.
+
 ## Optional Later — Persistence
 
 ### PERF-01 — Dirty tracking for `_save_world`
