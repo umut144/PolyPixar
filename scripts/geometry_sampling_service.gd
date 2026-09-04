@@ -62,14 +62,14 @@ static func generate(component: Dictionary, raw_recipe = {}, cut_guides: Array =
 	var recipe := normalize_recipe(raw_recipe)
 	var allow_open := bool(raw_recipe.get("allow_open", false)) if raw_recipe is Dictionary else false
 	if PrimitiveGeometryService.has_analytic_shape(component):
-		var sampled_circle := _sample_analytic_primitive(component, recipe, "", "outer")
+		var sampled_circle := _sample_analytic_primitive(component, recipe, "", WorldDocumentService.ROLE_OUTER)
 		if not bool(sampled_circle.get("valid", false)):
 			return _failed_result(recipe, sampled_circle.get("errors", []), source_fingerprint(component, cut_guides, hole_components))
 		var samples: Array = sampled_circle.get("samples", [])
 		var primitive_result := {
 			"valid": true, "errors": [], "method": recipe["method"], "parameters": recipe["parameters"].duplicate(true),
 			"algorithm_version": ALGORITHM_VERSION,
-			"source_fingerprint": source_fingerprint(component, cut_guides, hole_components), "chains": [{"chain_id": "primitive:%s" % str(component.get("primitive", {}).get("type", "")), "input_id": "", "topology_role": "outer", "closed": true, "effective_spacing": sampled_circle["effective_spacing"], "samples": samples}], "cuts": [],
+			"source_fingerprint": source_fingerprint(component, cut_guides, hole_components), "chains": [{"chain_id": "primitive:%s" % str(component.get("primitive", {}).get("type", "")), "input_id": "", "topology_role": WorldDocumentService.ROLE_OUTER, "closed": true, "effective_spacing": sampled_circle["effective_spacing"], "samples": samples}], "cuts": [],
 			"boundary_refinement_count": 0,
 			"boundary_refinement_complete": true,
 			"boundary_refinement_unresolved_corner_count": 0,
@@ -127,7 +127,7 @@ static func generate(component: Dictionary, raw_recipe = {}, cut_guides: Array =
 		sampled_chains.append({
 			"chain_id": str(chain_data.get("id", "")),
 			"input_id": "",
-			"topology_role": str(chain_data.get("topology_role", "outer")),
+			"topology_role": WorldDocumentService.topology_role(chain_data),
 			"closed": bool(chain_data.get("closed", false)),
 			"effective_spacing": float(recipe["parameters"]["spacing"]),
 			"samples": samples
@@ -226,9 +226,9 @@ static func source_fingerprint(component: Dictionary, cut_guides: Array = [], ho
 			parts.append("c|%s|%s|%s|%d|%s" % [
 				str(chain_data.get("id", "")), ",".join(chain_data.get("point_ids", [])),
 				",".join(chain_data.get("edge_ids", [])), int(bool(chain_data.get("closed", false))),
-				str(chain_data.get("topology_role", "outer"))
+				WorldDocumentService.topology_role(chain_data)
 			])
-	parts.append("draw_mode|%s" % str(component.get("draw_mode", "closed_loop")))
+	parts.append("draw_mode|%s" % WorldDocumentService.component_draw_mode(component))
 	for guide in cut_guides:
 		if guide is Dictionary:
 			parts.append("cut|%s|%s" % [str(guide.get("id", "")), source_fingerprint(guide)])
@@ -277,14 +277,14 @@ static func _sample_hole_components(hole_components: Array, recipe: Dictionary) 
 			errors.append(_hole_error(working_hole, str(working_hole.get("sampling_error", ""))))
 			continue
 		if PrimitiveGeometryService.has_analytic_shape(working_hole):
-			var sampled_circle := _sample_analytic_primitive(working_hole, hole_recipe, input_id, "hole", str(hole_component.get("id", input_id)))
+			var sampled_circle := _sample_analytic_primitive(working_hole, hole_recipe, input_id, WorldDocumentService.ROLE_HOLE, str(hole_component.get("id", input_id)))
 			if not bool(sampled_circle.get("valid", false)):
 				for sampled_error in sampled_circle.get("errors", []):
 					errors.append(_hole_error(working_hole, str(sampled_error)))
 				continue
 			var circle_samples: Array = sampled_circle.get("samples", [])
 			sample_count += circle_samples.size()
-			sampled_chains.append({"chain_id": "hole:%s:primitive:%s" % [str(hole_component.get("id", "")), str(working_hole.get("primitive", {}).get("type", ""))], "input_id": input_id, "topology_role": "hole", "closed": true, "effective_spacing": sampled_circle["effective_spacing"], "samples": circle_samples})
+			sampled_chains.append({"chain_id": "hole:%s:primitive:%s" % [str(hole_component.get("id", "")), str(working_hole.get("primitive", {}).get("type", ""))], "input_id": input_id, "topology_role": WorldDocumentService.ROLE_HOLE, "closed": true, "effective_spacing": sampled_circle["effective_spacing"], "samples": circle_samples})
 			continue
 		BezierGeometry.resolve_auto_handles(working_hole.get("points", []), working_hole.get("chains", []))
 		var hole_errors := _validation_issues(working_hole, false, false)
@@ -311,7 +311,7 @@ static func _sample_hole_components(hole_components: Array, recipe: Dictionary) 
 			sampled_chains.append({
 				"chain_id": "hole:%s:%s" % [str(hole_component.get("id", "")), str(chain_data.get("id", ""))],
 				"input_id": input_id,
-				"topology_role": "hole",
+				"topology_role": WorldDocumentService.ROLE_HOLE,
 				"closed": bool(chain_data.get("closed", false)),
 				"effective_spacing": float(hole_recipe["parameters"]["spacing"]),
 				"samples": samples
@@ -524,7 +524,7 @@ static func _point_inside_sampled_domain(position: Vector2, chains: Array) -> bo
 		if polygon.size() < 3:
 			continue
 		var inside := Geometry2D.is_point_in_polygon(position, polygon)
-		if str(chain_data.get("topology_role", "outer")) == "outer":
+		if WorldDocumentService.topology_role(chain_data) == WorldDocumentService.ROLE_OUTER:
 			inside_outer = inside_outer or inside
 		elif inside:
 			return false
@@ -575,7 +575,7 @@ static func _validation_issues(component: Dictionary, allow_open := false, requi
 			continue
 		if not allow_open and not bool(chain_data.get("closed", false)):
 			errors.append("Sampling for the mesh pipeline requires closed Chains.")
-		if str(chain_data.get("topology_role", "outer")) == "outer" and (bool(chain_data.get("closed", false)) or allow_open):
+		if WorldDocumentService.topology_role(chain_data) == WorldDocumentService.ROLE_OUTER and (bool(chain_data.get("closed", false)) or allow_open):
 			has_valid_outer = true
 		var chain_point_ids: Array = chain_data.get("point_ids", [])
 		var neighbor_count := chain_point_ids.size() if bool(chain_data.get("closed", false)) else maxi(chain_point_ids.size() - 1, 0)
@@ -589,7 +589,7 @@ static func _validation_issues(component: Dictionary, allow_open := false, requi
 		errors.append("The Component needs an outer Chain.")
 	if not require_outer and not has_valid_outer:
 		for chain_data in chains:
-			if str(chain_data.get("topology_role", "outer")) != "hole" or not bool(chain_data.get("closed", false)):
+			if WorldDocumentService.topology_role(chain_data) != WorldDocumentService.ROLE_HOLE or not bool(chain_data.get("closed", false)):
 				errors.append("A Hole input requires one closed Hole Chain.")
 	return errors
 
@@ -812,7 +812,7 @@ static func _finalize_result_stats(result: Dictionary) -> void:
 		constraint_count += count
 		stats.append({
 			"input_id": str(chain_data.get("input_id", "")),
-			"role": str(chain_data.get("topology_role", "outer")),
+			"role": WorldDocumentService.topology_role(chain_data),
 			"effective_spacing": float(chain_data.get("effective_spacing", result.get("parameters", {}).get("spacing", DEFAULT_SPACING))),
 			"sample_count": count
 		})

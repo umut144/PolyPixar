@@ -173,7 +173,7 @@ static func validation_issues(sampling_bake: Dictionary, recipe: Dictionary = {}
 static func guide_fingerprint(guide: Dictionary) -> String:
 	if guide.is_empty():
 		return ""
-	return _hash_parts(PackedStringArray([str(guide.get("id", "")), str(guide.get("guide_type", "")), str(guide.get("scope", {}).get("component_id", "")), GeometrySamplingService.source_fingerprint(guide)]))
+	return _hash_parts(PackedStringArray([str(guide.get("id", "")), str(guide.get("guide_type", "")), AssetGuide.scope_component_id(guide), GeometrySamplingService.source_fingerprint(guide)]))
 
 
 static func guides_fingerprint(raw_guides) -> String:
@@ -199,10 +199,10 @@ static func constraint_domain(sampling_bake: Dictionary) -> Dictionary:
 		for sample in chain_data.get("samples", []):
 			if sample is Dictionary:
 				polygon.append(Vector2(sample.get("position", Vector2.ZERO)))
-		var role := str(chain_data.get("topology_role", "outer"))
-		if role == "outer" and outer.is_empty():
+		var role := WorldDocumentService.topology_role(chain_data)
+		if role == WorldDocumentService.ROLE_OUTER and outer.is_empty():
 			outer = polygon
-		elif role == "hole" and polygon.size() >= 3:
+		elif role == WorldDocumentService.ROLE_HOLE and polygon.size() >= 3:
 			holes.append(polygon)
 	for cut_data in sampling_bake.get("cuts", []):
 		if not cut_data is Dictionary or not bool(cut_data.get("valid", false)):
@@ -232,7 +232,7 @@ static func sampling_fingerprint(sampling_bake: Dictionary) -> String:
 	for chain_data in sampling_bake.get("chains", []):
 		if not chain_data is Dictionary:
 			continue
-		parts.append("c|%s|%s|%d" % [str(chain_data.get("chain_id", "")), str(chain_data.get("topology_role", "outer")), int(bool(chain_data.get("closed", false)))])
+		parts.append("c|%s|%s|%d" % [str(chain_data.get("chain_id", "")), WorldDocumentService.topology_role(chain_data), int(bool(chain_data.get("closed", false)))])
 		for sample in chain_data.get("samples", []):
 			if sample is Dictionary:
 				var position: Vector2 = sample.get("position", Vector2.ZERO)

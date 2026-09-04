@@ -618,7 +618,7 @@ func _render_component_outliner_tree(container: VBoxContainer, asset: Dictionary
 	component_button.focus_mode = Control.FOCUS_NONE
 	if WorldDocumentService.is_reference_component(component):
 		component_button.tooltip_text = _reference_outliner_tooltip(asset, component)
-	EditorWidgets.style_outliner_button(component_button, (component_id == selected_component_id or selected_component_ids.has(component_id)) and asset_id == selected_asset_id, str(component.get("topology_role", "outer")))
+	EditorWidgets.style_outliner_button(component_button, (component_id == selected_component_id or selected_component_ids.has(component_id)) and asset_id == selected_asset_id, WorldDocumentService.topology_role(component))
 	component_button.pressed.connect(component_selected.emit.bind(asset_id, component_id))
 	component_button.gui_input.connect(_emit_row_context_menu.bind("component", asset_id, component_id, component_button))
 	component_button.set_drag_forwarding(_outliner_get_drag_data.bind(asset_id, component_id), can_drop_data.bind(asset_id, component_id), _emit_drop.bind(asset_id, component_id))

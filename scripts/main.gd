@@ -533,7 +533,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if selected_component_id.is_empty():
 		return
 	var selected_component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	if str(selected_component.get("draw_mode", "")) == "primitive":
+	if WorldDocumentService.is_primitive(selected_component):
 		if has_command_modifier and event.keycode == KEY_1 and selected_component.get("primitive", {}).is_empty():
 			_set_active_state("draw")
 			_set_active_context_command("asset.create_primitive")
@@ -559,7 +559,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 	elif has_command_modifier and event.keycode == KEY_4:
-		if str(selected_component.get("draw_mode", "closed_loop")) == "closed_loop":
+		if WorldDocumentService.is_closed_loop(selected_component):
 			_activate_edit_face_state()
 		get_viewport().set_input_as_handled()
 		return
@@ -2460,8 +2460,8 @@ func _save_world() -> void:
 				"visibility": bool(component.get("visibility", true)),
 				"z_index": int(component.get("z_index", 0)),
 				"projection_depth_cm": float(component.get("projection_depth_cm", WorldDocumentService.DEFAULT_PROJECTION_DEPTH_CM)),
-				"draw_mode": str(component.get("draw_mode", "closed_loop")),
-				"topology_role": str(component.get("topology_role", "outer")) if str(component.get("topology_role", "outer")) in ["outer", "hole"] else "outer",
+				"draw_mode": WorldDocumentService.component_draw_mode(component),
+				"topology_role": WorldDocumentService.topology_role(component) if WorldDocumentService.topology_role(component) in WorldDocumentService.TOPOLOGY_ROLES else WorldDocumentService.ROLE_OUTER,
 				"catch_parent_component_id": str(component.get("catch_parent_component_id", "")),
 				"show_point_numbers": bool(component.get("show_point_numbers", false)),
 				"primitive": WorldDocumentService.serialize_primitive(component.get("primitive", {}))
@@ -3417,7 +3417,7 @@ func _sampler_spines_for_component(asset: Dictionary, component_id: String) -> A
 	var guides: Array = []
 	for guide in asset.get("guides", []):
 		if str(guide.get("guide_type", "")) == AssetGuide.SAMPLER_SPINE \
-			and str(guide.get("scope", {}).get("component_id", "")) == component_id:
+			and AssetGuide.scope_component_id(guide) == component_id:
 			guides.append(guide)
 	guides.sort_custom(_sort_named_documents)
 	return guides
@@ -3427,7 +3427,7 @@ func _cut_guides_for_component(asset: Dictionary, component_id: String) -> Array
 	var guides: Array = []
 	for guide in asset.get("guides", []):
 		if str(guide.get("guide_type", "")) == AssetGuide.CUT \
-			and str(guide.get("scope", {}).get("component_id", "")) == component_id:
+			and AssetGuide.scope_component_id(guide) == component_id:
 			guides.append(guide)
 	guides.sort_custom(_sort_named_documents)
 	return guides
@@ -3437,7 +3437,7 @@ func _animation_spines_for_component(asset: Dictionary, component_id: String) ->
 	var guides: Array = []
 	for guide in asset.get("guides", []):
 		if str(guide.get("guide_type", "")) == AssetGuide.ANIMATION_SPINE \
-			and str(guide.get("scope", {}).get("component_id", "")) == component_id:
+			and AssetGuide.scope_component_id(guide) == component_id:
 			guides.append(guide)
 	guides.sort_custom(_sort_named_documents)
 	return guides
@@ -3459,7 +3459,7 @@ func _geometry_seeding_sampler_spines(asset_id: String, component_id: String, re
 			continue
 		var guide := _get_guide(asset, str(input.get("guide_id", "")))
 		if not guide.is_empty() and str(guide.get("guide_type", "")) == AssetGuide.SAMPLER_SPINE \
-			and str(guide.get("scope", {}).get("component_id", "")) == component_id:
+			and AssetGuide.scope_component_id(guide) == component_id:
 			result.append(guide)
 	return result
 
@@ -3523,7 +3523,7 @@ func _geometry_meshing_bakes(asset_id: String, component_id: String) -> Dictiona
 
 func _geometry_meshing_bake(asset_id: String, component_id: String, method := "") -> Dictionary:
 	var component := _get_component(_get_asset(asset_id), component_id)
-	var resolved_method := method if not method.is_empty() else (ContourMeshService.METHOD if str(component.get("draw_mode", "")) == "contour" else str(_geometry_meshing_recipe(asset_id, component_id).get("method", "")))
+	var resolved_method := method if not method.is_empty() else (ContourMeshService.METHOD if WorldDocumentService.is_contour(component) else str(_geometry_meshing_recipe(asset_id, component_id).get("method", "")))
 	return _geometry_meshing_bakes(asset_id, component_id).get(resolved_method, {})
 
 
@@ -3536,7 +3536,7 @@ func _component_mesh_build_diagnostic_lines(asset_id: String, component_id: Stri
 	var lines := PackedStringArray()
 	var asset := _get_asset(asset_id)
 	var component := _get_component(asset, component_id)
-	if component.is_empty() or str(component.get("draw_mode", "closed_loop")) == "contour":
+	if component.is_empty() or WorldDocumentService.is_contour(component):
 		return lines
 	var reference := _component_mesh_reference(asset_id, component_id)
 	var provenance: Dictionary = reference.get("build_provenance", {}) if reference.get("build_provenance", {}) is Dictionary else {}
@@ -3764,7 +3764,7 @@ func _geometry_build_signature(asset_id: String, component_id: String, component
 	var hole_components := _geometry_sampling_hole_components(asset, component_id)
 	var resolved_recipes := recipes if not recipes.is_empty() else _geometry_build_recipes(asset_id, component_id, component, cut_guides, hole_components)
 	var stroke_width_px := _effective_contour_stroke_width_px(component)
-	if str(component.get("draw_mode", "")) == "contour":
+	if WorldDocumentService.is_contour(component):
 		resolved_recipes = {"contour": {"method": ContourMeshService.METHOD, "algorithm_version": ContourMeshService.ALGORITHM_VERSION, "stroke_width_px": stroke_width_px}}
 	else:
 		resolved_recipes = resolved_recipes.duplicate(true)
@@ -3785,14 +3785,14 @@ func _component_mesh_source_validation_issues(asset: Dictionary, component: Dict
 		return ["Semantic Regions do not enter the visual Mesh pipeline."]
 	if _is_constraint_only_hole(component):
 		return ["Hole Components are constraints of their direct Parent and do not own a Mesh."]
-	var draw_mode := str(component.get("draw_mode", "closed_loop"))
+	var draw_mode := WorldDocumentService.component_draw_mode(component)
 	var stroke_width_px := _effective_contour_stroke_width_px(component)
-	if draw_mode == "contour":
+	if draw_mode == WorldDocumentService.DRAW_MODE_CONTOUR:
 		var contour_issues: Array[String] = []
 		for issue in ContourMeshService.validation_issues(component, stroke_width_px):
 			contour_issues.append(str(issue))
 		return contour_issues
-	if draw_mode not in ["closed_loop", "primitive"]:
+	if draw_mode not in [WorldDocumentService.DRAW_MODE_CLOSED_LOOP, WorldDocumentService.DRAW_MODE_PRIMITIVE]:
 		return ["Draw Mode '%s' cannot be meshed." % draw_mode]
 	var component_id := str(component.get("id", ""))
 	var sampling_issues: Array[String] = []
@@ -3969,7 +3969,7 @@ func _generate_component_mesh_build(asset_id: String, component_id: String) -> D
 	var component := _get_component(asset, component_id)
 	if not _component_is_meshable_source(asset, component):
 		return {"valid": false, "errors": ["Component source is not meshable."]}
-	if str(component.get("draw_mode", "")) == "contour":
+	if WorldDocumentService.is_contour(component):
 		var contour_mesh := ContourMeshService.generate(component, _effective_contour_stroke_width_px(component))
 		if bool(contour_mesh.get("valid", false)):
 			contour_mesh["bake_id"] = "meshing_bake_%d" % ResourceUID.create_id()
@@ -4256,7 +4256,7 @@ func _runtime_export_build(asset: Dictionary) -> Dictionary:
 			continue
 		var contour_stroke := _contour_stroke_bake(asset_id, component_id)
 		var stroke_current := _contour_stroke_bake_is_current(asset_id, component_id, component)
-		var fill_required := str(component.get("draw_mode", "closed_loop")) != "contour"
+		var fill_required := not WorldDocumentService.is_contour(component)
 		var mesh := _component_mesh_bake(asset_id, component_id) if fill_required else {}
 		var mesh_current := not fill_required or _component_mesh_status(asset_id, component_id, component) == "Ready"
 		sources[component_id] = {
@@ -4534,7 +4534,7 @@ func _geometry_meshing_input_is_current(asset_id: String, component_id: String, 
 func _geometry_meshing_result_matches(result: Dictionary, asset_id: String, component_id: String, component: Dictionary) -> bool:
 	if result.is_empty() or not bool(result.get("valid", false)):
 		return false
-	if str(component.get("draw_mode", "")) == "contour":
+	if WorldDocumentService.is_contour(component):
 		return ContourMeshService.matches_source(result, component, _effective_contour_stroke_width_px(component))
 	var recipe := _geometry_meshing_recipe(asset_id, component_id)
 	if not _geometry_meshing_input_is_current(asset_id, component_id, component, recipe):
@@ -4559,7 +4559,7 @@ func _geometry_meshing_preview_matches(asset_id: String, component_id: String, c
 func _geometry_meshing_status(asset_id: String, component_id: String, component: Dictionary) -> String:
 	if component.is_empty():
 		return "Invalid"
-	if str(component.get("draw_mode", "")) == "contour":
+	if WorldDocumentService.is_contour(component):
 		if not ContourMeshService.validation_issues(component, _effective_contour_stroke_width_px(component)).is_empty():
 			return "Invalid"
 		var contour_key := _geometry_document_key(asset_id, component_id)
@@ -4761,7 +4761,7 @@ func _render_context_bar() -> void:
 		context_bar.add_child(transform_reference_button)
 		_render_info_bar()
 		return
-	if str(primitive_component.get("draw_mode", "")) == "primitive":
+	if WorldDocumentService.is_primitive(primitive_component):
 		var create_primitive_button := Button.new()
 		create_primitive_button.text = "⌘1  Create Primitive"
 		create_primitive_button.disabled = not primitive_component.get("primitive", {}).is_empty()
@@ -4823,7 +4823,7 @@ func _render_context_bar() -> void:
 		edit_edge_menu.tooltip_text = draw_menu.tooltip_text
 	context_bar.add_child(edit_edge_menu)
 	var selected_component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	if str(selected_component.get("draw_mode", "closed_loop")) == "closed_loop":
+	if WorldDocumentService.is_closed_loop(selected_component):
 		var edit_face_menu := MenuButton.new()
 		edit_face_menu.text = "⌘4  Edit Face  ▼"
 		edit_face_menu.custom_minimum_size = Vector2(134, 32)
@@ -5230,7 +5230,7 @@ func _set_geometry_seeding_edit_tool(tool: String) -> void:
 
 func _render_geometry_meshing_context_bar() -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	if str(component.get("draw_mode", "")) == "contour":
+	if WorldDocumentService.is_contour(component):
 		var contour_label := Label.new()
 		contour_label.text = "Contour Stroke · Automatic"
 		contour_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -5589,7 +5589,7 @@ func _activate_edit_state() -> void:
 func _activate_guide_draw_state() -> void:
 	var asset := _get_asset(selected_asset_id)
 	var guide := _get_guide(asset, selected_guide_id)
-	var component := _get_component(asset, str(guide.get("scope", {}).get("component_id", "")))
+	var component := _get_component(asset, AssetGuide.scope_component_id(guide))
 	if guide.is_empty() or component.is_empty():
 		_show_status_message("Select a Guide with a valid parent Component.")
 		return
@@ -5689,7 +5689,7 @@ func _activate_edit_face_state() -> void:
 
 
 func _can_activate_selection_mirror(component: Dictionary) -> bool:
-	if component.is_empty() or _region_uses_component_geometry(component) or str(component.get("draw_mode", "closed_loop")) != "closed_loop":
+	if component.is_empty() or _region_uses_component_geometry(component) or not WorldDocumentService.is_closed_loop(component):
 		return false
 	return SELECTION_MIRROR_SERVICE_SCRIPT.selection_issues(component, selected_point_ids).is_empty()
 
@@ -5701,7 +5701,7 @@ func _flip_selected_component_geometry_x() -> void:
 func _flip_component_geometry_x(asset_id: String, component_id: String) -> void:
 	var asset := _get_asset(asset_id)
 	var component := _get_component(asset, component_id)
-	if asset.is_empty() or component.is_empty() or _region_uses_component_geometry(component) or str(component.get("draw_mode", "")) != "closed_loop":
+	if asset.is_empty() or component.is_empty() or _region_uses_component_geometry(component) or str(component.get("draw_mode", "")) != WorldDocumentService.DRAW_MODE_CLOSED_LOOP:
 		return
 	var points: Array = component.get("points", [])
 	if points.is_empty():
@@ -6384,8 +6384,8 @@ func _append_geometry_asset_rows(rows: Array, asset: Dictionary, force_expand: b
 	components.sort_custom(_sort_named_documents)
 	guides.sort_custom(func(left: Dictionary, right: Dictionary) -> bool: return WorldDocumentService.guide_display_name(asset, left).naturalnocasecmp_to(WorldDocumentService.guide_display_name(asset, right)) < 0)
 	for component in components:
-		var draw_mode := str(component.get("draw_mode", "closed_loop"))
-		if active_geometry_submodule in ["Sampling", "Seeding"] and draw_mode == "contour":
+		var draw_mode := WorldDocumentService.component_draw_mode(component)
+		if active_geometry_submodule in ["Sampling", "Seeding"] and draw_mode == WorldDocumentService.DRAW_MODE_CONTOUR:
 			continue
 		var component_id := str(component.get("id", ""))
 		var summary := _geometry_outliner_status_summary(asset_id, component_id, component)
@@ -6396,7 +6396,7 @@ func _append_geometry_asset_rows(rows: Array, asset: Dictionary, force_expand: b
 			"label": str(component.get("name", "Component")),
 			"tooltip": str(summary.get("tooltip", "")),
 			"selected": selected_asset_id == asset_id and selected_component_id == component_id and selected_geometry_bake_method.is_empty(),
-			"badge": str(component.get("topology_role", "outer")),
+			"badge": WorldDocumentService.topology_role(component),
 			"status_color": summary.get("color", Color("#737f91")),
 			"status_count": int(summary.get("count", 0))
 		})
@@ -6427,7 +6427,7 @@ func _append_geometry_sampling_rows(rows: Array, asset: Dictionary, component_id
 				"badge": "hole"
 			})
 	for guide in guides:
-		if str(guide.get("scope", {}).get("component_id", "")) != component_id or str(guide.get("guide_type", "")) != AssetGuide.CUT:
+		if AssetGuide.scope_component_id(guide) != component_id or str(guide.get("guide_type", "")) != AssetGuide.CUT:
 			continue
 		var guide_id := str(guide.get("id", ""))
 		var guide_summary := _geometry_sampling_input_summary(asset_id, component_id, guide_id, "cut")
@@ -6477,7 +6477,7 @@ func _append_geometry_seeding_rows(rows: Array, asset: Dictionary, component: Di
 			if _is_geometry_hole_candidate(asset, hole_component, component_id):
 				rows.append(_geometry_seeding_input_row(asset_id, component_id, str(hole_component.get("id", "")), "hole", "Hole · %s" % WorldDocumentService.component_outliner_name(assets, hole_component), "Excluded", "Hole"))
 	for guide in guides:
-		if str(guide.get("scope", {}).get("component_id", "")) != component_id:
+		if AssetGuide.scope_component_id(guide) != component_id:
 			continue
 		var guide_type := str(guide.get("guide_type", ""))
 		var guide_name := WorldDocumentService.guide_display_name(asset, guide)
@@ -6934,9 +6934,9 @@ func _sampling_input_kind_for_seeding_role(role: String) -> String:
 	# boundaries at all; the Outer contour has no input record of its own and a
 	# Spine is a Seeding input, so both map to no Sampling input rather than to a
 	# kind the lookup would then fail on silently.
-	if role == "hole":
+	if role == WorldDocumentService.ROLE_HOLE:
 		return "component"
-	if role == "cut":
+	if role == WorldDocumentService.ROLE_CUT:
 		return "guide"
 	return ""
 
@@ -7512,9 +7512,9 @@ func _on_component_draw_mode_selected(index: int) -> void:
 
 
 func _draw_mode_display_name(draw_mode: String) -> String:
-	if draw_mode == "contour":
+	if draw_mode == WorldDocumentService.DRAW_MODE_CONTOUR:
 		return "Contour"
-	if draw_mode == "primitive":
+	if draw_mode == WorldDocumentService.DRAW_MODE_PRIMITIVE:
 		return "Primitive"
 	return "Closed Loop"
 
@@ -7524,10 +7524,10 @@ func _draw_mode_change_issue(component: Dictionary, target_mode: String) -> Stri
 		return "Select a Component first."
 	if _is_reference_component(component):
 		return "Symbol References inherit their source geometry and cannot change Draw Mode."
-	var current_mode := str(component.get("draw_mode", "closed_loop"))
+	var current_mode := WorldDocumentService.component_draw_mode(component)
 	if current_mode == target_mode:
 		return ""
-	var crosses_geometry_source := (current_mode == "primitive") != (target_mode == "primitive")
+	var crosses_geometry_source := (current_mode == WorldDocumentService.DRAW_MODE_PRIMITIVE) != (target_mode == WorldDocumentService.DRAW_MODE_PRIMITIVE)
 	if not crosses_geometry_source:
 		return ""
 	var primitive = component.get("primitive", {})
@@ -7541,11 +7541,11 @@ func _draw_mode_change_issue(component: Dictionary, target_mode: String) -> Stri
 func _apply_component_draw_mode(component: Dictionary, target_mode: String) -> bool:
 	if not _draw_mode_change_issue(component, target_mode).is_empty():
 		return false
-	var current_mode := str(component.get("draw_mode", "closed_loop"))
+	var current_mode := WorldDocumentService.component_draw_mode(component)
 	if current_mode == target_mode:
 		return false
 	component["draw_mode"] = target_mode
-	if target_mode == "primitive":
+	if target_mode == WorldDocumentService.DRAW_MODE_PRIMITIVE:
 		component["geometry_source"] = "primitive"
 		component["primitive"] = {}
 		component["points"] = []
@@ -7568,7 +7568,7 @@ func _update_draw_mode_status() -> void:
 		return
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	var has_editable_component := active_module == "Create" and not component.is_empty() and not _is_reference_component(component) and not _is_region(component)
-	var current_mode := str(component.get("draw_mode", "closed_loop")) if not component.is_empty() else ""
+	var current_mode := WorldDocumentService.component_draw_mode(component) if not component.is_empty() else ""
 	draw_mode_status.text = "Draw Mode: %s  ▾" % _draw_mode_display_name(current_mode) if not current_mode.is_empty() else "Draw Mode: —  ▾"
 	draw_mode_status.disabled = not has_editable_component
 	draw_mode_status.tooltip_text = "Closed Loop and Contour preserve Bezier topology. Primitive is available only while the Component is empty." if has_editable_component else ("Symbol References inherit their source Draw Mode." if _is_reference_component(component) else "Select a Component in Create to change Draw Mode.")
@@ -7589,7 +7589,7 @@ func _on_draw_mode_status_selected(index: int) -> void:
 		_show_status_message(issue)
 		_update_draw_mode_status()
 		return
-	if str(component.get("draw_mode", "closed_loop")) == target_mode:
+	if WorldDocumentService.component_draw_mode(component) == target_mode:
 		return
 	_record_direct_change()
 	if not _apply_component_draw_mode(component, target_mode):
@@ -7750,8 +7750,8 @@ func _create_region(asset_id: String, scope_kind: String, scope_id: String, regi
 		"source_asset_id": "", "parent_component_id": scope_id,
 		"group_id": "", "points": [], "edges": [], "chains": [],
 		"transform": WorldDocumentService.default_component_transform(), "visibility": true, "z_index": 0,
-		"projection_depth_cm": WorldDocumentService.DEFAULT_PROJECTION_DEPTH_CM, "draw_mode": "closed_loop",
-		"topology_role": "outer", "geometry_source": "bezier", "primitive": {},
+		"projection_depth_cm": WorldDocumentService.DEFAULT_PROJECTION_DEPTH_CM, "draw_mode": WorldDocumentService.DRAW_MODE_CLOSED_LOOP,
+		"topology_role": WorldDocumentService.ROLE_OUTER, "geometry_source": "bezier", "primitive": {},
 		"catch_parent_component_id": "", "show_point_numbers": false
 	})
 	selected_asset_id = asset_id
@@ -8011,7 +8011,7 @@ func _copy_selected_component_subtrees(source_asset_id := "") -> void:
 				copied_id_set[descendant_id] = true
 	var copied_guides: Array[Dictionary] = []
 	for guide in asset.get("guides", []):
-		if guide is Dictionary and copied_id_set.has(str(guide.get("scope", {}).get("component_id", ""))):
+		if guide is Dictionary and copied_id_set.has(AssetGuide.scope_component_id(guide)):
 			copied_guides.append(guide.duplicate(true))
 	component_clipboard = {
 		"source_asset_id": asset_id,
@@ -8066,7 +8066,7 @@ func _paste_component_clipboard(target_asset_id: String, target_parent_id := "")
 	for source_guide in component_clipboard.get("guides", []):
 		if not source_guide is Dictionary:
 			continue
-		var source_component_id := str(source_guide.get("scope", {}).get("component_id", ""))
+		var source_component_id := AssetGuide.scope_component_id(source_guide)
 		if not id_map.has(source_component_id):
 			continue
 		var guide_copy := _duplicate_guide_record(source_guide, target_asset)
@@ -8351,7 +8351,7 @@ func _duplicate_guide_record(source: Dictionary, asset: Dictionary) -> Dictionar
 	var guide_id := "guide_%d" % next_guide_id
 	next_guide_id += 1
 	guide_copy["id"] = guide_id
-	guide_copy["ordinal"] = ComponentHierarchy.next_guide_ordinal(asset, str(source.get("scope", {}).get("component_id", "")), str(source.get("guide_type", AssetGuide.SAMPLE)))
+	guide_copy["ordinal"] = ComponentHierarchy.next_guide_ordinal(asset, AssetGuide.scope_component_id(source), str(source.get("guide_type", AssetGuide.SAMPLE)))
 	var base_name := str(source.get("name", AssetGuide.display_name(str(source.get("guide_type", AssetGuide.SAMPLER_SPINE))))) + " Copy"
 	var candidate := base_name
 	var suffix := 2
@@ -8416,7 +8416,7 @@ func _confirm_component_creation() -> void:
 		_update_component_name_dialog_validation()
 		_show_status_message(name_error)
 		return
-	var draw_mode := str(component_dialog.get_meta("draw_mode", "closed_loop"))
+	var draw_mode := str(component_dialog.get_meta("draw_mode", WorldDocumentService.DRAW_MODE_CLOSED_LOOP))
 	var is_reference := draw_mode == "reference"
 	var parent_component_id := str(component_dialog.get_meta("parent_component_id", ""))
 	var target_group_id := str(component_dialog.get_meta("group_id", ""))
@@ -8456,9 +8456,9 @@ func _confirm_component_creation() -> void:
 		"visibility": true,
 		"z_index": 0,
 		"projection_depth_cm": WorldDocumentService.DEFAULT_PROJECTION_DEPTH_CM,
-		"draw_mode": draw_mode if draw_mode in WorldDocumentService.DRAW_MODES else "closed_loop",
-		"topology_role": "outer",
-		"geometry_source": "primitive" if draw_mode == "primitive" else "bezier",
+		"draw_mode": draw_mode if draw_mode in WorldDocumentService.DRAW_MODES else WorldDocumentService.DRAW_MODE_CLOSED_LOOP,
+		"topology_role": WorldDocumentService.ROLE_OUTER,
+		"geometry_source": "primitive" if draw_mode == WorldDocumentService.DRAW_MODE_PRIMITIVE else "bezier",
 		"primitive": {},
 		"catch_parent_component_id": "",
 		"show_point_numbers": false
@@ -8555,7 +8555,7 @@ func _select_guide(asset_id: String, guide_id: String) -> void:
 	if guide.is_empty():
 		return
 	if active_module == "Mesh" and active_geometry_submodule == "Sampling":
-		var parent_component_id := str(guide.get("scope", {}).get("component_id", ""))
+		var parent_component_id := AssetGuide.scope_component_id(guide)
 		if not _get_component(_get_asset(asset_id), parent_component_id).is_empty():
 			selected_asset_id = asset_id
 			selected_component_id = parent_component_id
@@ -8598,7 +8598,7 @@ func _delete_selected_component() -> void:
 	var removed_component_ids := _component_deletion_set(asset, root_component_ids)
 	var removed_guide_count := 0
 	for guide in asset.get("guides", []):
-		if removed_component_ids.has(str(guide.get("scope", {}).get("component_id", ""))):
+		if removed_component_ids.has(AssetGuide.scope_component_id(guide)):
 			removed_guide_count += 1
 	var component_count := removed_component_ids.size()
 	var description := ""
@@ -8649,7 +8649,7 @@ func _confirm_component_deletion() -> void:
 	asset["components"] = surviving_components
 	var surviving_guides: Array = []
 	for guide in asset.get("guides", []):
-		if not removed_component_ids.has(str(guide.get("scope", {}).get("component_id", ""))):
+		if not removed_component_ids.has(AssetGuide.scope_component_id(guide)):
 			surviving_guides.append(guide)
 	asset["guides"] = surviving_guides
 	for surviving_component in surviving_components:
@@ -8925,7 +8925,7 @@ func _on_guide_type_selected(index: int, option: OptionButton) -> void:
 	if guide_type not in AssetGuide.VALID_TYPES or guide_type == str(guide.get("guide_type", "")):
 		return
 	_record_direct_change()
-	var guide_ordinal := ComponentHierarchy.next_guide_ordinal(asset, str(guide.get("scope", {}).get("component_id", "")), guide_type)
+	var guide_ordinal := ComponentHierarchy.next_guide_ordinal(asset, AssetGuide.scope_component_id(guide), guide_type)
 	guide["guide_type"] = guide_type
 	guide["ordinal"] = guide_ordinal
 	_invalidate_render(RENDER_DOCUMENT)
@@ -8937,7 +8937,7 @@ func _on_guide_target_selected(index: int, option: OptionButton) -> void:
 	if guide.is_empty() or not guide.get("points", []).is_empty() or index < 0 or index >= option.item_count:
 		return
 	var component_id := str(option.get_item_metadata(index))
-	if str(guide.get("scope", {}).get("component_id", "")) == component_id:
+	if AssetGuide.scope_component_id(guide) == component_id:
 		return
 	_record_direct_change()
 	var guide_ordinal := ComponentHierarchy.next_guide_ordinal(asset, component_id, str(guide.get("guide_type", AssetGuide.SAMPLE)))
@@ -9279,7 +9279,7 @@ func _geometry_sampling_hole_components(asset: Dictionary, component_id: String)
 		var reference_world := ComponentHierarchy.world_transform(asset, input_id)
 		var source_boundary_count := 0
 		for source_component in source_asset.get("components", []):
-			if not source_component is Dictionary or _is_reference_component(source_component) or _is_constraint_only_hole(source_component) or not _effective_component_visibility(source_asset, source_component) or str(source_component.get("draw_mode", "closed_loop")) not in ["closed_loop", "primitive"]:
+			if not source_component is Dictionary or _is_reference_component(source_component) or _is_constraint_only_hole(source_component) or not _effective_component_visibility(source_asset, source_component) or WorldDocumentService.component_draw_mode(source_component) not in [WorldDocumentService.DRAW_MODE_CLOSED_LOOP, WorldDocumentService.DRAW_MODE_PRIMITIVE]:
 				continue
 			source_boundary_count += 1
 			var hole_id := "%s:%s" % [input_id, str(source_component.get("id", ""))]
@@ -9300,7 +9300,7 @@ func _is_constraint_only_hole(component: Variant) -> bool:
 
 func _geometry_body_accepts_holes(asset: Dictionary, component_id: String) -> bool:
 	var component := _get_component(asset, component_id)
-	return not component.is_empty() and not _is_reference_component(component) and not _is_region(component) and str(component.get("topology_role", "outer")) == "outer" and str(component.get("draw_mode", "closed_loop")) in ["closed_loop", "primitive"] and _effective_component_visibility(asset, component)
+	return WorldDocumentService.is_outer_body(component) and _effective_component_visibility(asset, component)
 
 
 func _is_geometry_hole_input(asset: Dictionary, component: Variant, parent_component_id: String) -> bool:
@@ -9311,14 +9311,14 @@ func _is_geometry_hole_input(asset: Dictionary, component: Variant, parent_compo
 func _is_geometry_hole_candidate(asset: Dictionary, component: Variant, parent_component_id: String) -> bool:
 	if not component is Dictionary or _is_region(component):
 		return false
-	if str(component.get("parent_component_id", "")) != parent_component_id or str(component.get("topology_role", "outer")) != "hole" or not _effective_component_visibility(asset, component):
+	if str(component.get("parent_component_id", "")) != parent_component_id or WorldDocumentService.topology_role(component) != WorldDocumentService.ROLE_HOLE or not _effective_component_visibility(asset, component):
 		return false
-	return _is_reference_component(component) or str(component.get("draw_mode", "closed_loop")) in ["closed_loop", "primitive"]
+	return _is_reference_component(component) or WorldDocumentService.component_draw_mode(component) in [WorldDocumentService.DRAW_MODE_CLOSED_LOOP, WorldDocumentService.DRAW_MODE_PRIMITIVE]
 
 
 func _geometry_sampling_invalid_hole(input_id: String, input_label: String, error: String) -> Dictionary:
 	return {"id": input_id, "sampling_input_id": input_id, "sampling_input_label": input_label,
-		"sampling_error": error, "draw_mode": "closed_loop", "topology_role": "hole",
+		"sampling_error": error, "draw_mode": WorldDocumentService.DRAW_MODE_CLOSED_LOOP, "topology_role": WorldDocumentService.ROLE_HOLE,
 		"transform": WorldDocumentService.default_component_transform(),
 		"sampling_transform": Transform2D.IDENTITY, "points": [], "edges": [], "chains": []}
 
@@ -9329,26 +9329,26 @@ func _geometry_sampling_hole_source(source_component: Dictionary, hole_id: Strin
 		primitive_hole["id"] = hole_id
 		primitive_hole["sampling_input_id"] = input_id
 		primitive_hole["sampling_input_label"] = input_label
-		primitive_hole["topology_role"] = "hole"
+		primitive_hole["topology_role"] = WorldDocumentService.ROLE_HOLE
 		primitive_hole["sampling_transform"] = transform
 		return primitive_hole
-	if str(source_component.get("draw_mode", "closed_loop")) == "primitive":
+	if WorldDocumentService.is_primitive(source_component):
 		var invalid_primitive: Dictionary = source_component.duplicate(true)
 		invalid_primitive["id"] = hole_id
 		invalid_primitive["sampling_input_id"] = input_id
 		invalid_primitive["sampling_input_label"] = input_label
-		invalid_primitive["topology_role"] = "hole"
+		invalid_primitive["topology_role"] = WorldDocumentService.ROLE_HOLE
 		invalid_primitive["sampling_transform"] = transform
 		var primitive_issues := PrimitiveGeometryService.validation_issues(invalid_primitive)
 		invalid_primitive["sampling_error"] = str(primitive_issues[0]) if not primitive_issues.is_empty() else "Primitive boundary is invalid."
 		return invalid_primitive
-	if str(source_component.get("draw_mode", "closed_loop")) != "closed_loop":
+	if not WorldDocumentService.is_closed_loop(source_component):
 		return {}
 	var hole_component: Dictionary = source_component.duplicate(true)
 	hole_component["id"] = hole_id
 	hole_component["sampling_input_id"] = input_id
 	hole_component["sampling_input_label"] = input_label
-	hole_component["topology_role"] = "hole"
+	hole_component["topology_role"] = WorldDocumentService.ROLE_HOLE
 	var point_id_map: Dictionary = {}
 	for point in hole_component.get("points", []):
 		var old_point_id := str(point.get("id", ""))
@@ -9366,7 +9366,7 @@ func _geometry_sampling_hole_source(source_component: Dictionary, hole_id: Strin
 		chain["id"] = "%s:%s" % [hole_id, str(chain.get("id", ""))]
 		chain["point_ids"] = chain.get("point_ids", []).map(func(point_id: String) -> String: return str(point_id_map.get(point_id, "")))
 		chain["edge_ids"] = chain.get("edge_ids", []).map(func(edge_id: String) -> String: return "%s:%s" % [hole_id, edge_id])
-		chain["topology_role"] = "hole"
+		chain["topology_role"] = WorldDocumentService.ROLE_HOLE
 	return hole_component
 
 
@@ -9828,7 +9828,7 @@ func _generate_geometry_meshing_preview_after_delay(revision: int) -> void:
 
 func _generate_geometry_meshing_preview() -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	if str(component.get("draw_mode", "")) == "contour":
+	if WorldDocumentService.is_contour(component):
 		geometry_meshing_preview_key = _geometry_document_key(selected_asset_id, selected_component_id)
 		geometry_meshing_preview = ContourMeshService.generate(component, _effective_contour_stroke_width_px(component))
 		geometry_meshing_preview_state = "ready" if bool(geometry_meshing_preview.get("valid", false)) else "invalid"
@@ -9921,7 +9921,7 @@ func _refresh_geometry_meshing_workspace() -> void:
 	if component.is_empty():
 		geometry_meshing_workspace.clear_context()
 		return
-	if str(component.get("draw_mode", "")) == "contour":
+	if WorldDocumentService.is_contour(component):
 		var contour_result := geometry_meshing_preview if _geometry_meshing_preview_matches(selected_asset_id, selected_component_id, component) else _geometry_meshing_bake(selected_asset_id, selected_component_id, ContourMeshService.METHOD)
 		geometry_meshing_workspace.set_context({}, {}, contour_result, _geometry_meshing_status(selected_asset_id, selected_component_id, component))
 		return
@@ -10018,7 +10018,7 @@ func _geometry_sampling_inspector_context(component: Dictionary) -> Dictionary:
 				boundary_rows.append({"title": "Hole · %s" % WorldDocumentService.component_outliner_name(assets, hole_component),
 					"input_id": str(hole_component.get("id", "")), "role": "hole", "kind": "hole"})
 	for guide in asset.get("guides", []):
-		if str(guide.get("scope", {}).get("component_id", "")) != selected_component_id or str(guide.get("guide_type", "")) != AssetGuide.CUT:
+		if AssetGuide.scope_component_id(guide) != selected_component_id or str(guide.get("guide_type", "")) != AssetGuide.CUT:
 			continue
 		boundary_rows.append({"title": "Cut · %s" % WorldDocumentService.guide_display_name(asset, guide),
 			"input_id": str(guide.get("id", "")), "role": "cut", "kind": "cut"})
@@ -11706,7 +11706,7 @@ func _render_canvas_context() -> void:
 	canvas_view.set_bezier_color_override(Color.TRANSPARENT)
 	canvas_view.set_point_numbers_visible(false)
 	canvas_view.set_catch_parent_component("")
-	canvas_view.set_component_draw_mode("closed_loop")
+	canvas_view.set_component_draw_mode(WorldDocumentService.DRAW_MODE_CLOSED_LOOP)
 	canvas_view.clear_draw_constraint()
 	geometry_sampling_workspace.visible = false
 	geometry_seeding_workspace.visible = false
@@ -11880,10 +11880,10 @@ func _render_canvas_context() -> void:
 	canvas_view.set_reference_shapes(_build_reference_shapes(asset, display_component_id))
 	if _is_region(component):
 		canvas_view.set_bezier_color_override(EditorWidgets.REGION_COLORS.get(str(component.get("region_type", "attack")), EditorWidgets.REGION_COLORS["attack"]))
-	canvas_view.set_component_draw_mode(str(display_component.get("draw_mode", "closed_loop")))
+	canvas_view.set_component_draw_mode(WorldDocumentService.component_draw_mode(display_component))
 	canvas_view.set_point_numbers_visible(bool(component.get("show_point_numbers", false)))
 	var catch_parent_id := str(display_component.get("parent_component_id", ""))
-	if catch_parent_id.is_empty() and str(display_component.get("draw_mode", "closed_loop")) == "contour":
+	if catch_parent_id.is_empty() and WorldDocumentService.is_contour(display_component):
 		catch_parent_id = str(display_component.get("catch_parent_component_id", ""))
 	canvas_view.set_catch_parent_component(catch_parent_id)
 	BezierGeometry.resolve_auto_handles(display_component.get("points", []), display_component.get("chains", []))
@@ -11894,7 +11894,7 @@ func _render_canvas_context() -> void:
 
 
 func _render_spine_canvas(asset: Dictionary, guide: Dictionary, drawing: bool) -> void:
-	var target_component_id := str(guide.get("scope", {}).get("component_id", ""))
+	var target_component_id := AssetGuide.scope_component_id(guide)
 	var target_component := _get_component(asset, target_component_id)
 	var type_name := AssetGuide.display_name(str(guide.get("guide_type", AssetGuide.SAMPLER_SPINE)))
 	var guide_name := WorldDocumentService.guide_display_name(asset, guide)
@@ -12018,7 +12018,7 @@ func _build_reference_shapes(asset: Dictionary, excluded_component_id := "", emp
 			"visibility": asset_is_visible and _effective_component_visibility(asset, component),
 			"z_index": _effective_component_z_index(asset, component),
 			"emphasized": str(component["id"]) == emphasized_component_id,
-			"topology_role": str(component.get("topology_role", "outer"))
+			"topology_role": WorldDocumentService.topology_role(component)
 		})
 	return shapes
 
@@ -12049,7 +12049,7 @@ func _reference_asset_shapes(target_asset: Dictionary, reference: Dictionary, em
 		for source_point in source_component.get("points", []):
 			if source_point is Dictionary:
 				authored_points.append({"id": str(source_point.get("id", "")), "position": _transform_point(_transform_point(Vector2(source_point.get("position", Vector2.ZERO)), source_transform), reference_transform)})
-		result.append({"id": str(reference.get("id", "")), "points": points, "bezier_points": authored_points, "closed": PrimitiveGeometryService.has_analytic_shape(source_component) or BezierTopology.outer_chain_closed(source_component), "transform": WorldDocumentService.default_component_transform(), "visibility": bool(target_asset.get("visibility", true)) and bool(reference.get("visibility", true)), "z_index": int(reference.get("z_index", 0)), "emphasized": str(reference.get("id", "")) == emphasized_component_id, "topology_role": str(reference.get("topology_role", "outer"))})
+		result.append({"id": str(reference.get("id", "")), "points": points, "bezier_points": authored_points, "closed": PrimitiveGeometryService.has_analytic_shape(source_component) or BezierTopology.outer_chain_closed(source_component), "transform": WorldDocumentService.default_component_transform(), "visibility": bool(target_asset.get("visibility", true)) and bool(reference.get("visibility", true)), "z_index": int(reference.get("z_index", 0)), "emphasized": str(reference.get("id", "")) == emphasized_component_id, "topology_role": WorldDocumentService.topology_role(reference)})
 	return result
 
 
@@ -12073,10 +12073,10 @@ func _component_guide_boundaries(component: Dictionary) -> Dictionary:
 		var polygon := BezierGeometry.flatten_chain(resolved_component, chain_data)
 		if polygon.size() < 3:
 			continue
-		var role := str(chain_data.get("topology_role", "outer"))
-		if role == "outer" and outer.is_empty():
+		var role := WorldDocumentService.topology_role(chain_data)
+		if role == WorldDocumentService.ROLE_OUTER and outer.is_empty():
 			outer = polygon
-		elif role == "hole":
+		elif role == WorldDocumentService.ROLE_HOLE:
 			holes.append(polygon)
 	return {"outer": outer, "holes": holes}
 
@@ -12091,7 +12091,7 @@ func _refresh_component_geometry(component: Dictionary) -> void:
 
 func _on_primitive_placed(center: Vector2, diameter_cm: float) -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	if component.is_empty() or str(component.get("draw_mode", "")) != "primitive" or not component.get("primitive", {}).is_empty():
+	if component.is_empty() or not WorldDocumentService.is_primitive(component) or not component.get("primitive", {}).is_empty():
 		return
 	_record_direct_change()
 	component["geometry_source"] = "primitive"
@@ -12117,7 +12117,7 @@ func _on_primitive_center_changed(center: Vector2) -> void:
 
 func _on_primitive_preview_cancelled() -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	if str(component.get("draw_mode", "")) != "primitive" or not component.get("primitive", {}).is_empty():
+	if not WorldDocumentService.is_primitive(component) or not component.get("primitive", {}).is_empty():
 		return
 	_set_active_state("")
 	_set_active_context_command("")
@@ -12157,7 +12157,7 @@ func _on_bezier_point_added(world_position: Vector2, point_mode: String = "linea
 
 func _on_bezier_endpoint_connection_requested(anchor_point_id: String, target_point_id: String) -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	if component.is_empty() or str(component.get("draw_mode", "closed_loop")) not in ["closed_loop", "contour"]:
+	if component.is_empty() or WorldDocumentService.component_draw_mode(component) not in [WorldDocumentService.DRAW_MODE_CLOSED_LOOP, WorldDocumentService.DRAW_MODE_CONTOUR]:
 		return
 	var anchor_chain := BezierTopology.chain_for_point(component.get("chains", []), anchor_point_id)
 	var target_chain := BezierTopology.chain_for_point(component.get("chains", []), target_point_id)
@@ -12184,7 +12184,7 @@ func _on_bezier_endpoint_connection_requested(anchor_point_id: String, target_po
 
 func _on_bezier_chain_closed() -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	if component.is_empty() or str(component.get("draw_mode", "closed_loop")) not in ["closed_loop", "contour"]:
+	if component.is_empty() or WorldDocumentService.component_draw_mode(component) not in [WorldDocumentService.DRAW_MODE_CLOSED_LOOP, WorldDocumentService.DRAW_MODE_CONTOUR]:
 		return
 	var chains: Array = component.get("chains", [])
 	if chains.is_empty() or bool(chains.back().get("closed", false)) or chains.back().get("point_ids", []).size() < 3:
@@ -12303,11 +12303,11 @@ func _on_component_topology_role_selected(index: int, option: OptionButton) -> v
 	if component.is_empty() or index < 0 or index >= option.item_count:
 		return
 	var role := str(option.get_item_metadata(index))
-	if role not in ["outer", "hole"] or role == str(component.get("topology_role", "outer")):
+	if role not in WorldDocumentService.TOPOLOGY_ROLES or role == WorldDocumentService.topology_role(component):
 		return
-	if role == "hole" and not _is_reference_component(component):
+	if role == WorldDocumentService.ROLE_HOLE and not _is_reference_component(component):
 		var proposed_hole := component.duplicate(false)
-		proposed_hole["topology_role"] = "hole"
+		proposed_hole["topology_role"] = WorldDocumentService.ROLE_HOLE
 		var hole_issue := WorldDocumentService.constraint_hole_parent_validation_issue(asset, proposed_hole)
 		if hole_issue.is_empty() and not ComponentHierarchy.children(asset, selected_component_id).is_empty():
 			hole_issue = "Detach child Components before changing this Component to Hole."
@@ -12318,7 +12318,7 @@ func _on_component_topology_role_selected(index: int, option: OptionButton) -> v
 	_record_direct_change()
 	component["topology_role"] = role
 	for chain in component.get("chains", []):
-		if chain is Dictionary and str(chain.get("topology_role", "outer")) in ["outer", "hole"]:
+		if chain is Dictionary and WorldDocumentService.topology_role(chain) in WorldDocumentService.TOPOLOGY_ROLES:
 			chain["topology_role"] = role
 	_invalidate_render(RENDER_DOCUMENT)
 
@@ -12380,7 +12380,7 @@ func _on_bezier_points_moved(point_ids: Array, world_delta: Vector2) -> void:
 		return
 	if bezier_point_move_component_id != selected_component_id or bezier_point_move_guide_id != selected_guide_id or bezier_point_move_start_positions.is_empty():
 		_on_bezier_points_move_started(point_ids)
-	var transform_component_id := str(guide.get("scope", {}).get("component_id", "")) if not guide.is_empty() else selected_component_id
+	var transform_component_id := AssetGuide.scope_component_id(guide) if not guide.is_empty() else selected_component_id
 	var transform := _asset_preview_world_record(asset, ComponentHierarchy.world_transform_record(asset, transform_component_id))
 	var transform_rotation := deg_to_rad(float(transform.get("rotation", 0.0)))
 	var transform_scale: Vector2 = transform.get("scale", Vector2.ONE)
@@ -12526,7 +12526,7 @@ func _on_bezier_edges_delete_requested(edge_ids: Array) -> void:
 	if edge_ids.is_empty():
 		return
 	var subject := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	if subject.is_empty() or str(subject.get("draw_mode", "closed_loop")) == "primitive":
+	if subject.is_empty() or WorldDocumentService.is_primitive(subject):
 		return
 	var valid_edge_ids: Array[String] = []
 	for edge_id_value in edge_ids:

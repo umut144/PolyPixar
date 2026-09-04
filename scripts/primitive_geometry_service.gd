@@ -6,7 +6,7 @@ const CIRCLE_MESH_SEGMENTS := 48
 const ELLIPSE := "ellipse"
 
 static func is_primitive(component: Dictionary) -> bool:
-	return str(component.get("draw_mode", "")) == "primitive"
+	return WorldDocumentService.is_primitive(component)
 
 static func has_circle(component: Dictionary) -> bool:
 	return is_primitive(component) and component.get("primitive", {}) is Dictionary and str(component.get("primitive", {}).get("type", "")) == "circle"

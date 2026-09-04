@@ -181,7 +181,7 @@ static func style_region_outliner_button(button: Button, selected: bool, region_
 	button.add_theme_stylebox_override("pressed", normal)
 	button.add_theme_color_override("font_color", Color("#f4f7ff") if selected else color.lightened(0.38))
 
-static func style_outliner_button(button: Button, selected: bool, topology_role := "outer") -> void:
+static func style_outliner_button(button: Button, selected: bool, topology_role := WorldDocumentService.ROLE_OUTER) -> void:
 	var normal := StyleBoxFlat.new()
 	normal.bg_color = Color("#f2c94c") if selected else Color("#252a33")
 	normal.border_color = Color("#f2c94c") if selected else Color("#303744")
@@ -194,10 +194,10 @@ static func style_outliner_button(button: Button, selected: bool, topology_role 
 	button.add_theme_stylebox_override("hover", hover)
 	button.add_theme_stylebox_override("pressed", pressed)
 	button.add_theme_stylebox_override("focus", normal)
-	var text_color := Color("#ef6c78") if topology_role == "hole" else Color("#16181d") if selected else Color("#ffffff")
+	var text_color := Color("#ef6c78") if topology_role == WorldDocumentService.ROLE_HOLE else Color("#16181d") if selected else Color("#ffffff")
 	button.add_theme_color_override("font_color", text_color)
-	button.add_theme_color_override("font_hover_color", Color("#ef6c78") if topology_role == "hole" else Color("#16181d") if selected else Color("#ffffff"))
-	button.add_theme_color_override("font_pressed_color", Color("#ef6c78") if topology_role == "hole" else Color("#16181d"))
+	button.add_theme_color_override("font_hover_color", Color("#ef6c78") if topology_role == WorldDocumentService.ROLE_HOLE else Color("#16181d") if selected else Color("#ffffff"))
+	button.add_theme_color_override("font_pressed_color", Color("#ef6c78") if topology_role == WorldDocumentService.ROLE_HOLE else Color("#16181d"))
 	button.add_theme_color_override("font_focus_color", text_color)
 
 static func style_guide_outliner_button(button: Button, selected: bool, guide_type := AssetGuide.SAMPLER_SPINE) -> void:

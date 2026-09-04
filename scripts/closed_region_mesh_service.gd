@@ -23,7 +23,7 @@ static func generate(component: Dictionary) -> Dictionary:
 
 static func _derive(component: Dictionary, include_mesh: bool) -> Dictionary:
 	var errors: Array[String] = []
-	if str(component.get("draw_mode", "")) != "contour":
+	if not WorldDocumentService.is_contour(component):
 		errors.append("Closed contour region geometry requires draw_mode 'contour'.")
 	var chains: Array = component.get("chains", [])
 	if chains.size() != 1 or not bool(chains[0].get("closed", false)):

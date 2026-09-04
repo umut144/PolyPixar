@@ -140,9 +140,7 @@ static func can_parent(asset: Dictionary, component_id: String, candidate_parent
 	var candidate_parent := component_by_id(asset, candidate_parent_id)
 	if component_id == candidate_parent_id or candidate_parent.is_empty() or _is_constraint_only_hole(candidate_parent):
 		return false
-	if _is_constraint_only_hole(component) and (str(candidate_parent.get("type", "component")) in ["reference", "region"] \
-		or str(candidate_parent.get("topology_role", "outer")) != "outer" \
-		or str(candidate_parent.get("draw_mode", "closed_loop")) not in ["closed_loop", "primitive"]):
+	if _is_constraint_only_hole(component) and not WorldDocumentService.is_outer_body(candidate_parent):
 		return false
 	var cursor := candidate_parent_id
 	var visited: Dictionary = {}
@@ -156,7 +154,7 @@ static func can_parent(asset: Dictionary, component_id: String, candidate_parent
 
 static func _is_constraint_only_hole(component: Dictionary) -> bool:
 	return str(component.get("type", "component")) not in ["reference", "region"] \
-		and str(component.get("topology_role", "outer")) == "hole"
+		and WorldDocumentService.topology_role(component) == WorldDocumentService.ROLE_HOLE
 
 
 static func can_parent_group(asset: Dictionary, group_id: String, candidate_parent_id: String) -> bool:
@@ -201,7 +199,7 @@ static func next_guide_ordinal(asset: Dictionary, component_id: String, guide_ty
 	for guide in asset.get("guides", []):
 		if not guide is Dictionary:
 			continue
-		if str(guide.get("scope", {}).get("component_id", "")) == component_id and AssetGuide.canonical_type(str(guide.get("guide_type", ""))) == AssetGuide.canonical_type(guide_type):
+		if AssetGuide.scope_component_id(guide) == component_id and AssetGuide.canonical_type(str(guide.get("guide_type", ""))) == AssetGuide.canonical_type(guide_type):
 			highest = maxi(highest, int(guide.get("ordinal", 0)))
 	return highest + 1
 
@@ -361,7 +359,7 @@ static func _normalize_guide_ordinals(asset: Dictionary) -> void:
 	for guide in guides:
 		if not guide is Dictionary:
 			continue
-		var component_id := str(guide.get("scope", {}).get("component_id", ""))
+		var component_id := AssetGuide.scope_component_id(guide)
 		var guide_type := AssetGuide.canonical_type(str(guide.get("guide_type", "")))
 		guide["guide_type"] = guide_type
 		var key := "%s\u001f%s" % [component_id, guide_type]

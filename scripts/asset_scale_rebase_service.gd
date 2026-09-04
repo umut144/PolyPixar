@@ -79,7 +79,7 @@ static func rebase_asset(asset: Dictionary) -> Dictionary:
 		var root_scope := str(component.get("parent_component_id", "")).is_empty() and ComponentHierarchy.membership_group_id(working, component_id).is_empty()
 		var is_reference := str(component.get("type", "component")) == "reference"
 		component["transform"] = _rebased_transform(component.get("transform", {}), scale, root_offset, asset_pivot, root_scope, not is_reference)
-		if is_reference or str(component.get("draw_mode", "")) == "primitive":
+		if is_reference or WorldDocumentService.is_primitive(component):
 			_scale_component_source(component, scale)
 
 	# Anisotropic root scaling does not commute with a rotated Component
@@ -87,7 +87,7 @@ static func rebase_asset(asset: Dictionary) -> Dictionary:
 	# hierarchy placements have been rebased; uniform scaling naturally reduces
 	# to the legacy component-wise multiplication.
 	for component in working.get("components", []):
-		if not component is Dictionary or str(component.get("type", "component")) == "guide" or str(component.get("type", "component")) == "reference" or str(component.get("draw_mode", "")) == "primitive":
+		if not component is Dictionary or str(component.get("type", "component")) == "guide" or str(component.get("type", "component")) == "reference" or WorldDocumentService.is_primitive(component):
 			continue
 		var component_id := str(component.get("id", ""))
 		var old_world := ComponentHierarchy.world_transform(asset, component_id)

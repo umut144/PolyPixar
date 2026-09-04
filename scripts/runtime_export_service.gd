@@ -200,12 +200,12 @@ static func _build_regions(asset: Dictionary) -> Dictionary:
 			if WorldDocumentService.is_reference_component(source_component):
 				errors.append("Region '%s' cannot inherit geometry from an Asset Reference." % name)
 				continue
-			if str(source_component.get("topology_role", "outer")) == "hole":
+			if WorldDocumentService.topology_role(source_component) == WorldDocumentService.ROLE_HOLE:
 				errors.append("Region '%s' cannot inherit geometry from a constraint-only Hole Component." % name)
 				continue
-			var draw_mode := str(source_component.get("draw_mode", "closed_loop"))
+			var draw_mode := WorldDocumentService.component_draw_mode(source_component)
 			var chains: Array = source_component.get("chains", [])
-			if draw_mode == "contour" and (chains.size() != 1 or not bool(chains[0].get("closed", false))):
+			if draw_mode == WorldDocumentService.DRAW_MODE_CONTOUR and (chains.size() != 1 or not bool(chains[0].get("closed", false))):
 				errors.append("Region '%s' requires a closed source Component boundary." % name)
 				continue
 			items.append({
@@ -216,7 +216,7 @@ static func _build_regions(asset: Dictionary) -> Dictionary:
 				"source_component_id": source_component_id
 			})
 			continue
-		var mesh := ClosedRegionMeshService.generate({"draw_mode": "contour", "points": region.get("points", []), "edges": region.get("edges", []), "chains": region.get("chains", [])})
+		var mesh := ClosedRegionMeshService.generate({"draw_mode": WorldDocumentService.DRAW_MODE_CONTOUR, "points": region.get("points", []), "edges": region.get("edges", []), "chains": region.get("chains", [])})
 		if not bool(mesh.get("valid", false)):
 			var mesh_errors: Array = mesh.get("errors", [])
 			errors.append("Region '%s': %s" % [name, str(mesh_errors[0]) if not mesh_errors.is_empty() else "invalid closed boundary"])
@@ -249,7 +249,7 @@ static func _build_regions(asset: Dictionary) -> Dictionary:
 static func _build_component_v8(component: Dictionary, source: Dictionary, export_transform: Dictionary, component_pivot: Vector2) -> Dictionary:
 	var errors: Array[String] = []
 	var label := _component_label(component)
-	var draw_mode := str(component.get("draw_mode", "closed_loop"))
+	var draw_mode := WorldDocumentService.component_draw_mode(component)
 	var authored_transform = component.get("transform", {})
 	if not authored_transform is Dictionary:
 		authored_transform = {}
@@ -274,10 +274,10 @@ static func _build_component_v8(component: Dictionary, source: Dictionary, expor
 		errors.append("%s: Contour Stroke width metadata is invalid or non-metric." % label)
 	if str(parameters.get("join", "")) != ContourStrokeService.JOIN_TYPE or not is_equal_approx(float(parameters.get("miter_limit", 0.0)), ContourStrokeService.MITER_LIMIT) or str(parameters.get("cap", "")) != ContourStrokeService.CAP_TYPE:
 		errors.append("%s: Contour Stroke join/cap metadata does not match the authored contract." % label)
-	if str(stroke.get("topology_role", component.get("topology_role", "outer"))) not in ["outer", "hole"]:
+	if str(stroke.get("topology_role", WorldDocumentService.topology_role(component))) not in WorldDocumentService.TOPOLOGY_ROLES:
 		errors.append("%s: Contour Stroke topology role must be outer or hole." % label)
 	var fill_mesh := {}
-	if draw_mode != "contour":
+	if draw_mode != WorldDocumentService.DRAW_MODE_CONTOUR:
 		var mesh = source.get("mesh", {})
 		if not mesh is Dictionary or not bool(mesh.get("valid", false)) or str(mesh.get("method", "")) == ContourMeshService.METHOD:
 			errors.append("%s: a current accepted Fill Mesh is required." % label)
@@ -286,7 +286,7 @@ static func _build_component_v8(component: Dictionary, source: Dictionary, expor
 		errors.append_array(fill_mesh.get("errors", []))
 	var closed_region_mesh := {}
 	var chains: Array = component.get("chains", [])
-	var requires_closed_region := draw_mode == "contour" and chains.size() == 1 and bool(chains[0].get("closed", false))
+	var requires_closed_region := draw_mode == WorldDocumentService.DRAW_MODE_CONTOUR and chains.size() == 1 and bool(chains[0].get("closed", false))
 	if requires_closed_region:
 		var closed_region = stroke.get("closed_region", {})
 		if not closed_region is Dictionary or not bool(closed_region.get("valid", false)) or int(closed_region.get("algorithm_version", 0)) != ClosedRegionMeshService.ALGORITHM_VERSION:
@@ -327,11 +327,11 @@ static func _build_component_v8(component: Dictionary, source: Dictionary, expor
 			"outer_offset_meters": width_meters * 0.5,
 			"join": {"type": ContourStrokeService.JOIN_TYPE, "miter_limit": ContourStrokeService.MITER_LIMIT, "fallback": "bevel"},
 			"cap": ContourStrokeService.CAP_TYPE,
-			"topology_role": str(stroke.get("topology_role", component.get("topology_role", "outer"))),
+			"topology_role": str(stroke.get("topology_role", WorldDocumentService.topology_role(component))),
 			"runs": _serialize_stroke_runs(stroke.get("runs", []))
 		}
 	}
-	if draw_mode != "contour":
+	if draw_mode != WorldDocumentService.DRAW_MODE_CONTOUR:
 		runtime_component["mesh"] = {"vertices": fill_mesh.get("vertices", []), "indices": fill_mesh.get("indices", [])}
 	if requires_closed_region:
 		runtime_component["closed_region_mesh"] = {

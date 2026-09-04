@@ -51,7 +51,7 @@ static func apply(component: Dictionary, selected_point_ids: Array, axis_start: 
 		"point_ids": mirrored_ids,
 		"edge_ids": [],
 		"closed": false,
-		"topology_role": "outer"
+		"topology_role": WorldDocumentService.ROLE_OUTER
 	}
 	chains.append(mirrored_chain)
 	result["chains"] = chains
@@ -231,7 +231,7 @@ static func validation_issues(component: Dictionary, selected_point_ids: Array, 
 ## uses this before an axis exists; preview and apply add the axis-specific rules.
 static func selection_issues(component: Dictionary, selected_point_ids: Array) -> Array[String]:
 	var errors := BezierTopology.validate(component)
-	if str(component.get("draw_mode", "closed_loop")) != "closed_loop":
+	if not WorldDocumentService.is_closed_loop(component):
 		errors.append("Mirror is available only for Closed Loop Components.")
 	var chains: Array = component.get("chains", [])
 	if chains.size() != 1 or (not chains.is_empty() and bool(chains[0].get("closed", false))):

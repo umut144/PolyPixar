@@ -16,7 +16,20 @@ const REGION_GEOMETRY_COMPONENT := "component"
 const REGION_GEOMETRY_SOURCES := [REGION_GEOMETRY_AUTHORED, REGION_GEOMETRY_COMPONENT]
 const REGION_TYPES := ["attack", "hurt", "collision"]
 const DEFAULT_PROJECTION_DEPTH_CM := 10.0
-const DRAW_MODES := ["closed_loop", "contour", "primitive"]
+# Component discriminators. The persisted values are stable; code compares
+# against these names so a misspelling is a parse error rather than a silent
+# fallback to the default branch. AssetGuide owns the Guide types the same way.
+const DRAW_MODE_CLOSED_LOOP := "closed_loop"
+const DRAW_MODE_CONTOUR := "contour"
+const DRAW_MODE_PRIMITIVE := "primitive"
+const DRAW_MODES := [DRAW_MODE_CLOSED_LOOP, DRAW_MODE_CONTOUR, DRAW_MODE_PRIMITIVE]
+# Topology roles of a Component and of the derived Sampling Chains and
+# constraints built from it; `cut` exists only on the derived records.
+const ROLE_OUTER := "outer"
+const ROLE_HOLE := "hole"
+const ROLE_CUT := "cut"
+const ROLE_SEAM := "seam"
+const TOPOLOGY_ROLES := [ROLE_OUTER, ROLE_HOLE]
 
 
 static func serialize_bezier_points(points: Array) -> Array:
@@ -61,7 +74,7 @@ static func serialize_chains(chains: Array) -> Array:
 			"point_ids": chain_data.get("point_ids", []).duplicate(),
 			"edge_ids": chain_data.get("edge_ids", []).duplicate(),
 			"closed": bool(chain_data.get("closed", false)),
-			"topology_role": str(chain_data.get("topology_role", "outer"))
+			"topology_role": topology_role(chain_data)
 		})
 	return serialized
 
@@ -125,15 +138,15 @@ static func deserialize_component_topology(component_data: Dictionary) -> Dictio
 			var edge_id := str(edge_id_value)
 			if known_edge_ids.has(edge_id):
 				edge_ids.append(edge_id)
-		var topology_role := str(raw_chain.get("topology_role", "outer"))
-		if topology_role not in BezierTopology.VALID_TOPOLOGY_ROLES:
-			topology_role = "outer"
+		var chain_role := topology_role(raw_chain)
+		if chain_role not in BezierTopology.VALID_TOPOLOGY_ROLES:
+			chain_role = ROLE_OUTER
 		chains.append({
 			"id": str(raw_chain.get("id", "chain_%d" % (chains.size() + 1))),
 			"point_ids": point_ids,
 			"edge_ids": edge_ids,
 			"closed": bool(raw_chain.get("closed", false)) and point_ids.size() >= 3,
-			"topology_role": topology_role
+			"topology_role": chain_role
 		})
 	BezierGeometry.resolve_auto_handles(points, chains)
 	return {"points": points, "edges": edges, "chains": chains}
@@ -237,7 +250,7 @@ static func serialize_primitive(raw_primitive) -> Dictionary:
 	if not raw_primitive is Dictionary:
 		return {}
 	var primitive_type := str(raw_primitive.get("type", ""))
-	var result := {"type": primitive_type, "center": serialize_vector(PrimitiveGeometryService.center({"draw_mode": "primitive", "primitive": raw_primitive}))}
+	var result := {"type": primitive_type, "center": serialize_vector(PrimitiveGeometryService.center({"draw_mode": DRAW_MODE_PRIMITIVE, "primitive": raw_primitive}))}
 	if primitive_type == "circle":
 		result["diameter_cm"] = maxf(float(raw_primitive.get("diameter_cm", 1.0)), 0.001)
 		return result
@@ -372,8 +385,8 @@ static func deserialize_component(component_data: Dictionary, source_schema_vers
 		"visibility": bool(component_data.get("visibility", true)),
 		"z_index": int(component_data.get("z_index", 0)),
 		"projection_depth_cm": deserialize_projection_depth_cm(component_data.get("projection_depth_cm", DEFAULT_PROJECTION_DEPTH_CM)),
-		"draw_mode": normalize_component_draw_mode(component_data.get("draw_mode", "closed_loop"), source_schema_version),
-		"topology_role": str(component_data.get("topology_role", "outer")) if str(component_data.get("topology_role", "outer")) in ["outer", "hole"] else "outer",
+		"draw_mode": normalize_component_draw_mode(component_data.get("draw_mode", DRAW_MODE_CLOSED_LOOP), source_schema_version),
+		"topology_role": topology_role(component_data) if topology_role(component_data) in TOPOLOGY_ROLES else ROLE_OUTER,
 		"catch_parent_component_id": str(component_data.get("catch_parent_component_id", "")),
 		"show_point_numbers": bool(component_data.get("show_point_numbers", false)),
 		"primitive": deserialize_primitive(component_data.get("primitive", {}))
@@ -583,7 +596,7 @@ static func normalize_sampling_bake(raw_bake) -> Dictionary:
 		for raw_sample in raw_chain.get("samples", []):
 			if raw_sample is Dictionary:
 				samples.append({"id": str(raw_sample.get("id", "")), "position": deserialize_vector(raw_sample.get("position", [0.0, 0.0]), Vector2.ZERO), "edge_id": str(raw_sample.get("edge_id", "")), "curve_t": clampf(float(raw_sample.get("curve_t", 0.0)), 0.0, 1.0), "source_point_id": str(raw_sample.get("source_point_id", "")), "preserved": bool(raw_sample.get("preserved", false))})
-		normalized_chains.append({"chain_id": str(raw_chain.get("chain_id", "")), "input_id": str(raw_chain.get("input_id", "")), "topology_role": str(raw_chain.get("topology_role", "outer")), "closed": bool(raw_chain.get("closed", false)), "effective_spacing": maxf(float(raw_chain.get("effective_spacing", raw_bake.get("parameters", {}).get("spacing", GeometrySamplingService.DEFAULT_SPACING))), GeometrySamplingService.MIN_SPACING), "samples": samples})
+		normalized_chains.append({"chain_id": str(raw_chain.get("chain_id", "")), "input_id": str(raw_chain.get("input_id", "")), "topology_role": topology_role(raw_chain), "closed": bool(raw_chain.get("closed", false)), "effective_spacing": maxf(float(raw_chain.get("effective_spacing", raw_bake.get("parameters", {}).get("spacing", GeometrySamplingService.DEFAULT_SPACING))), GeometrySamplingService.MIN_SPACING), "samples": samples})
 	bake["method"] = GeometrySamplingService.ADAPTIVE
 	bake["algorithm_version"] = int(raw_bake.get("algorithm_version", 0))
 	bake["parameters"] = GeometrySamplingService.normalize_recipe({"method": bake["method"], "parameters": raw_bake.get("parameters", {})})["parameters"]
@@ -617,7 +630,7 @@ static func normalize_sampling_bake(raw_bake) -> Dictionary:
 	bake["boundary_refinement_unresolved_corner_count"] = maxi(int(raw_bake.get("boundary_refinement_unresolved_corner_count", 0)), 0)
 	bake["boundary_refinement_limit_reached"] = bool(raw_bake.get("boundary_refinement_limit_reached", false))
 	bake["preserve_count"] = int(raw_bake.get("preserve_count", 0))
-	bake["hole_count"] = normalized_chains.filter(func(chain: Dictionary) -> bool: return str(chain.get("topology_role", "outer")) == "hole").size()
+	bake["hole_count"] = normalized_chains.filter(func(chain: Dictionary) -> bool: return topology_role(chain) == ROLE_HOLE).size()
 	var constraint_count := 0
 	for chain_data in normalized_chains:
 		constraint_count += chain_data.get("samples", []).size()
@@ -626,7 +639,7 @@ static func normalize_sampling_bake(raw_bake) -> Dictionary:
 	bake["constraint_sample_count"] = constraint_count
 	var boundary_stats: Array = []
 	for chain_data in normalized_chains:
-		boundary_stats.append({"input_id": str(chain_data.get("input_id", "")), "role": str(chain_data.get("topology_role", "outer")), "effective_spacing": float(chain_data.get("effective_spacing", GeometrySamplingService.DEFAULT_SPACING)), "sample_count": chain_data.get("samples", []).size()})
+		boundary_stats.append({"input_id": str(chain_data.get("input_id", "")), "role": topology_role(chain_data), "effective_spacing": float(chain_data.get("effective_spacing", GeometrySamplingService.DEFAULT_SPACING)), "sample_count": chain_data.get("samples", []).size()})
 	for cut_data in normalized_cuts:
 		boundary_stats.append({"input_id": str(cut_data.get("input_id", cut_data.get("guide_id", ""))), "role": "cut", "effective_spacing": float(cut_data.get("effective_spacing", GeometrySamplingService.DEFAULT_SPACING)), "sample_count": cut_data.get("samples", []).size()})
 	bake["boundary_stats"] = boundary_stats
@@ -781,7 +794,7 @@ static func serialize_sampling_bake(bake: Dictionary) -> Dictionary:
 		var serialized_samples: Array = []
 		for sample in chain_data.get("samples", []):
 			serialized_samples.append({"id": str(sample.get("id", "")), "position": serialize_vector(Vector2(sample.get("position", Vector2.ZERO))), "edge_id": str(sample.get("edge_id", "")), "curve_t": float(sample.get("curve_t", 0.0)), "source_point_id": str(sample.get("source_point_id", "")), "preserved": bool(sample.get("preserved", false))})
-		serialized_chains.append({"chain_id": str(chain_data.get("chain_id", "")), "input_id": str(chain_data.get("input_id", "")), "topology_role": str(chain_data.get("topology_role", "outer")), "closed": bool(chain_data.get("closed", false)), "effective_spacing": float(chain_data.get("effective_spacing", GeometrySamplingService.DEFAULT_SPACING)), "samples": serialized_samples})
+		serialized_chains.append({"chain_id": str(chain_data.get("chain_id", "")), "input_id": str(chain_data.get("input_id", "")), "topology_role": topology_role(chain_data), "closed": bool(chain_data.get("closed", false)), "effective_spacing": float(chain_data.get("effective_spacing", GeometrySamplingService.DEFAULT_SPACING)), "samples": serialized_samples})
 	serialized_bake["chains"] = serialized_chains
 	var serialized_cuts: Array = []
 	for cut_data in bake.get("cuts", []):
@@ -796,7 +809,7 @@ static func serialize_sampling_bake(bake: Dictionary) -> Dictionary:
 			serialized_fragments.append({"id": str(fragment.get("id", "")), "samples": fragment_samples})
 		serialized_cuts.append({"valid": bool(cut_data.get("valid", true)), "errors": cut_data.get("errors", []).duplicate(), "guide_id": str(cut_data.get("guide_id", "")), "input_id": str(cut_data.get("input_id", cut_data.get("guide_id", ""))), "effective_spacing": float(cut_data.get("effective_spacing", GeometrySamplingService.DEFAULT_SPACING)), "samples": serialized_samples, "fragments": serialized_fragments})
 	serialized_bake["cuts"] = serialized_cuts
-	serialized_bake["hole_count"] = serialized_chains.filter(func(chain: Dictionary) -> bool: return str(chain.get("topology_role", "outer")) == "hole").size()
+	serialized_bake["hole_count"] = serialized_chains.filter(func(chain: Dictionary) -> bool: return topology_role(chain) == ROLE_HOLE).size()
 	return serialized_bake
 
 static func serialize_seeding_bake(bake: Dictionary) -> Dictionary:
@@ -1045,9 +1058,9 @@ static func projection_depth_cm(component: Dictionary) -> float:
 
 
 static func draw_mode_display_name(draw_mode: String) -> String:
-	if draw_mode == "contour":
+	if draw_mode == DRAW_MODE_CONTOUR:
 		return "Contour"
-	if draw_mode == "primitive":
+	if draw_mode == DRAW_MODE_PRIMITIVE:
 		return "Primitive"
 	return "Closed Loop"
 
@@ -1106,7 +1119,41 @@ static func is_reference_component(component: Dictionary) -> bool:
 
 static func is_constraint_only_hole(component: Dictionary) -> bool:
 	return not is_reference_component(component) and not is_region(component) \
-		and str(component.get("topology_role", "outer")) == "hole"
+		and topology_role(component) == ROLE_HOLE
+
+
+# The Component's draw mode, defaulting to a Closed Loop like every reader
+# of the persisted field.
+static func component_draw_mode(component: Dictionary) -> String:
+	return str(component.get("draw_mode", DRAW_MODE_CLOSED_LOOP))
+
+
+static func is_closed_loop(component: Dictionary) -> bool:
+	return component_draw_mode(component) == DRAW_MODE_CLOSED_LOOP
+
+
+static func is_contour(component: Dictionary) -> bool:
+	return component_draw_mode(component) == DRAW_MODE_CONTOUR
+
+
+static func is_primitive(component: Dictionary) -> bool:
+	return component_draw_mode(component) == DRAW_MODE_PRIMITIVE
+
+
+# The topology role of a Component, a Chain, or a derived Sampling record;
+# all of them default to `outer`.
+static func topology_role(record: Dictionary) -> String:
+	return str(record.get("topology_role", ROLE_OUTER))
+
+
+# An ordinary Component that owns a Fill: outer role, Closed Loop or
+# Primitive, neither a Reference nor a Region. Only such a Component can be
+# a Body for Holes, Cuts and Seeding.
+static func is_outer_body(component: Dictionary) -> bool:
+	if component.is_empty() or is_reference_component(component) or is_region(component):
+		return false
+	return topology_role(component) == ROLE_OUTER \
+		and component_draw_mode(component) in [DRAW_MODE_CLOSED_LOOP, DRAW_MODE_PRIMITIVE]
 
 
 static func component_effectively_visible(asset: Dictionary, component: Dictionary) -> bool:
@@ -1133,12 +1180,12 @@ static func constraint_hole_parent_validation_issue(asset: Dictionary, component
 	if parent.is_empty():
 		return "Hole Component references a missing Parent '%s'." % parent_id
 	if is_reference_component(parent) or is_region(parent) \
-		or str(parent.get("topology_role", "outer")) != "outer" \
-		or str(parent.get("draw_mode", "closed_loop")) not in ["closed_loop", "primitive"]:
+		or topology_role(parent) != ROLE_OUTER \
+		or component_draw_mode(parent) not in [DRAW_MODE_CLOSED_LOOP, DRAW_MODE_PRIMITIVE]:
 		return "Hole Component Parent '%s' must be an outer Closed Loop or Primitive Body." % normalized_component_name(parent)
 	if not component_effectively_visible(asset, parent):
 		return "Hole Component Parent '%s' must be visible." % normalized_component_name(parent)
-	if str(component.get("draw_mode", "closed_loop")) not in ["closed_loop", "primitive"]:
+	if component_draw_mode(component) not in [DRAW_MODE_CLOSED_LOOP, DRAW_MODE_PRIMITIVE]:
 		return "Hole Component must use Closed Loop or Primitive Draw Mode."
 	return ""
 
@@ -1169,10 +1216,10 @@ static func has_supported_schema(data) -> bool:
 static func normalize_component_draw_mode(raw_mode, source_schema_version: int) -> String:
 	var draw_mode := str(raw_mode)
 	if draw_mode == "ribbon" and source_schema_version < 40:
-		return "contour"
+		return DRAW_MODE_CONTOUR
 	if draw_mode == "ribbon":
 		return draw_mode
-	return draw_mode if draw_mode in DRAW_MODES else "closed_loop"
+	return draw_mode if draw_mode in DRAW_MODES else DRAW_MODE_CLOSED_LOOP
 
 static func normalize_asset_type(value) -> String:
 	var normalized := str(value).strip_edges().to_lower()

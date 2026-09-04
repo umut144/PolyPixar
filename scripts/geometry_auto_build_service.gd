@@ -274,7 +274,7 @@ static func source_signature(component: Dictionary, cut_guides: Array, hole_comp
 	var vectors: Array = []
 	var scalars: Array = []
 	var topology_parts := PackedStringArray()
-	_append_source_signature("outer", component, topology_parts, vectors, scalars)
+	_append_source_signature(WorldDocumentService.ROLE_OUTER, component, topology_parts, vectors, scalars)
 	for hole in hole_components:
 		if hole is Dictionary:
 			_append_source_signature("hole:%s" % str(hole.get("sampling_input_id", hole.get("id", ""))), hole, topology_parts, vectors, scalars)
@@ -359,7 +359,7 @@ static func _outer_contour(component: Dictionary) -> PackedVector2Array:
 static func _append_source_signature(prefix: String, source: Dictionary, topology_parts: PackedStringArray, vectors: Array, scalars: Array) -> void:
 	var working := source.duplicate(true)
 	BezierGeometry.resolve_auto_handles(working.get("points", []), working.get("chains", []))
-	topology_parts.append("source|%s|%s|%s" % [prefix, str(working.get("draw_mode", "closed_loop")), str(working.get("topology_role", "outer"))])
+	topology_parts.append("source|%s|%s|%s" % [prefix, WorldDocumentService.component_draw_mode(working), WorldDocumentService.topology_role(working)])
 	if not str(working.get("sampling_error", "")).is_empty():
 		topology_parts.append("sampling_error|%s|%s" % [prefix, str(working.get("sampling_error", ""))])
 	for point in working.get("points", []):
@@ -374,14 +374,14 @@ static func _append_source_signature(prefix: String, source: Dictionary, topolog
 			topology_parts.append("edge|%s|%s|%s|%s" % [prefix, str(edge.get("id", "")), str(edge.get("start_point_id", "")), str(edge.get("end_point_id", ""))])
 	for chain in working.get("chains", []):
 		if chain is Dictionary:
-			topology_parts.append("chain|%s|%s|%s|%s|%d|%s" % [prefix, str(chain.get("id", "")), ",".join(chain.get("point_ids", [])), ",".join(chain.get("edge_ids", [])), int(bool(chain.get("closed", false))), str(chain.get("topology_role", "outer"))])
+			topology_parts.append("chain|%s|%s|%s|%s|%d|%s" % [prefix, str(chain.get("id", "")), ",".join(chain.get("point_ids", [])), ",".join(chain.get("edge_ids", [])), int(bool(chain.get("closed", false))), WorldDocumentService.topology_role(chain)])
 	if PrimitiveGeometryService.has_analytic_shape(working):
 		topology_parts.append("primitive|%s|%s" % [prefix, str(working.get("primitive", {}).get("type", ""))])
 		_append_vector(vectors, PrimitiveGeometryService.center(working))
 		var primitive_diameters := PrimitiveGeometryService.diameters_tool_units(working)
 		scalars.append(primitive_diameters.x)
 		scalars.append(primitive_diameters.y)
-	if str(working.get("draw_mode", "")) == "contour":
+	if WorldDocumentService.is_contour(working):
 		scalars.append(float(ContourStrokeService.DEFAULT_STROKE_WIDTH_PX))
 		scalars.append(float(ContourMeshService.ALGORITHM_VERSION))
 		for edge in working.get("edges", []):

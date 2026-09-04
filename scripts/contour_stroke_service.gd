@@ -156,7 +156,7 @@ static func generate(component: Dictionary, stroke_width_px := DEFAULT_STROKE_WI
 		"cap": CAP_TYPE,
 		"source_chain_closed": source_closed,
 		"chain_id": str(chain.get("id", "")),
-		"topology_role": str(chain.get("topology_role", "outer")),
+		"topology_role": WorldDocumentService.topology_role(chain),
 		"has_outline": not output_runs.is_empty(),
 		"outline_run_count": output_runs.size(),
 		"runs": output_runs,
@@ -179,18 +179,18 @@ static func validation_issues(component: Dictionary, stroke_width_px := DEFAULT_
 	var errors := BezierTopology.validate(component)
 	if not is_finite(stroke_width_px) or stroke_width_px <= 0.0:
 		errors.append("Contour stroke width must be a finite positive authored pixel value.")
-	var draw_mode := str(component.get("draw_mode", "closed_loop"))
-	if draw_mode not in ["closed_loop", "contour"]:
+	var draw_mode := WorldDocumentService.component_draw_mode(component)
+	if draw_mode not in [WorldDocumentService.DRAW_MODE_CLOSED_LOOP, WorldDocumentService.DRAW_MODE_CONTOUR]:
 		errors.append("Contour Stroke requires a Closed Loop or Contour Component.")
 	var chains: Array = component.get("chains", [])
 	if chains.size() != 1:
 		errors.append("Contour Stroke requires exactly one Chain.")
 		return errors
 	var chain: Dictionary = chains[0]
-	var component_role := str(component.get("topology_role", "outer"))
-	var chain_role := str(chain.get("topology_role", "outer"))
+	var component_role := WorldDocumentService.topology_role(component)
+	var chain_role := WorldDocumentService.topology_role(chain)
 	if bool(chain.get("closed", false)):
-		if component_role not in ["outer", "hole"] or chain_role not in ["outer", "hole"]:
+		if component_role not in WorldDocumentService.TOPOLOGY_ROLES or chain_role not in WorldDocumentService.TOPOLOGY_ROLES:
 			errors.append("A closed Contour Stroke requires an outer or hole Chain.")
 		elif component_role != chain_role:
 			errors.append("Contour Stroke Component and Chain topology roles must match.")
@@ -199,7 +199,7 @@ static func validation_issues(component: Dictionary, stroke_width_px := DEFAULT_
 	else:
 		if bool(chain.get("closed", false)) or chain.get("point_ids", []).size() < 2:
 			errors.append("An open Contour Stroke requires one open Chain with at least two Points.")
-		if component_role != "outer" or chain_role != "outer":
+		if component_role != WorldDocumentService.ROLE_OUTER or chain_role != WorldDocumentService.ROLE_OUTER:
 			errors.append("An open Contour Component must use the outer topology role.")
 	return errors
 

@@ -11,14 +11,14 @@ const ALGORITHM_VERSION := 5
 
 static func validation_issues(component: Dictionary, stroke_width_px := ContourStrokeService.DEFAULT_STROKE_WIDTH_PX) -> Array[String]:
 	var errors: Array[String] = []
-	if str(component.get("draw_mode", "")) == "primitive":
+	if WorldDocumentService.is_primitive(component):
 		errors.append_array(PrimitiveGeometryService.validation_issues(component))
 		if not is_finite(stroke_width_px) or stroke_width_px <= 0.0:
 			errors.append("Contour stroke width must be a finite positive authored pixel value.")
 	else:
 		errors.append_array(ContourStrokeService.validation_issues(component, stroke_width_px))
 		var chains: Array = component.get("chains", [])
-		if errors.is_empty() and str(component.get("draw_mode", "")) == "contour" and chains.size() == 1 and bool(chains[0].get("closed", false)):
+		if errors.is_empty() and WorldDocumentService.is_contour(component) and chains.size() == 1 and bool(chains[0].get("closed", false)):
 			errors.append_array(ClosedRegionMeshService.validation_issues(component))
 	return errors
 
@@ -29,14 +29,14 @@ static func generate(component: Dictionary, stroke_width_px := ContourStrokeServ
 	if not errors.is_empty():
 		return _failed_result(fingerprint, errors)
 	var stroke_source := component
-	if str(component.get("draw_mode", "")) == "primitive":
+	if WorldDocumentService.is_primitive(component):
 		var proxy := _primitive_stroke_source(component)
 		if not bool(proxy.get("valid", false)):
 			return _failed_result(fingerprint, proxy.get("errors", []))
 		stroke_source = proxy["component"]
 	var closed_region := {}
 	var chains: Array = component.get("chains", [])
-	if str(component.get("draw_mode", "")) == "contour" and chains.size() == 1 and bool(chains[0].get("closed", false)):
+	if WorldDocumentService.is_contour(component) and chains.size() == 1 and bool(chains[0].get("closed", false)):
 		closed_region = ClosedRegionMeshService.generate(component)
 		if not bool(closed_region.get("valid", false)):
 			return _failed_result(fingerprint, closed_region.get("errors", []))
@@ -80,9 +80,9 @@ static func generate(component: Dictionary, stroke_width_px := ContourStrokeServ
 			"cap": ContourStrokeService.CAP_TYPE
 		},
 		"has_outline": bool(stroke.get("has_outline", false)),
-		"source_draw_mode": str(component.get("draw_mode", "closed_loop")),
+		"source_draw_mode": WorldDocumentService.component_draw_mode(component),
 		"source_chain_closed": bool(stroke.get("source_chain_closed", false)),
-		"topology_role": str(component.get("topology_role", "outer")),
+		"topology_role": WorldDocumentService.topology_role(component),
 		"runs": stroke.get("runs", []).duplicate(true),
 		"geometry_diagnostics": stroke.get("geometry_diagnostics", {}).duplicate(true),
 		"vertices": vertices,
@@ -122,11 +122,11 @@ static func _primitive_stroke_source(component: Dictionary) -> Dictionary:
 	for index in range(edges.size()):
 		edges[index]["end_point_id"] = point_ids[(index + 1) % point_ids.size()]
 	return {"valid": true, "errors": [], "component": {
-		"draw_mode": "closed_loop",
-		"topology_role": "outer",
+		"draw_mode": WorldDocumentService.DRAW_MODE_CLOSED_LOOP,
+		"topology_role": WorldDocumentService.ROLE_OUTER,
 		"points": points,
 		"edges": edges,
-		"chains": [{"id": "primitive:%s" % primitive_type, "point_ids": point_ids, "edge_ids": edge_ids, "closed": true, "topology_role": "outer"}]
+		"chains": [{"id": "primitive:%s" % primitive_type, "point_ids": point_ids, "edge_ids": edge_ids, "closed": true, "topology_role": WorldDocumentService.ROLE_OUTER}]
 	}}
 
 
@@ -172,7 +172,7 @@ static func source_fingerprint(component: Dictionary, stroke_width_px := Contour
 		",".join(outline_parts)
 	]
 	var chains: Array = component.get("chains", [])
-	if str(component.get("draw_mode", "")) == "contour" and chains.size() == 1 and bool(chains[0].get("closed", false)):
+	if WorldDocumentService.is_contour(component) and chains.size() == 1 and bool(chains[0].get("closed", false)):
 		fingerprint_text += "\nclosed_region|%d" % ClosedRegionMeshService.ALGORITHM_VERSION
 	context.update(fingerprint_text.to_utf8_buffer())
 	return context.finish().hex_encode()

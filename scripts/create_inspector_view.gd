@@ -383,14 +383,14 @@ func rebuild() -> void:
 			hierarchy_parent_items.append({"label": str(candidate.get("name", "Component")), "metadata": candidate_id})
 		add_child(EditorWidgets.create_option_field(hierarchy_parent_items,
 			current_parent_id, component_hierarchy_parent_selected.emit))
-	var draw_mode := str(component.get("draw_mode", "closed_loop"))
+	var draw_mode := WorldDocumentService.component_draw_mode(component)
 	add_child(EditorWidgets.create_inspector_field_label("Draw Mode: %s" % WorldDocumentService.draw_mode_display_name(draw_mode)))
-	if not WorldDocumentService.is_region(component) and (WorldDocumentService.is_reference_component(component) or draw_mode in ["closed_loop", "primitive"]):
+	if not WorldDocumentService.is_region(component) and (WorldDocumentService.is_reference_component(component) or draw_mode in [WorldDocumentService.DRAW_MODE_CLOSED_LOOP, WorldDocumentService.DRAW_MODE_PRIMITIVE]):
 		add_child(EditorWidgets.create_inspector_section("Topology", section_toggled.emit))
 		add_child(EditorWidgets.create_option_field([
-			{"label": "Outer", "metadata": "outer"},
-			{"label": "Hole", "metadata": "hole"},
-		], str(component.get("topology_role", "outer")), component_topology_role_selected.emit))
+			{"label": "Outer", "metadata": WorldDocumentService.ROLE_OUTER},
+			{"label": "Hole", "metadata": WorldDocumentService.ROLE_HOLE},
+		], WorldDocumentService.topology_role(component), component_topology_role_selected.emit))
 	var primitive = component.get("primitive", {})
 	if primitive is Dictionary and str(primitive.get("type", "")) in ["circle", PrimitiveGeometryService.ELLIPSE]:
 		add_child(EditorWidgets.create_inspector_section("Geometry", section_toggled.emit))
@@ -411,9 +411,9 @@ func rebuild() -> void:
 	var validation_component := component
 	if inherited_region_geometry:
 		validation_component = WorldDocumentService.component_by_id(asset, str(component.get("parent_component_id", "")))
-	var validation_draw_mode := str(validation_component.get("draw_mode", "closed_loop"))
-	var mode_issues := ["Attached Component is missing."] if validation_component.is_empty() else PrimitiveGeometryService.validation_issues(validation_component) if validation_draw_mode == "primitive" else BezierTopology.mode_validation_issues(validation_component, true)
-	if inherited_region_geometry and validation_draw_mode == "contour" and (validation_component.get("chains", []).size() != 1 or not bool(validation_component.get("chains", [])[0].get("closed", false))):
+	var validation_draw_mode := WorldDocumentService.component_draw_mode(validation_component)
+	var mode_issues := ["Attached Component is missing."] if validation_component.is_empty() else PrimitiveGeometryService.validation_issues(validation_component) if validation_draw_mode == WorldDocumentService.DRAW_MODE_PRIMITIVE else BezierTopology.mode_validation_issues(validation_component, true)
+	if inherited_region_geometry and validation_draw_mode == WorldDocumentService.DRAW_MODE_CONTOUR and (validation_component.get("chains", []).size() != 1 or not bool(validation_component.get("chains", [])[0].get("closed", false))):
 		mode_issues.append("Component Geometry requires a closed Component boundary.")
 	var configured_catch_parent_id := str(component.get("catch_parent_component_id", ""))
 	if not configured_catch_parent_id.is_empty() and (configured_catch_parent_id == selected_component_id or WorldDocumentService.component_by_id(asset, configured_catch_parent_id).is_empty()):
@@ -422,7 +422,7 @@ func rebuild() -> void:
 	var mode_status := EditorWidgets.create_inspector_field_label("Geometry: Valid" if mode_issues.is_empty() else "Geometry: Draft · %s" % mode_issues[0])
 	mode_status.add_theme_color_override("font_color", Color("#75b88a") if mode_issues.is_empty() else Color("#f2c94c"))
 	add_child(mode_status)
-	if draw_mode == "contour":
+	if draw_mode == WorldDocumentService.DRAW_MODE_CONTOUR:
 		add_child(EditorWidgets.create_inspector_section("Drawing Reference", section_toggled.emit))
 		add_child(EditorWidgets.create_inspector_field_label("Catch Parent"))
 		var catch_parent_items: Array = [{"label": "None", "metadata": ""}]
@@ -594,7 +594,7 @@ func _render_guide_inspector(asset: Dictionary, guide: Dictionary) -> void:
 		{"label": "Motion", "metadata": AssetGuide.ANIMATION_SPINE},
 	], str(guide.get("guide_type", AssetGuide.BODY_FLOW)), guide_type_selected.emit, false))
 	add_child(EditorWidgets.create_inspector_field_label("Parent Component"))
-	var target_id := str(guide.get("scope", {}).get("component_id", ""))
+	var target_id := AssetGuide.scope_component_id(guide)
 	var target_name := "Missing Component"
 	for component in asset.get("components", []):
 		if str(component.get("type", "component")) == "guide":

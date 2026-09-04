@@ -202,9 +202,9 @@ func _draw_boundaries() -> void:
 		var samples: Array = chain_data.get("samples", [])
 		if samples.size() < 2:
 			continue
-		var role := str(chain_data.get("topology_role", "outer"))
+		var role := WorldDocumentService.topology_role(chain_data)
 		var input_id := str(chain_data.get("input_id", ""))
-		var color := HOLE_COLOR if role == "hole" else BOUNDARY_COLOR
+		var color := HOLE_COLOR if role == WorldDocumentService.ROLE_HOLE else BOUNDARY_COLOR
 		var width := 3.0 if not input_id.is_empty() and input_id == selected_input_id else 1.5
 		for sample_index in range(samples.size()):
 			var current := _to_screen(Vector2(samples[sample_index].get("position", Vector2.ZERO)))

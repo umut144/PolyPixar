@@ -300,7 +300,7 @@ static func _boundary_constraints(sampling_bake: Dictionary) -> Array:
 		for sample_index in range(samples.size()):
 			constraints.append({
 				"chain_id": str(chain_data.get("chain_id", "")),
-				"topology_role": str(chain_data.get("topology_role", "outer")),
+				"topology_role": WorldDocumentService.topology_role(chain_data),
 				"segment_index": sample_index,
 				"vertex_ids": [
 					"vertex:boundary:%s" % str(samples[sample_index].get("id", "")),
@@ -317,7 +317,7 @@ static func _boundary_constraints(sampling_bake: Dictionary) -> Array:
 				var first_id := str(samples[sample_index].get("vertex_id", ""))
 				var second_id := str(samples[sample_index + 1].get("vertex_id", ""))
 				if not first_id.is_empty() and not second_id.is_empty() and first_id != second_id:
-					constraints.append({"chain_id": str(fragment.get("id", "cut:%s" % str(cut.get("guide_id", "")))), "topology_role": "cut", "fragment_index": fragment_index, "segment_index": sample_index, "vertex_ids": [first_id, second_id]})
+					constraints.append({"chain_id": str(fragment.get("id", "cut:%s" % str(cut.get("guide_id", "")))), "topology_role": WorldDocumentService.ROLE_CUT, "fragment_index": fragment_index, "segment_index": sample_index, "vertex_ids": [first_id, second_id]})
 			fragment_index += 1
 	return constraints
 
@@ -459,21 +459,21 @@ static func _select_domain_triangles(raw_triangles: Array, positions: PackedVect
 	var boundary_edge_keys: Dictionary = {}
 	var outer_orientation_by_chain: Dictionary = {}
 	for constraint_index in range(constraint_indices.size()):
-		var role := str(constraints[constraint_index].get("topology_role", "outer"))
-		if role not in ["outer", "hole"]:
+		var role := WorldDocumentService.topology_role(constraints[constraint_index])
+		if role not in WorldDocumentService.TOPOLOGY_ROLES:
 			continue
 		var edge: Array = constraint_indices[constraint_index]
 		var first := int(edge[0])
 		var second := int(edge[1])
 		boundary_edge_keys[_edge_key(first, second)] = true
-		if role == "outer":
+		if role == WorldDocumentService.ROLE_OUTER:
 			var chain_id := str(constraints[constraint_index].get("chain_id", ""))
 			outer_orientation_by_chain[chain_id] = float(outer_orientation_by_chain.get(chain_id, 0.0)) + positions[first].cross(positions[second])
 
 	var selected: Dictionary = {}
 	var pending: Array[int] = []
 	for constraint_index in range(constraint_indices.size()):
-		if str(constraints[constraint_index].get("topology_role", "outer")) != "outer":
+		if WorldDocumentService.topology_role(constraints[constraint_index]) != WorldDocumentService.ROLE_OUTER:
 			continue
 		var edge: Array = constraint_indices[constraint_index]
 		var first := int(edge[0])
@@ -563,8 +563,8 @@ static func _final_constraint_issues(triangles: Array, constraint_indices: Array
 	for constraint_index in range(constraint_indices.size()):
 		var edge: Array = constraint_indices[constraint_index]
 		var actual_count := int(edge_use_count.get(_edge_key(int(edge[0]), int(edge[1])), 0))
-		var role := str(constraints[constraint_index].get("topology_role", "outer"))
-		var expected_count := 2 if role == "cut" else 1
+		var role := WorldDocumentService.topology_role(constraints[constraint_index])
+		var expected_count := 2 if role == WorldDocumentService.ROLE_CUT else 1
 		if actual_count != expected_count:
 			errors.append("Final Mesh uses %s in %d Triangle%s; expected %d." % [
 				_constraint_label(constraints[constraint_index], constraint_index),

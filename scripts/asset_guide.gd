@@ -59,6 +59,14 @@ static func create_weapon_frame(guide_id: String, guide_type: String, scope_kind
 	}
 
 
+# The Component a Component-scoped Guide belongs to; empty for Group scope.
+static func scope_component_id(guide: Dictionary) -> String:
+	var scope = guide.get("scope", {})
+	if not scope is Dictionary:
+		return ""
+	return str(scope.get("component_id", ""))
+
+
 static func normalize(raw_guide) -> Dictionary:
 	var source: Dictionary = raw_guide if raw_guide is Dictionary else {}
 	var guide_type := canonical_type(str(source.get("guide_type", SAMPLER_SPINE)))

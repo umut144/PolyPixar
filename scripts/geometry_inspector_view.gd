@@ -329,11 +329,11 @@ func _render_seeding() -> void:
 	var cut_count := 0
 	for stat in sampling_bake.get("boundary_stats", []):
 		var role := str(stat.get("role", ""))
-		if role == "outer":
+		if role == WorldDocumentService.ROLE_OUTER:
 			outer_count += int(stat.get("sample_count", 0))
-		elif role == "hole":
+		elif role == WorldDocumentService.ROLE_HOLE:
 			hole_count += int(stat.get("sample_count", 0))
-		elif role == "cut":
+		elif role == WorldDocumentService.ROLE_CUT:
 			cut_count += int(stat.get("sample_count", 0))
 	add_child(EditorWidgets.create_inspector_field_label("Outer · inward clearance · %d points" % outer_count))
 	add_child(EditorWidgets.create_inspector_field_label("Holes · excluded + clearance · %d points" % hole_count))
@@ -379,7 +379,7 @@ func _render_meshing() -> void:
 	if component.is_empty():
 		add_child(EditorWidgets.create_inspector_field_label("Select one Component to generate its derived Mesh."))
 		return
-	if str(component.get("draw_mode", "")) == "contour":
+	if WorldDocumentService.is_contour(component):
 		_render_contour_meshing(component)
 		return
 	add_child(EditorWidgets.create_inspector_field_label(str(component.get("name", "Component"))))

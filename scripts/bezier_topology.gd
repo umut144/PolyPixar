@@ -2,7 +2,7 @@ class_name BezierTopology
 extends RefCounted
 
 const VALID_POINT_MODES := ["linear", "aligned", "free", "mirrored", "corner"]
-const VALID_TOPOLOGY_ROLES := ["outer", "hole", "cut", "seam"]
+const VALID_TOPOLOGY_ROLES := [WorldDocumentService.ROLE_OUTER, WorldDocumentService.ROLE_HOLE, WorldDocumentService.ROLE_CUT, WorldDocumentService.ROLE_SEAM]
 const FUSE_POINT_TOLERANCE := 0.0001
 
 
@@ -48,7 +48,7 @@ static func chain_for_edge(chains: Array, edge_id: String) -> Dictionary:
 static func outer_chain(component: Dictionary) -> Dictionary:
 	var chains: Array = component.get("chains", [])
 	for chain_data in chains:
-		if chain_data is Dictionary and str(chain_data.get("topology_role", "outer")) == "outer":
+		if chain_data is Dictionary and WorldDocumentService.topology_role(chain_data) == WorldDocumentService.ROLE_OUTER:
 			return chain_data
 	return chains[0] if not chains.is_empty() and chains[0] is Dictionary else {}
 
@@ -81,7 +81,7 @@ static func add_point(component: Dictionary, position: Vector2, requested_mode: 
 			"point_ids": [],
 			"edge_ids": [],
 			"closed": false,
-			"topology_role": "outer"
+			"topology_role": WorldDocumentService.ROLE_OUTER
 		})
 	var chain: Dictionary = chains.back()
 	var mode := requested_mode if requested_mode in VALID_POINT_MODES else "linear"
@@ -203,20 +203,20 @@ static func mode_validation_issues(component: Dictionary, complete := true) -> A
 	if chains.is_empty():
 		errors.append("The Component needs one Chain.")
 		return errors
-	var draw_mode := str(component.get("draw_mode", "closed_loop"))
-	if draw_mode == "closed_loop":
-		var topology_role := str(component.get("topology_role", "outer"))
-		if topology_role not in ["outer", "hole"]:
-			topology_role = "outer"
+	var draw_mode := WorldDocumentService.component_draw_mode(component)
+	if draw_mode == WorldDocumentService.DRAW_MODE_CLOSED_LOOP:
+		var topology_role := WorldDocumentService.topology_role(component)
+		if topology_role not in WorldDocumentService.TOPOLOGY_ROLES:
+			topology_role = WorldDocumentService.ROLE_OUTER
 		if chains.size() != 1:
 			errors.append("Closed Loop requires one final closed Chain.")
 		else:
 			var chain: Dictionary = chains[0]
-			if str(chain.get("topology_role", "outer")) != topology_role:
+			if WorldDocumentService.topology_role(chain) != topology_role:
 				errors.append("Closed Loop chain role must be %s." % topology_role)
 			if not bool(chain.get("closed", false)) or chain.get("point_ids", []).size() < 3:
 				errors.append("Closed Loop requires one closed Chain with at least three Points.")
-	elif draw_mode == "contour":
+	elif draw_mode == WorldDocumentService.DRAW_MODE_CONTOUR:
 		if chains.size() != 1:
 			errors.append("Contour requires one Chain.")
 		else:

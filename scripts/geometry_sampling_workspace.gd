@@ -172,7 +172,7 @@ func _draw_samples() -> void:
 		var samples: Array = chain_data.get("samples", [])
 		if samples.is_empty():
 			continue
-		var is_hole := str(chain_data.get("topology_role", "outer")) == "hole"
+		var is_hole := WorldDocumentService.topology_role(chain_data) == WorldDocumentService.ROLE_HOLE
 		var selected := not selected_input_id.is_empty() and str(chain_data.get("input_id", "")) == selected_input_id
 		var line_color := HOLE_LINE_COLOR if is_hole else SAMPLE_LINE_COLOR
 		var point_color := HOLE_POINT_COLOR if is_hole else SAMPLE_POINT_COLOR

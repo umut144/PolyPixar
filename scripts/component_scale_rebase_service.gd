@@ -208,10 +208,10 @@ static func _bake_group_guides(asset: Dictionary, group_id: String, group_world_
 static func _blocking_reason(_asset: Dictionary, component: Dictionary, scale: Vector2) -> String:
 	if not scale.is_finite() or absf(scale.x) <= SCALE_EPSILON or absf(scale.y) <= SCALE_EPSILON:
 		return "Scale axes must be finite and non-zero."
-	var draw_mode := str(component.get("draw_mode", "closed_loop"))
-	if draw_mode in ["closed_loop", "contour"]:
+	var draw_mode := WorldDocumentService.component_draw_mode(component)
+	if draw_mode in [WorldDocumentService.DRAW_MODE_CLOSED_LOOP, WorldDocumentService.DRAW_MODE_CONTOUR]:
 		return "" if not component.get("points", []).is_empty() else "Component has no geometry that can absorb Scale."
-	if draw_mode == "primitive":
+	if draw_mode == WorldDocumentService.DRAW_MODE_PRIMITIVE:
 		return "" if PrimitiveGeometryService.has_analytic_shape(component) else "Primitive must be a complete Circle or Ellipse."
 	return "Draw Mode '%s' does not own rebaseable geometry." % draw_mode
 
@@ -219,10 +219,10 @@ static func _blocking_reason(_asset: Dictionary, component: Dictionary, scale: V
 static func _target_blocking_reason(component: Dictionary, scale: Vector2) -> String:
 	if not scale.is_finite() or absf(scale.x) <= SCALE_EPSILON or absf(scale.y) <= SCALE_EPSILON:
 		return "Scale axes must be finite and non-zero."
-	var draw_mode := str(component.get("draw_mode", "closed_loop"))
-	if draw_mode in ["closed_loop", "contour"]:
+	var draw_mode := WorldDocumentService.component_draw_mode(component)
+	if draw_mode in [WorldDocumentService.DRAW_MODE_CLOSED_LOOP, WorldDocumentService.DRAW_MODE_CONTOUR]:
 		return "" if not component.get("points", []).is_empty() else "Component has no geometry that can absorb Scale."
-	if draw_mode == "primitive":
+	if draw_mode == WorldDocumentService.DRAW_MODE_PRIMITIVE:
 		return "" if PrimitiveGeometryService.has_analytic_shape(component) else "Primitive must be a complete Circle or Ellipse."
 	return "Draw Mode '%s' does not own rebaseable geometry." % draw_mode
 
@@ -245,7 +245,7 @@ static func _component_depth(asset: Dictionary, component_id: String) -> int:
 
 
 static func _bake_component_geometry(component: Dictionary, pivot: Vector2, scale: Vector2) -> void:
-	if str(component.get("draw_mode", "closed_loop")) in ["closed_loop", "contour"]:
+	if WorldDocumentService.component_draw_mode(component) in [WorldDocumentService.DRAW_MODE_CLOSED_LOOP, WorldDocumentService.DRAW_MODE_CONTOUR]:
 		BezierGeometry.resolve_auto_handles(component.get("points", []), component.get("chains", []))
 		for point in component.get("points", []):
 			if not point is Dictionary:
@@ -273,7 +273,7 @@ static func _bake_component_geometry(component: Dictionary, pivot: Vector2, scal
 
 static func _bake_component_guides(asset: Dictionary, component_id: String, pivot: Vector2, scale: Vector2) -> void:
 	for guide in asset.get("guides", []):
-		if not guide is Dictionary or str(guide.get("scope", {}).get("component_id", "")) != component_id:
+		if not guide is Dictionary or AssetGuide.scope_component_id(guide) != component_id:
 			continue
 		BezierGeometry.resolve_auto_handles(guide.get("points", []), guide.get("chains", []))
 		for point in guide.get("points", []):

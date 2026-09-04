@@ -248,7 +248,7 @@ func _stored_position(value) -> Vector2:
 func _draw_boundaries() -> void:
 	for chain_data in sampling_bake.get("chains", []):
 		var samples: Array = chain_data.get("samples", [])
-		var color := HOLE_COLOR if str(chain_data.get("topology_role", "outer")) == "hole" else BOUNDARY_COLOR
+		var color := HOLE_COLOR if WorldDocumentService.topology_role(chain_data) == WorldDocumentService.ROLE_HOLE else BOUNDARY_COLOR
 		for sample_index in range(samples.size()):
 			if sample_index == samples.size() - 1 and not bool(chain_data.get("closed", false)):
 				continue
