@@ -1,8 +1,10 @@
 # PolyTools AI Context
 
 PolyTools is a Godot 4 editor for authoring topology-based 2D assets and
-deriving mesh data from them. The current product surface is intentionally
-small and database-oriented.
+deriving mesh data from them. The product surface is intentionally small and
+database-oriented. This file is the entry point; it says what the product is,
+where the rules live, and in which order to read them. It repeats nothing
+that another document owns.
 
 ## Visible modules
 
@@ -14,368 +16,59 @@ The left rail is always expanded and exposes exactly these categories:
 
 Only one module is active at a time, even though all categories remain open.
 Motion authoring is retained internally for future work but is not selectable
-or restored as an active editor category. Transform and Effects are not product
-categories. Texture and Material authoring are not part of the application.
+or restored as an active editor category. Transform and Effects are not
+product categories. Texture and Material authoring are not part of the
+application, and UV and SDF have no authoring surface any more.
 
-## Asset kinds
+All seven Create views are one Asset implementation filtered by the Asset's
+stable `asset_type`. Mesh is the user-facing name of the derived geometry
+pipeline; the `geometry_*` identifiers in code are its technical names.
 
-All seven Create modules use the same Asset, Component, Guide, canvas, and
-Inspector implementation. An Asset stores one stable `asset_type` value:
-`character`, `props`, `weapons`, `terrain`, `items`, `icon`, or `symbols`. Create views filter the Outliner by
-that value. Documents without an `asset_type` normalize to `character`.
+## What the data is
 
-The Asset-level `Initial Pose` Inspector group stores `authored_facing` as
-`left`, `right`, `neutral`, `top`, or `down`. It describes only the direction
-in which the artwork was originally drawn. Missing legacy values normalize to
-`neutral`, and every subsequent save writes the normalized value explicitly.
-This presentation metadata never mirrors geometry, changes the canvas, or
-modifies Component transforms.
+An Asset owns Components, Groups and Guides. Component geometry is stored only
+as Bézier `points`, `edges` and `chains`, or as one typed analytic primitive;
+everything a renderer, a hit test or an export needs is derived from that on
+demand and never stored back. Sampling, Seeding and Meshing produce derived
+documents that are keyed by Asset and Component ID and kept beside, never
+inside, the source topology. Runtime Export publishes accepted Meshes as
+engine-neutral Manifests plus one Catalog per World. The full current model is
+in `ARCHITECTURE.md`; how it got there, schema by schema, is in
+`SCHEMA_HISTORY.md`.
 
-Mesh and Style show a shared multi-select Asset filter above the Outliner
-search field. Character, Props, Weapons, Terrain, Items, Icon, and Symbols are checked by default;
-search text and checked types are combined. The filter is an editor-state
-preference, not a document mutation.
+## Rules that do not bend
 
-The field is written to `asset.json` and to the engine-neutral runtime manifest.
-This is the current export contract for distinguishing product modules;
-module-specific behavior can be layered on top later without changing Asset
-topology.
+- `outer_shape`, a Component-level `closed`, the old Line tool, and any
+  reverse synchronization from a display polygon into Bézier topology stay
+  gone. Do not reintroduce them.
+- Views — `ComponentCanvas`, `OutlinerView`, the Inspector views,
+  `RuntimeExportView` — render what `main.gd` pushes in and emit intent. They
+  hold no editor state and mutate no document.
+- Services are static and hold no editor state. A service returns
+  `{valid, errors, ...}` rather than raising; `main.gd` decides what to do.
+- Persistence never adds display polygons or derived data to Assets. A
+  migration below a schema step is explicit; at or above it there is no
+  silent fallback.
+- Files below `worlds/` are user data, never test fixtures. The generated
+  `catalog.json` and `PolyToolsRuntimeExports/` are the one untracked
+  exception.
 
-## Geometry model
+## Reading order
 
-Components have an explicit geometry source. Bézier Components are canonical
-only as `points`, `edges`, and `chains`; `BezierTopology` owns their structural
-changes and validation, and `BezierGeometry` owns cubic mathematics and handle
-resolution. Primitive Components instead own a typed `primitive` record and
-never store generated Bézier points, edges, chains, or samples. Authored
-primitives are `{ type: "circle", center, diameter_cm }`; Scale Rebase may
-derive `{ type: "ellipse", center, diameter_x_cm, diameter_y_cm }`.
+1. `AGENTS.md` — workflow, verification, Git rules. Read in full.
+2. `ARCHITECTURE.md` — the shell, the ownership boundaries, the documents as
+   they are, the derived pipeline, persistence and export.
+3. `BEZIER_MODEL.md` — before any change to Component geometry.
+4. The topic documents when the change touches them: `GEOMETRY_SAMPLING.md`,
+   `GEOMETRY_SEEDING.md`, `GEOMETRY_MESHING.md`, `CONTOUR_STROKE.md`,
+   `SCALE_REBASE.md`, `STYLE_WEIGHTING.md`, `RUNTIME_EXPORT_CONTRACT.md`
+   (normative for the package format; no other document redefines its
+   fields), the `MOTION_*.md` files, `UI_CONTEXT_COMMANDS.md`.
+5. `SCHEMA_HISTORY.md` — only when a change touches persistence or an older
+   document must be read.
 
-`ComponentCanvas` receives immutable view copies, renders them, and emits user
-intent; it never mutates World geometry directly. Polygon arrays for fill,
-hit testing, sampling, meshing, and export are derived on demand from either
-source. While drawing or editing individual authored Points, a Parent may snap
-to visible Points of its Child Components; hierarchy transforms are resolved
-into the Parent's local space. Whole-Component Parent transforms do not snap to
-their moving descendants. A Primitive's center handle moves its
-`primitive.center`; its Component pivot remains an independent transform handle.
-
-Components support `closed_loop`, `contour`, and `primitive` draw modes. Contours
-are fill-less and may use one open or closed Chain; simulation
-and construction
-paths are modeled as Guides. Primitive sampling evaluates analytic Circles and Ellipses at the selected Body's
-adaptive target edge length and scale-aware Curve Detail, so it has no fixed or
-user-editable sample count. Closed Loops and Primitives expose the same authored
-`outer` or `hole` topology role in the Inspector; a Primitive keeps that role as
-metadata and never materializes a Bézier Chain. Guides remain independent
-topology records scoped to an Asset or Component. Derived
-Sampling, Seeding, Meshing, UV, and Weighting records are stored separately
-from source topology.
-
-A closed Contour additionally derives a deterministic triangulation of its
-complete authored Boundary for Runtime consumers. This
-`closed_region_mesh` is engine-neutral geometry without material, color,
-transparency, UV, rendering, or Fill semantics. It is not displayed by the
-Canvas, Preview, or Component Mesh and never becomes Component source data.
-
-Assets may also contain editor-only Component Groups. A Group owns a stable ID,
-a unique lower-snake-case name, visibility, and a local transform,
-and an optional `parent_component_id`. Group membership (`group_id`) does not
-replace Component parentage: the Group's Parts remain ordinary Components, and
-a child inherits its ancestor's effective Group membership. A Group may be
-parented below a Component only when that Component is an ancestor of every
-direct Part; its transform is then applied once after that Component. Moving a
-Component into or out of a Group, changing a Component parent, or reparenting a
-Group through the Outliner preserves every affected Component's world transform.
-Dropping a Group onto a new Component Parent atomically reparents its direct
-Parts so this invariant also holds across sibling Component branches. Deleting
-a Group removes only the editor container and keeps its former Parts in place.
-Group visibility is effective for all members. Each Component exclusively owns
-its individual Z Index. Runtime export does not emit Group records; it resolves
-Group transforms into ordinary Component exports.
-
-Component Z Index is an asset-local semantic ordering value. It establishes
-the back-to-front relationship among all visual parts of one Asset but is not
-an absolute game-world depth. Runtime consumers preserve the ordering while
-mapping the Asset into their own contextual presentation range; independently
-authored Assets may therefore be placed wholly before or behind one another.
-
-World schema 41 owns the default authored Contour stroke width in its typed
-`world_settings` record. It defaults to `4 px` at the fixed `192 px/m`
-reference density. Schema 45 adds an optional finite positive
-`contour_stroke_width_px` to a Component. An ordinary Component inherits the
-World default when the field is absent or equal to that default; a different
-value is its implicit local override. The Inspector always shows the Contour
-Stroke Width field, with no separate Override toggle. World-width changes
-invalidate only inheriting Contour Meshes, while a local override invalidates
-only its Component's stroke mesh. A Reference uses the same field as an
-instance-local override for every Contour part of its source Asset, without
-changing that source. Schema 40 and older Worlds migrate explicitly
-to 4 px.
-
-World schema 42 adds the Asset Inspector's atomic Scale Rebase. Finite, non-zero
-signed local Component and Group Scale is normalized together. Group Rebase
-first compensates member transforms, then bakes the resulting Component Scale
-around the unchanged Pivot into owned Points, resolved handles, Component
-Guides, or analytic primitive axes; all local Scale becomes `(1, 1)`. Parent
-rebases compensate direct Child local transforms to
-preserve their visible world transforms, so Child Position, Rotation, or Scale
-may change. Negative axes encode a transient Mirror reflection. Non-uniform
-Circles become analytic Ellipses. Zero/non-finite Scale is an explicit blocker
-with no partial fallback. Asset References are excluded because their signed
-Scale is an instance placement transform rather than owned geometry Scale.
-
-Seeding consumes the complete accepted Sampling constraint set. Outer bounds
-the valid interior, Holes exclude regions, and Cuts are two-sided barriers with
-clearance. A Hole may be a direct ordinary Closed Loop or Primitive Child, or a
-direct Asset Reference; it affects that Parent only and is not inherited by
-higher ancestors. Only effectively visible Hole inputs participate. An ordinary
-Hole Component is an authoring constraint: it owns no Fill or Contour Stroke
-Mesh, cannot own Component children or Weighting Styles, and is omitted from
-Runtime export. A visible ordinary Hole without a valid visible direct outer
-Parent Body is reported as a Mesh and Runtime blocker, and its Inspector keeps
-the invalid current Parent visible as an explicit warning entry until repaired.
-A Hole Reference likewise owns no Mesh,
-but retains the existing Barde-style Runtime instance of its source Asset.
-Poisson Fill and combined multi-Spine Flow generate
-deterministic previews; an explicit Bake accepts that exact result before manual
-Seed editing or downstream Meshing. Spine Flow presents Seed Spacing and Flow
-Stretch as its primary Artistic controls; exact lattice values and optional Boundary/Stagger
-refinements remain available under Advanced Pattern.
-
-Meshing consumes one accepted Seeding Bake and exposes one closed-Body method:
-`Constrained Mesh`. Its `Mesh Character` moves continuously from Structured to
-Organic by deriving optimization strength and passes while keeping every
-sampled Outer, Hole, and Cut constraint fixed. `Optimize Mesh` provides an
-exact raw-CDT versus optimized A/B switch. Only quality-improving relocation
-passes are accepted; Optimization and Quality views expose movement and a
-triangle heatmap. Advanced Optimization can override the derived technical
-values. New recipes start at the accepted 64% Artistic profile, deriving
-Strength 0.40 and three passes without technical overrides. A debounced Preview
-is accepted with `Bake Preview`; that exact Bake
-automatically becomes the Component Mesh. Cut seam vertices are duplicated
-only after the final constrained triangulation and optimization.
-Selecting the Asset root in Meshing presents all current visible Component
-Meshes in Asset space; missing or stale Component Meshes are simply omitted.
-
-The persistent toolbar action `Update Meshes (N)` runs Adaptive Sampling,
-Poisson Seeding, Constrained Mesh, Optimization, and validation for valid,
-effectively visible out-of-date Components across every Create Asset type. Automatic recipe version
-3 retains the Barde-scale density calibration introduced by version 2:
-Boundary and Seed Spacing remain `0.55` for ordinary Character/Symbol contours.
-Above that range, Boundary Spacing grows sublinearly with perimeter, while Seed
-Spacing separately grows with area to bound unnecessary interior density. Small
-contours retain the existing minimum-boundary-sample behavior. Adaptive
-Sampling additionally attempts to balance the two derived segments meeting at
-an authored corner when their lengths differ by more than `3×`. It inserts up
-to 64 deterministic curve samples per Chain only on the longer side, preserving
-the exact curve and authored topology while preventing narrow Item silhouettes
-from feeding abrupt Boundary edge-size jumps into Meshing. An unresolvable
-interval or exhausted limit remains valid but is reported explicitly.
-
-Build provenance records automatic versus manual recipe ownership plus the
-effective pipeline-recipe hash. An unchanged automatic recipe may be
-recalibrated after geometry or model changes; editing any stored recipe makes it
-manual and preserves it exactly. Legacy automatic profiles migrate, as do
-untouched UI-default profiles only for clearly oversized Components. Small
-legacy defaults remain untouched. Automatic builds may retry conservatively at
-coarser density. Seed retries never change Boundary Spacing or Curve Detail;
-only a Sampling safety failure or the automatic 4096-Sample Boundary budget can
-request a Boundary retry. Automatic acceptance also caps interior Seeds at 2500
-and Triangles at 12000, while retaining the hard zero-degenerate and complete
-Constraint-coverage requirements. Provenance records every attempt's effective
-spacings, counts, outcome, and Mesh quality readings. Manual builds run their
-exact recipe once. Successful results commit atomically per Component, and one
-failure never replaces an older valid Mesh. The actionable count comes from
-semantic build provenance rather than a mutable dirty flag, so selection and
-sub-tolerance pointer jitter do not trigger the batch pipeline. Components
-rejected before the batch expose their concrete source-validation issue in the
-Meshing Inspector without inflating the count.
-
-The Meshing Inspector's read-only `Auto Build Diagnostics` section explains the
-resolved recipe ownership, model version, and geometry metrics before a build,
-then reports effective Boundary/Seed Spacing, fixed budget usage, every automatic attempt
-and retry reason, plus the accepted minimum angle, mean quality, and worst
-aspect ratio. Accepted results below `5°` minimum angle or above `25` worst
-aspect ratio receive an orange quality warning without becoming invalid; the
-hard gates remain complete Constraints and zero degenerates. It reads build
-provenance only and never changes a recipe or Mesh. Geometry regression tests
-use synthetic tiny-Symbol, narrow Item at two scales, Barde-scale, Tree-scale,
-concave, Hole, and Cut fixtures with invariant/range assertions; files under
-`worlds/` remain user data and are not test fixtures.
-
-UV and SDF have no authoring surface: no Workspace, Inspector, batch, or
-Canvas presentation. Their services and existing derived records remain
-readable Legacy data. They are not active batch stages, Runtime dependencies,
-or schema-4 fields. PolyTools does not delete or silently reinterpret those
-records, and a load/save round trip returns them unchanged.
-
-The persistent `Export Runtime (N)` action automatically considers every visible
-Asset. Every exported Component must have one unique free-form `name`. Ordinary
-Hole Components are authoring-only constraints and are not exported; invalid
-visible Hole parenting blocks export explicitly. Other
-Closed Loop and Primitive ordinary Components require a current Fill Mesh and
-current centered Contour Stroke Mesh. Open Contours require only that Stroke and
-export no Fill or closed region. Closed Contours require the current Stroke Bake
-plus its independent derived closed region, but still export no Fill Mesh. Asset
-References, including Hole References, instead export
-their local Component name, signed instance transform, and the referenced
-Asset's derived `source_asset_key`; they do not duplicate the referenced
-geometry. The editor retains `source_asset_id` only as its internal source link.
-The batch writes a versioned engine-neutral Manifest to
-the active World-local
-`res://worlds/<world_key>/PolyToolsRuntimeExports/<asset_key>/` directory and
-updates the World-root `catalog.json` with the currently valid Runtime set.
-Packages are staged, verified, and replaced atomically per Asset; an invalid
-Asset retains its older package and no fallback geometry is generated, but is
-excluded from that Catalog until it validates again.
-The separate `Sync Consumers` action beside `Export All Valid` runs PolyTools'
-owned `scripts/sync_world01_consumers.sh` workflow against the currently
-published Catalog. It updates SceneMaker from that Catalog, re-exports
-SceneMaker's current `world01` scene, then updates world01's runtime content and
-imported map. The Export workspace retains the last Consumer Sync result and
-includes command output on failure. Export and synchronization are deliberately
-separate actions: a downstream failure does not alter the already published
-PolyTools Runtime packages, and each consumer script remains responsible for
-its own atomic target update.
-Runtime Manifest schema 16 exports `contour_stroke_mesh` independently from the
-unchanged Fill Mesh and adds geometry-only `closed_region_mesh` to closed
-Contours. It also exports Asset-local Weapon Attachment Frames and the ordered
-local-meter positions of authored `corner` points as `projection_depth_corners`.
-It additionally exports an optional `regions` array for Attack, Hurt, and
-Collision Regions. A Region is always attached to a Component. Its active
-geometry source is either retained authored Bézier topology or a permanent
-Component binding. Component-bound Runtime Regions reference the source
-Component without duplicating vertices, so consumers apply the same animated
-transform or deformation result. Missing or empty Regions preserve the
-consumer's Component-based fallback behavior.
-It contains no UV, SDF, mask, or Carrier compatibility fields;
-older consumers must reject it.
-The normative field-level package and consumer rules live in
-`docs/RUNTIME_EXPORT_CONTRACT.md`; other documents must not redefine them.
-
-The active Mesh and Runtime batch stages use the same compact tooltip summary. A
-`Pending` section lists actionable work, while `Needs attention` lists visible
-Components or Assets blocked by invalid source data, missing/stale upstream
-resources, or the last failed batch attempt. Attention entries remain outside
-the actionable counts. Each active Batch button draws its own
-orange attention point whenever that same summary contains at least one
-`Needs attention` entry; the point remains visible even if the Button itself is
-disabled.
-
-## World and export
-
-A World persists Assets plus the currently retained motion and derived
-mesh records. Assets own Components, transform and spine Guides, reference-image settings, their
-Asset pivot, `asset_type`, and `authored_facing` presentation metadata. World schema 40 retains the schema-39
-free-form Component names and replaces legacy Ribbons with open Contours. Names
-are unique within an Asset and are the authored runtime-target bindings. The World `name` is its stable technical
-key and owns its directory and main JSON filename. A separate persisted
-`world_name` stores the human-facing title and does not need to be visible in
-the current UI. New persistence must not add display polygons or reverse
-synchronization into Component topology. The former Godot-scene Export module
-is retired; runtime export is a batch operation over accepted derived data.
-
-World schema 52 adds transform-based Weapon Guides.
-Ordinary outer Component and Group outliner rows expose `+`; constraint-only
-Hole rows do not, because Holes cannot own children, Guides, or Regions. The shared add menu
-contains `Guide → Weapon → weapon_socket_primary | grip_primary |
-grip_secondary | attack_point_primary | reach_limit_primary`. Weapon Guides
-may use Component or Group scope and author position plus rotation only.
-
-World schema 53 adds positive X/Y `root_scale` axes to the Asset root's
-`Asset Transform` Inspector. Legacy scalar values migrate to equal X/Y axes.
-The independent axes preview the complete Asset around the unchanged Asset
-Pivot, including Components, Groups, References, Guides, and Weapon frames.
-`Rebase Asset Transform` atomically bakes both axes into canonical local
-coordinates and Reference instance scale, then resets the field to `(1, 1)`.
-Default Motion is supported; authored non-default Motion blocks the operation
-until a dedicated scale conversion exists. Runtime Export also blocks while
-either `root_scale` axis is not `1`; it never applies the scale silently.
-
-World schema 54 adds the transform-based Weapon Guide role
-`reach_limit_primary`. It is authored through the same Component/Group `+` and
-context-menu paths as the existing Weapon frames and marks an Asset-local
-maximum reach endpoint independently from visual Component names or pivots.
-Runtime Manifest schema 10 exports the additional optional Attachment Frame
-role and strictly replaces schema 9.
-
-World schema 55 adds the transform-based Weapon Guide role `grip_secondary`.
-It marks a second weapon-local hand contact used when an attack regrips a
-weapon while the character-owned `weapon_socket_primary` remains fixed.
-Runtime Manifest schema 11 exports this fifth optional Attachment Frame role
-and strictly replaces schema 10.
-
-World schema 56 adds Component-local `projection_depth_cm` for visible
-Components. It is shown only in the Component Inspector beside Contour Stroke
-Width and Z Order, defaults to `10 cm`, and is independent of Component/Asset
-Scale, Rebase, Z Order, and Contour Stroke Width. Runtime Manifest schema 15
-exports the corresponding `projection_depth_meters` value and authored `corner`
-point positions for projection-depth contour edges.
-
-World schema 60 restores optional semantic gameplay Regions. They reuse the
-canonical `points`/`edges`/`chains` Bézier topology, remain outside visual Mesh
-processing, and are exported separately from ordinary Components.
-
-World schema 61 restricts Region creation to a Component's `+` menu and adds
-`region_geometry_source`. Newly created Regions default to `component`; missing
-legacy values still normalize to `authored`. `authored` activates the Region's
-retained editable Bézier topology. `component` displays and exports the attached
-Component's geometry by stable ID; the inactive authored topology remains stored so
-switching back is lossless. Drawing and Bézier editing are disabled while the
-Component source is active.
-
-World schema 62 adds `Items` as a seventh Create database view. Its stable
-`asset_type` value is `items`; it shares the existing Asset, Component, Guide,
-Canvas, Inspector, Mesh, Style, and Runtime Export paths without introducing a
-second geometry model.
-
-World schema 58 adds `root_position` to the Asset root's `Asset Transform`
-Inspector. It previews a translation of the complete Asset independently from
-the unchanged Asset Pivot. `Rebase Asset Transform` atomically bakes Root
-Position and Root Scale together into canonical root placements and local
-coordinates, then resets Position to `(0, 0)` and Scale to `(1, 1)`. Authored
-non-default Motion remains a blocker. Runtime Export rejects either pending
-root transform instead of applying it silently.
-
-World schema 59 makes Asset-root Scale explicitly non-uniform: `root_scale` is
-serialized as `[scale_x, scale_y]`, and the Inspector exposes independent
-`Scale X` and `Scale Y` controls.
-
-The Create toolbar also provides an optional editor-only `Frame` guide. Its
-`Half Extent X/Y` and `Offset / Pivot X/Y` values are authored in centimetres,
-persist under `editor_state.frame`, default to hidden with a 10 cm half extent,
-and are never serialized into Asset geometry or Runtime export data.
-
-Plain `P` places the selected Asset, Group, or Component Pivot at the Canvas
-pointer. The shortcut is routed before focused Inspector controls can consume
-the printable key, but only while the pointer is inside the visible Canvas, so
-text entry elsewhere remains unaffected. It remains available in Component
-Transform and Bézier Edit states and is disabled during Draw.
-
-`catalog.json` has its own schema version and is derived automatically from
-visible Assets. Each `asset_key` is the lower-snake-case derivation of the full
-Asset display name and is never authored independently. Creation and rename
-reject collisions across all Assets, including hidden Assets. The Catalog and
-runtime contract expose no internal Asset IDs; the Catalog is the authoritative
-closed export set, so consumers do not discover packages by directory listing.
-
-## Component naming
-
-Component names are free-form and unique within each Asset. Runtime animation
-configs bind generic targets such as `target01` to these names per Asset.
-
-References classify borrowed geometry locally: for example, Barde may use
-the Orb Asset through its stable Asset ID in `source_asset_id` while assigning the local
-`name = "belly"`. Runtime export resolves that internal link to
-`source_asset_key = "orb"`. Duplicate maps the known pairs `eye_left` /
-`eye_right` and `eyebrow_left` / `eyebrow_right` automatically. Every other
-copied Component requires an explicit picker choice before the duplicate is
-committed.
-
-Asset References retain `source_asset_id` as their internal source link.
-
-Guides are not Component Semantic Keys.
+`TASKS.md` lists what is deliberately left open and why; check it before
+proposing a refactor that it already records as not worth doing.
 
 ## Verification
 
@@ -387,5 +80,3 @@ tools/verify.sh
 
 It runs the headless editor parse, the native CDT smoke test, the test suite
 and `git diff --check`, and fails on the same lines CI fails on.
-
-Files below `worlds/` are user data and must not be rewritten as fixtures.

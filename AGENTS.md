@@ -1,7 +1,8 @@
 # PolyTools Agent Guide
 
 Read `docs/AI_CONTEXT.md`, `docs/ARCHITECTURE.md`, and
-`docs/BEZIER_MODEL.md` before changing editor geometry.
+`docs/BEZIER_MODEL.md` before changing editor geometry, and
+`docs/SCHEMA_HISTORY.md` before changing persistence or a load-time migration.
 
 ## Geometry ownership
 
