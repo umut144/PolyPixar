@@ -62,6 +62,71 @@ func _test_atomic_document_writes() -> void:
 	application.free()
 
 
+func _test_asset_deserialization_migrations() -> void:
+	# One legacy Asset document below schema 40, holding every load-time
+	# migration deserialize_asset performs, so a change to any of them is
+	# caught without a World on disk.
+	var legacy := {
+		"schema_version": 39,
+		"id": "asset_legacy",
+		"name": "Relic",
+		"root_scale": 2.0,
+		"groups": [{"id": "group_1", "name": "Arm", "z_index": 4, "transform": {}}],
+		"components": [
+			{"id": "component_1", "semantic_key": "body", "draw_mode": "ribbon", "points": [], "edges": [], "chains": []},
+			{"id": "component_2", "name": "", "semantic_key": "Body", "draw_mode": "closed_loop", "points": [], "edges": [], "chains": []},
+			{"id": "component_3", "name": "missing_semantic_1", "missing_semantic_source": "eye", "points": [], "edges": [], "chains": []},
+			{"id": "component_4", "points": [], "edges": [], "chains": []},
+			{"id": "component_5", "name": "lid", "type": "region", "region_type": "spikes", "points": [], "edges": [], "chains": []},
+			{"id": "component_6", "name": "hem", "draw_mode": "contour", "contour_stroke_width_px": 0.0, "points": [], "edges": [], "chains": []},
+			{"id": "component_7", "name": "seam", "draw_mode": "contour", "contour_stroke_width_px": 6, "points": [], "edges": [], "chains": []},
+			{"id": "guide_legacy", "type": "guide", "guide_type": "cut", "name": "Split", "scope": {"kind": "component", "component_id": "component_1"}, "points": [], "edges": [], "chains": []},
+		],
+	}
+	var asset := WorldDocumentService.deserialize_asset(legacy, "fallback_id")
+	_expect(str(asset.get("id", "")) == "asset_legacy" and str(asset.get("asset_type", "")) == "character"
+		and int(asset.get("authored_facing", -1)) == AssetPresentation.AuthoredFacing.NEUTRAL,
+		"A legacy Asset without asset_type or authored_facing should load as a neutral character.")
+	_expect(Vector2(asset.get("root_scale", Vector2.ZERO)).is_equal_approx(Vector2(2.0, 2.0)),
+		"A scalar root_scale should load as equal X/Y axes.")
+	var components: Array = asset.get("components", [])
+	var guides: Array = asset.get("guides", [])
+	_expect(components.size() == 7 and guides.size() == 1 and str(guides[0].get("id", "")) == "guide_legacy"
+		and str(guides[0].get("guide_type", "")) == AssetGuide.CUT,
+		"A Guide stored among the Components should load as a Guide, not as a Component.")
+	var names: Array[String] = []
+	for component in components:
+		names.append(str(component.get("name", "")))
+	_expect(names == ["body", "Body 2", "eye", "Component", "lid", "hem", "seam"],
+		"Names should come from the Semantic Key fields where the name is missing, with numbered suffixes on case-insensitive collisions, not %s." % str(names))
+	_expect(str(components[0].get("draw_mode", "")) == "contour",
+		"A Ribbon below schema 40 should load as a Contour.")
+	_expect(str(components[4].get("region_type", "")) == "attack"
+		and str(components[4].get("region_geometry_source", "")) == WorldDocumentService.REGION_GEOMETRY_AUTHORED,
+		"An unknown Region type should fall back to attack with authored geometry.")
+	_expect(not components[5].has("contour_stroke_width_px") and is_equal_approx(float(components[6].get("contour_stroke_width_px", 0.0)), 6.0),
+		"Only a finite positive Contour width should survive as a Component override.")
+	var groups: Array = asset.get("groups", [])
+	_expect(groups.size() == 1 and not groups[0].has("z_index"),
+		"Schema 48 removed Group z_index; a legacy value must not be loaded.")
+
+	var current := {"schema_version": WorldDocumentService.SCHEMA_VERSION, "id": "asset_current",
+		"components": [{"id": "component_1", "name": "body", "draw_mode": "ribbon", "points": [], "edges": [], "chains": []}]}
+	var current_component: Dictionary = WorldDocumentService.deserialize_asset(current, "asset_current").get("components", [])[0]
+	_expect(str(current_component.get("draw_mode", "")) == "ribbon",
+		"A Ribbon at the current schema is invalid and must not be silently converted.")
+
+	var blink := {"schema_version": 18, "id": "act_1", "primitive": MotionActEvaluator.BLINK,
+		"parameters": {"anticipation_share": 0.18}}
+	var migrated_blink := WorldDocumentService.normalize_motion_act(blink, "act_1")
+	_expect(is_equal_approx(float(migrated_blink.get("parameters", {}).get("anticipation_share", 0.0)), 0.5),
+		"The schema 1–18 Blink default of 0.18 should migrate to the later default of 0.5.")
+	blink["schema_version"] = 19
+	var kept_blink := WorldDocumentService.normalize_motion_act(blink, "act_1")
+	_expect(is_equal_approx(float(kept_blink.get("parameters", {}).get("anticipation_share", 0.0)), 0.18),
+		"From schema 19 on, an authored anticipation_share of 0.18 is kept.")
+
+
 func _test_geometry_document_history_isolation() -> void:
 	var component := _component()
 	BezierTopology.add_point(component, Vector2.ZERO, "corner")

@@ -9,7 +9,7 @@ const MOTION_SUBMODULES := ["Animation", "Path", "Act", "Sequence"]
 const WORLDS_ROOT := "res://worlds"
 const CONFIG_PATH := "res://configs/app_config.json"
 const CONSUMER_SYNC_SCRIPT := "res://scripts/sync_world01_consumers.sh"
-const REGION_TYPES := ["attack", "hurt", "collision"]
+const REGION_TYPES := WorldDocumentService.REGION_TYPES
 const MAX_HISTORY_SIZE := 100
 # Render targets. Mutations declare what became stale; the flush below decides
 # what actually runs, once per frame.
@@ -2847,82 +2847,7 @@ func _load_world(world_entry: String, persist_as_last := true) -> bool:
 		var asset_data = _read_asset_data(world_root, asset_id)
 		if not WorldDocumentService.has_supported_schema(asset_data):
 			continue
-		var components: Array[Dictionary] = []
-		var used_component_names: Dictionary = {}
-		var groups: Array[Dictionary] = []
-		var guides: Array[Dictionary] = []
-		for group_data in asset_data.get("groups", []):
-			if not group_data is Dictionary:
-				continue
-			groups.append({
-				"id": str(group_data.get("id", "")),
-				"name": str(group_data.get("name", "Group")),
-				"parent_component_id": str(group_data.get("parent_component_id", "")),
-				"transform": WorldDocumentService.deserialize_transform(group_data.get("transform", {})),
-				"visibility": bool(group_data.get("visibility", true))
-			})
-		for component_data in asset_data.get("components", []):
-			if not component_data is Dictionary:
-				continue
-			var topology := WorldDocumentService.deserialize_component_topology(component_data)
-			if str(component_data.get("type", "component")) == "guide":
-				var legacy_guide: Dictionary = component_data.duplicate(true)
-				legacy_guide["points"] = topology["points"]
-				legacy_guide["edges"] = topology["edges"]
-				legacy_guide["chains"] = topology["chains"]
-				guides.append(AssetGuide.normalize(legacy_guide))
-				continue
-			var component_type := str(component_data.get("type", "component"))
-			var component_name := _migrated_component_name(component_data, used_component_names)
-			var component := {
-				"id": str(component_data.get("id", "")),
-				"type": component_type,
-				"name": component_name,
-				"source_asset_id": str(component_data.get("source_asset_id", "")),
-				"parent_component_id": str(component_data.get("parent_component_id", "")),
-				"group_id": str(component_data.get("group_id", "")),
-				"points": topology["points"],
-				"edges": topology["edges"],
-				"chains": topology["chains"],
-				"transform": WorldDocumentService.deserialize_transform(component_data.get("transform", {})),
-				"visibility": bool(component_data.get("visibility", true)),
-				"z_index": int(component_data.get("z_index", 0)),
-				"projection_depth_cm": WorldDocumentService.deserialize_projection_depth_cm(component_data.get("projection_depth_cm", WorldDocumentService.DEFAULT_PROJECTION_DEPTH_CM)),
-				"draw_mode": WorldDocumentService.normalize_component_draw_mode(component_data.get("draw_mode", "closed_loop"), int(asset_data.get("schema_version", 0))),
-				"topology_role": str(component_data.get("topology_role", "outer")) if str(component_data.get("topology_role", "outer")) in ["outer", "hole"] else "outer",
-				"catch_parent_component_id": str(component_data.get("catch_parent_component_id", "")),
-				"show_point_numbers": bool(component_data.get("show_point_numbers", false)),
-				"primitive": WorldDocumentService.deserialize_primitive(component_data.get("primitive", {}))
-			}
-			if component_type == "region":
-				component["region_type"] = str(component_data.get("region_type", "attack")) if str(component_data.get("region_type", "attack")) in REGION_TYPES else "attack"
-				component["region_geometry_source"] = WorldDocumentService.normalize_region_geometry_source(component_data.get("region_geometry_source", ""))
-			if component_type == "reference":
-				component["reference_instance_scale"] = WorldDocumentService.deserialize_vector(component_data.get("reference_instance_scale", [1.0, 1.0]), Vector2.ONE)
-			if _serialized_component_contour_stroke_width_is_valid(component_data):
-				component["contour_stroke_width_px"] = float(component_data["contour_stroke_width_px"])
-			components.append(component)
-		for guide_data in asset_data.get("guides", []):
-			if not guide_data is Dictionary:
-				continue
-			guides.append(WorldDocumentService.deserialize_asset_guide(guide_data))
-		var loaded_asset := {
-			"id": str(asset_data.get("id", asset_id)),
-			"name": str(asset_data.get("name", asset_id)),
-			"asset_type": WorldDocumentService.normalize_asset_type(asset_data.get("asset_type", "character")),
-			"authored_facing": AssetPresentation.deserialize_authored_facing(asset_data.get("authored_facing", "neutral")),
-			"visibility": bool(asset_data.get("visibility", true)),
-			"asset_pivot": WorldDocumentService.deserialize_vector(asset_data.get("asset_pivot", [0.0, 0.0]), Vector2.ZERO),
-			"root_position": WorldDocumentService.deserialize_vector(asset_data.get("root_position", [0.0, 0.0]), Vector2.ZERO),
-			"root_scale": WorldDocumentService.deserialize_asset_root_scale(asset_data.get("root_scale", [1.0, 1.0])),
-			"reference_image": WorldDocumentService.normalize_reference_image(asset_data.get("reference_image", {})),
-			"animation": MotionWorkspace.normalize_animation_document(asset_data.get("animation", {})),
-			"components": components,
-			"groups": groups,
-			"guides": guides
-		}
-		ComponentHierarchy.normalize_asset(loaded_asset)
-		loaded_assets.append(loaded_asset)
+		loaded_assets.append(WorldDocumentService.deserialize_asset(asset_data, asset_id))
 	assets = loaded_assets
 	var loaded_geometry_documents: Dictionary = {}
 	for loaded_asset in loaded_assets:
@@ -2987,22 +2912,6 @@ func _load_world(world_entry: String, persist_as_last := true) -> bool:
 		WorldDocumentService.write_json(CONFIG_PATH, {"schema_version": WorldDocumentService.SCHEMA_VERSION, "last_world": world_name})
 	return true
 
-
-func _migrated_component_name(component_data: Dictionary, used_names: Dictionary) -> String:
-	var candidate := str(component_data.get("name", "")).strip_edges()
-	if candidate.is_empty() or candidate.begins_with("missing_semantic"):
-		candidate = str(component_data.get("semantic_key", "")).strip_edges()
-	if candidate.is_empty() or candidate.begins_with("missing_semantic"):
-		candidate = str(component_data.get("missing_semantic_source", component_data.get("semantic_role", ""))).strip_edges()
-	if candidate.is_empty() or candidate.begins_with("missing_semantic"):
-		candidate = "Component"
-	var base_name := candidate
-	var suffix := 2
-	while used_names.has(candidate.to_lower()):
-		candidate = "%s %d" % [base_name, suffix]
-		suffix += 1
-	used_names[candidate.to_lower()] = true
-	return candidate
 
 
 func _serialize_editor_state() -> Dictionary:
@@ -3731,10 +3640,7 @@ func _contour_stroke_bake(asset_id: String, component_id: String) -> Dictionary:
 
 
 func _serialized_component_contour_stroke_width_is_valid(component: Dictionary) -> bool:
-	if not component.has("contour_stroke_width_px"):
-		return false
-	var width: Variant = component.get("contour_stroke_width_px")
-	return typeof(width) in [TYPE_INT, TYPE_FLOAT] and is_finite(float(width)) and float(width) > 0.0
+	return WorldDocumentService.serialized_contour_stroke_width_is_valid(component)
 
 
 func _component_has_contour_stroke_width_override(component: Dictionary) -> bool:

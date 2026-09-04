@@ -14,6 +14,7 @@ const SCHEMA_VERSION := 62
 const REGION_GEOMETRY_AUTHORED := "authored"
 const REGION_GEOMETRY_COMPONENT := "component"
 const REGION_GEOMETRY_SOURCES := [REGION_GEOMETRY_AUTHORED, REGION_GEOMETRY_COMPONENT]
+const REGION_TYPES := ["attack", "hurt", "collision"]
 const DEFAULT_PROJECTION_DEPTH_CM := 10.0
 const DRAW_MODES := ["closed_loop", "contour", "primitive"]
 
@@ -287,6 +288,133 @@ static func deserialize_asset_guide(raw_guide: Dictionary) -> Dictionary:
 	if AssetGuide.is_weapon_frame(str(guide.get("guide_type", ""))):
 		guide["transform"] = deserialize_transform(raw_guide.get("transform", {}))
 	return AssetGuide.normalize(guide)
+
+
+# The in-memory Asset record from one persisted Asset document, at any
+# supported schema. Every migration a schema step needs on load runs here —
+# Ribbon to Contour below schema 40, Semantic Keys to names, Guides that were
+# stored as Components — so a fixture can exercise it without a World on disk.
+# `fallback_asset_id` names the record when the document carries no id.
+static func deserialize_asset(asset_data: Dictionary, fallback_asset_id: String) -> Dictionary:
+	var source_schema_version := int(asset_data.get("schema_version", 0))
+	var components: Array[Dictionary] = []
+	var used_component_names: Dictionary = {}
+	var groups: Array[Dictionary] = []
+	var guides: Array[Dictionary] = []
+	for group_data in asset_data.get("groups", []):
+		if not group_data is Dictionary:
+			continue
+		groups.append(deserialize_group(group_data))
+	for component_data in asset_data.get("components", []):
+		if not component_data is Dictionary:
+			continue
+		if str(component_data.get("type", "component")) == "guide":
+			# Guides were once stored among the Components. Their topology reads
+			# like a Component's; everything else is the Guide record itself.
+			var topology := deserialize_component_topology(component_data)
+			var legacy_guide: Dictionary = component_data.duplicate(true)
+			legacy_guide["points"] = topology["points"]
+			legacy_guide["edges"] = topology["edges"]
+			legacy_guide["chains"] = topology["chains"]
+			guides.append(AssetGuide.normalize(legacy_guide))
+			continue
+		components.append(deserialize_component(component_data, source_schema_version, used_component_names))
+	for guide_data in asset_data.get("guides", []):
+		if not guide_data is Dictionary:
+			continue
+		guides.append(deserialize_asset_guide(guide_data))
+	var asset := {
+		"id": str(asset_data.get("id", fallback_asset_id)),
+		"name": str(asset_data.get("name", fallback_asset_id)),
+		"asset_type": normalize_asset_type(asset_data.get("asset_type", "character")),
+		"authored_facing": AssetPresentation.deserialize_authored_facing(asset_data.get("authored_facing", "neutral")),
+		"visibility": bool(asset_data.get("visibility", true)),
+		"asset_pivot": deserialize_vector(asset_data.get("asset_pivot", [0.0, 0.0]), Vector2.ZERO),
+		"root_position": deserialize_vector(asset_data.get("root_position", [0.0, 0.0]), Vector2.ZERO),
+		"root_scale": deserialize_asset_root_scale(asset_data.get("root_scale", [1.0, 1.0])),
+		"reference_image": normalize_reference_image(asset_data.get("reference_image", {})),
+		"animation": MotionWorkspace.normalize_animation_document(asset_data.get("animation", {})),
+		"components": components,
+		"groups": groups,
+		"guides": guides
+	}
+	ComponentHierarchy.normalize_asset(asset)
+	return asset
+
+
+static func deserialize_group(group_data: Dictionary) -> Dictionary:
+	return {
+		"id": str(group_data.get("id", "")),
+		"name": str(group_data.get("name", "Group")),
+		"parent_component_id": str(group_data.get("parent_component_id", "")),
+		"transform": deserialize_transform(group_data.get("transform", {})),
+		"visibility": bool(group_data.get("visibility", true))
+	}
+
+
+# One Component record. `used_names` carries the names already taken within
+# the Asset, lower-cased, and receives this Component's name; a collision gets
+# a numbered suffix.
+static func deserialize_component(component_data: Dictionary, source_schema_version: int, used_names: Dictionary) -> Dictionary:
+	var topology := deserialize_component_topology(component_data)
+	var component_type := str(component_data.get("type", "component"))
+	var component := {
+		"id": str(component_data.get("id", "")),
+		"type": component_type,
+		"name": migrated_component_name(component_data, used_names),
+		"source_asset_id": str(component_data.get("source_asset_id", "")),
+		"parent_component_id": str(component_data.get("parent_component_id", "")),
+		"group_id": str(component_data.get("group_id", "")),
+		"points": topology["points"],
+		"edges": topology["edges"],
+		"chains": topology["chains"],
+		"transform": deserialize_transform(component_data.get("transform", {})),
+		"visibility": bool(component_data.get("visibility", true)),
+		"z_index": int(component_data.get("z_index", 0)),
+		"projection_depth_cm": deserialize_projection_depth_cm(component_data.get("projection_depth_cm", DEFAULT_PROJECTION_DEPTH_CM)),
+		"draw_mode": normalize_component_draw_mode(component_data.get("draw_mode", "closed_loop"), source_schema_version),
+		"topology_role": str(component_data.get("topology_role", "outer")) if str(component_data.get("topology_role", "outer")) in ["outer", "hole"] else "outer",
+		"catch_parent_component_id": str(component_data.get("catch_parent_component_id", "")),
+		"show_point_numbers": bool(component_data.get("show_point_numbers", false)),
+		"primitive": deserialize_primitive(component_data.get("primitive", {}))
+	}
+	if component_type == "region":
+		component["region_type"] = str(component_data.get("region_type", "attack")) if str(component_data.get("region_type", "attack")) in REGION_TYPES else "attack"
+		component["region_geometry_source"] = normalize_region_geometry_source(component_data.get("region_geometry_source", ""))
+	if component_type == "reference":
+		component["reference_instance_scale"] = deserialize_vector(component_data.get("reference_instance_scale", [1.0, 1.0]), Vector2.ONE)
+	if serialized_contour_stroke_width_is_valid(component_data):
+		component["contour_stroke_width_px"] = float(component_data["contour_stroke_width_px"])
+	return component
+
+
+# The persisted name, or the schema-43 migration from the Semantic Key fields
+# that preceded free-form names. Case-insensitive collisions within the Asset
+# receive a numbered suffix, in document order.
+static func migrated_component_name(component_data: Dictionary, used_names: Dictionary) -> String:
+	var candidate := str(component_data.get("name", "")).strip_edges()
+	if candidate.is_empty() or candidate.begins_with("missing_semantic"):
+		candidate = str(component_data.get("semantic_key", "")).strip_edges()
+	if candidate.is_empty() or candidate.begins_with("missing_semantic"):
+		candidate = str(component_data.get("missing_semantic_source", component_data.get("semantic_role", ""))).strip_edges()
+	if candidate.is_empty() or candidate.begins_with("missing_semantic"):
+		candidate = "Component"
+	var base_name := candidate
+	var suffix := 2
+	while used_names.has(candidate.to_lower()):
+		candidate = "%s %d" % [base_name, suffix]
+		suffix += 1
+	used_names[candidate.to_lower()] = true
+	return candidate
+
+
+# A persisted Contour width counts only when it is a finite positive number;
+# anything else means the Component inherits the World default.
+static func serialized_contour_stroke_width_is_valid(component: Dictionary) -> bool:
+	if not component.has("contour_stroke_width_px"):
+		return false
+	var width: Variant = component.get("contour_stroke_width_px")
+	return typeof(width) in [TYPE_INT, TYPE_FLOAT] and is_finite(float(width)) and float(width) > 0.0
 
 static func default_geometry_document(asset_id: String, component_id: String) -> Dictionary:
 	return {

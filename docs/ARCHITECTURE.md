@@ -109,10 +109,16 @@ the four views is visible, resolves that view's context and calls `rebuild()`.
   hand because no render comparison covers those states yet.
 - `WorldDocumentService` owns the on-disk document format: normalization on
   load, serialization on save, and the atomic file replacement both sides use.
-  It is static and holds no editor state. `main.gd` keeps the orchestration —
-  which records exist, when they are read and written, and what the editor does
-  with them — including `_serialize_editor_state` and `_serialize_world_settings`,
-  which read editor state by definition.
+  It is static and holds no editor state. `deserialize_asset` turns one Asset
+  document at any supported schema into the in-memory record and carries every
+  load-time migration — Ribbon to Contour below schema 40, Semantic Keys to
+  names, Guides once stored among the Components — so
+  `_test_asset_deserialization_migrations` can exercise them on a fixture
+  without a World on disk. `main.gd` keeps the orchestration — which records
+  exist, when they are read and written, and what the editor does with them —
+  including `_serialize_editor_state` and `_serialize_world_settings`, which
+  read editor state by definition, and the Asset serialization in `_save_world`,
+  which decides a Contour width override against the World default.
 - `RuntimeExportView` is the Runtime Export module's work surface under the same
   contract as the Inspector views: `main.gd` resolves the Preflight into one
   context Dictionary — summary line, Consumer Sync hint, the two stages with
