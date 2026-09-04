@@ -30,6 +30,17 @@ const ROLE_HOLE := "hole"
 const ROLE_CUT := "cut"
 const ROLE_SEAM := "seam"
 const TOPOLOGY_ROLES := [ROLE_OUTER, ROLE_HOLE]
+# Asset types: the seven Create module filters. The persisted value is
+# lower-case and stable; `_asset_type_create_submodule` in main.gd derives
+# each Create module's display name from it with String.capitalize().
+const ASSET_TYPE_CHARACTER := "character"
+const ASSET_TYPE_PROPS := "props"
+const ASSET_TYPE_WEAPONS := "weapons"
+const ASSET_TYPE_TERRAIN := "terrain"
+const ASSET_TYPE_ITEMS := "items"
+const ASSET_TYPE_ICON := "icon"
+const ASSET_TYPE_SYMBOLS := "symbols"
+const ASSET_TYPES := [ASSET_TYPE_CHARACTER, ASSET_TYPE_PROPS, ASSET_TYPE_WEAPONS, ASSET_TYPE_TERRAIN, ASSET_TYPE_ITEMS, ASSET_TYPE_ICON, ASSET_TYPE_SYMBOLS]
 
 
 static func serialize_bezier_points(points: Array) -> Array:
@@ -339,7 +350,7 @@ static func deserialize_asset(asset_data: Dictionary, fallback_asset_id: String)
 	var asset := {
 		"id": str(asset_data.get("id", fallback_asset_id)),
 		"name": str(asset_data.get("name", fallback_asset_id)),
-		"asset_type": normalize_asset_type(asset_data.get("asset_type", "character")),
+		"asset_type": normalize_asset_type(asset_data.get("asset_type", ASSET_TYPE_CHARACTER)),
 		"authored_facing": AssetPresentation.deserialize_authored_facing(asset_data.get("authored_facing", "neutral")),
 		"visibility": bool(asset_data.get("visibility", true)),
 		"asset_pivot": deserialize_vector(asset_data.get("asset_pivot", [0.0, 0.0]), Vector2.ZERO),
@@ -1097,7 +1108,7 @@ static func motion_path_by_id(motion_paths: Array, path_id: String) -> Dictionar
 
 
 static func asset_type(asset: Dictionary) -> String:
-	return normalize_asset_type(asset.get("asset_type", "character"))
+	return normalize_asset_type(asset.get("asset_type", ASSET_TYPE_CHARACTER))
 
 
 static func is_region(component: Dictionary) -> bool:
@@ -1223,7 +1234,7 @@ static func normalize_component_draw_mode(raw_mode, source_schema_version: int) 
 
 static func normalize_asset_type(value) -> String:
 	var normalized := str(value).strip_edges().to_lower()
-	return normalized if normalized in ["character", "props", "weapons", "terrain", "items", "icon", "symbols"] else "character"
+	return normalized if normalized in ASSET_TYPES else ASSET_TYPE_CHARACTER
 
 static func default_motion_path(path_id: String, path_name: String) -> Dictionary:
 	return {

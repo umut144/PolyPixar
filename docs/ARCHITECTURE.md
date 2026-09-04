@@ -115,19 +115,22 @@ the four views is visible, resolves that view's context and calls `rebuild()`.
   load-time migration — Ribbon to Contour below schema 40, Semantic Keys to
   names, Guides once stored among the Components — so
   `_test_asset_deserialization_migrations` can exercise them on a fixture
-  without a World on disk. It also owns the Component discriminator
-  vocabulary — `DRAW_MODE_CLOSED_LOOP`, `DRAW_MODE_CONTOUR`,
-  `DRAW_MODE_PRIMITIVE`, `ROLE_OUTER`, `ROLE_HOLE`, `ROLE_CUT` — and the
-  predicates that read it: `component_draw_mode`, `is_closed_loop`,
-  `is_contour`, `is_primitive`, `topology_role` and `is_outer_body`. Code
-  compares against those names, never against the literal strings, so a
-  misspelled discriminator is a parse error rather than a silent fall into
-  the default branch; `AssetGuide` owns the Guide types the same way, plus
-  the Guide scope vocabulary — `SCOPE_COMPONENT`, `SCOPE_GROUP`,
-  `is_group_scoped`, `scope_component_id`, `scope_group_id`,
-  `scope_target_id` — read by `ComponentHierarchy.guide_world_transform`,
-  the one place a Guide's scope resolves to a world Transform. `main.gd`
-  keeps the orchestration — which records
+  without a World on disk. It also owns the discriminator vocabularies that
+  every reader compares against by name rather than by literal string, so a
+  misspelling is a parse error rather than a silent fall into the default
+  branch: the Component's `DRAW_MODE_CLOSED_LOOP`, `DRAW_MODE_CONTOUR`,
+  `DRAW_MODE_PRIMITIVE`, `ROLE_OUTER`, `ROLE_HOLE`, `ROLE_CUT` and the
+  predicates that read them — `component_draw_mode`, `is_closed_loop`,
+  `is_contour`, `is_primitive`, `topology_role`, `is_outer_body` — and the
+  seven `ASSET_TYPE_*` constants (`ASSET_TYPES`) behind `asset_type` and
+  `normalize_asset_type` for the Create module filter; `main.gd`'s
+  `_asset_type_create_submodule` turns one into its Create module's display
+  name with `String.capitalize()`, since every value is a single lower-case
+  word. `AssetGuide` owns the Guide types the same way, plus the Guide scope
+  vocabulary — `SCOPE_COMPONENT`, `SCOPE_GROUP`, `is_group_scoped`,
+  `scope_component_id`, `scope_group_id`, `scope_target_id` — read by
+  `ComponentHierarchy.guide_world_transform`, the one place a Guide's scope
+  resolves to a world Transform. `main.gd` keeps the orchestration — which records
   exist, when they are read and written, and what the editor does with them —
   including `_serialize_editor_state` and `_serialize_world_settings`, which
   read editor state by definition, and the Asset serialization in `_save_world`,

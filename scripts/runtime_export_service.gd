@@ -99,7 +99,7 @@ static func build_manifest(asset: Dictionary, sources: Dictionary) -> Dictionary
 		"schema_version": MANIFEST_SCHEMA_VERSION,
 		"asset_key": asset_key,
 		"display_name": str(asset.get("name", asset_id)),
-		"asset_type": str(asset.get("asset_type", "character")),
+		"asset_type": str(asset.get("asset_type", WorldDocumentService.ASSET_TYPE_CHARACTER)),
 		"presentation": {
 			"authored_facing": AssetPresentation.serialize_authored_facing(asset.get("authored_facing", AssetPresentation.AuthoredFacing.NEUTRAL))
 		},

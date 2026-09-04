@@ -38,15 +38,7 @@ var outliner_search_input: LineEdit
 var outliner_asset_type_filter_panel: VBoxContainer
 var outliner_asset_type_filter_checkboxes: Dictionary = {}
 var outliner_component_navigation_active := false
-var outliner_asset_type_filters: Dictionary = {
-	"character": true,
-	"props": true,
-	"weapons": true,
-	"terrain": true,
-	"items": true,
-	"icon": true,
-	"symbols": true
-}
+var outliner_asset_type_filters: Dictionary = _default_outliner_asset_type_filters()
 var inspector_content: VBoxContainer
 var create_inspector_view: CreateInspectorView
 var geometry_inspector_view: GeometryInspectorView
@@ -900,10 +892,9 @@ func _build_ui() -> void:
 	filter_grid.columns = 2
 	filter_grid.add_theme_constant_override("h_separation", 4)
 	filter_grid.add_theme_constant_override("v_separation", 0)
-	var asset_type_labels := {"character": "Character", "props": "Props", "weapons": "Weapons", "terrain": "Terrain", "items": "Items", "icon": "Icon", "symbols": "Symbols"}
-	for asset_type in ["character", "props", "weapons", "terrain", "items", "icon", "symbols"]:
+	for asset_type in WorldDocumentService.ASSET_TYPES:
 		var type_checkbox := CheckBox.new()
-		type_checkbox.text = asset_type_labels[asset_type]
+		type_checkbox.text = asset_type.capitalize()
 		type_checkbox.button_pressed = bool(outliner_asset_type_filters.get(asset_type, true))
 		type_checkbox.focus_mode = Control.FOCUS_NONE
 		type_checkbox.custom_minimum_size = Vector2(0, 24)
@@ -2999,7 +2990,7 @@ func _restore_editor_state(state) -> void:
 	frame_visible = false
 	frame_half_extent = Vector2(1.0, 1.0)
 	frame_offset = Vector2.ZERO
-	outliner_asset_type_filters = {"character": true, "props": true, "weapons": true, "terrain": true, "items": true, "icon": true, "symbols": true}
+	outliner_asset_type_filters = _default_outliner_asset_type_filters()
 	_apply_outliner_asset_type_filter_checkboxes()
 	expanded_assets.clear()
 	asset_camera_states.clear()
@@ -6581,6 +6572,13 @@ func _update_outliner_asset_type_filter_visibility() -> void:
 	outliner_asset_type_filter_panel.visible = active_module in ["Mesh", "Style"]
 
 
+static func _default_outliner_asset_type_filters() -> Dictionary:
+	var filters: Dictionary = {}
+	for asset_type in WorldDocumentService.ASSET_TYPES:
+		filters[asset_type] = true
+	return filters
+
+
 func _on_outliner_asset_type_filter_toggled(enabled: bool, asset_type: String) -> void:
 	outliner_asset_type_filters[asset_type] = enabled
 	_invalidate_render(RENDER_OUTLINER)
@@ -7438,7 +7436,7 @@ func _open_component_add_menu(asset_id: String, parent_component_id: String, anc
 	component_add_menu.set_item_disabled(component_add_menu.get_item_index(2), false)
 	component_add_reference_menu.clear()
 	for source_asset in assets:
-		if _asset_type(source_asset) != "symbols" or str(source_asset.get("id", "")) == asset_id:
+		if _asset_type(source_asset) != WorldDocumentService.ASSET_TYPE_SYMBOLS or str(source_asset.get("id", "")) == asset_id:
 			continue
 		component_add_reference_menu.add_item(str(source_asset.get("name", "Symbol")), component_add_reference_menu.item_count)
 		component_add_reference_menu.set_item_metadata(component_add_reference_menu.item_count - 1, str(source_asset.get("id", "")))
@@ -12607,21 +12605,10 @@ func _create_submodule_asset_type(submodule: String) -> String:
 
 
 func _asset_type_create_submodule(asset_type: String) -> String:
-	match WorldDocumentService.normalize_asset_type(asset_type):
-		"props":
-			return "Props"
-		"weapons":
-			return "Weapons"
-		"terrain":
-			return "Terrain"
-		"items":
-			return "Items"
-		"icon":
-			return "Icon"
-		"symbols":
-			return "Symbols"
-		_:
-			return "Character"
+	# Every asset_type is a single lower-case word (WorldDocumentService.ASSET_TYPES),
+	# so capitalize() reduces to "uppercase the first letter" and reproduces
+	# the Create module name exactly: "props" -> "Props", "character" -> "Character".
+	return WorldDocumentService.normalize_asset_type(asset_type).capitalize()
 
 
 func _ensure_asset_animation(asset: Dictionary) -> Dictionary:

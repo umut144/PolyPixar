@@ -55,7 +55,7 @@ static func build_catalog(world_key: String, world_name: String, assets: Array) 
 		entries.append({
 			"asset_key": key,
 			"display_name": str(raw_asset.get("name", "")),
-			"asset_type": str(raw_asset.get("asset_type", "character")),
+			"asset_type": str(raw_asset.get("asset_type", WorldDocumentService.ASSET_TYPE_CHARACTER)),
 			"runtime_package": "PolyToolsRuntimeExports/%s/manifest.json" % key
 		})
 	entries.sort_custom(func(left: Dictionary, right: Dictionary) -> bool:
