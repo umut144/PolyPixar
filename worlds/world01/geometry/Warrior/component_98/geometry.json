@@ -2,7 +2,7 @@
 	"asset_id": "asset_15",
 	"component_id": "component_98",
 	"component_mesh": {
-		"bake_id": "meshing_bake_8220837775965603996",
+		"bake_id": "meshing_bake_4240519797862449149",
 		"build_provenance": {
 			"attempts": 1.0,
 			"auto_recipe_version": 3.0,
@@ -45,7 +45,7 @@
 				},
 				"version": 1.0
 			},
-			"exact_input_hash": "5e0207d65ea0d4334a8d3507f544da088d75f123bb112ba0a1a72b9beef1fd52",
+			"exact_input_hash": "0cb74f067c539db7f9c96f02189708ebc8ad79260d48ee3d49194672e5b93fa6",
 			"pipeline_recipe_hash": "ad0fd0d4f889505d271f8850b7a5458e031ba8b47344d2b0e60b8feac845bcaf",
 			"recipe_mode": "automatic",
 			"schema_version": 1.0,
@@ -54,7 +54,7 @@
 				"meshing_algorithm": 5.0,
 				"recipe_hash": "da80c2a45ab554d60281da77916708a675e9f799ddde2a43661f1a7fc8fcebd9",
 				"recipe_version": 2.0,
-				"sampling_algorithm": 3.0,
+				"sampling_algorithm": 4.0,
 				"scalars": [
 					1.0,
 					1.0
@@ -116,14 +116,14 @@
 		},
 		"last_error": "",
 		"last_failure_signature": {},
-		"mesh_fingerprint": "fb7e76929c3e925bf1a2200ca51c81ee718c6945306ff5484d2ad5c743055173",
+		"mesh_fingerprint": "8408b6056955a2a3736ac632b4ebab15b9edcfaa60f5e0734566a667b5e58fd3",
 		"method": "constrained_mesh"
 	},
 	"meshing": {
 		"bakes": {
 			"constrained_mesh": {
 				"algorithm_version": 5,
-				"bake_id": "meshing_bake_8220837775965603996",
+				"bake_id": "meshing_bake_4240519797862449149",
 				"boundary_constraints": [
 					{
 						"chain_id": "chain_2201072348742903422",
@@ -458,10 +458,10 @@
 					"seeding_method": "poisson_fill"
 				},
 				"runs": [],
-				"sampling_bake_id": "bake_2951850525601565872",
-				"sampling_fingerprint": "7a6e7a1cf0e4d68554b652770e16524020d6f8895a25b82acc6cb7366af9811e",
-				"seeding_bake_id": "seeding_bake_1617792541797162807",
-				"seeding_fingerprint": "7127f045d402a367f8000a49540cc6af0be0f2e62d1a1d2e2cf6d0bf0a2ed9f1",
+				"sampling_bake_id": "bake_3021534724657891697",
+				"sampling_fingerprint": "3677a800cefb20f5ec4f09de2140d437518d66ac620267ae76baea34688c3f22",
+				"seeding_bake_id": "seeding_bake_3402184361932217572",
+				"seeding_fingerprint": "478c19376acbe94870ae08bf32551ba4c469b926b2ed0fbcff6bc122200b52ac",
 				"triangle_count": 16,
 				"triangles": [
 					{
@@ -766,7 +766,7 @@
 			},
 			"contour_stroke": {
 				"algorithm_version": 5,
-				"bake_id": "contour_stroke_bake_6147371175548159554",
+				"bake_id": "contour_stroke_bake_5705803946250103554",
 				"boundary_constraints": [],
 				"errors": [],
 				"geometry_diagnostics": {
@@ -1220,8 +1220,12 @@
 	"sampling": {
 		"bakes": {
 			"adaptive": {
-				"algorithm_version": 3,
-				"bake_id": "bake_2951850525601565872",
+				"algorithm_version": 4,
+				"bake_id": "bake_3021534724657891697",
+				"boundary_refinement_complete": true,
+				"boundary_refinement_count": 0,
+				"boundary_refinement_limit_reached": false,
+				"boundary_refinement_unresolved_corner_count": 0,
 				"boundary_stats": [
 					{
 						"effective_spacing": 0.55,
@@ -1456,7 +1460,7 @@
 					"meshing_algorithm": 5.0,
 					"recipe_hash": "83b3bb413e898ca18e00478db3e3a3d09c454bb845c409777d399d470a3b5ee4",
 					"recipe_version": 2.0,
-					"sampling_algorithm": 3.0,
+					"sampling_algorithm": 4.0,
 					"scalars": [
 						1.0,
 						1.0
@@ -1528,7 +1532,7 @@
 			}
 		}
 	},
-	"schema_version": 61,
+	"schema_version": 62,
 	"sdf": {
 		"bake": {},
 		"last_error": "",
@@ -1545,7 +1549,7 @@
 		"bakes": {
 			"poisson_fill": {
 				"algorithm_version": 2.0,
-				"bake_id": "seeding_bake_1617792541797162807",
+				"bake_id": "seeding_bake_3402184361932217572",
 				"edited": false,
 				"errors": [],
 				"flow_seed_count": 0.0,
@@ -1561,8 +1565,8 @@
 					"seed": 1,
 					"spacing": 0.55
 				},
-				"sampling_bake_id": "bake_2951850525601565872",
-				"sampling_fingerprint": "7a6e7a1cf0e4d68554b652770e16524020d6f8895a25b82acc6cb7366af9811e",
+				"sampling_bake_id": "bake_3021534724657891697",
+				"sampling_fingerprint": "3677a800cefb20f5ec4f09de2140d437518d66ac620267ae76baea34688c3f22",
 				"seed_count": 0,
 				"seeds": [],
 				"valid": true

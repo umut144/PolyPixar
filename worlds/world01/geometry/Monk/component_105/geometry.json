@@ -2,7 +2,7 @@
 	"asset_id": "asset_16",
 	"component_id": "component_105",
 	"component_mesh": {
-		"bake_id": "meshing_bake_7496305854518170766",
+		"bake_id": "meshing_bake_1224111652887938467",
 		"build_provenance": {
 			"attempts": 1.0,
 			"auto_recipe_version": 3.0,
@@ -45,7 +45,7 @@
 				},
 				"version": 1.0
 			},
-			"exact_input_hash": "3e62f70e04fe0d8ee337271f75c9bf24ad852c40f6094e3ef19761763a77503e",
+			"exact_input_hash": "41f88131f16ca5ea00b73add3ed6a0ce603432b99724c7b74e4a0fb0172346b0",
 			"pipeline_recipe_hash": "ad0fd0d4f889505d271f8850b7a5458e031ba8b47344d2b0e60b8feac845bcaf",
 			"recipe_mode": "automatic",
 			"schema_version": 1.0,
@@ -54,7 +54,7 @@
 				"meshing_algorithm": 5.0,
 				"recipe_hash": "da80c2a45ab554d60281da77916708a675e9f799ddde2a43661f1a7fc8fcebd9",
 				"recipe_version": 2.0,
-				"sampling_algorithm": 3.0,
+				"sampling_algorithm": 4.0,
 				"scalars": [
 					1.0,
 					1.0
@@ -140,14 +140,14 @@
 		},
 		"last_error": "",
 		"last_failure_signature": {},
-		"mesh_fingerprint": "ad5c0b6e9450a597ea1054ee8af4cc8a2847da433778c3f9eaf39f1b68a98ee5",
+		"mesh_fingerprint": "bc1d8643b676aa56c84c6fd3a98e85e4900034e17f3d4d5de3174a033863fd2d",
 		"method": "constrained_mesh"
 	},
 	"meshing": {
 		"bakes": {
 			"constrained_mesh": {
 				"algorithm_version": 5,
-				"bake_id": "meshing_bake_7496305854518170766",
+				"bake_id": "meshing_bake_1224111652887938467",
 				"boundary_constraints": [
 					{
 						"chain_id": "chain_4029901878546098257",
@@ -1979,10 +1979,10 @@
 					"seeding_method": "poisson_fill"
 				},
 				"runs": [],
-				"sampling_bake_id": "bake_7169565760591373818",
-				"sampling_fingerprint": "20d374f176f74124d5fab373105a133f4495d5bd07f2a1348c56b70c0c6454ac",
-				"seeding_bake_id": "seeding_bake_2837479258983534232",
-				"seeding_fingerprint": "3136d3c67666eba58bc46d11437601ab222b278019ec5dfa22ee0fd1f44d6c84",
+				"sampling_bake_id": "bake_2584418324474798757",
+				"sampling_fingerprint": "ba139aa91f7135599caa5547ff698e495dc10a5cbba5bd753c574815a0d55224",
+				"seeding_bake_id": "seeding_bake_8100540672366958103",
+				"seeding_fingerprint": "7c7dd6ac195c2bbae234e18c1c570dcfeae1d05916a9fb07af9b305c3d1fbeaa",
 				"triangle_count": 120,
 				"triangles": [
 					{
@@ -3775,7 +3775,7 @@
 			},
 			"contour_stroke": {
 				"algorithm_version": 5,
-				"bake_id": "contour_stroke_bake_5316465862322283804",
+				"bake_id": "contour_stroke_bake_3794742024417102154",
 				"boundary_constraints": [],
 				"errors": [],
 				"geometry_diagnostics": {
@@ -4481,8 +4481,12 @@
 	"sampling": {
 		"bakes": {
 			"adaptive": {
-				"algorithm_version": 3,
-				"bake_id": "bake_7169565760591373818",
+				"algorithm_version": 4,
+				"bake_id": "bake_2584418324474798757",
+				"boundary_refinement_complete": true,
+				"boundary_refinement_count": 0,
+				"boundary_refinement_limit_reached": false,
+				"boundary_refinement_unresolved_corner_count": 0,
 				"boundary_stats": [
 					{
 						"effective_spacing": 0.55,
@@ -5245,7 +5249,7 @@
 					"meshing_algorithm": 5.0,
 					"recipe_hash": "83b3bb413e898ca18e00478db3e3a3d09c454bb845c409777d399d470a3b5ee4",
 					"recipe_version": 2.0,
-					"sampling_algorithm": 3.0,
+					"sampling_algorithm": 4.0,
 					"scalars": [
 						1.0,
 						1.0
@@ -5341,7 +5345,7 @@
 			}
 		}
 	},
-	"schema_version": 61,
+	"schema_version": 62,
 	"sdf": {
 		"bake": {},
 		"last_error": "",
@@ -5358,7 +5362,7 @@
 		"bakes": {
 			"poisson_fill": {
 				"algorithm_version": 2.0,
-				"bake_id": "seeding_bake_2837479258983534232",
+				"bake_id": "seeding_bake_8100540672366958103",
 				"edited": false,
 				"errors": [],
 				"flow_seed_count": 0.0,
@@ -5374,8 +5378,8 @@
 					"seed": 1,
 					"spacing": 0.55
 				},
-				"sampling_bake_id": "bake_7169565760591373818",
-				"sampling_fingerprint": "20d374f176f74124d5fab373105a133f4495d5bd07f2a1348c56b70c0c6454ac",
+				"sampling_bake_id": "bake_2584418324474798757",
+				"sampling_fingerprint": "ba139aa91f7135599caa5547ff698e495dc10a5cbba5bd753c574815a0d55224",
 				"seed_count": 28,
 				"seeds": [
 					{

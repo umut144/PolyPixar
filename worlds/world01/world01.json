@@ -19,10 +19,11 @@
 		"asset_16",
 		"asset_17",
 		"asset_18",
-		"asset_19"
+		"asset_19",
+		"asset_20"
 	],
 	"editor_state": {
-		"active_create_submodule": "Character",
+		"active_create_submodule": "Items",
 		"active_geometry_submodule": "Sampling",
 		"active_module": "Create",
 		"active_motion_submodule": "Animation",
@@ -112,6 +113,13 @@
 				],
 				"zoom": 86.4386731023068
 			},
+			"asset_20": {
+				"position": [
+					-0.00993497669696808,
+					1.4057708978653
+				],
+				"zoom": 1250.7455839167
+			},
 			"asset_3": {
 				"position": [
 					-0.126418218016624,
@@ -175,7 +183,8 @@
 			"asset_18": false,
 			"asset_19": true,
 			"asset_2": false,
-			"asset_3": true,
+			"asset_20": true,
+			"asset_3": false,
 			"asset_4": false,
 			"asset_5": false,
 			"asset_6": false,
@@ -194,21 +203,22 @@
 			],
 			"visible": false
 		},
-		"motion_act_preview_asset_id": "",
+		"motion_act_preview_asset_id": "asset_1",
 		"motion_act_preview_loop": true,
-		"motion_path_preview_asset_id": "",
+		"motion_path_preview_asset_id": "asset_1",
 		"motion_sequence_preview_loop": true,
 		"motion_sequence_view": "composition",
 		"outliner_asset_type_filters": {
 			"character": true,
-			"icon": true,
+			"icon": false,
+			"items": true,
 			"props": true,
-			"symbols": true,
+			"symbols": false,
 			"terrain": false,
 			"weapons": false
 		},
-		"selected_asset_id": "asset_3",
-		"selected_component_id": "component_173",
+		"selected_asset_id": "asset_20",
+		"selected_component_id": "",
 		"selected_edge_ids": [],
 		"selected_guide_id": "",
 		"selected_motion_act_id": "",
@@ -218,8 +228,8 @@
 		"selected_weighting_style_id": "",
 		"snap": {
 			"enabled": true,
-			"grid_step": 0.01,
-			"mode": "ultra_fine",
+			"grid_step": 0.05,
+			"mode": "finer",
 			"rotation_step": 15.0
 		},
 		"world_scale": {
@@ -229,7 +239,7 @@
 	},
 	"name": "world01",
 	"paths": [],
-	"schema_version": 61,
+	"schema_version": 62,
 	"sequences": [],
 	"world_name": "Secrets, Room's & Travels'",
 	"world_settings": {

@@ -2,7 +2,7 @@
 	"asset_id": "asset_6",
 	"component_id": "component_47",
 	"component_mesh": {
-		"bake_id": "meshing_bake_5267294256139150873",
+		"bake_id": "meshing_bake_6753688434961379935",
 		"build_provenance": {
 			"attempts": 1.0,
 			"auto_recipe_version": 3.0,
@@ -45,7 +45,7 @@
 				},
 				"version": 1.0
 			},
-			"exact_input_hash": "379d290cd053ec0829f3e725795efe86995483b49a6f48422e2a76f5118e8697",
+			"exact_input_hash": "090ed40468692bfd02fd4a7290648fe0feaefaecd995d5ada763b7890cf5be28",
 			"pipeline_recipe_hash": "ad0fd0d4f889505d271f8850b7a5458e031ba8b47344d2b0e60b8feac845bcaf",
 			"recipe_mode": "automatic",
 			"schema_version": 1.0,
@@ -54,7 +54,7 @@
 				"meshing_algorithm": 5.0,
 				"recipe_hash": "da80c2a45ab554d60281da77916708a675e9f799ddde2a43661f1a7fc8fcebd9",
 				"recipe_version": 2.0,
-				"sampling_algorithm": 3.0,
+				"sampling_algorithm": 4.0,
 				"scalars": [
 					1.0,
 					1.0
@@ -200,14 +200,14 @@
 		},
 		"last_error": "",
 		"last_failure_signature": {},
-		"mesh_fingerprint": "15c42cee8c70289b1c69e56acaf744cd4d9b3463d4bbaa3d257b9a9ed23ad6f6",
+		"mesh_fingerprint": "5dc29f765c7ee64d18b0cab6612b4ae9c6b5e9255cda4e616116ff3f34c87651",
 		"method": "constrained_mesh"
 	},
 	"meshing": {
 		"bakes": {
 			"constrained_mesh": {
 				"algorithm_version": 5,
-				"bake_id": "meshing_bake_5267294256139150873",
+				"bake_id": "meshing_bake_6753688434961379935",
 				"boundary_constraints": [
 					{
 						"chain_id": "chain_829766076588447363",
@@ -1891,10 +1891,10 @@
 					"seeding_method": "poisson_fill"
 				},
 				"runs": [],
-				"sampling_bake_id": "bake_7432745724763469042",
-				"sampling_fingerprint": "8cdcb50e43e5ec256b82a7237613c41ee7a6f6afc92802065c7e36e99ee930df",
-				"seeding_bake_id": "seeding_bake_2181854346042763555",
-				"seeding_fingerprint": "20b11f0228c38bb2b9f9b88b26184a0345efa440fccccc2d69e56fbf72f6e2b3",
+				"sampling_bake_id": "bake_7930728537104655933",
+				"sampling_fingerprint": "6decb9dce43808e2dbfbe45364132ef5c5e88a0af59e2db396d204b6f43f9a87",
+				"seeding_bake_id": "seeding_bake_6524923434889958226",
+				"seeding_fingerprint": "045a4252803ab65f6a4fdc4594592b48aa2604884539c501ef3c23fffd9b2399",
 				"triangle_count": 110,
 				"triangles": [
 					{
@@ -3537,7 +3537,7 @@
 			},
 			"contour_stroke": {
 				"algorithm_version": 5,
-				"bake_id": "contour_stroke_bake_8819813977108764943",
+				"bake_id": "contour_stroke_bake_4178631526718986063",
 				"boundary_constraints": [],
 				"errors": [],
 				"geometry_diagnostics": {
@@ -6747,8 +6747,12 @@
 	"sampling": {
 		"bakes": {
 			"adaptive": {
-				"algorithm_version": 3,
-				"bake_id": "bake_7432745724763469042",
+				"algorithm_version": 4,
+				"bake_id": "bake_7930728537104655933",
+				"boundary_refinement_complete": true,
+				"boundary_refinement_count": 0,
+				"boundary_refinement_limit_reached": false,
+				"boundary_refinement_unresolved_corner_count": 0,
 				"boundary_stats": [
 					{
 						"effective_spacing": 0.55,
@@ -7445,7 +7449,7 @@
 					"meshing_algorithm": 5.0,
 					"recipe_hash": "83b3bb413e898ca18e00478db3e3a3d09c454bb845c409777d399d470a3b5ee4",
 					"recipe_version": 2.0,
-					"sampling_algorithm": 3.0,
+					"sampling_algorithm": 4.0,
 					"scalars": [
 						1.0,
 						1.0
@@ -7601,7 +7605,7 @@
 			}
 		}
 	},
-	"schema_version": 61,
+	"schema_version": 62,
 	"sdf": {
 		"bake": {
 			"algorithm_version": 1,
@@ -7648,7 +7652,7 @@
 		"bakes": {
 			"poisson_fill": {
 				"algorithm_version": 2.0,
-				"bake_id": "seeding_bake_2181854346042763555",
+				"bake_id": "seeding_bake_6524923434889958226",
 				"edited": false,
 				"errors": [],
 				"flow_seed_count": 0.0,
@@ -7664,8 +7668,8 @@
 					"seed": 1,
 					"spacing": 0.55
 				},
-				"sampling_bake_id": "bake_7432745724763469042",
-				"sampling_fingerprint": "8cdcb50e43e5ec256b82a7237613c41ee7a6f6afc92802065c7e36e99ee930df",
+				"sampling_bake_id": "bake_7930728537104655933",
+				"sampling_fingerprint": "6decb9dce43808e2dbfbe45364132ef5c5e88a0af59e2db396d204b6f43f9a87",
 				"seed_count": 26,
 				"seeds": [
 					{

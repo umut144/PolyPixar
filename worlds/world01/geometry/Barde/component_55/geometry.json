@@ -2,11 +2,12 @@
 	"asset_id": "asset_9",
 	"component_id": "component_55",
 	"component_mesh": {
-		"bake_id": "meshing_bake_905866697303716202",
+		"bake_id": "meshing_bake_578903841083561826",
 		"build_provenance": {
 			"attempts": 1.0,
 			"auto_recipe_version": 0.0,
-			"exact_input_hash": "38a2f956e0009ac20b87bd308ec25ed4c890b9d0c6ac0af68ccc2f5adc7ad2b9",
+			"automatic_diagnostics": {},
+			"exact_input_hash": "0111d13cdb66275fa96f568e39362ef63d2311a93fdfe2611d5dde37ff62ce0c",
 			"pipeline_recipe_hash": "ea2bc9984c1ca3e5d9cc9e28bc168a4fddfc40efb329dbcc3c5a2a0d01ccd4ce",
 			"recipe_mode": "manual",
 			"schema_version": 1.0,
@@ -15,7 +16,7 @@
 				"meshing_algorithm": 5.0,
 				"recipe_hash": "57b46742fe9253eb321a476f997c7d8ecc8112f0e75d58a1fa4e4f04a653623d",
 				"recipe_version": 2.0,
-				"sampling_algorithm": 3.0,
+				"sampling_algorithm": 4.0,
 				"scalars": [
 					2.0,
 					2.0,
@@ -311,14 +312,14 @@
 		},
 		"last_error": "",
 		"last_failure_signature": {},
-		"mesh_fingerprint": "65bbb1e9ba84355d00b38da91a2857ea78476b31a636c867663d54295aee19d2",
+		"mesh_fingerprint": "f6e93317f4c61a7b8ddace73696ee41ed5abb98827d15493dc60d9d9d90ea757",
 		"method": "constrained_mesh"
 	},
 	"meshing": {
 		"bakes": {
 			"constrained_mesh": {
 				"algorithm_version": 5,
-				"bake_id": "meshing_bake_905866697303716202",
+				"bake_id": "meshing_bake_578903841083561826",
 				"boundary_constraints": [
 					{
 						"chain_id": "chain_4067757503348057739",
@@ -1153,8 +1154,8 @@
 						"segment_index": 0.0,
 						"topology_role": "hole",
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:0",
-							"vertex:boundary:sample:circle:component_58:1"
+							"vertex:boundary:sample:circle:component_58:component_53:0",
+							"vertex:boundary:sample:circle:component_58:component_53:1"
 						]
 					},
 					{
@@ -1162,8 +1163,8 @@
 						"segment_index": 1.0,
 						"topology_role": "hole",
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:1",
-							"vertex:boundary:sample:circle:component_58:2"
+							"vertex:boundary:sample:circle:component_58:component_53:1",
+							"vertex:boundary:sample:circle:component_58:component_53:2"
 						]
 					},
 					{
@@ -1171,8 +1172,8 @@
 						"segment_index": 2.0,
 						"topology_role": "hole",
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:2",
-							"vertex:boundary:sample:circle:component_58:3"
+							"vertex:boundary:sample:circle:component_58:component_53:2",
+							"vertex:boundary:sample:circle:component_58:component_53:3"
 						]
 					},
 					{
@@ -1180,8 +1181,8 @@
 						"segment_index": 3.0,
 						"topology_role": "hole",
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:3",
-							"vertex:boundary:sample:circle:component_58:4"
+							"vertex:boundary:sample:circle:component_58:component_53:3",
+							"vertex:boundary:sample:circle:component_58:component_53:4"
 						]
 					},
 					{
@@ -1189,8 +1190,8 @@
 						"segment_index": 4.0,
 						"topology_role": "hole",
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:4",
-							"vertex:boundary:sample:circle:component_58:5"
+							"vertex:boundary:sample:circle:component_58:component_53:4",
+							"vertex:boundary:sample:circle:component_58:component_53:5"
 						]
 					},
 					{
@@ -1198,8 +1199,8 @@
 						"segment_index": 5.0,
 						"topology_role": "hole",
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:5",
-							"vertex:boundary:sample:circle:component_58:6"
+							"vertex:boundary:sample:circle:component_58:component_53:5",
+							"vertex:boundary:sample:circle:component_58:component_53:6"
 						]
 					},
 					{
@@ -1207,8 +1208,8 @@
 						"segment_index": 6.0,
 						"topology_role": "hole",
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:6",
-							"vertex:boundary:sample:circle:component_58:7"
+							"vertex:boundary:sample:circle:component_58:component_53:6",
+							"vertex:boundary:sample:circle:component_58:component_53:7"
 						]
 					},
 					{
@@ -1216,8 +1217,8 @@
 						"segment_index": 7.0,
 						"topology_role": "hole",
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:7",
-							"vertex:boundary:sample:circle:component_58:8"
+							"vertex:boundary:sample:circle:component_58:component_53:7",
+							"vertex:boundary:sample:circle:component_58:component_53:8"
 						]
 					},
 					{
@@ -1225,8 +1226,8 @@
 						"segment_index": 8.0,
 						"topology_role": "hole",
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:8",
-							"vertex:boundary:sample:circle:component_58:9"
+							"vertex:boundary:sample:circle:component_58:component_53:8",
+							"vertex:boundary:sample:circle:component_58:component_53:9"
 						]
 					},
 					{
@@ -1234,8 +1235,8 @@
 						"segment_index": 9.0,
 						"topology_role": "hole",
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:9",
-							"vertex:boundary:sample:circle:component_58:10"
+							"vertex:boundary:sample:circle:component_58:component_53:9",
+							"vertex:boundary:sample:circle:component_58:component_53:10"
 						]
 					},
 					{
@@ -1243,8 +1244,8 @@
 						"segment_index": 10.0,
 						"topology_role": "hole",
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:10",
-							"vertex:boundary:sample:circle:component_58:11"
+							"vertex:boundary:sample:circle:component_58:component_53:10",
+							"vertex:boundary:sample:circle:component_58:component_53:11"
 						]
 					},
 					{
@@ -1252,8 +1253,8 @@
 						"segment_index": 11.0,
 						"topology_role": "hole",
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:11",
-							"vertex:boundary:sample:circle:component_58:12"
+							"vertex:boundary:sample:circle:component_58:component_53:11",
+							"vertex:boundary:sample:circle:component_58:component_53:12"
 						]
 					},
 					{
@@ -1261,8 +1262,8 @@
 						"segment_index": 12.0,
 						"topology_role": "hole",
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:12",
-							"vertex:boundary:sample:circle:component_58:13"
+							"vertex:boundary:sample:circle:component_58:component_53:12",
+							"vertex:boundary:sample:circle:component_58:component_53:13"
 						]
 					},
 					{
@@ -1270,8 +1271,8 @@
 						"segment_index": 13.0,
 						"topology_role": "hole",
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:13",
-							"vertex:boundary:sample:circle:component_58:14"
+							"vertex:boundary:sample:circle:component_58:component_53:13",
+							"vertex:boundary:sample:circle:component_58:component_53:14"
 						]
 					},
 					{
@@ -1279,8 +1280,8 @@
 						"segment_index": 14.0,
 						"topology_role": "hole",
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:14",
-							"vertex:boundary:sample:circle:component_58:15"
+							"vertex:boundary:sample:circle:component_58:component_53:14",
+							"vertex:boundary:sample:circle:component_58:component_53:15"
 						]
 					},
 					{
@@ -1288,8 +1289,8 @@
 						"segment_index": 15.0,
 						"topology_role": "hole",
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:15",
-							"vertex:boundary:sample:circle:component_58:16"
+							"vertex:boundary:sample:circle:component_58:component_53:15",
+							"vertex:boundary:sample:circle:component_58:component_53:16"
 						]
 					},
 					{
@@ -1297,8 +1298,8 @@
 						"segment_index": 16.0,
 						"topology_role": "hole",
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:16",
-							"vertex:boundary:sample:circle:component_58:17"
+							"vertex:boundary:sample:circle:component_58:component_53:16",
+							"vertex:boundary:sample:circle:component_58:component_53:17"
 						]
 					},
 					{
@@ -1306,8 +1307,8 @@
 						"segment_index": 17.0,
 						"topology_role": "hole",
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:17",
-							"vertex:boundary:sample:circle:component_58:18"
+							"vertex:boundary:sample:circle:component_58:component_53:17",
+							"vertex:boundary:sample:circle:component_58:component_53:18"
 						]
 					},
 					{
@@ -1315,8 +1316,8 @@
 						"segment_index": 18.0,
 						"topology_role": "hole",
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:18",
-							"vertex:boundary:sample:circle:component_58:19"
+							"vertex:boundary:sample:circle:component_58:component_53:18",
+							"vertex:boundary:sample:circle:component_58:component_53:19"
 						]
 					},
 					{
@@ -1324,8 +1325,8 @@
 						"segment_index": 19.0,
 						"topology_role": "hole",
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:19",
-							"vertex:boundary:sample:circle:component_58:20"
+							"vertex:boundary:sample:circle:component_58:component_53:19",
+							"vertex:boundary:sample:circle:component_58:component_53:20"
 						]
 					},
 					{
@@ -1333,8 +1334,8 @@
 						"segment_index": 20.0,
 						"topology_role": "hole",
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:20",
-							"vertex:boundary:sample:circle:component_58:21"
+							"vertex:boundary:sample:circle:component_58:component_53:20",
+							"vertex:boundary:sample:circle:component_58:component_53:21"
 						]
 					},
 					{
@@ -1342,8 +1343,8 @@
 						"segment_index": 21.0,
 						"topology_role": "hole",
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:21",
-							"vertex:boundary:sample:circle:component_58:22"
+							"vertex:boundary:sample:circle:component_58:component_53:21",
+							"vertex:boundary:sample:circle:component_58:component_53:22"
 						]
 					},
 					{
@@ -1351,8 +1352,8 @@
 						"segment_index": 22.0,
 						"topology_role": "hole",
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:22",
-							"vertex:boundary:sample:circle:component_58:23"
+							"vertex:boundary:sample:circle:component_58:component_53:22",
+							"vertex:boundary:sample:circle:component_58:component_53:23"
 						]
 					},
 					{
@@ -1360,8 +1361,8 @@
 						"segment_index": 23.0,
 						"topology_role": "hole",
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:23",
-							"vertex:boundary:sample:circle:component_58:24"
+							"vertex:boundary:sample:circle:component_58:component_53:23",
+							"vertex:boundary:sample:circle:component_58:component_53:24"
 						]
 					},
 					{
@@ -1369,8 +1370,8 @@
 						"segment_index": 24.0,
 						"topology_role": "hole",
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:24",
-							"vertex:boundary:sample:circle:component_58:25"
+							"vertex:boundary:sample:circle:component_58:component_53:24",
+							"vertex:boundary:sample:circle:component_58:component_53:25"
 						]
 					},
 					{
@@ -1378,8 +1379,8 @@
 						"segment_index": 25.0,
 						"topology_role": "hole",
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:25",
-							"vertex:boundary:sample:circle:component_58:26"
+							"vertex:boundary:sample:circle:component_58:component_53:25",
+							"vertex:boundary:sample:circle:component_58:component_53:26"
 						]
 					},
 					{
@@ -1387,8 +1388,8 @@
 						"segment_index": 26.0,
 						"topology_role": "hole",
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:26",
-							"vertex:boundary:sample:circle:component_58:27"
+							"vertex:boundary:sample:circle:component_58:component_53:26",
+							"vertex:boundary:sample:circle:component_58:component_53:27"
 						]
 					},
 					{
@@ -1396,8 +1397,8 @@
 						"segment_index": 27.0,
 						"topology_role": "hole",
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:27",
-							"vertex:boundary:sample:circle:component_58:28"
+							"vertex:boundary:sample:circle:component_58:component_53:27",
+							"vertex:boundary:sample:circle:component_58:component_53:28"
 						]
 					},
 					{
@@ -1405,8 +1406,8 @@
 						"segment_index": 28.0,
 						"topology_role": "hole",
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:28",
-							"vertex:boundary:sample:circle:component_58:29"
+							"vertex:boundary:sample:circle:component_58:component_53:28",
+							"vertex:boundary:sample:circle:component_58:component_53:29"
 						]
 					},
 					{
@@ -1414,8 +1415,8 @@
 						"segment_index": 29.0,
 						"topology_role": "hole",
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:29",
-							"vertex:boundary:sample:circle:component_58:30"
+							"vertex:boundary:sample:circle:component_58:component_53:29",
+							"vertex:boundary:sample:circle:component_58:component_53:30"
 						]
 					},
 					{
@@ -1423,8 +1424,8 @@
 						"segment_index": 30.0,
 						"topology_role": "hole",
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:30",
-							"vertex:boundary:sample:circle:component_58:31"
+							"vertex:boundary:sample:circle:component_58:component_53:30",
+							"vertex:boundary:sample:circle:component_58:component_53:31"
 						]
 					},
 					{
@@ -1432,8 +1433,8 @@
 						"segment_index": 31.0,
 						"topology_role": "hole",
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:31",
-							"vertex:boundary:sample:circle:component_58:0"
+							"vertex:boundary:sample:circle:component_58:component_53:31",
+							"vertex:boundary:sample:circle:component_58:component_53:0"
 						]
 					},
 					{
@@ -1543,7 +1544,7 @@
 						"topology_role": "cut",
 						"vertex_ids": [
 							"vertex:cut:cut:guide_1:10",
-							"vertex:boundary:sample:circle:component_58:24"
+							"vertex:boundary:sample:circle:component_58:component_53:24"
 						]
 					},
 					{
@@ -1552,7 +1553,7 @@
 						"segment_index": 0.0,
 						"topology_role": "cut",
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:8",
+							"vertex:boundary:sample:circle:component_58:component_53:8",
 							"vertex:cut:cut:guide_1:21"
 						]
 					},
@@ -1719,210 +1720,210 @@
 					"baseline_triangles": [
 						{
 							"vertex_ids": [
-								"vertex:boundary:sample:circle:component_58:0",
-								"vertex:boundary:sample:circle:component_58:31",
+								"vertex:boundary:sample:circle:component_58:component_53:0",
+								"vertex:boundary:sample:circle:component_58:component_53:31",
 								"vertex:seed:seed:auto:000072"
 							]
 						},
 						{
 							"vertex_ids": [
-								"vertex:boundary:sample:circle:component_58:0",
+								"vertex:boundary:sample:circle:component_58:component_53:0",
 								"vertex:seed:seed:auto:000072",
-								"vertex:boundary:sample:circle:component_58:1"
+								"vertex:boundary:sample:circle:component_58:component_53:1"
 							]
 						},
 						{
 							"vertex_ids": [
-								"vertex:boundary:sample:circle:component_58:1",
+								"vertex:boundary:sample:circle:component_58:component_53:1",
 								"vertex:seed:seed:auto:000072",
-								"vertex:boundary:sample:circle:component_58:2"
+								"vertex:boundary:sample:circle:component_58:component_53:2"
 							]
 						},
 						{
 							"vertex_ids": [
-								"vertex:boundary:sample:circle:component_58:10",
-								"vertex:boundary:sample:circle:component_58:9",
+								"vertex:boundary:sample:circle:component_58:component_53:10",
+								"vertex:boundary:sample:circle:component_58:component_53:9",
 								"vertex:seed:seed:auto:000045"
 							]
 						},
 						{
 							"vertex_ids": [
-								"vertex:boundary:sample:circle:component_58:10",
+								"vertex:boundary:sample:circle:component_58:component_53:10",
 								"vertex:seed:seed:auto:000045",
-								"vertex:boundary:sample:circle:component_58:11"
+								"vertex:boundary:sample:circle:component_58:component_53:11"
 							]
 						},
 						{
 							"vertex_ids": [
-								"vertex:boundary:sample:circle:component_58:12",
-								"vertex:boundary:sample:circle:component_58:11",
+								"vertex:boundary:sample:circle:component_58:component_53:12",
+								"vertex:boundary:sample:circle:component_58:component_53:11",
 								"vertex:seed:seed:auto:000039"
 							]
 						},
 						{
 							"vertex_ids": [
-								"vertex:boundary:sample:circle:component_58:12",
+								"vertex:boundary:sample:circle:component_58:component_53:12",
 								"vertex:seed:seed:auto:000039",
-								"vertex:boundary:sample:circle:component_58:13"
+								"vertex:boundary:sample:circle:component_58:component_53:13"
 							]
 						},
 						{
 							"vertex_ids": [
-								"vertex:boundary:sample:circle:component_58:13",
+								"vertex:boundary:sample:circle:component_58:component_53:13",
 								"vertex:seed:seed:auto:000039",
 								"vertex:seed:seed:auto:000020"
 							]
 						},
 						{
 							"vertex_ids": [
-								"vertex:boundary:sample:circle:component_58:14",
+								"vertex:boundary:sample:circle:component_58:component_53:14",
 								"vertex:seed:seed:auto:000020",
-								"vertex:boundary:sample:circle:component_58:15"
+								"vertex:boundary:sample:circle:component_58:component_53:15"
 							]
 						},
 						{
 							"vertex_ids": [
-								"vertex:boundary:sample:circle:component_58:15",
+								"vertex:boundary:sample:circle:component_58:component_53:15",
 								"vertex:seed:seed:auto:000012",
-								"vertex:boundary:sample:circle:component_58:16"
+								"vertex:boundary:sample:circle:component_58:component_53:16"
 							]
 						},
 						{
 							"vertex_ids": [
-								"vertex:boundary:sample:circle:component_58:17",
+								"vertex:boundary:sample:circle:component_58:component_53:17",
 								"vertex:seed:seed:auto:000012",
-								"vertex:boundary:sample:circle:component_58:18"
+								"vertex:boundary:sample:circle:component_58:component_53:18"
 							]
 						},
 						{
 							"vertex_ids": [
-								"vertex:boundary:sample:circle:component_58:19",
+								"vertex:boundary:sample:circle:component_58:component_53:19",
 								"vertex:seed:seed:auto:000017",
-								"vertex:boundary:sample:circle:component_58:20"
+								"vertex:boundary:sample:circle:component_58:component_53:20"
 							]
 						},
 						{
 							"vertex_ids": [
-								"vertex:boundary:sample:circle:component_58:20",
+								"vertex:boundary:sample:circle:component_58:component_53:20",
 								"vertex:seed:seed:auto:000017",
 								"vertex:seed:seed:auto:000019"
 							]
 						},
 						{
 							"vertex_ids": [
-								"vertex:boundary:sample:circle:component_58:20",
+								"vertex:boundary:sample:circle:component_58:component_53:20",
 								"vertex:seed:seed:auto:000019",
-								"vertex:boundary:sample:circle:component_58:21"
+								"vertex:boundary:sample:circle:component_58:component_53:21"
 							]
 						},
 						{
 							"vertex_ids": [
-								"vertex:boundary:sample:circle:component_58:21",
+								"vertex:boundary:sample:circle:component_58:component_53:21",
 								"vertex:seed:seed:auto:000019",
-								"vertex:boundary:sample:circle:component_58:22"
+								"vertex:boundary:sample:circle:component_58:component_53:22"
 							]
 						},
 						{
 							"vertex_ids": [
-								"vertex:boundary:sample:circle:component_58:23",
+								"vertex:boundary:sample:circle:component_58:component_53:23",
 								"vertex:cut:cut:guide_1:10",
-								"vertex:boundary:sample:circle:component_58:24"
+								"vertex:boundary:sample:circle:component_58:component_53:24"
 							]
 						},
 						{
 							"vertex_ids": [
-								"vertex:boundary:sample:circle:component_58:23",
+								"vertex:boundary:sample:circle:component_58:component_53:23",
 								"vertex:cut:cut:guide_1:9",
 								"vertex:cut:cut:guide_1:10"
 							]
 						},
 						{
 							"vertex_ids": [
-								"vertex:boundary:sample:circle:component_58:23",
+								"vertex:boundary:sample:circle:component_58:component_53:23",
 								"vertex:seed:seed:auto:000019",
 								"vertex:cut:cut:guide_1:9"
 							]
 						},
 						{
 							"vertex_ids": [
-								"vertex:boundary:sample:circle:component_58:24",
+								"vertex:boundary:sample:circle:component_58:component_53:24",
 								"vertex:cut:cut:guide_1:10",
-								"vertex:boundary:sample:circle:component_58:25"
+								"vertex:boundary:sample:circle:component_58:component_53:25"
 							]
 						},
 						{
 							"vertex_ids": [
-								"vertex:boundary:sample:circle:component_58:26",
-								"vertex:boundary:sample:circle:component_58:25",
+								"vertex:boundary:sample:circle:component_58:component_53:26",
+								"vertex:boundary:sample:circle:component_58:component_53:25",
 								"vertex:seed:seed:auto:000038"
 							]
 						},
 						{
 							"vertex_ids": [
-								"vertex:boundary:sample:circle:component_58:26",
+								"vertex:boundary:sample:circle:component_58:component_53:26",
 								"vertex:seed:seed:auto:000038",
-								"vertex:boundary:sample:circle:component_58:27"
+								"vertex:boundary:sample:circle:component_58:component_53:27"
 							]
 						},
 						{
 							"vertex_ids": [
-								"vertex:boundary:sample:circle:component_58:28",
+								"vertex:boundary:sample:circle:component_58:component_53:28",
 								"vertex:seed:seed:auto:000038",
 								"vertex:seed:seed:auto:000061"
 							]
 						},
 						{
 							"vertex_ids": [
-								"vertex:boundary:sample:circle:component_58:28",
+								"vertex:boundary:sample:circle:component_58:component_53:28",
 								"vertex:seed:seed:auto:000061",
-								"vertex:boundary:sample:circle:component_58:29"
+								"vertex:boundary:sample:circle:component_58:component_53:29"
 							]
 						},
 						{
 							"vertex_ids": [
-								"vertex:boundary:sample:circle:component_58:3",
-								"vertex:boundary:sample:circle:component_58:2",
+								"vertex:boundary:sample:circle:component_58:component_53:3",
+								"vertex:boundary:sample:circle:component_58:component_53:2",
 								"vertex:seed:seed:auto:000080"
 							]
 						},
 						{
 							"vertex_ids": [
-								"vertex:boundary:sample:circle:component_58:30",
+								"vertex:boundary:sample:circle:component_58:component_53:30",
 								"vertex:seed:seed:auto:000061",
-								"vertex:boundary:sample:circle:component_58:31"
+								"vertex:boundary:sample:circle:component_58:component_53:31"
 							]
 						},
 						{
 							"vertex_ids": [
-								"vertex:boundary:sample:circle:component_58:31",
+								"vertex:boundary:sample:circle:component_58:component_53:31",
 								"vertex:seed:seed:auto:000061",
 								"vertex:seed:seed:auto:000072"
 							]
 						},
 						{
 							"vertex_ids": [
-								"vertex:boundary:sample:circle:component_58:4",
+								"vertex:boundary:sample:circle:component_58:component_53:4",
 								"vertex:seed:seed:auto:000078",
-								"vertex:boundary:sample:circle:component_58:5"
+								"vertex:boundary:sample:circle:component_58:component_53:5"
 							]
 						},
 						{
 							"vertex_ids": [
-								"vertex:boundary:sample:circle:component_58:6",
+								"vertex:boundary:sample:circle:component_58:component_53:6",
 								"vertex:cut:cut:guide_1:22",
-								"vertex:boundary:sample:circle:component_58:7"
+								"vertex:boundary:sample:circle:component_58:component_53:7"
 							]
 						},
 						{
 							"vertex_ids": [
-								"vertex:boundary:sample:circle:component_58:6",
+								"vertex:boundary:sample:circle:component_58:component_53:6",
 								"vertex:seed:seed:auto:000053",
 								"vertex:cut:cut:guide_1:22"
 							]
 						},
 						{
 							"vertex_ids": [
-								"vertex:boundary:sample:circle:component_58:6",
+								"vertex:boundary:sample:circle:component_58:component_53:6",
 								"vertex:seed:seed:auto:000078",
 								"vertex:seed:seed:auto:000053"
 							]
@@ -2596,7 +2597,7 @@
 							"vertex_ids": [
 								"vertex:cut:cut:guide_1:10",
 								"vertex:cut:cut:guide_1:9",
-								"vertex:boundary:sample:circle:component_58:25"
+								"vertex:boundary:sample:circle:component_58:component_53:25"
 							]
 						},
 						{
@@ -2623,36 +2624,36 @@
 						{
 							"vertex_ids": [
 								"vertex:cut:cut:guide_1:21",
-								"vertex:boundary:sample:circle:component_58:8",
-								"vertex:boundary:sample:circle:component_58:7"
+								"vertex:boundary:sample:circle:component_58:component_53:8",
+								"vertex:boundary:sample:circle:component_58:component_53:7"
 							]
 						},
 						{
 							"vertex_ids": [
 								"vertex:cut:cut:guide_1:21",
-								"vertex:boundary:sample:circle:component_58:9",
-								"vertex:boundary:sample:circle:component_58:8"
+								"vertex:boundary:sample:circle:component_58:component_53:9",
+								"vertex:boundary:sample:circle:component_58:component_53:8"
 							]
 						},
 						{
 							"vertex_ids": [
 								"vertex:cut:cut:guide_1:21",
 								"vertex:cut:cut:guide_1:22",
-								"vertex:boundary:sample:circle:component_58:9"
+								"vertex:boundary:sample:circle:component_58:component_53:9"
 							]
 						},
 						{
 							"vertex_ids": [
 								"vertex:cut:cut:guide_1:22",
 								"vertex:cut:cut:guide_1:21",
-								"vertex:boundary:sample:circle:component_58:7"
+								"vertex:boundary:sample:circle:component_58:component_53:7"
 							]
 						},
 						{
 							"vertex_ids": [
 								"vertex:cut:cut:guide_1:22",
 								"vertex:seed:seed:auto:000045",
-								"vertex:boundary:sample:circle:component_58:9"
+								"vertex:boundary:sample:circle:component_58:component_53:9"
 							]
 						},
 						{
@@ -3113,15 +3114,15 @@
 						{
 							"vertex_ids": [
 								"vertex:seed:seed:auto:000012",
-								"vertex:boundary:sample:circle:component_58:15",
+								"vertex:boundary:sample:circle:component_58:component_53:15",
 								"vertex:seed:seed:auto:000020"
 							]
 						},
 						{
 							"vertex_ids": [
 								"vertex:seed:seed:auto:000012",
-								"vertex:boundary:sample:circle:component_58:17",
-								"vertex:boundary:sample:circle:component_58:16"
+								"vertex:boundary:sample:circle:component_58:component_53:17",
+								"vertex:boundary:sample:circle:component_58:component_53:16"
 							]
 						},
 						{
@@ -3197,29 +3198,29 @@
 						{
 							"vertex_ids": [
 								"vertex:seed:seed:auto:000017",
-								"vertex:boundary:sample:circle:component_58:18",
+								"vertex:boundary:sample:circle:component_58:component_53:18",
 								"vertex:seed:seed:auto:000012"
 							]
 						},
 						{
 							"vertex_ids": [
 								"vertex:seed:seed:auto:000017",
-								"vertex:boundary:sample:circle:component_58:19",
-								"vertex:boundary:sample:circle:component_58:18"
+								"vertex:boundary:sample:circle:component_58:component_53:19",
+								"vertex:boundary:sample:circle:component_58:component_53:18"
 							]
 						},
 						{
 							"vertex_ids": [
 								"vertex:seed:seed:auto:000019",
-								"vertex:boundary:sample:circle:component_58:23",
-								"vertex:boundary:sample:circle:component_58:22"
+								"vertex:boundary:sample:circle:component_58:component_53:23",
+								"vertex:boundary:sample:circle:component_58:component_53:22"
 							]
 						},
 						{
 							"vertex_ids": [
 								"vertex:seed:seed:auto:000020",
-								"vertex:boundary:sample:circle:component_58:14",
-								"vertex:boundary:sample:circle:component_58:13"
+								"vertex:boundary:sample:circle:component_58:component_53:14",
+								"vertex:boundary:sample:circle:component_58:component_53:13"
 							]
 						},
 						{
@@ -3456,15 +3457,15 @@
 						{
 							"vertex_ids": [
 								"vertex:seed:seed:auto:000038",
-								"vertex:boundary:sample:circle:component_58:25",
+								"vertex:boundary:sample:circle:component_58:component_53:25",
 								"vertex:cut:cut:guide_1:9"
 							]
 						},
 						{
 							"vertex_ids": [
 								"vertex:seed:seed:auto:000038",
-								"vertex:boundary:sample:circle:component_58:28",
-								"vertex:boundary:sample:circle:component_58:27"
+								"vertex:boundary:sample:circle:component_58:component_53:28",
+								"vertex:boundary:sample:circle:component_58:component_53:27"
 							]
 						},
 						{
@@ -3541,7 +3542,7 @@
 							"vertex_ids": [
 								"vertex:seed:seed:auto:000045",
 								"vertex:seed:seed:auto:000039",
-								"vertex:boundary:sample:circle:component_58:11"
+								"vertex:boundary:sample:circle:component_58:component_53:11"
 							]
 						},
 						{
@@ -3743,8 +3744,8 @@
 						{
 							"vertex_ids": [
 								"vertex:seed:seed:auto:000061",
-								"vertex:boundary:sample:circle:component_58:30",
-								"vertex:boundary:sample:circle:component_58:29"
+								"vertex:boundary:sample:circle:component_58:component_53:30",
+								"vertex:boundary:sample:circle:component_58:component_53:29"
 							]
 						},
 						{
@@ -3926,7 +3927,7 @@
 							"vertex_ids": [
 								"vertex:seed:seed:auto:000072",
 								"vertex:seed:seed:auto:000080",
-								"vertex:boundary:sample:circle:component_58:2"
+								"vertex:boundary:sample:circle:component_58:component_53:2"
 							]
 						},
 						{
@@ -4002,22 +4003,22 @@
 						{
 							"vertex_ids": [
 								"vertex:seed:seed:auto:000078",
-								"vertex:boundary:sample:circle:component_58:3",
+								"vertex:boundary:sample:circle:component_58:component_53:3",
 								"vertex:seed:seed:auto:000080"
 							]
 						},
 						{
 							"vertex_ids": [
 								"vertex:seed:seed:auto:000078",
-								"vertex:boundary:sample:circle:component_58:4",
-								"vertex:boundary:sample:circle:component_58:3"
+								"vertex:boundary:sample:circle:component_58:component_53:4",
+								"vertex:boundary:sample:circle:component_58:component_53:3"
 							]
 						},
 						{
 							"vertex_ids": [
 								"vertex:seed:seed:auto:000078",
-								"vertex:boundary:sample:circle:component_58:6",
-								"vertex:boundary:sample:circle:component_58:5"
+								"vertex:boundary:sample:circle:component_58:component_53:6",
+								"vertex:boundary:sample:circle:component_58:component_53:5"
 							]
 						},
 						{
@@ -5302,233 +5303,233 @@
 					"seeding_method": "poisson_fill"
 				},
 				"runs": [],
-				"sampling_bake_id": "bake_6165161508111523192",
-				"sampling_fingerprint": "3ba4b1949ed3ebad240da362f824ea77d75fd474f36d0079054906de2dbfdde0",
-				"seeding_bake_id": "seeding_bake_1185884752046526294",
-				"seeding_fingerprint": "5d34502ca1280f50bbe754fa866cfc24ce0ca4a9aa404070803288a73bdca9a8",
+				"sampling_bake_id": "bake_2702504739842550530",
+				"sampling_fingerprint": "0c713a6306cdd741bed1d1bdfcdf6097a4bb775b9c54f2c48ac15c0e0dcc0534",
+				"seeding_bake_id": "seeding_bake_7356730493303411947",
+				"seeding_fingerprint": "0f1af6ca0d1b1148ecf1222f6db06c87cb232582a9bcc719cd4c31c9ce9b0b2d",
 				"triangle_count": 352,
 				"triangles": [
 					{
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:0",
-							"vertex:boundary:sample:circle:component_58:31",
+							"vertex:boundary:sample:circle:component_58:component_53:0",
+							"vertex:boundary:sample:circle:component_58:component_53:31",
 							"vertex:seed:seed:auto:000072"
 						]
 					},
 					{
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:0",
+							"vertex:boundary:sample:circle:component_58:component_53:0",
 							"vertex:seed:seed:auto:000072",
-							"vertex:boundary:sample:circle:component_58:1"
+							"vertex:boundary:sample:circle:component_58:component_53:1"
 						]
 					},
 					{
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:1",
+							"vertex:boundary:sample:circle:component_58:component_53:1",
 							"vertex:seed:seed:auto:000072",
-							"vertex:boundary:sample:circle:component_58:2"
+							"vertex:boundary:sample:circle:component_58:component_53:2"
 						]
 					},
 					{
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:10",
-							"vertex:boundary:sample:circle:component_58:9",
+							"vertex:boundary:sample:circle:component_58:component_53:10",
+							"vertex:boundary:sample:circle:component_58:component_53:9",
 							"vertex:seed:seed:auto:000045"
 						]
 					},
 					{
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:10",
+							"vertex:boundary:sample:circle:component_58:component_53:10",
 							"vertex:seed:seed:auto:000045",
-							"vertex:boundary:sample:circle:component_58:11"
+							"vertex:boundary:sample:circle:component_58:component_53:11"
 						]
 					},
 					{
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:12",
-							"vertex:boundary:sample:circle:component_58:11",
+							"vertex:boundary:sample:circle:component_58:component_53:12",
+							"vertex:boundary:sample:circle:component_58:component_53:11",
 							"vertex:seed:seed:auto:000039"
 						]
 					},
 					{
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:12",
+							"vertex:boundary:sample:circle:component_58:component_53:12",
 							"vertex:seed:seed:auto:000039",
-							"vertex:boundary:sample:circle:component_58:13"
+							"vertex:boundary:sample:circle:component_58:component_53:13"
 						]
 					},
 					{
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:13",
+							"vertex:boundary:sample:circle:component_58:component_53:13",
 							"vertex:seed:seed:auto:000039",
 							"vertex:seed:seed:auto:000020"
 						]
 					},
 					{
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:14",
+							"vertex:boundary:sample:circle:component_58:component_53:14",
 							"vertex:seed:seed:auto:000020",
-							"vertex:boundary:sample:circle:component_58:15"
+							"vertex:boundary:sample:circle:component_58:component_53:15"
 						]
 					},
 					{
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:15",
+							"vertex:boundary:sample:circle:component_58:component_53:15",
 							"vertex:seed:seed:auto:000012",
-							"vertex:boundary:sample:circle:component_58:16"
+							"vertex:boundary:sample:circle:component_58:component_53:16"
 						]
 					},
 					{
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:15",
+							"vertex:boundary:sample:circle:component_58:component_53:15",
 							"vertex:seed:seed:auto:000020",
 							"vertex:seed:seed:auto:000012"
 						]
 					},
 					{
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:17",
+							"vertex:boundary:sample:circle:component_58:component_53:17",
 							"vertex:seed:seed:auto:000012",
-							"vertex:boundary:sample:circle:component_58:18"
+							"vertex:boundary:sample:circle:component_58:component_53:18"
 						]
 					},
 					{
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:19",
+							"vertex:boundary:sample:circle:component_58:component_53:19",
 							"vertex:seed:seed:auto:000017",
-							"vertex:boundary:sample:circle:component_58:20"
+							"vertex:boundary:sample:circle:component_58:component_53:20"
 						]
 					},
 					{
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:2",
+							"vertex:boundary:sample:circle:component_58:component_53:2",
 							"vertex:seed:seed:auto:000080",
-							"vertex:boundary:sample:circle:component_58:3"
+							"vertex:boundary:sample:circle:component_58:component_53:3"
 						]
 					},
 					{
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:20",
+							"vertex:boundary:sample:circle:component_58:component_53:20",
 							"vertex:seed:seed:auto:000017",
 							"vertex:seed:seed:auto:000019"
 						]
 					},
 					{
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:20",
+							"vertex:boundary:sample:circle:component_58:component_53:20",
 							"vertex:seed:seed:auto:000019",
-							"vertex:boundary:sample:circle:component_58:21"
+							"vertex:boundary:sample:circle:component_58:component_53:21"
 						]
 					},
 					{
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:21",
+							"vertex:boundary:sample:circle:component_58:component_53:21",
 							"vertex:seed:seed:auto:000019",
-							"vertex:boundary:sample:circle:component_58:22"
+							"vertex:boundary:sample:circle:component_58:component_53:22"
 						]
 					},
 					{
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:23",
+							"vertex:boundary:sample:circle:component_58:component_53:23",
 							"vertex:cut:cut:guide_1:10:seam",
-							"vertex:boundary:sample:circle:component_58:24:seam"
+							"vertex:boundary:sample:circle:component_58:component_53:24:seam"
 						]
 					},
 					{
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:23",
+							"vertex:boundary:sample:circle:component_58:component_53:23",
 							"vertex:cut:cut:guide_1:9:seam",
 							"vertex:cut:cut:guide_1:10:seam"
 						]
 					},
 					{
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:23",
+							"vertex:boundary:sample:circle:component_58:component_53:23",
 							"vertex:seed:seed:auto:000019",
 							"vertex:cut:cut:guide_1:9"
 						]
 					},
 					{
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:24",
+							"vertex:boundary:sample:circle:component_58:component_53:24",
 							"vertex:cut:cut:guide_1:10",
-							"vertex:boundary:sample:circle:component_58:25"
+							"vertex:boundary:sample:circle:component_58:component_53:25"
 						]
 					},
 					{
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:26",
-							"vertex:boundary:sample:circle:component_58:25",
+							"vertex:boundary:sample:circle:component_58:component_53:26",
+							"vertex:boundary:sample:circle:component_58:component_53:25",
 							"vertex:seed:seed:auto:000038"
 						]
 					},
 					{
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:26",
+							"vertex:boundary:sample:circle:component_58:component_53:26",
 							"vertex:seed:seed:auto:000038",
-							"vertex:boundary:sample:circle:component_58:27"
+							"vertex:boundary:sample:circle:component_58:component_53:27"
 						]
 					},
 					{
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:28",
+							"vertex:boundary:sample:circle:component_58:component_53:28",
 							"vertex:seed:seed:auto:000038",
 							"vertex:seed:seed:auto:000061"
 						]
 					},
 					{
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:29",
-							"vertex:boundary:sample:circle:component_58:28",
+							"vertex:boundary:sample:circle:component_58:component_53:29",
+							"vertex:boundary:sample:circle:component_58:component_53:28",
 							"vertex:seed:seed:auto:000061"
 						]
 					},
 					{
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:29",
+							"vertex:boundary:sample:circle:component_58:component_53:29",
 							"vertex:seed:seed:auto:000061",
-							"vertex:boundary:sample:circle:component_58:30"
+							"vertex:boundary:sample:circle:component_58:component_53:30"
 						]
 					},
 					{
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:30",
+							"vertex:boundary:sample:circle:component_58:component_53:30",
 							"vertex:seed:seed:auto:000061",
-							"vertex:boundary:sample:circle:component_58:31"
+							"vertex:boundary:sample:circle:component_58:component_53:31"
 						]
 					},
 					{
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:31",
+							"vertex:boundary:sample:circle:component_58:component_53:31",
 							"vertex:seed:seed:auto:000061",
 							"vertex:seed:seed:auto:000072"
 						]
 					},
 					{
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:4",
-							"vertex:boundary:sample:circle:component_58:3",
+							"vertex:boundary:sample:circle:component_58:component_53:4",
+							"vertex:boundary:sample:circle:component_58:component_53:3",
 							"vertex:seed:seed:auto:000078"
 						]
 					},
 					{
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:4",
+							"vertex:boundary:sample:circle:component_58:component_53:4",
 							"vertex:seed:seed:auto:000078",
-							"vertex:boundary:sample:circle:component_58:5"
+							"vertex:boundary:sample:circle:component_58:component_53:5"
 						]
 					},
 					{
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:6",
+							"vertex:boundary:sample:circle:component_58:component_53:6",
 							"vertex:seed:seed:auto:000053",
 							"vertex:cut:cut:guide_1:22"
 						]
 					},
 					{
 						"vertex_ids": [
-							"vertex:boundary:sample:circle:component_58:7",
-							"vertex:boundary:sample:circle:component_58:6",
+							"vertex:boundary:sample:circle:component_58:component_53:7",
+							"vertex:boundary:sample:circle:component_58:component_53:6",
 							"vertex:cut:cut:guide_1:22"
 						]
 					},
@@ -6215,7 +6216,7 @@
 						"vertex_ids": [
 							"vertex:cut:cut:guide_1:10",
 							"vertex:cut:cut:guide_1:9",
-							"vertex:boundary:sample:circle:component_58:25"
+							"vertex:boundary:sample:circle:component_58:component_53:25"
 						]
 					},
 					{
@@ -6242,36 +6243,36 @@
 					{
 						"vertex_ids": [
 							"vertex:cut:cut:guide_1:21",
-							"vertex:boundary:sample:circle:component_58:7",
+							"vertex:boundary:sample:circle:component_58:component_53:7",
 							"vertex:cut:cut:guide_1:22"
 						]
 					},
 					{
 						"vertex_ids": [
 							"vertex:cut:cut:guide_1:21",
-							"vertex:boundary:sample:circle:component_58:8",
-							"vertex:boundary:sample:circle:component_58:7"
+							"vertex:boundary:sample:circle:component_58:component_53:8",
+							"vertex:boundary:sample:circle:component_58:component_53:7"
 						]
 					},
 					{
 						"vertex_ids": [
 							"vertex:cut:cut:guide_1:21:seam",
-							"vertex:boundary:sample:circle:component_58:9",
-							"vertex:boundary:sample:circle:component_58:8:seam"
+							"vertex:boundary:sample:circle:component_58:component_53:9",
+							"vertex:boundary:sample:circle:component_58:component_53:8:seam"
 						]
 					},
 					{
 						"vertex_ids": [
 							"vertex:cut:cut:guide_1:21:seam",
 							"vertex:cut:cut:guide_1:22:seam",
-							"vertex:boundary:sample:circle:component_58:9"
+							"vertex:boundary:sample:circle:component_58:component_53:9"
 						]
 					},
 					{
 						"vertex_ids": [
 							"vertex:cut:cut:guide_1:22",
 							"vertex:seed:seed:auto:000045",
-							"vertex:boundary:sample:circle:component_58:9"
+							"vertex:boundary:sample:circle:component_58:component_53:9"
 						]
 					},
 					{
@@ -6711,8 +6712,8 @@
 					{
 						"vertex_ids": [
 							"vertex:seed:seed:auto:000012",
-							"vertex:boundary:sample:circle:component_58:17",
-							"vertex:boundary:sample:circle:component_58:16"
+							"vertex:boundary:sample:circle:component_58:component_53:17",
+							"vertex:boundary:sample:circle:component_58:component_53:16"
 						]
 					},
 					{
@@ -6760,15 +6761,15 @@
 					{
 						"vertex_ids": [
 							"vertex:seed:seed:auto:000017",
-							"vertex:boundary:sample:circle:component_58:18",
+							"vertex:boundary:sample:circle:component_58:component_53:18",
 							"vertex:seed:seed:auto:000012"
 						]
 					},
 					{
 						"vertex_ids": [
 							"vertex:seed:seed:auto:000017",
-							"vertex:boundary:sample:circle:component_58:19",
-							"vertex:boundary:sample:circle:component_58:18"
+							"vertex:boundary:sample:circle:component_58:component_53:19",
+							"vertex:boundary:sample:circle:component_58:component_53:18"
 						]
 					},
 					{
@@ -6781,15 +6782,15 @@
 					{
 						"vertex_ids": [
 							"vertex:seed:seed:auto:000019",
-							"vertex:boundary:sample:circle:component_58:23",
-							"vertex:boundary:sample:circle:component_58:22"
+							"vertex:boundary:sample:circle:component_58:component_53:23",
+							"vertex:boundary:sample:circle:component_58:component_53:22"
 						]
 					},
 					{
 						"vertex_ids": [
 							"vertex:seed:seed:auto:000020",
-							"vertex:boundary:sample:circle:component_58:14",
-							"vertex:boundary:sample:circle:component_58:13"
+							"vertex:boundary:sample:circle:component_58:component_53:14",
+							"vertex:boundary:sample:circle:component_58:component_53:13"
 						]
 					},
 					{
@@ -7075,15 +7076,15 @@
 					{
 						"vertex_ids": [
 							"vertex:seed:seed:auto:000038",
-							"vertex:boundary:sample:circle:component_58:25",
+							"vertex:boundary:sample:circle:component_58:component_53:25",
 							"vertex:cut:cut:guide_1:9"
 						]
 					},
 					{
 						"vertex_ids": [
 							"vertex:seed:seed:auto:000038",
-							"vertex:boundary:sample:circle:component_58:28",
-							"vertex:boundary:sample:circle:component_58:27"
+							"vertex:boundary:sample:circle:component_58:component_53:28",
+							"vertex:boundary:sample:circle:component_58:component_53:27"
 						]
 					},
 					{
@@ -7174,7 +7175,7 @@
 						"vertex_ids": [
 							"vertex:seed:seed:auto:000045",
 							"vertex:seed:seed:auto:000039",
-							"vertex:boundary:sample:circle:component_58:11"
+							"vertex:boundary:sample:circle:component_58:component_53:11"
 						]
 					},
 					{
@@ -7586,15 +7587,15 @@
 					{
 						"vertex_ids": [
 							"vertex:seed:seed:auto:000078",
-							"vertex:boundary:sample:circle:component_58:6",
-							"vertex:boundary:sample:circle:component_58:5"
+							"vertex:boundary:sample:circle:component_58:component_53:6",
+							"vertex:boundary:sample:circle:component_58:component_53:5"
 						]
 					},
 					{
 						"vertex_ids": [
 							"vertex:seed:seed:auto:000078",
 							"vertex:seed:seed:auto:000053",
-							"vertex:boundary:sample:circle:component_58:6"
+							"vertex:boundary:sample:circle:component_58:component_53:6"
 						]
 					},
 					{
@@ -7621,7 +7622,7 @@
 					{
 						"vertex_ids": [
 							"vertex:seed:seed:auto:000080",
-							"vertex:boundary:sample:circle:component_58:2",
+							"vertex:boundary:sample:circle:component_58:component_53:2",
 							"vertex:seed:seed:auto:000072"
 						]
 					},
@@ -7643,7 +7644,7 @@
 						"vertex_ids": [
 							"vertex:seed:seed:auto:000080",
 							"vertex:seed:seed:auto:000078",
-							"vertex:boundary:sample:circle:component_58:3"
+							"vertex:boundary:sample:circle:component_58:component_53:3"
 						]
 					},
 					{
@@ -8698,324 +8699,324 @@
 						"source_id": "sample:edge_8851604806671901674:0.750000000"
 					},
 					{
-						"id": "vertex:boundary:sample:circle:component_58:0",
+						"id": "vertex:boundary:sample:circle:component_58:component_53:0",
 						"origin": "boundary",
 						"position": [
 							1.0,
 							5.55000019073486
 						],
 						"preserved": false,
-						"source_id": "sample:circle:component_58:0"
+						"source_id": "sample:circle:component_58:component_53:0"
 					},
 					{
-						"id": "vertex:boundary:sample:circle:component_58:1",
+						"id": "vertex:boundary:sample:circle:component_58:component_53:1",
 						"origin": "boundary",
 						"position": [
 							0.980785250663757,
 							5.74509048461914
 						],
 						"preserved": false,
-						"source_id": "sample:circle:component_58:1"
+						"source_id": "sample:circle:component_58:component_53:1"
 					},
 					{
-						"id": "vertex:boundary:sample:circle:component_58:2",
+						"id": "vertex:boundary:sample:circle:component_58:component_53:2",
 						"origin": "boundary",
 						"position": [
 							0.923879504203796,
 							5.93268346786499
 						],
 						"preserved": false,
-						"source_id": "sample:circle:component_58:2"
+						"source_id": "sample:circle:component_58:component_53:2"
 					},
 					{
-						"id": "vertex:boundary:sample:circle:component_58:3",
+						"id": "vertex:boundary:sample:circle:component_58:component_53:3",
 						"origin": "boundary",
 						"position": [
 							0.831469595432281,
 							6.1055703163147
 						],
 						"preserved": false,
-						"source_id": "sample:circle:component_58:3"
+						"source_id": "sample:circle:component_58:component_53:3"
 					},
 					{
-						"id": "vertex:boundary:sample:circle:component_58:4",
+						"id": "vertex:boundary:sample:circle:component_58:component_53:4",
 						"origin": "boundary",
 						"position": [
 							0.70710676908493,
 							6.25710678100586
 						],
 						"preserved": false,
-						"source_id": "sample:circle:component_58:4"
+						"source_id": "sample:circle:component_58:component_53:4"
 					},
 					{
-						"id": "vertex:boundary:sample:circle:component_58:5",
+						"id": "vertex:boundary:sample:circle:component_58:component_53:5",
 						"origin": "boundary",
 						"position": [
 							0.555570244789124,
 							6.3814697265625
 						],
 						"preserved": false,
-						"source_id": "sample:circle:component_58:5"
+						"source_id": "sample:circle:component_58:component_53:5"
 					},
 					{
-						"id": "vertex:boundary:sample:circle:component_58:6",
+						"id": "vertex:boundary:sample:circle:component_58:component_53:6",
 						"origin": "boundary",
 						"position": [
 							0.382683426141739,
 							6.47387981414795
 						],
 						"preserved": false,
-						"source_id": "sample:circle:component_58:6"
+						"source_id": "sample:circle:component_58:component_53:6"
 					},
 					{
-						"id": "vertex:boundary:sample:circle:component_58:7",
+						"id": "vertex:boundary:sample:circle:component_58:component_53:7",
 						"origin": "boundary",
 						"position": [
 							0.1950903236866,
 							6.53078556060791
 						],
 						"preserved": false,
-						"source_id": "sample:circle:component_58:7"
+						"source_id": "sample:circle:component_58:component_53:7"
 					},
 					{
-						"id": "vertex:boundary:sample:circle:component_58:8",
+						"id": "vertex:boundary:sample:circle:component_58:component_53:8",
 						"origin": "boundary",
 						"position": [
 							0.0,
 							6.55000019073486
 						],
 						"preserved": false,
-						"source_id": "sample:circle:component_58:8"
+						"source_id": "sample:circle:component_58:component_53:8"
 					},
 					{
-						"id": "vertex:boundary:sample:circle:component_58:9",
+						"id": "vertex:boundary:sample:circle:component_58:component_53:9",
 						"origin": "boundary",
 						"position": [
 							-0.1950903236866,
 							6.53078556060791
 						],
 						"preserved": false,
-						"source_id": "sample:circle:component_58:9"
+						"source_id": "sample:circle:component_58:component_53:9"
 					},
 					{
-						"id": "vertex:boundary:sample:circle:component_58:10",
+						"id": "vertex:boundary:sample:circle:component_58:component_53:10",
 						"origin": "boundary",
 						"position": [
 							-0.382683426141739,
 							6.47387981414795
 						],
 						"preserved": false,
-						"source_id": "sample:circle:component_58:10"
+						"source_id": "sample:circle:component_58:component_53:10"
 					},
 					{
-						"id": "vertex:boundary:sample:circle:component_58:11",
+						"id": "vertex:boundary:sample:circle:component_58:component_53:11",
 						"origin": "boundary",
 						"position": [
 							-0.555570244789124,
 							6.3814697265625
 						],
 						"preserved": false,
-						"source_id": "sample:circle:component_58:11"
+						"source_id": "sample:circle:component_58:component_53:11"
 					},
 					{
-						"id": "vertex:boundary:sample:circle:component_58:12",
+						"id": "vertex:boundary:sample:circle:component_58:component_53:12",
 						"origin": "boundary",
 						"position": [
 							-0.70710676908493,
 							6.25710678100586
 						],
 						"preserved": false,
-						"source_id": "sample:circle:component_58:12"
+						"source_id": "sample:circle:component_58:component_53:12"
 					},
 					{
-						"id": "vertex:boundary:sample:circle:component_58:13",
+						"id": "vertex:boundary:sample:circle:component_58:component_53:13",
 						"origin": "boundary",
 						"position": [
 							-0.831469595432281,
 							6.1055703163147
 						],
 						"preserved": false,
-						"source_id": "sample:circle:component_58:13"
+						"source_id": "sample:circle:component_58:component_53:13"
 					},
 					{
-						"id": "vertex:boundary:sample:circle:component_58:14",
+						"id": "vertex:boundary:sample:circle:component_58:component_53:14",
 						"origin": "boundary",
 						"position": [
 							-0.923879504203796,
 							5.93268346786499
 						],
 						"preserved": false,
-						"source_id": "sample:circle:component_58:14"
+						"source_id": "sample:circle:component_58:component_53:14"
 					},
 					{
-						"id": "vertex:boundary:sample:circle:component_58:15",
+						"id": "vertex:boundary:sample:circle:component_58:component_53:15",
 						"origin": "boundary",
 						"position": [
 							-0.980785250663757,
 							5.74509048461914
 						],
 						"preserved": false,
-						"source_id": "sample:circle:component_58:15"
+						"source_id": "sample:circle:component_58:component_53:15"
 					},
 					{
-						"id": "vertex:boundary:sample:circle:component_58:16",
+						"id": "vertex:boundary:sample:circle:component_58:component_53:16",
 						"origin": "boundary",
 						"position": [
 							-1.0,
 							5.55000019073486
 						],
 						"preserved": false,
-						"source_id": "sample:circle:component_58:16"
+						"source_id": "sample:circle:component_58:component_53:16"
 					},
 					{
-						"id": "vertex:boundary:sample:circle:component_58:17",
+						"id": "vertex:boundary:sample:circle:component_58:component_53:17",
 						"origin": "boundary",
 						"position": [
 							-0.980785250663757,
 							5.35490989685059
 						],
 						"preserved": false,
-						"source_id": "sample:circle:component_58:17"
+						"source_id": "sample:circle:component_58:component_53:17"
 					},
 					{
-						"id": "vertex:boundary:sample:circle:component_58:18",
+						"id": "vertex:boundary:sample:circle:component_58:component_53:18",
 						"origin": "boundary",
 						"position": [
 							-0.923879504203796,
 							5.16731691360474
 						],
 						"preserved": false,
-						"source_id": "sample:circle:component_58:18"
+						"source_id": "sample:circle:component_58:component_53:18"
 					},
 					{
-						"id": "vertex:boundary:sample:circle:component_58:19",
+						"id": "vertex:boundary:sample:circle:component_58:component_53:19",
 						"origin": "boundary",
 						"position": [
 							-0.831469595432281,
 							4.99443006515503
 						],
 						"preserved": false,
-						"source_id": "sample:circle:component_58:19"
+						"source_id": "sample:circle:component_58:component_53:19"
 					},
 					{
-						"id": "vertex:boundary:sample:circle:component_58:20",
+						"id": "vertex:boundary:sample:circle:component_58:component_53:20",
 						"origin": "boundary",
 						"position": [
 							-0.70710676908493,
 							4.84289360046387
 						],
 						"preserved": false,
-						"source_id": "sample:circle:component_58:20"
+						"source_id": "sample:circle:component_58:component_53:20"
 					},
 					{
-						"id": "vertex:boundary:sample:circle:component_58:21",
+						"id": "vertex:boundary:sample:circle:component_58:component_53:21",
 						"origin": "boundary",
 						"position": [
 							-0.555570244789124,
 							4.71853065490723
 						],
 						"preserved": false,
-						"source_id": "sample:circle:component_58:21"
+						"source_id": "sample:circle:component_58:component_53:21"
 					},
 					{
-						"id": "vertex:boundary:sample:circle:component_58:22",
+						"id": "vertex:boundary:sample:circle:component_58:component_53:22",
 						"origin": "boundary",
 						"position": [
 							-0.382683426141739,
 							4.62612056732178
 						],
 						"preserved": false,
-						"source_id": "sample:circle:component_58:22"
+						"source_id": "sample:circle:component_58:component_53:22"
 					},
 					{
-						"id": "vertex:boundary:sample:circle:component_58:23",
+						"id": "vertex:boundary:sample:circle:component_58:component_53:23",
 						"origin": "boundary",
 						"position": [
 							-0.1950903236866,
 							4.56921482086182
 						],
 						"preserved": false,
-						"source_id": "sample:circle:component_58:23"
+						"source_id": "sample:circle:component_58:component_53:23"
 					},
 					{
-						"id": "vertex:boundary:sample:circle:component_58:24",
+						"id": "vertex:boundary:sample:circle:component_58:component_53:24",
 						"origin": "boundary",
 						"position": [
 							0.0,
 							4.55000019073486
 						],
 						"preserved": false,
-						"source_id": "sample:circle:component_58:24"
+						"source_id": "sample:circle:component_58:component_53:24"
 					},
 					{
-						"id": "vertex:boundary:sample:circle:component_58:25",
+						"id": "vertex:boundary:sample:circle:component_58:component_53:25",
 						"origin": "boundary",
 						"position": [
 							0.1950903236866,
 							4.56921482086182
 						],
 						"preserved": false,
-						"source_id": "sample:circle:component_58:25"
+						"source_id": "sample:circle:component_58:component_53:25"
 					},
 					{
-						"id": "vertex:boundary:sample:circle:component_58:26",
+						"id": "vertex:boundary:sample:circle:component_58:component_53:26",
 						"origin": "boundary",
 						"position": [
 							0.382683426141739,
 							4.62612056732178
 						],
 						"preserved": false,
-						"source_id": "sample:circle:component_58:26"
+						"source_id": "sample:circle:component_58:component_53:26"
 					},
 					{
-						"id": "vertex:boundary:sample:circle:component_58:27",
+						"id": "vertex:boundary:sample:circle:component_58:component_53:27",
 						"origin": "boundary",
 						"position": [
 							0.555570244789124,
 							4.71853065490723
 						],
 						"preserved": false,
-						"source_id": "sample:circle:component_58:27"
+						"source_id": "sample:circle:component_58:component_53:27"
 					},
 					{
-						"id": "vertex:boundary:sample:circle:component_58:28",
+						"id": "vertex:boundary:sample:circle:component_58:component_53:28",
 						"origin": "boundary",
 						"position": [
 							0.70710676908493,
 							4.84289360046387
 						],
 						"preserved": false,
-						"source_id": "sample:circle:component_58:28"
+						"source_id": "sample:circle:component_58:component_53:28"
 					},
 					{
-						"id": "vertex:boundary:sample:circle:component_58:29",
+						"id": "vertex:boundary:sample:circle:component_58:component_53:29",
 						"origin": "boundary",
 						"position": [
 							0.831469595432281,
 							4.99443006515503
 						],
 						"preserved": false,
-						"source_id": "sample:circle:component_58:29"
+						"source_id": "sample:circle:component_58:component_53:29"
 					},
 					{
-						"id": "vertex:boundary:sample:circle:component_58:30",
+						"id": "vertex:boundary:sample:circle:component_58:component_53:30",
 						"origin": "boundary",
 						"position": [
 							0.923879504203796,
 							5.16731691360474
 						],
 						"preserved": false,
-						"source_id": "sample:circle:component_58:30"
+						"source_id": "sample:circle:component_58:component_53:30"
 					},
 					{
-						"id": "vertex:boundary:sample:circle:component_58:31",
+						"id": "vertex:boundary:sample:circle:component_58:component_53:31",
 						"origin": "boundary",
 						"position": [
 							0.980785250663757,
 							5.35490989685059
 						],
 						"preserved": false,
-						"source_id": "sample:circle:component_58:31"
+						"source_id": "sample:circle:component_58:component_53:31"
 					},
 					{
 						"id": "vertex:seed:seed:auto:000001",
@@ -10268,24 +10269,24 @@
 						"source_id": "vertex:cut:cut:guide_1:10"
 					},
 					{
-						"id": "vertex:boundary:sample:circle:component_58:24:seam",
+						"id": "vertex:boundary:sample:circle:component_58:component_53:24:seam",
 						"origin": "cut_seam",
 						"position": [
 							0.0,
 							4.55000019073486
 						],
 						"preserved": true,
-						"source_id": "vertex:boundary:sample:circle:component_58:24"
+						"source_id": "vertex:boundary:sample:circle:component_58:component_53:24"
 					},
 					{
-						"id": "vertex:boundary:sample:circle:component_58:8:seam",
+						"id": "vertex:boundary:sample:circle:component_58:component_53:8:seam",
 						"origin": "cut_seam",
 						"position": [
 							0.0,
 							6.55000019073486
 						],
 						"preserved": true,
-						"source_id": "vertex:boundary:sample:circle:component_58:8"
+						"source_id": "vertex:boundary:sample:circle:component_58:component_53:8"
 					},
 					{
 						"id": "vertex:cut:cut:guide_1:21:seam",
@@ -10432,7 +10433,7 @@
 			},
 			"contour_stroke": {
 				"algorithm_version": 5,
-				"bake_id": "contour_stroke_bake_2136177578932309228",
+				"bake_id": "contour_stroke_bake_4503106474251715063",
 				"boundary_constraints": [],
 				"errors": [],
 				"geometry_diagnostics": {
@@ -16494,8 +16495,12 @@
 	"sampling": {
 		"bakes": {
 			"adaptive": {
-				"algorithm_version": 3,
-				"bake_id": "bake_6165161508111523192",
+				"algorithm_version": 4,
+				"bake_id": "bake_2702504739842550530",
+				"boundary_refinement_complete": true,
+				"boundary_refinement_count": 0,
+				"boundary_refinement_limit_reached": false,
+				"boundary_refinement_unresolved_corner_count": 0,
 				"boundary_stats": [
 					{
 						"effective_spacing": 0.55,
@@ -17547,7 +17552,7 @@
 							{
 								"curve_t": 0.0,
 								"edge_id": "primitive:circle",
-								"id": "sample:circle:component_58:0",
+								"id": "sample:circle:component_58:component_53:0",
 								"position": [
 									1.0,
 									5.55000019073486
@@ -17558,7 +17563,7 @@
 							{
 								"curve_t": 0.03125,
 								"edge_id": "primitive:circle",
-								"id": "sample:circle:component_58:1",
+								"id": "sample:circle:component_58:component_53:1",
 								"position": [
 									0.980785250663757,
 									5.74509048461914
@@ -17569,7 +17574,7 @@
 							{
 								"curve_t": 0.0625,
 								"edge_id": "primitive:circle",
-								"id": "sample:circle:component_58:2",
+								"id": "sample:circle:component_58:component_53:2",
 								"position": [
 									0.923879504203796,
 									5.93268346786499
@@ -17580,7 +17585,7 @@
 							{
 								"curve_t": 0.09375,
 								"edge_id": "primitive:circle",
-								"id": "sample:circle:component_58:3",
+								"id": "sample:circle:component_58:component_53:3",
 								"position": [
 									0.831469595432281,
 									6.1055703163147
@@ -17591,7 +17596,7 @@
 							{
 								"curve_t": 0.125,
 								"edge_id": "primitive:circle",
-								"id": "sample:circle:component_58:4",
+								"id": "sample:circle:component_58:component_53:4",
 								"position": [
 									0.70710676908493,
 									6.25710678100586
@@ -17602,7 +17607,7 @@
 							{
 								"curve_t": 0.15625,
 								"edge_id": "primitive:circle",
-								"id": "sample:circle:component_58:5",
+								"id": "sample:circle:component_58:component_53:5",
 								"position": [
 									0.555570244789124,
 									6.3814697265625
@@ -17613,7 +17618,7 @@
 							{
 								"curve_t": 0.1875,
 								"edge_id": "primitive:circle",
-								"id": "sample:circle:component_58:6",
+								"id": "sample:circle:component_58:component_53:6",
 								"position": [
 									0.382683426141739,
 									6.47387981414795
@@ -17624,7 +17629,7 @@
 							{
 								"curve_t": 0.21875,
 								"edge_id": "primitive:circle",
-								"id": "sample:circle:component_58:7",
+								"id": "sample:circle:component_58:component_53:7",
 								"position": [
 									0.1950903236866,
 									6.53078556060791
@@ -17635,7 +17640,7 @@
 							{
 								"curve_t": 0.25,
 								"edge_id": "primitive:circle",
-								"id": "sample:circle:component_58:8",
+								"id": "sample:circle:component_58:component_53:8",
 								"position": [
 									0.0,
 									6.55000019073486
@@ -17646,7 +17651,7 @@
 							{
 								"curve_t": 0.28125,
 								"edge_id": "primitive:circle",
-								"id": "sample:circle:component_58:9",
+								"id": "sample:circle:component_58:component_53:9",
 								"position": [
 									-0.1950903236866,
 									6.53078556060791
@@ -17657,7 +17662,7 @@
 							{
 								"curve_t": 0.3125,
 								"edge_id": "primitive:circle",
-								"id": "sample:circle:component_58:10",
+								"id": "sample:circle:component_58:component_53:10",
 								"position": [
 									-0.382683426141739,
 									6.47387981414795
@@ -17668,7 +17673,7 @@
 							{
 								"curve_t": 0.34375,
 								"edge_id": "primitive:circle",
-								"id": "sample:circle:component_58:11",
+								"id": "sample:circle:component_58:component_53:11",
 								"position": [
 									-0.555570244789124,
 									6.3814697265625
@@ -17679,7 +17684,7 @@
 							{
 								"curve_t": 0.375,
 								"edge_id": "primitive:circle",
-								"id": "sample:circle:component_58:12",
+								"id": "sample:circle:component_58:component_53:12",
 								"position": [
 									-0.70710676908493,
 									6.25710678100586
@@ -17690,7 +17695,7 @@
 							{
 								"curve_t": 0.40625,
 								"edge_id": "primitive:circle",
-								"id": "sample:circle:component_58:13",
+								"id": "sample:circle:component_58:component_53:13",
 								"position": [
 									-0.831469595432281,
 									6.1055703163147
@@ -17701,7 +17706,7 @@
 							{
 								"curve_t": 0.4375,
 								"edge_id": "primitive:circle",
-								"id": "sample:circle:component_58:14",
+								"id": "sample:circle:component_58:component_53:14",
 								"position": [
 									-0.923879504203796,
 									5.93268346786499
@@ -17712,7 +17717,7 @@
 							{
 								"curve_t": 0.46875,
 								"edge_id": "primitive:circle",
-								"id": "sample:circle:component_58:15",
+								"id": "sample:circle:component_58:component_53:15",
 								"position": [
 									-0.980785250663757,
 									5.74509048461914
@@ -17723,7 +17728,7 @@
 							{
 								"curve_t": 0.5,
 								"edge_id": "primitive:circle",
-								"id": "sample:circle:component_58:16",
+								"id": "sample:circle:component_58:component_53:16",
 								"position": [
 									-1.0,
 									5.55000019073486
@@ -17734,7 +17739,7 @@
 							{
 								"curve_t": 0.53125,
 								"edge_id": "primitive:circle",
-								"id": "sample:circle:component_58:17",
+								"id": "sample:circle:component_58:component_53:17",
 								"position": [
 									-0.980785250663757,
 									5.35490989685059
@@ -17745,7 +17750,7 @@
 							{
 								"curve_t": 0.5625,
 								"edge_id": "primitive:circle",
-								"id": "sample:circle:component_58:18",
+								"id": "sample:circle:component_58:component_53:18",
 								"position": [
 									-0.923879504203796,
 									5.16731691360474
@@ -17756,7 +17761,7 @@
 							{
 								"curve_t": 0.59375,
 								"edge_id": "primitive:circle",
-								"id": "sample:circle:component_58:19",
+								"id": "sample:circle:component_58:component_53:19",
 								"position": [
 									-0.831469595432281,
 									4.99443006515503
@@ -17767,7 +17772,7 @@
 							{
 								"curve_t": 0.625,
 								"edge_id": "primitive:circle",
-								"id": "sample:circle:component_58:20",
+								"id": "sample:circle:component_58:component_53:20",
 								"position": [
 									-0.70710676908493,
 									4.84289360046387
@@ -17778,7 +17783,7 @@
 							{
 								"curve_t": 0.65625,
 								"edge_id": "primitive:circle",
-								"id": "sample:circle:component_58:21",
+								"id": "sample:circle:component_58:component_53:21",
 								"position": [
 									-0.555570244789124,
 									4.71853065490723
@@ -17789,7 +17794,7 @@
 							{
 								"curve_t": 0.6875,
 								"edge_id": "primitive:circle",
-								"id": "sample:circle:component_58:22",
+								"id": "sample:circle:component_58:component_53:22",
 								"position": [
 									-0.382683426141739,
 									4.62612056732178
@@ -17800,7 +17805,7 @@
 							{
 								"curve_t": 0.71875,
 								"edge_id": "primitive:circle",
-								"id": "sample:circle:component_58:23",
+								"id": "sample:circle:component_58:component_53:23",
 								"position": [
 									-0.1950903236866,
 									4.56921482086182
@@ -17811,7 +17816,7 @@
 							{
 								"curve_t": 0.75,
 								"edge_id": "primitive:circle",
-								"id": "sample:circle:component_58:24",
+								"id": "sample:circle:component_58:component_53:24",
 								"position": [
 									0.0,
 									4.55000019073486
@@ -17822,7 +17827,7 @@
 							{
 								"curve_t": 0.78125,
 								"edge_id": "primitive:circle",
-								"id": "sample:circle:component_58:25",
+								"id": "sample:circle:component_58:component_53:25",
 								"position": [
 									0.1950903236866,
 									4.56921482086182
@@ -17833,7 +17838,7 @@
 							{
 								"curve_t": 0.8125,
 								"edge_id": "primitive:circle",
-								"id": "sample:circle:component_58:26",
+								"id": "sample:circle:component_58:component_53:26",
 								"position": [
 									0.382683426141739,
 									4.62612056732178
@@ -17844,7 +17849,7 @@
 							{
 								"curve_t": 0.84375,
 								"edge_id": "primitive:circle",
-								"id": "sample:circle:component_58:27",
+								"id": "sample:circle:component_58:component_53:27",
 								"position": [
 									0.555570244789124,
 									4.71853065490723
@@ -17855,7 +17860,7 @@
 							{
 								"curve_t": 0.875,
 								"edge_id": "primitive:circle",
-								"id": "sample:circle:component_58:28",
+								"id": "sample:circle:component_58:component_53:28",
 								"position": [
 									0.70710676908493,
 									4.84289360046387
@@ -17866,7 +17871,7 @@
 							{
 								"curve_t": 0.90625,
 								"edge_id": "primitive:circle",
-								"id": "sample:circle:component_58:29",
+								"id": "sample:circle:component_58:component_53:29",
 								"position": [
 									0.831469595432281,
 									4.99443006515503
@@ -17877,7 +17882,7 @@
 							{
 								"curve_t": 0.9375,
 								"edge_id": "primitive:circle",
-								"id": "sample:circle:component_58:30",
+								"id": "sample:circle:component_58:component_53:30",
 								"position": [
 									0.923879504203796,
 									5.16731691360474
@@ -17888,7 +17893,7 @@
 							{
 								"curve_t": 0.96875,
 								"edge_id": "primitive:circle",
-								"id": "sample:circle:component_58:31",
+								"id": "sample:circle:component_58:component_53:31",
 								"position": [
 									0.980785250663757,
 									5.35490989685059
@@ -18594,7 +18599,7 @@
 					"meshing_algorithm": 5.0,
 					"recipe_hash": "5f112e760342717996fe9f53388372f6d0ca3c9ec50b9753caff3f788eb18b37",
 					"recipe_version": 2.0,
-					"sampling_algorithm": 3.0,
+					"sampling_algorithm": 4.0,
 					"scalars": [
 						2.0,
 						2.0,
@@ -18907,7 +18912,7 @@
 			}
 		}
 	},
-	"schema_version": 61,
+	"schema_version": 62,
 	"sdf": {
 		"bake": {
 			"algorithm_version": 1,
@@ -18954,7 +18959,7 @@
 		"bakes": {
 			"poisson_fill": {
 				"algorithm_version": 2.0,
-				"bake_id": "seeding_bake_1185884752046526294",
+				"bake_id": "seeding_bake_7356730493303411947",
 				"edited": false,
 				"errors": [],
 				"flow_seed_count": 0.0,
@@ -18970,8 +18975,8 @@
 					"seed": 1,
 					"spacing": 0.55
 				},
-				"sampling_bake_id": "bake_6165161508111523192",
-				"sampling_fingerprint": "3ba4b1949ed3ebad240da362f824ea77d75fd474f36d0079054906de2dbfdde0",
+				"sampling_bake_id": "bake_2702504739842550530",
+				"sampling_fingerprint": "0c713a6306cdd741bed1d1bdfcdf6097a4bb775b9c54f2c48ac15c0e0dcc0534",
 				"seed_count": 91,
 				"seeds": [
 					{

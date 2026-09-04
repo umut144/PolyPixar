@@ -2,12 +2,12 @@
 	"asset_id": "asset_2",
 	"component_id": "component_153",
 	"component_mesh": {
-		"bake_id": "meshing_bake_1759915529029947113",
+		"bake_id": "meshing_bake_8472252946339967926",
 		"build_provenance": {
 			"attempts": 1.0,
 			"auto_recipe_version": 0.0,
 			"automatic_diagnostics": {},
-			"exact_input_hash": "7d1b3059915fcc44b1f1e0f4b8a2968587180e5c4b59d4e09314d26c9f11479e",
+			"exact_input_hash": "1b6faacc586c82b969ff17eb52e2711e8829f39a0cf2eb3591f1d6504886e94e",
 			"pipeline_recipe_hash": "",
 			"recipe_mode": "derived",
 			"schema_version": 1.0,
@@ -16,7 +16,7 @@
 				"meshing_algorithm": 5.0,
 				"recipe_hash": "434c5bf9607c731efa01481664980536853f0a3f9801ea86920d7cb3ad0fd4f7",
 				"recipe_version": 2.0,
-				"sampling_algorithm": 3.0,
+				"sampling_algorithm": 4.0,
 				"scalars": [
 					4.0,
 					5.0,
@@ -116,14 +116,14 @@
 		},
 		"last_error": "",
 		"last_failure_signature": {},
-		"mesh_fingerprint": "f3f9fc81879d0d8a6832e65252c7036371fe4bacbadbf8e8279ad16f5173ec36",
+		"mesh_fingerprint": "783ef9aaa5c4ddeb97a6eaddf2e36104dceb1dd6efa5d37e6c82c7ac3d10ea73",
 		"method": "contour_stroke"
 	},
 	"meshing": {
 		"bakes": {
 			"contour_stroke": {
 				"algorithm_version": 5,
-				"bake_id": "meshing_bake_1759915529029947113",
+				"bake_id": "meshing_bake_8472252946339967926",
 				"boundary_constraints": [],
 				"errors": [],
 				"geometry_diagnostics": {
@@ -1257,7 +1257,7 @@
 			}
 		}
 	},
-	"schema_version": 61,
+	"schema_version": 62,
 	"sdf": {
 		"bake": {},
 		"last_error": "",

@@ -2,7 +2,7 @@
 	"asset_id": "asset_16",
 	"component_id": "component_120",
 	"component_mesh": {
-		"bake_id": "meshing_bake_6283104158828544100",
+		"bake_id": "meshing_bake_3269796120515274442",
 		"build_provenance": {
 			"attempts": 1.0,
 			"auto_recipe_version": 3.0,
@@ -45,7 +45,7 @@
 				},
 				"version": 1.0
 			},
-			"exact_input_hash": "3a9883a617e79d0ecfa4469f8a0f99703b529cd17d9e8c224b02785c5e442ca9",
+			"exact_input_hash": "81adf8856fa9160a5521e942116c5e59b128fe468dae4f893519e46b7c6f82f9",
 			"pipeline_recipe_hash": "28c51fb8c3a454cb5a18ca87ff6e95f0a8350b3c55e0828d0ef3314b11f60c87",
 			"recipe_mode": "automatic",
 			"schema_version": 1.0,
@@ -54,7 +54,7 @@
 				"meshing_algorithm": 5.0,
 				"recipe_hash": "463d64430541e1af5a864db0bba0820c9b4337621ee50d921b63fa13c21016ed",
 				"recipe_version": 2.0,
-				"sampling_algorithm": 3.0,
+				"sampling_algorithm": 4.0,
 				"scalars": [
 					1.0,
 					1.0
@@ -140,14 +140,14 @@
 		},
 		"last_error": "",
 		"last_failure_signature": {},
-		"mesh_fingerprint": "43207e66b89c9d475f2615d959511f2a0157e585d38e324724283211d98a4441",
+		"mesh_fingerprint": "f697a0ba5036b0c3aacf1a43f79701009e09cbc126cf1f1d1380116a8c613f8c",
 		"method": "constrained_mesh"
 	},
 	"meshing": {
 		"bakes": {
 			"constrained_mesh": {
 				"algorithm_version": 5,
-				"bake_id": "meshing_bake_6283104158828544100",
+				"bake_id": "meshing_bake_3269796120515274442",
 				"boundary_constraints": [
 					{
 						"chain_id": "chain_3234837632246941104",
@@ -354,10 +354,10 @@
 					"seeding_method": "poisson_fill"
 				},
 				"runs": [],
-				"sampling_bake_id": "bake_51545397737414636",
-				"sampling_fingerprint": "bfb1413febbbd026c5019b97b404caef32c86237060913128b0199e55e3d9d23",
-				"seeding_bake_id": "seeding_bake_2360494935609011107",
-				"seeding_fingerprint": "ec9c60fc32779e0797667120955bcbbf8b4ad8a09fbf9294aaff2710295b1a81",
+				"sampling_bake_id": "bake_91780067716294765",
+				"sampling_fingerprint": "32d42f3f804d3264db27a20c6196a2cee2fec503cd270d4d9df0b5d840799f09",
+				"seeding_bake_id": "seeding_bake_3869350201020090741",
+				"seeding_fingerprint": "628713b41a43f62522405c929d4f6160958035ec78a07611b2649bd5983aef42",
 				"triangle_count": 8,
 				"triangles": [
 					{
@@ -526,7 +526,7 @@
 			},
 			"contour_stroke": {
 				"algorithm_version": 5,
-				"bake_id": "contour_stroke_bake_2638320516234490842",
+				"bake_id": "contour_stroke_bake_35420234361710142",
 				"boundary_constraints": [],
 				"errors": [],
 				"geometry_diagnostics": {
@@ -1232,8 +1232,12 @@
 	"sampling": {
 		"bakes": {
 			"adaptive": {
-				"algorithm_version": 3,
-				"bake_id": "bake_51545397737414636",
+				"algorithm_version": 4,
+				"bake_id": "bake_91780067716294765",
+				"boundary_refinement_complete": true,
+				"boundary_refinement_count": 0,
+				"boundary_refinement_limit_reached": false,
+				"boundary_refinement_unresolved_corner_count": 0,
 				"boundary_stats": [
 					{
 						"effective_spacing": 0.389599022455513,
@@ -1380,7 +1384,7 @@
 					"meshing_algorithm": 5.0,
 					"recipe_hash": "93815aeb25c6f5d74dd1fe4b7edf86c471bb3c39d86508ba0eb4b53686ae347b",
 					"recipe_version": 2.0,
-					"sampling_algorithm": 3.0,
+					"sampling_algorithm": 4.0,
 					"scalars": [
 						1.0,
 						1.0
@@ -1476,7 +1480,7 @@
 			}
 		}
 	},
-	"schema_version": 61,
+	"schema_version": 62,
 	"sdf": {
 		"bake": {},
 		"last_error": "",
@@ -1493,7 +1497,7 @@
 		"bakes": {
 			"poisson_fill": {
 				"algorithm_version": 2.0,
-				"bake_id": "seeding_bake_2360494935609011107",
+				"bake_id": "seeding_bake_3869350201020090741",
 				"edited": false,
 				"errors": [],
 				"flow_seed_count": 0.0,
@@ -1509,8 +1513,8 @@
 					"seed": 1,
 					"spacing": 0.389599022455513
 				},
-				"sampling_bake_id": "bake_51545397737414636",
-				"sampling_fingerprint": "bfb1413febbbd026c5019b97b404caef32c86237060913128b0199e55e3d9d23",
+				"sampling_bake_id": "bake_91780067716294765",
+				"sampling_fingerprint": "32d42f3f804d3264db27a20c6196a2cee2fec503cd270d4d9df0b5d840799f09",
 				"seed_count": 0,
 				"seeds": [],
 				"valid": true

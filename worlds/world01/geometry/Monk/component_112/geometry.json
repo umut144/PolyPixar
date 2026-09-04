@@ -2,7 +2,7 @@
 	"asset_id": "asset_16",
 	"component_id": "component_112",
 	"component_mesh": {
-		"bake_id": "meshing_bake_5135294175673615155",
+		"bake_id": "meshing_bake_6119311117910517459",
 		"build_provenance": {
 			"attempts": 1.0,
 			"auto_recipe_version": 3.0,
@@ -45,7 +45,7 @@
 				},
 				"version": 1.0
 			},
-			"exact_input_hash": "e72364f6e2019ab2845fef8289b8544877716a32405440b9561aa3d56430c9bd",
+			"exact_input_hash": "f0610d18482f67bdcc26e7d51d4517be9eeaae4c44261153ec69691579d94c67",
 			"pipeline_recipe_hash": "6c3413ecbce4bddadfd9aca8add9d866c5f83d4e1d4ff35589d40206e5cd1821",
 			"recipe_mode": "automatic",
 			"schema_version": 1.0,
@@ -54,7 +54,7 @@
 				"meshing_algorithm": 5.0,
 				"recipe_hash": "a5212e52d3b799adb519255538439e883a0f9f9eb5bb016854bcf1c1fa9e9ad2",
 				"recipe_version": 2.0,
-				"sampling_algorithm": 3.0,
+				"sampling_algorithm": 4.0,
 				"scalars": [
 					0.239999994635582,
 					0.239999994635582,
@@ -86,14 +86,14 @@
 		},
 		"last_error": "",
 		"last_failure_signature": {},
-		"mesh_fingerprint": "c2d2cc977649fd5a508464daa1d6c3e00e4994d3d943b4a0be5908f5b78e8636",
+		"mesh_fingerprint": "28786dde5cf1c85075e5a272d275df6e3dc0cc90f0ab1cca535627421b6b4ed3",
 		"method": "constrained_mesh"
 	},
 	"meshing": {
 		"bakes": {
 			"constrained_mesh": {
 				"algorithm_version": 5,
-				"bake_id": "meshing_bake_5135294175673615155",
+				"bake_id": "meshing_bake_6119311117910517459",
 				"boundary_constraints": [
 					{
 						"chain_id": "primitive:circle",
@@ -666,10 +666,10 @@
 					"seeding_method": "poisson_fill"
 				},
 				"runs": [],
-				"sampling_bake_id": "bake_2787097656994800546",
-				"sampling_fingerprint": "2df5ffd6b79b71f2259a00c8fa77ed5ded7031cf33e3a444828515a5f8cf7b0c",
-				"seeding_bake_id": "seeding_bake_4257634970348525980",
-				"seeding_fingerprint": "8562ff718b355180129bd6e3acae78e9af4ccf4ba8534a321a6859be4f293ca3",
+				"sampling_bake_id": "bake_2655057965095876466",
+				"sampling_fingerprint": "ed8fcdd155acd7f89457587724403bb9a11c18402fdb13973d91e0f074add12c",
+				"seeding_bake_id": "seeding_bake_2653899442848324704",
+				"seeding_fingerprint": "ba30fc60275eeddcd4999ff0b5c73b655c474cd6c90a99d2f47456dfecbc78ac",
 				"triangle_count": 32,
 				"triangles": [
 					{
@@ -1236,7 +1236,7 @@
 			},
 			"contour_stroke": {
 				"algorithm_version": 5,
-				"bake_id": "contour_stroke_bake_6880597421506505845",
+				"bake_id": "contour_stroke_bake_810238533645429005",
 				"boundary_constraints": [],
 				"errors": [],
 				"geometry_diagnostics": {
@@ -5732,8 +5732,12 @@
 	"sampling": {
 		"bakes": {
 			"adaptive": {
-				"algorithm_version": 3,
-				"bake_id": "bake_2787097656994800546",
+				"algorithm_version": 4,
+				"bake_id": "bake_2655057965095876466",
+				"boundary_refinement_complete": true,
+				"boundary_refinement_count": 0,
+				"boundary_refinement_limit_reached": false,
+				"boundary_refinement_unresolved_corner_count": 0,
 				"boundary_stats": [
 					{
 						"effective_spacing": 0.0942098817322403,
@@ -6122,7 +6126,7 @@
 					"meshing_algorithm": 5.0,
 					"recipe_hash": "15fdc9ad182a6f38dc53389dc30e7218217de8adea3efe157f9a791f56a8d695",
 					"recipe_version": 2.0,
-					"sampling_algorithm": 3.0,
+					"sampling_algorithm": 4.0,
 					"scalars": [
 						0.239999994635582,
 						0.239999994635582,
@@ -6164,7 +6168,7 @@
 			}
 		}
 	},
-	"schema_version": 61,
+	"schema_version": 62,
 	"sdf": {
 		"bake": {},
 		"last_error": "",
@@ -6181,7 +6185,7 @@
 		"bakes": {
 			"poisson_fill": {
 				"algorithm_version": 2.0,
-				"bake_id": "seeding_bake_4257634970348525980",
+				"bake_id": "seeding_bake_2653899442848324704",
 				"edited": false,
 				"errors": [],
 				"flow_seed_count": 0.0,
@@ -6197,8 +6201,8 @@
 					"seed": 1,
 					"spacing": 0.0942098817322403
 				},
-				"sampling_bake_id": "bake_2787097656994800546",
-				"sampling_fingerprint": "2df5ffd6b79b71f2259a00c8fa77ed5ded7031cf33e3a444828515a5f8cf7b0c",
+				"sampling_bake_id": "bake_2655057965095876466",
+				"sampling_fingerprint": "ed8fcdd155acd7f89457587724403bb9a11c18402fdb13973d91e0f074add12c",
 				"seed_count": 1,
 				"seeds": [
 					{
