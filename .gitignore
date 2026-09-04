@@ -17,6 +17,9 @@ worlds/*/catalog.json
 # macOS
 .DS_Store
 
+# Logs kept by tools/verify.sh
+.verify/
+
 # Residue of an interrupted atomic document write
 *.staging
 *.backup

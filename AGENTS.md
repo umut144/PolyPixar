@@ -22,14 +22,28 @@ or reverse synchronization from a display polygon into Bézier topology.
 
 ## Verification
 
-Run both commands after geometry changes:
+Run the wrapper after every change:
+
+```bash
+tools/verify.sh
+```
+
+It runs the headless editor parse, the native CDT smoke test, the test suite
+and `git diff --check`, in that order, and fails on a non-zero exit code, on any
+`SCRIPT ERROR`, `ERROR:` or leak line, and when a runner's pass line is
+missing. The same script backs `.github/workflows/verify.yml`, so a local pass
+and a CI pass mean the same thing. It finds Godot through `GODOT_BIN` or the
+`application` path in `native/polytools_cdt/toolchain-lock.json`, and keeps the
+logs below `.verify/`. A single step can be run alone, for example
+`tools/verify.sh tests`. The commands it wraps remain valid on their own:
 
 ```bash
 /Applications/Godot_mono.app/Contents/MacOS/Godot --headless --path . -s res://tests/run_tests.gd
 /Applications/Godot_mono.app/Contents/MacOS/Godot --headless --path . --editor --quit
 ```
 
-Also run `git diff --check`. Files below `worlds/` are user data and must
+When they are run by hand, their output must be checked for the same lines the
+wrapper checks. Files below `worlds/` are user data and must
 not be rewritten as test fixtures. Two things below `worlds/` are the
 exception because they are generated rather than authored: `catalog.json` and
 `PolyToolsRuntimeExports/` are produced by `Export Runtime`, are read by the
@@ -49,10 +63,11 @@ helpers as much as to render code — a grid or field built for a branch that th
 does not add it leaks on every render.
 
 A `SCRIPT ERROR` in the test output is a failure even when the runner prints
-`All PolyTools tests passed`: a runtime error aborts that test function, so its
-remaining assertions never run and never increment the failure count. The
-GitHub Actions workflow in `.github/workflows/verify.yml` fails the job on any
-such line.
+`All PolyTools tests passed`: a runtime error aborts only the GDScript function
+it occurs in and returns `null` to the caller, so a failing test, helper or
+`main.gd` method lets the run continue and the remaining assertions of that
+test may never execute or never increment the failure count. `tools/verify.sh`
+fails on any such line, and on a missing pass line, both locally and in CI.
 
 `tools/inspector_render_probe.gd` renders the Inspector in a fixed state matrix
 and prints one line per control. Run it before and after any change that is

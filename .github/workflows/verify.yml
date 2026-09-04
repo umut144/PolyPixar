@@ -25,7 +25,7 @@ env:
   # Matches native/polytools_cdt/toolchain-lock.json. That file names the Mono
   # build; the project contains no C#, so the standard build is used here.
   GODOT_VERSION: "4.7.1-stable"
-  GODOT_BIN: "Godot_v4.7.1-stable_linux.x86_64"
+  GODOT_FILE: "Godot_v4.7.1-stable_linux.x86_64"
   CDT_LIBRARY: "libpolytools_cdt.linux.template_debug.x86_64.so"
 
 jobs:
@@ -51,18 +51,19 @@ jobs:
       - name: Provide Godot
         run: |
           set -eu
-          if [ ! -x ".ci-cache/godot/$GODOT_BIN" ]; then
+          if [ ! -x ".ci-cache/godot/$GODOT_FILE" ]; then
             echo "Downloading Godot $GODOT_VERSION"
             mkdir -p .ci-cache/godot
             curl -sSfL -o /tmp/godot.zip \
-              "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/${GODOT_BIN}.zip"
+              "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/${GODOT_FILE}.zip"
             unzip -oq /tmp/godot.zip -d .ci-cache/godot
-            chmod +x ".ci-cache/godot/$GODOT_BIN"
+            chmod +x ".ci-cache/godot/$GODOT_FILE"
           fi
-          echo "GODOT=$GITHUB_WORKSPACE/.ci-cache/godot/$GODOT_BIN" >> "$GITHUB_ENV"
+          # tools/verify.sh locates Godot through GODOT_BIN.
+          echo "GODOT_BIN=$GITHUB_WORKSPACE/.ci-cache/godot/$GODOT_FILE" >> "$GITHUB_ENV"
 
       - name: Godot version
-        run: "$GODOT --version"
+        run: "$GODOT_BIN --version"
 
       # Pinned dependency commits plus the adapter itself. Reading the submodule
       # SHAs from the tree avoids checking them out just to identify them.
@@ -102,43 +103,27 @@ jobs:
             -r native/polytools_cdt/requirements-native.txt
           native/polytools_cdt/build.sh -j"$(nproc)"
 
-      # Also populates .godot/, including the global class cache the suite needs
-      # to resolve class_name identifiers. On a fresh checkout it must therefore
-      # run before the suite.
+      # The four steps below are the same four steps tools/verify.sh runs
+      # locally. They are invoked one per Actions step so a failure is visible
+      # by name, but the commands, the error pattern and the pass-line checks
+      # live in the script, so a local run and this workflow cannot drift apart.
+      #
+      # The editor parse also populates .godot/, including the global class
+      # cache the suite needs to resolve class_name identifiers. On a fresh
+      # checkout it must therefore run before the suite.
       - name: Headless editor parse
-        run: |
-          set -o pipefail
-          "$GODOT" --headless --path . --editor --quit 2>&1 | tee /tmp/editor.log
-          if grep -Eq '^(SCRIPT ERROR|ERROR:|WARNING: .*leaked)' /tmp/editor.log; then
-            echo "Godot reported an error during the headless editor parse."
-            grep -E '^(SCRIPT ERROR|ERROR:|WARNING: .*leaked)' /tmp/editor.log
-            exit 1
-          fi
+        run: tools/verify.sh editor
 
       - name: Native CDT smoke test
-        run: |
-          set -o pipefail
-          "$GODOT" --headless --path . -s res://tests/native_cdt_smoke.gd 2>&1 | tee /tmp/native-smoke.log
-          if grep -Eq '^(SCRIPT ERROR|ERROR:|WARNING: .*leaked)' /tmp/native-smoke.log; then
-            echo "Godot reported an error during the native CDT smoke test."
-            grep -E '^(SCRIPT ERROR|ERROR:|WARNING: .*leaked)' /tmp/native-smoke.log
-            exit 1
-          fi
+        run: tools/verify.sh smoke
 
-      # A Godot error can still return exit code zero. A SCRIPT ERROR may abort
-      # one test function before its remaining assertions run. Ordinary ERROR
-      # lines expose invalid UI operations, while leak warnings expose unowned
-      # Nodes even when no resource error follows. Treat all of them as
-      # failures in addition to the runner's own exit code.
+      # A Godot error can still return exit code zero. A SCRIPT ERROR aborts
+      # only the GDScript function it occurs in, so the runner may still print
+      # its pass line after a test, a helper or main.gd failed. The script
+      # treats error lines, leak warnings and a missing pass line as failures
+      # in addition to the runner's own exit code.
       - name: Test suite
-        run: |
-          set -o pipefail
-          "$GODOT" --headless --path . -s res://tests/run_tests.gd 2>&1 | tee /tmp/tests.log
-          if grep -Eq '^(SCRIPT ERROR|ERROR:|WARNING: .*leaked)' /tmp/tests.log; then
-            echo "Godot reported an error during the test suite."
-            grep -E '^(SCRIPT ERROR|ERROR:|WARNING: .*leaked)' /tmp/tests.log
-            exit 1
-          fi
+        run: tools/verify.sh tests
 
       - name: Whitespace
         run: |
@@ -150,10 +135,10 @@ jobs:
             && [ "$PUSH_BEFORE_SHA" != "0000000000000000000000000000000000000000" ]; then
             base="$PUSH_BEFORE_SHA"
           fi
-          if [ -n "$base" ] && git cat-file -e "$base^{commit}" 2>/dev/null; then
-            git diff --check "$base" HEAD
+          if [ -n "$base" ]; then
+            VERIFY_DIFF_BASE="$base" tools/verify.sh whitespace
           else
-            echo "No reachable base commit for this run; skipping the diff check."
+            echo "No base commit for this run; skipping the diff check."
           fi
         env:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
