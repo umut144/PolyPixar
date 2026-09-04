@@ -379,12 +379,13 @@ Guides are not Component Semantic Keys.
 
 ## Verification
 
-After geometry changes run:
+After every change run:
 
 ```bash
-/Applications/Godot_mono.app/Contents/MacOS/Godot --headless --path . -s res://tests/run_tests.gd
-/Applications/Godot_mono.app/Contents/MacOS/Godot --headless --path . --editor --quit
-git diff --check
+tools/verify.sh
 ```
+
+It runs the headless editor parse, the native CDT smoke test, the test suite
+and `git diff --check`, and fails on the same lines CI fails on.
 
 Files below `worlds/` are user data and must not be rewritten as fixtures.

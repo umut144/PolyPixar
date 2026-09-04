@@ -53,7 +53,15 @@ Sync.
 
 Setting `SpinBox.value` in a test does not emit `value_changed` — only real
 input does — so an Inspector edit is simulated by setting the value and
-emitting the signal. `_edit_inspector_value` in the suite does both.
+emitting the signal. `_edit_inspector_value` in `tests/editor_tests.gd` does both.
+
+The suite is `tests/run_tests.gd` plus the five suites it lists —
+`topology_tests.gd`, `geometry_tests.gd`, `editor_tests.gd`,
+`persistence_tests.gd` and `motion_tests.gd` — which extend
+`tests/test_case.gd`. A test is any `_test_*` function in a suite; the runner
+finds it with `get_method_list()`, so nothing has to be listed. Put a new test
+in the suite of its subject and a helper only one suite needs beside it; a
+helper two suites need goes into `test_case.gd`.
 
 A Control created with `.new()` that never gets a Scene Tree parent must be
 released with `free()`. `queue_free()` is not enough here: the deletion queue is
@@ -62,12 +70,15 @@ survives to exit and the workflow fails on the leak report. This applies to test
 helpers as much as to render code — a grid or field built for a branch that then
 does not add it leaks on every render.
 
-A `SCRIPT ERROR` in the test output is a failure even when the runner prints
-`All PolyTools tests passed`: a runtime error aborts only the GDScript function
-it occurs in and returns `null` to the caller, so a failing test, helper or
-`main.gd` method lets the run continue and the remaining assertions of that
-test may never execute or never increment the failure count. `tools/verify.sh`
-fails on any such line, and on a missing pass line, both locally and in CI.
+A runtime error aborts only the GDScript function it occurs in and returns
+`null` to the caller, so a failing test, helper or `main.gd` method lets the
+run continue and the remaining assertions of that test may never execute. The
+runner therefore registers a `Logger` for the run and counts every engine
+`ERROR` and `SCRIPT ERROR` raised while a test runs as a failure of that test,
+printed as `FAIL <test>: Godot reported an error while it ran`. Leak warnings
+are printed after the runner has quit and stay with `tools/verify.sh`, which
+also fails on any error line and on a missing pass line, so a `SCRIPT ERROR`
+in the output is a failure however the run ends.
 
 `tools/inspector_render_probe.gd` renders the Inspector in a fixed state matrix
 and prints one line per control. Run it before and after any change that is
@@ -78,23 +89,27 @@ lists what each state is for.
 
 A view extracted from `main.gd` needs both halves checked, and the render probe
 is only one of them. It proves the same controls are still drawn; it says
-nothing about where a control leads. `_test_motion_inspector_wiring` is the
-pattern for the other half: one table of signal-to-handler pairs checked against
-`get_signal_connection_list`, and one walk that drives every control the view
-builds across every state and asserts each signal is reachable and arrives with
-its declared argument types. Both halves are needed — a control wired to the
-wrong signal passes the routing table, and a signal wired to the wrong handler
-passes the emission walk.
+nothing about where a control leads. `_check_view_wiring` in
+`tests/test_case.gd` is the other half: one table of signal-to-handler pairs
+checked against `get_signal_connection_list` and against the signals the view
+declares, and one walk that drives every control the view builds across every
+state and asserts each signal is reachable and arrives with its declared
+argument types. The six wiring tests hand it their routing table, their probe
+cases and a probe builder; `_test_style_inspector_wiring` is the shortest
+example, `_test_runtime_export_view_wiring` shows the optional hooks. Both
+halves are needed — a control wired to the wrong signal passes the routing
+table, and a signal wired to the wrong handler passes the emission walk.
 
 The `--editor --quit` run is not a full parse check: it reported clean on a
 script with undeclared identifiers that the test run caught immediately. Treat
 the test run, not the editor run, as the parser of record.
 
 The same holds when `scripts/main.gd` fails to parse: every test that does
-`load("res://scripts/main.gd").new()` then skips its assertions and the runner
-still reports a pass. An unused local is a parse error here — warnings are
-treated as errors — so check the `SCRIPT ERROR` count on *every* run, including
-the deliberately broken one in a mutation test.
+`load("res://scripts/main.gd").new()` then aborts at that line. The runner's
+`Logger` attributes the `SCRIPT ERROR` to each such test and fails the run, but
+the test's own assertions still never executed, so read the first failure, not
+the count. An unused local is a parse error here — warnings are treated as
+errors.
 
 ## External reviews
 

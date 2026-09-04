@@ -179,18 +179,20 @@ inventory.
 
 ## Optional Later — Tests and repository
 
-### TEST-01 — One driver for the five wiring tests
+### TEST-01 — One driver for the wiring tests
 
-- **Status:** Optional / Later
-- **Risk:** None to the product; test-only
-- `_test_outliner_wiring`, `_test_geometry_inspector_wiring`,
-  `_test_create_inspector_wiring`, `_test_style_inspector_wiring` and
-  `_test_motion_inspector_wiring` are structurally identical: routing table,
-  reverse check against `get_script_signal_list`, emission walk, argument types.
-  Only the fixture and the probe builder differ.
-- About 600 duplicated lines could become one driver taking
-  `(view, routes, cases, probe builder)`. The payoff is that a sixth view cannot
-  be rebuilt by hand and silently miss a half.
+- **Status:** Done
+- `_check_view_wiring` in `tests/test_case.gd` carries the routing half and the
+  emission half; the six wiring tests (the five listed here plus
+  `_test_runtime_export_view_wiring`, which the count had missed) hand it a
+  routing table, probe cases and a probe builder. The duplicated part was about
+  250 lines rather than the 600 estimated: the per-view fixtures and probe
+  builders are not duplicates and stayed where they were.
+- Done at the same time: `run_tests.gd` is a runner over five suites that
+  extend `tests/test_case.gd`, finds tests with `get_method_list()`, and
+  attributes every engine `ERROR` and `SCRIPT ERROR` to the test that was
+  running through a `Logger`, so the pass line no longer depends on a
+  `SCRIPT ERROR` happening to reach an assertion.
 
 ### REPO-01 — Repository size below `worlds/`
 
