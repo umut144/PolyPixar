@@ -111,10 +111,15 @@ func _test_asset_deserialization_migrations() -> void:
 		"Schema 48 removed Group z_index; a legacy value must not be loaded.")
 
 	var current := {"schema_version": WorldDocumentService.SCHEMA_VERSION, "id": "asset_current",
-		"components": [{"id": "component_1", "name": "body", "draw_mode": "ribbon", "points": [], "edges": [], "chains": []}]}
-	var current_component: Dictionary = WorldDocumentService.deserialize_asset(current, "asset_current").get("components", [])[0]
-	_expect(str(current_component.get("draw_mode", "")) == "ribbon",
+		"components": [
+			{"id": "component_1", "name": "body", "draw_mode": "ribbon", "points": [], "edges": [], "chains": []},
+			{"id": "component_2", "name": "", "semantic_key": "stale_key", "points": [], "edges": [], "chains": []},
+		]}
+	var current_components: Array = WorldDocumentService.deserialize_asset(current, "asset_current").get("components", [])
+	_expect(str(current_components[0].get("draw_mode", "")) == "ribbon",
 		"A Ribbon at the current schema is invalid and must not be silently converted.")
+	_expect(str(current_components[1].get("name", "")) == "Component",
+		"From schema 43 on, a missing name is not recovered from a leftover Semantic Key.")
 
 	var blink := {"schema_version": 18, "id": "act_1", "primitive": MotionActEvaluator.BLINK,
 		"parameters": {"anticipation_share": 0.18}}

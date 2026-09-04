@@ -361,7 +361,7 @@ static func deserialize_component(component_data: Dictionary, source_schema_vers
 	var component := {
 		"id": str(component_data.get("id", "")),
 		"type": component_type,
-		"name": migrated_component_name(component_data, used_names),
+		"name": migrated_component_name(component_data, source_schema_version, used_names),
 		"source_asset_id": str(component_data.get("source_asset_id", "")),
 		"parent_component_id": str(component_data.get("parent_component_id", "")),
 		"group_id": str(component_data.get("group_id", "")),
@@ -388,15 +388,19 @@ static func deserialize_component(component_data: Dictionary, source_schema_vers
 	return component
 
 
-# The persisted name, or the schema-43 migration from the Semantic Key fields
-# that preceded free-form names. Case-insensitive collisions within the Asset
-# receive a numbered suffix, in document order.
-static func migrated_component_name(component_data: Dictionary, used_names: Dictionary) -> String:
+# The persisted name. Below schema 43, where free-form names replaced the
+# Semantic Key fields, a missing name is migrated from those fields; from
+# schema 43 on they are not consulted, so a Component that lost its name is
+# visibly named `Component` rather than quietly renamed from stale data.
+# Case-insensitive collisions within the Asset receive a numbered suffix, in
+# document order.
+static func migrated_component_name(component_data: Dictionary, source_schema_version: int, used_names: Dictionary) -> String:
 	var candidate := str(component_data.get("name", "")).strip_edges()
-	if candidate.is_empty() or candidate.begins_with("missing_semantic"):
-		candidate = str(component_data.get("semantic_key", "")).strip_edges()
-	if candidate.is_empty() or candidate.begins_with("missing_semantic"):
-		candidate = str(component_data.get("missing_semantic_source", component_data.get("semantic_role", ""))).strip_edges()
+	if source_schema_version < 43:
+		if candidate.is_empty() or candidate.begins_with("missing_semantic"):
+			candidate = str(component_data.get("semantic_key", "")).strip_edges()
+		if candidate.is_empty() or candidate.begins_with("missing_semantic"):
+			candidate = str(component_data.get("missing_semantic_source", component_data.get("semantic_role", ""))).strip_edges()
 	if candidate.is_empty() or candidate.begins_with("missing_semantic"):
 		candidate = "Component"
 	var base_name := candidate

@@ -442,7 +442,9 @@ Schema 43 restores free-form Component names. New and renamed names use
 and Inspector reject invalid names before committing. Existing names are preserved;
 older Semantic Key fields are used only as a deterministic one-time migration
 fallback, and case-insensitive name collisions receive numbered suffixes.
-Names remain unique within an Asset. Asset References retain their internal
+The Semantic Key fallback applies only to documents below schema 43; from
+schema 43 on a Component without a name loads as `Component` and is not
+renamed from a leftover key. Names remain unique within an Asset. Asset References retain their internal
 `source_asset_id`; runtime export resolves that link to `source_asset_key`.
 
 Weapon Components use the namespaced keys `weapon_body`, `weapon_collar`,
