@@ -7405,6 +7405,7 @@ func _set_component_group_preserving_world(asset: Dictionary, component_id: Stri
 	var world_record := ComponentHierarchy.world_transform_record(asset, component_id)
 	component["group_id"] = group_id
 	component["transform"] = ComponentHierarchy.local_transform_from_world_record(asset, component_id, world_record)
+	ComponentHierarchy.canonicalize_redundant_group_membership(asset)
 
 
 func _set_component_parent_preserving_world(asset: Dictionary, component_id: String, parent_id: String) -> void:
@@ -7414,6 +7415,7 @@ func _set_component_parent_preserving_world(asset: Dictionary, component_id: Str
 	var world_record := ComponentHierarchy.world_transform_record(asset, component_id)
 	component["parent_component_id"] = parent_id
 	component["transform"] = ComponentHierarchy.local_transform_from_world_record(asset, component_id, world_record)
+	ComponentHierarchy.canonicalize_redundant_group_membership(asset)
 
 
 func _set_group_parent_preserving_world(asset: Dictionary, group_id: String, parent_id: String) -> void:
@@ -7972,6 +7974,7 @@ func _confirm_group_creation() -> void:
 		var component := _get_component(asset, component_id)
 		if not component.is_empty():
 			component["group_id"] = group_id
+	ComponentHierarchy.canonicalize_redundant_group_membership(asset)
 	group_dialog.hide()
 	selected_component_ids = component_ids.duplicate()
 	selected_component_id = str(component_ids.back())

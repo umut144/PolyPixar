@@ -4468,6 +4468,18 @@ func _test_component_hierarchy_model() -> void:
 	var asset := {"components": [parent, child], "groups": [group], "guides": [flow_1, flow_2, sample_1, child_sample]}
 	ComponentHierarchy.normalize_asset(asset)
 	_expect(ComponentHierarchy.membership_group_id(asset, "component_child") == "group_face", "Child Components should inherit their Parent Component's Group membership.")
+	child["group_id"] = "group_face"
+	var parent_world_before_canonicalization := ComponentHierarchy.world_transform(asset, "component_parent")
+	var child_world_before_canonicalization := ComponentHierarchy.world_transform(asset, "component_child")
+	ComponentHierarchy.normalize_asset(asset)
+	_expect(str(child.get("group_id", "")) == "" and ComponentHierarchy.membership_group_id(asset, "component_child") == "group_face", "A Child should inherit its Parent's effective Group membership instead of storing the same Group ID redundantly.")
+	_expect(ComponentHierarchy.world_transform(asset, "component_parent").is_equal_approx(parent_world_before_canonicalization) and ComponentHierarchy.world_transform(asset, "component_child").is_equal_approx(child_world_before_canonicalization), "Canonicalizing redundant Child Group membership must preserve the Parent and Child world transforms.")
+	var independent_group := {"id": "group_independent", "name": "independent", "visibility": true, "parent_component_id": "", "transform": WorldDocumentService.default_component_transform()}
+	asset["groups"].append(independent_group)
+	child["group_id"] = "group_independent"
+	ComponentHierarchy.normalize_asset(asset)
+	_expect(str(child.get("group_id", "")) == "group_independent", "Canonicalization must retain a Child's explicit membership when it differs from its Parent's effective Group.")
+	child["group_id"] = ""
 	_expect(ComponentHierarchy.group_by_id(asset, "group_face").get("name", "") == "face_details", "Groups should be first-class Asset records with stable names.")
 	group["z_index"] = 17
 	parent["z_index"] = 4
@@ -4539,6 +4551,17 @@ func _test_group_outliner_workflows() -> void:
 	application._delete_current_outliner_selection()
 	_expect(ComponentHierarchy.group_by_id(asset, "lashes").is_empty() and not ComponentHierarchy.component_by_id(asset, "eyelashes_right").is_empty() and str(eyelashes_right.get("group_id", "")) == "", "Delete on a selected Group should remove only the Group and retain its Components.")
 	_expect(ComponentHierarchy.world_transform(asset, "eyelashes_right").is_equal_approx(world_before_delete), "Deleting a Group should keep its former Components visually fixed.")
+	var opening := {"id": "opening", "name": "body_opening01", "type": "component", "draw_mode": "primitive", "topology_role": "outer", "parent_component_id": "", "group_id": "potion", "visibility": true, "primitive": {"type": "circle", "center": Vector2.ZERO, "diameter_cm": 4.0}, "transform": {"position": Vector2(3.0, 2.0), "rotation": 8.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}}
+	var opening_hole := {"id": "opening_hole", "name": "body_opening_hole01", "type": "component", "draw_mode": "primitive", "topology_role": "hole", "parent_component_id": "opening", "group_id": "potion", "visibility": true, "primitive": {"type": "circle", "center": Vector2.ZERO, "diameter_cm": 3.0}, "transform": {"position": Vector2(0.5, 0.25), "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}}
+	var potion_group := {"id": "potion", "name": "potion", "parent_component_id": "", "visibility": true, "transform": {"position": Vector2(7.0, -4.0), "rotation": 12.0, "scale": Vector2(1.2, 1.2), "pivot": Vector2.ZERO}}
+	var potion_asset := {"id": "potion_asset", "name": "Potion", "asset_type": "items", "visibility": true, "components": [opening, opening_hole], "groups": [potion_group], "guides": []}
+	ComponentHierarchy.normalize_asset(potion_asset)
+	_expect(str(opening_hole.get("group_id", "")) == "" and ComponentHierarchy.membership_group_id(potion_asset, "opening_hole") == "potion", "A loaded Potion Hole should canonicalize to inherited Group membership like an ordinary Child.")
+	var opening_world_before_remove := ComponentHierarchy.world_transform(potion_asset, "opening")
+	var hole_world_before_remove := ComponentHierarchy.world_transform(potion_asset, "opening_hole")
+	application._set_component_group_preserving_world(potion_asset, "opening", "")
+	_expect(ComponentHierarchy.membership_group_id(potion_asset, "opening").is_empty() and ComponentHierarchy.membership_group_id(potion_asset, "opening_hole").is_empty() and str(opening_hole.get("parent_component_id", "")) == "opening", "Removing the Potion Parent from its Group should also remove the inherited Hole subtree while retaining Component parentage.")
+	_expect(ComponentHierarchy.world_transform(potion_asset, "opening").is_equal_approx(opening_world_before_remove) and ComponentHierarchy.world_transform(potion_asset, "opening_hole").is_equal_approx(hole_world_before_remove), "Removing a grouped Potion Parent must preserve both Parent and Hole world transforms.")
 	application.free()
 
 

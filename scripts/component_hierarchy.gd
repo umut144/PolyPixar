@@ -35,6 +35,7 @@ static func normalize_asset(asset: Dictionary) -> void:
 		var component_group_id := str(component_data.get("group_id", ""))
 		component_data["group_id"] = component_group_id if known_group_ids.has(component_group_id) else ""
 	_break_cycles(components)
+	canonicalize_redundant_group_membership(asset)
 	_normalize_group_parents(asset, known_ids)
 	_normalize_guide_ordinals(asset)
 
@@ -91,6 +92,24 @@ static func membership_group_id(asset: Dictionary, component_id: String) -> Stri
 			return own_group_id
 		cursor = component_by_id(asset, parent_id(cursor))
 	return ""
+
+
+static func canonicalize_redundant_group_membership(asset: Dictionary) -> void:
+	var components: Array = asset.get("components", []) if asset.get("components", []) is Array else []
+	var ordered: Array[Dictionary] = []
+	for candidate in components:
+		if candidate is Dictionary and str(candidate.get("type", "component")) != "guide":
+			ordered.append(candidate)
+	ordered.sort_custom(func(left: Dictionary, right: Dictionary) -> bool:
+		return component_depth(asset, str(left.get("id", ""))) < component_depth(asset, str(right.get("id", "")))
+	)
+	for component in ordered:
+		var own_group_id := str(component.get("group_id", ""))
+		var parent_component_id := parent_id(component)
+		if own_group_id.is_empty() or parent_component_id.is_empty():
+			continue
+		if membership_group_id(asset, parent_component_id) == own_group_id:
+			component["group_id"] = ""
 
 
 static func children(asset: Dictionary, parent_component_id: String) -> Array[Dictionary]:
