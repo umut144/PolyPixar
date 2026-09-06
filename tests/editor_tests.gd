@@ -282,9 +282,10 @@ func _test_set_composition() -> void:
 	application._on_reference_role_requested("rope_post")
 	_expect(WorldDocumentService.reference_role(post_member) == "rope_post", "An authored Set Role should be stored on the member Reference.")
 	application._render_outliner()
-	# A member row names the Reference and the Asset it instances, the same
-	# summary the References section has always drawn.
-	_expect(_button_with_text(application.outliner_view, "Bridge") != null and _button_with_text(application.outliner_view, "rope_rail ← Rope Rail") != null and _button_with_text(application.outliner_view, "bridge_post_02 ← Bridge Post") != null, "The Set Outliner should list the Set and its members.")
+	# A member row names the member Asset, exactly as a Palette names a variant:
+	# the Reference that carries it is derived, so it is read in the tooltip.
+	_expect(_button_with_text(application.outliner_view, "Bridge") != null and _button_with_text(application.outliner_view, "Rope Rail") != null and _button_with_text(application.outliner_view, "Bridge Post") != null, "The Set Outliner should list the Set and its members by name.")
+	_expect(application.outliner_view._set_member_tooltip(post_member, "Bridge Post") == "Member asset: Bridge Post\nReference: bridge_post_02\nRole: rope_post", "A member tooltip should carry the derived Reference and the authored Role.")
 	# A member is authored where it belongs: its Components are added through
 	# the member row and drawn underneath it, without leaving the Set.
 	var member_asset_id := str(rail_member.get("source_asset_id", ""))
@@ -321,25 +322,36 @@ func _test_set_composition() -> void:
 		"chains": [], "visibility": true, "transform": WorldDocumentService.default_component_transform()})
 	_expect(application._reference_cycle_issue("asset_plank", "asset_post").is_empty() and not application._reference_cycle_issue("asset_post", "asset_plank").is_empty(), "A Reference that would close a cycle should be rejected where it is authored.")
 	_expect(not application._reference_cycle_issue("asset_plank", "asset_plank").is_empty() and not application._reference_cycle_issue("asset_plank", "").is_empty(), "Self-reference and a missing source should be rejected as well.")
-	# Any Asset may be instanced, including a Set member, but not a composition
-	# and not a Palette variant: a variant is presentation the client chooses on
-	# its own, so an authoritative placement must not depend on one.
-	var palette := {"id": "asset_grass", "name": "Grass", "asset_type": "terrain",
+	# A Component's Reference places a Symbol inside that Component's frame;
+	# assembling ordinary Assets is the Set's job, so the two entry points do
+	# not overlap. A Palette variant stays out even when it is a Symbol: a
+	# variant is presentation the client chooses on its own, so an authoritative
+	# placement must not depend on one.
+	var palette := {"id": "asset_runes", "name": "Runes", "asset_type": "symbols",
 		"asset_category": WorldDocumentService.ASSET_CATEGORY_PALETTE,
-		"palette_variants": ["asset_blade"], "visibility": true,
+		"palette_variants": ["asset_rune"], "visibility": true,
 		"components": [], "groups": [], "guides": []}
-	var blade := {"id": "asset_blade", "name": "Grass01", "asset_type": "terrain",
+	var rune := {"id": "asset_rune", "name": "Rune01", "asset_type": "symbols",
 		"visibility": true, "components": [], "groups": [], "guides": []}
+	var glyph := {"id": "asset_glyph", "name": "Glyph", "asset_type": "symbols",
+		"visibility": true, "components": [], "groups": [], "guides": []}
+	var mark := {"id": "asset_mark", "name": "Mark", "asset_type": "symbols", "visibility": true,
+		"components": [{"id": "component_mark", "type": "reference", "name": "glyph",
+			"source_asset_id": "asset_glyph", "parent_component_id": "", "points": [], "edges": [],
+			"chains": [], "visibility": true, "transform": WorldDocumentService.default_component_transform()}],
+		"groups": [], "guides": []}
 	application.assets.append(palette)
-	application.assets.append(blade)
+	application.assets.append(rune)
+	application.assets.append(glyph)
+	application.assets.append(mark)
 	var plank_sources: Array[String] = []
 	for candidate in application._reference_source_candidates("asset_plank"):
 		plank_sources.append(str(candidate.get("name", "")))
-	_expect(plank_sources == ["Bridge Post", "Rope Post", "Rope Rail"], "A Reference may instance any ordinary Asset and a Set member, but neither a composition, nor a Palette variant, nor itself, yet offered %s." % [plank_sources])
-	var post_sources: Array[String] = []
-	for candidate in application._reference_source_candidates("asset_post"):
-		post_sources.append(str(candidate.get("name", "")))
-	_expect(not post_sources.has("Plank"), "A source that already reaches the owner should stay out of the list, but offered %s." % [post_sources])
+	_expect(plank_sources == ["Glyph", "Mark"], "A Component Reference should offer Symbols only, and neither a composition nor a Palette variant, yet offered %s." % [plank_sources])
+	var glyph_sources: Array[String] = []
+	for candidate in application._reference_source_candidates("asset_glyph"):
+		glyph_sources.append(str(candidate.get("name", "")))
+	_expect(glyph_sources.is_empty(), "Itself, and a source that already reaches it, should stay out of an Asset's list, but offered %s." % [glyph_sources])
 	application.free()
 
 

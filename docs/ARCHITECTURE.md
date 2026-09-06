@@ -43,11 +43,15 @@ on the composition moves it to everything the composition owns, so the two
 cannot come to disagree. Export checks it rather than assuming it — a Set whose
 member is of another type, or which holds anything but member References, is
 rejected.
-A member Asset is drawn underneath its Reference with everything an Asset has —
-Components, References, Guides and Regions — and the `Add` button on that row
-belongs to the member, so a member is authored where it belongs instead of in a
-second view. `OutlinerView._render_asset_contents` is that shared body, drawn
-once for an Asset entry and once per member. Selecting a member's Component
+A member row names the member Asset, exactly as a Palette row names a variant.
+The Reference that carries it is machinery: its name is derived from the
+member's name by the Asset Key derivation, made unique inside the Set, and read
+in the row's tooltip and in the Inspector rather than in the tree; the Canvas
+names the member as well. A member Asset is drawn underneath its Reference with
+everything an Asset has — Components, References, Guides and Regions — and the
+`Add` button on that row belongs to the member, so a member is authored where
+it belongs instead of in a second view. `OutlinerView._render_asset_contents`
+is that shared body, drawn once for an Asset entry and once per member. Selecting a member's Component
 therefore leaves `selected_asset_id` pointing at the member while the module
 stays `Set`: `_create_submodule_for_asset` keeps the module, and
 `_outliner_expansion_anchor_asset_id` redirects every expansion to the
@@ -55,14 +59,20 @@ composition that owns the member, so the module's one expanded row stays the
 composition. The Canvas follows the selection and shows the member alone, the
 same way Single would.
 
-A member Asset is ordinary in every other way, References included.
-`_reference_source_candidates` in `main.gd` is what a Component's
-`+ → Reference` offers: every Asset except a composition, which is assembled
-rather than placed, and except a Palette variant, which is presentation the
-client chooses on its own and therefore must not carry an authoritative
-placement. `_reference_cycle_issue` completes it — a cycle is a consumer's
-infinite recursion, so it is rejected where it would be authored rather than
-exported and left for the consumer to notice.
+A member Asset is ordinary in every other way, References included — but a
+Reference under a Component and a Set are two different tools, and they are kept
+apart. `_reference_source_candidates` in `main.gd` is what a Component's
+`+ → Reference` offers: Symbols, and only Symbols. Such a Reference places a
+Symbol inside a Component's frame and follows whatever that Component does,
+which is what Barde's two eyes need and what a member Reference cannot do,
+having no parent Component. Assembling ordinary Assets is the Set's job;
+offering it here as well would be two ways to the same result, one of them
+without a Set's guarantees. A Palette variant stays out even when it is a
+Symbol, because a variant is presentation the client chooses on its own and
+therefore must not carry an authoritative placement; a composition stays out
+because it is assembled rather than placed. `_reference_cycle_issue` completes
+it — a cycle is a consumer's infinite recursion, so it is rejected where it
+would be authored rather than exported and left for the consumer to notice.
 
 A member is an ordinary Asset, so it keeps its own type, its own Components
 and its own place in Mesh and Style. What it does not keep is a second entry in

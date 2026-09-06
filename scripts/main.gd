@@ -7790,19 +7790,24 @@ func _on_palette_add_selected(id: int) -> void:
 
 
 func _reference_source_candidates(owner_asset_id: String) -> Array[Dictionary]:
-	# Anything an Asset may instance. A composition is excluded because it is
-	# assembled rather than placed, and the cycle check keeps every remaining
-	# choice resolvable through the Catalog.
+	# What a Component's `+ -> Reference` offers: Symbols, and only Symbols.
+	# A Reference under a Component places a Symbol inside that Component's
+	# frame and follows whatever the Component does. Assembling ordinary Assets
+	# is what a Set is for, and offering it here as well would be two ways to
+	# the same result, one of them without a Set's guarantees.
 	#
-	# A Palette variant is excluded for a different reason: it is presentation
+	# A Palette variant is excluded even when it is a Symbol: it is presentation
 	# the client chooses on its own and carries no gameplay data by contract.
 	# Instancing one would make an authoritative placement depend on a choice
-	# nobody has to agree on. A Set member has no such property and stays
-	# available.
+	# nobody has to agree on. A composition is excluded because it is assembled
+	# rather than placed, and the cycle check keeps every remaining choice
+	# resolvable through the Catalog.
 	var owner_by_member := _composition_owner_by_member_id()
 	var candidates: Array[Dictionary] = []
 	for source_asset in assets:
 		if not source_asset is Dictionary or WorldDocumentService.is_composition_asset(source_asset):
+			continue
+		if WorldDocumentService.asset_type(source_asset) != WorldDocumentService.ASSET_TYPE_SYMBOLS:
 			continue
 		var source_asset_id := str(source_asset.get("id", ""))
 		if WorldDocumentService.is_palette_asset(_get_asset(str(owner_by_member.get(source_asset_id, "")))):
@@ -12251,8 +12256,16 @@ func _render_canvas_context() -> void:
 		canvas_view.call_deferred("grab_focus")
 		return
 	if _is_reference_component(component):
-		canvas_context_label.text = "Reference: %s" % str(component.get("name", "Reference"))
-		canvas_view.set_context(str(component.get("name", "Reference")))
+		# In a Set the Reference is how a member hangs in the assembly, so the
+		# Canvas names the member Asset and leaves the derived Reference name
+		# to the Inspector.
+		var reference_context := str(component.get("name", "Reference"))
+		if WorldDocumentService.is_set_asset(asset) and str(component.get("parent_component_id", "")).is_empty():
+			reference_context = str(_get_asset(str(component.get("source_asset_id", ""))).get("name", reference_context))
+			canvas_context_label.text = "Member: %s" % reference_context
+		else:
+			canvas_context_label.text = "Reference: %s" % reference_context
+		canvas_view.set_context(reference_context)
 		canvas_view.set_interaction_state("transform")
 		canvas_view.set_tool_mode("")
 		canvas_view.set_component_transform(_asset_preview_world_record(asset, ComponentHierarchy.world_transform_record(asset, selected_component_id)))

@@ -600,9 +600,12 @@ func _render_set_member_row(container: VBoxContainer, owner_asset: Dictionary, m
 	member_row.add_child(member_indent)
 	member_row.add_child(EditorWidgets.create_visibility_checkbox(bool(member.get("visibility", true)), _emit_visibility.bind("component", owner_asset_id, member_id)))
 	var member_button := Button.new()
-	var member_name := WorldDocumentService.component_outliner_name(assets, member)
+	# The row names the member Asset. Its Reference is machinery: derived from
+	# the member's name, unique inside the Set, and read in the tooltip and the
+	# Inspector rather than in the tree.
+	var member_name := str(member_asset.get("name", "Missing asset"))
 	member_button.text = member_name if bool(member.get("visibility", true)) else EditorWidgets.strikethrough_text(member_name)
-	member_button.tooltip_text = _reference_outliner_tooltip(owner_asset, member)
+	member_button.tooltip_text = _set_member_tooltip(member, member_name)
 	member_button.custom_minimum_size = Vector2(0, 30)
 	member_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	member_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
@@ -817,6 +820,15 @@ func _render_region_outliner_row(container: VBoxContainer, asset: Dictionary, re
 func _component_tree_name(component: Dictionary) -> String:
 	var component_name := WorldDocumentService.normalized_component_name(component)
 	return "R: %s" % component_name if WorldDocumentService.is_reference_component(component) else component_name
+
+
+func _set_member_tooltip(member: Dictionary, member_name: String) -> String:
+	var tooltip := "Member asset: %s\nReference: %s" % [member_name, WorldDocumentService.normalized_component_name(member)]
+	var role := WorldDocumentService.reference_role(member)
+	if not role.is_empty():
+		tooltip += "\nRole: %s" % role
+	return tooltip
+
 
 func _reference_outliner_tooltip(asset: Dictionary, reference: Dictionary) -> String:
 	var source_asset := WorldDocumentService.asset_by_id(assets, str(reference.get("source_asset_id", "")))
