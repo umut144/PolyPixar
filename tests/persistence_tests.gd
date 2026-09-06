@@ -745,18 +745,18 @@ func _test_runtime_export_service() -> void:
 	var result := RuntimeExportService.build_manifest(asset, {"component_a": source, "component_b": source})
 	var manifest: Dictionary = result.get("manifest", {})
 	var components: Array = manifest.get("components", [])
-	_expect(bool(result.get("valid", false)) and int(manifest.get("schema_version", 0)) == 16 and str(manifest.get("asset_key", "")) == "wizard" and not manifest.has("asset_id"), "Runtime export schema 16 should identify packages only by the Asset Key derived from their display name.")
+	_expect(bool(result.get("valid", false)) and int(manifest.get("schema_version", 0)) == RuntimeExportService.MANIFEST_SCHEMA_VERSION and str(manifest.get("asset_key", "")) == "wizard" and not manifest.has("asset_id"), "The current Runtime export schema should identify packages only by the Asset Key derived from their display name.")
 	var item_asset: Dictionary = asset.duplicate(true)
 	item_asset["asset_type"] = "items"
 	var item_manifest: Dictionary = RuntimeExportService.build_manifest(item_asset, {"component_a": source, "component_b": source}).get("manifest", {})
 	_expect(str(item_manifest.get("asset_type", "")) == "items", "Runtime export should retain the stable Items Asset type.")
-	_expect(str(manifest.get("presentation", {}).get("authored_facing", "")) == "right", "Runtime export schema 16 should publish the selected authored facing under presentation.authored_facing.")
+	_expect(str(manifest.get("presentation", {}).get("authored_facing", "")) == "right", "Runtime export should publish the selected authored facing under presentation.authored_facing.")
 	var neutral_asset: Dictionary = asset.duplicate(true)
 	neutral_asset.erase("authored_facing")
 	var neutral_manifest: Dictionary = RuntimeExportService.build_manifest(neutral_asset, {"component_a": source, "component_b": source}).get("manifest", {})
-	_expect(str(neutral_manifest.get("presentation", {}).get("authored_facing", "")) == "neutral", "Runtime export schema 16 should explicitly publish neutral for an older Asset without authored_facing.")
+	_expect(str(neutral_manifest.get("presentation", {}).get("authored_facing", "")) == "neutral", "Runtime export should explicitly publish neutral for an older Asset without authored_facing.")
 	var manifest_text := JSON.stringify(manifest, "\t")
-	_expect(application._runtime_manifest_text_matches(manifest_text, manifest_text), "Runtime staging should verify exact schema-16 JSON bytes without rejecting numeric JSON round-trip types.")
+	_expect(application._runtime_manifest_text_matches(manifest_text, manifest_text), "Runtime staging should verify exact current-schema JSON bytes without rejecting numeric JSON round-trip types.")
 	_expect(components.size() == 2 and str(components[0].get("component_id", "")) == "component_a" and str(components[1].get("component_id", "")) == "component_b", "Runtime Components should sort globally by ascending z_index and lexicographic Component ID.")
 	var constraint_hole := {"id": "component_hole", "name": "body_hole", "type": "component", "draw_mode": "primitive", "topology_role": "hole", "visibility": true, "parent_component_id": "component_b", "transform": WorldDocumentService.default_component_transform(), "primitive": {"type": "circle", "center": Vector2.ZERO, "diameter_cm": 10.0}, "points": [], "edges": [], "chains": []}
 	var asset_with_constraint_hole: Dictionary = asset.duplicate(true)
@@ -785,7 +785,7 @@ func _test_runtime_export_service() -> void:
 	var combat_result := RuntimeExportService.build_manifest(combat_asset, {"component_a": source, "component_b": source})
 	var combat_manifest: Dictionary = combat_result.get("manifest", {})
 	var exported_frame_roles: Array = combat_manifest.get("attachment_frames", []).map(func(frame: Dictionary): return str(frame.get("role", "")))
-	_expect(bool(combat_result.get("valid", false)) and int(combat_manifest.get("schema_version", 0)) == 16 and combat_manifest.get("attachment_frames", []).size() == 3 and AssetGuide.WEAPON_SOCKET_PRIMARY in exported_frame_roles and AssetGuide.GRIP_SECONDARY in exported_frame_roles and AssetGuide.REACH_LIMIT_PRIMARY in exported_frame_roles and combat_manifest.has("regions") and combat_manifest.get("regions", []).is_empty(), "Schema 16 should export every oriented Weapon Guide and an optional empty Regions array.")
+	_expect(bool(combat_result.get("valid", false)) and int(combat_manifest.get("schema_version", 0)) == RuntimeExportService.MANIFEST_SCHEMA_VERSION and combat_manifest.get("attachment_frames", []).size() == 3 and AssetGuide.WEAPON_SOCKET_PRIMARY in exported_frame_roles and AssetGuide.GRIP_SECONDARY in exported_frame_roles and AssetGuide.REACH_LIMIT_PRIMARY in exported_frame_roles and combat_manifest.has("regions") and combat_manifest.get("regions", []).is_empty(), "The current schema should export every oriented Weapon Guide and an optional empty Regions array.")
 	var authored_region := {"id": "region_attack", "type": "region", "region_type": "attack", "name": "attack_region", "visibility": true, "parent_component_id": "component_b", "group_id": "", "transform": {"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}, "points": [], "edges": [], "chains": [], "draw_mode": "closed_loop"}
 	for region_position in [Vector2.ZERO, Vector2(2.0, 0.0), Vector2(1.0, 2.0)]:
 		BezierTopology.add_point(authored_region, region_position, "linear")
@@ -876,8 +876,44 @@ func _test_runtime_export_service() -> void:
 	var exported_reference: Dictionary = referenced_components[2] if referenced_components.size() == 3 else {}
 	var exported_reference_scale: Array = exported_reference.get("local_transform", {}).get("scale", [])
 	_expect(bool(referenced_result.get("valid", false)) and str(exported_reference.get("kind", "")) == "asset_reference" and str(exported_reference.get("source_asset_key", "")) == "orb" and is_equal_approx(float(exported_reference.get("contour_stroke_width_override_px", 0.0)), 3.0) and not exported_reference.has("source_asset_id") and str(exported_reference.get("name", "")) == "orb_reference" and not exported_reference.has("mesh") and not exported_reference.has("contour_stroke_mesh") and not exported_reference.has("closed_region_mesh") and exported_reference_scale.size() == 2 and float(exported_reference_scale[0]) * float(exported_reference_scale[1]) < 0.0, "A Hole Reference should keep the Barde-style Runtime instance while owning no Fill or Contour Stroke geometry.")
+	_expect(str(exported_reference.get("role", "")) == "orb", "An unauthored role should export as the member's own Asset Key, so the assembly is read rather than guessed.")
+	var roled_asset: Dictionary = referenced_asset.duplicate(true)
+	roled_asset["components"][2]["role"] = "rope_post"
+	var roled_components: Array = RuntimeExportService.build_manifest(roled_asset, {"component_a": source, "component_b": source, "component_orb": reference_source}).get("manifest", {}).get("components", [])
+	_expect(str(roled_components[2].get("role", "")) == "rope_post", "An authored role should cross the boundary as it was authored.")
 	reference_source["source_asset_exists"] = false
 	_expect(not bool(RuntimeExportService.build_manifest(referenced_asset, {"component_a": source, "component_b": source, "component_orb": reference_source}).get("valid", true)), "Runtime export should reject a Reference whose actual source Asset cannot be resolved.")
+
+	# A Palette publishes the Keys that substitute for one another and nothing
+	# else; a variant that carries gameplay data invalidates the Palette rather
+	# than itself.
+	var palette_asset := {"id": "grass", "name": "Grass", "visibility": true,
+		"asset_type": WorldDocumentService.ASSET_TYPE_PALETTE,
+		"variant_asset_type": WorldDocumentService.ASSET_TYPE_TERRAIN,
+		"palette_variants": ["asset_1", "asset_2"], "components": []}
+	var variant_records: Array = [
+		{"asset_id": "asset_2", "display_name": "Grass02", "exists": true, "visible": true,
+			"asset_key": "grass02", "asset_type": "terrain", "region_count": 0, "attachment_frame_count": 0},
+		{"asset_id": "asset_1", "display_name": "Grass01", "exists": true, "visible": true,
+			"asset_key": "grass01", "asset_type": "terrain", "region_count": 0, "attachment_frame_count": 0},
+	]
+	var palette_result := RuntimeExportService.build_manifest(palette_asset, {}, variant_records)
+	var palette_manifest: Dictionary = palette_result.get("manifest", {})
+	_expect(bool(palette_result.get("valid", false)) and palette_manifest.get("variants", []) == ["grass01", "grass02"] and str(palette_manifest.get("variant_asset_type", "")) == "terrain" and palette_manifest.get("components", []).is_empty() and palette_manifest.get("regions", []).is_empty(), "A Palette should publish sorted variant Keys and one category, with no geometry of its own.")
+	_expect(int(palette_manifest.get("schema_version", 0)) == RuntimeExportService.MANIFEST_SCHEMA_VERSION and str(palette_manifest.get("asset_type", "")) == "palette" and palette_manifest.has("asset_pivot"), "A Palette Manifest should keep the shape every other Manifest has, minus the geometry it does not own.")
+	var gameplay_variants: Array = variant_records.duplicate(true)
+	gameplay_variants[0]["region_count"] = 1
+	_expect(not bool(RuntimeExportService.build_manifest(palette_asset, {}, gameplay_variants).get("valid", true)), "A variant carrying gameplay Regions should invalidate its Palette, because the client chooses variants on its own.")
+	var framed_variants: Array = variant_records.duplicate(true)
+	framed_variants[1]["attachment_frame_count"] = 1
+	_expect(not bool(RuntimeExportService.build_manifest(palette_asset, {}, framed_variants).get("valid", true)), "A variant carrying Attachment Frames should invalidate its Palette for the same reason.")
+	var mistyped_variants: Array = variant_records.duplicate(true)
+	mistyped_variants[0]["asset_type"] = "props"
+	_expect(not bool(RuntimeExportService.build_manifest(palette_asset, {}, mistyped_variants).get("valid", true)), "Every variant shares the Palette's one category; another type should be rejected.")
+	var missing_variants: Array = variant_records.duplicate(true)
+	missing_variants[1]["exists"] = false
+	_expect(not bool(RuntimeExportService.build_manifest(palette_asset, {}, missing_variants).get("valid", true)), "A Palette advertising a Key no consumer can resolve should be rejected.")
+	_expect(not bool(RuntimeExportService.build_manifest(palette_asset, {}, []).get("valid", true)), "An empty Palette has nothing to publish.")
 	var duplicate_role_asset: Dictionary = asset.duplicate(true)
 	duplicate_role_asset["components"][1]["name"] = "body"
 	_expect(not bool(RuntimeExportService.build_manifest(duplicate_role_asset, {"component_a": source, "component_b": source}).get("valid", true)), "Runtime export should reject duplicate Component Names.")

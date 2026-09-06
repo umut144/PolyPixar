@@ -1,10 +1,10 @@
 # PolyTools Runtime Export Contract
 
 **Status:** Normative consumer contract for Asset Catalog schema `1` and
-runtime Manifest schema `16`.
+runtime Manifest schema `17`.
 
 This document is the sole field-level contract for PolyTools Runtime packages.
-Manifest schema 16 replaces schema 15. Consumers must reject older schemas; there is
+Manifest schema 17 replaces schema 16. Consumers must reject older schemas; there is
 no SDF/Carrier/UV compatibility fallback.
 
 ## Package boundary
@@ -45,12 +45,12 @@ Root Transform instead of silently changing package placement or dimensions.
 ## Compatibility policy
 
 Catalog `schema_version` must equal `1`; Manifest `schema_version` must equal
-`16`. Missing, non-integer, older, or newer versions are rejected as complete
+`17`. Missing, non-integer, older, or newer versions are rejected as complete
 packages. Missing required geometry is an error. Consumers must not synthesize
 Fill Meshes, strokes, closed Contour regions, Semantic Keys, hierarchy links,
 or referenced Assets.
 
-Schema 16 contains no UV, SDF, mask, contour-domain, padding, or Carrier field.
+Schema 17 contains no UV, SDF, mask, contour-domain, padding, or Carrier field.
 Its optional `regions` array contains authored or Component-bound Attack, Hurt,
 and Collision geometry; consumers may use it and must retain their Component
 fallback when it is empty.
@@ -64,14 +64,14 @@ The Catalog requires `world_key`, `world_name`, and `assets`, sorted by
 
 ## Top-level Manifest
 
-Schema 16 requires:
+Every Manifest except a Palette requires:
 
 | Field | Type | Meaning |
 | --- | --- | --- |
 | `schema_version` | integer | Exactly `16`. |
 | `asset_key` | non-empty lower-snake-case string | Runtime identity. |
 | `display_name` | string | Informational authored name. |
-| `asset_type` | string | `character`, `props`, `weapons`, `terrain`, `items`, `icon`, or `symbols`. |
+| `asset_type` | string | `character`, `props`, `weapons`, `terrain`, `items`, `icon`, `symbols`, `set`, or `palette`. |
 | `presentation` | object | Required Asset-level presentation metadata. |
 | `coordinate_system` | object | Exact convention below. |
 | `z_order` | object | Exact convention below. |
@@ -144,7 +144,7 @@ independent Frame property.
 
 ## Gameplay Regions
 
-`regions` is always present in schema 16 and may be empty. Every record contains
+`regions` is always present in schema 17 and may be empty. Every record contains
 `region_id`, `name`, `role`, `geometry_source`, and `source_component_id`;
 `role` is one of `attack`, `hurt`, or `collision`.
 
@@ -292,10 +292,66 @@ Open Contours must not contain `closed_region_mesh`. Closed-loop and Primitive
 Components retain their existing `mesh` and do not receive this additional
 field. Asset References also omit it.
 
+## Compositions
+
+Two `asset_type` values describe how an Asset is composed rather than what
+category of thing it is. Neither requires a consumer to learn a new package
+shape.
+
+A **Set** — `asset_type: "set"` — is an ordinary Manifest whose Components are
+all `asset_reference` records. Its assembly is the Component transforms, which
+are canonical exported transforms like any other, and each member says what it
+stands for through its required `role`. A consumer that already resolves Asset
+References needs nothing further.
+
+A **Palette** — `asset_type: "palette"` — is the one Manifest without geometry.
+It publishes the Keys that may substitute for one another and the single
+ordinary category they share:
+
+```json
+{
+  "schema_version": 17,
+  "asset_key": "grass",
+  "display_name": "Grass",
+  "asset_type": "palette",
+  "variant_asset_type": "terrain",
+  "variants": ["grass01", "grass02", "grass03", "grass04"],
+  "presentation": {"authored_facing": "neutral"},
+  "coordinate_system": { },
+  "z_order": { },
+  "asset_pivot": [0.0, 0.0],
+  "components": [],
+  "attachment_frames": [],
+  "regions": []
+}
+```
+
+`variants` is non-empty, sorted, and holds unique `lower_snake_case` Asset Keys
+that the Catalog also lists as packages of their own; each variant Manifest is
+an ordinary Asset Manifest of `variant_asset_type`. `components`,
+`attachment_frames` and `regions` are present and empty. No other Manifest
+carries `variants` or `variant_asset_type`.
+
+A variant is chosen by the presentation, independently per client, so it may
+carry nothing the simulation would have to agree on. PolyTools enforces the
+part it owns and rejects the Palette — not the variant — when a variant has
+gameplay Regions or Attachment Frames, is hidden, is missing, or is not of the
+declared category. **`Surface`, placement rank and every other consumer-side
+gameplay property are outside PolyTools and are not checked here.** A consumer
+that owns such properties must assert their absence itself, against this same
+`variants` list. The list is also the authority for which Keys are not placed
+on their own: a variant is reached by choosing it for a Palette, never by
+naming it in a map.
+
+An invalid Palette is excluded from the newly published Catalog like any other
+invalid Asset, and its variants remain valid packages of their own.
+
 ## Asset References
 
-An Asset Reference adds `kind: "asset_reference"` and required
-`source_asset_key`. It contains neither `mesh`, `contour_stroke_mesh`, nor
+An Asset Reference adds `kind: "asset_reference"`, required
+`source_asset_key`, and a required `lower_snake_case` `role` naming what the
+member stands for in its owner; where no role was authored, the role is the
+member's own `source_asset_key`, so it is always present and never guessed. It contains neither `mesh`, `contour_stroke_mesh`, nor
 `closed_region_mesh`, but retains its local `projection_depth_meters` value.
 An
 optional finite positive `contour_stroke_width_override_px` is local to the

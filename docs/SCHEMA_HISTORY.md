@@ -58,6 +58,7 @@ fingerprints.
 | 64 | `set` Asset type; optional `role` on Reference Components | additive (missing role reads unauthored) | `normalize_asset_type`, `deserialize_component` | `_test_set_composition`, `_test_asset_deserialization_migrations` |
 | 65 | `palette` Asset type; `palette_variants` and `variant_asset_type` | additive (missing list reads empty, missing category reads `character`) | `normalize_asset_type`, `normalized_palette_variants`, `normalize_variant_asset_type` | `_test_palette_composition`, `_test_asset_deserialization_migrations` |
 | Manifest 16 | `contour_stroke_mesh`, `closed_region_mesh`, Attachment Frames, `projection_depth_corners`, `regions` | derived | `RuntimeExportService` | `_test_runtime_export_service` |
+| Manifest 17 | required `role` on every `asset_reference`; Palette Manifests with `variants` and `variant_asset_type` | derived | `RuntimeExportService` | `_test_runtime_export_service` |
 | Sampling 6 | Junction-aware Cuts, boundary-namespaced analytic Samples, corner balancing | derived | `GeometrySamplingService` | `_test_geometry_sampling_corner_balancing` |
 | Motion 1–18 | Blink `anticipation_share` default 0.18 read as 0.5 | **explicit** (≤ 18) | `normalize_motion_act` | `_test_asset_deserialization_migrations` |
 
@@ -319,6 +320,23 @@ multiplicity mean nothing among things that stand in for each other.
 Additive as well. No existing document changes: an Asset that is not a Palette
 loads with an empty variant list, and a category that is missing or names a
 composition reads `character`, the same fallback `asset_type` uses.
+
+Runtime Manifest schema 17 carries what the two compositions must say across
+the boundary, and nothing more. An `asset_reference` gains a required
+`lower_snake_case` `role`; where none was authored it is the member's own
+`source_asset_key`, so a consumer reads the assembly instead of guessing it. A
+Palette exports the one Manifest without geometry: `variants`, the sorted,
+unique Asset Keys that may stand in for one another, and `variant_asset_type`,
+the ordinary category they share, with `components`, `attachment_frames` and
+`regions` present and empty.
+
+Export is where a Palette variant is checked, not load. A variant that carries
+gameplay Regions or Attachment Frames, is hidden, is missing, or is not of the
+declared category invalidates the Palette — never the variant, which stays a
+valid package of its own. `Surface`, placement rank and every other
+consumer-side gameplay property live outside PolyTools and are explicitly not
+checked; `RUNTIME_EXPORT_CONTRACT.md` says so, so that no consumer assumes a
+guarantee that was never made.
 
 Runtime Manifest schema 16 exports `contour_stroke_mesh` independently from
 the unchanged Fill Mesh and adds geometry-only `closed_region_mesh` to closed

@@ -679,7 +679,7 @@ The normative serialized package and consumer contract is
 must not redefine its fields. The summary below describes how the editor
 produces that contract.
 
-`RuntimeExportService` builds Manifest schema 16 exclusively from current
+`RuntimeExportService` builds Manifest schema 17 exclusively from current
 accepted Fill and Contour Stroke Mesh Bakes. Ordinary Hole Components are
 authoring-only Sampling constraints and do not enter the Manifest. A visible
 ordinary Hole with no valid direct outer Parent Body blocks export, as does a
@@ -692,7 +692,17 @@ Components never derive replacement geometry during export. References emit an
 `asset_reference` record containing the local `name`, signed placement
 transform, and actual `source_asset_key`, without copying geometry into the owner.
 
-Every schema-16 Manifest also exports the Asset-level presentation metadata as
+A Set exports as an ordinary Manifest whose Components are all
+`asset_reference` records, each with its `role`; a Palette exports the one
+Manifest without geometry, carrying `variants` and `variant_asset_type` and no
+Components. Its variants are validated at export — a Palette whose variant is
+missing, hidden, of another category, or carrying gameplay Regions or
+Attachment Frames is rejected, while the variant itself stays a valid package.
+`main.gd` resolves those variant facts, because they are questions about other
+Assets, and the Catalog prunes a Palette whose variant is not publishable the
+same way it prunes a dependant of an unpublishable Reference.
+
+Every schema-17 Manifest also exports the Asset-level presentation metadata as
 `presentation.authored_facing`, oriented Asset-local Weapon Attachment Frames,
 and geometry-only closed Contour boundaries. Free semantic Regions are exported
 as triangulated Asset-local meter geometry. Component-geometry Regions instead
@@ -714,7 +724,7 @@ while fill-less Contours do not invent one. A closed Contour additionally
 exports `closed_region_mesh` as local-meter vertices and triangle indices. That
 field is engine-neutral geometry only and has no material, color, alpha, UV,
 rendering, or Fill semantics. Open Contours and Asset References omit it.
-Schema 16 contains no UV/SDF/Carrier fields and carries an optional semantic
+Schema 17 contains no UV/SDF/Carrier fields and carries an optional semantic
 gameplay Region array.
 
 Each visible Asset is exported to the active World-local

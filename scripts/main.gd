@@ -2372,6 +2372,12 @@ func _asset_catalog_build() -> Dictionary:
 				if component is Dictionary and _effective_component_visibility(asset, component) and _is_reference_component(component) and not exportable_ids.has(str(component.get("source_asset_id", ""))):
 					has_unexportable_reference = true
 					break
+			# A Palette depends on its variants the same way: it advertises Keys
+			# a consumer must be able to resolve.
+			for variant_id in WorldDocumentService.palette_variants(asset):
+				if not exportable_ids.has(variant_id):
+					has_unexportable_reference = true
+					break
 			if has_unexportable_reference:
 				exportable_ids.erase(str(asset.get("id", "")))
 				exportable_assets.remove_at(index)
@@ -4285,6 +4291,36 @@ func _runtime_export_root() -> String:
 	return RuntimeExportFileService.export_root(_current_world_root())
 
 
+func _palette_variant_export_records(asset: Dictionary) -> Array:
+	# What a Palette's Manifest has to know about each variant. Resolved here
+	# because it is a question about other Assets, which the export service does
+	# not reach into.
+	var records: Array = []
+	if not WorldDocumentService.is_palette_asset(asset):
+		return records
+	for variant_asset_id in WorldDocumentService.palette_variants(asset):
+		var variant := _get_asset(variant_asset_id)
+		var region_count := 0
+		for component in variant.get("components", []):
+			if component is Dictionary and _is_region(component):
+				region_count += 1
+		var attachment_frame_count := 0
+		for guide in variant.get("guides", []):
+			if guide is Dictionary and AssetGuide.is_weapon_frame(str(guide.get("guide_type", ""))):
+				attachment_frame_count += 1
+		records.append({
+			"asset_id": variant_asset_id,
+			"display_name": str(variant.get("name", variant_asset_id)),
+			"exists": not variant.is_empty(),
+			"visible": bool(variant.get("visibility", true)),
+			"asset_key": _asset_key(variant) if not variant.is_empty() else "",
+			"asset_type": _asset_type(variant) if not variant.is_empty() else "",
+			"region_count": region_count,
+			"attachment_frame_count": attachment_frame_count,
+		})
+	return records
+
+
 func _runtime_export_build(asset: Dictionary) -> Dictionary:
 	var sources: Dictionary = {}
 	var asset_id := str(asset.get("id", ""))
@@ -4310,7 +4346,7 @@ func _runtime_export_build(asset: Dictionary) -> Dictionary:
 			"mesh": mesh if mesh_current else {},
 			"contour_stroke": contour_stroke if stroke_current else {}
 		}
-	var result := RuntimeExportService.build_manifest(asset, sources)
+	var result := RuntimeExportService.build_manifest(asset, sources, _palette_variant_export_records(asset))
 	var catalog_errors := AssetCatalogService.validation_errors(assets)
 	if not catalog_errors.is_empty():
 		var errors: Array = result.get("errors", [])

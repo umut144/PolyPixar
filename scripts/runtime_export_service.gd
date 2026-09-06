@@ -1,9 +1,11 @@
 class_name RuntimeExportService
 extends RefCounted
 
-const MANIFEST_SCHEMA_VERSION := 16
+const MANIFEST_SCHEMA_VERSION := 17
 const DEFAULT_PROJECTION_DEPTH_CM := 10.0
-static func build_manifest(asset: Dictionary, sources: Dictionary) -> Dictionary:
+static func build_manifest(asset: Dictionary, sources: Dictionary, palette_variants: Array = []) -> Dictionary:
+	if WorldDocumentService.is_palette_asset(asset):
+		return _build_palette_manifest(asset, palette_variants)
 	var errors: Array[String] = []
 	var asset_id := str(asset.get("id", ""))
 	if asset_id.is_empty():
@@ -103,21 +105,8 @@ static func build_manifest(asset: Dictionary, sources: Dictionary) -> Dictionary
 		"presentation": {
 			"authored_facing": AssetPresentation.serialize_authored_facing(asset.get("authored_facing", AssetPresentation.AuthoredFacing.NEUTRAL))
 		},
-		"coordinate_system": {
-			"dimensions": 2,
-			"x_axis": "right",
-			"y_axis": "up",
-			"unit": "meter",
-			"tool_unit_in_meters": ToolUnits.TO_METERS,
-			"rotation_unit": "radian",
-			"positive_rotation": "counter_clockwise",
-			"component_transform": "T(position) * R(rotation) * S(scale) * T(-pivot)"
-		},
-		"z_order": {
-			"scope": "global",
-			"back_to_front": "ascending",
-			"tie_breaker": "component_id_lexicographic"
-		},
+		"coordinate_system": _coordinate_system(),
+		"z_order": _z_order(),
 		"asset_pivot": _meters(asset_pivot),
 		"components": manifest_components,
 		"attachment_frames": attachment_frames_build.get("items", []),
@@ -127,6 +116,101 @@ static func build_manifest(asset: Dictionary, sources: Dictionary) -> Dictionary
 	if not manifest_issues.is_empty():
 		return {"valid": false, "errors": manifest_issues, "manifest": {}}
 	return {"valid": true, "errors": [], "manifest": manifest}
+
+
+static func _build_palette_manifest(asset: Dictionary, palette_variants: Array) -> Dictionary:
+	# A Palette publishes what it is: the one category its variants share and
+	# the Keys that may stand in for one another. It has no geometry, so the
+	# rest of the Manifest is present and empty rather than absent.
+	var errors: Array[String] = []
+	var asset_key := AssetCatalogService.asset_key(str(asset.get("name", "")))
+	if asset_key.is_empty():
+		errors.append("Asset name does not derive a usable lower_snake_case Asset Key.")
+	if not bool(asset.get("visibility", true)):
+		errors.append("The Asset is hidden.")
+	var variant_type := WorldDocumentService.palette_variant_type(asset)
+	var variant_keys: Array = []
+	var seen_keys: Dictionary = {}
+	for raw_variant in palette_variants:
+		if not raw_variant is Dictionary:
+			errors.append("The Palette contains an invalid variant record.")
+			continue
+		var variant: Dictionary = raw_variant
+		var label := str(variant.get("display_name", variant.get("asset_id", "A variant")))
+		if not bool(variant.get("exists", false)):
+			errors.append("Variant '%s' no longer exists." % label)
+			continue
+		if not bool(variant.get("visible", true)):
+			errors.append("Variant '%s' is hidden." % label)
+			continue
+		var variant_key := str(variant.get("asset_key", ""))
+		if variant_key.is_empty():
+			errors.append("Variant '%s' does not derive a usable lower_snake_case Asset Key." % label)
+			continue
+		if seen_keys.has(variant_key):
+			errors.append("Variant Asset Key '%s' is duplicated." % variant_key)
+			continue
+		if str(variant.get("asset_type", "")) != variant_type:
+			errors.append("Variant '%s' is not a %s; every variant of a Palette shares its one category." % [label, variant_type])
+			continue
+		# A variant is chosen by the presentation alone, so it may not carry
+		# anything the simulation would have to agree on. This is checked here
+		# rather than hoped for at load.
+		if int(variant.get("region_count", 0)) > 0:
+			errors.append("Variant '%s' carries gameplay Regions; a Palette variant is presentation only." % label)
+			continue
+		if int(variant.get("attachment_frame_count", 0)) > 0:
+			errors.append("Variant '%s' carries Attachment Frames; a Palette variant is presentation only." % label)
+			continue
+		seen_keys[variant_key] = true
+		variant_keys.append(variant_key)
+	if variant_keys.is_empty() and errors.is_empty():
+		errors.append("A Palette must publish at least one variant.")
+	if not errors.is_empty():
+		return {"valid": false, "errors": errors, "manifest": {}}
+	variant_keys.sort()
+	var manifest := {
+		"schema_version": MANIFEST_SCHEMA_VERSION,
+		"asset_key": asset_key,
+		"display_name": str(asset.get("name", "")),
+		"asset_type": WorldDocumentService.ASSET_TYPE_PALETTE,
+		"variant_asset_type": variant_type,
+		"variants": variant_keys,
+		"presentation": {
+			"authored_facing": AssetPresentation.serialize_authored_facing(asset.get("authored_facing", AssetPresentation.AuthoredFacing.NEUTRAL))
+		},
+		"coordinate_system": _coordinate_system(),
+		"z_order": _z_order(),
+		"asset_pivot": _meters(Vector2.ZERO),
+		"components": [],
+		"attachment_frames": [],
+		"regions": []
+	}
+	var manifest_issues := manifest_validation_issues(manifest)
+	if not manifest_issues.is_empty():
+		return {"valid": false, "errors": manifest_issues, "manifest": {}}
+	return {"valid": true, "errors": [], "manifest": manifest}
+
+
+static func _coordinate_system() -> Dictionary:
+	return {
+		"dimensions": 2,
+		"x_axis": "right",
+		"y_axis": "up",
+		"unit": "meter",
+		"tool_unit_in_meters": ToolUnits.TO_METERS,
+		"rotation_unit": "radian",
+		"positive_rotation": "counter_clockwise",
+		"component_transform": "T(position) * R(rotation) * S(scale) * T(-pivot)"
+	}
+
+
+static func _z_order() -> Dictionary:
+	return {
+		"scope": "global",
+		"back_to_front": "ascending",
+		"tie_breaker": "component_id_lexicographic"
+	}
 
 
 static func _build_attachment_frames(asset: Dictionary) -> Dictionary:
@@ -430,6 +514,28 @@ static func _runtime_component_by_id(components: Array, component_id: String) ->
 	return {}
 
 
+static func _palette_manifest_validation_issues(manifest: Dictionary) -> Array[String]:
+	# A Palette Manifest is the one shape without geometry: a category and the
+	# Keys that substitute for one another.
+	var errors: Array[String] = []
+	if str(manifest.get("variant_asset_type", "")) not in WorldDocumentService.SINGLE_ASSET_TYPES:
+		errors.append("A Palette Manifest requires the one ordinary Asset type its variants share.")
+	var variants = manifest.get("variants", null)
+	if not variants is Array or variants.is_empty():
+		errors.append("A Palette Manifest requires a non-empty variants array.")
+	else:
+		var seen: Dictionary = {}
+		for variant_key in variants:
+			var key := str(variant_key)
+			if not _is_lower_snake_case(key) or seen.has(key):
+				errors.append("A Palette Manifest requires unique lower_snake_case variant Asset Keys.")
+				break
+			seen[key] = true
+	if not manifest.get("components", []).is_empty() or not manifest.get("attachment_frames", []).is_empty() or not manifest.get("regions", []).is_empty():
+		errors.append("A Palette Manifest carries no Components, Attachment Frames or Regions.")
+	return errors
+
+
 static func manifest_validation_issues(manifest: Dictionary) -> Array[String]:
 	var errors: Array[String] = []
 	var schema_version = manifest.get("schema_version")
@@ -438,11 +544,16 @@ static func manifest_validation_issues(manifest: Dictionary) -> Array[String]:
 	if str(manifest.get("asset_key", "")).is_empty() or not manifest.get("components", null) is Array:
 		errors.append("Runtime Manifest requires an Asset Key and Component array.")
 		return errors
+	if str(manifest.get("asset_type", "")) == WorldDocumentService.ASSET_TYPE_PALETTE:
+		errors.append_array(_palette_manifest_validation_issues(manifest))
+		return errors
+	if manifest.has("variants") or manifest.has("variant_asset_type"):
+		errors.append("Only a Palette Manifest carries variants.")
 	if not manifest.get("attachment_frames", null) is Array:
-		errors.append("Runtime Manifest schema 16 requires an attachment_frames array.")
+		errors.append("Runtime Manifest schema %d requires an attachment_frames array." % MANIFEST_SCHEMA_VERSION)
 		return errors
 	if not manifest.get("regions", null) is Array:
-		errors.append("Runtime Manifest schema 16 requires an optional regions array.")
+		errors.append("Runtime Manifest schema %d requires an optional regions array." % MANIFEST_SCHEMA_VERSION)
 	else:
 		var region_ids: Dictionary = {}
 		for raw_region in manifest.get("regions", []):
@@ -486,6 +597,8 @@ static func manifest_validation_issues(manifest: Dictionary) -> Array[String]:
 		if str(component.get("kind", "")) == "asset_reference":
 			if component.has("mesh") or component.has("contour_stroke_mesh") or component.has("closed_region_mesh") or component.has("projection_depth_corners"):
 				errors.append("%s: Asset References must not contain owned geometry meshes." % label)
+			if not _is_lower_snake_case(str(component.get("role", ""))):
+				errors.append("%s: an Asset Reference requires a lower_snake_case role." % label)
 			continue
 		if not component.get("contour_stroke_mesh", null) is Dictionary:
 			errors.append("%s: ordinary Runtime Components require contour_stroke_mesh." % label)
@@ -659,6 +772,9 @@ static func _build_reference_component(component: Dictionary, source: Dictionary
 			"name": str(component.get("name", "")),
 			"kind": "asset_reference",
 			"source_asset_key": source_asset_key,
+			# What this member stands for in the assembly. Unauthored means the
+			# member's own Key, so the role is always readable and never guessed.
+			"role": WorldDocumentService.reference_role(component) if not WorldDocumentService.reference_role(component).is_empty() else source_asset_key,
 			"parent_component_id": parent_component_id,
 			"z_index": int(component.get("z_index", 0)),
 			"projection_depth_meters": maxf(0.0, float(component.get("projection_depth_cm", DEFAULT_PROJECTION_DEPTH_CM))) * 0.01,
