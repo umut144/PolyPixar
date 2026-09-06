@@ -10,7 +10,7 @@ extends RefCounted
 # functions that do read editor state, _serialize_editor_state and
 # _serialize_world_settings, stay in main.gd for that reason.
 
-const SCHEMA_VERSION := 63
+const SCHEMA_VERSION := 64
 const REGION_GEOMETRY_AUTHORED := "authored"
 const REGION_GEOMETRY_COMPONENT := "component"
 const REGION_GEOMETRY_SOURCES := [REGION_GEOMETRY_AUTHORED, REGION_GEOMETRY_COMPONENT]
@@ -40,7 +40,13 @@ const ASSET_TYPE_TERRAIN := "terrain"
 const ASSET_TYPE_ITEMS := "items"
 const ASSET_TYPE_ICON := "icon"
 const ASSET_TYPE_SYMBOLS := "symbols"
-const ASSET_TYPES := [ASSET_TYPE_CHARACTER, ASSET_TYPE_PROPS, ASSET_TYPE_WEAPONS, ASSET_TYPE_TERRAIN, ASSET_TYPE_ITEMS, ASSET_TYPE_ICON, ASSET_TYPE_SYMBOLS]
+# A Set is an Asset whose visible Components are References to its members. It
+# is a composition, not an eighth category, so it is kept out of
+# SINGLE_ASSET_TYPES: that list is what the Single view and the Outliner Asset
+# filter offer.
+const ASSET_TYPE_SET := "set"
+const SINGLE_ASSET_TYPES := [ASSET_TYPE_CHARACTER, ASSET_TYPE_PROPS, ASSET_TYPE_WEAPONS, ASSET_TYPE_TERRAIN, ASSET_TYPE_ITEMS, ASSET_TYPE_ICON, ASSET_TYPE_SYMBOLS]
+const ASSET_TYPES := [ASSET_TYPE_CHARACTER, ASSET_TYPE_PROPS, ASSET_TYPE_WEAPONS, ASSET_TYPE_TERRAIN, ASSET_TYPE_ITEMS, ASSET_TYPE_ICON, ASSET_TYPE_SYMBOLS, ASSET_TYPE_SET]
 
 
 static func serialize_bezier_points(points: Array) -> Array:
@@ -407,6 +413,7 @@ static func deserialize_component(component_data: Dictionary, source_schema_vers
 		component["region_geometry_source"] = normalize_region_geometry_source(component_data.get("region_geometry_source", ""))
 	if component_type == "reference":
 		component["reference_instance_scale"] = deserialize_vector(component_data.get("reference_instance_scale", [1.0, 1.0]), Vector2.ONE)
+		component["role"] = normalized_reference_role(component_data.get("role", ""))
 	if serialized_contour_stroke_width_is_valid(component_data):
 		component["contour_stroke_width_px"] = float(component_data["contour_stroke_width_px"])
 	return component
@@ -1109,6 +1116,21 @@ static func motion_path_by_id(motion_paths: Array, path_id: String) -> Dictionar
 
 static func asset_type(asset: Dictionary) -> String:
 	return normalize_asset_type(asset.get("asset_type", ASSET_TYPE_CHARACTER))
+
+
+static func is_set_asset(asset: Dictionary) -> bool:
+	return asset_type(asset) == ASSET_TYPE_SET
+
+
+static func normalized_reference_role(value) -> String:
+	# The role a Reference plays in its Set. Empty means unauthored: Runtime
+	# Export then falls back to the member's own Asset Key, so the role is
+	# always present at the boundary and never has to be guessed.
+	return str(value).strip_edges().to_lower()
+
+
+static func reference_role(component: Dictionary) -> String:
+	return normalized_reference_role(component.get("role", ""))
 
 
 static func is_region(component: Dictionary) -> bool:

@@ -13,6 +13,7 @@ extends VBoxContainer
 
 signal asset_authored_facing_selected(index: int, option: OptionButton)
 signal asset_type_selected(index: int, option: OptionButton)
+signal reference_role_requested(new_role: String)
 signal asset_pivot_property_changed(value: float, property_name: String)
 signal asset_rename_requested(new_name: String)
 signal asset_root_position_changed(value: float, property_name: String)
@@ -89,6 +90,7 @@ var asset_root_scale_rebase_button: Button
 var asset_scale_rebase_button: Button
 var asset_authored_facing_option: OptionButton
 var asset_type_option: OptionButton
+var reference_role_editor: LineEdit
 var asset_name_editor: LineEdit
 var component_name_editor: LineEdit
 
@@ -130,6 +132,7 @@ func _reset_field_cache() -> void:
 	asset_scale_rebase_button = null
 	asset_authored_facing_option = null
 	asset_type_option = null
+	reference_role_editor = null
 	asset_name_editor = null
 	component_name_editor = null
 
@@ -160,12 +163,17 @@ func rebuild() -> void:
 		# The one Create view does not carry the type any more, so the Asset
 		# root is where it is read and changed.
 		add_child(EditorWidgets.create_inspector_field_label("Asset Type"))
-		var asset_type_items: Array = []
-		for asset_type in WorldDocumentService.ASSET_TYPES:
-			asset_type_items.append({"label": asset_type.capitalize(), "metadata": asset_type})
-		asset_type_option = EditorWidgets.create_option_field(asset_type_items,
-			WorldDocumentService.asset_type(asset), asset_type_selected.emit)
-		add_child(asset_type_option)
+		if WorldDocumentService.is_set_asset(asset):
+			# A Set's composition is not a category to switch: changing it would
+			# leave member References in an Asset that has no place for them.
+			add_child(EditorWidgets.create_inspector_field_label("Set"))
+		else:
+			var asset_type_items: Array = []
+			for asset_type in WorldDocumentService.SINGLE_ASSET_TYPES:
+				asset_type_items.append({"label": asset_type.capitalize(), "metadata": asset_type})
+			asset_type_option = EditorWidgets.create_option_field(asset_type_items,
+				WorldDocumentService.asset_type(asset), asset_type_selected.emit)
+			add_child(asset_type_option)
 		add_child(EditorWidgets.create_inspector_section("Initial Pose", section_toggled.emit))
 		add_child(EditorWidgets.create_inspector_field_label("Authored Facing"))
 		var facing_items: Array = []
@@ -395,6 +403,20 @@ func rebuild() -> void:
 			hierarchy_parent_items.append({"label": str(candidate.get("name", "Component")), "metadata": candidate_id})
 		add_child(EditorWidgets.create_option_field(hierarchy_parent_items,
 			current_parent_id, component_hierarchy_parent_selected.emit))
+	if WorldDocumentService.is_set_asset(asset) and WorldDocumentService.is_reference_component(component):
+		# What this member is in the assembly. The Reference already carries
+		# which member and where it sits; the role says what it stands for.
+		add_child(EditorWidgets.create_inspector_section("Set Role", section_toggled.emit))
+		reference_role_editor = EditorWidgets.create_name_editor(
+			WorldDocumentService.reference_role(component), "Role, e.g. rope_post")
+		reference_role_editor.text_submitted.connect(reference_role_requested.emit)
+		reference_role_editor.focus_exited.connect(func() -> void:
+			reference_role_requested.emit(reference_role_editor.text)
+		)
+		add_child(reference_role_editor)
+		var role_hint := EditorWidgets.create_inspector_field_label("Empty exports the member's own Asset Key.")
+		role_hint.add_theme_color_override("font_color", Color("#9aa3b2"))
+		add_child(role_hint)
 	var draw_mode := WorldDocumentService.component_draw_mode(component)
 	add_child(EditorWidgets.create_inspector_field_label("Draw Mode: %s" % WorldDocumentService.draw_mode_display_name(draw_mode)))
 	if not WorldDocumentService.is_region(component) and (WorldDocumentService.is_reference_component(component) or draw_mode in [WorldDocumentService.DRAW_MODE_CLOSED_LOOP, WorldDocumentService.DRAW_MODE_PRIMITIVE]):

@@ -756,7 +756,7 @@ func _test_geometry_sampling_ui_shell() -> void:
 	application._select_submodule("Create", "Single", create_section)
 	_expect(application.active_module == "Create" and application.active_create_submodule == "Single" and application.canvas_view.visible and not application.geometry_sampling_workspace.visible, "Selecting Create Single should immediately render the shared asset workspace.")
 	_expect(application._find_section("Mesh").active_submodule.is_empty() and application._find_section("Style").active_submodule.is_empty(), "Only the selected module should remain highlighted across always-expanded categories.")
-	_expect(create_section.content_list.get_child_count() == 1 and application.create_action_button.text == "Create Asset", "Create should expose one Single view instead of one module per Asset type.")
+	_expect(create_section.content_list.get_child_count() == 2 and application.create_action_button.text == "Create Asset", "Create should expose one view per composition instead of one module per Asset type.")
 	_expect(_create_asset_of_type(application, "Shield", "props") == "props", "The New Asset dialog should persist the stable props Asset type.")
 	_expect(_create_asset_of_type(application, "Sword", "weapons") == "weapons", "The New Asset dialog should persist the stable weapons Asset type.")
 	_expect(_create_asset_of_type(application, "Potion Flask", "items") == "items", "The New Asset dialog should persist the stable items Asset type.")
@@ -767,9 +767,9 @@ func _test_geometry_sampling_ui_shell() -> void:
 	application._on_asset_type_selected(0, application.asset_type_input)
 	_expect(str(application.assets[-1].get("asset_type", "")) == "character", "The Asset root Inspector should be able to correct an Asset type after creation.")
 	var single_modules := true
-	for asset_type in WorldDocumentService.ASSET_TYPES:
+	for asset_type in WorldDocumentService.SINGLE_ASSET_TYPES:
 		single_modules = single_modules and application._asset_type_create_submodule(str(asset_type)) == "Single"
-	_expect(WorldDocumentService.normalize_asset_type("") == "character" and single_modules and application._normalized_create_submodule("Props") == "Single", "Missing Asset types should normalize to Character while every valid type maps to the Single Create module.")
+	_expect(WorldDocumentService.normalize_asset_type("") == "character" and single_modules and application._asset_type_create_submodule(WorldDocumentService.ASSET_TYPE_SET) == "Set" and application._normalized_create_submodule("Props") == "Single", "Missing Asset types should normalize to Character while the seven map to Single and a Set to its own module.")
 	for asset in application.assets:
 		application.expanded_assets[str(asset.get("id", ""))] = false
 	var single_view_labels := _outliner_asset_labels(application)

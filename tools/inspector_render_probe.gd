@@ -1,6 +1,6 @@
 # Inspector render probe.
 #
-# Renders the Inspector in 53 fixed states and prints one line per control with
+# Renders the Inspector in 55 fixed states and prints one line per control with
 # the properties a reader would notice: values, ranges, item lists, selections,
 # pressed state, disabled state, captions, colours and tooltips. It asserts
 # nothing on its own. It is run before and after a change that is meant to leave
@@ -15,7 +15,8 @@
 # a parse error here means the probe rendered nothing and the empty diff means
 # nothing.
 #
-# The state list covers Create (Asset, Component, Group, Guide, weapon Guide,
+# The state list covers Create (Asset, Set Asset root, Set member Reference with
+# its Role, Component, Group, Guide, weapon Guide,
 # grouped Component, Contour Component, Circle, valid and invalid Hole, Hole Edge
 # modes, and Ellipse Primitive, authored
 # and Component-geometry Regions, two
@@ -131,12 +132,23 @@ func _init() -> void:
 	var inherited_region := authored_region.duplicate(true)
 	inherited_region.merge({"id": "component_9", "name": "hurt_region", "region_type": "hurt",
 		"region_geometry_source": WorldDocumentService.REGION_GEOMETRY_COMPONENT}, true)
+	# A Set carries no geometry of its own: its visible Components are
+	# References to its members, and each one says what role it plays.
+	var set_member := {"points": [], "edges": [], "chains": [], "id": "component_13",
+		"name": "post_left", "visibility": true, "type": "reference",
+		"parent_component_id": "", "topology_role": "outer", "role": "rope_post",
+		"source_asset_id": "asset_2",
+		"transform": WorldDocumentService.default_component_transform()}
 	var assets: Array[Dictionary] = [{"id": "asset_1", "name": "Wizard", "visibility": true,
 		"components": [comp, arm, outline, circle, ellipse, mesh_body, hole_reference, authored_region, inherited_region],
 		"groups": [group], "guides": [guide, weapon_guide, cut_guide, spine_guide],
 		"asset_pivot": Vector2(5, 6), "root_position": Vector2(1, 2), "root_scale": Vector2(1, 1)},
 		{"id": "asset_2", "name": "Orb", "visibility": true,
 			"components": [hole_source], "groups": [], "guides": []}]
+	var set_asset := {"id": "asset_3", "name": "Bridge", "visibility": true,
+		"asset_type": WorldDocumentService.ASSET_TYPE_SET,
+		"components": [set_member], "groups": [], "guides": [],
+		"asset_pivot": Vector2.ZERO, "root_position": Vector2.ZERO, "root_scale": Vector2.ONE}
 	app.assets = assets
 	app.selected_asset_id = "asset_1"
 	app.expanded_assets["asset_1"] = true
@@ -209,12 +221,20 @@ func _init() -> void:
 		{"m": "Create", "sub": "Single", "comp": "component_9", "grp": "", "gd": ""},
 		{"m": "Create", "sub": "Single", "comp": "", "grp": "", "gd": "guide_3"},
 		{"m": "Create", "sub": "Single", "comp": "component_1", "grp": "", "gd": "", "multi": true},
+		{"m": "Create", "sub": "Set", "comp": "", "grp": "", "gd": "", "asset": "asset_3"},
+		{"m": "Create", "sub": "Set", "comp": "component_13", "grp": "", "gd": "", "asset": "asset_3"},
 	]
 	for c in cases:
 		# Keep the new Hole fixture out of every pre-existing state so this probe
 		# still detects unrelated rendering changes byte-for-byte.
 		assets[0]["components"].erase(direct_hole)
 		assets[0]["components"].erase(bezier_hole)
+		# The Set fixture is kept out of every other state for the same reason
+		# the Hole fixtures are: an Asset the Motion dropdowns would list moves
+		# lines that have nothing to do with the change under test.
+		assets.erase(set_asset)
+		if str(c.get("asset", "")) == "asset_3":
+			assets.append(set_asset)
 		direct_hole["parent_component_id"] = "" if bool(c.get("orphan_hole", false)) else "component_1"
 		if str(c["comp"]) == "component_11":
 			assets[0]["components"].append(direct_hole)
@@ -225,6 +245,7 @@ func _init() -> void:
 		elif c["m"] == "Mesh": app.active_geometry_submodule = str(c["sub"])
 		elif c["m"] == "Motion": app.active_motion_submodule = str(c["sub"])
 		else: app.active_style_submodule = str(c["sub"])
+		app.selected_asset_id = str(c.get("asset", "asset_1"))
 		app.selected_component_id = str(c["comp"])
 		app.selected_group_id = str(c["grp"])
 		app.selected_guide_id = str(c["gd"])
@@ -400,7 +421,8 @@ func _init() -> void:
 		app._render_inspector()
 		var out: Array = []
 		_collect(app.inspector_content, out)
-		print("### %s/%s comp=%s grp=%s guide=%s" % [c["m"], c["sub"], c["comp"], c["grp"], c["gd"]])
+		print("### %s/%s comp=%s grp=%s guide=%s%s" % [c["m"], c["sub"], c["comp"], c["grp"], c["gd"],
+			"" if not c.has("asset") else " asset=%s" % str(c["asset"])])
 		for l in out: print(l)
 	app.free()
 	quit(0)

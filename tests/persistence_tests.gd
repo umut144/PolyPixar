@@ -121,6 +121,23 @@ func _test_asset_deserialization_migrations() -> void:
 	_expect(str(current_components[1].get("name", "")) == "Component",
 		"From schema 43 on, a missing name is not recovered from a leftover Semantic Key.")
 
+	# Schema 64 is additive: a Reference without a role loads with none, which
+	# Runtime Export reads as the member's own Asset Key.
+	var references := {"schema_version": WorldDocumentService.SCHEMA_VERSION, "id": "asset_set",
+		"asset_type": WorldDocumentService.ASSET_TYPE_SET,
+		"components": [
+			{"id": "component_1", "name": "post_left", "type": "reference",
+				"source_asset_id": "asset_post", "role": " Rope_Post ", "points": [], "edges": [], "chains": []},
+			{"id": "component_2", "name": "plank_01", "type": "reference",
+				"source_asset_id": "asset_plank", "points": [], "edges": [], "chains": []},
+		]}
+	var reference_asset: Dictionary = WorldDocumentService.deserialize_asset(references, "asset_set")
+	var reference_components: Array = reference_asset.get("components", [])
+	_expect(WorldDocumentService.is_set_asset(reference_asset)
+		and WorldDocumentService.reference_role(reference_components[0]) == "rope_post"
+		and WorldDocumentService.reference_role(reference_components[1]).is_empty(),
+		"A Set should load with its type, and a member role should normalize while a missing one stays unauthored.")
+
 	var blink := {"schema_version": 18, "id": "act_1", "primitive": MotionActEvaluator.BLINK,
 		"parameters": {"anticipation_share": 0.18}}
 	var migrated_blink := WorldDocumentService.normalize_motion_act(blink, "act_1")

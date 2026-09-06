@@ -8,19 +8,37 @@ contains always-expanded Create, Mesh, and Style categories. A single
 `active_module` plus its category-specific submodule identifies the one active
 workspace.
 
-Create has one database view over the Asset implementation, `Single`. The
+Create has two modules. `Single` is one database view over the Asset
+implementation; `Set` is a composition above it. The
 stable persisted discriminator `asset_type` — `character`, `props`, `weapons`,
 `terrain`, `items`, `icon`, `symbols`; missing or invalid values normalize to
 `character` — is unchanged and still exported, but it no longer selects a view.
 It is authored in the New Asset dialog and corrected on the Asset root in the
 Inspector.
 
-Create, Mesh and Style share one multi-select Outliner Asset filter. Its seven
+A **Set** is an Asset with `asset_type: "set"` whose visible Components are
+Asset References to its members. Nothing new is persisted for the assembly: the
+Reference already carries which member (`source_asset_id`, exported as
+`source_asset_key`), where it sits (its own transform, canonicalized at export)
+and in what order (`z_index`). What a Reference gains is an optional `role` —
+free `lower_snake_case`, empty meaning unauthored — because a Set may fill one
+role more than once and the Component name is unique per Asset. A Set is
+authored from the `Set` module: its Asset root offers members instead of draw
+modes, its Outliner entry has one `Members` section, and a member may be any
+Asset that is not a Set and does not already reach the owner through References.
+`_reference_cycle_issue` in `main.gd` is that check, and it guards the Symbol
+Reference path as well; a cycle is a consumer's infinite recursion, so it is
+rejected where it would be authored.
+
+Single, Mesh and Style share one multi-select Outliner Asset filter. Its seven
 checkbox states are persisted in `editor_state`; the filter is applied together
 with the Outliner search and does not alter the selected Asset or document
-data. In Create it is what selects among the seven types, so a World saved
+data. In Single it is what selects among the seven types, so a World saved
 below schema 63 — where the filter gated Mesh and Style only and could be
-stored with every type switched off — has it restored once on load.
+stored with every type switched off — has it restored once on load. The
+`Set` module has no checkbox row of its own and is handed the one type it
+lists, so the Outliner keeps applying exactly one rule; `set` is absent from
+the seven, which is why Sets never appear in Mesh or Style.
 
 Mesh is the user-facing name of the derived geometry pipeline. Existing
 internal `geometry_*` identifiers remain technical names, while UI copy uses
@@ -63,7 +81,7 @@ export data.
 - `CreateInspectorView` draws the Create module's Inspector under the same
   contract as `OutlinerView`: `main.gd` pushes a snapshot in through `set_document`,
   `set_selection`, `set_resolved_selection` and `set_mode`, `rebuild()` draws from
-  that snapshot alone, and every user action leaves as one of 44 intent signals.
+  that snapshot alone, and every user action leaves as one of 45 intent signals.
   The two lists that need the document to resolve — the Components of a multi
   selection and the Point ids that still exist — are computed in `main.gd` and
   handed over, so the view never resolves a stale id itself. The controls the
@@ -128,12 +146,14 @@ the four views is visible, resolves that view's context and calls `rebuild()`.
   `DRAW_MODE_PRIMITIVE`, `ROLE_OUTER`, `ROLE_HOLE`, `ROLE_CUT` and the
   predicates that read them — `component_draw_mode`, `is_closed_loop`,
   `is_contour`, `is_primitive`, `topology_role`, `is_outer_body` — and the
-  seven `ASSET_TYPE_*` constants (`ASSET_TYPES`) behind `asset_type` and
-  `normalize_asset_type` for the Outliner Asset filter; `main.gd`'s
-  `CREATE_SUBMODULE_BY_ASSET_TYPE` maps one to its Create module, which is
-  `Single` for all seven, and `_normalized_create_submodule` reads any other
-  value — including the seven module names Worlds below schema 63 stored — as
-  `Single`. `AssetGuide` owns the Guide types the same way, plus the Guide scope
+  eight `ASSET_TYPE_*` constants behind `asset_type` and
+  `normalize_asset_type`, split into `SINGLE_ASSET_TYPES` (the seven the Asset
+  filter and the New Asset dialog offer) and `ASSET_TYPES` (those plus `set`),
+  plus `is_set_asset` and the `reference_role` normalization; `main.gd`'s
+  `CREATE_SUBMODULE_BY_ASSET_TYPE` maps one to its Create module — `Single` for
+  all seven, `Set` for `set` — and `_normalized_create_submodule` reads any
+  other value, including the seven module names Worlds below schema 63 stored,
+  as `Single`. `AssetGuide` owns the Guide types the same way, plus the Guide scope
   vocabulary — `SCOPE_COMPONENT`, `SCOPE_GROUP`, `is_group_scoped`,
   `scope_component_id`, `scope_group_id`, `scope_target_id` — read by
   `ComponentHierarchy.guide_world_transform`, the one place a Guide's scope
@@ -245,8 +265,8 @@ one of the seven Asset-type names, and every such value reads as `Single`.
 An Asset contains:
 
 - stable ID, name, visibility, and `asset_type` — `character`, `props`,
-  `weapons`, `terrain`, `items`, `icon`, or `symbols`; a missing or invalid
-  value normalizes to `character`;
+  `weapons`, `terrain`, `items`, `icon`, `symbols`, or the composition `set`;
+  a missing or invalid value normalizes to `character`;
 - typed Asset-level `authored_facing` presentation metadata (`left`, `right`,
   `neutral`, `top`, or `down`). It is edited only on the Asset root in the
   Inspector's `Initial Pose` group, uses the `AssetPresentation.AuthoredFacing`
@@ -272,9 +292,10 @@ override, catch-parent reference, `projection_depth_cm`, and point number
 display setting. It has no Material assignment.
 
 Its `type` is `component`, `reference`, or `region`. A Reference carries
-`source_asset_id` as the editor's internal link to another Asset and a signed
-`reference_instance_scale`; runtime export resolves the link to
-`source_asset_key` and never copies the referenced geometry.
+`source_asset_id` as the editor's internal link to another Asset, a signed
+`reference_instance_scale`, and an optional `role` naming what it stands for in
+a Set; runtime export resolves the link to `source_asset_key` and never copies
+the referenced geometry.
 
 The free-form `name` is unique within its Asset, case-insensitively, and is
 the authored identity used by runtime animation bindings: runtime animation

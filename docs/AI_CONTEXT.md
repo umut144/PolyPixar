@@ -10,7 +10,7 @@ that another document owns.
 
 The left rail is always expanded and exposes exactly these categories:
 
-- `Create`: `Single`
+- `Create`: `Single`, `Set`
 - `Mesh`: `Sampling`, `Seeding`, `Meshing`
 - `Style`: `Weighting`
 
@@ -23,8 +23,11 @@ application, and UV and SDF have no authoring surface any more.
 `Single` is the one view over the Asset implementation. The stable
 `asset_type` remains persisted and exported, but it no longer opens a view of
 its own: the Outliner search and the shared multi-select Asset filter select
-among the seven types. Mesh is the user-facing name of the derived geometry
-pipeline; the `geometry_*` identifiers in code are its technical names.
+among the seven types. `Set` is a different thing, not an eighth category: a
+Set is an Asset whose visible Components are References to its members, each
+with the role it plays in the assembly. Mesh is the user-facing name of the
+derived geometry pipeline; the `geometry_*` identifiers in code are its
+technical names.
 
 ## What the data is
 

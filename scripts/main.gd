@@ -1,7 +1,7 @@
 extends Control
 
 const SELECTION_MIRROR_SERVICE_SCRIPT = preload("res://scripts/selection_mirror_service.gd")
-const CREATE_SUBMODULES := ["Single"]
+const CREATE_SUBMODULES := ["Single", "Set"]
 const CREATE_SUBMODULE_BY_ASSET_TYPE := {
 	WorldDocumentService.ASSET_TYPE_CHARACTER: "Single",
 	WorldDocumentService.ASSET_TYPE_PROPS: "Single",
@@ -10,6 +10,7 @@ const CREATE_SUBMODULE_BY_ASSET_TYPE := {
 	WorldDocumentService.ASSET_TYPE_ITEMS: "Single",
 	WorldDocumentService.ASSET_TYPE_ICON: "Single",
 	WorldDocumentService.ASSET_TYPE_SYMBOLS: "Single",
+	WorldDocumentService.ASSET_TYPE_SET: "Set",
 }
 const GEOMETRY_SUBMODULES := ["Sampling", "Seeding", "Meshing"]
 const STYLE_SUBMODULES := ["Weighting"]
@@ -181,6 +182,7 @@ var component_add_guide_menu: PopupMenu
 var component_add_weapon_guide_menu: PopupMenu
 var component_add_region_menu: PopupMenu
 var component_add_reference_menu: PopupMenu
+var set_member_menu: PopupMenu
 var component_context_menu: PopupMenu
 var group_dialog: ConfirmationDialog
 var group_name_input: LineEdit
@@ -903,7 +905,7 @@ func _build_ui() -> void:
 	filter_grid.columns = 2
 	filter_grid.add_theme_constant_override("h_separation", 4)
 	filter_grid.add_theme_constant_override("v_separation", 0)
-	for asset_type in WorldDocumentService.ASSET_TYPES:
+	for asset_type in WorldDocumentService.SINGLE_ASSET_TYPES:
 		var type_checkbox := CheckBox.new()
 		type_checkbox.text = asset_type.capitalize()
 		type_checkbox.button_pressed = bool(outliner_asset_type_filters.get(asset_type, true))
@@ -1027,6 +1029,7 @@ func _build_ui() -> void:
 	create_inspector_view.add_theme_constant_override("separation", 2)
 	create_inspector_view.asset_authored_facing_selected.connect(_on_asset_authored_facing_selected)
 	create_inspector_view.asset_type_selected.connect(_on_asset_type_selected)
+	create_inspector_view.reference_role_requested.connect(_on_reference_role_requested)
 	create_inspector_view.asset_pivot_property_changed.connect(_on_asset_pivot_property_changed)
 	create_inspector_view.asset_rename_requested.connect(_rename_selected_asset)
 	create_inspector_view.asset_root_position_changed.connect(_on_asset_root_position_changed)
@@ -1938,6 +1941,13 @@ func _create_component_add_menu() -> void:
 	EditorWidgets.style_popup_menu(component_add_region_menu)
 	EditorWidgets.style_popup_menu(component_add_reference_menu)
 	add_child(component_add_menu)
+	# A Set is assembled from its members, so its Asset root offers members
+	# rather than draw modes.
+	set_member_menu = PopupMenu.new()
+	set_member_menu.name = "SetMemberMenu"
+	set_member_menu.id_pressed.connect(_on_set_member_selected)
+	EditorWidgets.style_popup_menu(set_member_menu)
+	add_child(set_member_menu)
 
 
 func _create_component_context_menu() -> void:
@@ -2078,7 +2088,7 @@ func _update_context_action_button() -> void:
 	if not show_asset_create_controls and is_instance_valid(frame_popup):
 		frame_popup.hide()
 	if active_module == "Create" and active_create_submodule in CREATE_SUBMODULES:
-		create_action_button.text = "Create Asset"
+		create_action_button.text = "Create Set" if active_create_submodule == "Set" else "Create Asset"
 	elif active_module == "Style" and active_style_submodule == "Weighting":
 		create_action_button.text = "Create Weighting Style"
 	elif active_module == "Motion" and active_motion_submodule == "Path":
@@ -2485,6 +2495,7 @@ func _save_world() -> void:
 				serialized_component["region_geometry_source"] = WorldDocumentService.normalize_region_geometry_source(component.get("region_geometry_source", ""))
 			if _is_reference_component(component):
 				serialized_component["reference_instance_scale"] = WorldDocumentService.serialize_vector(Vector2(component.get("reference_instance_scale", Vector2.ONE)))
+				serialized_component["role"] = WorldDocumentService.reference_role(component)
 			if _component_has_contour_stroke_width_override(component):
 				serialized_component["contour_stroke_width_px"] = float(component["contour_stroke_width_px"])
 			asset_data["components"].append(serialized_component)
@@ -6055,9 +6066,20 @@ func _add_info_mode_option(text: String, active: bool) -> void:
 func _open_new_asset_dialog() -> void:
 	asset_name_input.text = ""
 	asset_dialog.dialog_text = "Enter an asset name"
+	asset_dialog.title = "New %s" % ("Set" if active_create_submodule == "Set" else "Asset")
+	if is_instance_valid(asset_type_input):
+		asset_type_input.visible = active_create_submodule != "Set"
 	_sync_new_asset_type_input()
 	asset_dialog.popup_centered()
 	asset_name_input.grab_focus()
+
+
+func _create_submodule_new_asset_type() -> String:
+	# The module fixes the composition; within Single the dialog fixes the
+	# category. Both end up in the one persisted discriminator.
+	if active_create_submodule == "Set":
+		return WorldDocumentService.ASSET_TYPE_SET
+	return WorldDocumentService.normalize_asset_type(new_asset_type)
 
 
 func _sync_new_asset_type_input() -> void:
@@ -6071,7 +6093,7 @@ func _sync_new_asset_type_input() -> void:
 
 func _asset_type_option_items() -> Array:
 	var items: Array = []
-	for asset_type in WorldDocumentService.ASSET_TYPES:
+	for asset_type in WorldDocumentService.SINGLE_ASSET_TYPES:
 		items.append({"label": _asset_type_display_name(str(asset_type)), "metadata": str(asset_type)})
 	return items
 
@@ -6086,6 +6108,40 @@ func _on_new_asset_type_selected(index: int, option: OptionButton) -> void:
 	if index < 0 or index >= option.item_count:
 		return
 	new_asset_type = WorldDocumentService.normalize_asset_type(option.get_item_metadata(index))
+
+
+func _on_reference_role_requested(new_role: String) -> void:
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if component.is_empty() or not _is_reference_component(component):
+		return
+	var role := WorldDocumentService.normalized_reference_role(new_role)
+	if role == WorldDocumentService.reference_role(component):
+		return
+	var role_error := _reference_role_validation_error(role)
+	if not role_error.is_empty():
+		_show_status_message(role_error)
+		_invalidate_render(RENDER_INSPECTOR)
+		return
+	_record_direct_change()
+	component["role"] = role
+	_invalidate_render(RENDER_DOCUMENT)
+
+
+func _reference_role_validation_error(raw_role: String) -> String:
+	# An empty role is not an error: it means unauthored, and Runtime Export
+	# then falls back to the member's own Asset Key.
+	var role := raw_role.strip_edges()
+	if role.is_empty():
+		return ""
+	if role.begins_with("_") or role.ends_with("_") or role.contains("__"):
+		return "Use lower_snake_case for the Set Role, e.g. rope_post."
+	for character in role:
+		var code := character.unicode_at(0)
+		if not ((code >= 97 and code <= 122) or (code >= 48 and code <= 57) or code == 95):
+			return "Use lower_snake_case for the Set Role, e.g. rope_post."
+	if role.unicode_at(0) >= 48 and role.unicode_at(0) <= 57:
+		return "A Set Role must start with a lowercase letter."
+	return ""
 
 
 func _on_asset_type_selected(index: int, option: OptionButton) -> void:
@@ -6119,7 +6175,7 @@ func _confirm_asset_creation() -> void:
 	_record_direct_change()
 	var asset_id := "asset_%d" % next_asset_id
 	next_asset_id += 1
-	assets.append({"id": asset_id, "name": asset_name, "asset_type": WorldDocumentService.normalize_asset_type(new_asset_type), "authored_facing": AssetPresentation.AuthoredFacing.NEUTRAL, "visibility": true, "asset_pivot": Vector2.ZERO, "root_position": Vector2.ZERO, "root_scale": Vector2.ONE, "reference_image": WorldDocumentService.default_reference_image(), "animation": MotionWorkspace.create_default_animation_document(), "components": [], "groups": [], "guides": []})
+	assets.append({"id": asset_id, "name": asset_name, "asset_type": _create_submodule_new_asset_type(), "authored_facing": AssetPresentation.AuthoredFacing.NEUTRAL, "visibility": true, "asset_pivot": Vector2.ZERO, "root_position": Vector2.ZERO, "root_scale": Vector2.ONE, "reference_image": WorldDocumentService.default_reference_image(), "animation": MotionWorkspace.create_default_animation_document(), "components": [], "groups": [], "guides": []})
 	selected_asset_id = asset_id
 	selected_component_id = ""
 	selected_component_ids.clear()
@@ -6392,7 +6448,7 @@ func _render_outliner() -> void:
 	outliner_view.set_documents(assets, motion_paths, motion_sequences)
 	outliner_view.set_module(active_module, active_create_submodule, active_geometry_submodule, active_motion_submodule)
 	outliner_view.set_selection(selected_asset_id, selected_component_id, selected_component_ids, selected_group_id, selected_guide_id, selected_motion_path_id, selected_motion_sequence_id, selected_weighting_style_id, motion_act_preview_asset_id)
-	outliner_view.set_filters(outliner_search_input.text.strip_edges().to_lower() if is_instance_valid(outliner_search_input) else "", outliner_asset_type_filters)
+	outliner_view.set_filters(outliner_search_input.text.strip_edges().to_lower() if is_instance_valid(outliner_search_input) else "", _outliner_module_asset_type_filters())
 	outliner_view.set_expansion(expanded_assets, _outliner_focus_asset_id())
 	outliner_view.set_row_status(_outliner_row_status())
 	outliner_view.set_geometry_rows(_geometry_outliner_rows())
@@ -6635,15 +6691,24 @@ func _outliner_drop_data_from_view(asset_id: String, target_id: String, payload:
 	_outliner_drop_data(Vector2.ZERO, payload, asset_id, target_id)
 
 
+func _outliner_module_asset_type_filters() -> Dictionary:
+	# The Outliner applies one rule: does this Asset's type pass the filter it
+	# was handed. The Set module has no checkbox row of its own, so it is handed
+	# the single type it lists.
+	if active_module == "Create" and active_create_submodule == "Set":
+		return {WorldDocumentService.ASSET_TYPE_SET: true}
+	return outliner_asset_type_filters
+
+
 func _update_outliner_asset_type_filter_visibility() -> void:
 	if not is_instance_valid(outliner_asset_type_filter_panel):
 		return
-	outliner_asset_type_filter_panel.visible = active_module in ["Create", "Mesh", "Style"]
+	outliner_asset_type_filter_panel.visible = (active_module == "Create" and active_create_submodule == "Single") or active_module in ["Mesh", "Style"]
 
 
 static func _default_outliner_asset_type_filters() -> Dictionary:
 	var filters: Dictionary = {}
-	for asset_type in WorldDocumentService.ASSET_TYPES:
+	for asset_type in WorldDocumentService.SINGLE_ASSET_TYPES:
 		filters[asset_type] = true
 	return filters
 
@@ -7484,10 +7549,77 @@ func _open_component_dialog(asset_id: String, anchor: Control) -> void:
 	selected_component_id = ""
 	selected_component_ids.clear()
 	selected_guide_id = ""
+	if WorldDocumentService.is_set_asset(_get_asset(asset_id)):
+		_open_set_member_menu(asset_id, anchor)
+		return
 	component_draw_mode_menu.set_meta("asset_id", asset_id)
 	component_draw_mode_menu.set_meta("parent_component_id", "")
 	component_draw_mode_menu.position = Vector2i(anchor.global_position + Vector2(0.0, anchor.size.y))
 	component_draw_mode_menu.popup()
+
+
+func _open_set_member_menu(asset_id: String, anchor: Control) -> void:
+	set_member_menu.clear()
+	for source_asset in _reference_source_candidates(asset_id):
+		set_member_menu.add_item(str(source_asset.get("name", "Asset")), set_member_menu.item_count)
+		set_member_menu.set_item_metadata(set_member_menu.item_count - 1, str(source_asset.get("id", "")))
+	if set_member_menu.item_count == 0:
+		_show_status_message("No Asset can join this Set yet: a member is an ordinary Asset that does not reference this one.")
+		return
+	set_member_menu.set_meta("asset_id", asset_id)
+	set_member_menu.position = Vector2i(anchor.global_position + Vector2(0.0, anchor.size.y))
+	set_member_menu.popup()
+
+
+func _reference_source_candidates(owner_asset_id: String) -> Array[Dictionary]:
+	# A member is an ordinary Asset. Sets are excluded because a Set of Sets has
+	# no Canvas preview and no consumer asked for one; the cycle check keeps the
+	# remaining choices resolvable.
+	var candidates: Array[Dictionary] = []
+	for source_asset in assets:
+		if not source_asset is Dictionary or WorldDocumentService.is_set_asset(source_asset):
+			continue
+		if not _reference_cycle_issue(owner_asset_id, str(source_asset.get("id", ""))).is_empty():
+			continue
+		candidates.append(source_asset)
+	candidates.sort_custom(WorldDocumentService.sort_named_documents)
+	return candidates
+
+
+func _reference_cycle_issue(owner_asset_id: String, source_asset_id: String) -> String:
+	# A Reference is resolved through the Catalog at Runtime, so a cycle is a
+	# consumer's infinite recursion. It is rejected where it would be authored
+	# rather than exported and left to the consumer to notice.
+	if owner_asset_id.is_empty() or source_asset_id.is_empty():
+		return "The referenced Asset is missing."
+	if owner_asset_id == source_asset_id:
+		return "An Asset cannot reference itself."
+	var visited: Dictionary = {}
+	var pending: Array[String] = [source_asset_id]
+	while not pending.is_empty():
+		var current_id: String = pending.pop_back()
+		if visited.has(current_id):
+			continue
+		visited[current_id] = true
+		if current_id == owner_asset_id:
+			return "That Asset already reaches this one through its own References."
+		for component in _get_asset(current_id).get("components", []):
+			if component is Dictionary and _is_reference_component(component):
+				pending.append(str(component.get("source_asset_id", "")))
+	return ""
+
+
+func _on_set_member_selected(index: int) -> void:
+	var item_index := set_member_menu.get_item_index(index)
+	if item_index < 0:
+		return
+	var asset_id := str(set_member_menu.get_meta("asset_id", ""))
+	var source_asset_id := str(set_member_menu.get_item_metadata(item_index))
+	var cycle_issue := _reference_cycle_issue(asset_id, source_asset_id)
+	if not cycle_issue.is_empty():
+		_show_status_message(cycle_issue)
+		return
+	_open_component_name_dialog(asset_id, "", "reference", source_asset_id)
 
 
 func _open_component_add_menu(asset_id: String, parent_component_id: String, anchor: Control) -> void:
@@ -7567,6 +7699,10 @@ func _on_component_add_reference_selected(index: int) -> void:
 	var source_asset := _get_asset(str(component_add_reference_menu.get_item_metadata(item_index)))
 	var asset := _get_asset(str(component_add_menu.get_meta("asset_id", "")))
 	if source_asset.is_empty() or asset.is_empty():
+		return
+	var cycle_issue := _reference_cycle_issue(str(asset.get("id", "")), str(source_asset.get("id", "")))
+	if not cycle_issue.is_empty():
+		_show_status_message(cycle_issue)
 		return
 	_open_component_name_dialog(str(asset.get("id", "")), str(component_add_menu.get_meta("parent_component_id", "")), "reference", str(source_asset.get("id", "")))
 
@@ -7683,7 +7819,8 @@ func _open_component_name_dialog(asset_id: String, parent_component_id: String, 
 	component_dialog.set_meta("draw_mode", draw_mode)
 	component_dialog.set_meta("source_asset_id", source_asset_id)
 	component_dialog.set_meta("group_id", group_id)
-	component_dialog.title = "Add %s" % ("Symbol Reference" if draw_mode == "reference" else "%s Component" % _draw_mode_display_name(draw_mode))
+	var reference_title := "Set Member" if WorldDocumentService.is_set_asset(asset) else "Symbol Reference"
+	component_dialog.title = "Add %s" % (reference_title if draw_mode == "reference" else "%s Component" % _draw_mode_display_name(draw_mode))
 	component_name_input.text = ""
 	_update_component_name_dialog_validation()
 	canvas_view.set_navigation_locked(true)
@@ -8529,6 +8666,8 @@ func _confirm_component_creation() -> void:
 		"catch_parent_component_id": "",
 		"show_point_numbers": false
 	}
+	if is_reference:
+		component["role"] = ""
 	asset["components"].append(component)
 	selected_asset_id = asset_id
 	selected_component_id = component_id

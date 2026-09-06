@@ -206,6 +206,71 @@ func _test_create_outliner_expansion_scope() -> void:
 	application.free()
 
 
+func _add_set_member(application: Control, asset_id: String, source_asset_id: String, member_name: String) -> String:
+	# The member dialog the way the Set root menu opens it, without the popup a
+	# headless run has no tree for.
+	application.component_dialog.set_meta("asset_id", asset_id)
+	application.component_dialog.set_meta("parent_component_id", "")
+	application.component_dialog.set_meta("draw_mode", "reference")
+	application.component_dialog.set_meta("source_asset_id", source_asset_id)
+	application.component_dialog.set_meta("group_id", "")
+	application.component_name_input.text = member_name
+	application._confirm_component_creation()
+	return application.selected_component_id
+
+
+func _test_set_composition() -> void:
+	var application: Control = load("res://scripts/main.gd").new()
+	application._build_ui()
+	var plank := {"id": "asset_plank", "name": "Plank", "asset_type": "props", "visibility": true,
+		"components": [], "groups": [], "guides": []}
+	var post := {"id": "asset_post", "name": "Rope Post", "asset_type": "props", "visibility": true,
+		"components": [], "groups": [], "guides": []}
+	var test_assets: Array[Dictionary] = [plank, post]
+	application.assets = test_assets
+	application.next_asset_id = 3
+	var create_section: ModuleSection = application._find_section("Create")
+	application._select_submodule("Create", "Set", create_section)
+	_expect(application.active_create_submodule == "Set" and application.create_action_button.text == "Create Set" and not application.outliner_asset_type_filter_panel.visible, "The Set module should create Sets and hide the seven-type Asset filter, which does not describe them.")
+	application.asset_name_input.text = "Bridge"
+	application._confirm_asset_creation()
+	var bridge: Dictionary = application.assets[-1]
+	var bridge_id := str(bridge.get("id", ""))
+	_expect(WorldDocumentService.is_set_asset(bridge) and application._asset_type_create_submodule(WorldDocumentService.asset_type(bridge)) == "Set", "Creating from the Set module should persist the stable set Asset type.")
+	var candidate_names: Array[String] = []
+	for candidate in application._reference_source_candidates(bridge_id):
+		candidate_names.append(str(candidate.get("name", "")))
+	_expect(candidate_names == ["Plank", "Rope Post"], "A Set should offer every ordinary Asset as a member and neither itself nor another Set, but offered %s." % [candidate_names])
+	var post_member_id := _add_set_member(application, bridge_id, "asset_post", "post_left")
+	var plank_member_id := _add_set_member(application, bridge_id, "asset_plank", "plank_01")
+	var post_member: Dictionary = application._get_component(bridge, post_member_id)
+	var plank_member: Dictionary = application._get_component(bridge, plank_member_id)
+	_expect(application._is_reference_component(post_member) and str(post_member.get("source_asset_id", "")) == "asset_post" and str(post_member.get("parent_component_id", "")).is_empty(), "A Set member should be a root-level Reference carrying which Asset it instances.")
+	_expect(str(plank_member.get("source_asset_id", "")) == "asset_plank" and WorldDocumentService.reference_role(plank_member).is_empty(), "A new member should start without an authored role, which Runtime Export reads as the member's own Asset Key.")
+	application.selected_asset_id = bridge_id
+	application.selected_component_id = post_member_id
+	application._on_reference_role_requested("Rope Post")
+	_expect(WorldDocumentService.reference_role(post_member).is_empty(), "A Set Role that is not lower_snake_case should be rejected rather than stored.")
+	application._on_reference_role_requested("rope_post")
+	_expect(WorldDocumentService.reference_role(post_member) == "rope_post", "An authored Set Role should be stored on the member Reference.")
+	application._render_outliner()
+	# A member row names the Reference and the Asset it instances, the same
+	# summary the References section has always drawn.
+	_expect(_button_with_text(application.outliner_view, "Bridge") != null and _button_with_text(application.outliner_view, "post_left ← Rope Post") != null and _button_with_text(application.outliner_view, "plank_01 ← Plank") != null, "The Set Outliner should list the Set and its members.")
+	# Plank instances Rope Post, so Rope Post may not instance Plank back: the
+	# consumer resolves References through the Catalog and would recurse.
+	plank["components"].append({"id": "component_cap", "type": "reference", "name": "cap",
+		"source_asset_id": "asset_post", "parent_component_id": "", "points": [], "edges": [],
+		"chains": [], "visibility": true, "transform": WorldDocumentService.default_component_transform()})
+	_expect(application._reference_cycle_issue("asset_plank", "asset_post").is_empty() and not application._reference_cycle_issue("asset_post", "asset_plank").is_empty(), "A Reference that would close a cycle should be rejected where it is authored.")
+	_expect(not application._reference_cycle_issue("asset_plank", "asset_plank").is_empty() and not application._reference_cycle_issue("asset_plank", "").is_empty(), "Self-reference and a missing source should be rejected as well.")
+	var post_candidates: Array[String] = []
+	for candidate in application._reference_source_candidates("asset_post"):
+		post_candidates.append(str(candidate.get("name", "")))
+	_expect(post_candidates.is_empty(), "The member menu should not offer a source that already reaches the owner, but offered %s." % [post_candidates])
+	application.free()
+
+
 func _test_world_contour_settings() -> void:
 	var defaults := WorldSettingsService.default_settings()
 	_expect(is_equal_approx(float(defaults.get("reference_pixels_per_meter", 0.0)), 192.0) and is_equal_approx(float(defaults.get("contour_stroke_width_px", 0.0)), 4.0), "New Worlds should start with the approved 192 px/m reference density and one 4 px Contour width for every Asset.")
@@ -1651,6 +1716,7 @@ const CREATE_SIGNAL_ROUTES := [
 	["multi_component_visibility_selected", "_on_multi_component_visibility_selected"],
 	["point_position_changed", "_on_point_position_changed"],
 	["reference_image_clear_requested", "_clear_reference_image"],
+	["reference_role_requested", "_on_reference_role_requested"],
 	["reference_image_load_requested", "_open_reference_image_dialog"],
 	["reference_image_pivot_selected", "_on_reference_image_pivot_selected"],
 	["reference_image_property_changed", "_on_reference_image_property_changed"],
@@ -1665,10 +1731,22 @@ const CREATE_SIGNAL_ROUTES := [
 ]
 
 
-const CREATE_PROBE_CASES := ["asset", "asset_reference", "component", "component_grouped",
+const CREATE_PROBE_CASES := ["asset", "asset_reference", "set_asset", "set_member", "component", "component_grouped",
 	"component_contour", "primitive_circle", "primitive_hole", "primitive_ellipse", "group", "guide",
 	"guide_weapon", "region_authored", "region_component", "multi_component", "point_none", "point_one", "point_many",
 	"edge_none", "edge_one", "edge_many", "hole_edge_one", "hole_edge_many", "face"]
+
+
+func _create_wiring_set() -> Dictionary:
+	# A Set carries no geometry: one Reference per member, each with the role it
+	# plays in the assembly.
+	var member := _outliner_test_component("component_20", "post_left")
+	member.merge({"type": "reference", "source_asset_id": "asset_1", "role": "rope_post",
+		"points": [], "edges": [], "chains": []}, true)
+	return {"id": "asset_9", "name": "Bridge", "visibility": true,
+		"asset_type": WorldDocumentService.ASSET_TYPE_SET,
+		"components": [member], "groups": [], "guides": [],
+		"asset_pivot": Vector2.ZERO, "root_position": Vector2.ZERO, "root_scale": Vector2.ONE}
 
 
 func _create_wiring_asset() -> Dictionary:
@@ -1720,6 +1798,7 @@ func _create_wiring_asset() -> Dictionary:
 func _prepare_create_case(application: Control, case_name: String) -> void:
 	var asset: Dictionary = application.assets[0]
 	application.active_module = "Create"
+	application.active_create_submodule = "Single"
 	application.selected_asset_id = "asset_1"
 	application.selected_component_id = ""
 	application.selected_group_id = ""
@@ -1747,6 +1826,13 @@ func _prepare_create_case(application: Control, case_name: String) -> void:
 			asset["reference_image"] = {"file": "res://ref.png", "target_height_cm": 21.5,
 				"pivot_mode": "center", "visible": true, "opacity": 0.35,
 				"position": Vector2(2.5, -3.5), "scale": 1.25}
+		"set_asset":
+			application.active_create_submodule = "Set"
+			application.selected_asset_id = "asset_9"
+		"set_member":
+			application.active_create_submodule = "Set"
+			application.selected_asset_id = "asset_9"
+			application.selected_component_id = "component_20"
 		"component":
 			application.selected_component_id = "component_1"
 		"component_grouped":
@@ -1836,7 +1922,7 @@ func _build_create_probe(application: Control) -> CreateInspectorView:
 
 
 func _test_create_inspector_wiring() -> void:
-	var create_assets: Array[Dictionary] = [_create_wiring_asset()]
+	var create_assets: Array[Dictionary] = [_create_wiring_asset(), _create_wiring_set()]
 	var application: Control = load("res://scripts/main.gd").new()
 	application._build_ui()
 	application.assets = create_assets

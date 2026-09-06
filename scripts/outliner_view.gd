@@ -64,7 +64,7 @@ var row_status: Dictionary = {}
 # documented at _render_geometry_rows below.
 var geometry_rows: Array = []
 
-const CREATE_SUBMODULES := ["Single"]
+const CREATE_SUBMODULES := ["Single", "Set"]
 const GEOMETRY_SUBMODULES := ["Sampling", "Seeding", "Meshing"]
 
 
@@ -177,7 +177,7 @@ func rebuild() -> void:
 			if asset_is_visible(asset) and asset_type_filter_matches(asset) and asset_matches_search(asset, search_text):
 				visible_assets.append(asset)
 		visible_assets.sort_custom(WorldDocumentService.sort_named_documents)
-		self.add_child(EditorWidgets.create_outliner_group_label("Assets"))
+		self.add_child(EditorWidgets.create_outliner_group_label("Sets" if active_create_submodule == "Set" else "Assets"))
 		for asset in visible_assets:
 			_render_asset_outliner_entry(asset, not search_text.is_empty())
 
@@ -461,6 +461,9 @@ func _render_asset_outliner_entry(asset: Dictionary, force_expand := false) -> v
 	asset_header.add_child(add_button)
 	if not force_expand and not bool(expanded_assets.get(asset_id, false)):
 		return
+	if WorldDocumentService.is_set_asset(asset):
+		_render_set_member_rows(asset_container, asset)
+		return
 	var components: Array = []
 	var references: Array = []
 	var regions: Array = []
@@ -504,6 +507,21 @@ func _render_asset_outliner_entry(asset: Dictionary, force_expand := false) -> v
 	regions.sort_custom(WorldDocumentService.sort_named_documents)
 	for region in regions:
 		_render_region_outliner_row(asset_container, asset, region)
+
+func _render_set_member_rows(container: VBoxContainer, asset: Dictionary) -> void:
+	# A Set owns no geometry of its own: every visible Component is a Reference
+	# to a member, so the entry has one section and no Components, Guides or
+	# Regions to draw.
+	container.add_child(EditorWidgets.create_outliner_child_group_label("Members"))
+	var members: Array = []
+	for component in asset.get("components", []):
+		if WorldDocumentService.is_reference_component(component):
+			members.append(component)
+	members.sort_custom(WorldDocumentService.sort_named_documents)
+	var rendered_component_ids: Dictionary = {}
+	for member in members:
+		_render_component_outliner_tree(container, asset, member, 16, rendered_component_ids, true, {})
+
 
 func _render_group_outliner_tree(container: VBoxContainer, asset: Dictionary, group: Dictionary, indent: int, rendered_component_ids: Dictionary, rendered_group_ids: Dictionary) -> void:
 	var group_id := str(group.get("id", ""))

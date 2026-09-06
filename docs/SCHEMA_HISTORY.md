@@ -55,6 +55,7 @@ fingerprints.
 | 62 | `items` Asset type | additive | `normalize_asset_type` | `_test_asset_deserialization_migrations` |
 | 63 | Seven Create views merged into `Single`; `editor_state.active_create_submodule` holds a module name | shape (every old view name reads as `Single`) | `main.gd._normalized_create_submodule` | `_test_create_outliner_expansion_scope` |
 | 63 | The Outliner Asset filter gates Create as well | **explicit** (< 63) | `main.gd._restore_editor_state` | `_test_create_outliner_expansion_scope` |
+| 64 | `set` Asset type; optional `role` on Reference Components | additive (missing role reads unauthored) | `normalize_asset_type`, `deserialize_component` | `_test_set_composition`, `_test_asset_deserialization_migrations` |
 | Manifest 16 | `contour_stroke_mesh`, `closed_region_mesh`, Attachment Frames, `projection_depth_corners`, `regions` | derived | `RuntimeExportService` | `_test_runtime_export_service` |
 | Sampling 6 | Junction-aware Cuts, boundary-namespaced analytic Samples, corner balancing | derived | `GeometrySamplingService` | `_test_geometry_sampling_corner_balancing` |
 | Motion 1–18 | Blink `anticipation_share` default 0.18 read as 0.5 | **explicit** (≤ 18) | `normalize_motion_act` | `_test_asset_deserialization_migrations` |
@@ -288,6 +289,22 @@ be saved with every type switched off — `worlds/world01` was — and that stat
 would read as an empty Create module. Loading a World below 63 therefore
 restores all seven filter entries exactly once. From 63 on the saved filter is
 authoritative in Create as well and receives no fallback.
+
+World schema 64 adds the `set` Asset type and the optional `role` on Reference
+Components. A Set is an Asset whose visible Components are References to its
+members: the assembly needs no new document, because the Reference already
+carries which member, where it sits and in what order. The role is the one
+thing it did not carry — `source_asset_key` says which member, not what it
+stands for — and a Set may fill one role twice while a Component name is unique
+per Asset, so the two cannot be the same field. It is free `lower_snake_case`
+and normalizes on load; empty means unauthored, and Runtime Export then reads
+the member's own Asset Key.
+
+Both are additive. No existing document changes: every Asset keeps one of the
+seven types, and a Reference without a role loads without one. `ASSET_TYPES`
+gains `set` while the new `SINGLE_ASSET_TYPES` keeps the seven that the Asset
+filter and the New Asset dialog offer, so a Set never appears in Mesh, Style or
+the Single view.
 
 Runtime Manifest schema 16 exports `contour_stroke_mesh` independently from
 the unchanged Fill Mesh and adds geometry-only `closed_region_mesh` to closed
