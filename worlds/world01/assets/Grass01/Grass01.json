@@ -1,0 +1,580 @@
+{
+	"animation": {
+		"legacy_path_follow_motions": [],
+		"next_state_index": 4,
+		"simulation_contract": {
+			"next_parameter_index": 1,
+			"parameters": [
+				{
+					"id": "parameter_speed",
+					"name": "speed",
+					"type": "number"
+				},
+				{
+					"id": "parameter_grounded",
+					"name": "grounded",
+					"type": "bool"
+				}
+			],
+			"source": "Asset Animation"
+		},
+		"states": [
+			{
+				"cycle_duration": 1.0,
+				"id": "state_idle",
+				"markers": [
+					{
+						"event_id": "rustle",
+						"id": "marker_idle_01",
+						"kind": "sfx",
+						"phase": 0.52
+					}
+				],
+				"motions": [
+					{
+						"domain": "outer",
+						"enabled": true,
+						"guide_ids": [],
+						"id": "motion_idle_01",
+						"name": "Idle Bob",
+						"parameters": {
+							"cycles": 1.0,
+							"distance": 0.25
+						},
+						"phase_offset": 0.0,
+						"primitive": "bob",
+						"target_component_id": "",
+						"target_scope": "asset"
+					}
+				],
+				"name": "IDLE",
+				"next_marker_index": 2,
+				"next_motion_index": 2,
+				"next_transition_index": 2,
+				"transitions": [
+					{
+						"blend_duration": 0.15,
+						"entry_mode": "restart",
+						"exit_phase": 0.0,
+						"exit_policy": "any_phase",
+						"id": "transition_idle_01",
+						"next_rule_index": 2,
+						"rules": [
+							{
+								"id": "rule_idle_01",
+								"operator": "greater",
+								"parameter_id": "parameter_speed",
+								"value": 0.1
+							}
+						],
+						"target_state_id": "state_walk"
+					}
+				]
+			},
+			{
+				"cycle_duration": 1.0,
+				"id": "state_walk",
+				"markers": [
+					{
+						"event_id": "footstep",
+						"id": "marker_walk_01",
+						"kind": "sfx",
+						"phase": 0.25
+					}
+				],
+				"motions": [
+					{
+						"domain": "outer",
+						"enabled": true,
+						"guide_ids": [],
+						"id": "motion_walk_01",
+						"name": "Walk Bob",
+						"parameters": {
+							"cycles": 1.0,
+							"distance": 0.5
+						},
+						"phase_offset": 0.0,
+						"primitive": "bob",
+						"target_component_id": "",
+						"target_scope": "asset"
+					}
+				],
+				"name": "WALK",
+				"next_marker_index": 2,
+				"next_motion_index": 2,
+				"next_transition_index": 3,
+				"transitions": [
+					{
+						"blend_duration": 0.15,
+						"entry_mode": "restart",
+						"exit_phase": 0.0,
+						"exit_policy": "any_phase",
+						"id": "transition_walk_01",
+						"next_rule_index": 2,
+						"rules": [
+							{
+								"id": "rule_walk_idle_01",
+								"operator": "less_equal",
+								"parameter_id": "parameter_speed",
+								"value": 0.1
+							}
+						],
+						"target_state_id": "state_idle"
+					},
+					{
+						"blend_duration": 0.15,
+						"entry_mode": "preserve_phase",
+						"exit_phase": 0.0,
+						"exit_policy": "any_phase",
+						"id": "transition_walk_02",
+						"next_rule_index": 2,
+						"rules": [
+							{
+								"id": "rule_walk_run_01",
+								"operator": "greater",
+								"parameter_id": "parameter_speed",
+								"value": 0.65
+							}
+						],
+						"target_state_id": "state_run"
+					}
+				]
+			},
+			{
+				"cycle_duration": 1.0,
+				"id": "state_run",
+				"markers": [
+					{
+						"event_id": "footstep",
+						"id": "marker_run_01",
+						"kind": "sfx",
+						"phase": 0.18
+					}
+				],
+				"motions": [
+					{
+						"domain": "outer",
+						"enabled": true,
+						"guide_ids": [],
+						"id": "motion_run_01",
+						"name": "Run Bob",
+						"parameters": {
+							"cycles": 1.0,
+							"distance": 0.8
+						},
+						"phase_offset": 0.0,
+						"primitive": "bob",
+						"target_component_id": "",
+						"target_scope": "asset"
+					},
+					{
+						"domain": "inner",
+						"enabled": true,
+						"guide_ids": [],
+						"id": "motion_run_02",
+						"name": "Run Sway",
+						"parameters": {
+							"cycles": 1.0,
+							"strength": 0.5
+						},
+						"phase_offset": 0.0,
+						"primitive": "spine_sway",
+						"target_component_id": "",
+						"target_scope": "component"
+					}
+				],
+				"name": "RUN",
+				"next_marker_index": 2,
+				"next_motion_index": 3,
+				"next_transition_index": 2,
+				"transitions": [
+					{
+						"blend_duration": 0.15,
+						"entry_mode": "preserve_phase",
+						"exit_phase": 0.0,
+						"exit_policy": "any_phase",
+						"id": "transition_run_01",
+						"next_rule_index": 2,
+						"rules": [
+							{
+								"id": "rule_run_01",
+								"operator": "less_equal",
+								"parameter_id": "parameter_speed",
+								"value": 0.65
+							}
+						],
+						"target_state_id": "state_walk"
+					}
+				]
+			}
+		]
+	},
+	"asset_category": "single",
+	"asset_pivot": [
+		0.0,
+		0.0
+	],
+	"asset_type": "terrain",
+	"authored_facing": "neutral",
+	"components": [
+		{
+			"catch_parent_component_id": "",
+			"chains": [
+				{
+					"closed": true,
+					"edge_ids": [
+						"edge_7794639369836012217",
+						"edge_713035879903603333",
+						"edge_2933256482100911935",
+						"edge_9151927617320776609",
+						"edge_4918561885222941378",
+						"edge_8358780665406553716",
+						"edge_756474278966911208",
+						"edge_380895055202255289",
+						"edge_5417825212860199620",
+						"edge_8533443462439996013",
+						"edge_8262095385832556906"
+					],
+					"id": "chain_2895387611417995765",
+					"point_ids": [
+						"point_4552382060629935912",
+						"point_1872069111434543748",
+						"point_8312203770924603500",
+						"point_4853220960227917462",
+						"point_5357448350876364844",
+						"point_5979985200442224353",
+						"point_5263438870609623590",
+						"point_1086082917676530787",
+						"point_1163944440450828139",
+						"point_2907176200778615309",
+						"point_8661137064189761445"
+					],
+					"topology_role": "outer"
+				}
+			],
+			"draw_mode": "closed_loop",
+			"edges": [
+				{
+					"end_point_id": "point_1872069111434543748",
+					"id": "edge_7794639369836012217",
+					"render_outline": true,
+					"start_point_id": "point_4552382060629935912"
+				},
+				{
+					"end_point_id": "point_8312203770924603500",
+					"id": "edge_713035879903603333",
+					"render_outline": true,
+					"start_point_id": "point_1872069111434543748"
+				},
+				{
+					"end_point_id": "point_4853220960227917462",
+					"id": "edge_2933256482100911935",
+					"render_outline": true,
+					"start_point_id": "point_8312203770924603500"
+				},
+				{
+					"end_point_id": "point_5357448350876364844",
+					"id": "edge_9151927617320776609",
+					"render_outline": true,
+					"start_point_id": "point_4853220960227917462"
+				},
+				{
+					"end_point_id": "point_5979985200442224353",
+					"id": "edge_4918561885222941378",
+					"render_outline": true,
+					"start_point_id": "point_5357448350876364844"
+				},
+				{
+					"end_point_id": "point_5263438870609623590",
+					"id": "edge_8358780665406553716",
+					"render_outline": true,
+					"start_point_id": "point_5979985200442224353"
+				},
+				{
+					"end_point_id": "point_1086082917676530787",
+					"id": "edge_756474278966911208",
+					"render_outline": true,
+					"start_point_id": "point_5263438870609623590"
+				},
+				{
+					"end_point_id": "point_1163944440450828139",
+					"id": "edge_380895055202255289",
+					"render_outline": true,
+					"start_point_id": "point_1086082917676530787"
+				},
+				{
+					"end_point_id": "point_2907176200778615309",
+					"id": "edge_5417825212860199620",
+					"render_outline": true,
+					"start_point_id": "point_1163944440450828139"
+				},
+				{
+					"end_point_id": "point_8661137064189761445",
+					"id": "edge_8533443462439996013",
+					"render_outline": true,
+					"start_point_id": "point_2907176200778615309"
+				},
+				{
+					"end_point_id": "point_4552382060629935912",
+					"id": "edge_8262095385832556906",
+					"render_outline": true,
+					"start_point_id": "point_8661137064189761445"
+				}
+			],
+			"group_id": "",
+			"id": "component_136",
+			"name": "body",
+			"parent_component_id": "",
+			"points": [
+				{
+					"handle_in": [
+						-0.039000004529953,
+						0.210000038146973
+					],
+					"handle_out": [
+						0.0779999867081642,
+						0.011666695587337
+					],
+					"handle_source": "auto",
+					"id": "point_8661137064189761445",
+					"mode": "corner",
+					"position": [
+						0.28600001335144,
+						2.34500002861023
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						-0.0596760511398315,
+						0.195094749331474
+					],
+					"handle_out": [
+						0.0624762438237667,
+						-0.20424921810627
+					],
+					"handle_source": "auto",
+					"id": "point_2907176200778615309",
+					"mode": "aligned",
+					"position": [
+						0.168999999761581,
+						2.97500014305115
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.0656702518463135,
+						0.132603377103806
+					],
+					"handle_out": [
+						0.0905423164367676,
+						-0.182825818657875
+					],
+					"handle_source": "auto",
+					"id": "point_1163944440450828139",
+					"mode": "aligned",
+					"position": [
+						-0.0780000016093254,
+						3.53499984741211
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.0658179074525833,
+						0.0990247577428818
+					],
+					"handle_out": [
+						0.0819098949432373,
+						-0.123235575854778
+					],
+					"handle_source": "auto",
+					"id": "point_1086082917676530787",
+					"mode": "aligned",
+					"position": [
+						-0.29899999499321,
+						3.92000007629395
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.0996666550636292,
+						-0.023333391174674
+					],
+					"handle_out": [
+						0.0736666619777679,
+						-0.093333400785923
+					],
+					"handle_source": "auto",
+					"id": "point_5263438870609623590",
+					"mode": "corner",
+					"position": [
+						-0.519999980926514,
+						4.20000028610229
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						0.0872119143605232,
+						-0.044025294482708
+					],
+					"handle_out": [
+						-0.0913785398006439,
+						0.0461286418139935
+					],
+					"handle_source": "auto",
+					"id": "point_5979985200442224353",
+					"mode": "aligned",
+					"position": [
+						-0.221000000834465,
+						4.13000011444092
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.089935727417469,
+						-0.117506541311741
+					],
+					"handle_out": [
+						-0.0593767166137695,
+						0.0775793194770813
+					],
+					"handle_source": "auto",
+					"id": "point_5357448350876364844",
+					"mode": "aligned",
+					"position": [
+						0.0,
+						3.9375
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.0645783171057701,
+						-0.130398511886597
+					],
+					"handle_out": [
+						-0.0656702220439911,
+						0.132603332400322
+					],
+					"handle_source": "auto",
+					"id": "point_4853220960227917462",
+					"mode": "aligned",
+					"position": [
+						0.221000000834465,
+						3.55250000953674
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.0431763343513012,
+						-0.136586681008339
+					],
+					"handle_out": [
+						-0.0438589937984943,
+						0.138746246695518
+					],
+					"handle_source": "auto",
+					"id": "point_8312203770924603500",
+					"mode": "aligned",
+					"position": [
+						0.389999985694885,
+						3.15000009536743
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						0.0195423103868961,
+						-0.115750603377819
+					],
+					"handle_out": [
+						-0.0238473210483789,
+						0.141249522566795
+					],
+					"handle_source": "auto",
+					"id": "point_1872069111434543748",
+					"mode": "aligned",
+					"position": [
+						0.481000006198883,
+						2.73000001907349
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.0779999867081642,
+						-0.011666695587337
+					],
+					"handle_out": [
+						-0.0129999918863177,
+						0.11666663736105
+					],
+					"handle_source": "auto",
+					"id": "point_4552382060629935912",
+					"mode": "corner",
+					"position": [
+						0.519999980926514,
+						2.38000011444092
+					],
+					"preserve_point": true
+				}
+			],
+			"primitive": {},
+			"projection_depth_cm": 10.0,
+			"show_point_numbers": false,
+			"source_asset_id": "",
+			"topology_role": "outer",
+			"transform": {
+				"pivot": [
+					0.0,
+					0.0
+				],
+				"position": [
+					0.0,
+					-4.0
+				],
+				"rotation": 0.0,
+				"scale": [
+					1.0,
+					1.0
+				]
+			},
+			"type": "component",
+			"visibility": true,
+			"z_index": 0
+		}
+	],
+	"groups": [],
+	"guides": [],
+	"id": "asset_22",
+	"name": "Grass01",
+	"palette_variants": [],
+	"reference_image": {
+		"file": "",
+		"opacity": 0.5,
+		"pivot_mode": "bottom_center",
+		"position": [
+			0.0,
+			0.0
+		],
+		"scale": 1.0,
+		"target_height_cm": 13.0,
+		"visible": true
+	},
+	"root_position": [
+		0.0,
+		0.0
+	],
+	"root_scale": [
+		1.0,
+		1.0
+	],
+	"schema_version": 67,
+	"visibility": true
+}

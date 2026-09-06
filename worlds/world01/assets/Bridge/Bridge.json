@@ -209,6 +209,7 @@
 			}
 		]
 	},
+	"asset_category": "set",
 	"asset_pivot": [
 		0.0,
 		0.0
@@ -218,186 +219,22 @@
 	"components": [
 		{
 			"catch_parent_component_id": "",
-			"chains": [
-				{
-					"closed": true,
-					"edge_ids": [
-						"edge_3981491208543636096",
-						"edge_8942723327635273174",
-						"edge_6725348933900687877",
-						"edge_7823985534142734702",
-						"edge_5052212418895080521",
-						"edge_4017888122840652820"
-					],
-					"id": "chain_5381980339869561216",
-					"point_ids": [
-						"point_4234542794695940932",
-						"point_1318907469026392205",
-						"point_2843282350377829739",
-						"point_8624859753901215403",
-						"mirror_point_8689302331618479225",
-						"mirror_point_4120289834393754639"
-					],
-					"topology_role": "outer"
-				}
-			],
+			"chains": [],
 			"draw_mode": "closed_loop",
-			"edges": [
-				{
-					"end_point_id": "point_1318907469026392205",
-					"id": "edge_3981491208543636096",
-					"render_outline": true,
-					"start_point_id": "point_4234542794695940932"
-				},
-				{
-					"end_point_id": "point_2843282350377829739",
-					"id": "edge_8942723327635273174",
-					"render_outline": true,
-					"start_point_id": "point_1318907469026392205"
-				},
-				{
-					"end_point_id": "point_8624859753901215403",
-					"id": "edge_6725348933900687877",
-					"render_outline": true,
-					"start_point_id": "point_2843282350377829739"
-				},
-				{
-					"end_point_id": "mirror_point_8689302331618479225",
-					"id": "edge_7823985534142734702",
-					"render_outline": true,
-					"start_point_id": "point_8624859753901215403"
-				},
-				{
-					"end_point_id": "mirror_point_4120289834393754639",
-					"id": "edge_5052212418895080521",
-					"render_outline": true,
-					"start_point_id": "mirror_point_8689302331618479225"
-				},
-				{
-					"end_point_id": "point_4234542794695940932",
-					"id": "edge_4017888122840652820",
-					"render_outline": true,
-					"start_point_id": "mirror_point_4120289834393754639"
-				}
-			],
+			"edges": [],
 			"group_id": "",
-			"id": "component_182",
+			"id": "component_187",
 			"name": "rope_post",
 			"parent_component_id": "",
-			"points": [
-				{
-					"handle_in": [
-						0.0,
-						0.0
-					],
-					"handle_out": [
-						0.0,
-						0.0
-					],
-					"handle_source": "manual",
-					"id": "point_4234542794695940932",
-					"mode": "linear",
-					"position": [
-						0.0,
-						0.0
-					],
-					"preserve_point": true
-				},
-				{
-					"handle_in": [
-						0.0,
-						0.0
-					],
-					"handle_out": [
-						0.0,
-						0.0
-					],
-					"handle_source": "manual",
-					"id": "point_1318907469026392205",
-					"mode": "linear",
-					"position": [
-						-1.16999995708466,
-						0.0
-					],
-					"preserve_point": false
-				},
-				{
-					"handle_in": [
-						0.0,
-						0.0
-					],
-					"handle_out": [
-						0.0,
-						0.0
-					],
-					"handle_source": "manual",
-					"id": "point_2843282350377829739",
-					"mode": "linear",
-					"position": [
-						-1.16999995708466,
-						12.5099992752075
-					],
-					"preserve_point": false
-				},
-				{
-					"handle_in": [
-						0.0,
-						0.0
-					],
-					"handle_out": [
-						0.0,
-						0.0
-					],
-					"handle_source": "manual",
-					"id": "point_8624859753901215403",
-					"mode": "linear",
-					"position": [
-						0.0,
-						12.5099992752075
-					],
-					"preserve_point": false
-				},
-				{
-					"handle_in": [
-						0.0,
-						0.0
-					],
-					"handle_out": [
-						0.0,
-						0.0
-					],
-					"handle_source": "manual",
-					"id": "mirror_point_4120289834393754639",
-					"mode": "linear",
-					"position": [
-						1.16999995708466,
-						0.0
-					],
-					"preserve_point": true
-				},
-				{
-					"handle_in": [
-						0.0,
-						0.0
-					],
-					"handle_out": [
-						0.0,
-						0.0
-					],
-					"handle_source": "manual",
-					"id": "mirror_point_8689302331618479225",
-					"mode": "linear",
-					"position": [
-						1.16999995708466,
-						12.5099992752075
-					],
-					"preserve_point": false
-				}
-			],
+			"points": [],
 			"primitive": {},
 			"projection_depth_cm": 10.0,
+			"reference_instance_scale": [
+				1.0,
+				1.0
+			],
 			"show_point_numbers": false,
-			"source_asset_id": "",
+			"source_asset_id": "asset_27",
 			"topology_role": "outer",
 			"transform": {
 				"pivot": [
@@ -414,344 +251,28 @@
 					1.0
 				]
 			},
-			"type": "component",
+			"type": "reference",
 			"visibility": true,
 			"z_index": 0
 		},
 		{
 			"catch_parent_component_id": "",
-			"chains": [
-				{
-					"closed": true,
-					"edge_ids": [
-						"edge_25854621043348448",
-						"edge_3830978230749436243",
-						"edge_7953457601014769546",
-						"edge_3912076325500197919"
-					],
-					"id": "chain_2554608014249552216",
-					"point_ids": [
-						"point_3742519782261441715",
-						"point_691148142217196025",
-						"point_1515164716138835046",
-						"point_6223910302083210044"
-					],
-					"topology_role": "outer"
-				}
-			],
+			"chains": [],
 			"draw_mode": "closed_loop",
-			"edges": [
-				{
-					"end_point_id": "point_691148142217196025",
-					"id": "edge_25854621043348448",
-					"render_outline": true,
-					"start_point_id": "point_3742519782261441715"
-				},
-				{
-					"end_point_id": "point_1515164716138835046",
-					"id": "edge_3830978230749436243",
-					"render_outline": true,
-					"start_point_id": "point_691148142217196025"
-				},
-				{
-					"end_point_id": "point_6223910302083210044",
-					"id": "edge_7953457601014769546",
-					"render_outline": true,
-					"start_point_id": "point_1515164716138835046"
-				},
-				{
-					"end_point_id": "point_3742519782261441715",
-					"id": "edge_3912076325500197919",
-					"render_outline": true,
-					"start_point_id": "point_6223910302083210044"
-				}
-			],
+			"edges": [],
 			"group_id": "",
-			"id": "component_183",
-			"name": "collision_region",
-			"parent_component_id": "component_182",
-			"points": [
-				{
-					"handle_in": [
-						0.779999911785126,
-						0.0
-					],
-					"handle_out": [
-						0.0,
-						0.779999911785126
-					],
-					"handle_source": "manual",
-					"id": "point_6223910302083210044",
-					"mode": "corner",
-					"position": [
-						-1.16999995708466,
-						0.0
-					],
-					"preserve_point": true
-				},
-				{
-					"handle_in": [
-						0.0000000357627882863198,
-						0.779999911785126
-					],
-					"handle_out": [
-						-0.779999911785126,
-						0.0
-					],
-					"handle_source": "manual",
-					"id": "point_1515164716138835046",
-					"mode": "corner",
-					"position": [
-						1.16999983787537,
-						0.0
-					],
-					"preserve_point": true
-				},
-				{
-					"handle_in": [
-						-0.779999911785126,
-						0.0
-					],
-					"handle_out": [
-						-0.0000000357627882863198,
-						-0.779999911785126
-					],
-					"handle_source": "manual",
-					"id": "point_691148142217196025",
-					"mode": "corner",
-					"position": [
-						1.16999995708466,
-						2.33999991416931
-					],
-					"preserve_point": true
-				},
-				{
-					"handle_in": [
-						0.0,
-						-0.779999911785126
-					],
-					"handle_out": [
-						0.779999911785126,
-						0.0
-					],
-					"handle_source": "manual",
-					"id": "point_3742519782261441715",
-					"mode": "corner",
-					"position": [
-						-1.16999995708466,
-						2.33999991416931
-					],
-					"preserve_point": true
-				}
-			],
-			"primitive": {},
-			"projection_depth_cm": 10.0,
-			"region_geometry_source": "authored",
-			"region_type": "collision",
-			"show_point_numbers": false,
-			"source_asset_id": "",
-			"topology_role": "outer",
-			"transform": {
-				"pivot": [
-					0.0,
-					0.0
-				],
-				"position": [
-					0.0,
-					0.0
-				],
-				"rotation": 0.0,
-				"scale": [
-					1.0,
-					1.0
-				]
-			},
-			"type": "region",
-			"visibility": true,
-			"z_index": 0
-		},
-		{
-			"catch_parent_component_id": "",
-			"chains": [
-				{
-					"closed": true,
-					"edge_ids": [
-						"edge_9208811338541160752",
-						"edge_2285289967762145799",
-						"edge_3208128315237209440",
-						"edge_4720454392064008020",
-						"edge_7630833284568243077",
-						"edge_4747751991806984925"
-					],
-					"id": "chain_8354570595549551375",
-					"point_ids": [
-						"point_8242330607791068798",
-						"point_2290514270376717227",
-						"point_3477391969009940241",
-						"point_1335481663711862332",
-						"mirror_point_4709322523778311204",
-						"mirror_point_2098205431454358226"
-					],
-					"topology_role": "outer"
-				}
-			],
-			"draw_mode": "closed_loop",
-			"edges": [
-				{
-					"end_point_id": "point_2290514270376717227",
-					"id": "edge_9208811338541160752",
-					"render_outline": true,
-					"start_point_id": "point_8242330607791068798"
-				},
-				{
-					"end_point_id": "point_3477391969009940241",
-					"id": "edge_2285289967762145799",
-					"render_outline": true,
-					"start_point_id": "point_2290514270376717227"
-				},
-				{
-					"end_point_id": "point_1335481663711862332",
-					"id": "edge_3208128315237209440",
-					"render_outline": true,
-					"start_point_id": "point_3477391969009940241"
-				},
-				{
-					"end_point_id": "mirror_point_4709322523778311204",
-					"id": "edge_4720454392064008020",
-					"render_outline": true,
-					"start_point_id": "point_1335481663711862332"
-				},
-				{
-					"end_point_id": "mirror_point_2098205431454358226",
-					"id": "edge_7630833284568243077",
-					"render_outline": true,
-					"start_point_id": "mirror_point_4709322523778311204"
-				},
-				{
-					"end_point_id": "point_8242330607791068798",
-					"id": "edge_4747751991806984925",
-					"render_outline": true,
-					"start_point_id": "mirror_point_2098205431454358226"
-				}
-			],
-			"group_id": "",
-			"id": "component_184",
+			"id": "component_188",
 			"name": "plank",
 			"parent_component_id": "",
-			"points": [
-				{
-					"handle_in": [
-						1.66666662693024,
-						0.0
-					],
-					"handle_out": [
-						0.0,
-						-0.666666686534882
-					],
-					"handle_source": "auto",
-					"id": "point_2290514270376717227",
-					"mode": "corner",
-					"position": [
-						-5.0,
-						1.0
-					],
-					"preserve_point": true
-				},
-				{
-					"handle_in": [
-						0.0,
-						0.666666686534882
-					],
-					"handle_out": [
-						1.66666662693024,
-						0.0
-					],
-					"handle_source": "auto",
-					"id": "point_3477391969009940241",
-					"mode": "corner",
-					"position": [
-						-5.0,
-						-1.0
-					],
-					"preserve_point": true
-				},
-				{
-					"handle_in": [
-						0.0,
-						0.0
-					],
-					"handle_out": [
-						0.0,
-						0.0
-					],
-					"handle_source": "auto",
-					"id": "point_1335481663711862332",
-					"mode": "linear",
-					"position": [
-						0.0,
-						-1.0
-					],
-					"preserve_point": false
-				},
-				{
-					"handle_in": [
-						0.0,
-						0.0
-					],
-					"handle_out": [
-						0.0,
-						0.0
-					],
-					"handle_source": "auto",
-					"id": "point_8242330607791068798",
-					"mode": "linear",
-					"position": [
-						0.0,
-						1.0
-					],
-					"preserve_point": true
-				},
-				{
-					"handle_in": [
-						0.0,
-						-0.666666686534882
-					],
-					"handle_out": [
-						-1.66666662693024,
-						0.0
-					],
-					"handle_source": "auto",
-					"id": "mirror_point_2098205431454358226",
-					"mode": "corner",
-					"position": [
-						5.0,
-						1.0
-					],
-					"preserve_point": true
-				},
-				{
-					"handle_in": [
-						-1.66666662693024,
-						0.0
-					],
-					"handle_out": [
-						0.0,
-						0.666666686534882
-					],
-					"handle_source": "auto",
-					"id": "mirror_point_4709322523778311204",
-					"mode": "corner",
-					"position": [
-						5.0,
-						-1.0
-					],
-					"preserve_point": true
-				}
-			],
+			"points": [],
 			"primitive": {},
 			"projection_depth_cm": 10.0,
+			"reference_instance_scale": [
+				1.0,
+				1.0
+			],
 			"show_point_numbers": false,
-			"source_asset_id": "",
+			"source_asset_id": "asset_28",
 			"topology_role": "outer",
 			"transform": {
 				"pivot": [
@@ -768,7 +289,7 @@
 					1.0
 				]
 			},
-			"type": "component",
+			"type": "reference",
 			"visibility": true,
 			"z_index": 0
 		}
@@ -777,6 +298,7 @@
 	"guides": [],
 	"id": "asset_21",
 	"name": "Bridge",
+	"palette_variants": [],
 	"reference_image": {
 		"file": "",
 		"opacity": 0.5,
@@ -797,6 +319,6 @@
 		1.0,
 		1.0
 	],
-	"schema_version": 62,
+	"schema_version": 67,
 	"visibility": true
 }

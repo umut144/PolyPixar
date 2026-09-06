@@ -21,12 +21,19 @@
 		"asset_18",
 		"asset_19",
 		"asset_20",
-		"asset_21"
+		"asset_21",
+		"asset_22",
+		"asset_23",
+		"asset_24",
+		"asset_25",
+		"asset_26",
+		"asset_27",
+		"asset_28"
 	],
 	"editor_state": {
-		"active_create_submodule": "Props",
+		"active_create_submodule": "Set",
 		"active_geometry_submodule": "Sampling",
-		"active_module": "Create",
+		"active_module": "Export",
 		"active_motion_submodule": "Animation",
 		"active_style_submodule": "Weighting",
 		"asset_cameras": {
@@ -128,6 +135,13 @@
 				],
 				"zoom": 52.856105924932
 			},
+			"asset_27": {
+				"position": [
+					0.0714081600308418,
+					3.86005043983459
+				],
+				"zoom": 52.856105924932
+			},
 			"asset_3": {
 				"position": [
 					-0.126418218016624,
@@ -193,6 +207,13 @@
 			"asset_2": false,
 			"asset_20": true,
 			"asset_21": true,
+			"asset_22": false,
+			"asset_23": false,
+			"asset_24": false,
+			"asset_25": false,
+			"asset_26": false,
+			"asset_27": false,
+			"asset_28": false,
 			"asset_3": false,
 			"asset_4": false,
 			"asset_5": false,
@@ -218,15 +239,15 @@
 		"motion_sequence_preview_loop": true,
 		"motion_sequence_view": "composition",
 		"outliner_asset_type_filters": {
-			"character": false,
-			"icon": false,
-			"items": false,
-			"props": false,
-			"symbols": false,
-			"terrain": false,
-			"weapons": false
+			"character": true,
+			"icon": true,
+			"items": true,
+			"props": true,
+			"symbols": true,
+			"terrain": true,
+			"weapons": true
 		},
-		"selected_asset_id": "asset_21",
+		"selected_asset_id": "asset_27",
 		"selected_component_id": "component_182",
 		"selected_edge_ids": [],
 		"selected_guide_id": "",
@@ -248,7 +269,7 @@
 	},
 	"name": "world01",
 	"paths": [],
-	"schema_version": 62,
+	"schema_version": 67,
 	"sequences": [],
 	"world_name": "Secrets, Room's & Travels'",
 	"world_settings": {
