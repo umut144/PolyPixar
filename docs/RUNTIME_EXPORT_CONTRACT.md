@@ -30,7 +30,7 @@ missing or stale` as pending.
 
 `asset_key` is the deterministic lower-snake-case derivation of the complete
 Asset display name. Internal editor Asset IDs never enter the contract.
-`catalog.json` schema 1 is the closed authoritative Asset set; consumers must
+`catalog.json` is the closed authoritative Asset set; consumers must
 not discover packages by enumerating directories. An invalid visible Asset is
 excluded from the newly published Catalog so it cannot block valid siblings;
 its previous complete package is retained on disk but is not advertised until
@@ -46,12 +46,12 @@ Root Transform instead of silently changing package placement or dimensions.
 ## Compatibility policy
 
 Catalog `schema_version` must equal `2`; Manifest `schema_version` must equal
-`18`. Missing, non-integer, older, or newer versions are rejected as complete
+`19`. Missing, non-integer, older, or newer versions are rejected as complete
 packages. Missing required geometry is an error. Consumers must not synthesize
 Fill Meshes, strokes, closed Contour regions, Semantic Keys, hierarchy links,
 or referenced Assets.
 
-Schema 18 contains no UV, SDF, mask, contour-domain, padding, or Carrier field.
+Schema 19 contains no UV, SDF, mask, contour-domain, padding, or Carrier field.
 Its optional `regions` array contains authored or Component-bound Attack, Hurt,
 and Collision geometry; consumers may use it and must retain their Component
 fallback when it is empty.
@@ -71,7 +71,7 @@ Every Manifest except a Palette requires:
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `schema_version` | integer | Exactly `16`. |
+| `schema_version` | integer | Exactly `19`. |
 | `asset_key` | non-empty lower-snake-case string | Runtime identity. |
 | `display_name` | string | Informational authored name. |
 | `asset_type` | string | What the Asset is: `character`, `props`, `weapons`, `terrain`, `items`, `icon`, or `symbols`. |
