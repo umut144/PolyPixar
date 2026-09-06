@@ -308,6 +308,25 @@ func _test_set_composition() -> void:
 		"chains": [], "visibility": true, "transform": WorldDocumentService.default_component_transform()})
 	_expect(application._reference_cycle_issue("asset_plank", "asset_post").is_empty() and not application._reference_cycle_issue("asset_post", "asset_plank").is_empty(), "A Reference that would close a cycle should be rejected where it is authored.")
 	_expect(not application._reference_cycle_issue("asset_plank", "asset_plank").is_empty() and not application._reference_cycle_issue("asset_plank", "").is_empty(), "Self-reference and a missing source should be rejected as well.")
+	# Any Asset may be instanced, including a Set member, but not a composition
+	# and not a Palette variant: a variant is presentation the client chooses on
+	# its own, so an authoritative placement must not depend on one.
+	var palette := {"id": "asset_grass", "name": "Grass", "asset_type": "terrain",
+		"asset_category": WorldDocumentService.ASSET_CATEGORY_PALETTE,
+		"palette_variants": ["asset_blade"], "visibility": true,
+		"components": [], "groups": [], "guides": []}
+	var blade := {"id": "asset_blade", "name": "Grass01", "asset_type": "terrain",
+		"visibility": true, "components": [], "groups": [], "guides": []}
+	application.assets.append(palette)
+	application.assets.append(blade)
+	var plank_sources: Array[String] = []
+	for candidate in application._reference_source_candidates("asset_plank"):
+		plank_sources.append(str(candidate.get("name", "")))
+	_expect(plank_sources == ["Bridge Post", "Rope Post", "Rope Rail"], "A Reference may instance any ordinary Asset and a Set member, but neither a composition, nor a Palette variant, nor itself, yet offered %s." % [plank_sources])
+	var post_sources: Array[String] = []
+	for candidate in application._reference_source_candidates("asset_post"):
+		post_sources.append(str(candidate.get("name", "")))
+	_expect(not post_sources.has("Plank"), "A source that already reaches the owner should stay out of the list, but offered %s." % [post_sources])
 	application.free()
 
 

@@ -73,7 +73,7 @@ Closed-loop Components and analytic Primitives also store
 `topology_role: outer | hole`. New Components default to `outer`; changing a
 Bézier Component to `hole` updates its closed contour Chain role as well, while
 changing a Primitive updates only its metadata and never creates Bézier topology.
-Symbol References own this role independently from the referenced Symbol. An
+An Asset Reference owns this role independently from the Asset it instances. An
 ordinary Component authored as `hole` is a visible, editable constraint of its
 direct outer Parent rather than an independent Mesh body; hiding it disables
 the constraint. It cannot live at Asset root, accept Component children, or

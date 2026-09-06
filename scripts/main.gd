@@ -1931,13 +1931,13 @@ func _create_component_add_menu() -> void:
 	component_add_region_menu.id_pressed.connect(_on_component_add_region_selected)
 	component_add_menu.add_child(component_add_region_menu)
 	component_add_reference_menu = PopupMenu.new()
-	component_add_reference_menu.name = "ReferenceSymbols"
+	component_add_reference_menu.name = "ReferenceSources"
 	component_add_reference_menu.id_pressed.connect(_on_component_add_reference_selected)
 	component_add_menu.add_child(component_add_reference_menu)
 	component_add_menu.add_submenu_item("Child", "ChildTypes")
 	component_add_menu.add_submenu_item("Guide", "GuideTypes")
 	component_add_menu.add_submenu_item("Region", "RegionTypes")
-	component_add_menu.add_submenu_item("Reference", "ReferenceSymbols")
+	component_add_menu.add_submenu_item("Reference", "ReferenceSources")
 	EditorWidgets.style_popup_menu(component_add_menu)
 	EditorWidgets.style_popup_menu(component_add_child_menu)
 	EditorWidgets.style_popup_menu(component_add_guide_menu)
@@ -7768,6 +7768,31 @@ func _on_palette_add_selected(id: int) -> void:
 		_open_new_asset_dialog(asset_id)
 
 
+func _reference_source_candidates(owner_asset_id: String) -> Array[Dictionary]:
+	# Anything an Asset may instance. A composition is excluded because it is
+	# assembled rather than placed, and the cycle check keeps every remaining
+	# choice resolvable through the Catalog.
+	#
+	# A Palette variant is excluded for a different reason: it is presentation
+	# the client chooses on its own and carries no gameplay data by contract.
+	# Instancing one would make an authoritative placement depend on a choice
+	# nobody has to agree on. A Set member has no such property and stays
+	# available.
+	var owner_by_member := _composition_owner_by_member_id()
+	var candidates: Array[Dictionary] = []
+	for source_asset in assets:
+		if not source_asset is Dictionary or WorldDocumentService.is_composition_asset(source_asset):
+			continue
+		var source_asset_id := str(source_asset.get("id", ""))
+		if WorldDocumentService.is_palette_asset(_get_asset(str(owner_by_member.get(source_asset_id, "")))):
+			continue
+		if not _reference_cycle_issue(owner_asset_id, source_asset_id).is_empty():
+			continue
+		candidates.append(source_asset)
+	candidates.sort_custom(WorldDocumentService.sort_named_documents)
+	return candidates
+
+
 func _reference_cycle_issue(owner_asset_id: String, source_asset_id: String) -> String:
 	# A Reference is resolved through the Catalog at Runtime, so a cycle is a
 	# consumer's infinite recursion. It is rejected where it would be authored
@@ -7805,10 +7830,8 @@ func _open_component_add_menu(asset_id: String, parent_component_id: String, anc
 	component_add_menu.set_meta("scope_id", parent_component_id)
 	component_add_menu.set_item_disabled(component_add_menu.get_item_index(2), false)
 	component_add_reference_menu.clear()
-	for source_asset in assets:
-		if _asset_type(source_asset) != WorldDocumentService.ASSET_TYPE_SYMBOLS or str(source_asset.get("id", "")) == asset_id:
-			continue
-		component_add_reference_menu.add_item(str(source_asset.get("name", "Symbol")), component_add_reference_menu.item_count)
+	for source_asset in _reference_source_candidates(asset_id):
+		component_add_reference_menu.add_item(str(source_asset.get("name", "Asset")), component_add_reference_menu.item_count)
 		component_add_reference_menu.set_item_metadata(component_add_reference_menu.item_count - 1, str(source_asset.get("id", "")))
 	component_add_menu.position = Vector2i(anchor.global_position + Vector2(0.0, anchor.size.y))
 	component_add_menu.popup()
@@ -7894,7 +7917,7 @@ func _draw_mode_change_issue(component: Dictionary, target_mode: String) -> Stri
 	if component.is_empty() or target_mode not in WorldDocumentService.DRAW_MODES:
 		return "Select a Component first."
 	if _is_reference_component(component):
-		return "Symbol References inherit their source geometry and cannot change Draw Mode."
+		return "References inherit their source geometry and cannot change Draw Mode."
 	var current_mode := WorldDocumentService.component_draw_mode(component)
 	if current_mode == target_mode:
 		return ""
@@ -7942,7 +7965,7 @@ func _update_draw_mode_status() -> void:
 	var current_mode := WorldDocumentService.component_draw_mode(component) if not component.is_empty() else ""
 	draw_mode_status.text = "Draw Mode: %s  ▾" % _draw_mode_display_name(current_mode) if not current_mode.is_empty() else "Draw Mode: —  ▾"
 	draw_mode_status.disabled = not has_editable_component
-	draw_mode_status.tooltip_text = "Closed Loop and Contour preserve Bezier topology. Primitive is available only while the Component is empty." if has_editable_component else ("Symbol References inherit their source Draw Mode." if _is_reference_component(component) else "Select a Component in Create to change Draw Mode.")
+	draw_mode_status.tooltip_text = "Closed Loop and Contour preserve Bezier topology. Primitive is available only while the Component is empty." if has_editable_component else ("References inherit their source Draw Mode." if _is_reference_component(component) else "Select a Component in Create to change Draw Mode.")
 	var popup := draw_mode_status.get_popup()
 	for draw_mode_index in range(WorldDocumentService.DRAW_MODES.size()):
 		var target_mode: String = WorldDocumentService.DRAW_MODES[draw_mode_index]
@@ -7988,8 +8011,7 @@ func _open_component_name_dialog(asset_id: String, parent_component_id: String, 
 	component_dialog.set_meta("draw_mode", draw_mode)
 	component_dialog.set_meta("source_asset_id", source_asset_id)
 	component_dialog.set_meta("group_id", group_id)
-	var reference_title := "Set Member" if WorldDocumentService.is_set_asset(asset) else "Symbol Reference"
-	component_dialog.title = "Add %s" % (reference_title if draw_mode == "reference" else "%s Component" % _draw_mode_display_name(draw_mode))
+	component_dialog.title = "Add %s" % ("Reference" if draw_mode == "reference" else "%s Component" % _draw_mode_display_name(draw_mode))
 	component_name_input.text = ""
 	_update_component_name_dialog_validation()
 	canvas_view.set_navigation_locked(true)

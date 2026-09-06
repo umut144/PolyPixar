@@ -47,11 +47,14 @@ composition that owns the member, so the module's one expanded row stays the
 composition. The Canvas follows the selection and shows the member alone, the
 same way Single would.
 
-A member Asset is ordinary in every other way, References included: it may
-instance a Symbol exactly as a Single does. `_reference_cycle_issue` in
-`main.gd` guards that path — a cycle is a consumer's infinite recursion, so it
-is rejected where it would be authored rather than exported and left for the
-consumer to notice.
+A member Asset is ordinary in every other way, References included.
+`_reference_source_candidates` in `main.gd` is what a Component's
+`+ → Reference` offers: every Asset except a composition, which is assembled
+rather than placed, and except a Palette variant, which is presentation the
+client chooses on its own and therefore must not carry an authoritative
+placement. `_reference_cycle_issue` completes it — a cycle is a consumer's
+infinite recursion, so it is rejected where it would be authored rather than
+exported and left for the consumer to notice.
 
 A member is an ordinary Asset, so it keeps its own type, its own Components
 and its own place in Mesh and Style. What it does not keep is a second entry in
@@ -274,9 +277,9 @@ Line tool, or synchronization from a display polygon back into source geometry.
 
 Closed-loop and Primitive Components also carry a persisted `topology_role`:
 `outer` by default or `hole` when authored as a hole. A Primitive retains its
-analytic source and does not create a Chain when its role changes. A Symbol
-Reference owns its role independently from the referenced Symbol, so the
-reference may be `hole` while the source Symbol remains `outer`.
+analytic source and does not create a Chain when its role changes. An Asset
+Reference owns its role independently from the Asset it instances, so the
+reference may be `hole` while the source stays `outer`.
 
 
 ## Documents
