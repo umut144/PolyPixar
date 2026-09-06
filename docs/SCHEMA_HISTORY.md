@@ -357,7 +357,10 @@ one. Runtime Manifest schema 19 drops `role` from every `asset_reference` to
 match, so an assembly is read from `name` and `source_asset_key` instead of from
 three strings that said the same thing, and it additionally rejects a member
 Reference that does not sit at the Set's root: a Set is a flat assembly, not a
-tree of members.
+tree of members. The same step drops the claim that a Set's transforms are its
+assembly. They are ordinary transforms in the Set's own space; members are
+authored centered on their own pivot, which is not an arrangement but the
+precondition for a placing consumer to set them itself.
 
 Runtime Manifest schema 17 carries what the two compositions must say across
 the boundary, and nothing more. An `asset_reference` gains a required

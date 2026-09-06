@@ -304,11 +304,15 @@ package shape.
 
 A **Set** — `asset_category: "set"` — is an ordinary Manifest whose Components
 are all `asset_reference` records sitting at the Manifest root, and every member
-is an Asset of the Set's own `asset_type`. Its assembly is the Component
-transforms, which are canonical exported transforms like any other. A member's
-place in the assembly is its `name`, stable across a rename of the member Asset;
-which Asset fills that place is its `source_asset_key`. A consumer that already
-resolves Asset References needs nothing further.
+is an Asset of the Set's own `asset_type`. A Set publishes which Assets belong
+together and, through each Reference's `name`, which place every member fills;
+`source_asset_key` says which Asset fills that place, and the `name` is stable
+across a rename of the member Asset. Its Component transforms are ordinary
+exported transforms in the Set's own space and say **nothing about placement in
+a world**. Where members lie centered on their own pivot, that is exactly what
+it is: not an arrangement, but the precondition for a placing source to set
+them itself. A consumer that already resolves Asset References needs nothing
+further.
 
 A **Palette** — `asset_category: "palette"` — is the one Manifest without
 geometry. It publishes the Keys that may substitute for one another; every one

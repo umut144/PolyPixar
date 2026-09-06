@@ -25,8 +25,11 @@ would leave members or variants in an Asset with no place for them.
 A **Set** is an Asset with `asset_category: "set"` whose visible Components are
 Asset References to its members. Nothing new is persisted for the assembly: the
 Reference already carries which member (`source_asset_id`, exported as
-`source_asset_key`), where it sits (its own transform, canonicalized at export)
-and in what order (`z_index`). Nothing is added for the role either: the
+`source_asset_key`), where it sits in the Set's own space (its own transform,
+canonicalized at export) and in what order (`z_index`). That space is authoring
+space: `RUNTIME_EXPORT_CONTRACT.md` states that a Set's transforms say nothing
+about placement in a world, because members are authored centered on their own
+pivot so that a placing consumer sets them itself. Nothing is added for the role either: the
 Reference's own `name` is the place the member fills in the assembly. It is
 derived from the member's name when the member is made, unique inside the Set,
 editable, and unaffected by a later rename of the member Asset — which is
