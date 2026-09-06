@@ -171,6 +171,9 @@ var next_component_id := 1
 var next_group_id := 1
 var next_guide_id := 1
 var asset_dialog: ConfirmationDialog
+var asset_rename_dialog: ConfirmationDialog
+var asset_rename_input: LineEdit
+var asset_rename_key_label: Label
 var asset_name_input: LineEdit
 var asset_type_input: OptionButton
 var new_asset_type := WorldDocumentService.ASSET_TYPE_CHARACTER
@@ -1034,7 +1037,8 @@ func _build_ui() -> void:
 	create_inspector_view.asset_type_selected.connect(_on_asset_type_selected)
 	create_inspector_view.palette_variant_remove_requested.connect(_on_palette_variant_remove_requested)
 	create_inspector_view.asset_pivot_property_changed.connect(_on_asset_pivot_property_changed)
-	create_inspector_view.asset_rename_requested.connect(_rename_selected_asset)
+	create_inspector_view.asset_rename_dialog_requested.connect(_on_asset_rename_dialog_requested)
+	create_inspector_view.set_member_rename_dialog_requested.connect(_on_set_member_rename_dialog_requested)
 	create_inspector_view.asset_root_position_changed.connect(_on_asset_root_position_changed)
 	create_inspector_view.asset_root_scale_changed.connect(_on_asset_root_scale_changed)
 	create_inspector_view.asset_root_scale_rebase_requested.connect(_on_rebase_asset_root_scale_pressed)
@@ -1212,6 +1216,7 @@ func _build_ui() -> void:
 	add_child(status_clear_timer)
 
 	_create_asset_dialog()
+	_create_asset_rename_dialog()
 	_create_component_dialog()
 	_create_group_dialog()
 	_create_component_draw_mode_menu()
@@ -1844,6 +1849,31 @@ func _create_asset_dialog() -> void:
 	add_child(asset_dialog)
 
 
+func _create_asset_rename_dialog() -> void:
+	# Renaming an Asset is not relabelling it: the name derives the Asset Key
+	# the Catalog publishes and the directory its document, Reference Image and
+	# Geometry live in. A field that commits on focus loss is the wrong shape
+	# for that, so the new name is confirmed and the derived Key is shown while
+	# it is typed.
+	asset_rename_dialog = ConfirmationDialog.new()
+	asset_rename_dialog.title = "Rename Asset"
+	asset_rename_dialog.size = Vector2i(360, 200)
+	asset_rename_dialog.confirmed.connect(_confirm_asset_rename)
+	asset_rename_input = LineEdit.new()
+	asset_rename_input.placeholder_text = "Asset name"
+	asset_rename_input.custom_minimum_size = Vector2(320, 32)
+	asset_rename_input.focus_mode = Control.FOCUS_ALL
+	asset_rename_input.text_changed.connect(_update_asset_rename_preview)
+	asset_rename_input.text_submitted.connect(_submit_asset_rename)
+	asset_rename_key_label = EditorWidgets.create_inspector_field_label("Asset Key: —")
+	var rename_fields := VBoxContainer.new()
+	rename_fields.add_theme_constant_override("separation", 6)
+	rename_fields.add_child(asset_rename_input)
+	rename_fields.add_child(asset_rename_key_label)
+	asset_rename_dialog.add_child(rename_fields)
+	add_child(asset_rename_dialog)
+
+
 func _create_component_dialog() -> void:
 	component_dialog = ConfirmationDialog.new()
 	component_dialog.title = "Add Component"
@@ -2318,15 +2348,83 @@ func _sanitize_asset_storage_name(value: String, fallback: String = "asset") -> 
 
 
 func _asset_storage_name(asset: Dictionary) -> String:
-	var base := _sanitize_asset_storage_name(str(asset.get("name", "")), str(asset.get("id", "asset")))
+	return _asset_storage_name_for(str(asset.get("id", "asset")), str(asset.get("name", "")))
+
+
+func _asset_storage_name_for(asset_id: String, asset_name: String) -> String:
+	# The directory an Asset of this name would use. Taking the name as an
+	# argument rather than reading it off the Asset is what lets a rename ask
+	# where the files would have to go before it changes anything.
+	var base := _sanitize_asset_storage_name(asset_name, asset_id)
 	var has_name_collision := false
 	for other_asset in assets:
-		if other_asset == asset:
+		if str(other_asset.get("id", "")) == asset_id:
 			continue
 		if _sanitize_asset_storage_name(str(other_asset.get("name", "")), str(other_asset.get("id", "asset"))) == base:
 			has_name_collision = true
 			break
-	return "%s__%s" % [base, str(asset.get("id", "asset"))] if has_name_collision else base
+	return "%s__%s" % [base, asset_id] if has_name_collision else base
+
+
+func _asset_storage_directory(world_root: String, asset_id: String) -> String:
+	# The directory that holds this Asset's document today, which is not always
+	# the one its current name derives: a World written by an older build kept
+	# the directory of the name the Asset had when it was created.
+	var directory := DirAccess.open("%s/assets" % world_root)
+	if directory == null:
+		return ""
+	for entry in directory.get_directories():
+		for file_name in DirAccess.get_files_at(ProjectSettings.globalize_path("%s/assets/%s" % [world_root, entry])):
+			if not str(file_name).to_lower().ends_with(".json"):
+				continue
+			var candidate = WorldDocumentService.read_json("%s/assets/%s/%s" % [world_root, entry, file_name])
+			if candidate is Dictionary and str(candidate.get("id", "")) == asset_id:
+				return str(entry)
+	return ""
+
+
+func _asset_storage_move_plan(world_root: String, current_directory: String, new_directory: String) -> Dictionary:
+	# What a rename has to move, decided before anything is touched. An Asset is
+	# addressed on disk through its name: the document, the Reference Image
+	# beside it and the Geometry documents all live under the derived directory,
+	# so a rename that changed only the label would strand all three.
+	if current_directory.is_empty() or current_directory == new_directory:
+		return {"moves": [], "blocked": ""}
+	var asset_source := "%s/assets/%s" % [world_root, current_directory]
+	var asset_target := "%s/assets/%s" % [world_root, new_directory]
+	if DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(asset_target)):
+		return {"moves": [], "blocked": "assets/%s already exists" % new_directory}
+	var geometry_source := "%s/geometry/%s" % [world_root, current_directory]
+	var geometry_target := "%s/geometry/%s" % [world_root, new_directory]
+	var moves: Array = [{"from": asset_source, "to": asset_target}]
+	if DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(geometry_source)):
+		if DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(geometry_target)):
+			return {"moves": [], "blocked": "geometry/%s already exists" % new_directory}
+		moves.append({"from": geometry_source, "to": geometry_target})
+	# The document is named after its directory, so it travels under the new
+	# name; a leftover file under the old one would be read back as a second
+	# Asset of the same ID.
+	if FileAccess.file_exists(ProjectSettings.globalize_path("%s/%s.json" % [asset_source, current_directory])):
+		moves.append({"from": "%s/%s.json" % [asset_target, current_directory],
+			"to": "%s/%s.json" % [asset_target, new_directory]})
+	return {"moves": moves, "blocked": ""}
+
+
+func _apply_asset_storage_moves(moves: Array) -> String:
+	# A half-moved Asset is worse than one that was not renamed, so a failure
+	# puts back what already moved and the rename is refused as a whole.
+	var applied: Array = []
+	for move in moves:
+		var from_path := ProjectSettings.globalize_path(str(move.get("from", "")))
+		var to_path := ProjectSettings.globalize_path(str(move.get("to", "")))
+		if DirAccess.rename_absolute(from_path, to_path) == OK:
+			applied.push_front(move)
+			continue
+		for undo in applied:
+			DirAccess.rename_absolute(ProjectSettings.globalize_path(str(undo.get("to", ""))),
+				ProjectSettings.globalize_path(str(undo.get("from", ""))))
+		return "could not move %s" % str(move.get("from", "")).get_file()
+	return ""
 
 
 func _asset_storage_root(world_root: String, asset: Dictionary) -> String:
@@ -6230,6 +6328,89 @@ func _composition_owned_asset_ids(asset: Dictionary) -> Array[String]:
 
 func _submit_asset_name(_submitted_text: String) -> void:
 	_confirm_asset_creation()
+
+
+func _submit_asset_rename(_submitted_text: String) -> void:
+	asset_rename_dialog.hide()
+	_confirm_asset_rename()
+
+
+func _on_asset_rename_dialog_requested() -> void:
+	_open_rename_asset_dialog(selected_asset_id)
+
+
+func _on_set_member_rename_dialog_requested() -> void:
+	_open_rename_asset_dialog(str(_selected_set_member_asset().get("id", "")))
+
+
+func _selected_set_member_asset() -> Dictionary:
+	# The Asset behind the selected member Reference. A member row names its
+	# Asset, so the Inspector reached from it renames that Asset rather than the
+	# Reference that carries it.
+	var asset := _get_asset(selected_asset_id)
+	if not WorldDocumentService.is_set_asset(asset):
+		return {}
+	var component := _get_component(asset, selected_component_id)
+	if component.is_empty() or not _is_reference_component(component):
+		return {}
+	return _get_asset(str(component.get("source_asset_id", "")))
+
+
+func _open_rename_asset_dialog(asset_id: String) -> void:
+	var asset := _get_asset(asset_id)
+	if asset.is_empty():
+		return
+	asset_rename_dialog.set_meta("asset_id", asset_id)
+	asset_rename_dialog.title = "Rename %s" % str(asset.get("name", "Asset"))
+	asset_rename_dialog.dialog_text = "The new name moves the Asset's files and changes the Asset Key the Catalog publishes."
+	asset_rename_input.text = str(asset.get("name", ""))
+	_update_asset_rename_preview(asset_rename_input.text)
+	# The suite and the render probe build the shell without a scene tree, where
+	# a Window cannot be shown; the dialog is then prepared and confirmed
+	# directly, which is what those tests drive.
+	if not is_inside_tree():
+		return
+	asset_rename_dialog.popup_centered()
+	asset_rename_input.grab_focus()
+	asset_rename_input.select_all()
+
+
+func _update_asset_rename_preview(proposed_name: String) -> void:
+	var key := AssetCatalogService.asset_key(proposed_name.strip_edges())
+	asset_rename_key_label.text = "Asset Key: %s" % (key if not key.is_empty() else "—")
+
+
+func _confirm_asset_rename() -> void:
+	var asset_id := str(asset_rename_dialog.get_meta("asset_id", ""))
+	var asset := _get_asset(asset_id)
+	var asset_name := asset_rename_input.text.strip_edges()
+	if asset.is_empty() or asset_name.is_empty() or asset_name == str(asset.get("name", "")):
+		return
+	var validation_error := _asset_name_validation_error(asset_name, asset_id)
+	if not validation_error.is_empty():
+		_show_status_message(validation_error)
+		return
+	# The files move first: a name that has changed while its directory has not
+	# would leave the Reference Image and every Geometry document unreachable.
+	var storage_error := _rename_asset_storage(asset, asset_name)
+	if not storage_error.is_empty():
+		_show_status_message("%s was not renamed: %s." % [str(asset.get("name", "Asset")), storage_error])
+		return
+	_record_direct_change()
+	asset["name"] = asset_name
+	_invalidate_render(RENDER_OUTLINER | RENDER_INSPECTOR | RENDER_CANVAS_CONTEXT)
+
+
+func _rename_asset_storage(asset: Dictionary, new_name: String) -> String:
+	# Before the first save there is nothing on disk, and nothing to move.
+	if world_name.is_empty():
+		return ""
+	var world_root := _current_world_root()
+	var asset_id := str(asset.get("id", ""))
+	var plan := _asset_storage_move_plan(world_root, _asset_storage_directory(world_root, asset_id),
+		_asset_storage_name_for(asset_id, new_name))
+	var blocked := str(plan.get("blocked", ""))
+	return blocked if not blocked.is_empty() else _apply_asset_storage_moves(plan.get("moves", []))
 
 
 func _confirm_asset_creation() -> void:
@@ -10523,6 +10704,7 @@ func _render_inspector() -> void:
 		selected_edge_id, selected_edge_ids.duplicate())
 	create_inspector_view.set_resolved_selection(_selected_components_for_inspector(asset),
 		_valid_selected_point_ids(_get_component(asset, selected_component_id)))
+	create_inspector_view.set_member_asset_name(str(_selected_set_member_asset().get("name", "")))
 	create_inspector_view.set_palette_variants(_palette_variant_rows(asset))
 	create_inspector_view.set_mode(active_state, active_edit_mode, canvas_view.face_selected)
 	create_inspector_view.rebuild()
@@ -11685,27 +11867,6 @@ func _on_multi_component_projection_depth_changed(value: float) -> void:
 	for component in components:
 		component["projection_depth_cm"] = depth
 	_invalidate_render(RENDER_INSPECTOR | RENDER_CANVAS_CONTEXT)
-
-
-func _rename_selected_asset(new_name: String) -> void:
-	var asset_name := new_name.strip_edges()
-	var asset := _get_asset(selected_asset_id)
-	if asset.is_empty():
-		return
-	if asset_name.is_empty():
-		create_inspector_view.asset_name_editor.text = str(asset["name"])
-		return
-	if asset_name == str(asset["name"]):
-		return
-	var validation_error := _asset_name_validation_error(asset_name, selected_asset_id)
-	if not validation_error.is_empty():
-		if is_instance_valid(create_inspector_view.asset_name_editor):
-			create_inspector_view.asset_name_editor.text = str(asset["name"])
-		_show_status_message(validation_error)
-		return
-	_record_direct_change()
-	asset["name"] = asset_name
-	_invalidate_render(RENDER_OUTLINER | RENDER_CANVAS_CONTEXT)
 
 
 func _rename_selected_component(new_name: String) -> void:

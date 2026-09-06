@@ -664,6 +664,18 @@ inside the JSON and in the World index. Older ID-based paths such as
 `assets/asset_1/asset.json` remain readable as a migration fallback. Motion
 Paths, Acts and Sequences live below `paths/`, `acts/` and `sequences/`.
 
+Because the directory is derived from the visible name, renaming an Asset moves
+files. Three things live under that directory — the document, the Reference
+Image beside it, and the Asset's Geometry documents under `geometry/<name>/` —
+and all three are addressed through the derived name, so a rename that changed
+only the label would strand them and leave a second document of the same ID
+behind for the next load to find. `_confirm_asset_rename` therefore moves the
+directories first and applies the name only when the move succeeded, and it
+refuses rather than merges when a target directory already exists. For the same
+reason the name is not edited in place: the Inspector offers `Rename…`, and the
+dialog shows the Asset Key the new name derives, because that Key is what the
+Catalog publishes and a consumer resolves.
+
 Every record is written through `WorldDocumentService.write_text_atomically`:
 a staging file is completed and then swapped in, so a failed write leaves the
 previous content rather than a truncated file, and a `.staging` or `.backup`

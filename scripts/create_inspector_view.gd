@@ -15,7 +15,8 @@ signal asset_authored_facing_selected(index: int, option: OptionButton)
 signal asset_type_selected(index: int, option: OptionButton)
 signal palette_variant_remove_requested(variant_asset_id: String)
 signal asset_pivot_property_changed(value: float, property_name: String)
-signal asset_rename_requested(new_name: String)
+signal asset_rename_dialog_requested()
+signal set_member_rename_dialog_requested()
 signal asset_root_position_changed(value: float, property_name: String)
 signal asset_root_scale_changed(value: float, property_name: String)
 signal asset_root_scale_rebase_requested()
@@ -90,8 +91,10 @@ var asset_root_scale_rebase_button: Button
 var asset_scale_rebase_button: Button
 var asset_authored_facing_option: OptionButton
 var asset_type_option: OptionButton
+var member_asset_name: String = ""
 var palette_variant_rows: Array = []
-var asset_name_editor: LineEdit
+var asset_rename_button: Button
+var set_member_rename_button: Button
 var component_name_editor: LineEdit
 
 
@@ -107,6 +110,13 @@ func set_selection(component_id: String, group_id: String, guide_id: String,
 	selected_guide_id = guide_id
 	selected_edge_id = edge_id
 	selected_edge_ids = edge_ids
+
+
+func set_member_asset_name(value: String) -> void:
+	# Resolving the Asset behind a member Reference needs every Asset, which the
+	# view does not have, so main.gd hands the name over — the same rule the
+	# Palette rows follow.
+	member_asset_name = value
 
 
 func set_palette_variants(rows: Array) -> void:
@@ -139,7 +149,8 @@ func _reset_field_cache() -> void:
 	asset_scale_rebase_button = null
 	asset_authored_facing_option = null
 	asset_type_option = null
-	asset_name_editor = null
+	asset_rename_button = null
+	set_member_rename_button = null
 	component_name_editor = null
 
 
@@ -159,13 +170,17 @@ func rebuild() -> void:
 		_render_multi_component_inspector(asset, inspector_components)
 		return
 	if selected_component_id.is_empty():
+		# The name derives the Asset Key and the directory the Asset's files
+		# live in, so it is not edited in place: the button opens the dialog
+		# that confirms the new name and moves the files with it.
 		add_child(EditorWidgets.create_inspector_field_label("Name"))
-		asset_name_editor = EditorWidgets.create_name_editor(str(asset["name"]), "Asset name")
-		asset_name_editor.text_submitted.connect(asset_rename_requested.emit)
-		asset_name_editor.focus_exited.connect(func() -> void:
-			asset_rename_requested.emit(asset_name_editor.text)
-		)
-		add_child(asset_name_editor)
+		add_child(EditorWidgets.create_inspector_field_label(str(asset["name"])))
+		asset_rename_button = Button.new()
+		asset_rename_button.text = "Rename…"
+		asset_rename_button.custom_minimum_size = Vector2(0, 30)
+		asset_rename_button.focus_mode = Control.FOCUS_NONE
+		asset_rename_button.pressed.connect(asset_rename_dialog_requested.emit)
+		add_child(asset_rename_button)
 		# The one Create view does not carry the type any more, so the Asset
 		# root is where it is read and changed.
 		# What the Asset is, and separately how it is composed. A Set is props
@@ -384,7 +399,21 @@ func rebuild() -> void:
 					"Render Outline", bool(selected_edge.get("render_outline", true)),
 					edge_render_outline_changed.emit))
 			return
-	add_child(EditorWidgets.create_inspector_section("Component", section_toggled.emit))
+	# A member row names its Asset, so the Inspector reached from it renames
+	# that Asset. The Reference below is the place the member fills in the Set,
+	# not a second name for the same thing.
+	var is_set_member := WorldDocumentService.is_set_asset(asset) and WorldDocumentService.is_reference_component(component)
+	if is_set_member:
+		add_child(EditorWidgets.create_inspector_section("Member Asset", section_toggled.emit))
+		add_child(EditorWidgets.create_inspector_field_label(member_asset_name if not member_asset_name.is_empty() else "Missing Asset"))
+		set_member_rename_button = Button.new()
+		set_member_rename_button.text = "Rename…"
+		set_member_rename_button.custom_minimum_size = Vector2(0, 30)
+		set_member_rename_button.focus_mode = Control.FOCUS_NONE
+		set_member_rename_button.disabled = member_asset_name.is_empty()
+		set_member_rename_button.pressed.connect(set_member_rename_dialog_requested.emit)
+		add_child(set_member_rename_button)
+	add_child(EditorWidgets.create_inspector_section("Place in Set" if is_set_member else "Component", section_toggled.emit))
 	component_name_editor = EditorWidgets.create_name_editor(WorldDocumentService.normalized_component_name(component), "Component name")
 	component_name_editor.text_submitted.connect(component_rename_requested.emit)
 	component_name_editor.focus_exited.connect(func() -> void: component_rename_requested.emit(component_name_editor.text))
@@ -400,7 +429,7 @@ func rebuild() -> void:
 		add_child(geometry_source_option)
 		var source_component := WorldDocumentService.component_by_id(asset, str(component.get("parent_component_id", "")))
 		add_child(EditorWidgets.create_inspector_field_label("Attached Component: %s" % str(source_component.get("name", "Missing Component"))))
-	elif not (WorldDocumentService.is_set_asset(asset) and WorldDocumentService.is_reference_component(component)):
+	elif not is_set_member:
 		# A member sits at the Set's root, always: a Set is a flat assembly and
 		# not a tree of members. There is nothing to choose here, so nothing is
 		# offered, and Runtime Export checks it rather than trusting this view.

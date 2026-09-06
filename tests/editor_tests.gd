@@ -286,13 +286,26 @@ func _test_set_composition() -> void:
 	var member_inspector_texts: Array[String] = []
 	for control in member_inspector:
 		if "text" in control:
-			member_inspector_texts.append(str(control.text))
-	_expect(member_inspector_texts.has("bridge_post_02") and not member_inspector_texts.has("Hierarchy") and not member_inspector_texts.has("Set Role"), "A member Inspector should name the Reference and offer neither a Parent nor a second name for it, but showed %s." % [member_inspector_texts])
+			# A section header draws its collapse arrow into its own text, so it
+			# is stripped here: without that, asserting a section is absent
+			# succeeds even when it is drawn.
+			member_inspector_texts.append(str(control.text).trim_prefix("▾").trim_prefix("▸").strip_edges())
+	_expect(member_inspector_texts.has("Member Asset") and member_inspector_texts.has("Bridge Post") and member_inspector_texts.has("Place in Set") and member_inspector_texts.has("bridge_post_02") and not member_inspector_texts.has("Hierarchy") and not member_inspector_texts.has("Component") and not member_inspector_texts.has("Set Role"), "A member Inspector should name the member Asset and the place it fills, and offer neither a Parent nor a second name for the place, but showed %s." % [member_inspector_texts])
 	application._render_outliner()
 	# A member row names the member Asset, exactly as a Palette names a variant:
 	# the Reference that carries it is derived, so it is read in the tooltip.
 	_expect(_button_with_text(application.outliner_view, "Bridge") != null and _button_with_text(application.outliner_view, "Rope Rail") != null and _button_with_text(application.outliner_view, "Bridge Post") != null, "The Set Outliner should list the Set and its members by name.")
 	_expect(application.outliner_view._set_member_tooltip(post_member, "Bridge Post") == "Member asset: Bridge Post\nReference: bridge_post_02", "A member tooltip should carry the derived Reference the row does not show.")
+	# The row names the member Asset, so this is where that Asset is renamed —
+	# through the dialog, because the name derives the Asset Key and the
+	# directory the Asset's files live in.
+	var post_asset: Dictionary = application._get_asset(str(post_member.get("source_asset_id", "")))
+	_expect(is_instance_valid(application.create_inspector_view.set_member_rename_button), "A member Inspector should offer to rename the member Asset.")
+	application.create_inspector_view.set_member_rename_button.pressed.emit()
+	_expect(str(application.asset_rename_dialog.get_meta("asset_id", "")) == str(post_asset.get("id", "")), "The member rename dialog should open on the member Asset rather than on the Set.")
+	application.asset_rename_input.text = "Deck"
+	application._confirm_asset_rename()
+	_expect(str(post_asset.get("name", "")) == "Deck" and WorldDocumentService.normalized_component_name(post_member) == "bridge_post_02", "Renaming a member should rename its Asset and leave the place it fills in the Set untouched.")
 	# A member is authored where it belongs: its Components are added through
 	# the member row and drawn underneath it, without leaving the Set.
 	var member_asset_id := str(rail_member.get("source_asset_id", ""))
@@ -740,9 +753,16 @@ func _test_inspector_field_wiring() -> void:
 	_expect(is_equal_approx(Vector2(AssetScaleRebaseService.root_position(asset)).y, application._world_to_editor_units(7.0)), "The Root Position Y field should write the Asset root position.")
 	_edit_inspector_value(application.create_inspector_view.asset_root_scale_fields["scale_x"], 2.5)
 	_expect(is_equal_approx(Vector2(AssetScaleRebaseService.root_scale(asset)).x, 2.5), "The Root Scale X field should write the Asset root scale.")
-	_expect(is_instance_valid(application.create_inspector_view.asset_name_editor), "The Asset Inspector should expose its name editor.")
-	application._rename_selected_asset("Sorcerer")
-	_expect(str(asset["name"]) == "Sorcerer", "The Asset name editor should rename the Asset.")
+	# Renaming is confirmed rather than typed in place: the name derives the
+	# Asset Key and the directory the Asset's files live in.
+	_expect(is_instance_valid(application.create_inspector_view.asset_rename_button), "The Asset Inspector should offer the rename dialog rather than an inline name field.")
+	application.create_inspector_view.asset_rename_button.pressed.emit()
+	_expect(str(application.asset_rename_dialog.get_meta("asset_id", "")) == application.selected_asset_id and application.asset_rename_input.text == str(asset["name"]) and application.asset_rename_key_label.text == "Asset Key: %s" % AssetCatalogService.asset_key(str(asset["name"])), "The rename dialog should open on the selected Asset with its name and derived Key.")
+	application.asset_rename_input.text = "Sorcerer"
+	application._update_asset_rename_preview("Sorcerer")
+	_expect(application.asset_rename_key_label.text == "Asset Key: sorcerer", "The dialog should show the Key the new name derives while it is typed.")
+	application._confirm_asset_rename()
+	_expect(str(asset["name"]) == "Sorcerer", "Confirming the dialog should rename the Asset.")
 
 	# Component level: transform, then the properties that reach the document.
 	application.selected_component_id = "component_1"
@@ -1868,7 +1888,7 @@ func _test_sampling_input_kind_from_seeding_selection() -> void:
 const CREATE_SIGNAL_ROUTES := [
 	["asset_authored_facing_selected", "_on_asset_authored_facing_selected"],
 	["asset_pivot_property_changed", "_on_asset_pivot_property_changed"],
-	["asset_rename_requested", "_rename_selected_asset"],
+	["asset_rename_dialog_requested", "_on_asset_rename_dialog_requested"],
 	["asset_root_position_changed", "_on_asset_root_position_changed"],
 	["asset_root_scale_changed", "_on_asset_root_scale_changed"],
 	["asset_root_scale_rebase_requested", "_on_rebase_asset_root_scale_pressed"],
@@ -1910,6 +1930,7 @@ const CREATE_SIGNAL_ROUTES := [
 	["selected_points_delta_changed", "_on_selected_points_delta_changed"],
 	["selected_points_mode_selected", "_on_selected_points_mode_selected"],
 	["selected_points_preserve_changed", "_on_selected_points_preserve_changed"],
+	["set_member_rename_dialog_requested", "_on_set_member_rename_dialog_requested"],
 	["transform_value_changed", "_on_transform_value_changed"],
 	["weapon_frame_value_changed", "_on_weapon_frame_value_changed"],
 ]
