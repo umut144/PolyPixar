@@ -1,10 +1,10 @@
 # PolyTools Runtime Export Contract
 
 **Status:** Normative consumer contract for Asset Catalog schema `2` and
-runtime Manifest schema `18`.
+runtime Manifest schema `19`.
 
 This document is the sole field-level contract for PolyTools Runtime packages.
-Manifest schema 18 replaces schema 17 and Catalog schema 2 replaces schema 1.
+Manifest schema 19 replaces schema 18 and Catalog schema 2 replaces schema 1.
 Consumers must reject older schemas; there is no SDF/Carrier/UV compatibility
 fallback.
 
@@ -148,7 +148,7 @@ independent Frame property.
 
 ## Gameplay Regions
 
-`regions` is always present in schema 18 and may be empty. Every record contains
+`regions` is always present in schema 19 and may be empty. Every record contains
 `region_id`, `name`, `role`, `geometry_source`, and `source_component_id`;
 `role` is one of `attack`, `hurt`, or `collision`.
 
@@ -303,11 +303,12 @@ field. Asset References also omit it.
 package shape.
 
 A **Set** — `asset_category: "set"` — is an ordinary Manifest whose Components
-are all `asset_reference` records, and every member is an Asset of the Set's own
-`asset_type`. Its assembly is the Component transforms, which are canonical
-exported transforms like any other, and each member says what it stands for
-through its required `role`. A consumer that already resolves Asset References
-needs nothing further.
+are all `asset_reference` records sitting at the Manifest root, and every member
+is an Asset of the Set's own `asset_type`. Its assembly is the Component
+transforms, which are canonical exported transforms like any other. A member's
+place in the assembly is its `name`, stable across a rename of the member Asset;
+which Asset fills that place is its `source_asset_key`. A consumer that already
+resolves Asset References needs nothing further.
 
 A **Palette** — `asset_category: "palette"` — is the one Manifest without
 geometry. It publishes the Keys that may substitute for one another; every one
@@ -315,7 +316,7 @@ of them is an Asset of the Palette's own `asset_type`:
 
 ```json
 {
-  "schema_version": 18,
+  "schema_version": 19,
   "asset_key": "grass",
   "display_name": "Grass",
   "asset_type": "terrain",
@@ -353,10 +354,8 @@ invalid Asset, and its variants remain valid packages of their own.
 
 ## Asset References
 
-An Asset Reference adds `kind: "asset_reference"`, required
-`source_asset_key`, and a required `lower_snake_case` `role` naming what the
-member stands for in its owner; where no role was authored, the role is the
-member's own `source_asset_key`, so it is always present and never guessed. It contains neither `mesh`, `contour_stroke_mesh`, nor
+An Asset Reference adds `kind: "asset_reference"` and a required
+`source_asset_key`. It contains neither `mesh`, `contour_stroke_mesh`, nor
 `closed_region_mesh`, but retains its local `projection_depth_meters` value.
 An
 optional finite positive `contour_stroke_width_override_px` is local to the

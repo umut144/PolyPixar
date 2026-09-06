@@ -127,16 +127,17 @@ func _test_asset_deserialization_migrations() -> void:
 		"asset_category": WorldDocumentService.ASSET_CATEGORY_SET,
 		"components": [
 			{"id": "component_1", "name": "post_left", "type": "reference",
-				"source_asset_id": "asset_post", "role": " Rope_Post ", "points": [], "edges": [], "chains": []},
+				"source_asset_id": "asset_post", "role": "rope_post", "points": [], "edges": [], "chains": []},
 			{"id": "component_2", "name": "plank_01", "type": "reference",
 				"source_asset_id": "asset_plank", "points": [], "edges": [], "chains": []},
 		]}
 	var reference_asset: Dictionary = WorldDocumentService.deserialize_asset(references, "asset_set")
 	var reference_components: Array = reference_asset.get("components", [])
 	_expect(WorldDocumentService.is_set_asset(reference_asset)
-		and WorldDocumentService.reference_role(reference_components[0]) == "rope_post"
-		and WorldDocumentService.reference_role(reference_components[1]).is_empty(),
-		"A Set should load with its type, and a member role should normalize while a missing one stays unauthored.")
+		and WorldDocumentService.normalized_component_name(reference_components[0]) == "post_left"
+		and not reference_components[0].has("role")
+		and WorldDocumentService.normalized_component_name(reference_components[1]) == "plank_01",
+		"A Set should load with its category and its member names, and a schema 64 role should be dropped rather than carried along.")
 
 	# Schema 65 is additive too: a Palette is a list plus the one category its
 	# variants share, and an Asset that is neither loads with neither.
@@ -894,11 +895,7 @@ func _test_runtime_export_service() -> void:
 	var exported_reference: Dictionary = referenced_components[2] if referenced_components.size() == 3 else {}
 	var exported_reference_scale: Array = exported_reference.get("local_transform", {}).get("scale", [])
 	_expect(bool(referenced_result.get("valid", false)) and str(exported_reference.get("kind", "")) == "asset_reference" and str(exported_reference.get("source_asset_key", "")) == "orb" and is_equal_approx(float(exported_reference.get("contour_stroke_width_override_px", 0.0)), 3.0) and not exported_reference.has("source_asset_id") and str(exported_reference.get("name", "")) == "orb_reference" and not exported_reference.has("mesh") and not exported_reference.has("contour_stroke_mesh") and not exported_reference.has("closed_region_mesh") and exported_reference_scale.size() == 2 and float(exported_reference_scale[0]) * float(exported_reference_scale[1]) < 0.0, "A Hole Reference should keep the Barde-style Runtime instance while owning no Fill or Contour Stroke geometry.")
-	_expect(str(exported_reference.get("role", "")) == "orb", "An unauthored role should export as the member's own Asset Key, so the assembly is read rather than guessed.")
-	var roled_asset: Dictionary = referenced_asset.duplicate(true)
-	roled_asset["components"][2]["role"] = "rope_post"
-	var roled_components: Array = RuntimeExportService.build_manifest(roled_asset, {"component_a": source, "component_b": source, "component_orb": reference_source}).get("manifest", {}).get("components", [])
-	_expect(str(roled_components[2].get("role", "")) == "rope_post", "An authored role should cross the boundary as it was authored.")
+	_expect(not exported_reference.has("role"), "A Reference names its place through `name` and its source through `source_asset_key`; a third name for the same thing should not cross the boundary.")
 	reference_source["source_asset_exists"] = false
 	_expect(not bool(RuntimeExportService.build_manifest(referenced_asset, {"component_a": source, "component_b": source, "component_orb": reference_source}).get("valid", true)), "Runtime export should reject a Reference whose actual source Asset cannot be resolved.")
 
@@ -936,7 +933,7 @@ func _test_runtime_export_service() -> void:
 	# A Set is its members and nothing else, and it is one kind of thing with
 	# them. Both are checked at export rather than assumed.
 	var set_member := {"id": "component_post", "name": "rope_post", "type": "reference",
-		"role": "rope_post", "source_asset_id": "asset_post", "visibility": true, "z_index": 0,
+		"source_asset_id": "asset_post", "visibility": true, "z_index": 0,
 		"parent_component_id": "", "transform": WorldDocumentService.default_component_transform(),
 		"points": [], "edges": [], "chains": []}
 	var set_asset := {"id": "bridge", "name": "Bridge", "asset_type": "props",
@@ -946,7 +943,11 @@ func _test_runtime_export_service() -> void:
 		"source_asset_key": "rope_post", "source_asset_type": "props"}
 	var set_result := RuntimeExportService.build_manifest(set_asset, {"component_post": member_source})
 	var set_manifest: Dictionary = set_result.get("manifest", {})
-	_expect(bool(set_result.get("valid", false)) and str(set_manifest.get("asset_category", "")) == "set" and str(set_manifest.get("asset_type", "")) == "props" and str(set_manifest.get("components", [])[0].get("role", "")) == "rope_post", "A Set should export as an ordinary Manifest of its own type whose Components are member References.")
+	_expect(bool(set_result.get("valid", false)) and str(set_manifest.get("asset_category", "")) == "set" and str(set_manifest.get("asset_type", "")) == "props" and str(set_manifest.get("components", [])[0].get("name", "")) == "rope_post" and str(set_manifest.get("components", [])[0].get("source_asset_key", "")) == "rope_post", "A Set should export as an ordinary Manifest of its own type whose Components are member References, each naming its place and its source.")
+	var nested_set: Dictionary = set_asset.duplicate(true)
+	nested_set["components"][0]["parent_component_id"] = "component_other"
+	var nested_errors: Array = RuntimeExportService.build_manifest(nested_set, {"component_post": member_source}).get("errors", [])
+	_expect(nested_errors.any(func(error: String) -> bool: return error.contains("sits at the Set's root")), "A member hung under something else should be rejected as such: a Set is a flat assembly, not a tree of members, yet reported %s." % [nested_errors])
 	var mistyped_member := member_source.duplicate(true)
 	mistyped_member["source_asset_type"] = "terrain"
 	_expect(not bool(RuntimeExportService.build_manifest(set_asset, {"component_post": mistyped_member}).get("valid", true)), "A member of another type should be rejected: a Set and its members are one kind of thing.")

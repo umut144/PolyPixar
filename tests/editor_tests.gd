@@ -274,18 +274,25 @@ func _test_set_composition() -> void:
 	bridge["components"].append(_outliner_test_component("component_taken", "bridge_post"))
 	var post_member_id := _create_set_member(application, bridge_id, "Bridge Post")
 	var post_member: Dictionary = application._get_component(bridge, post_member_id)
-	_expect(WorldDocumentService.normalized_component_name(post_member) == "bridge_post_02" and WorldDocumentService.reference_role(post_member).is_empty(), "A derived Reference name should stay unique, and a new member should start without an authored role.")
+	_expect(WorldDocumentService.normalized_component_name(post_member) == "bridge_post_02", "A derived Reference name should stay unique inside the Set.")
 	application.selected_asset_id = bridge_id
 	application.selected_component_id = post_member_id
-	application._on_reference_role_requested("Rope Post")
-	_expect(WorldDocumentService.reference_role(post_member).is_empty(), "A Set Role that is not lower_snake_case should be rejected rather than stored.")
-	application._on_reference_role_requested("rope_post")
-	_expect(WorldDocumentService.reference_role(post_member) == "rope_post", "An authored Set Role should be stored on the member Reference.")
+	# The Reference name is the member's place in the Set, so the Inspector
+	# offers that one name and nothing beside it: no second name for the same
+	# thing, and no Parent, because a member always sits at the Set's root.
+	application._render_inspector()
+	var member_inspector: Array = []
+	_inspector_controls(application.inspector_content, member_inspector)
+	var member_inspector_texts: Array[String] = []
+	for control in member_inspector:
+		if "text" in control:
+			member_inspector_texts.append(str(control.text))
+	_expect(member_inspector_texts.has("bridge_post_02") and not member_inspector_texts.has("Hierarchy") and not member_inspector_texts.has("Set Role"), "A member Inspector should name the Reference and offer neither a Parent nor a second name for it, but showed %s." % [member_inspector_texts])
 	application._render_outliner()
 	# A member row names the member Asset, exactly as a Palette names a variant:
 	# the Reference that carries it is derived, so it is read in the tooltip.
 	_expect(_button_with_text(application.outliner_view, "Bridge") != null and _button_with_text(application.outliner_view, "Rope Rail") != null and _button_with_text(application.outliner_view, "Bridge Post") != null, "The Set Outliner should list the Set and its members by name.")
-	_expect(application.outliner_view._set_member_tooltip(post_member, "Bridge Post") == "Member asset: Bridge Post\nReference: bridge_post_02\nRole: rope_post", "A member tooltip should carry the derived Reference and the authored Role.")
+	_expect(application.outliner_view._set_member_tooltip(post_member, "Bridge Post") == "Member asset: Bridge Post\nReference: bridge_post_02", "A member tooltip should carry the derived Reference the row does not show.")
 	# A member is authored where it belongs: its Components are added through
 	# the member row and drawn underneath it, without leaving the Set.
 	var member_asset_id := str(rail_member.get("source_asset_id", ""))
@@ -1894,7 +1901,6 @@ const CREATE_SIGNAL_ROUTES := [
 	["palette_variant_remove_requested", "_on_palette_variant_remove_requested"],
 	["point_position_changed", "_on_point_position_changed"],
 	["reference_image_clear_requested", "_clear_reference_image"],
-	["reference_role_requested", "_on_reference_role_requested"],
 	["reference_image_load_requested", "_open_reference_image_dialog"],
 	["reference_image_pivot_selected", "_on_reference_image_pivot_selected"],
 	["reference_image_property_changed", "_on_reference_image_property_changed"],

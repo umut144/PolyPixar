@@ -1032,7 +1032,6 @@ func _build_ui() -> void:
 	create_inspector_view.add_theme_constant_override("separation", 2)
 	create_inspector_view.asset_authored_facing_selected.connect(_on_asset_authored_facing_selected)
 	create_inspector_view.asset_type_selected.connect(_on_asset_type_selected)
-	create_inspector_view.reference_role_requested.connect(_on_reference_role_requested)
 	create_inspector_view.palette_variant_remove_requested.connect(_on_palette_variant_remove_requested)
 	create_inspector_view.asset_pivot_property_changed.connect(_on_asset_pivot_property_changed)
 	create_inspector_view.asset_rename_requested.connect(_rename_selected_asset)
@@ -2516,7 +2515,6 @@ func _save_world() -> void:
 				serialized_component["region_geometry_source"] = WorldDocumentService.normalize_region_geometry_source(component.get("region_geometry_source", ""))
 			if _is_reference_component(component):
 				serialized_component["reference_instance_scale"] = WorldDocumentService.serialize_vector(Vector2(component.get("reference_instance_scale", Vector2.ONE)))
-				serialized_component["role"] = WorldDocumentService.reference_role(component)
 			if _component_has_contour_stroke_width_override(component):
 				serialized_component["contour_stroke_width_px"] = float(component["contour_stroke_width_px"])
 			asset_data["components"].append(serialized_component)
@@ -6196,40 +6194,6 @@ func _on_new_asset_type_selected(index: int, option: OptionButton) -> void:
 	new_asset_type = WorldDocumentService.normalize_asset_type(option.get_item_metadata(index))
 
 
-func _on_reference_role_requested(new_role: String) -> void:
-	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	if component.is_empty() or not _is_reference_component(component):
-		return
-	var role := WorldDocumentService.normalized_reference_role(new_role)
-	if role == WorldDocumentService.reference_role(component):
-		return
-	var role_error := _reference_role_validation_error(role)
-	if not role_error.is_empty():
-		_show_status_message(role_error)
-		_invalidate_render(RENDER_INSPECTOR)
-		return
-	_record_direct_change()
-	component["role"] = role
-	_invalidate_render(RENDER_DOCUMENT)
-
-
-func _reference_role_validation_error(raw_role: String) -> String:
-	# An empty role is not an error: it means unauthored, and Runtime Export
-	# then falls back to the member's own Asset Key.
-	var role := raw_role.strip_edges()
-	if role.is_empty():
-		return ""
-	if role.begins_with("_") or role.ends_with("_") or role.contains("__"):
-		return "Use lower_snake_case for the Set Role, e.g. rope_post."
-	for character in role:
-		var code := character.unicode_at(0)
-		if not ((code >= 97 and code <= 122) or (code >= 48 and code <= 57) or code == 95):
-			return "Use lower_snake_case for the Set Role, e.g. rope_post."
-	if role.unicode_at(0) >= 48 and role.unicode_at(0) <= 57:
-		return "A Set Role must start with a lowercase letter."
-	return ""
-
-
 func _on_asset_type_selected(index: int, option: OptionButton) -> void:
 	var asset := _get_asset(selected_asset_id)
 	if asset.is_empty() or index < 0 or index >= option.item_count:
@@ -6374,7 +6338,6 @@ func _add_set_member_reference(owner_set: Dictionary, member_asset_id: String) -
 		"primitive": {},
 		"catch_parent_component_id": "",
 		"show_point_numbers": false,
-		"role": "",
 	})
 	return component_id
 
@@ -8883,8 +8846,6 @@ func _confirm_component_creation() -> void:
 		"catch_parent_component_id": "",
 		"show_point_numbers": false
 	}
-	if is_reference:
-		component["role"] = ""
 	asset["components"].append(component)
 	selected_asset_id = asset_id
 	selected_component_id = component_id

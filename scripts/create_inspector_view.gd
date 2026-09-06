@@ -13,7 +13,6 @@ extends VBoxContainer
 
 signal asset_authored_facing_selected(index: int, option: OptionButton)
 signal asset_type_selected(index: int, option: OptionButton)
-signal reference_role_requested(new_role: String)
 signal palette_variant_remove_requested(variant_asset_id: String)
 signal asset_pivot_property_changed(value: float, property_name: String)
 signal asset_rename_requested(new_name: String)
@@ -91,7 +90,6 @@ var asset_root_scale_rebase_button: Button
 var asset_scale_rebase_button: Button
 var asset_authored_facing_option: OptionButton
 var asset_type_option: OptionButton
-var reference_role_editor: LineEdit
 var palette_variant_rows: Array = []
 var asset_name_editor: LineEdit
 var component_name_editor: LineEdit
@@ -141,7 +139,6 @@ func _reset_field_cache() -> void:
 	asset_scale_rebase_button = null
 	asset_authored_facing_option = null
 	asset_type_option = null
-	reference_role_editor = null
 	asset_name_editor = null
 	component_name_editor = null
 
@@ -403,7 +400,10 @@ func rebuild() -> void:
 		add_child(geometry_source_option)
 		var source_component := WorldDocumentService.component_by_id(asset, str(component.get("parent_component_id", "")))
 		add_child(EditorWidgets.create_inspector_field_label("Attached Component: %s" % str(source_component.get("name", "Missing Component"))))
-	else:
+	elif not (WorldDocumentService.is_set_asset(asset) and WorldDocumentService.is_reference_component(component)):
+		# A member sits at the Set's root, always: a Set is a flat assembly and
+		# not a tree of members. There is nothing to choose here, so nothing is
+		# offered, and Runtime Export checks it rather than trusting this view.
 		add_child(EditorWidgets.create_inspector_section("Hierarchy", section_toggled.emit))
 		add_child(EditorWidgets.create_inspector_field_label("Parent Component"))
 		var hierarchy_parent_items: Array = []
@@ -422,20 +422,6 @@ func rebuild() -> void:
 			hierarchy_parent_items.append({"label": str(candidate.get("name", "Component")), "metadata": candidate_id})
 		add_child(EditorWidgets.create_option_field(hierarchy_parent_items,
 			current_parent_id, component_hierarchy_parent_selected.emit))
-	if WorldDocumentService.is_set_asset(asset) and WorldDocumentService.is_reference_component(component):
-		# What this member is in the assembly. The Reference already carries
-		# which member and where it sits; the role says what it stands for.
-		add_child(EditorWidgets.create_inspector_section("Set Role", section_toggled.emit))
-		reference_role_editor = EditorWidgets.create_name_editor(
-			WorldDocumentService.reference_role(component), "Role, e.g. rope_post")
-		reference_role_editor.text_submitted.connect(reference_role_requested.emit)
-		reference_role_editor.focus_exited.connect(func() -> void:
-			reference_role_requested.emit(reference_role_editor.text)
-		)
-		add_child(reference_role_editor)
-		var role_hint := EditorWidgets.create_inspector_field_label("Empty exports the member's own Asset Key.")
-		role_hint.add_theme_color_override("font_color", Color("#9aa3b2"))
-		add_child(role_hint)
 	var draw_mode := WorldDocumentService.component_draw_mode(component)
 	add_child(EditorWidgets.create_inspector_field_label("Draw Mode: %s" % WorldDocumentService.draw_mode_display_name(draw_mode)))
 	if not WorldDocumentService.is_region(component) and (WorldDocumentService.is_reference_component(component) or draw_mode in [WorldDocumentService.DRAW_MODE_CLOSED_LOOP, WorldDocumentService.DRAW_MODE_PRIMITIVE]):

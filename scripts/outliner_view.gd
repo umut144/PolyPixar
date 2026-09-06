@@ -823,11 +823,9 @@ func _component_tree_name(component: Dictionary) -> String:
 
 
 func _set_member_tooltip(member: Dictionary, member_name: String) -> String:
-	var tooltip := "Member asset: %s\nReference: %s" % [member_name, WorldDocumentService.normalized_component_name(member)]
-	var role := WorldDocumentService.reference_role(member)
-	if not role.is_empty():
-		tooltip += "\nRole: %s" % role
-	return tooltip
+	# The Reference name is the member's place in the Set, so it is what the
+	# tooltip adds to the Asset the row already names.
+	return "Member asset: %s\nReference: %s" % [member_name, WorldDocumentService.normalized_component_name(member)]
 
 
 func _reference_outliner_tooltip(asset: Dictionary, reference: Dictionary) -> String:

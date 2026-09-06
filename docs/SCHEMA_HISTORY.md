@@ -61,6 +61,8 @@ fingerprints.
 | Manifest 17 | required `role` on every `asset_reference`; Palette Manifests with `variants` and `variant_asset_type` | derived | `RuntimeExportService` | `_test_runtime_export_service` |
 | 66 | `asset_category` beside `asset_type`; `variant_asset_type` retired | **explicit** (< 66) | `deserialize_asset_category` | `_test_asset_deserialization_migrations` |
 | Manifest 18, Catalog 2 | `asset_category` on every Manifest and Catalog entry; `variant_asset_type` gone | derived | `RuntimeExportService`, `AssetCatalogService` | `_test_runtime_export_service`, `_test_asset_catalog_service` |
+| 67 | `role` on Reference Components retired: a member's place in its Set is the Reference `name` | shape (a stored role is dropped on load) | `deserialize_component` | `_test_asset_deserialization_migrations` |
+| Manifest 19 | `role` gone from `asset_reference`; a member Reference must sit at the Set's root | derived | `RuntimeExportService` | `_test_runtime_export_service` |
 | Sampling 6 | Junction-aware Cuts, boundary-namespaced analytic Samples, corner balancing | derived | `GeometrySamplingService` | `_test_geometry_sampling_corner_balancing` |
 | Motion 1–18 | Blink `anticipation_share` default 0.18 read as 0.5 | **explicit** (≤ 18) | `normalize_motion_act` | `_test_asset_deserialization_migrations` |
 
@@ -345,6 +347,17 @@ boundary. Every Manifest and every Catalog entry has both `asset_type` and
 without opening its package, and `bridge` and `grass` keep the types world01
 already expects. `variant_asset_type` is gone from the Manifest with the field
 itself.
+
+Schema 67 retires the `role` field on Reference Components. What a member is
+called in its Set is the Reference's own `name`: derived from the member's name
+when the member is made, unique inside the Set, editable, and unchanged by a
+later rename of the member Asset — which is exactly what an authored role was
+for. A stored `role` is dropped on load rather than migrated; no World authored
+one. Runtime Manifest schema 19 drops `role` from every `asset_reference` to
+match, so an assembly is read from `name` and `source_asset_key` instead of from
+three strings that said the same thing, and it additionally rejects a member
+Reference that does not sit at the Set's root: a Set is a flat assembly, not a
+tree of members.
 
 Runtime Manifest schema 17 carries what the two compositions must say across
 the boundary, and nothing more. An `asset_reference` gains a required

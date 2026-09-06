@@ -133,10 +133,10 @@ func _init() -> void:
 	inherited_region.merge({"id": "component_9", "name": "hurt_region", "region_type": "hurt",
 		"region_geometry_source": WorldDocumentService.REGION_GEOMETRY_COMPONENT}, true)
 	# A Set carries no geometry of its own: its visible Components are
-	# References to its members, and each one says what role it plays.
+	# References to its members, each named for the place it fills.
 	var set_member := {"points": [], "edges": [], "chains": [], "id": "component_13",
 		"name": "post_left", "visibility": true, "type": "reference",
-		"parent_component_id": "", "topology_role": "outer", "role": "rope_post",
+		"parent_component_id": "", "topology_role": "outer",
 		"source_asset_id": "asset_2",
 		"transform": WorldDocumentService.default_component_transform()}
 	var assets: Array[Dictionary] = [{"id": "asset_1", "name": "Wizard", "visibility": true,

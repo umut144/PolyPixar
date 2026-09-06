@@ -26,9 +26,13 @@ A **Set** is an Asset with `asset_category: "set"` whose visible Components are
 Asset References to its members. Nothing new is persisted for the assembly: the
 Reference already carries which member (`source_asset_id`, exported as
 `source_asset_key`), where it sits (its own transform, canonicalized at export)
-and in what order (`z_index`). What a Reference gains is an optional `role` —
-free `lower_snake_case`, empty meaning unauthored — because a Set may fill one
-role more than once and the Component name is unique per Asset. A Set is
+and in what order (`z_index`). Nothing is added for the role either: the
+Reference's own `name` is the place the member fills in the assembly. It is
+derived from the member's name when the member is made, unique inside the Set,
+editable, and unaffected by a later rename of the member Asset — which is
+exactly what a second, authored role field would have been. A member always
+sits at the Set's root, so its Inspector offers no Parent, and Runtime Export
+rejects a member hung under anything. A Set is
 authored from the `Set` module, top down: its Asset root offers
 `New Member Asset`, and one dialog makes the member Asset plus the Reference
 that carries it into the assembly, named after the member by the same
@@ -214,8 +218,8 @@ the four views is visible, resolves that view's context and calls `rebuild()`.
   the seven `ASSET_TYPE_*` constants behind `asset_type` and
   `normalize_asset_type`, the three `ASSET_CATEGORY_*` constants behind
   `asset_category` and `normalize_asset_category`, plus `is_set_asset`,
-  `is_palette_asset`, `is_composition_asset`, the `reference_role`
-  normalization and the `palette_variants` reader; `main.gd`'s
+  `is_palette_asset`, `is_composition_asset` and the `palette_variants`
+  reader; `main.gd`'s
   `CREATE_SUBMODULE_BY_ASSET_CATEGORY` maps a category to its Create module and
   `ASSET_CATEGORY_BY_CREATE_SUBMODULE` back again, while
   `_normalized_create_submodule` reads any unknown module name, including the
@@ -704,7 +708,7 @@ The normative serialized package and consumer contract is
 must not redefine its fields. The summary below describes how the editor
 produces that contract.
 
-`RuntimeExportService` builds Manifest schema 18 exclusively from current
+`RuntimeExportService` builds Manifest schema 19 exclusively from current
 accepted Fill and Contour Stroke Mesh Bakes. Ordinary Hole Components are
 authoring-only Sampling constraints and do not enter the Manifest. A visible
 ordinary Hole with no valid direct outer Parent Body blocks export, as does a

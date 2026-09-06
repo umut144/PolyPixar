@@ -27,7 +27,7 @@ picks the Create module. A Bridge is therefore `props` and a Set. Inside
 `Single`, the Outliner search and the shared multi-select Asset filter select
 among the seven types. `Set` is a different thing, not an eighth category: a
 Set is an Asset whose visible Components are References to its members, each
-with the role it plays in the assembly. `Palette` is the third: several equally
+named for the place it fills in the assembly. `Palette` is the third: several equally
 valid, interchangeable Assets the presentation chooses among freely, sharing
 one category and carrying no arrangement at all. Members and variants are
 ordinary Assets, authored from the composition that owns them, and `Single`

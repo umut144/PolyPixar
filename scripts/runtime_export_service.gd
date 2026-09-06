@@ -1,7 +1,7 @@
 class_name RuntimeExportService
 extends RefCounted
 
-const MANIFEST_SCHEMA_VERSION := 18
+const MANIFEST_SCHEMA_VERSION := 19
 const DEFAULT_PROJECTION_DEPTH_CM := 10.0
 static func build_manifest(asset: Dictionary, sources: Dictionary, palette_variants: Array = []) -> Dictionary:
 	if WorldDocumentService.is_palette_asset(asset):
@@ -82,6 +82,8 @@ static func build_manifest(asset: Dictionary, sources: Dictionary, palette_varia
 			if str(component.get("type", "component")) != "reference":
 				errors.append("%s: a Set holds member References and no geometry of its own." % label)
 				continue
+			if not str(component.get("parent_component_id", "")).is_empty():
+				errors.append("%s: a member Reference sits at the Set's root." % label)
 			var member_source: Dictionary = sources.get(str(component.get("id", "")), {})
 			if not bool(member_source.get("source_asset_exists", false)):
 				continue
@@ -618,8 +620,10 @@ static func manifest_validation_issues(manifest: Dictionary) -> Array[String]:
 		if str(component.get("kind", "")) == "asset_reference":
 			if component.has("mesh") or component.has("contour_stroke_mesh") or component.has("closed_region_mesh") or component.has("projection_depth_corners"):
 				errors.append("%s: Asset References must not contain owned geometry meshes." % label)
-			if not _is_lower_snake_case(str(component.get("role", ""))):
-				errors.append("%s: an Asset Reference requires a lower_snake_case role." % label)
+			# The name is the place this Reference fills in its owner, so it is
+			# the one identity the boundary requires of it.
+			if not _is_lower_snake_case(str(component.get("name", ""))):
+				errors.append("%s: an Asset Reference requires a lower_snake_case name." % label)
 			continue
 		if not component.get("contour_stroke_mesh", null) is Dictionary:
 			errors.append("%s: ordinary Runtime Components require contour_stroke_mesh." % label)
@@ -793,9 +797,6 @@ static func _build_reference_component(component: Dictionary, source: Dictionary
 			"name": str(component.get("name", "")),
 			"kind": "asset_reference",
 			"source_asset_key": source_asset_key,
-			# What this member stands for in the assembly. Unauthored means the
-			# member's own Key, so the role is always readable and never guessed.
-			"role": WorldDocumentService.reference_role(component) if not WorldDocumentService.reference_role(component).is_empty() else source_asset_key,
 			"parent_component_id": parent_component_id,
 			"z_index": int(component.get("z_index", 0)),
 			"projection_depth_meters": maxf(0.0, float(component.get("projection_depth_cm", DEFAULT_PROJECTION_DEPTH_CM))) * 0.01,
