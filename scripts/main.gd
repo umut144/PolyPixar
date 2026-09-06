@@ -176,6 +176,8 @@ var asset_rename_dialog: ConfirmationDialog
 var asset_rename_input: LineEdit
 var asset_rename_key_label: Label
 var asset_name_input: LineEdit
+var asset_role_input: LineEdit
+var asset_role_edited := false
 var asset_type_input: OptionButton
 var new_asset_type := WorldDocumentService.ASSET_TYPE_CHARACTER
 var component_dialog: ConfirmationDialog
@@ -1060,6 +1062,7 @@ func _build_ui() -> void:
 	create_inspector_view.asset_pivot_property_changed.connect(_on_asset_pivot_property_changed)
 	create_inspector_view.asset_rename_dialog_requested.connect(_on_asset_rename_dialog_requested)
 	create_inspector_view.set_member_rename_dialog_requested.connect(_on_set_member_rename_dialog_requested)
+	create_inspector_view.reference_role_requested.connect(_on_reference_role_requested)
 	create_inspector_view.asset_root_position_changed.connect(_on_asset_root_position_changed)
 	create_inspector_view.asset_root_scale_changed.connect(_on_asset_root_scale_changed)
 	create_inspector_view.asset_root_scale_rebase_requested.connect(_on_rebase_asset_root_scale_pressed)
@@ -1855,11 +1858,22 @@ func _create_asset_dialog() -> void:
 	asset_name_input.custom_minimum_size = Vector2(320, 32)
 	asset_name_input.focus_mode = Control.FOCUS_ALL
 	asset_name_input.text_submitted.connect(_submit_asset_name)
+	asset_name_input.text_changed.connect(_on_new_asset_name_typed)
 	# AcceptDialog gives every Control child the same content rect, so the two
 	# fields live in one container rather than on top of each other.
 	var asset_dialog_fields := VBoxContainer.new()
 	asset_dialog_fields.add_theme_constant_override("separation", 6)
 	asset_dialog_fields.add_child(asset_name_input)
+	# A member of a Set is asked what it stands for while it is made, because
+	# nothing derives that later. The suggestion follows the name until it is
+	# typed over: suggested and confirmed is an answer, silently substituted is
+	# an invention.
+	asset_role_input = LineEdit.new()
+	asset_role_input.placeholder_text = "Role in the Set, e.g. rope_post"
+	asset_role_input.custom_minimum_size = Vector2(320, 32)
+	asset_role_input.focus_mode = Control.FOCUS_ALL
+	asset_role_input.text_changed.connect(_on_new_member_role_typed)
+	asset_dialog_fields.add_child(asset_role_input)
 	# The one Create view no longer implies a type, so the type is chosen here
 	# and stays the offered default for the next Asset.
 	asset_type_input = EditorWidgets.create_option_field(_asset_type_option_items(),
@@ -2675,6 +2689,7 @@ func _save_world() -> bool:
 				serialized_component["region_geometry_source"] = WorldDocumentService.normalize_region_geometry_source(component.get("region_geometry_source", ""))
 			if _is_reference_component(component):
 				serialized_component["reference_instance_scale"] = WorldDocumentService.serialize_vector(Vector2(component.get("reference_instance_scale", Vector2.ONE)))
+				serialized_component["role"] = WorldDocumentService.reference_role(component)
 			if _component_has_contour_stroke_width_override(component):
 				serialized_component["contour_stroke_width_px"] = float(component["contour_stroke_width_px"])
 			asset_data["components"].append(serialized_component)
@@ -6302,6 +6317,12 @@ func _open_new_asset_dialog(composition_owner_id := "") -> void:
 	asset_dialog.title = _new_asset_dialog_title(composition_owner_id)
 	if is_instance_valid(asset_type_input):
 		asset_type_input.visible = _new_asset_dialog_offers_a_type(composition_owner_id)
+	# Only a Set has roles to fill; a Palette variant and a standalone Asset are
+	# not members of anything.
+	asset_role_edited = false
+	if is_instance_valid(asset_role_input):
+		asset_role_input.text = ""
+		asset_role_input.visible = WorldDocumentService.is_set_asset(_get_asset(composition_owner_id))
 	_sync_new_asset_type_input()
 	asset_dialog.popup_centered()
 	asset_name_input.grab_focus()
@@ -6404,6 +6425,16 @@ func _composition_owned_asset_ids(asset: Dictionary) -> Array[String]:
 	return member_ids
 
 
+func _on_new_asset_name_typed(new_text: String) -> void:
+	if not is_instance_valid(asset_role_input) or not asset_role_input.visible or asset_role_edited:
+		return
+	asset_role_input.text = AssetCatalogService.asset_key(new_text)
+
+
+func _on_new_member_role_typed(_new_text: String) -> void:
+	asset_role_edited = true
+
+
 func _submit_asset_name(_submitted_text: String) -> void:
 	_confirm_asset_creation()
 
@@ -6419,6 +6450,41 @@ func _on_asset_rename_dialog_requested() -> void:
 
 func _on_set_member_rename_dialog_requested() -> void:
 	_open_rename_asset_dialog(str(_selected_set_member_asset().get("id", "")))
+
+
+func _on_reference_role_requested(new_role: String) -> void:
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if component.is_empty() or not _is_reference_component(component):
+		return
+	var role := WorldDocumentService.normalized_reference_role(new_role)
+	if role == WorldDocumentService.reference_role(component):
+		return
+	var role_error := _reference_role_validation_error(role)
+	if not role_error.is_empty():
+		_show_status_message(role_error)
+		_invalidate_render(RENDER_INSPECTOR)
+		return
+	_record_direct_change()
+	component["role"] = role
+	_invalidate_render(RENDER_DOCUMENT)
+
+
+func _reference_role_validation_error(raw_role: String) -> String:
+	# Emptying a Role is allowed while authoring — Runtime Export is where a Set
+	# without one is refused, so the editor does not force the answer before the
+	# member exists.
+	var role := raw_role.strip_edges()
+	if role.is_empty():
+		return ""
+	if role.begins_with("_") or role.ends_with("_") or role.contains("__"):
+		return "Use lower_snake_case for the Role, e.g. rope_post."
+	for character in role:
+		var code := character.unicode_at(0)
+		if not ((code >= 97 and code <= 122) or (code >= 48 and code <= 57) or code == 95):
+			return "Use lower_snake_case for the Role, e.g. rope_post."
+	if role.unicode_at(0) >= 48 and role.unicode_at(0) <= 57:
+		return "A Role must start with a lowercase letter."
+	return ""
 
 
 func _selected_set_member_asset() -> Dictionary:
@@ -6580,7 +6646,8 @@ func _confirm_asset_creation() -> void:
 		# Its local name comes from the member's own name, the same derivation
 		# the Asset Key uses, so membership is readable without a second one.
 		selected_asset_id = composition_owner_id
-		selected_component_id = _add_set_member_reference(composition_owner, asset_id)
+		selected_component_id = _add_set_member_reference(composition_owner, asset_id,
+			WorldDocumentService.normalized_reference_role(asset_role_input.text if is_instance_valid(asset_role_input) else ""))
 		_set_outliner_asset_expanded(composition_owner_id, true)
 	elif WorldDocumentService.is_palette_asset(composition_owner):
 		# A variant is carried by the list alone: no Reference, no transform,
@@ -6626,13 +6693,14 @@ func _palette_variant_rows(asset: Dictionary) -> Array:
 	return rows
 
 
-func _add_set_member_reference(owner_set: Dictionary, member_asset_id: String) -> String:
+func _add_set_member_reference(owner_set: Dictionary, member_asset_id: String, member_role: String) -> String:
 	var member := _get_asset(member_asset_id)
 	var component_id := "component_%d" % next_component_id
 	next_component_id += 1
 	owner_set["components"].append({
 		"id": component_id,
 		"type": "reference",
+		"role": member_role,
 		"name": _unique_component_name(owner_set, AssetCatalogService.asset_key(str(member.get("name", "")))),
 		"source_asset_id": member_asset_id,
 		"parent_component_id": "",

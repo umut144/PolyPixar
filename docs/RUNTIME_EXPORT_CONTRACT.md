@@ -1,10 +1,10 @@
 # PolyTools Runtime Export Contract
 
 **Status:** Normative consumer contract for Asset Catalog schema `2` and
-runtime Manifest schema `19`.
+runtime Manifest schema `20`.
 
 This document is the sole field-level contract for PolyTools Runtime packages.
-Manifest schema 19 replaces schema 18 and Catalog schema 2 replaces schema 1.
+Manifest schema 20 replaces schema 19 and Catalog schema 2 replaces schema 1.
 Consumers must reject older schemas; there is no SDF/Carrier/UV compatibility
 fallback.
 
@@ -46,12 +46,12 @@ Root Transform instead of silently changing package placement or dimensions.
 ## Compatibility policy
 
 Catalog `schema_version` must equal `2`; Manifest `schema_version` must equal
-`19`. Missing, non-integer, older, or newer versions are rejected as complete
+`20`. Missing, non-integer, older, or newer versions are rejected as complete
 packages. Missing required geometry is an error. Consumers must not synthesize
 Fill Meshes, strokes, closed Contour regions, Semantic Keys, hierarchy links,
 or referenced Assets.
 
-Schema 19 contains no UV, SDF, mask, contour-domain, padding, or Carrier field.
+Schema 20 contains no UV, SDF, mask, contour-domain, padding, or Carrier field.
 Its optional `regions` array contains authored or Component-bound Attack, Hurt,
 and Collision geometry; consumers may use it and must retain their Component
 fallback when it is empty.
@@ -71,7 +71,7 @@ Every Manifest except a Palette requires:
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `schema_version` | integer | Exactly `19`. |
+| `schema_version` | integer | Exactly `20`. |
 | `asset_key` | non-empty lower-snake-case string | Runtime identity. |
 | `display_name` | string | Informational authored name. |
 | `asset_type` | string | What the Asset is: `character`, `props`, `weapons`, `terrain`, `items`, `icon`, or `symbols`. |
@@ -148,7 +148,7 @@ independent Frame property.
 
 ## Gameplay Regions
 
-`regions` is always present in schema 19 and may be empty. Every record contains
+`regions` is always present in schema 20 and may be empty. Every record contains
 `region_id`, `name`, `role`, `geometry_source`, and `source_component_id`;
 `role` is one of `attack`, `hurt`, or `collision`.
 
@@ -305,12 +305,18 @@ package shape.
 A **Set** — `asset_category: "set"` — is an ordinary Manifest whose Components
 are all `asset_reference` records sitting at the Manifest root, and every member
 is an Asset of the Set's own `asset_type`. A Set publishes which Assets belong
-together and, through each Reference's `name`, which place every member fills;
-`source_asset_key` says which Asset fills that place. Neither is stable across a
-rename of the member Asset: the Key moves with the name, and a `name` that is
-the member's own Key moves with it, so a rename is a breaking change here as it
-is everywhere else in the Catalog. A `name` that was authored rather than
-derived stays as authored. Its Component transforms are ordinary
+together and, through each Reference's required `role`, what every member
+stands for in it. `source_asset_key` says which Asset fills that role, and
+`name` is the Reference's identity inside the Set.
+
+The role is the only one of the three a consumer cannot work out for itself.
+`source_asset_key` and `name` both follow a rename of the member Asset — the Key
+by derivation, the `name` because it is derived from the member and kept in step
+— so neither says what a member is *for*. The role is authored, never derived
+and never rewritten: rename `deck` to `plank` and the plank of the bridge is
+still the plank of the bridge. It is `lower_snake_case`, it may repeat within a
+Set where one role is filled twice, and Runtime Export rejects a Set whose
+member carries none rather than inventing one. Its Component transforms are ordinary
 exported transforms in the Set's own space and say **nothing about placement in
 a world**. Where members lie centered on their own pivot, that is exactly what
 it is: not an arrangement, but the precondition for a placing source to set
@@ -323,7 +329,7 @@ of them is an Asset of the Palette's own `asset_type`:
 
 ```json
 {
-  "schema_version": 19,
+  "schema_version": 20,
   "asset_key": "grass",
   "display_name": "Grass",
   "asset_type": "terrain",
@@ -365,7 +371,9 @@ invalid Asset, and its variants remain valid packages of their own.
 ## Asset References
 
 An Asset Reference adds `kind: "asset_reference"` and a required
-`source_asset_key`. It contains neither `mesh`, `contour_stroke_mesh`, nor
+`source_asset_key`. In a Set Manifest it also carries the required
+`lower_snake_case` `role` described under **Compositions**; elsewhere a
+Reference is a member of nothing and carries none. It contains neither `mesh`, `contour_stroke_mesh`, nor
 `closed_region_mesh`, but retains its local `projection_depth_meters` value.
 An
 optional finite positive `contour_stroke_width_override_px` is local to the

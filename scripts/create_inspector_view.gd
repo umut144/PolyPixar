@@ -17,6 +17,7 @@ signal palette_variant_remove_requested(variant_asset_id: String)
 signal asset_pivot_property_changed(value: float, property_name: String)
 signal asset_rename_dialog_requested()
 signal set_member_rename_dialog_requested()
+signal reference_role_requested(new_role: String)
 signal asset_root_position_changed(value: float, property_name: String)
 signal asset_root_scale_changed(value: float, property_name: String)
 signal asset_root_scale_rebase_requested()
@@ -95,6 +96,7 @@ var member_asset_name: String = ""
 var palette_variant_rows: Array = []
 var asset_rename_button: Button
 var set_member_rename_button: Button
+var reference_role_editor: LineEdit
 var component_name_editor: LineEdit
 
 
@@ -151,6 +153,7 @@ func _reset_field_cache() -> void:
 	asset_type_option = null
 	asset_rename_button = null
 	set_member_rename_button = null
+	reference_role_editor = null
 	component_name_editor = null
 
 
@@ -413,6 +416,21 @@ func rebuild() -> void:
 		set_member_rename_button.disabled = member_asset_name.is_empty()
 		set_member_rename_button.pressed.connect(set_member_rename_dialog_requested.emit)
 		add_child(set_member_rename_button)
+		# What this member stands for in the Set. It is the one thing a consumer
+		# cannot work out for itself: the Reference name and the member's Key
+		# both follow a rename of the member, the role does not.
+		add_child(EditorWidgets.create_inspector_section("Role in the Set", section_toggled.emit))
+		reference_role_editor = EditorWidgets.create_name_editor(
+			WorldDocumentService.reference_role(component), "Role, e.g. rope_post")
+		reference_role_editor.text_submitted.connect(reference_role_requested.emit)
+		reference_role_editor.focus_exited.connect(func() -> void:
+			reference_role_requested.emit(reference_role_editor.text)
+		)
+		add_child(reference_role_editor)
+		if WorldDocumentService.reference_role(component).is_empty():
+			var role_hint := EditorWidgets.create_inspector_field_label("Runtime Export rejects a member without a Role.")
+			role_hint.add_theme_color_override("font_color", Color("#ef6c78"))
+			add_child(role_hint)
 	add_child(EditorWidgets.create_inspector_section("Place in Set" if is_set_member else "Component", section_toggled.emit))
 	component_name_editor = EditorWidgets.create_name_editor(WorldDocumentService.normalized_component_name(component), "Component name")
 	component_name_editor.text_submitted.connect(component_rename_requested.emit)

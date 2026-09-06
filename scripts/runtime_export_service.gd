@@ -1,7 +1,7 @@
 class_name RuntimeExportService
 extends RefCounted
 
-const MANIFEST_SCHEMA_VERSION := 19
+const MANIFEST_SCHEMA_VERSION := 20
 const DEFAULT_PROJECTION_DEPTH_CM := 10.0
 static func build_manifest(asset: Dictionary, sources: Dictionary, palette_variants: Array = []) -> Dictionary:
 	if WorldDocumentService.is_palette_asset(asset):
@@ -84,6 +84,13 @@ static func build_manifest(asset: Dictionary, sources: Dictionary, palette_varia
 				continue
 			if not str(component.get("parent_component_id", "")).is_empty():
 				errors.append("%s: a member Reference sits at the Set's root." % label)
+			# What a member stands for is the one thing a consumer cannot derive:
+			# `source_asset_key` and `name` both follow a rename of the member
+			# Asset, so neither carries a role. It is authored or it is missing.
+			if WorldDocumentService.reference_role(component).is_empty():
+				errors.append("%s: every member of a Set carries an authored Role." % label)
+			elif not _is_lower_snake_case(WorldDocumentService.reference_role(component)):
+				errors.append("%s: a Set Role must be lower_snake_case." % label)
 			var member_source: Dictionary = sources.get(str(component.get("id", "")), {})
 			if not bool(member_source.get("source_asset_exists", false)):
 				continue
@@ -620,6 +627,8 @@ static func manifest_validation_issues(manifest: Dictionary) -> Array[String]:
 		if str(component.get("kind", "")) == "asset_reference":
 			if component.has("mesh") or component.has("contour_stroke_mesh") or component.has("closed_region_mesh") or component.has("projection_depth_corners"):
 				errors.append("%s: Asset References must not contain owned geometry meshes." % label)
+			if str(manifest.get("asset_category", "")) == WorldDocumentService.ASSET_CATEGORY_SET and not _is_lower_snake_case(str(component.get("role", ""))):
+				errors.append("%s: a Set member Reference requires a lower_snake_case role." % label)
 			# The name is the place this Reference fills in its owner, so it is
 			# the one identity the boundary requires of it.
 			if not _is_lower_snake_case(str(component.get("name", ""))):
@@ -808,6 +817,12 @@ static func _build_reference_component(component: Dictionary, source: Dictionary
 			}
 		}
 	}
+	# The role crosses only where it means something: a Set publishes what each
+	# member stands for, a Reference under a Component is not a member of
+	# anything and carries none.
+	var authored_role := WorldDocumentService.reference_role(component)
+	if not authored_role.is_empty():
+		result["component"]["role"] = authored_role
 	if component.has("contour_stroke_width_px"):
 		var local_width = component.get("contour_stroke_width_px")
 		if typeof(local_width) not in [TYPE_INT, TYPE_FLOAT] or not is_finite(float(local_width)) or float(local_width) <= 0.0:

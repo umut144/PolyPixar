@@ -223,6 +223,9 @@ func _create_set_member(application: Control, asset_id: String, member_name: Str
 	# the one kind of thing it and its members are.
 	application.asset_dialog.set_meta("composition_owner_id", asset_id)
 	application.asset_name_input.text = member_name
+	# What the dialog suggests while the name is typed, and what the author
+	# leaves standing unless they type over it.
+	application.asset_role_input.text = AssetCatalogService.asset_key(member_name)
 	application._confirm_asset_creation()
 	return application.selected_component_id
 
@@ -274,7 +277,7 @@ func _test_set_composition() -> void:
 	bridge["components"].append(_outliner_test_component("component_taken", "bridge_post"))
 	var post_member_id := _create_set_member(application, bridge_id, "Bridge Post")
 	var post_member: Dictionary = application._get_component(bridge, post_member_id)
-	_expect(WorldDocumentService.normalized_component_name(post_member) == "bridge_post_02", "A derived Reference name should stay unique inside the Set.")
+	_expect(WorldDocumentService.normalized_component_name(post_member) == "bridge_post_02" and WorldDocumentService.reference_role(post_member) == "bridge_post", "A derived Reference name should stay unique inside the Set, and the Role the dialog suggested should be stored as authored.")
 	application.selected_asset_id = bridge_id
 	application.selected_component_id = post_member_id
 	# The Reference name is the member's place in the Set, so the Inspector
@@ -290,7 +293,7 @@ func _test_set_composition() -> void:
 			# is stripped here: without that, asserting a section is absent
 			# succeeds even when it is drawn.
 			member_inspector_texts.append(str(control.text).trim_prefix("▾").trim_prefix("▸").strip_edges())
-	_expect(member_inspector_texts.has("Member Asset") and member_inspector_texts.has("Bridge Post") and member_inspector_texts.has("Place in Set") and member_inspector_texts.has("bridge_post_02") and not member_inspector_texts.has("Hierarchy") and not member_inspector_texts.has("Component") and not member_inspector_texts.has("Set Role"), "A member Inspector should name the member Asset and the place it fills, and offer neither a Parent nor a second name for the place, but showed %s." % [member_inspector_texts])
+	_expect(member_inspector_texts.has("Member Asset") and member_inspector_texts.has("Bridge Post") and member_inspector_texts.has("Place in Set") and member_inspector_texts.has("bridge_post_02") and member_inspector_texts.has("Role in the Set") and not member_inspector_texts.has("Hierarchy") and not member_inspector_texts.has("Component") and not member_inspector_texts.has("Set Role"), "A member Inspector should name the member Asset and the place it fills, and offer neither a Parent nor a second name for the place, but showed %s." % [member_inspector_texts])
 	application._render_outliner()
 	# A member row names the member Asset, exactly as a Palette names a variant:
 	# the Reference that carries it is derived, so it is read in the tooltip.
@@ -305,7 +308,12 @@ func _test_set_composition() -> void:
 	_expect(str(application.asset_rename_dialog.get_meta("asset_id", "")) == str(post_asset.get("id", "")), "The member rename dialog should open on the member Asset rather than on the Set.")
 	application.asset_rename_input.text = "Deck"
 	application._confirm_asset_rename()
-	_expect(str(post_asset.get("name", "")) == "Deck" and WorldDocumentService.normalized_component_name(post_member) == "deck", "Renaming a member should rename its Asset, and the derived place name should follow rather than stay behind disagreeing with it.")
+	_expect(str(post_asset.get("name", "")) == "Deck" and WorldDocumentService.normalized_component_name(post_member) == "deck" and WorldDocumentService.reference_role(post_member) == "bridge_post", "Renaming a member should rename its Asset and carry the derived name along, while the authored Role stays: what a member stands for is not what it is called.")
+	application.selected_component_id = post_member_id
+	application._on_reference_role_requested("Bridge Post")
+	_expect(WorldDocumentService.reference_role(post_member) == "bridge_post", "A Role that is not lower_snake_case should be rejected rather than stored.")
+	application._on_reference_role_requested("anchor")
+	_expect(WorldDocumentService.reference_role(post_member) == "anchor", "An authored Role should replace the suggested one.")
 	# A place the user named answers a different question than which Asset fills
 	# it, so it is left alone.
 	post_member["name"] = "left_side"
@@ -1961,6 +1969,7 @@ const CREATE_SIGNAL_ROUTES := [
 	["reference_image_property_changed", "_on_reference_image_property_changed"],
 	["reference_image_target_height_changed", "_on_reference_image_target_height_changed"],
 	["reference_image_visibility_changed", "_on_reference_image_visibility_changed"],
+	["reference_role_requested", "_on_reference_role_requested"],
 	["section_toggled", "_on_inspector_section_toggled"],
 	["selected_points_delta_changed", "_on_selected_points_delta_changed"],
 	["selected_points_mode_selected", "_on_selected_points_mode_selected"],

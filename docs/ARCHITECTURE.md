@@ -30,14 +30,17 @@ canonicalized at export) and in what order (`z_index`). That space is authoring
 space: `RUNTIME_EXPORT_CONTRACT.md` states that a Set's transforms say nothing
 about placement in a world, because members are authored centered on their own
 pivot so that a placing consumer sets them itself. Nothing is added for the role either: the
-Reference's own `name` is the place the member fills in the assembly. It is
-derived from the member's name when the member is made, unique inside the Set,
-and editable — which is exactly what a second, authored role field would have
-been. A Reference whose name is still the source Asset's own Key follows a
-rename of that Asset (`_follow_reference_rename`), because two names disagreeing
-about the same thing help nobody and the Key moved anyway; a name that was
-authored instead answers which place this is, not which Asset fills it, and
-stays. A member always
+Reference's own `name` is its identity inside the Set: derived from the member's
+name when the member is made, unique there, and editable. A Reference whose name
+is still the source Asset's own Key follows a rename of that Asset
+(`_follow_reference_rename`), because two names disagreeing about the same thing
+help nobody and the Key moved anyway.
+
+What a member stands for is a separate field, `role`, precisely because the name
+follows. It is authored — suggested from the name while the member is made,
+never substituted afterwards — `lower_snake_case`, may repeat where one role is
+filled twice, and Runtime Export rejects a Set whose member carries none. The
+Inspector shows it under `Role in the Set` and says so when it is missing. A member always
 sits at the Set's root, so its Inspector offers no Parent, and Runtime Export
 rejects a member hung under anything. A Set is
 authored from the `Set` module, top down: its Asset root offers

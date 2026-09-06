@@ -63,6 +63,8 @@ fingerprints.
 | Manifest 18, Catalog 2 | `asset_category` on every Manifest and Catalog entry; `variant_asset_type` gone | derived | `RuntimeExportService`, `AssetCatalogService` | `_test_runtime_export_service`, `_test_asset_catalog_service` |
 | 67 | `role` on Reference Components retired: a member's place in its Set is the Reference `name` | shape (a stored role is dropped on load) | `deserialize_component` | `_test_asset_deserialization_migrations` |
 | Manifest 19 | `role` gone from `asset_reference`; a member Reference must sit at the Set's root | derived | `RuntimeExportService` | `_test_runtime_export_service` |
+| 68 | `role` back on Reference Components, authored and never derived | additive (missing role reads empty) | `deserialize_component` | `_test_set_composition`, `_test_asset_deserialization_migrations` |
+| Manifest 20 | `role` required on every member Reference of a Set | derived | `RuntimeExportService` | `_test_runtime_export_service` |
 | Sampling 6 | Junction-aware Cuts, boundary-namespaced analytic Samples, corner balancing | derived | `GeometrySamplingService` | `_test_geometry_sampling_corner_balancing` |
 | Motion 1–18 | Blink `anticipation_share` default 0.18 read as 0.5 | **explicit** (≤ 18) | `normalize_motion_act` | `_test_asset_deserialization_migrations` |
 
@@ -362,6 +364,23 @@ tree of members. The same step drops the claim that a Set's transforms are its
 assembly. They are ordinary transforms in the Set's own space; members are
 authored centered on their own pivot, which is not an arrangement but the
 precondition for a placing consumer to set them itself.
+
+Schema 68 puts `role` back on Reference Components, and schema 67 is the reason
+it has to come back. Dropping it was right while the Reference name stood still:
+the name was derived from the member once and never moved again, so it could
+carry what a member stands for. Schema 67 made every derived name follow its
+Asset, which is what a rename should do — and with that the name became a second
+spelling of `source_asset_key` and stopped being able to say what a member is
+for. A consumer assembling a bridge needs to know which member is the plank; it
+cannot read that from two fields that both track the member's current name.
+
+The role is therefore authored and never derived. It is suggested while a member
+is made, from the name being typed, and stands until it is typed over —
+suggested and confirmed is an answer, silently substituted is an invention, and
+the first version's silent fallback to the Asset Key is exactly what made it
+look redundant. Runtime Manifest schema 20 requires it on every member Reference
+of a Set and rejects a Set without it; a Reference under a Component is a member
+of nothing and carries none.
 
 Runtime Manifest schema 17 carries what the two compositions must say across
 the boundary, and nothing more. An `asset_reference` gains a required

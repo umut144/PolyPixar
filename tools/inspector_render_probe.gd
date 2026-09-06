@@ -139,7 +139,7 @@ func _init() -> void:
 	# References to its members, each named for the place it fills.
 	var set_member := {"points": [], "edges": [], "chains": [], "id": "component_13",
 		"name": "post_left", "visibility": true, "type": "reference",
-		"parent_component_id": "", "topology_role": "outer",
+		"parent_component_id": "", "topology_role": "outer", "role": "anchor",
 		"source_asset_id": "asset_2",
 		"transform": WorldDocumentService.default_component_transform()}
 	var assets: Array[Dictionary] = [{"id": "asset_1", "name": "Wizard", "visibility": true,

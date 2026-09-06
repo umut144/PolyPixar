@@ -10,7 +10,7 @@ extends RefCounted
 # functions that do read editor state, _serialize_editor_state and
 # _serialize_world_settings, stay in main.gd for that reason.
 
-const SCHEMA_VERSION := 67
+const SCHEMA_VERSION := 68
 const REGION_GEOMETRY_AUTHORED := "authored"
 const REGION_GEOMETRY_COMPONENT := "component"
 const REGION_GEOMETRY_SOURCES := [REGION_GEOMETRY_AUTHORED, REGION_GEOMETRY_COMPONENT]
@@ -433,6 +433,7 @@ static func deserialize_component(component_data: Dictionary, source_schema_vers
 		component["region_geometry_source"] = normalize_region_geometry_source(component_data.get("region_geometry_source", ""))
 	if component_type == "reference":
 		component["reference_instance_scale"] = deserialize_vector(component_data.get("reference_instance_scale", [1.0, 1.0]), Vector2.ONE)
+		component["role"] = normalized_reference_role(component_data.get("role", ""))
 	if serialized_contour_stroke_width_is_valid(component_data):
 		component["contour_stroke_width_px"] = float(component_data["contour_stroke_width_px"])
 	return component
@@ -1174,6 +1175,19 @@ static func normalized_palette_variants(value) -> Array[String]:
 
 static func palette_variants(asset: Dictionary) -> Array[String]:
 	return normalized_palette_variants(asset.get("palette_variants", []))
+
+
+static func normalized_reference_role(value) -> String:
+	# What a member stands for in its Set. Authored, never derived: the two
+	# neighbouring fields already answer which Asset fills the place
+	# (`source_asset_key`) and what the Reference is called inside its owner
+	# (`name`), and both follow a rename of that Asset. The role does not,
+	# which is the whole point of it.
+	return str(value).strip_edges().to_lower()
+
+
+static func reference_role(component: Dictionary) -> String:
+	return normalized_reference_role(component.get("role", ""))
 
 
 static func is_region(component: Dictionary) -> bool:
