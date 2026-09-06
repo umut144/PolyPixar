@@ -25,7 +25,8 @@ application, and UV and SDF have no authoring surface any more.
 its own: the Outliner search and the shared multi-select Asset filter select
 among the seven types. `Set` is a different thing, not an eighth category: a
 Set is an Asset whose visible Components are References to its members, each
-with the role it plays in the assembly. Mesh is the user-facing name of the
+with the role it plays in the assembly. A member is an ordinary Asset, authored
+from the Set that owns it, and `Single` lists only what is placed on its own. Mesh is the user-facing name of the
 derived geometry pipeline; the `geometry_*` identifiers in code are its
 technical names.
 

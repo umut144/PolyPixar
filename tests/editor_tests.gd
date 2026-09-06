@@ -61,6 +61,17 @@ func _press_outliner_button(application: Control, prefix: String) -> bool:
 	return true
 
 
+func _collect_button_labels(node: Node, labels: Array[String]) -> void:
+	# A rebuild clears with queue_free(), and a -s run never ends the frame that
+	# would drain the queue, so the previous render's rows are still parented.
+	if node.is_queued_for_deletion() or node is CheckBox or node is CheckButton:
+		return
+	if node is Button and str(node.text) != "Add":
+		labels.append(str(node.text))
+	for child in node.get_children():
+		_collect_button_labels(child, labels)
+
+
 func _button_with_text(root: Node, expected_text: String) -> Button:
 	if root is Button and str(root.text) == expected_text:
 		return root
@@ -206,16 +217,13 @@ func _test_create_outliner_expansion_scope() -> void:
 	application.free()
 
 
-func _add_set_member(application: Control, asset_id: String, source_asset_id: String, member_name: String) -> String:
-	# The member dialog the way the Set root menu opens it, without the popup a
-	# headless run has no tree for.
-	application.component_dialog.set_meta("asset_id", asset_id)
-	application.component_dialog.set_meta("parent_component_id", "")
-	application.component_dialog.set_meta("draw_mode", "reference")
-	application.component_dialog.set_meta("source_asset_id", source_asset_id)
-	application.component_dialog.set_meta("group_id", "")
-	application.component_name_input.text = member_name
-	application._confirm_component_creation()
+func _create_set_member(application: Control, asset_id: String, member_name: String, asset_type: String) -> String:
+	# The New Member path: one dialog makes the Asset and the Reference that
+	# puts it into the assembly.
+	application.asset_dialog.set_meta("member_of_set_id", asset_id)
+	application.new_asset_type = asset_type
+	application.asset_name_input.text = member_name
+	application._confirm_asset_creation()
 	return application.selected_component_id
 
 
@@ -232,21 +240,39 @@ func _test_set_composition() -> void:
 	var create_section: ModuleSection = application._find_section("Create")
 	application._select_submodule("Create", "Set", create_section)
 	_expect(application.active_create_submodule == "Set" and application.create_action_button.text == "Create Set" and not application.outliner_asset_type_filter_panel.visible, "The Set module should create Sets and hide the seven-type Asset filter, which does not describe them.")
+	application.asset_dialog.set_meta("member_of_set_id", "")
 	application.asset_name_input.text = "Bridge"
 	application._confirm_asset_creation()
 	var bridge: Dictionary = application.assets[-1]
 	var bridge_id := str(bridge.get("id", ""))
 	_expect(WorldDocumentService.is_set_asset(bridge) and application._asset_type_create_submodule(WorldDocumentService.asset_type(bridge)) == "Set", "Creating from the Set module should persist the stable set Asset type.")
-	var candidate_names: Array[String] = []
-	for candidate in application._reference_source_candidates(bridge_id):
-		candidate_names.append(str(candidate.get("name", "")))
-	_expect(candidate_names == ["Plank", "Rope Post"], "A Set should offer every ordinary Asset as a member and neither itself nor another Set, but offered %s." % [candidate_names])
-	var post_member_id := _add_set_member(application, bridge_id, "asset_post", "post_left")
-	var plank_member_id := _add_set_member(application, bridge_id, "asset_plank", "plank_01")
+	# The primary path: Add makes a member. The member is an ordinary Asset, and
+	# the Reference that carries it into the assembly is named after it.
+	var rail_member_id := _create_set_member(application, bridge_id, "Rope Rail", "props")
+	var rail_member: Dictionary = application._get_component(bridge, rail_member_id)
+	var rail_asset: Dictionary = application._get_asset(str(rail_member.get("source_asset_id", "")))
+	_expect(application.selected_asset_id == bridge_id and application._is_reference_component(rail_member) and str(rail_member.get("parent_component_id", "")).is_empty(), "Adding a member should leave the Set selected and put a root-level Reference into it.")
+	_expect(str(rail_asset.get("name", "")) == "Rope Rail" and str(rail_asset.get("asset_type", "")) == "props" and rail_asset.get("components", []).is_empty(), "A member should be an ordinary Asset of its own category, ready for its Components.")
+	_expect(WorldDocumentService.normalized_component_name(rail_member) == "rope_rail", "The Reference should be named after the member, by the same derivation the Asset Key uses.")
+	# A member is reached through its composition, so Single does not offer it
+	# a second time.
+	_expect(application._composition_member_asset_ids().has(str(rail_asset.get("id", ""))), "An Asset a Set owns should count as a composition member.")
+	application._select_submodule("Create", "Single", create_section)
+	# An expanded Asset focuses the Create list on itself, so the list is read
+	# with everything collapsed.
+	for asset in application.assets:
+		application.expanded_assets[str(asset.get("id", ""))] = false
+	application._render_outliner()
+	var single_labels: Array[String] = []
+	_collect_button_labels(application.outliner_view, single_labels)
+	_expect(single_labels.has("Plank") and single_labels.has("Rope Post") and not single_labels.has("Rope Rail") and not single_labels.has("Bridge"), "Single should list what is placed on its own and neither members nor compositions, but listed %s." % [single_labels])
+	application._select_submodule("Create", "Set", create_section)
+	# The Reference name is derived, so it has to survive a name the Set already
+	# uses rather than silently duplicating it.
+	bridge["components"].append(_outliner_test_component("component_taken", "bridge_post"))
+	var post_member_id := _create_set_member(application, bridge_id, "Bridge Post", "props")
 	var post_member: Dictionary = application._get_component(bridge, post_member_id)
-	var plank_member: Dictionary = application._get_component(bridge, plank_member_id)
-	_expect(application._is_reference_component(post_member) and str(post_member.get("source_asset_id", "")) == "asset_post" and str(post_member.get("parent_component_id", "")).is_empty(), "A Set member should be a root-level Reference carrying which Asset it instances.")
-	_expect(str(plank_member.get("source_asset_id", "")) == "asset_plank" and WorldDocumentService.reference_role(plank_member).is_empty(), "A new member should start without an authored role, which Runtime Export reads as the member's own Asset Key.")
+	_expect(WorldDocumentService.normalized_component_name(post_member) == "bridge_post_02" and WorldDocumentService.reference_role(post_member).is_empty(), "A derived Reference name should stay unique, and a new member should start without an authored role.")
 	application.selected_asset_id = bridge_id
 	application.selected_component_id = post_member_id
 	application._on_reference_role_requested("Rope Post")
@@ -256,7 +282,7 @@ func _test_set_composition() -> void:
 	application._render_outliner()
 	# A member row names the Reference and the Asset it instances, the same
 	# summary the References section has always drawn.
-	_expect(_button_with_text(application.outliner_view, "Bridge") != null and _button_with_text(application.outliner_view, "post_left ← Rope Post") != null and _button_with_text(application.outliner_view, "plank_01 ← Plank") != null, "The Set Outliner should list the Set and its members.")
+	_expect(_button_with_text(application.outliner_view, "Bridge") != null and _button_with_text(application.outliner_view, "rope_rail ← Rope Rail") != null and _button_with_text(application.outliner_view, "bridge_post_02 ← Bridge Post") != null, "The Set Outliner should list the Set and its members.")
 	# Plank instances Rope Post, so Rope Post may not instance Plank back: the
 	# consumer resolves References through the Catalog and would recurse.
 	plank["components"].append({"id": "component_cap", "type": "reference", "name": "cap",
@@ -264,10 +290,6 @@ func _test_set_composition() -> void:
 		"chains": [], "visibility": true, "transform": WorldDocumentService.default_component_transform()})
 	_expect(application._reference_cycle_issue("asset_plank", "asset_post").is_empty() and not application._reference_cycle_issue("asset_post", "asset_plank").is_empty(), "A Reference that would close a cycle should be rejected where it is authored.")
 	_expect(not application._reference_cycle_issue("asset_plank", "asset_plank").is_empty() and not application._reference_cycle_issue("asset_plank", "").is_empty(), "Self-reference and a missing source should be rejected as well.")
-	var post_candidates: Array[String] = []
-	for candidate in application._reference_source_candidates("asset_post"):
-		post_candidates.append(str(candidate.get("name", "")))
-	_expect(post_candidates.is_empty(), "The member menu should not offer a source that already reaches the owner, but offered %s." % [post_candidates])
 	application.free()
 
 

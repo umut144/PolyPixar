@@ -23,12 +23,26 @@ Reference already carries which member (`source_asset_id`, exported as
 and in what order (`z_index`). What a Reference gains is an optional `role` —
 free `lower_snake_case`, empty meaning unauthored — because a Set may fill one
 role more than once and the Component name is unique per Asset. A Set is
-authored from the `Set` module: its Asset root offers members instead of draw
-modes, its Outliner entry has one `Members` section, and a member may be any
-Asset that is not a Set and does not already reach the owner through References.
-`_reference_cycle_issue` in `main.gd` is that check, and it guards the Symbol
-Reference path as well; a cycle is a consumer's infinite recursion, so it is
-rejected where it would be authored.
+authored from the `Set` module, top down: its Asset root offers
+`New Member Asset`, and one dialog makes the member Asset — with its own
+category, so a Set may mix types — plus the Reference that carries it into the
+assembly, named after the member by the same derivation the Asset Key uses. A
+Set therefore owns the Assets it is made of rather than collecting Assets that
+already exist. Its Outliner entry has one `Members` section.
+A member Asset is ordinary in every other way, References included: it may
+instance a Symbol exactly as a Single does. `_reference_cycle_issue` in
+`main.gd` guards that path — a cycle is a consumer's infinite recursion, so it
+is rejected where it would be authored rather than exported and left for the
+consumer to notice.
+
+A member is an ordinary Asset, so it keeps its own type, its own Components
+and its own place in Mesh and Style. What it does not keep is a second entry in
+`Single`: that view lists what is placed on its own, and an Asset some
+composition already owns is reached through that composition instead.
+`_composition_member_asset_ids` in `main.gd` resolves that set once per render
+and hands it to the Outliner, and `_asset_matches_create_submodule` applies the
+same rule to the module's expansion scope and its active Asset, so the three
+never disagree.
 
 Single, Mesh and Style share one multi-select Outliner Asset filter. Its seven
 checkbox states are persisted in `editor_state`; the filter is applied together

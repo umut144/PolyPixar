@@ -1943,9 +1943,12 @@ func _create_component_add_menu() -> void:
 	add_child(component_add_menu)
 	# A Set is assembled from its members, so its Asset root offers members
 	# rather than draw modes.
+	# A Set is authored top down: Add makes the member Asset and the Reference
+	# that carries it into the assembly in one step.
 	set_member_menu = PopupMenu.new()
 	set_member_menu.name = "SetMemberMenu"
-	set_member_menu.id_pressed.connect(_on_set_member_selected)
+	set_member_menu.add_item("New Member Asset…", 0)
+	set_member_menu.id_pressed.connect(_on_set_add_selected)
 	EditorWidgets.style_popup_menu(set_member_menu)
 	add_child(set_member_menu)
 
@@ -6063,21 +6066,26 @@ func _add_info_mode_option(text: String, active: bool) -> void:
 	info_bar.add_child(option)
 
 
-func _open_new_asset_dialog() -> void:
+func _open_new_asset_dialog(member_of_set_id := "") -> void:
+	# One dialog, two intents: a standalone Asset, or a member authored from
+	# inside the Set that will reference it. A member is an ordinary Asset, so
+	# it is the composition modules that hide the type, not the member.
 	asset_name_input.text = ""
 	asset_dialog.dialog_text = "Enter an asset name"
-	asset_dialog.title = "New %s" % ("Set" if active_create_submodule == "Set" else "Asset")
+	asset_dialog.set_meta("member_of_set_id", member_of_set_id)
+	var creates_ordinary_asset := not member_of_set_id.is_empty() or active_create_submodule == "Single"
+	asset_dialog.title = "New Member" if not member_of_set_id.is_empty() else "New %s" % (active_create_submodule if active_create_submodule == "Set" else "Asset")
 	if is_instance_valid(asset_type_input):
-		asset_type_input.visible = active_create_submodule != "Set"
+		asset_type_input.visible = creates_ordinary_asset
 	_sync_new_asset_type_input()
 	asset_dialog.popup_centered()
 	asset_name_input.grab_focus()
 
 
-func _create_submodule_new_asset_type() -> String:
-	# The module fixes the composition; within Single the dialog fixes the
-	# category. Both end up in the one persisted discriminator.
-	if active_create_submodule == "Set":
+func _new_asset_type(member_of_set_id: String) -> String:
+	# The module fixes the composition; the dialog fixes the category. A member
+	# is an ordinary Asset whatever module it was authored from.
+	if member_of_set_id.is_empty() and active_create_submodule == "Set":
 		return WorldDocumentService.ASSET_TYPE_SET
 	return WorldDocumentService.normalize_asset_type(new_asset_type)
 
@@ -6172,19 +6180,74 @@ func _confirm_asset_creation() -> void:
 		asset_name_input.select_all()
 		_show_status_message(validation_error)
 		return
+	var member_of_set_id := str(asset_dialog.get_meta("member_of_set_id", ""))
+	# Single shot: the next Asset is standalone unless the dialog is opened for
+	# a Set again.
+	asset_dialog.set_meta("member_of_set_id", "")
+	var owner_set := _get_asset(member_of_set_id)
+	if not member_of_set_id.is_empty() and not WorldDocumentService.is_set_asset(owner_set):
+		asset_dialog.hide()
+		return
 	_record_direct_change()
 	var asset_id := "asset_%d" % next_asset_id
 	next_asset_id += 1
-	assets.append({"id": asset_id, "name": asset_name, "asset_type": _create_submodule_new_asset_type(), "authored_facing": AssetPresentation.AuthoredFacing.NEUTRAL, "visibility": true, "asset_pivot": Vector2.ZERO, "root_position": Vector2.ZERO, "root_scale": Vector2.ONE, "reference_image": WorldDocumentService.default_reference_image(), "animation": MotionWorkspace.create_default_animation_document(), "components": [], "groups": [], "guides": []})
+	assets.append({"id": asset_id, "name": asset_name, "asset_type": _new_asset_type(member_of_set_id), "authored_facing": AssetPresentation.AuthoredFacing.NEUTRAL, "visibility": true, "asset_pivot": Vector2.ZERO, "root_position": Vector2.ZERO, "root_scale": Vector2.ONE, "reference_image": WorldDocumentService.default_reference_image(), "animation": MotionWorkspace.create_default_animation_document(), "components": [], "groups": [], "guides": []})
 	selected_asset_id = asset_id
 	selected_component_id = ""
 	selected_component_ids.clear()
 	selected_group_id = ""
 	selected_guide_id = ""
 	active_state = ""
-	_set_outliner_asset_expanded(asset_id, true)
+	if not member_of_set_id.is_empty():
+		# The member exists; the Reference is what puts it into the assembly.
+		# Its local name comes from the member's own name, the same derivation
+		# the Asset Key uses, so membership is readable without a second one.
+		selected_asset_id = member_of_set_id
+		selected_component_id = _add_set_member_reference(owner_set, asset_id)
+		_set_outliner_asset_expanded(member_of_set_id, true)
+	else:
+		_set_outliner_asset_expanded(asset_id, true)
 	asset_dialog.hide()
 	_invalidate_render(RENDER_DOCUMENT)
+
+
+func _add_set_member_reference(owner_set: Dictionary, member_asset_id: String) -> String:
+	var member := _get_asset(member_asset_id)
+	var component_id := "component_%d" % next_component_id
+	next_component_id += 1
+	owner_set["components"].append({
+		"id": component_id,
+		"type": "reference",
+		"name": _unique_component_name(owner_set, AssetCatalogService.asset_key(str(member.get("name", "")))),
+		"source_asset_id": member_asset_id,
+		"parent_component_id": "",
+		"group_id": "",
+		"points": [], "edges": [], "chains": [],
+		"transform": WorldDocumentService.default_component_transform(),
+		"visibility": true,
+		"z_index": 0,
+		"projection_depth_cm": WorldDocumentService.DEFAULT_PROJECTION_DEPTH_CM,
+		"draw_mode": WorldDocumentService.DRAW_MODE_CLOSED_LOOP,
+		"topology_role": WorldDocumentService.ROLE_OUTER,
+		"geometry_source": "bezier",
+		"primitive": {},
+		"catch_parent_component_id": "",
+		"show_point_numbers": false,
+		"role": "",
+	})
+	return component_id
+
+
+func _unique_component_name(asset: Dictionary, base_name: String) -> String:
+	# The member's own name, made unique where one Asset fills a role twice:
+	# rope_post, rope_post_02.
+	var candidate := base_name if not base_name.is_empty() else "member"
+	if not _has_component_name(asset, candidate):
+		return candidate
+	var index := 2
+	while _has_component_name(asset, "%s_%02d" % [candidate, index]):
+		index += 1
+	return "%s_%02d" % [candidate, index]
 
 
 func _open_reference_image_dialog() -> void:
@@ -6448,7 +6511,7 @@ func _render_outliner() -> void:
 	outliner_view.set_documents(assets, motion_paths, motion_sequences)
 	outliner_view.set_module(active_module, active_create_submodule, active_geometry_submodule, active_motion_submodule)
 	outliner_view.set_selection(selected_asset_id, selected_component_id, selected_component_ids, selected_group_id, selected_guide_id, selected_motion_path_id, selected_motion_sequence_id, selected_weighting_style_id, motion_act_preview_asset_id)
-	outliner_view.set_filters(outliner_search_input.text.strip_edges().to_lower() if is_instance_valid(outliner_search_input) else "", _outliner_module_asset_type_filters())
+	outliner_view.set_filters(outliner_search_input.text.strip_edges().to_lower() if is_instance_valid(outliner_search_input) else "", _outliner_module_asset_type_filters(), _composition_member_asset_ids())
 	outliner_view.set_expansion(expanded_assets, _outliner_focus_asset_id())
 	outliner_view.set_row_status(_outliner_row_status())
 	outliner_view.set_geometry_rows(_geometry_outliner_rows())
@@ -7559,31 +7622,17 @@ func _open_component_dialog(asset_id: String, anchor: Control) -> void:
 
 
 func _open_set_member_menu(asset_id: String, anchor: Control) -> void:
-	set_member_menu.clear()
-	for source_asset in _reference_source_candidates(asset_id):
-		set_member_menu.add_item(str(source_asset.get("name", "Asset")), set_member_menu.item_count)
-		set_member_menu.set_item_metadata(set_member_menu.item_count - 1, str(source_asset.get("id", "")))
-	if set_member_menu.item_count == 0:
-		_show_status_message("No Asset can join this Set yet: a member is an ordinary Asset that does not reference this one.")
-		return
 	set_member_menu.set_meta("asset_id", asset_id)
 	set_member_menu.position = Vector2i(anchor.global_position + Vector2(0.0, anchor.size.y))
 	set_member_menu.popup()
 
 
-func _reference_source_candidates(owner_asset_id: String) -> Array[Dictionary]:
-	# A member is an ordinary Asset. Sets are excluded because a Set of Sets has
-	# no Canvas preview and no consumer asked for one; the cycle check keeps the
-	# remaining choices resolvable.
-	var candidates: Array[Dictionary] = []
-	for source_asset in assets:
-		if not source_asset is Dictionary or WorldDocumentService.is_set_asset(source_asset):
-			continue
-		if not _reference_cycle_issue(owner_asset_id, str(source_asset.get("id", ""))).is_empty():
-			continue
-		candidates.append(source_asset)
-	candidates.sort_custom(WorldDocumentService.sort_named_documents)
-	return candidates
+func _on_set_add_selected(id: int) -> void:
+	if id != 0:
+		return
+	var asset_id := str(set_member_menu.get_meta("asset_id", ""))
+	if WorldDocumentService.is_set_asset(_get_asset(asset_id)):
+		_open_new_asset_dialog(asset_id)
 
 
 func _reference_cycle_issue(owner_asset_id: String, source_asset_id: String) -> String:
@@ -7607,19 +7656,6 @@ func _reference_cycle_issue(owner_asset_id: String, source_asset_id: String) -> 
 			if component is Dictionary and _is_reference_component(component):
 				pending.append(str(component.get("source_asset_id", "")))
 	return ""
-
-
-func _on_set_member_selected(index: int) -> void:
-	var item_index := set_member_menu.get_item_index(index)
-	if item_index < 0:
-		return
-	var asset_id := str(set_member_menu.get_meta("asset_id", ""))
-	var source_asset_id := str(set_member_menu.get_item_metadata(item_index))
-	var cycle_issue := _reference_cycle_issue(asset_id, source_asset_id)
-	if not cycle_issue.is_empty():
-		_show_status_message(cycle_issue)
-		return
-	_open_component_name_dialog(asset_id, "", "reference", source_asset_id)
 
 
 func _open_component_add_menu(asset_id: String, parent_component_id: String, anchor: Control) -> void:
@@ -12823,7 +12859,28 @@ func _normalized_create_submodule(submodule: String) -> String:
 
 
 func _asset_matches_create_submodule(asset: Dictionary) -> bool:
-	return _asset_type_create_submodule(_asset_type(asset)) == active_create_submodule
+	if _asset_type_create_submodule(_asset_type(asset)) != active_create_submodule:
+		return false
+	# Single lists what is placed on its own. An Asset a composition already
+	# owns is reached through that composition instead, so it is not offered
+	# twice.
+	return active_create_submodule != "Single" or not _composition_member_asset_ids().has(str(asset.get("id", "")))
+
+
+func _composition_member_asset_ids() -> Dictionary:
+	# Every Asset some composition owns, as a set of IDs. A Set owns what its
+	# visible and hidden member References point at; a Reference inside an
+	# ordinary Asset is a Symbol instance rather than membership.
+	var member_ids: Dictionary = {}
+	for asset in assets:
+		if not asset is Dictionary or not WorldDocumentService.is_set_asset(asset):
+			continue
+		for component in asset.get("components", []):
+			if component is Dictionary and _is_reference_component(component):
+				var member_id := str(component.get("source_asset_id", ""))
+				if not member_id.is_empty():
+					member_ids[member_id] = true
+	return member_ids
 
 
 func _ensure_asset_animation(asset: Dictionary) -> Dictionary:

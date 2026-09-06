@@ -55,6 +55,7 @@ var selected_weighting_style_id := ""
 var motion_act_preview_asset_id := ""
 var expanded_assets: Dictionary = {}
 var outliner_asset_type_filters: Dictionary = {}
+var composition_member_asset_ids: Dictionary = {}
 var search_text := ""
 var focus_asset_id := ""
 # Derived state the rows display, computed by main.gd so this view never has to
@@ -99,9 +100,12 @@ func set_selection(asset_id: String, component_id: String, component_ids: Array,
 	motion_act_preview_asset_id = act_preview_asset_id
 
 
-func set_filters(text: String, asset_type_filters: Dictionary) -> void:
+func set_filters(text: String, asset_type_filters: Dictionary, composition_member_ids := {}) -> void:
 	search_text = text
 	outliner_asset_type_filters = asset_type_filters
+	# Which Assets a composition already owns. main.gd resolves it, because it
+	# is a question about every Asset rather than about the one being drawn.
+	composition_member_asset_ids = composition_member_ids
 
 
 func set_expansion(expansion: Dictionary, focused_asset_id: String) -> void:
@@ -174,7 +178,7 @@ func rebuild() -> void:
 		# select among them; the view itself tests only what main.gd pushed in.
 		var visible_assets: Array = []
 		for asset in assets:
-			if asset_is_visible(asset) and asset_type_filter_matches(asset) and asset_matches_search(asset, search_text):
+			if asset_is_visible(asset) and asset_type_filter_matches(asset) and not composition_member_asset_ids.has(str(asset.get("id", ""))) and asset_matches_search(asset, search_text):
 				visible_assets.append(asset)
 		visible_assets.sort_custom(WorldDocumentService.sort_named_documents)
 		self.add_child(EditorWidgets.create_outliner_group_label("Sets" if active_create_submodule == "Set" else "Assets"))
