@@ -90,6 +90,14 @@ learn which Asset now answers to another name. **A live `asset_key` always wins
 over any `previous_keys` entry**: a Key that has been taken over by another
 Asset names that Asset, not the one that used to hold it.
 
+A Key is not handed out twice either. The Key a deleted Asset carried last, and
+every Key still published under some Asset's `previous_keys`, are refused for a
+new or renamed Asset — a Key that once meant something must not quietly come to
+mean something else, and a consumer that wrote a Key down without an ID beside
+it cannot tell the difference. Keys that never existed in this Catalog are
+outside that guarantee: a consumer whose own vocabulary overlaps with a Key
+PolyTools may coin later has to keep them apart itself.
+
 `retired_assets` holds `{asset_id, last_asset_key}` for every ID the World has
 withdrawn. It is what separates "this Asset was deleted" from "this package is
 missing and the sync is broken" — without it the two are the same absence. A
@@ -102,7 +110,8 @@ Every Manifest except a Palette requires:
 | Field | Type | Meaning |
 | --- | --- | --- |
 | `schema_version` | integer | Exactly `21`. |
-| `asset_key` | non-empty lower-snake-case string | Runtime identity. |
+| `asset_key` | non-empty lower-snake-case string | Readable handle; follows the display name. |
+| `asset_id` | non-empty opaque string | Stable identity; never reused, not even after deletion. |
 | `display_name` | string | Informational authored name. |
 | `asset_type` | string | What the Asset is: `character`, `props`, `weapons`, `terrain`, `items`, `icon`, or `symbols`. |
 | `asset_category` | string | How it is composed: `single`, `set`, or `palette`. |

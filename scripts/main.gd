@@ -2519,6 +2519,20 @@ func _asset_name_validation_error(proposed_name: String, excluded_asset_id := ""
 			continue
 		if _asset_key(other_asset) == key:
 			return "Asset Key '%s' is already used by '%s'." % [key, str(other_asset.get("name", "Asset"))]
+	# A Key that once meant something must not quietly come to mean something
+	# else. A consumer that wrote the Key down and has no ID beside it cannot
+	# tell the difference, so the Key a deleted Asset carried last is spent.
+	for retired in retired_assets:
+		if retired is Dictionary and str(retired.get("last_asset_key", "")) == key:
+			return "Asset Key '%s' belonged to a deleted Asset and is not handed out again." % key
+	# The same holds for a Key an Asset left behind: it is still published under
+	# `previous_keys`, and taking it over would make that trail point at the
+	# wrong Asset.
+	for other_asset in assets:
+		if str(other_asset.get("id", "")) == excluded_asset_id:
+			continue
+		if WorldDocumentService.previous_asset_keys(other_asset).has(key):
+			return "Asset Key '%s' was carried by '%s' before and is still published as its previous Key." % [key, str(other_asset.get("name", "Asset"))]
 	return ""
 
 

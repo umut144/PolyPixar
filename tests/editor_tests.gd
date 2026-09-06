@@ -819,6 +819,16 @@ func _test_inspector_field_wiring() -> void:
 	application.asset_rename_input.text = "Wizard"
 	application._confirm_asset_rename()
 	_expect(WorldDocumentService.previous_asset_keys(asset) == ["wizard", "sorcerer"], "Renaming back should record that trail too rather than tidying it away.")
+	# A Key that once meant something must not come to mean something else: a
+	# consumer that wrote it down without an ID beside it cannot tell.
+	application.retired_assets = [{"id": "asset_gone", "last_asset_key": "vial"}]
+	_expect(application._asset_name_validation_error("Vial").contains("deleted Asset"), "A Key a deleted Asset carried last should not be handed out again.")
+	var second := {"id": "asset_2", "name": "Orb", "asset_type": "symbols", "visibility": true,
+		"components": [], "groups": [], "guides": [], "previous_asset_keys": ["sphere"]}
+	application.assets.append(second)
+	_expect(application._asset_name_validation_error("Sphere").contains("previous Key"), "A Key still published as some Asset's previous one should not be taken over either.")
+	_expect(application._asset_name_validation_error("Sorcerer", str(asset["id"])).is_empty(), "An Asset may still take back a Key it left behind itself.")
+	application.retired_assets = []
 	# The Reference Image is named after the Asset too, so a rename can carry it
 	# along instead of leaving it under the previous name.
 	_expect(application._reference_image_filename_for("Rope Post", "asset_9") == "rope_post_ref.png" and application._reference_image_filename_for("", "asset_9") == "asset_9_ref.png", "The Reference Image filename should derive from the Asset name, with the ID as the fallback.")
