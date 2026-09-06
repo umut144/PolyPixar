@@ -468,6 +468,14 @@ func _render_asset_outliner_entry(asset: Dictionary, force_expand := false) -> v
 	if WorldDocumentService.is_set_asset(asset):
 		_render_set_member_rows(asset_container, asset)
 		return
+	_render_asset_contents(asset_container, asset, 16)
+
+
+func _render_asset_contents(container: VBoxContainer, asset: Dictionary, indent: int) -> void:
+	# What an Asset holds, at one indentation. The Set module draws this a
+	# second time under each member row, because a member Asset is an ordinary
+	# Asset: its Components, References, Guides and Regions are all authored
+	# where the member is.
 	var components: Array = []
 	var references: Array = []
 	var regions: Array = []
@@ -483,48 +491,84 @@ func _render_asset_outliner_entry(asset: Dictionary, force_expand := false) -> v
 			components.append(component)
 	components.sort_custom(WorldDocumentService.sort_named_documents)
 	guides.sort_custom(func(left: Dictionary, right: Dictionary) -> bool: return WorldDocumentService.guide_display_name(asset, left).naturalnocasecmp_to(WorldDocumentService.guide_display_name(asset, right)) < 0)
-	var components_label := EditorWidgets.create_outliner_child_group_label("Components")
+	var components_label := EditorWidgets.create_outliner_child_group_label("Components", indent)
 	components_label.set_drag_forwarding(_outliner_get_drag_data.bind(str(asset.get("id", "")), "root"), can_drop_data.bind(str(asset.get("id", "")), "root"), _emit_drop.bind(str(asset.get("id", "")), "root"))
-	asset_container.add_child(components_label)
+	container.add_child(components_label)
 	var rendered_component_ids: Dictionary = {}
 	var rendered_group_ids: Dictionary = {}
 	var groups: Array = asset.get("groups", []).duplicate(true)
 	groups.sort_custom(WorldDocumentService.sort_named_documents)
 	for group in groups:
 		if str(group.get("parent_component_id", "")).is_empty():
-			_render_group_outliner_tree(asset_container, asset, group, 16, rendered_component_ids, rendered_group_ids)
+			_render_group_outliner_tree(container, asset, group, indent, rendered_component_ids, rendered_group_ids)
 	for component in components:
 		if str(component.get("parent_component_id", "")).is_empty() and ComponentHierarchy.membership_group_id(asset, str(component.get("id", ""))).is_empty():
-			_render_component_outliner_tree(asset_container, asset, component, 16, rendered_component_ids, false, rendered_group_ids)
+			_render_component_outliner_tree(container, asset, component, indent, rendered_component_ids, false, rendered_group_ids)
 	# A malformed in-memory document should remain editable even before its next load migration.
 	for component in components:
 		if not rendered_component_ids.has(str(component.get("id", ""))):
-			_render_component_outliner_tree(asset_container, asset, component, 16, rendered_component_ids, false, rendered_group_ids)
-	asset_container.add_child(EditorWidgets.create_outliner_child_group_label("References"))
+			_render_component_outliner_tree(container, asset, component, indent, rendered_component_ids, false, rendered_group_ids)
+	container.add_child(EditorWidgets.create_outliner_child_group_label("References", indent))
 	references.sort_custom(WorldDocumentService.sort_named_documents)
 	for reference in references:
-		_render_component_outliner_tree(asset_container, asset, reference, 16, rendered_component_ids, true, {})
-	asset_container.add_child(EditorWidgets.create_outliner_child_group_label("Guides"))
+		_render_component_outliner_tree(container, asset, reference, indent, rendered_component_ids, true, {})
+	container.add_child(EditorWidgets.create_outliner_child_group_label("Guides", indent))
 	for guide in guides:
-		_render_component_guide_row(asset_container, asset, guide)
-	asset_container.add_child(EditorWidgets.create_outliner_child_group_label("Regions"))
+		_render_component_guide_row(container, asset, guide, indent)
+	container.add_child(EditorWidgets.create_outliner_child_group_label("Regions", indent))
 	regions.sort_custom(WorldDocumentService.sort_named_documents)
 	for region in regions:
-		_render_region_outliner_row(asset_container, asset, region)
+		_render_region_outliner_row(container, asset, region, indent)
 
 func _render_set_member_rows(container: VBoxContainer, asset: Dictionary) -> void:
 	# A Set owns no geometry of its own: every visible Component is a Reference
-	# to a member, so the entry has one section and no Components, Guides or
-	# Regions to draw.
+	# to a member. Each member Asset is drawn underneath its Reference, because
+	# a member is authored where it belongs rather than in a second view.
 	container.add_child(EditorWidgets.create_outliner_child_group_label("Members"))
 	var members: Array = []
 	for component in asset.get("components", []):
 		if WorldDocumentService.is_reference_component(component):
 			members.append(component)
 	members.sort_custom(WorldDocumentService.sort_named_documents)
-	var rendered_component_ids: Dictionary = {}
 	for member in members:
-		_render_component_outliner_tree(container, asset, member, 16, rendered_component_ids, true, {})
+		_render_set_member_row(container, asset, member)
+
+
+func _render_set_member_row(container: VBoxContainer, owner_asset: Dictionary, member: Dictionary) -> void:
+	var owner_asset_id := str(owner_asset.get("id", ""))
+	var member_id := str(member.get("id", ""))
+	var member_asset := WorldDocumentService.asset_by_id(assets, str(member.get("source_asset_id", "")))
+	var member_row := HBoxContainer.new()
+	member_row.add_theme_constant_override("separation", 0)
+	container.add_child(member_row)
+	var member_indent := Control.new()
+	member_indent.custom_minimum_size = Vector2(16, 0)
+	member_row.add_child(member_indent)
+	member_row.add_child(EditorWidgets.create_visibility_checkbox(bool(member.get("visibility", true)), _emit_visibility.bind("component", owner_asset_id, member_id)))
+	var member_button := Button.new()
+	var member_name := WorldDocumentService.component_outliner_name(assets, member)
+	member_button.text = member_name if bool(member.get("visibility", true)) else EditorWidgets.strikethrough_text(member_name)
+	member_button.tooltip_text = _reference_outliner_tooltip(owner_asset, member)
+	member_button.custom_minimum_size = Vector2(0, 30)
+	member_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	member_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	member_button.focus_mode = Control.FOCUS_NONE
+	EditorWidgets.style_outliner_button(member_button, member_id == selected_component_id and owner_asset_id == selected_asset_id, WorldDocumentService.topology_role(member))
+	member_button.pressed.connect(component_selected.emit.bind(owner_asset_id, member_id))
+	member_button.gui_input.connect(_emit_row_context_menu.bind("component", owner_asset_id, member_id, member_button))
+	member_row.add_child(member_button)
+	if member_asset.is_empty():
+		return
+	# The Add button belongs to the member Asset, not to the Reference: what it
+	# adds is a Component of the member.
+	var add_button := Button.new()
+	add_button.text = "Add"
+	add_button.custom_minimum_size = Vector2(48, 30)
+	add_button.focus_mode = Control.FOCUS_NONE
+	add_button.tooltip_text = "Add to %s" % str(member_asset.get("name", "the member Asset"))
+	add_button.pressed.connect(component_dialog_requested.emit.bind(str(member_asset.get("id", "")), add_button))
+	member_row.add_child(add_button)
+	_render_asset_contents(container, member_asset, 32)
 
 
 func _render_group_outliner_tree(container: VBoxContainer, asset: Dictionary, group: Dictionary, indent: int, rendered_component_ids: Dictionary, rendered_group_ids: Dictionary) -> void:
@@ -672,13 +716,13 @@ func _render_component_outliner_tree(container: VBoxContainer, asset: Dictionary
 			if str(group.get("parent_component_id", "")) == component_id:
 				_render_group_outliner_tree(container, asset, group, indent + 16, rendered_component_ids, rendered_group_ids)
 
-func _render_component_guide_row(container: VBoxContainer, asset: Dictionary, guide: Dictionary) -> void:
+func _render_component_guide_row(container: VBoxContainer, asset: Dictionary, guide: Dictionary, indent := 16) -> void:
 	var asset_id := str(asset.get("id", ""))
 	var guide_row := HBoxContainer.new()
 	guide_row.add_theme_constant_override("separation", 0)
 	container.add_child(guide_row)
 	var component_indent := Control.new()
-	component_indent.custom_minimum_size = Vector2(16, 0)
+	component_indent.custom_minimum_size = Vector2(indent, 0)
 	guide_row.add_child(component_indent)
 	guide_row.add_child(EditorWidgets.create_visibility_checkbox(bool(guide.get("visibility", true)), _emit_visibility.bind("guide", asset_id, str(guide.get("id", "")))))
 	var guide_button := Button.new()
@@ -693,13 +737,13 @@ func _render_component_guide_row(container: VBoxContainer, asset: Dictionary, gu
 	guide_button.pressed.connect(guide_selected.emit.bind(asset_id, str(guide.get("id", ""))))
 	guide_row.add_child(guide_button)
 
-func _render_region_outliner_row(container: VBoxContainer, asset: Dictionary, region: Dictionary) -> void:
+func _render_region_outliner_row(container: VBoxContainer, asset: Dictionary, region: Dictionary, indent := 16) -> void:
 	var region_row := HBoxContainer.new()
 	region_row.add_theme_constant_override("separation", 0)
 	container.add_child(region_row)
-	var indent := Control.new()
-	indent.custom_minimum_size = Vector2(16, 0)
-	region_row.add_child(indent)
+	var region_indent := Control.new()
+	region_indent.custom_minimum_size = Vector2(indent, 0)
+	region_row.add_child(region_indent)
 	var region_id := str(region.get("id", ""))
 	region_row.add_child(EditorWidgets.create_visibility_checkbox(bool(region.get("visibility", true)), _emit_visibility.bind("component", str(asset.get("id", "")), region_id)))
 	var button := Button.new()

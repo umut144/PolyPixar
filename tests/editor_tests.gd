@@ -256,7 +256,7 @@ func _test_set_composition() -> void:
 	_expect(WorldDocumentService.normalized_component_name(rail_member) == "rope_rail", "The Reference should be named after the member, by the same derivation the Asset Key uses.")
 	# A member is reached through its composition, so Single does not offer it
 	# a second time.
-	_expect(application._composition_member_asset_ids().has(str(rail_asset.get("id", ""))), "An Asset a Set owns should count as a composition member.")
+	_expect(application._composition_owner_by_member_id().has(str(rail_asset.get("id", ""))), "An Asset a Set owns should count as a composition member.")
 	application._select_submodule("Create", "Single", create_section)
 	# An expanded Asset focuses the Create list on itself, so the list is read
 	# with everything collapsed.
@@ -283,6 +283,23 @@ func _test_set_composition() -> void:
 	# A member row names the Reference and the Asset it instances, the same
 	# summary the References section has always drawn.
 	_expect(_button_with_text(application.outliner_view, "Bridge") != null and _button_with_text(application.outliner_view, "rope_rail ← Rope Rail") != null and _button_with_text(application.outliner_view, "bridge_post_02 ← Bridge Post") != null, "The Set Outliner should list the Set and its members.")
+	# A member is authored where it belongs: its Components are added through
+	# the member row and drawn underneath it, without leaving the Set.
+	var member_asset_id := str(rail_member.get("source_asset_id", ""))
+	application.component_dialog.set_meta("asset_id", member_asset_id)
+	application.component_dialog.set_meta("parent_component_id", "")
+	application.component_dialog.set_meta("draw_mode", WorldDocumentService.DRAW_MODE_CLOSED_LOOP)
+	application.component_dialog.set_meta("source_asset_id", "")
+	application.component_dialog.set_meta("group_id", "")
+	application.component_name_input.text = "body"
+	application._confirm_component_creation()
+	var member_component_id: String = application.selected_component_id
+	_expect(application.selected_asset_id == member_asset_id and str(application._get_component(rail_asset, member_component_id).get("name", "")) == "body", "A Component added from the member row should belong to the member Asset.")
+	_expect(application.active_create_submodule == "Set" and application._outliner_focus_asset_id() == bridge_id, "Authoring inside a member should keep the Set module and keep the Set as the expanded row.")
+	application._render_outliner()
+	_expect(_button_with_text(application.outliner_view, "body") != null and _button_with_text(application.outliner_view, "Bridge") != null, "The member's Components should be drawn underneath its member row.")
+	application._select_component(member_asset_id, member_component_id)
+	_expect(application.active_create_submodule == "Set" and application.selected_asset_id == member_asset_id and application._outliner_focus_asset_id() == bridge_id, "Selecting a member's Component should stay in the Set module and leave the Set expanded.")
 	# Plank instances Rope Post, so Rope Post may not instance Plank back: the
 	# consumer resolves References through the Catalog and would recurse.
 	plank["components"].append({"id": "component_cap", "type": "reference", "name": "cap",
@@ -1325,7 +1342,7 @@ const OUTLINER_UNCONNECTED_SIGNALS: Array[String] = []
 const OUTLINER_UNDRIVABLE_SIGNALS := ["drop_requested"]
 
 
-const OUTLINER_PROBE_CASES := ["create", "create_expanded", "style", "motion_animation",
+const OUTLINER_PROBE_CASES := ["create", "create_expanded", "create_set", "style", "motion_animation",
 	"motion_path", "motion_sequence", "motion_act", "mesh_sampling", "mesh_seeding",
 	"mesh_meshing"]
 
@@ -1351,11 +1368,25 @@ func _outliner_wiring_assets() -> Array[Dictionary]:
 		"points": [], "edges": [], "chains": []}
 	var group := {"id": "group_1", "name": "torso", "transform": {}, "visibility": true,
 		"parent_component_id": ""}
+	# The Set draws its member Asset underneath the Reference, so the member
+	# carries the row kinds a member is authored with.
+	var member_body := _outliner_test_component("component_5", "body")
+	var member_region := {"points": [], "edges": [], "chains": [], "id": "component_6",
+		"name": "collision_region", "visibility": true, "type": "region",
+		"region_type": "collision", "parent_component_id": "component_5"}
+	var member_reference := {"points": [], "edges": [], "chains": [], "id": "component_7",
+		"name": "rope_post", "visibility": true, "type": "reference",
+		"parent_component_id": "", "source_asset_id": "asset_3", "role": "rope_post"}
 	return [
 		{"id": "asset_1", "name": "Wizard", "visibility": true,
 			"components": [body, arm, hole, region], "groups": [group], "guides": [guide, spine]},
 		{"id": "asset_2", "name": "Orb", "visibility": true,
 			"components": [], "groups": [], "guides": []},
+		{"id": "asset_3", "name": "Rope Post", "visibility": true, "asset_type": "props",
+			"components": [member_body, member_region], "groups": [], "guides": []},
+		{"id": "asset_4", "name": "Bridge", "visibility": true,
+			"asset_type": WorldDocumentService.ASSET_TYPE_SET,
+			"components": [member_reference], "groups": [], "guides": []},
 	] as Array[Dictionary]
 
 
@@ -1373,6 +1404,11 @@ func _prepare_outliner_case(application: Control, case_name: String) -> void:
 			application.active_module = "Create"
 			application.active_create_submodule = "Single"
 			application.expanded_assets["asset_1"] = true
+		"create_set":
+			application.active_module = "Create"
+			application.active_create_submodule = "Set"
+			application.selected_asset_id = "asset_4"
+			application.expanded_assets["asset_4"] = true
 		"style":
 			application.active_module = "Style"
 			application.active_style_submodule = "Weighting"

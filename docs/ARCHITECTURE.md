@@ -29,6 +29,18 @@ category, so a Set may mix types — plus the Reference that carries it into the
 assembly, named after the member by the same derivation the Asset Key uses. A
 Set therefore owns the Assets it is made of rather than collecting Assets that
 already exist. Its Outliner entry has one `Members` section.
+A member Asset is drawn underneath its Reference with everything an Asset has —
+Components, References, Guides and Regions — and the `Add` button on that row
+belongs to the member, so a member is authored where it belongs instead of in a
+second view. `OutlinerView._render_asset_contents` is that shared body, drawn
+once for an Asset entry and once per member. Selecting a member's Component
+therefore leaves `selected_asset_id` pointing at the member while the module
+stays `Set`: `_create_submodule_for_asset` keeps the module, and
+`_outliner_expansion_anchor_asset_id` redirects every expansion to the
+composition that owns the member, so the module's one expanded row stays the
+composition. The Canvas follows the selection and shows the member alone, the
+same way Single would.
+
 A member Asset is ordinary in every other way, References included: it may
 instance a Symbol exactly as a Single does. `_reference_cycle_issue` in
 `main.gd` guards that path — a cycle is a consumer's infinite recursion, so it
@@ -39,7 +51,7 @@ A member is an ordinary Asset, so it keeps its own type, its own Components
 and its own place in Mesh and Style. What it does not keep is a second entry in
 `Single`: that view lists what is placed on its own, and an Asset some
 composition already owns is reached through that composition instead.
-`_composition_member_asset_ids` in `main.gd` resolves that set once per render
+`_composition_owner_by_member_id` in `main.gd` resolves that map once per render
 and hands it to the Outliner, and `_asset_matches_create_submodule` applies the
 same rule to the module's expansion scope and its active Asset, so the three
 never disagree.

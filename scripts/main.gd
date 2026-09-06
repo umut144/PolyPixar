@@ -3077,7 +3077,11 @@ func _restore_editor_state(state, source_schema_version := WorldDocumentService.
 	active_module = "Create"
 	var requested_create_submodule := _normalized_create_submodule(str(state.get("active_create_submodule", "Single")))
 	if not selected_asset_id.is_empty():
-		requested_create_submodule = _asset_type_create_submodule(_asset_type(_get_asset(selected_asset_id)))
+		# A member Asset opens in the module of the composition that owns it,
+		# because that is where it is listed and authored.
+		var restored_owner_id := str(_composition_owner_by_member_id().get(selected_asset_id, ""))
+		requested_create_submodule = _asset_type_create_submodule(_asset_type(
+			_get_asset(restored_owner_id if not restored_owner_id.is_empty() else selected_asset_id)))
 	_set_create_submodule_context(requested_create_submodule)
 	var requested_geometry_submodule := str(state.get("active_geometry_submodule", "Sampling"))
 	var requested_style_submodule := str(state.get("active_style_submodule", "Weighting"))
@@ -6511,7 +6515,7 @@ func _render_outliner() -> void:
 	outliner_view.set_documents(assets, motion_paths, motion_sequences)
 	outliner_view.set_module(active_module, active_create_submodule, active_geometry_submodule, active_motion_submodule)
 	outliner_view.set_selection(selected_asset_id, selected_component_id, selected_component_ids, selected_group_id, selected_guide_id, selected_motion_path_id, selected_motion_sequence_id, selected_weighting_style_id, motion_act_preview_asset_id)
-	outliner_view.set_filters(outliner_search_input.text.strip_edges().to_lower() if is_instance_valid(outliner_search_input) else "", _outliner_module_asset_type_filters(), _composition_member_asset_ids())
+	outliner_view.set_filters(outliner_search_input.text.strip_edges().to_lower() if is_instance_valid(outliner_search_input) else "", _outliner_module_asset_type_filters(), _composition_owner_by_member_id())
 	outliner_view.set_expansion(expanded_assets, _outliner_focus_asset_id())
 	outliner_view.set_row_status(_outliner_row_status())
 	outliner_view.set_geometry_rows(_geometry_outliner_rows())
@@ -6812,7 +6816,8 @@ func _outliner_expansion_scope_matches(asset: Dictionary) -> bool:
 	return _asset_matches_create_submodule(asset)
 
 
-func _set_outliner_asset_expanded(asset_id: String, expanded: bool) -> void:
+func _set_outliner_asset_expanded(requested_asset_id: String, expanded: bool) -> void:
+	var asset_id := _outliner_expansion_anchor_asset_id(requested_asset_id)
 	if expanded:
 		for asset in assets:
 			if _outliner_expansion_scope_matches(asset):
@@ -7591,8 +7596,7 @@ func _select_asset(asset_id: String) -> void:
 	_set_active_context_command("")
 	var was_selected := selected_asset_id == asset_id and selected_component_id.is_empty() and selected_guide_id.is_empty()
 	active_module = "Create"
-	var selected_asset := _get_asset(asset_id)
-	_set_create_submodule_context(_asset_type_create_submodule(_asset_type(selected_asset)))
+	_set_create_submodule_context(_create_submodule_for_asset(asset_id))
 	selected_asset_id = asset_id
 	selected_component_id = ""
 	selected_component_ids.clear()
@@ -8756,7 +8760,7 @@ func _select_component(asset_id: String, component_id: String, focus_outliner :=
 	# Keep the asset's Create database view when selecting a component.  Passing
 	# the generic "Asset" label here normalizes to Character and hides Symbols
 	# (and the other non-character asset types) from the Outliner.
-	_set_create_submodule_context(_asset_type_create_submodule(_asset_type(_get_asset(asset_id))))
+	_set_create_submodule_context(_create_submodule_for_asset(asset_id))
 	var additive_selection := focus_outliner and (Input.is_key_pressed(KEY_CTRL) or Input.is_key_pressed(KEY_META))
 	if additive_selection:
 		if selected_asset_id != asset_id:
@@ -8811,7 +8815,7 @@ func _select_guide(asset_id: String, guide_id: String) -> void:
 			_invalidate_render(RENDER_DOCUMENT)
 			return
 	active_module = "Create"
-	_set_create_submodule_context(_asset_type_create_submodule(_asset_type(_get_asset(asset_id))))
+	_set_create_submodule_context(_create_submodule_for_asset(asset_id))
 	selected_asset_id = asset_id
 	selected_component_id = ""
 	selected_component_ids.clear()
@@ -12864,23 +12868,42 @@ func _asset_matches_create_submodule(asset: Dictionary) -> bool:
 	# Single lists what is placed on its own. An Asset a composition already
 	# owns is reached through that composition instead, so it is not offered
 	# twice.
-	return active_create_submodule != "Single" or not _composition_member_asset_ids().has(str(asset.get("id", "")))
+	return active_create_submodule != "Single" or not _composition_owner_by_member_id().has(str(asset.get("id", "")))
 
 
-func _composition_member_asset_ids() -> Dictionary:
-	# Every Asset some composition owns, as a set of IDs. A Set owns what its
-	# visible and hidden member References point at; a Reference inside an
-	# ordinary Asset is a Symbol instance rather than membership.
-	var member_ids: Dictionary = {}
+func _composition_owner_by_member_id() -> Dictionary:
+	# Every Asset some composition owns, mapped to its owner. A Set owns what
+	# its member References point at; a Reference inside an ordinary Asset is a
+	# Symbol instance rather than membership.
+	var owner_by_member: Dictionary = {}
 	for asset in assets:
 		if not asset is Dictionary or not WorldDocumentService.is_set_asset(asset):
 			continue
 		for component in asset.get("components", []):
 			if component is Dictionary and _is_reference_component(component):
 				var member_id := str(component.get("source_asset_id", ""))
-				if not member_id.is_empty():
-					member_ids[member_id] = true
-	return member_ids
+				if not member_id.is_empty() and not owner_by_member.has(member_id):
+					owner_by_member[member_id] = str(asset.get("id", ""))
+	return owner_by_member
+
+
+func _create_submodule_for_asset(asset_id: String) -> String:
+	# A member Asset is authored inside the composition that owns it, so
+	# selecting one of its Components must not leave that module.
+	if active_module == "Create" and active_create_submodule != "Single" \
+		and _composition_owner_by_member_id().has(asset_id):
+		return active_create_submodule
+	return _asset_type_create_submodule(_asset_type(_get_asset(asset_id)))
+
+
+func _outliner_expansion_anchor_asset_id(asset_id: String) -> String:
+	# Expanding is a statement about a row the module lists. Inside a
+	# composition module that row is the composition, even when the Asset being
+	# touched is one of its members.
+	if active_module != "Create" or active_create_submodule == "Single":
+		return asset_id
+	var owner_id := str(_composition_owner_by_member_id().get(asset_id, ""))
+	return owner_id if not owner_id.is_empty() else asset_id
 
 
 func _ensure_asset_animation(asset: Dictionary) -> Dictionary:
