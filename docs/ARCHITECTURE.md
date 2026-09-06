@@ -838,13 +838,27 @@ Manifest bytes, not by persisting export diagnostics in the Asset.
 
 The separate `Sync Consumers` action beside `Export All Valid` runs PolyTools'
 owned `scripts/sync_world01_consumers.sh` workflow against the currently
-published Catalog. It updates SceneMaker from that Catalog, re-exports
-SceneMaker's current `world01` scene, then updates world01's runtime content
-and imported map. The Export workspace retains the last Consumer Sync result
+published Catalog. It runs by dependency rather than by consumer: world01's
+runtime content and SceneMaker's own Catalog copy depend on nothing but the
+published Catalog and go first, then SceneMaker re-exports its current
+`world01` scene, and last world01 imports that map. The Export workspace retains the last Consumer Sync result
 and includes command output on failure. Export and synchronization are
 deliberately separate actions: a downstream failure does not alter the already
 published PolyTools Runtime packages, and each consumer script remains
 responsible for its own atomic target update.
+
+The run itself is not atomic — each step writes as it goes — so a failure names
+what reached whom: which steps were applied, which failed, which never ran, and
+what that leaves each consumer on. A log that simply stops says none of that,
+and the reader cannot tell an untouched consumer from an updated one.
+
+The order is world01's answer, not our convenience. The dangerous direction is
+a new map against old content, and keeping the map sync last locks that out —
+a map naming an Asset they do not have is refused at their gate. The reverse,
+new content against an old map, is a state they can see: their build fails
+loudly on a renamed file, and the next map sync refuses the stale map with a
+reason. So the independent pushes run first and a failure downstream no longer
+starves them.
 
 ## Testing
 
