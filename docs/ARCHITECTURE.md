@@ -8,8 +8,8 @@ contains always-expanded Create, Mesh, and Style categories. A single
 `active_module` plus its category-specific submodule identifies the one active
 workspace.
 
-Create has two modules. `Single` is one database view over the Asset
-implementation; `Set` is a composition above it. The
+Create has three modules. `Single` is one database view over the Asset
+implementation; `Set` and `Palette` are compositions above it. The
 stable persisted discriminator `asset_type` — `character`, `props`, `weapons`,
 `terrain`, `items`, `icon`, `symbols`; missing or invalid values normalize to
 `character` — is unchanged and still exported, but it no longer selects a view.
@@ -55,6 +55,19 @@ composition already owns is reached through that composition instead.
 and hands it to the Outliner, and `_asset_matches_create_submodule` applies the
 same rule to the module's expansion scope and its active Asset, so the three
 never disagree.
+
+A **Palette** is an Asset with `asset_type: "palette"` and needs less than an
+Asset, not more: `palette_variants`, a list of stable Asset IDs that export
+resolves to Asset Keys, and `variant_asset_type`, the one ordinary category
+every variant shares. It owns no Components, no geometry and no arrangement,
+because the presentation chooses among the variants freely — order in the list
+means nothing and duplicates are dropped on load. That is why a variant is not
+a Reference: a Reference carries a transform, a pivot, a z-index and a depth,
+and a Palette would have to define all of them away. Its category is chosen
+where the Palette is named, so `Add → New Variant Asset` only asks for a name;
+a Set, whose members answer for themselves, asks for a category per member.
+Removing a variant drops it from the list and leaves the Asset alone, and a
+variant whose Asset is gone stays visible as missing rather than vanishing.
 
 Single, Mesh and Style share one multi-select Outliner Asset filter. Its seven
 checkbox states are persisted in `editor_state`; the filter is applied together
@@ -107,7 +120,7 @@ export data.
 - `CreateInspectorView` draws the Create module's Inspector under the same
   contract as `OutlinerView`: `main.gd` pushes a snapshot in through `set_document`,
   `set_selection`, `set_resolved_selection` and `set_mode`, `rebuild()` draws from
-  that snapshot alone, and every user action leaves as one of 45 intent signals.
+  that snapshot alone, and every user action leaves as one of 46 intent signals.
   The two lists that need the document to resolve — the Components of a multi
   selection and the Point ids that still exist — are computed in `main.gd` and
   handed over, so the view never resolves a stale id itself. The controls the
@@ -172,10 +185,12 @@ the four views is visible, resolves that view's context and calls `rebuild()`.
   `DRAW_MODE_PRIMITIVE`, `ROLE_OUTER`, `ROLE_HOLE`, `ROLE_CUT` and the
   predicates that read them — `component_draw_mode`, `is_closed_loop`,
   `is_contour`, `is_primitive`, `topology_role`, `is_outer_body` — and the
-  eight `ASSET_TYPE_*` constants behind `asset_type` and
+  nine `ASSET_TYPE_*` constants behind `asset_type` and
   `normalize_asset_type`, split into `SINGLE_ASSET_TYPES` (the seven the Asset
-  filter and the New Asset dialog offer) and `ASSET_TYPES` (those plus `set`),
-  plus `is_set_asset` and the `reference_role` normalization; `main.gd`'s
+  filter and the New Asset dialog offer) and `ASSET_TYPES` (those plus `set`
+  and `palette`), plus `is_set_asset`, `is_palette_asset`,
+  `is_composition_asset`, the `reference_role` normalization and the
+  `palette_variants` / `palette_variant_type` readers; `main.gd`'s
   `CREATE_SUBMODULE_BY_ASSET_TYPE` maps one to its Create module — `Single` for
   all seven, `Set` for `set` — and `_normalized_create_submodule` reads any
   other value, including the seven module names Worlds below schema 63 stored,
@@ -291,8 +306,9 @@ one of the seven Asset-type names, and every such value reads as `Single`.
 An Asset contains:
 
 - stable ID, name, visibility, and `asset_type` — `character`, `props`,
-  `weapons`, `terrain`, `items`, `icon`, `symbols`, or the composition `set`;
-  a missing or invalid value normalizes to `character`;
+  `weapons`, `terrain`, `items`, `icon`, `symbols`, or the compositions `set`
+  and `palette`; a missing or invalid value normalizes to `character`. A
+  `palette` additionally carries `palette_variants` and `variant_asset_type`;
 - typed Asset-level `authored_facing` presentation metadata (`left`, `right`,
   `neutral`, `top`, or `down`). It is edited only on the Asset root in the
   Inspector's `Initial Pose` group, uses the `AssetPresentation.AuthoredFacing`

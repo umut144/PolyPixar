@@ -756,7 +756,7 @@ func _test_geometry_sampling_ui_shell() -> void:
 	application._select_submodule("Create", "Single", create_section)
 	_expect(application.active_module == "Create" and application.active_create_submodule == "Single" and application.canvas_view.visible and not application.geometry_sampling_workspace.visible, "Selecting Create Single should immediately render the shared asset workspace.")
 	_expect(application._find_section("Mesh").active_submodule.is_empty() and application._find_section("Style").active_submodule.is_empty(), "Only the selected module should remain highlighted across always-expanded categories.")
-	_expect(create_section.content_list.get_child_count() == 2 and application.create_action_button.text == "Create Asset", "Create should expose one view per composition instead of one module per Asset type.")
+	_expect(create_section.content_list.get_child_count() == 3 and application.create_action_button.text == "Create Asset", "Create should expose one view per composition instead of one module per Asset type.")
 	_expect(_create_asset_of_type(application, "Shield", "props") == "props", "The New Asset dialog should persist the stable props Asset type.")
 	_expect(_create_asset_of_type(application, "Sword", "weapons") == "weapons", "The New Asset dialog should persist the stable weapons Asset type.")
 	_expect(_create_asset_of_type(application, "Potion Flask", "items") == "items", "The New Asset dialog should persist the stable items Asset type.")

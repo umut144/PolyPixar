@@ -1,6 +1,6 @@
 # Inspector render probe.
 #
-# Renders the Inspector in 55 fixed states and prints one line per control with
+# Renders the Inspector in 56 fixed states and prints one line per control with
 # the properties a reader would notice: values, ranges, item lists, selections,
 # pressed state, disabled state, captions, colours and tooltips. It asserts
 # nothing on its own. It is run before and after a change that is meant to leave
@@ -16,7 +16,7 @@
 # nothing.
 #
 # The state list covers Create (Asset, Set Asset root, Set member Reference with
-# its Role, Component, Group, Guide, weapon Guide,
+# its Role, Palette Asset root with its variants, Component, Group, Guide, weapon Guide,
 # grouped Component, Contour Component, Circle, valid and invalid Hole, Hole Edge
 # modes, and Ellipse Primitive, authored
 # and Component-geometry Regions, two
@@ -145,6 +145,13 @@ func _init() -> void:
 		"asset_pivot": Vector2(5, 6), "root_position": Vector2(1, 2), "root_scale": Vector2(1, 1)},
 		{"id": "asset_2", "name": "Orb", "visibility": true,
 			"components": [hole_source], "groups": [], "guides": []}]
+	# A Palette is a list and one category: one variant resolves, one is gone.
+	var palette_asset := {"id": "asset_4", "name": "Grass", "visibility": true,
+		"asset_type": WorldDocumentService.ASSET_TYPE_PALETTE,
+		"variant_asset_type": WorldDocumentService.ASSET_TYPE_TERRAIN,
+		"palette_variants": ["asset_2", "asset_gone"],
+		"components": [], "groups": [], "guides": [],
+		"asset_pivot": Vector2.ZERO, "root_position": Vector2.ZERO, "root_scale": Vector2.ONE}
 	var set_asset := {"id": "asset_3", "name": "Bridge", "visibility": true,
 		"asset_type": WorldDocumentService.ASSET_TYPE_SET,
 		"components": [set_member], "groups": [], "guides": [],
@@ -223,6 +230,7 @@ func _init() -> void:
 		{"m": "Create", "sub": "Single", "comp": "component_1", "grp": "", "gd": "", "multi": true},
 		{"m": "Create", "sub": "Set", "comp": "", "grp": "", "gd": "", "asset": "asset_3"},
 		{"m": "Create", "sub": "Set", "comp": "component_13", "grp": "", "gd": "", "asset": "asset_3"},
+		{"m": "Create", "sub": "Palette", "comp": "", "grp": "", "gd": "", "asset": "asset_4"},
 	]
 	for c in cases:
 		# Keep the new Hole fixture out of every pre-existing state so this probe
@@ -233,8 +241,11 @@ func _init() -> void:
 		# the Hole fixtures are: an Asset the Motion dropdowns would list moves
 		# lines that have nothing to do with the change under test.
 		assets.erase(set_asset)
+		assets.erase(palette_asset)
 		if str(c.get("asset", "")) == "asset_3":
 			assets.append(set_asset)
+		elif str(c.get("asset", "")) == "asset_4":
+			assets.append(palette_asset)
 		direct_hole["parent_component_id"] = "" if bool(c.get("orphan_hole", false)) else "component_1"
 		if str(c["comp"]) == "component_11":
 			assets[0]["components"].append(direct_hole)

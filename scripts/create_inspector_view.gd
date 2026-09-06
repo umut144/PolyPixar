@@ -14,6 +14,7 @@ extends VBoxContainer
 signal asset_authored_facing_selected(index: int, option: OptionButton)
 signal asset_type_selected(index: int, option: OptionButton)
 signal reference_role_requested(new_role: String)
+signal palette_variant_remove_requested(variant_asset_id: String)
 signal asset_pivot_property_changed(value: float, property_name: String)
 signal asset_rename_requested(new_name: String)
 signal asset_root_position_changed(value: float, property_name: String)
@@ -91,6 +92,7 @@ var asset_scale_rebase_button: Button
 var asset_authored_facing_option: OptionButton
 var asset_type_option: OptionButton
 var reference_role_editor: LineEdit
+var palette_variant_rows: Array = []
 var asset_name_editor: LineEdit
 var component_name_editor: LineEdit
 
@@ -107,6 +109,13 @@ func set_selection(component_id: String, group_id: String, guide_id: String,
 	selected_guide_id = guide_id
 	selected_edge_id = edge_id
 	selected_edge_ids = edge_ids
+
+
+func set_palette_variants(rows: Array) -> void:
+	# Resolving a variant ID needs every Asset, which the view does not have, so
+	# main.gd hands the rows over already labelled — the same rule the Mesh tree
+	# and the multi selection follow.
+	palette_variant_rows = rows
 
 
 func set_resolved_selection(components: Array[Dictionary], point_ids: Array[String]) -> void:
@@ -163,10 +172,11 @@ func rebuild() -> void:
 		# The one Create view does not carry the type any more, so the Asset
 		# root is where it is read and changed.
 		add_child(EditorWidgets.create_inspector_field_label("Asset Type"))
-		if WorldDocumentService.is_set_asset(asset):
-			# A Set's composition is not a category to switch: changing it would
-			# leave member References in an Asset that has no place for them.
-			add_child(EditorWidgets.create_inspector_field_label("Set"))
+		if WorldDocumentService.is_composition_asset(asset):
+			# A composition is not a category to switch: changing it would leave
+			# its members or variants in an Asset with no place for them.
+			add_child(EditorWidgets.create_inspector_field_label(
+				"Palette" if WorldDocumentService.is_palette_asset(asset) else "Set"))
 		else:
 			var asset_type_items: Array = []
 			for asset_type in WorldDocumentService.SINGLE_ASSET_TYPES:
@@ -174,6 +184,14 @@ func rebuild() -> void:
 			asset_type_option = EditorWidgets.create_option_field(asset_type_items,
 				WorldDocumentService.asset_type(asset), asset_type_selected.emit)
 			add_child(asset_type_option)
+		if WorldDocumentService.is_palette_asset(asset):
+			# A Palette has no geometry, no pose and no arrangement. What it has
+			# is one category and the variants that may stand in for each other.
+			add_child(EditorWidgets.create_inspector_field_label("Variant Type"))
+			add_child(EditorWidgets.create_inspector_field_label(
+				WorldDocumentService.palette_variant_type(asset).capitalize()))
+			_render_palette_variants()
+			return
 		add_child(EditorWidgets.create_inspector_section("Initial Pose", section_toggled.emit))
 		add_child(EditorWidgets.create_inspector_field_label("Authored Facing"))
 		var facing_items: Array = []
@@ -533,6 +551,32 @@ func rebuild() -> void:
 		"min": -10000.0, "max": 10000.0, "step": 1.0, "font_size": 11,
 		"caption_tooltip": Z_ORDER_TOOLTIP, "tooltip": Z_ORDER_TOOLTIP,
 	}, component_z_index_changed.emit)
+
+
+func _render_palette_variants() -> void:
+	add_child(EditorWidgets.create_inspector_section("Variants (%d)" % palette_variant_rows.size(), section_toggled.emit))
+	if palette_variant_rows.is_empty():
+		var empty_hint := EditorWidgets.create_inspector_field_label("Add variants from the Palette's Outliner row.")
+		empty_hint.add_theme_color_override("font_color", Color("#9aa3b2"))
+		add_child(empty_hint)
+		return
+	for row_data in palette_variant_rows:
+		if not row_data is Dictionary:
+			continue
+		var variant_row := HBoxContainer.new()
+		variant_row.add_theme_constant_override("separation", 4)
+		var variant_label := EditorWidgets.create_inspector_field_label(str(row_data.get("label", "")))
+		variant_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		if bool(row_data.get("missing", false)):
+			variant_label.add_theme_color_override("font_color", Color("#ef6c78"))
+		variant_row.add_child(variant_label)
+		var remove_button := Button.new()
+		remove_button.text = "Remove"
+		remove_button.custom_minimum_size = Vector2(72, 26)
+		remove_button.focus_mode = Control.FOCUS_NONE
+		remove_button.pressed.connect(palette_variant_remove_requested.emit.bind(str(row_data.get("asset_id", ""))))
+		variant_row.add_child(remove_button)
+		add_child(variant_row)
 
 
 func _component_transform_descriptors(position_x: float, position_y: float, rotation: float, scale: Vector2) -> Array:

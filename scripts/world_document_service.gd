@@ -10,7 +10,7 @@ extends RefCounted
 # functions that do read editor state, _serialize_editor_state and
 # _serialize_world_settings, stay in main.gd for that reason.
 
-const SCHEMA_VERSION := 64
+const SCHEMA_VERSION := 65
 const REGION_GEOMETRY_AUTHORED := "authored"
 const REGION_GEOMETRY_COMPONENT := "component"
 const REGION_GEOMETRY_SOURCES := [REGION_GEOMETRY_AUTHORED, REGION_GEOMETRY_COMPONENT]
@@ -45,8 +45,13 @@ const ASSET_TYPE_SYMBOLS := "symbols"
 # SINGLE_ASSET_TYPES: that list is what the Single view and the Outliner Asset
 # filter offer.
 const ASSET_TYPE_SET := "set"
+# A Palette needs less than an Asset, not more: a list of interchangeable
+# variants, no geometry of its own and no arrangement, because the presentation
+# chooses freely among them. Its variants all share one category, so the
+# Palette carries that category instead of each variant answering for itself.
+const ASSET_TYPE_PALETTE := "palette"
 const SINGLE_ASSET_TYPES := [ASSET_TYPE_CHARACTER, ASSET_TYPE_PROPS, ASSET_TYPE_WEAPONS, ASSET_TYPE_TERRAIN, ASSET_TYPE_ITEMS, ASSET_TYPE_ICON, ASSET_TYPE_SYMBOLS]
-const ASSET_TYPES := [ASSET_TYPE_CHARACTER, ASSET_TYPE_PROPS, ASSET_TYPE_WEAPONS, ASSET_TYPE_TERRAIN, ASSET_TYPE_ITEMS, ASSET_TYPE_ICON, ASSET_TYPE_SYMBOLS, ASSET_TYPE_SET]
+const ASSET_TYPES := [ASSET_TYPE_CHARACTER, ASSET_TYPE_PROPS, ASSET_TYPE_WEAPONS, ASSET_TYPE_TERRAIN, ASSET_TYPE_ITEMS, ASSET_TYPE_ICON, ASSET_TYPE_SYMBOLS, ASSET_TYPE_SET, ASSET_TYPE_PALETTE]
 
 
 static func serialize_bezier_points(points: Array) -> Array:
@@ -366,7 +371,9 @@ static func deserialize_asset(asset_data: Dictionary, fallback_asset_id: String)
 		"animation": MotionWorkspace.normalize_animation_document(asset_data.get("animation", {})),
 		"components": components,
 		"groups": groups,
-		"guides": guides
+		"guides": guides,
+		"palette_variants": normalized_palette_variants(asset_data.get("palette_variants", [])),
+		"variant_asset_type": normalize_variant_asset_type(asset_data.get("variant_asset_type", ASSET_TYPE_CHARACTER))
 	}
 	ComponentHierarchy.normalize_asset(asset)
 	return asset
@@ -1120,6 +1127,44 @@ static func asset_type(asset: Dictionary) -> String:
 
 static func is_set_asset(asset: Dictionary) -> bool:
 	return asset_type(asset) == ASSET_TYPE_SET
+
+
+static func is_palette_asset(asset: Dictionary) -> bool:
+	return asset_type(asset) == ASSET_TYPE_PALETTE
+
+
+static func is_composition_asset(asset: Dictionary) -> bool:
+	return is_set_asset(asset) or is_palette_asset(asset)
+
+
+static func normalized_palette_variants(value) -> Array[String]:
+	# Stable internal Asset IDs, like a Reference's source_asset_id; export
+	# resolves them to Asset Keys. Order carries no meaning and duplicates are
+	# dropped: the variants are interchangeable, which is the whole point.
+	var variants: Array[String] = []
+	if not value is Array:
+		return variants
+	for entry in value:
+		var variant_id := str(entry).strip_edges()
+		if not variant_id.is_empty() and not variants.has(variant_id):
+			variants.append(variant_id)
+	return variants
+
+
+static func palette_variants(asset: Dictionary) -> Array[String]:
+	return normalized_palette_variants(asset.get("palette_variants", []))
+
+
+static func normalize_variant_asset_type(value) -> String:
+	# The one category every variant of a Palette has. It is an ordinary Asset
+	# type, never a composition, and a missing or invalid value reads the same
+	# way asset_type does.
+	var normalized := str(value).strip_edges().to_lower()
+	return normalized if normalized in SINGLE_ASSET_TYPES else ASSET_TYPE_CHARACTER
+
+
+static func palette_variant_type(asset: Dictionary) -> String:
+	return normalize_variant_asset_type(asset.get("variant_asset_type", ASSET_TYPE_CHARACTER))
 
 
 static func normalized_reference_role(value) -> String:

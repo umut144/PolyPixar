@@ -1,7 +1,7 @@
 extends Control
 
 const SELECTION_MIRROR_SERVICE_SCRIPT = preload("res://scripts/selection_mirror_service.gd")
-const CREATE_SUBMODULES := ["Single", "Set"]
+const CREATE_SUBMODULES := ["Single", "Set", "Palette"]
 const CREATE_SUBMODULE_BY_ASSET_TYPE := {
 	WorldDocumentService.ASSET_TYPE_CHARACTER: "Single",
 	WorldDocumentService.ASSET_TYPE_PROPS: "Single",
@@ -11,6 +11,7 @@ const CREATE_SUBMODULE_BY_ASSET_TYPE := {
 	WorldDocumentService.ASSET_TYPE_ICON: "Single",
 	WorldDocumentService.ASSET_TYPE_SYMBOLS: "Single",
 	WorldDocumentService.ASSET_TYPE_SET: "Set",
+	WorldDocumentService.ASSET_TYPE_PALETTE: "Palette",
 }
 const GEOMETRY_SUBMODULES := ["Sampling", "Seeding", "Meshing"]
 const STYLE_SUBMODULES := ["Weighting"]
@@ -183,6 +184,7 @@ var component_add_weapon_guide_menu: PopupMenu
 var component_add_region_menu: PopupMenu
 var component_add_reference_menu: PopupMenu
 var set_member_menu: PopupMenu
+var palette_variant_menu: PopupMenu
 var component_context_menu: PopupMenu
 var group_dialog: ConfirmationDialog
 var group_name_input: LineEdit
@@ -1030,6 +1032,7 @@ func _build_ui() -> void:
 	create_inspector_view.asset_authored_facing_selected.connect(_on_asset_authored_facing_selected)
 	create_inspector_view.asset_type_selected.connect(_on_asset_type_selected)
 	create_inspector_view.reference_role_requested.connect(_on_reference_role_requested)
+	create_inspector_view.palette_variant_remove_requested.connect(_on_palette_variant_remove_requested)
 	create_inspector_view.asset_pivot_property_changed.connect(_on_asset_pivot_property_changed)
 	create_inspector_view.asset_rename_requested.connect(_rename_selected_asset)
 	create_inspector_view.asset_root_position_changed.connect(_on_asset_root_position_changed)
@@ -1951,6 +1954,12 @@ func _create_component_add_menu() -> void:
 	set_member_menu.id_pressed.connect(_on_set_add_selected)
 	EditorWidgets.style_popup_menu(set_member_menu)
 	add_child(set_member_menu)
+	palette_variant_menu = PopupMenu.new()
+	palette_variant_menu.name = "PaletteVariantMenu"
+	palette_variant_menu.add_item("New Variant Asset…", 0)
+	palette_variant_menu.id_pressed.connect(_on_palette_add_selected)
+	EditorWidgets.style_popup_menu(palette_variant_menu)
+	add_child(palette_variant_menu)
 
 
 func _create_component_context_menu() -> void:
@@ -2091,7 +2100,7 @@ func _update_context_action_button() -> void:
 	if not show_asset_create_controls and is_instance_valid(frame_popup):
 		frame_popup.hide()
 	if active_module == "Create" and active_create_submodule in CREATE_SUBMODULES:
-		create_action_button.text = "Create Set" if active_create_submodule == "Set" else "Create Asset"
+		create_action_button.text = ("Create %s" % active_create_submodule) if active_create_submodule in ["Set", "Palette"] else "Create Asset"
 	elif active_module == "Style" and active_style_submodule == "Weighting":
 		create_action_button.text = "Create Weighting Style"
 	elif active_module == "Motion" and active_motion_submodule == "Path":
@@ -2462,7 +2471,9 @@ func _save_world() -> void:
 			"animation": MotionWorkspace.normalize_animation_document(asset.get("animation", {})).duplicate(true),
 			"components": [],
 			"groups": [],
-			"guides": []
+			"guides": [],
+			"palette_variants": WorldDocumentService.palette_variants(asset),
+			"variant_asset_type": WorldDocumentService.palette_variant_type(asset)
 		}
 		for group in asset.get("groups", []):
 			asset_data["groups"].append({
@@ -6070,27 +6081,54 @@ func _add_info_mode_option(text: String, active: bool) -> void:
 	info_bar.add_child(option)
 
 
-func _open_new_asset_dialog(member_of_set_id := "") -> void:
-	# One dialog, two intents: a standalone Asset, or a member authored from
-	# inside the Set that will reference it. A member is an ordinary Asset, so
-	# it is the composition modules that hide the type, not the member.
+func _open_new_asset_dialog(composition_owner_id := "") -> void:
+	# One dialog, three intents: a standalone Asset, a Set member, or a Palette
+	# variant. The owner says which, because its own type does.
 	asset_name_input.text = ""
 	asset_dialog.dialog_text = "Enter an asset name"
-	asset_dialog.set_meta("member_of_set_id", member_of_set_id)
-	var creates_ordinary_asset := not member_of_set_id.is_empty() or active_create_submodule == "Single"
-	asset_dialog.title = "New Member" if not member_of_set_id.is_empty() else "New %s" % (active_create_submodule if active_create_submodule == "Set" else "Asset")
+	asset_dialog.set_meta("composition_owner_id", composition_owner_id)
+	asset_dialog.title = _new_asset_dialog_title(composition_owner_id)
 	if is_instance_valid(asset_type_input):
-		asset_type_input.visible = creates_ordinary_asset
+		asset_type_input.visible = _new_asset_dialog_offers_a_type(composition_owner_id)
 	_sync_new_asset_type_input()
 	asset_dialog.popup_centered()
 	asset_name_input.grab_focus()
 
 
-func _new_asset_type(member_of_set_id: String) -> String:
+func _new_asset_dialog_title(composition_owner_id: String) -> String:
+	var owner := _get_asset(composition_owner_id)
+	if WorldDocumentService.is_palette_asset(owner):
+		return "New Variant Asset"
+	if WorldDocumentService.is_set_asset(owner):
+		return "New Member Asset"
+	if active_create_submodule in ["Set", "Palette"]:
+		return "New %s" % active_create_submodule
+	return "New Asset"
+
+
+func _new_asset_dialog_offers_a_type(composition_owner_id: String) -> bool:
+	# A Set member answers for its own category, so a Set may mix types. Every
+	# variant of a Palette shares the Palette's one category, which is why the
+	# Palette is where that category is chosen and a variant is not asked again.
+	var owner := _get_asset(composition_owner_id)
+	if WorldDocumentService.is_palette_asset(owner):
+		return false
+	if WorldDocumentService.is_set_asset(owner):
+		return true
+	return active_create_submodule in ["Single", "Palette"]
+
+
+func _new_asset_type(composition_owner_id: String) -> String:
 	# The module fixes the composition; the dialog fixes the category. A member
-	# is an ordinary Asset whatever module it was authored from.
-	if member_of_set_id.is_empty() and active_create_submodule == "Set":
+	# or variant is an ordinary Asset whatever module it was authored from, and
+	# a variant takes the one category its Palette declares.
+	var owner := _get_asset(composition_owner_id)
+	if WorldDocumentService.is_palette_asset(owner):
+		return WorldDocumentService.palette_variant_type(owner)
+	if composition_owner_id.is_empty() and active_create_submodule == "Set":
 		return WorldDocumentService.ASSET_TYPE_SET
+	if composition_owner_id.is_empty() and active_create_submodule == "Palette":
+		return WorldDocumentService.ASSET_TYPE_PALETTE
 	return WorldDocumentService.normalize_asset_type(new_asset_type)
 
 
@@ -6184,35 +6222,80 @@ func _confirm_asset_creation() -> void:
 		asset_name_input.select_all()
 		_show_status_message(validation_error)
 		return
-	var member_of_set_id := str(asset_dialog.get_meta("member_of_set_id", ""))
+	var composition_owner_id := str(asset_dialog.get_meta("composition_owner_id", ""))
 	# Single shot: the next Asset is standalone unless the dialog is opened for
-	# a Set again.
-	asset_dialog.set_meta("member_of_set_id", "")
-	var owner_set := _get_asset(member_of_set_id)
-	if not member_of_set_id.is_empty() and not WorldDocumentService.is_set_asset(owner_set):
+	# a composition again.
+	asset_dialog.set_meta("composition_owner_id", "")
+	var composition_owner := _get_asset(composition_owner_id)
+	if not composition_owner_id.is_empty() and not WorldDocumentService.is_composition_asset(composition_owner):
 		asset_dialog.hide()
 		return
+	var created_asset_type := _new_asset_type(composition_owner_id)
 	_record_direct_change()
 	var asset_id := "asset_%d" % next_asset_id
 	next_asset_id += 1
-	assets.append({"id": asset_id, "name": asset_name, "asset_type": _new_asset_type(member_of_set_id), "authored_facing": AssetPresentation.AuthoredFacing.NEUTRAL, "visibility": true, "asset_pivot": Vector2.ZERO, "root_position": Vector2.ZERO, "root_scale": Vector2.ONE, "reference_image": WorldDocumentService.default_reference_image(), "animation": MotionWorkspace.create_default_animation_document(), "components": [], "groups": [], "guides": []})
+	var created_asset := {"id": asset_id, "name": asset_name, "asset_type": created_asset_type, "authored_facing": AssetPresentation.AuthoredFacing.NEUTRAL, "visibility": true, "asset_pivot": Vector2.ZERO, "root_position": Vector2.ZERO, "root_scale": Vector2.ONE, "reference_image": WorldDocumentService.default_reference_image(), "animation": MotionWorkspace.create_default_animation_document(), "components": [], "groups": [], "guides": []}
+	if created_asset_type == WorldDocumentService.ASSET_TYPE_PALETTE:
+		# The one category every variant of this Palette will have, chosen where
+		# the Palette is named because a variant is never asked again.
+		created_asset["palette_variants"] = [] as Array[String]
+		created_asset["variant_asset_type"] = WorldDocumentService.normalize_variant_asset_type(new_asset_type)
+	assets.append(created_asset)
 	selected_asset_id = asset_id
 	selected_component_id = ""
 	selected_component_ids.clear()
 	selected_group_id = ""
 	selected_guide_id = ""
 	active_state = ""
-	if not member_of_set_id.is_empty():
+	if WorldDocumentService.is_set_asset(composition_owner):
 		# The member exists; the Reference is what puts it into the assembly.
 		# Its local name comes from the member's own name, the same derivation
 		# the Asset Key uses, so membership is readable without a second one.
-		selected_asset_id = member_of_set_id
-		selected_component_id = _add_set_member_reference(owner_set, asset_id)
-		_set_outliner_asset_expanded(member_of_set_id, true)
+		selected_asset_id = composition_owner_id
+		selected_component_id = _add_set_member_reference(composition_owner, asset_id)
+		_set_outliner_asset_expanded(composition_owner_id, true)
+	elif WorldDocumentService.is_palette_asset(composition_owner):
+		# A variant is carried by the list alone: no Reference, no transform,
+		# no order.
+		var variants := WorldDocumentService.palette_variants(composition_owner)
+		variants.append(asset_id)
+		composition_owner["palette_variants"] = variants
+		selected_asset_id = composition_owner_id
+		_set_outliner_asset_expanded(composition_owner_id, true)
 	else:
 		_set_outliner_asset_expanded(asset_id, true)
 	asset_dialog.hide()
 	_invalidate_render(RENDER_DOCUMENT)
+
+
+func _on_palette_variant_remove_requested(variant_asset_id: String) -> void:
+	var asset := _get_asset(selected_asset_id)
+	if not WorldDocumentService.is_palette_asset(asset):
+		return
+	var variants := WorldDocumentService.palette_variants(asset)
+	if not variants.has(variant_asset_id):
+		return
+	_record_direct_change()
+	variants.erase(variant_asset_id)
+	asset["palette_variants"] = variants
+	_invalidate_render(RENDER_DOCUMENT)
+
+
+func _palette_variant_rows(asset: Dictionary) -> Array:
+	# One row per variant, already labelled: resolving an Asset ID needs every
+	# Asset, which the view does not have. A variant that no longer exists stays
+	# visible as missing rather than disappearing silently.
+	var rows: Array = []
+	if not WorldDocumentService.is_palette_asset(asset):
+		return rows
+	for variant_asset_id in WorldDocumentService.palette_variants(asset):
+		var variant := _get_asset(variant_asset_id)
+		rows.append({
+			"asset_id": variant_asset_id,
+			"label": str(variant.get("name", "")) if not variant.is_empty() else "Missing Asset",
+			"missing": variant.is_empty(),
+		})
+	return rows
 
 
 func _add_set_member_reference(owner_set: Dictionary, member_asset_id: String) -> String:
@@ -6764,6 +6847,8 @@ func _outliner_module_asset_type_filters() -> Dictionary:
 	# the single type it lists.
 	if active_module == "Create" and active_create_submodule == "Set":
 		return {WorldDocumentService.ASSET_TYPE_SET: true}
+	if active_module == "Create" and active_create_submodule == "Palette":
+		return {WorldDocumentService.ASSET_TYPE_PALETTE: true}
 	return outliner_asset_type_filters
 
 
@@ -7604,7 +7689,10 @@ func _select_asset(asset_id: String) -> void:
 	selected_guide_id = ""
 	active_state = ""
 	canvas_view.set_interaction_state("")
-	if was_selected:
+	if was_selected and _outliner_expansion_anchor_asset_id(asset_id) == asset_id:
+		# Clicking the selected row again folds it. A variant row is not that
+		# row: its expansion belongs to the Palette that lists it, so clicking
+		# it selects and nothing more.
 		_set_outliner_asset_expanded(asset_id, not bool(expanded_assets.get(asset_id, false)))
 	else:
 		_set_outliner_asset_expanded(asset_id, true)
@@ -7616,8 +7704,12 @@ func _open_component_dialog(asset_id: String, anchor: Control) -> void:
 	selected_component_id = ""
 	selected_component_ids.clear()
 	selected_guide_id = ""
-	if WorldDocumentService.is_set_asset(_get_asset(asset_id)):
-		_open_set_member_menu(asset_id, anchor)
+	var add_menu_asset := _get_asset(asset_id)
+	if WorldDocumentService.is_set_asset(add_menu_asset):
+		_open_composition_add_menu(set_member_menu, asset_id, anchor)
+		return
+	if WorldDocumentService.is_palette_asset(add_menu_asset):
+		_open_composition_add_menu(palette_variant_menu, asset_id, anchor)
 		return
 	component_draw_mode_menu.set_meta("asset_id", asset_id)
 	component_draw_mode_menu.set_meta("parent_component_id", "")
@@ -7625,10 +7717,10 @@ func _open_component_dialog(asset_id: String, anchor: Control) -> void:
 	component_draw_mode_menu.popup()
 
 
-func _open_set_member_menu(asset_id: String, anchor: Control) -> void:
-	set_member_menu.set_meta("asset_id", asset_id)
-	set_member_menu.position = Vector2i(anchor.global_position + Vector2(0.0, anchor.size.y))
-	set_member_menu.popup()
+func _open_composition_add_menu(menu: PopupMenu, asset_id: String, anchor: Control) -> void:
+	menu.set_meta("asset_id", asset_id)
+	menu.position = Vector2i(anchor.global_position + Vector2(0.0, anchor.size.y))
+	menu.popup()
 
 
 func _on_set_add_selected(id: int) -> void:
@@ -7636,6 +7728,14 @@ func _on_set_add_selected(id: int) -> void:
 		return
 	var asset_id := str(set_member_menu.get_meta("asset_id", ""))
 	if WorldDocumentService.is_set_asset(_get_asset(asset_id)):
+		_open_new_asset_dialog(asset_id)
+
+
+func _on_palette_add_selected(id: int) -> void:
+	if id != 0:
+		return
+	var asset_id := str(palette_variant_menu.get_meta("asset_id", ""))
+	if WorldDocumentService.is_palette_asset(_get_asset(asset_id)):
 		_open_new_asset_dialog(asset_id)
 
 
@@ -10385,6 +10485,7 @@ func _render_inspector() -> void:
 		selected_edge_id, selected_edge_ids.duplicate())
 	create_inspector_view.set_resolved_selection(_selected_components_for_inspector(asset),
 		_valid_selected_point_ids(_get_component(asset, selected_component_id)))
+	create_inspector_view.set_palette_variants(_palette_variant_rows(asset))
 	create_inspector_view.set_mode(active_state, active_edit_mode, canvas_view.face_selected)
 	create_inspector_view.rebuild()
 
@@ -12877,13 +12978,19 @@ func _composition_owner_by_member_id() -> Dictionary:
 	# Symbol instance rather than membership.
 	var owner_by_member: Dictionary = {}
 	for asset in assets:
-		if not asset is Dictionary or not WorldDocumentService.is_set_asset(asset):
+		if not asset is Dictionary:
 			continue
-		for component in asset.get("components", []):
-			if component is Dictionary and _is_reference_component(component):
-				var member_id := str(component.get("source_asset_id", ""))
-				if not member_id.is_empty() and not owner_by_member.has(member_id):
-					owner_by_member[member_id] = str(asset.get("id", ""))
+		var owner_id := str(asset.get("id", ""))
+		if WorldDocumentService.is_set_asset(asset):
+			for component in asset.get("components", []):
+				if component is Dictionary and _is_reference_component(component):
+					var member_id := str(component.get("source_asset_id", ""))
+					if not member_id.is_empty() and not owner_by_member.has(member_id):
+						owner_by_member[member_id] = owner_id
+		elif WorldDocumentService.is_palette_asset(asset):
+			for variant_id in WorldDocumentService.palette_variants(asset):
+				if not owner_by_member.has(variant_id):
+					owner_by_member[variant_id] = owner_id
 	return owner_by_member
 
 

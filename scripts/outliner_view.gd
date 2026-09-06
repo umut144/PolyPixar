@@ -65,8 +65,9 @@ var row_status: Dictionary = {}
 # documented at _render_geometry_rows below.
 var geometry_rows: Array = []
 
-const CREATE_SUBMODULES := ["Single", "Set"]
+const CREATE_SUBMODULES := ["Single", "Set", "Palette"]
 const GEOMETRY_SUBMODULES := ["Sampling", "Seeding", "Meshing"]
+const CREATE_GROUP_LABELS := {"Single": "Assets", "Set": "Sets", "Palette": "Palettes"}
 
 
 func _init() -> void:
@@ -181,7 +182,7 @@ func rebuild() -> void:
 			if asset_is_visible(asset) and asset_type_filter_matches(asset) and not composition_member_asset_ids.has(str(asset.get("id", ""))) and asset_matches_search(asset, search_text):
 				visible_assets.append(asset)
 		visible_assets.sort_custom(WorldDocumentService.sort_named_documents)
-		self.add_child(EditorWidgets.create_outliner_group_label("Sets" if active_create_submodule == "Set" else "Assets"))
+		self.add_child(EditorWidgets.create_outliner_group_label(str(CREATE_GROUP_LABELS.get(active_create_submodule, "Assets"))))
 		for asset in visible_assets:
 			_render_asset_outliner_entry(asset, not search_text.is_empty())
 
@@ -468,6 +469,9 @@ func _render_asset_outliner_entry(asset: Dictionary, force_expand := false) -> v
 	if WorldDocumentService.is_set_asset(asset):
 		_render_set_member_rows(asset_container, asset)
 		return
+	if WorldDocumentService.is_palette_asset(asset):
+		_render_palette_variant_rows(asset_container, asset)
+		return
 	_render_asset_contents(asset_container, asset, 16)
 
 
@@ -532,6 +536,48 @@ func _render_set_member_rows(container: VBoxContainer, asset: Dictionary) -> voi
 	members.sort_custom(WorldDocumentService.sort_named_documents)
 	for member in members:
 		_render_set_member_row(container, asset, member)
+
+
+func _render_palette_variant_rows(container: VBoxContainer, asset: Dictionary) -> void:
+	# A Palette is a list, not a placement: a variant is carried by its ID
+	# alone, with no Reference, no transform and no order. The variant Asset
+	# itself is drawn underneath its row, exactly as a Set member is.
+	container.add_child(EditorWidgets.create_outliner_child_group_label("Variants"))
+	for variant_asset_id in WorldDocumentService.palette_variants(asset):
+		_render_palette_variant_row(container, WorldDocumentService.asset_by_id(assets, variant_asset_id), variant_asset_id)
+
+
+func _render_palette_variant_row(container: VBoxContainer, variant_asset: Dictionary, variant_asset_id: String) -> void:
+	var variant_row := HBoxContainer.new()
+	variant_row.add_theme_constant_override("separation", 0)
+	container.add_child(variant_row)
+	var variant_indent := Control.new()
+	variant_indent.custom_minimum_size = Vector2(16, 0)
+	variant_row.add_child(variant_indent)
+	if variant_asset.is_empty():
+		var missing_label := EditorWidgets.create_inspector_field_label("Missing Asset (%s)" % variant_asset_id)
+		missing_label.add_theme_color_override("font_color", Color("#ef6c78"))
+		variant_row.add_child(missing_label)
+		return
+	variant_row.add_child(EditorWidgets.create_visibility_checkbox(bool(variant_asset.get("visibility", true)), _emit_visibility.bind("asset", variant_asset_id, variant_asset_id)))
+	var variant_button := Button.new()
+	var variant_name := str(variant_asset.get("name", "Asset"))
+	variant_button.text = variant_name if bool(variant_asset.get("visibility", true)) else EditorWidgets.strikethrough_text(variant_name)
+	variant_button.custom_minimum_size = Vector2(0, 30)
+	variant_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	variant_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	variant_button.focus_mode = Control.FOCUS_NONE
+	EditorWidgets.style_outliner_button(variant_button, variant_asset_id == selected_asset_id and selected_component_id.is_empty())
+	variant_button.pressed.connect(asset_selected.emit.bind(variant_asset_id))
+	variant_row.add_child(variant_button)
+	var add_button := Button.new()
+	add_button.text = "Add"
+	add_button.custom_minimum_size = Vector2(48, 30)
+	add_button.focus_mode = Control.FOCUS_NONE
+	add_button.tooltip_text = "Add to %s" % variant_name
+	add_button.pressed.connect(component_dialog_requested.emit.bind(variant_asset_id, add_button))
+	variant_row.add_child(add_button)
+	_render_asset_contents(container, variant_asset, 32)
 
 
 func _render_set_member_row(container: VBoxContainer, owner_asset: Dictionary, member: Dictionary) -> void:

@@ -220,7 +220,7 @@ func _test_create_outliner_expansion_scope() -> void:
 func _create_set_member(application: Control, asset_id: String, member_name: String, asset_type: String) -> String:
 	# The New Member path: one dialog makes the Asset and the Reference that
 	# puts it into the assembly.
-	application.asset_dialog.set_meta("member_of_set_id", asset_id)
+	application.asset_dialog.set_meta("composition_owner_id", asset_id)
 	application.new_asset_type = asset_type
 	application.asset_name_input.text = member_name
 	application._confirm_asset_creation()
@@ -240,7 +240,7 @@ func _test_set_composition() -> void:
 	var create_section: ModuleSection = application._find_section("Create")
 	application._select_submodule("Create", "Set", create_section)
 	_expect(application.active_create_submodule == "Set" and application.create_action_button.text == "Create Set" and not application.outliner_asset_type_filter_panel.visible, "The Set module should create Sets and hide the seven-type Asset filter, which does not describe them.")
-	application.asset_dialog.set_meta("member_of_set_id", "")
+	application.asset_dialog.set_meta("composition_owner_id", "")
 	application.asset_name_input.text = "Bridge"
 	application._confirm_asset_creation()
 	var bridge: Dictionary = application.assets[-1]
@@ -307,6 +307,79 @@ func _test_set_composition() -> void:
 		"chains": [], "visibility": true, "transform": WorldDocumentService.default_component_transform()})
 	_expect(application._reference_cycle_issue("asset_plank", "asset_post").is_empty() and not application._reference_cycle_issue("asset_post", "asset_plank").is_empty(), "A Reference that would close a cycle should be rejected where it is authored.")
 	_expect(not application._reference_cycle_issue("asset_plank", "asset_plank").is_empty() and not application._reference_cycle_issue("asset_plank", "").is_empty(), "Self-reference and a missing source should be rejected as well.")
+	application.free()
+
+
+func _create_palette_variant(application: Control, palette_id: String, variant_name: String) -> String:
+	# The New Variant path: the Palette already fixed the category, so the
+	# dialog only asks for the name.
+	application.asset_dialog.set_meta("composition_owner_id", palette_id)
+	application.asset_name_input.text = variant_name
+	application._confirm_asset_creation()
+	return str(application.assets[-1].get("id", ""))
+
+
+func _test_palette_composition() -> void:
+	var application: Control = load("res://scripts/main.gd").new()
+	application._build_ui()
+	var meadow := {"id": "asset_meadow", "name": "Meadow", "asset_type": "terrain", "visibility": true,
+		"components": [], "groups": [], "guides": []}
+	var test_assets: Array[Dictionary] = [meadow]
+	application.assets = test_assets
+	application.next_asset_id = 2
+	var create_section: ModuleSection = application._find_section("Create")
+	application._select_submodule("Create", "Palette", create_section)
+	_expect(application.active_create_submodule == "Palette" and application.create_action_button.text == "Create Palette" and not application.outliner_asset_type_filter_panel.visible, "The Palette module should create Palettes and hide the seven-type Asset filter.")
+	_expect(application._new_asset_dialog_offers_a_type("") and application._new_asset_dialog_title("") == "New Palette", "A Palette declares the one category of its variants where it is named.")
+	application.asset_dialog.set_meta("composition_owner_id", "")
+	application.new_asset_type = WorldDocumentService.ASSET_TYPE_TERRAIN
+	application.asset_name_input.text = "Grass"
+	application._confirm_asset_creation()
+	var palette: Dictionary = application.assets[-1]
+	var palette_id := str(palette.get("id", ""))
+	_expect(WorldDocumentService.is_palette_asset(palette) and WorldDocumentService.palette_variant_type(palette) == "terrain" and WorldDocumentService.palette_variants(palette).is_empty(), "A new Palette should carry its variant category and start empty.")
+	_expect(not application._new_asset_dialog_offers_a_type(palette_id) and application._new_asset_dialog_title(palette_id) == "New Variant Asset", "A variant is never asked for a category, because its Palette already declared one.")
+	var first_variant_id := _create_palette_variant(application, palette_id, "Grass01")
+	var second_variant_id := _create_palette_variant(application, palette_id, "Grass02")
+	_expect(WorldDocumentService.palette_variants(palette) == [first_variant_id, second_variant_id], "Adding a variant should append its Asset ID to the Palette's list.")
+	_expect(str(application._get_asset(first_variant_id).get("asset_type", "")) == "terrain" and application._get_asset(first_variant_id).get("components", []).is_empty(), "A variant should be an ordinary Asset of the Palette's category, ready for its Components.")
+	_expect(application.selected_asset_id == palette_id, "Adding a variant should leave the Palette selected.")
+	# A variant carries no Reference, no transform and no order: the list is all
+	# there is.
+	_expect(palette.get("components", []).is_empty(), "A Palette should own no Components of its own.")
+	# The variant Asset is drawn underneath its row and authored there.
+	application.component_dialog.set_meta("asset_id", first_variant_id)
+	application.component_dialog.set_meta("parent_component_id", "")
+	application.component_dialog.set_meta("draw_mode", WorldDocumentService.DRAW_MODE_CLOSED_LOOP)
+	application.component_dialog.set_meta("source_asset_id", "")
+	application.component_dialog.set_meta("group_id", "")
+	application.component_name_input.text = "body"
+	application._confirm_component_creation()
+	_expect(application.selected_asset_id == first_variant_id and application.active_create_submodule == "Palette" and application._outliner_focus_asset_id() == palette_id, "Authoring inside a variant should keep the Palette module and keep the Palette as the expanded row.")
+	application._render_outliner()
+	_expect(_button_with_text(application.outliner_view, "Grass") != null and _button_with_text(application.outliner_view, "Grass01") != null and _button_with_text(application.outliner_view, "body") != null, "The Palette Outliner should list the Palette, its variants and each variant's Components.")
+	# Single lists what is placed on its own; a variant is reached through its
+	# Palette.
+	application._select_submodule("Create", "Single", create_section)
+	for asset in application.assets:
+		application.expanded_assets[str(asset.get("id", ""))] = false
+	application._render_outliner()
+	var single_labels: Array[String] = []
+	_collect_button_labels(application.outliner_view, single_labels)
+	_expect(single_labels == ["Meadow"], "Single should list neither the Palette nor its variants, but listed %s." % [single_labels])
+	application._select_submodule("Create", "Palette", create_section)
+	application.selected_asset_id = palette_id
+	application.selected_component_id = ""
+	var variant_rows: Array = application._palette_variant_rows(palette)
+	_expect(variant_rows.size() == 2 and str(variant_rows[0].get("label", "")) == "Grass01" and not bool(variant_rows[0].get("missing", true)), "The Palette Inspector should receive its variants already labelled.")
+	application._on_palette_variant_remove_requested(second_variant_id)
+	_expect(WorldDocumentService.palette_variants(palette) == [first_variant_id], "Removing a variant should drop it from the list and leave the Asset alone.")
+	_expect(not application._get_asset(second_variant_id).is_empty(), "Removing a variant from a Palette should not delete the Asset it named.")
+	# A variant Asset that is gone stays visible as missing rather than
+	# vanishing from the list.
+	palette["palette_variants"] = [first_variant_id, "asset_gone"]
+	var missing_rows: Array = application._palette_variant_rows(palette)
+	_expect(missing_rows.size() == 2 and bool(missing_rows[1].get("missing", false)) and str(missing_rows[1].get("label", "")) == "Missing Asset", "A variant whose Asset no longer exists should stay visible as missing.")
 	application.free()
 
 
@@ -1772,6 +1845,7 @@ const CREATE_SIGNAL_ROUTES := [
 	["multi_component_field_focus_exited", "_on_multi_component_field_focus_exited"],
 	["multi_component_field_submitted", "_on_multi_component_field_submitted"],
 	["multi_component_visibility_selected", "_on_multi_component_visibility_selected"],
+	["palette_variant_remove_requested", "_on_palette_variant_remove_requested"],
 	["point_position_changed", "_on_point_position_changed"],
 	["reference_image_clear_requested", "_clear_reference_image"],
 	["reference_role_requested", "_on_reference_role_requested"],
@@ -1789,10 +1863,21 @@ const CREATE_SIGNAL_ROUTES := [
 ]
 
 
-const CREATE_PROBE_CASES := ["asset", "asset_reference", "set_asset", "set_member", "component", "component_grouped",
+const CREATE_PROBE_CASES := ["asset", "asset_reference", "set_asset", "set_member", "palette_asset", "component", "component_grouped",
 	"component_contour", "primitive_circle", "primitive_hole", "primitive_ellipse", "group", "guide",
 	"guide_weapon", "region_authored", "region_component", "multi_component", "point_none", "point_one", "point_many",
 	"edge_none", "edge_one", "edge_many", "hole_edge_one", "hole_edge_many", "face"]
+
+
+func _create_wiring_palette() -> Dictionary:
+	# A Palette is a list and one category, nothing else. One variant resolves
+	# and one no longer exists, so both row forms are drawn.
+	return {"id": "asset_10", "name": "Grass", "visibility": true,
+		"asset_type": WorldDocumentService.ASSET_TYPE_PALETTE,
+		"variant_asset_type": WorldDocumentService.ASSET_TYPE_TERRAIN,
+		"palette_variants": ["asset_1", "asset_gone"],
+		"components": [], "groups": [], "guides": [],
+		"asset_pivot": Vector2.ZERO, "root_position": Vector2.ZERO, "root_scale": Vector2.ONE}
 
 
 func _create_wiring_set() -> Dictionary:
@@ -1891,6 +1976,9 @@ func _prepare_create_case(application: Control, case_name: String) -> void:
 			application.active_create_submodule = "Set"
 			application.selected_asset_id = "asset_9"
 			application.selected_component_id = "component_20"
+		"palette_asset":
+			application.active_create_submodule = "Palette"
+			application.selected_asset_id = "asset_10"
 		"component":
 			application.selected_component_id = "component_1"
 		"component_grouped":
@@ -1974,13 +2062,14 @@ func _build_create_probe(application: Control) -> CreateInspectorView:
 	probe.set_resolved_selection(application._selected_components_for_inspector(asset),
 		application._valid_selected_point_ids(
 			WorldDocumentService.component_by_id(asset, application.selected_component_id)))
+	probe.set_palette_variants(application._palette_variant_rows(asset))
 	probe.set_mode(application.active_state, application.active_edit_mode,
 		application.canvas_view.face_selected)
 	return probe
 
 
 func _test_create_inspector_wiring() -> void:
-	var create_assets: Array[Dictionary] = [_create_wiring_asset(), _create_wiring_set()]
+	var create_assets: Array[Dictionary] = [_create_wiring_asset(), _create_wiring_set(), _create_wiring_palette()]
 	var application: Control = load("res://scripts/main.gd").new()
 	application._build_ui()
 	application.assets = create_assets

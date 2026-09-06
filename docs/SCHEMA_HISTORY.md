@@ -56,6 +56,7 @@ fingerprints.
 | 63 | Seven Create views merged into `Single`; `editor_state.active_create_submodule` holds a module name | shape (every old view name reads as `Single`) | `main.gd._normalized_create_submodule` | `_test_create_outliner_expansion_scope` |
 | 63 | The Outliner Asset filter gates Create as well | **explicit** (< 63) | `main.gd._restore_editor_state` | `_test_create_outliner_expansion_scope` |
 | 64 | `set` Asset type; optional `role` on Reference Components | additive (missing role reads unauthored) | `normalize_asset_type`, `deserialize_component` | `_test_set_composition`, `_test_asset_deserialization_migrations` |
+| 65 | `palette` Asset type; `palette_variants` and `variant_asset_type` | additive (missing list reads empty, missing category reads `character`) | `normalize_asset_type`, `normalized_palette_variants`, `normalize_variant_asset_type` | `_test_palette_composition`, `_test_asset_deserialization_migrations` |
 | Manifest 16 | `contour_stroke_mesh`, `closed_region_mesh`, Attachment Frames, `projection_depth_corners`, `regions` | derived | `RuntimeExportService` | `_test_runtime_export_service` |
 | Sampling 6 | Junction-aware Cuts, boundary-namespaced analytic Samples, corner balancing | derived | `GeometrySamplingService` | `_test_geometry_sampling_corner_balancing` |
 | Motion 1–18 | Blink `anticipation_share` default 0.18 read as 0.5 | **explicit** (≤ 18) | `normalize_motion_act` | `_test_asset_deserialization_migrations` |
@@ -305,6 +306,19 @@ seven types, and a Reference without a role loads without one. `ASSET_TYPES`
 gains `set` while the new `SINGLE_ASSET_TYPES` keeps the seven that the Asset
 filter and the New Asset dialog offer, so a Set never appears in Mesh, Style or
 the Single view.
+
+World schema 65 adds the `palette` Asset type with `palette_variants` and
+`variant_asset_type`. A Palette is the smallest form that says what it is: a
+list of interchangeable Assets and the one ordinary category they share. It has
+no Components, no geometry and no arrangement, which is why its variants are
+plain Asset IDs rather than References — a Reference carries a transform, a
+pivot, a z-index and a depth, and a Palette would have to define every one of
+them away. The list drops blanks and repeats on load, because order and
+multiplicity mean nothing among things that stand in for each other.
+
+Additive as well. No existing document changes: an Asset that is not a Palette
+loads with an empty variant list, and a category that is missing or names a
+composition reads `character`, the same fallback `asset_type` uses.
 
 Runtime Manifest schema 16 exports `contour_stroke_mesh` independently from
 the unchanged Fill Mesh and adds geometry-only `closed_region_mesh` to closed

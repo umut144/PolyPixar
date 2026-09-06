@@ -138,6 +138,26 @@ func _test_asset_deserialization_migrations() -> void:
 		and WorldDocumentService.reference_role(reference_components[1]).is_empty(),
 		"A Set should load with its type, and a member role should normalize while a missing one stays unauthored.")
 
+	# Schema 65 is additive too: a Palette is a list plus the one category its
+	# variants share, and an Asset that is neither loads with neither.
+	var palette := {"schema_version": WorldDocumentService.SCHEMA_VERSION, "id": "asset_grass",
+		"asset_type": WorldDocumentService.ASSET_TYPE_PALETTE,
+		"variant_asset_type": "terrain",
+		"palette_variants": ["asset_1", " asset_2 ", "asset_1", ""],
+		"components": []}
+	var palette_asset: Dictionary = WorldDocumentService.deserialize_asset(palette, "asset_grass")
+	_expect(WorldDocumentService.is_palette_asset(palette_asset)
+		and WorldDocumentService.palette_variant_type(palette_asset) == "terrain"
+		and WorldDocumentService.palette_variants(palette_asset) == ["asset_1", "asset_2"],
+		"A Palette should load with its category and a variant list without blanks or repeats.")
+	var invalid_palette: Dictionary = WorldDocumentService.deserialize_asset(
+		{"schema_version": WorldDocumentService.SCHEMA_VERSION, "id": "asset_odd",
+			"asset_type": WorldDocumentService.ASSET_TYPE_PALETTE,
+			"variant_asset_type": WorldDocumentService.ASSET_TYPE_SET, "components": []}, "asset_odd")
+	_expect(WorldDocumentService.palette_variant_type(invalid_palette) == "character"
+		and WorldDocumentService.palette_variants(invalid_palette).is_empty(),
+		"A variant category is an ordinary Asset type, never a composition, and a missing list loads empty.")
+
 	var blink := {"schema_version": 18, "id": "act_1", "primitive": MotionActEvaluator.BLINK,
 		"parameters": {"anticipation_share": 0.18}}
 	var migrated_blink := WorldDocumentService.normalize_motion_act(blink, "act_1")
