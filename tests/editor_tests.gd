@@ -217,11 +217,11 @@ func _test_create_outliner_expansion_scope() -> void:
 	application.free()
 
 
-func _create_set_member(application: Control, asset_id: String, member_name: String, asset_type: String) -> String:
+func _create_set_member(application: Control, asset_id: String, member_name: String) -> String:
 	# The New Member path: one dialog makes the Asset and the Reference that
-	# puts it into the assembly.
+	# puts it into the assembly. It asks for no type — the Set already declared
+	# the one kind of thing it and its members are.
 	application.asset_dialog.set_meta("composition_owner_id", asset_id)
-	application.new_asset_type = asset_type
 	application.asset_name_input.text = member_name
 	application._confirm_asset_creation()
 	return application.selected_component_id
@@ -249,11 +249,12 @@ func _test_set_composition() -> void:
 	_expect(WorldDocumentService.is_set_asset(bridge) and WorldDocumentService.asset_type(bridge) == "props" and application._asset_create_submodule(bridge) == "Set", "Creating from the Set module should persist the set category while the Asset keeps a type of its own.")
 	# The primary path: Add makes a member. The member is an ordinary Asset, and
 	# the Reference that carries it into the assembly is named after it.
-	var rail_member_id := _create_set_member(application, bridge_id, "Rope Rail", "props")
+	var rail_member_id := _create_set_member(application, bridge_id, "Rope Rail")
 	var rail_member: Dictionary = application._get_component(bridge, rail_member_id)
 	var rail_asset: Dictionary = application._get_asset(str(rail_member.get("source_asset_id", "")))
 	_expect(application.selected_asset_id == bridge_id and application._is_reference_component(rail_member) and str(rail_member.get("parent_component_id", "")).is_empty(), "Adding a member should leave the Set selected and put a root-level Reference into it.")
-	_expect(str(rail_asset.get("name", "")) == "Rope Rail" and str(rail_asset.get("asset_type", "")) == "props" and rail_asset.get("components", []).is_empty(), "A member should be an ordinary Asset of its own category, ready for its Components.")
+	_expect(str(rail_asset.get("name", "")) == "Rope Rail" and str(rail_asset.get("asset_type", "")) == "props" and str(rail_asset.get("asset_category", "")) == "single" and rail_asset.get("components", []).is_empty(), "A member should be an ordinary Asset of the Set's own type, ready for its Components.")
+	_expect(not application._new_asset_dialog_offers_a_type(bridge_id), "A member is never asked for a type, because its Set already declared one.")
 	_expect(WorldDocumentService.normalized_component_name(rail_member) == "rope_rail", "The Reference should be named after the member, by the same derivation the Asset Key uses.")
 	# A member is reached through its composition, so Single does not offer it
 	# a second time.
@@ -271,7 +272,7 @@ func _test_set_composition() -> void:
 	# The Reference name is derived, so it has to survive a name the Set already
 	# uses rather than silently duplicating it.
 	bridge["components"].append(_outliner_test_component("component_taken", "bridge_post"))
-	var post_member_id := _create_set_member(application, bridge_id, "Bridge Post", "props")
+	var post_member_id := _create_set_member(application, bridge_id, "Bridge Post")
 	var post_member: Dictionary = application._get_component(bridge, post_member_id)
 	_expect(WorldDocumentService.normalized_component_name(post_member) == "bridge_post_02" and WorldDocumentService.reference_role(post_member).is_empty(), "A derived Reference name should stay unique, and a new member should start without an authored role.")
 	application.selected_asset_id = bridge_id
@@ -301,6 +302,18 @@ func _test_set_composition() -> void:
 	_expect(_button_with_text(application.outliner_view, "body") != null and _button_with_text(application.outliner_view, "Bridge") != null, "The member's Components should be drawn underneath its member row.")
 	application._select_component(member_asset_id, member_component_id)
 	_expect(application.active_create_submodule == "Set" and application.selected_asset_id == member_asset_id and application._outliner_focus_asset_id() == bridge_id, "Selecting a member's Component should stay in the Set module and leave the Set expanded.")
+	# A composition and the Assets it owns are one kind of thing, so changing the
+	# type on the Set moves it to every member.
+	application.selected_asset_id = bridge_id
+	application.selected_component_id = ""
+	var terrain_index := -1
+	for index in range(application.asset_type_input.item_count):
+		if str(application.asset_type_input.get_item_metadata(index)) == "terrain":
+			terrain_index = index
+	application._on_asset_type_selected(terrain_index, application.asset_type_input)
+	_expect(str(bridge.get("asset_type", "")) == "terrain" and str(rail_asset.get("asset_type", "")) == "terrain", "Changing a Set's type should move it to its members rather than leaving the two disagreeing.")
+	application._on_asset_type_selected(1, application.asset_type_input)
+	_expect(str(bridge.get("asset_type", "")) == "props" and str(rail_asset.get("asset_type", "")) == "props", "The same holds on the way back.")
 	# Plank instances Rope Post, so Rope Post may not instance Plank back: the
 	# consumer resolves References through the Catalog and would recurse.
 	plank["components"].append({"id": "component_cap", "type": "reference", "name": "cap",

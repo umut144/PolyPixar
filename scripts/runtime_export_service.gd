@@ -73,6 +73,20 @@ static func build_manifest(asset: Dictionary, sources: Dictionary, palette_varia
 			authored_scale = Vector2(authored_transform.get("scale", Vector2.ONE))
 		if str(component.get("type", "component")) != "reference" and (not authored_scale.is_finite() or not authored_scale.is_equal_approx(Vector2.ONE)):
 			errors.append("%s: Component Scale must be rebased to (1, 1) before Runtime Export." % _component_label(component))
+	if WorldDocumentService.is_set_asset(asset):
+		# A Set is its members and nothing else, and a Set and its members are
+		# one kind of thing. Both are authored that way; both are checked here
+		# rather than assumed.
+		for component in visible_components:
+			var label := _component_label(component)
+			if str(component.get("type", "component")) != "reference":
+				errors.append("%s: a Set holds member References and no geometry of its own." % label)
+				continue
+			var member_source: Dictionary = sources.get(str(component.get("id", "")), {})
+			if not bool(member_source.get("source_asset_exists", false)):
+				continue
+			if str(member_source.get("source_asset_type", "")) != WorldDocumentService.asset_type(asset):
+				errors.append("%s: every member of a Set shares the Set's Asset type." % label)
 	errors.append_array(_hierarchy_errors(visible_components))
 	var export_transforms := _canonical_export_transforms(asset, visible_components)
 	var manifest_components: Array = []

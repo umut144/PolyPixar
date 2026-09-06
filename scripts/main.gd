@@ -4335,7 +4335,8 @@ func _runtime_export_build(asset: Dictionary) -> Dictionary:
 			sources[component_id] = {
 				"owner_asset_id": asset_id,
 				"source_asset_exists": not source_asset.is_empty(),
-				"source_asset_key": _asset_key(source_asset) if not source_asset.is_empty() else ""
+				"source_asset_key": _asset_key(source_asset) if not source_asset.is_empty() else "",
+				"source_asset_type": _asset_type(source_asset) if not source_asset.is_empty() else ""
 			}
 			continue
 		var contour_stroke := _contour_stroke_bake(asset_id, component_id)
@@ -6144,18 +6145,17 @@ func _new_asset_dialog_title(composition_owner_id: String) -> String:
 
 
 func _new_asset_dialog_offers_a_type(composition_owner_id: String) -> bool:
-	# Everything answers for its own type — a Bridge is props and a Set, a
-	# member answers separately, which is why a Set may mix types. The one
-	# exception is a variant: its Palette already declared the type they share.
-	return not WorldDocumentService.is_palette_asset(_get_asset(composition_owner_id))
+	# A composition declares the type once, where it is named; its members and
+	# variants are never asked again.
+	return not WorldDocumentService.is_composition_asset(_get_asset(composition_owner_id))
 
 
 func _new_asset_type(composition_owner_id: String) -> String:
-	# The dialog fixes the category, except for a variant, which takes the one
-	# its Palette already has.
+	# A composition and everything it owns are one kind of thing: a Bridge is
+	# props, and so are its posts and planks; a Grass Palette is terrain, and so
+	# is each blade. Only a standalone Asset is asked.
 	var owner := _get_asset(composition_owner_id)
-	if WorldDocumentService.is_palette_asset(owner):
-		# A Grass Palette is terrain, and so is each blade.
+	if WorldDocumentService.is_composition_asset(owner):
 		return WorldDocumentService.asset_type(owner)
 	return WorldDocumentService.normalize_asset_type(new_asset_type)
 
@@ -6240,7 +6240,28 @@ func _on_asset_type_selected(index: int, option: OptionButton) -> void:
 	_record_direct_change()
 	asset["asset_type"] = asset_type
 	new_asset_type = asset_type
+	# A composition and the Assets it owns are one kind of thing, so the type
+	# moves with it rather than leaving the two disagreeing.
+	for owned_asset_id in _composition_owned_asset_ids(asset):
+		var owned_asset := _get_asset(owned_asset_id)
+		if not owned_asset.is_empty():
+			owned_asset["asset_type"] = asset_type
 	_invalidate_render(RENDER_DOCUMENT)
+
+
+func _composition_owned_asset_ids(asset: Dictionary) -> Array[String]:
+	# The member Assets of a Set, or the variant Assets of a Palette.
+	if WorldDocumentService.is_palette_asset(asset):
+		return WorldDocumentService.palette_variants(asset)
+	var member_ids: Array[String] = []
+	if not WorldDocumentService.is_set_asset(asset):
+		return member_ids
+	for component in asset.get("components", []):
+		if component is Dictionary and _is_reference_component(component):
+			var member_id := str(component.get("source_asset_id", ""))
+			if not member_id.is_empty() and not member_ids.has(member_id):
+				member_ids.append(member_id)
+	return member_ids
 
 
 func _submit_asset_name(_submitted_text: String) -> void:

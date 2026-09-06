@@ -30,11 +30,19 @@ and in what order (`z_index`). What a Reference gains is an optional `role` —
 free `lower_snake_case`, empty meaning unauthored — because a Set may fill one
 role more than once and the Component name is unique per Asset. A Set is
 authored from the `Set` module, top down: its Asset root offers
-`New Member Asset`, and one dialog makes the member Asset — with its own
-category, so a Set may mix types — plus the Reference that carries it into the
-assembly, named after the member by the same derivation the Asset Key uses. A
-Set therefore owns the Assets it is made of rather than collecting Assets that
-already exist. Its Outliner entry has one `Members` section.
+`New Member Asset`, and one dialog makes the member Asset plus the Reference
+that carries it into the assembly, named after the member by the same
+derivation the Asset Key uses. A Set therefore owns the Assets it is made of
+rather than collecting Assets that already exist. Its Outliner entry has one
+`Members` section.
+
+A composition and everything it owns are one kind of thing: a Bridge is `props`
+and so are its posts and planks. The type is declared once, where the
+composition is named, and a member or variant is never asked again; changing it
+on the composition moves it to everything the composition owns, so the two
+cannot come to disagree. Export checks it rather than assuming it — a Set whose
+member is of another type, or which holds anything but member References, is
+rejected.
 A member Asset is drawn underneath its Reference with everything an Asset has —
 Components, References, Guides and Regions — and the `Add` button on that row
 belongs to the member, so a member is authored where it belongs instead of in a
@@ -73,9 +81,8 @@ because the presentation chooses among the variants freely — order in the list
 means nothing and duplicates are dropped on load. That is why a variant is not
 a Reference: a Reference carries a transform, a pivot, a z-index and a depth,
 and a Palette would have to define all of them away. Its type is chosen where the Palette is
-named, so `Add → New Variant Asset` only asks for a name; a Set, whose members
-answer for themselves, asks per member and may therefore mix types.
-Removing a variant drops it from the list and leaves the Asset alone, and a
+named, so `Add → New Variant Asset` only asks for a name, the same way
+`New Member Asset` does. Removing a variant drops it from the list and leaves the Asset alone, and a
 variant whose Asset is gone stays visible as missing rather than vanishing.
 
 Single, Mesh and Style share one multi-select Outliner Asset filter. Its seven

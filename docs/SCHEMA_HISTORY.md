@@ -328,8 +328,9 @@ and 65 had put `set` and `palette` into `asset_type`, which left both without a
 category of their own: a Bridge could not also be props, and a Palette needed
 `variant_asset_type` to say what its variants were. From 66 the two are
 independent fields — `asset_type` is the seven again, `asset_category` is
-`single`, `set` or `palette` — a Bridge is props and a Set, and a Palette's own
-type is the type of every variant, so `variant_asset_type` is gone.
+`single`, `set` or `palette` — a Bridge is props and a Set, and a composition's
+own type is the type of everything it owns, so `variant_asset_type` is gone and
+a Set's members share its type the same way a Palette's variants do.
 
 This is the explicit step of the series. Below 66 an `asset_type` of `set` or
 `palette` is read as the category; the type it displaced cannot be recovered

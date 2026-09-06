@@ -932,6 +932,27 @@ func _test_runtime_export_service() -> void:
 	missing_variants[1]["exists"] = false
 	_expect(not bool(RuntimeExportService.build_manifest(palette_asset, {}, missing_variants).get("valid", true)), "A Palette advertising a Key no consumer can resolve should be rejected.")
 	_expect(not bool(RuntimeExportService.build_manifest(palette_asset, {}, []).get("valid", true)), "An empty Palette has nothing to publish.")
+
+	# A Set is its members and nothing else, and it is one kind of thing with
+	# them. Both are checked at export rather than assumed.
+	var set_member := {"id": "component_post", "name": "rope_post", "type": "reference",
+		"role": "rope_post", "source_asset_id": "asset_post", "visibility": true, "z_index": 0,
+		"parent_component_id": "", "transform": WorldDocumentService.default_component_transform(),
+		"points": [], "edges": [], "chains": []}
+	var set_asset := {"id": "bridge", "name": "Bridge", "asset_type": "props",
+		"asset_category": WorldDocumentService.ASSET_CATEGORY_SET, "visibility": true,
+		"asset_pivot": Vector2.ZERO, "components": [set_member]}
+	var member_source := {"owner_asset_id": "bridge", "source_asset_exists": true,
+		"source_asset_key": "rope_post", "source_asset_type": "props"}
+	var set_result := RuntimeExportService.build_manifest(set_asset, {"component_post": member_source})
+	var set_manifest: Dictionary = set_result.get("manifest", {})
+	_expect(bool(set_result.get("valid", false)) and str(set_manifest.get("asset_category", "")) == "set" and str(set_manifest.get("asset_type", "")) == "props" and str(set_manifest.get("components", [])[0].get("role", "")) == "rope_post", "A Set should export as an ordinary Manifest of its own type whose Components are member References.")
+	var mistyped_member := member_source.duplicate(true)
+	mistyped_member["source_asset_type"] = "terrain"
+	_expect(not bool(RuntimeExportService.build_manifest(set_asset, {"component_post": mistyped_member}).get("valid", true)), "A member of another type should be rejected: a Set and its members are one kind of thing.")
+	var mixed_set: Dictionary = set_asset.duplicate(true)
+	mixed_set["components"].append(body.duplicate(true))
+	_expect(not bool(RuntimeExportService.build_manifest(mixed_set, {"component_post": member_source, "component_b": source}).get("valid", true)), "A Set holding geometry of its own should be rejected; it is its members and nothing else.")
 	var duplicate_role_asset: Dictionary = asset.duplicate(true)
 	duplicate_role_asset["components"][1]["name"] = "body"
 	_expect(not bool(RuntimeExportService.build_manifest(duplicate_role_asset, {"component_a": source, "component_b": source}).get("valid", true)), "Runtime export should reject duplicate Component Names.")

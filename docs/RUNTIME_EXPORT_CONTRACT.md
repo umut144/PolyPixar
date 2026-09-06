@@ -302,11 +302,12 @@ field. Asset References also omit it.
 `asset_type` says it is. Neither composition requires a consumer to learn a new
 package shape.
 
-A **Set** — `asset_category: "set"` — is an ordinary Manifest whose Components are
-all `asset_reference` records. Its assembly is the Component transforms, which
-are canonical exported transforms like any other, and each member says what it
-stands for through its required `role`. A consumer that already resolves Asset
-References needs nothing further.
+A **Set** — `asset_category: "set"` — is an ordinary Manifest whose Components
+are all `asset_reference` records, and every member is an Asset of the Set's own
+`asset_type`. Its assembly is the Component transforms, which are canonical
+exported transforms like any other, and each member says what it stands for
+through its required `role`. A consumer that already resolves Asset References
+needs nothing further.
 
 A **Palette** — `asset_category: "palette"` — is the one Manifest without
 geometry. It publishes the Keys that may substitute for one another; every one
