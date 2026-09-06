@@ -693,6 +693,14 @@ inside the JSON and in the World index. Older ID-based paths such as
 `assets/asset_1/asset.json` remain readable as a migration fallback. Motion
 Paths, Acts and Sequences live below `paths/`, `acts/` and `sequences/`.
 
+An Asset ID is handed out once. The counters live in the World document rather
+than being derived from what exists, and a deleted Asset's ID is kept in
+`retired_assets` with the Key it carried last; both only ever raise the derived
+counter on load. Without that, deleting the highest Asset handed its ID back to
+the next one created, and every Reference still pointing at it followed along
+without a word. The retired Key is also what lets a consumer tell an Asset that
+was deleted from one whose package is merely missing.
+
 Because an Asset is found by its ID rather than by its directory, a document
 that exists twice is ambiguous, and the first directory read wins — alphabetical
 order deciding which version of an Asset a World loads. Renames used to leave

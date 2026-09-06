@@ -168,6 +168,7 @@ var expanded_assets: Dictionary = {}
 var asset_camera_states: Dictionary = {}
 var canvas_camera_asset_id := ""
 var next_asset_id := 1
+var retired_assets: Array = []
 var next_component_id := 1
 var next_group_id := 1
 var next_guide_id := 1
@@ -2276,6 +2277,7 @@ func _confirm_new_world() -> void:
 	selected_component_id = ""
 	selected_guide_id = ""
 	expanded_assets.clear()
+	retired_assets.clear()
 	next_asset_id = 1
 	next_component_id = 1
 	next_guide_id = 1
@@ -2746,6 +2748,12 @@ func _save_world() -> bool:
 		"paths": motion_path_ids,
 		"acts": motion_act_ids,
 		"sequences": motion_sequence_ids,
+		# An ID that was handed out once is never handed out again. Derived from
+		# what exists, the next ID would drop back as soon as the highest Asset
+		# is deleted, and the References still pointing at it would silently
+		# attach to whatever is created next.
+		"next_ids": _serialize_next_ids(),
+		"retired_assets": retired_assets.duplicate(true),
 		"editor_state": _serialize_editor_state()
 	}):
 		unwritten.append("%s.json" % world_name)
@@ -2819,6 +2827,7 @@ func _capture_history_snapshot() -> Dictionary:
 	return {
 		"world_contour_stroke_width_px": world_contour_stroke_width_px,
 		"assets": assets.duplicate(true),
+		"retired_assets": retired_assets.duplicate(true),
 		"next_asset_id": next_asset_id,
 		"next_component_id": next_component_id,
 		"next_group_id": next_group_id,
@@ -2922,6 +2931,7 @@ func _restore_history_snapshot(snapshot: Dictionary) -> void:
 	_set_geometry_command_state("")
 	geometry_seeding_enter_edit_after_bake = false
 	_stop_guide_draw_state()
+	retired_assets = snapshot.get("retired_assets", []).duplicate(true)
 	next_asset_id = int(snapshot.get("next_asset_id", 1))
 	next_component_id = int(snapshot.get("next_component_id", 1))
 	next_group_id = int(snapshot.get("next_group_id", 1))
@@ -3134,7 +3144,9 @@ func _load_world(world_entry: String, persist_as_last := true) -> bool:
 	world_name = str(world_data.get("name", world_entry))
 	world_title = str(world_data.get("world_name", world_name))
 	_restore_editor_state(world_data.get("editor_state", {}), int(world_data.get("schema_version", 0)))
+	retired_assets = WorldDocumentService.deserialize_retired_assets(world_data.get("retired_assets", []))
 	_update_next_ids()
+	_restore_next_ids(world_data.get("next_ids", {}))
 	active_state = ""
 	_invalidate_render(RENDER_DOCUMENT)
 	if persist_as_last:
@@ -4899,6 +4911,30 @@ func _geometry_uv_mapping_bake(asset_id: String, component_id: String, mesh_meth
 	var resolved_mesh_method := mesh_method if not mesh_method.is_empty() else str(component_mesh.get("method", recipe.get("parameters", {}).get("mesh_method", "")))
 	var resolved_uv_method := uv_method if not uv_method.is_empty() else str(recipe.get("method", ""))
 	return _geometry_uv_mapping_bakes(asset_id, component_id).get(GeometryUVMappingService.bake_key(resolved_mesh_method, resolved_uv_method), {})
+
+
+func _serialize_next_ids() -> Dictionary:
+	return {"asset": next_asset_id, "component": next_component_id, "group": next_group_id,
+		"guide": next_guide_id, "motion_path": next_motion_path_id,
+		"motion_act": next_motion_act_id, "motion_sequence": next_motion_sequence_id}
+
+
+func _restore_next_ids(serialized) -> void:
+	# The stored counters only ever raise the derived ones: a World written
+	# before schema 69 has none, and a World whose highest Asset was deleted
+	# would otherwise hand that ID out a second time.
+	if not serialized is Dictionary:
+		return
+	for retired in retired_assets:
+		if retired is Dictionary:
+			next_asset_id = maxi(next_asset_id, _id_suffix_number(str(retired.get("id", ""))) + 1)
+	next_asset_id = maxi(next_asset_id, int(serialized.get("asset", 0)))
+	next_component_id = maxi(next_component_id, int(serialized.get("component", 0)))
+	next_group_id = maxi(next_group_id, int(serialized.get("group", 0)))
+	next_guide_id = maxi(next_guide_id, int(serialized.get("guide", 0)))
+	next_motion_path_id = maxi(next_motion_path_id, int(serialized.get("motion_path", 0)))
+	next_motion_act_id = maxi(next_motion_act_id, int(serialized.get("motion_act", 0)))
+	next_motion_sequence_id = maxi(next_motion_sequence_id, int(serialized.get("motion_sequence", 0)))
 
 
 func _update_next_ids() -> void:
@@ -9545,6 +9581,11 @@ func _delete_selected_asset() -> void:
 	if asset_index < 0:
 		return
 	_record_direct_change()
+	# The ID is retired rather than freed. References to it stay where they are
+	# and show as missing; removing them silently would hide the deletion, and
+	# Runtime Export refuses them anyway.
+	retired_assets.append({"id": selected_asset_id,
+		"last_asset_key": AssetCatalogService.asset_key(str(assets[asset_index].get("name", "")))})
 	assets.remove_at(asset_index)
 	expanded_assets.erase(selected_asset_id)
 	asset_camera_states.erase(selected_asset_id)

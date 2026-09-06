@@ -230,6 +230,41 @@ func _create_set_member(application: Control, asset_id: String, member_name: Str
 	return application.selected_component_id
 
 
+func _test_retired_asset_ids() -> void:
+	# An ID that was handed out once is never handed out again. Derived from
+	# what exists, the next ID drops back as soon as the highest Asset is
+	# deleted, and a Reference still pointing at it attaches to whatever is
+	# created next — silently, because both are called asset_2.
+	var application: Control = load("res://scripts/main.gd").new()
+	application._build_ui()
+	var owner_asset := {"id": "asset_1", "name": "Bridge", "asset_type": "props",
+		"asset_category": WorldDocumentService.ASSET_CATEGORY_SET, "visibility": true,
+		"components": [{"id": "component_1", "type": "reference", "name": "plank", "role": "plank",
+			"source_asset_id": "asset_2", "parent_component_id": "", "points": [], "edges": [],
+			"chains": [], "visibility": true, "transform": WorldDocumentService.default_component_transform()}],
+		"groups": [], "guides": []}
+	var member := {"id": "asset_2", "name": "Plank", "asset_type": "props", "visibility": true,
+		"components": [], "groups": [], "guides": []}
+	var test_assets: Array[Dictionary] = [owner_asset, member]
+	application.assets = test_assets
+	application._update_next_ids()
+	application.selected_asset_id = "asset_2"
+	application._delete_selected_asset()
+	_expect(application.retired_assets.size() == 1 and str(application.retired_assets[0].get("id", "")) == "asset_2" and str(application.retired_assets[0].get("last_asset_key", "")) == "plank", "Deleting an Asset should retire its ID together with the Key it carried last, but retired %s." % [application.retired_assets])
+	_expect(str(owner_asset["components"][0].get("source_asset_id", "")) == "asset_2", "A Reference to a deleted Asset should stay and read as missing rather than being removed behind the author's back.")
+	# The counters are derived on load and only ever raised by what was stored,
+	# so a reload cannot let the freed ID come back.
+	application._update_next_ids()
+	_expect(application.next_asset_id == 2, "Derived on its own, the next ID falls back onto the deleted one.")
+	application._restore_next_ids(application._serialize_next_ids())
+	_expect(application.next_asset_id == 3, "The retired ID should raise the next one past itself.")
+	application._restore_next_ids({"asset": 9})
+	_expect(application.next_asset_id == 9, "A stored counter should raise the next ID, never lower it.")
+	application._restore_next_ids({"asset": 2})
+	_expect(application.next_asset_id == 9, "A lower stored counter should be ignored.")
+	application.free()
+
+
 func _test_set_composition() -> void:
 	var application: Control = load("res://scripts/main.gd").new()
 	application._build_ui()

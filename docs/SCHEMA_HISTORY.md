@@ -65,6 +65,7 @@ fingerprints.
 | Manifest 19 | `role` gone from `asset_reference`; a member Reference must sit at the Set's root | derived | `RuntimeExportService` | `_test_runtime_export_service` |
 | 68 | `role` back on Reference Components, authored and never derived | additive (missing role reads empty) | `deserialize_component` | `_test_set_composition`, `_test_asset_deserialization_migrations` |
 | Manifest 20 | `role` required on every member Reference of a Set | derived | `RuntimeExportService` | `_test_runtime_export_service` |
+| 69 | `next_ids` and `retired_assets` on the World document | additive (missing counters read as derived, missing list as empty) | `main.gd._restore_next_ids`, `deserialize_retired_assets` | `_test_retired_asset_ids`, `_test_asset_deserialization_migrations` |
 | Sampling 6 | Junction-aware Cuts, boundary-namespaced analytic Samples, corner balancing | derived | `GeometrySamplingService` | `_test_geometry_sampling_corner_balancing` |
 | Motion 1–18 | Blink `anticipation_share` default 0.18 read as 0.5 | **explicit** (≤ 18) | `normalize_motion_act` | `_test_asset_deserialization_migrations` |
 
@@ -381,6 +382,20 @@ the first version's silent fallback to the Asset Key is exactly what made it
 look redundant. Runtime Manifest schema 20 requires it on every member Reference
 of a Set and rejects a Set without it; a Reference under a Component is a member
 of nothing and carries none.
+
+Schema 69 makes an ID that was handed out stay handed out. The next ID was
+derived from the highest one in use, so deleting the highest Asset gave it back:
+the next Asset created took the same ID, and a Reference still pointing at the
+deleted one attached to it silently, because both are called `asset_28`. The
+World now stores its counters, and deleting an Asset retires its ID with the
+Asset Key it carried last. Both are read on load and only ever raise the derived
+counter, never lower it. A World written earlier has neither and behaves as
+before, minus the reuse: the retired list starts empty and the counters are
+derived as they always were.
+
+Deleting an Asset leaves the References that point at it alone. They read as
+missing in the Outliner and Runtime Export refuses them; removing them quietly
+would hide the deletion in exactly the documents that describe it.
 
 Runtime Manifest schema 17 carries what the two compositions must say across
 the boundary, and nothing more. An `asset_reference` gains a required

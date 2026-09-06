@@ -10,7 +10,7 @@ extends RefCounted
 # functions that do read editor state, _serialize_editor_state and
 # _serialize_world_settings, stay in main.gd for that reason.
 
-const SCHEMA_VERSION := 68
+const SCHEMA_VERSION := 69
 const REGION_GEOMETRY_AUTHORED := "authored"
 const REGION_GEOMETRY_COMPONENT := "component"
 const REGION_GEOMETRY_SOURCES := [REGION_GEOMETRY_AUTHORED, REGION_GEOMETRY_COMPONENT]
@@ -1175,6 +1175,26 @@ static func normalized_palette_variants(value) -> Array[String]:
 
 static func palette_variants(asset: Dictionary) -> Array[String]:
 	return normalized_palette_variants(asset.get("palette_variants", []))
+
+
+static func deserialize_retired_assets(value) -> Array:
+	# The IDs a World has handed out and will not hand out again. Each entry
+	# keeps the Asset Key it carried last, so a consumer can tell an Asset that
+	# was deleted from one whose package is simply missing.
+	var retired: Array = []
+	var seen: Dictionary = {}
+	if not value is Array:
+		return retired
+	for entry in value:
+		if not entry is Dictionary:
+			continue
+		var retired_id := str(entry.get("id", "")).strip_edges()
+		if retired_id.is_empty() or seen.has(retired_id):
+			continue
+		seen[retired_id] = true
+		retired.append({"id": retired_id, "last_asset_key": str(entry.get("last_asset_key", "")).strip_edges()})
+	retired.sort_custom(func(left: Dictionary, right: Dictionary) -> bool: return str(left.get("id", "")) < str(right.get("id", "")))
+	return retired
 
 
 static func normalized_reference_role(value) -> String:

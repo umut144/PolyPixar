@@ -140,6 +140,16 @@ func _test_asset_deserialization_migrations() -> void:
 		and WorldDocumentService.normalized_component_name(reference_components[1]) == "plank_01",
 		"A Set should load with its category, its member names and their authored Roles, and a member without one should read empty rather than borrow a name.")
 
+	# Schema 69 keeps the IDs a World has handed out: junk is dropped, an ID
+	# named twice counts once, and the order is the ID's.
+	var retired := WorldDocumentService.deserialize_retired_assets([
+		{"id": "asset_9", "last_asset_key": "vial"}, {"id": " asset_3 ", "last_asset_key": "orb"},
+		{"id": "asset_9", "last_asset_key": "potion"}, {"id": ""}, "asset_4", 7])
+	_expect(retired.size() == 2 and str(retired[0].get("id", "")) == "asset_3" and str(retired[0].get("last_asset_key", "")) == "orb" and str(retired[1].get("id", "")) == "asset_9" and str(retired[1].get("last_asset_key", "")) == "vial",
+		"Retired Asset IDs should load deduplicated, trimmed and ordered, but read %s." % [retired])
+	_expect(WorldDocumentService.deserialize_retired_assets({}).is_empty() and WorldDocumentService.deserialize_retired_assets(null).is_empty(),
+		"A World written before schema 69 should read as having retired nothing.")
+
 	# Schema 65 is additive too: a Palette is a list plus the one category its
 	# variants share, and an Asset that is neither loads with neither.
 	var palette := {"schema_version": WorldDocumentService.SCHEMA_VERSION, "id": "asset_grass",
