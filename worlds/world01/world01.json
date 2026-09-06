@@ -20,10 +20,11 @@
 		"asset_17",
 		"asset_18",
 		"asset_19",
-		"asset_20"
+		"asset_20",
+		"asset_21"
 	],
 	"editor_state": {
-		"active_create_submodule": "Items",
+		"active_create_submodule": "Props",
 		"active_geometry_submodule": "Sampling",
 		"active_module": "Create",
 		"active_motion_submodule": "Animation",
@@ -87,10 +88,10 @@
 			},
 			"asset_17": {
 				"position": [
-					0.12059885263443,
-					9.50876140594482
+					0.864311933517456,
+					5.8437647819519
 				],
-				"zoom": 392.406356516353
+				"zoom": 54.3988181231194
 			},
 			"asset_18": {
 				"position": [
@@ -119,6 +120,13 @@
 					1.4057708978653
 				],
 				"zoom": 1250.7455839167
+			},
+			"asset_21": {
+				"position": [
+					0.0714081600308418,
+					3.86005043983459
+				],
+				"zoom": 52.856105924932
 			},
 			"asset_3": {
 				"position": [
@@ -172,7 +180,7 @@
 		},
 		"expanded_assets": {
 			"asset_1": false,
-			"asset_10": true,
+			"asset_10": false,
 			"asset_11": true,
 			"asset_12": false,
 			"asset_13": false,
@@ -184,6 +192,7 @@
 			"asset_19": true,
 			"asset_2": false,
 			"asset_20": true,
+			"asset_21": true,
 			"asset_3": false,
 			"asset_4": false,
 			"asset_5": false,
@@ -203,22 +212,22 @@
 			],
 			"visible": false
 		},
-		"motion_act_preview_asset_id": "asset_1",
+		"motion_act_preview_asset_id": "",
 		"motion_act_preview_loop": true,
-		"motion_path_preview_asset_id": "asset_1",
+		"motion_path_preview_asset_id": "",
 		"motion_sequence_preview_loop": true,
 		"motion_sequence_view": "composition",
 		"outliner_asset_type_filters": {
-			"character": true,
+			"character": false,
 			"icon": false,
-			"items": true,
-			"props": true,
+			"items": false,
+			"props": false,
 			"symbols": false,
 			"terrain": false,
 			"weapons": false
 		},
-		"selected_asset_id": "asset_20",
-		"selected_component_id": "",
+		"selected_asset_id": "asset_21",
+		"selected_component_id": "component_182",
 		"selected_edge_ids": [],
 		"selected_guide_id": "",
 		"selected_motion_act_id": "",
@@ -228,8 +237,8 @@
 		"selected_weighting_style_id": "",
 		"snap": {
 			"enabled": true,
-			"grid_step": 0.05,
-			"mode": "finer",
+			"grid_step": 0.1,
+			"mode": "fine",
 			"rotation_step": 15.0
 		},
 		"world_scale": {

@@ -949,7 +949,7 @@
 				]
 			},
 			"type": "component",
-			"visibility": true,
+			"visibility": false,
 			"z_index": 0
 		},
 		{
@@ -1849,6 +1849,194 @@
 				]
 			},
 			"type": "component",
+			"visibility": true,
+			"z_index": 0
+		},
+		{
+			"catch_parent_component_id": "",
+			"chains": [
+				{
+					"closed": true,
+					"edge_ids": [
+						"edge_5470057734513368979",
+						"edge_7974486570668801056",
+						"edge_1547359512157164903",
+						"edge_3048829681720191173"
+					],
+					"id": "chain_656556373432245960",
+					"point_ids": [
+						"point_8922728484576731403",
+						"point_7884016137971688887",
+						"point_6302212554837686843",
+						"point_8012832697531588312"
+					],
+					"topology_role": "outer"
+				}
+			],
+			"draw_mode": "closed_loop",
+			"edges": [
+				{
+					"end_point_id": "point_7884016137971688887",
+					"id": "edge_5470057734513368979",
+					"render_outline": true,
+					"start_point_id": "point_8922728484576731403"
+				},
+				{
+					"end_point_id": "point_6302212554837686843",
+					"id": "edge_7974486570668801056",
+					"render_outline": true,
+					"start_point_id": "point_7884016137971688887"
+				},
+				{
+					"end_point_id": "point_8012832697531588312",
+					"id": "edge_1547359512157164903",
+					"render_outline": true,
+					"start_point_id": "point_6302212554837686843"
+				},
+				{
+					"end_point_id": "point_8922728484576731403",
+					"id": "edge_3048829681720191173",
+					"render_outline": true,
+					"start_point_id": "point_8012832697531588312"
+				}
+			],
+			"group_id": "",
+			"id": "component_185",
+			"name": "collision_region",
+			"parent_component_id": "component_122",
+			"points": [
+				{
+					"handle_in": [
+						0.793333470821381,
+						0.0
+					],
+					"handle_out": [
+						-0.00333333015441895,
+						0.766666650772095
+					],
+					"handle_source": "auto",
+					"id": "point_8012832697531588312",
+					"mode": "corner",
+					"position": [
+						-1.19000005722046,
+						0.0000000596046447753906
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						0.00333325075916946,
+						0.766666650772095
+					],
+					"handle_out": [
+						-0.793333470821381,
+						0.0
+					],
+					"handle_source": "auto",
+					"id": "point_6302212554837686843",
+					"mode": "corner",
+					"position": [
+						1.19000029563904,
+						0.0000000596046447753906
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						-0.800000011920929,
+						0.0
+					],
+					"handle_out": [
+						-0.00333325075916946,
+						-0.766666650772095
+					],
+					"handle_source": "auto",
+					"id": "point_7884016137971688887",
+					"mode": "corner",
+					"position": [
+						1.20000004768372,
+						2.29999995231628
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						0.00333333015441895,
+						-0.766666650772095
+					],
+					"handle_out": [
+						0.800000011920929,
+						0.0
+					],
+					"handle_source": "auto",
+					"id": "point_8922728484576731403",
+					"mode": "corner",
+					"position": [
+						-1.20000004768372,
+						2.29999995231628
+					],
+					"preserve_point": true
+				}
+			],
+			"primitive": {},
+			"projection_depth_cm": 10.0,
+			"region_geometry_source": "authored",
+			"region_type": "collision",
+			"show_point_numbers": false,
+			"source_asset_id": "",
+			"topology_role": "outer",
+			"transform": {
+				"pivot": [
+					0.0,
+					0.0
+				],
+				"position": [
+					0.0,
+					0.0
+				],
+				"rotation": 0.0,
+				"scale": [
+					1.0,
+					1.0
+				]
+			},
+			"type": "region",
+			"visibility": true,
+			"z_index": 0
+		},
+		{
+			"catch_parent_component_id": "",
+			"chains": [],
+			"draw_mode": "closed_loop",
+			"edges": [],
+			"group_id": "",
+			"id": "component_186",
+			"name": "collision_region_2",
+			"parent_component_id": "component_127",
+			"points": [],
+			"primitive": {},
+			"projection_depth_cm": 10.0,
+			"region_geometry_source": "component",
+			"region_type": "collision",
+			"show_point_numbers": false,
+			"source_asset_id": "",
+			"topology_role": "outer",
+			"transform": {
+				"pivot": [
+					0.0,
+					0.0
+				],
+				"position": [
+					0.0,
+					0.0
+				],
+				"rotation": 0.0,
+				"scale": [
+					1.0,
+					1.0
+				]
+			},
+			"type": "region",
 			"visibility": true,
 			"z_index": 0
 		}

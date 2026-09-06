@@ -2,13 +2,20 @@
 	"asset_id": "asset_15",
 	"component_id": "component_99",
 	"component_mesh": {
-		"bake_id": "meshing_bake_8783251650186902651",
+		"bake_id": "meshing_bake_3798200576073078",
 		"build_provenance": {
 			"attempts": 1.0,
 			"auto_recipe_version": 3.0,
 			"automatic_diagnostics": {
 				"accepted": {
 					"accepted": true,
+					"boundary_refinement": {
+						"added_vertex_count": 0.0,
+						"complete": true,
+						"enabled": true,
+						"limit_reached": false,
+						"unresolved_corner_count": 0.0
+					},
 					"issues": [],
 					"limits": {
 						"boundary_samples": 4096.0,
@@ -45,7 +52,7 @@
 				},
 				"version": 1.0
 			},
-			"exact_input_hash": "8ab794f8cf436001af5bf69c49ed53fe1c3da9ec1e0adf7c020e2830ae52148e",
+			"exact_input_hash": "0f1422370f54c80d1b468d1d29125eaa6565bba22e5935974bb74d44b41435ff",
 			"pipeline_recipe_hash": "ad0fd0d4f889505d271f8850b7a5458e031ba8b47344d2b0e60b8feac845bcaf",
 			"recipe_mode": "automatic",
 			"schema_version": 1.0,
@@ -54,7 +61,7 @@
 				"meshing_algorithm": 5.0,
 				"recipe_hash": "da80c2a45ab554d60281da77916708a675e9f799ddde2a43661f1a7fc8fcebd9",
 				"recipe_version": 2.0,
-				"sampling_algorithm": 4.0,
+				"sampling_algorithm": 6.0,
 				"scalars": [
 					1.0,
 					1.0
@@ -116,14 +123,14 @@
 		},
 		"last_error": "",
 		"last_failure_signature": {},
-		"mesh_fingerprint": "dbe93c33b2c449cdf136aaa8791ecbbda12313a970a7751c99c27016a0bc9bc5",
+		"mesh_fingerprint": "9e8bb4dc1b3bed07eca07b4b21bec437f1ab23754ff940ff6019e16c8d585e50",
 		"method": "constrained_mesh"
 	},
 	"meshing": {
 		"bakes": {
 			"constrained_mesh": {
 				"algorithm_version": 5,
-				"bake_id": "meshing_bake_8783251650186902651",
+				"bake_id": "meshing_bake_3798200576073078",
 				"boundary_constraints": [
 					{
 						"chain_id": "chain_5661189321250262776",
@@ -306,6 +313,13 @@
 						]
 					}
 				],
+				"boundary_refinement": {
+					"added_vertex_count": 0.0,
+					"complete": true,
+					"enabled": true,
+					"limit_reached": false,
+					"unresolved_corner_count": 0.0
+				},
 				"constraint_count": 20.0,
 				"constraints_valid": true,
 				"cut_seam_vertex_count": 0.0,
@@ -531,11 +545,12 @@
 					"relaxation_override": false,
 					"seeding_method": "poisson_fill"
 				},
+				"quality_warnings": [],
 				"runs": [],
-				"sampling_bake_id": "bake_7847969302125007835",
-				"sampling_fingerprint": "de18d3a62c812327a2fc0c6208215220b33cf801307b91ac1c532ba017fdf4ec",
-				"seeding_bake_id": "seeding_bake_7783999450469133551",
-				"seeding_fingerprint": "bd435542c93897bb0a4b96b5fd8e0f27725bf5b5ebc19cf892f93e2fa21d3c93",
+				"sampling_bake_id": "bake_2957141606411239363",
+				"sampling_fingerprint": "0f24b1abb232b6696820ab8c9e2458e7bb0f014f0452facce8951ddf56d1ab85",
+				"seeding_bake_id": "seeding_bake_8526691519017145897",
+				"seeding_fingerprint": "ef150510277d06d3cdc824060081ee8dc6c8ed84b651c1f8eb5e91d04fa7bead",
 				"triangle_count": 24,
 				"triangles": [
 					{
@@ -946,7 +961,7 @@
 			},
 			"contour_stroke": {
 				"algorithm_version": 5,
-				"bake_id": "contour_stroke_bake_2718276523888786264",
+				"bake_id": "contour_stroke_bake_5338526416971034873",
 				"boundary_constraints": [],
 				"errors": [],
 				"geometry_diagnostics": {
@@ -1380,8 +1395,8 @@
 	"sampling": {
 		"bakes": {
 			"adaptive": {
-				"algorithm_version": 4,
-				"bake_id": "bake_7847969302125007835",
+				"algorithm_version": 6,
+				"bake_id": "bake_2957141606411239363",
 				"boundary_refinement_complete": true,
 				"boundary_refinement_count": 0,
 				"boundary_refinement_limit_reached": false,
@@ -1642,7 +1657,7 @@
 					"meshing_algorithm": 5.0,
 					"recipe_hash": "83b3bb413e898ca18e00478db3e3a3d09c454bb845c409777d399d470a3b5ee4",
 					"recipe_version": 2.0,
-					"sampling_algorithm": 4.0,
+					"sampling_algorithm": 6.0,
 					"scalars": [
 						1.0,
 						1.0
@@ -1731,7 +1746,7 @@
 		"bakes": {
 			"poisson_fill": {
 				"algorithm_version": 2.0,
-				"bake_id": "seeding_bake_7783999450469133551",
+				"bake_id": "seeding_bake_8526691519017145897",
 				"edited": false,
 				"errors": [],
 				"flow_seed_count": 0.0,
@@ -1747,8 +1762,8 @@
 					"seed": 1,
 					"spacing": 0.55
 				},
-				"sampling_bake_id": "bake_7847969302125007835",
-				"sampling_fingerprint": "de18d3a62c812327a2fc0c6208215220b33cf801307b91ac1c532ba017fdf4ec",
+				"sampling_bake_id": "bake_2957141606411239363",
+				"sampling_fingerprint": "0f24b1abb232b6696820ab8c9e2458e7bb0f014f0452facce8951ddf56d1ab85",
 				"seed_count": 3,
 				"seeds": [
 					{
