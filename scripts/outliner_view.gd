@@ -182,9 +182,12 @@ func rebuild() -> void:
 		# share one view, the Asset filter and the search select among them.
 		var lists_singles := create_asset_category == WorldDocumentService.ASSET_CATEGORY_SINGLE
 		var visible_assets: Array = []
+		var assets_in_module := 0
 		for asset in assets:
 			if WorldDocumentService.asset_category(asset) != create_asset_category:
 				continue
+			if not composition_member_asset_ids.has(str(asset.get("id", ""))):
+				assets_in_module += 1
 			if lists_singles and not asset_type_filter_matches(asset):
 				continue
 			if asset_is_visible(asset) and not composition_member_asset_ids.has(str(asset.get("id", ""))) and asset_matches_search(asset, search_text):
@@ -193,6 +196,32 @@ func rebuild() -> void:
 		self.add_child(EditorWidgets.create_outliner_group_label(str(CREATE_GROUP_LABELS.get(active_create_submodule, "Assets"))))
 		for asset in visible_assets:
 			_render_asset_outliner_entry(asset, not search_text.is_empty())
+		if visible_assets.is_empty():
+			# An empty list says why it is empty. Hidden and absent are the two
+			# states it can be in, and only one of them is the user's own doing.
+			var empty_label := EditorWidgets.create_inspector_field_label(_empty_create_list_reason(assets_in_module))
+			empty_label.add_theme_color_override("font_color", Color("#9aa3b2"))
+			self.add_child(empty_label)
+
+func _empty_create_list_reason(assets_in_module: int) -> String:
+	if assets_in_module == 0:
+		return "No %s yet." % {"Single": "Asset", "Set": "Set", "Palette": "Palette"}.get(active_create_submodule, "Asset")
+	var hidden_by_filter := create_asset_category == WorldDocumentService.ASSET_CATEGORY_SINGLE and not _every_asset_type_shown()
+	if hidden_by_filter and not search_text.is_empty():
+		return "No Asset matches the Asset filter and the search."
+	if hidden_by_filter:
+		return "No Asset matches the Asset filter."
+	if not search_text.is_empty():
+		return "No Asset matches the search."
+	return "Every %s here is hidden." % {"Single": "Asset", "Set": "Set", "Palette": "Palette"}.get(active_create_submodule, "Asset")
+
+
+func _every_asset_type_shown() -> bool:
+	for asset_type in WorldDocumentService.ASSET_TYPES:
+		if not bool(outliner_asset_type_filters.get(asset_type, true)):
+			return false
+	return true
+
 
 func _render_geometry_rows() -> void:
 	# Renders the Mesh tree from the row list main.gd built. Every row is an

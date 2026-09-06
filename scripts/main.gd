@@ -49,6 +49,7 @@ var outliner_view: OutlinerView
 var outliner_search_input: LineEdit
 var outliner_asset_type_filter_panel: VBoxContainer
 var outliner_asset_type_filter_checkboxes: Dictionary = {}
+var outliner_asset_type_filter_all_button: Button
 var outliner_component_navigation_active := false
 var outliner_asset_type_filters: Dictionary = _default_outliner_asset_type_filters()
 var inspector_content: VBoxContainer
@@ -899,13 +900,11 @@ func _build_ui() -> void:
 	var filter_label := EditorWidgets.create_panel_label("Asset Filter")
 	filter_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	filter_header.add_child(filter_label)
-	var filter_reset := Button.new()
-	filter_reset.text = "All"
-	filter_reset.custom_minimum_size = Vector2(34, 22)
-	filter_reset.focus_mode = Control.FOCUS_NONE
-	filter_reset.tooltip_text = "Show all Asset types"
-	filter_reset.pressed.connect(_set_all_outliner_asset_type_filters)
-	filter_header.add_child(filter_reset)
+	outliner_asset_type_filter_all_button = Button.new()
+	outliner_asset_type_filter_all_button.custom_minimum_size = Vector2(40, 22)
+	outliner_asset_type_filter_all_button.focus_mode = Control.FOCUS_NONE
+	outliner_asset_type_filter_all_button.pressed.connect(_toggle_all_outliner_asset_type_filters)
+	filter_header.add_child(outliner_asset_type_filter_all_button)
 	outliner_asset_type_filter_panel.add_child(filter_header)
 	var filter_grid := GridContainer.new()
 	filter_grid.columns = 2
@@ -2377,18 +2376,48 @@ func _asset_storage_directories(world_root: String) -> Dictionary:
 	# by an older build kept the directory of the name the Asset was created
 	# with. Reading this rather than deriving it is what keeps a rename that was
 	# never saved from looking like an Asset whose Geometry disappeared.
+	return _asset_storage_scan(world_root).get("directories", {})
+
+
+func _asset_storage_scan(world_root: String) -> Dictionary:
+	# One pass over the Asset directories: which directory each ID was found in,
+	# and every ID that was found in more than one. A duplicate is a leftover of
+	# a rename made before renames moved their files, and it matters because the
+	# first directory found wins — which is alphabetical order deciding which
+	# version of an Asset the World loads.
 	var directories: Dictionary = {}
+	var duplicates: Dictionary = {}
 	var directory := DirAccess.open("%s/assets" % world_root)
 	if directory == null:
-		return directories
+		return {"directories": directories, "duplicates": duplicates}
 	for entry in directory.get_directories():
 		for file_name in DirAccess.get_files_at(ProjectSettings.globalize_path("%s/assets/%s" % [world_root, entry])):
 			if not str(file_name).to_lower().ends_with(".json"):
 				continue
 			var candidate = WorldDocumentService.read_json("%s/assets/%s/%s" % [world_root, entry, file_name])
-			if candidate is Dictionary and not directories.has(str(candidate.get("id", ""))):
-				directories[str(candidate.get("id", ""))] = str(entry)
-	return directories
+			if not candidate is Dictionary or not candidate.has("id"):
+				continue
+			var candidate_id := str(candidate.get("id", ""))
+			if directories.has(candidate_id):
+				var seen: Array = duplicates.get(candidate_id, [str(directories[candidate_id])])
+				seen.append(str(entry))
+				duplicates[candidate_id] = seen
+				continue
+			directories[candidate_id] = str(entry)
+	return {"directories": directories, "duplicates": duplicates}
+
+
+func _duplicate_asset_storage_message(duplicates: Dictionary, used: Dictionary) -> String:
+	# Names one case fully and counts the rest: the point is that the reader
+	# learns which copy is being read and that another one exists.
+	if duplicates.is_empty():
+		return ""
+	var first_id := str(duplicates.keys()[0])
+	var elsewhere: Array = duplicates.get(first_id, [])
+	var message := "%s lies in %d directories · loading assets/%s" % [first_id, elsewhere.size(), str(used.get(first_id, "?"))]
+	if duplicates.size() > 1:
+		message += " · %d more Assets affected" % (duplicates.size() - 1)
+	return message
 
 
 func _asset_storage_move_plan(world_root: String, current_directory: String, new_directory: String) -> Dictionary:
@@ -3007,7 +3036,11 @@ func _load_world(world_entry: String, persist_as_last := true) -> bool:
 	# Geometry lies beside its Asset's document, so it is read from where that
 	# document actually is rather than from where the Asset's name says it
 	# should be. The two differ after a rename that has not been saved yet.
-	var storage_directories := _asset_storage_directories(world_root)
+	var storage_scan := _asset_storage_scan(world_root)
+	var storage_directories: Dictionary = storage_scan.get("directories", {})
+	var duplicate_message := _duplicate_asset_storage_message(storage_scan.get("duplicates", {}), storage_directories)
+	if not duplicate_message.is_empty():
+		_show_status_message("Duplicate Asset document · %s" % duplicate_message)
 	for loaded_asset in loaded_assets:
 		var loaded_asset_id := str(loaded_asset.get("id", ""))
 		var storage_directory := str(storage_directories.get(loaded_asset_id, _asset_storage_name(loaded_asset)))
@@ -7171,17 +7204,35 @@ static func _default_outliner_asset_type_filters() -> Dictionary:
 
 func _on_outliner_asset_type_filter_toggled(enabled: bool, asset_type: String) -> void:
 	outliner_asset_type_filters[asset_type] = enabled
+	_update_outliner_asset_type_filter_all_button()
 	_invalidate_render(RENDER_OUTLINER)
 
 
-func _set_all_outliner_asset_type_filters() -> void:
+func _toggle_all_outliner_asset_type_filters() -> void:
+	# One button for both moves. Everything shown is the state where "show all"
+	# has nothing left to do, so there it clears instead: picking a single type
+	# is then two clicks rather than six unticks.
+	var enable_all := not _every_outliner_asset_type_filter_enabled()
 	for asset_type in outliner_asset_type_filters.keys():
-		outliner_asset_type_filters[asset_type] = true
-	for asset_type in outliner_asset_type_filter_checkboxes.keys():
-		var checkbox := outliner_asset_type_filter_checkboxes[asset_type] as CheckBox
-		if checkbox != null:
-			checkbox.set_pressed_no_signal(true)
+		outliner_asset_type_filters[asset_type] = enable_all
+	_apply_outliner_asset_type_filter_checkboxes()
 	_invalidate_render(RENDER_OUTLINER)
+
+
+func _every_outliner_asset_type_filter_enabled() -> bool:
+	for asset_type in outliner_asset_type_filters.keys():
+		if not bool(outliner_asset_type_filters[asset_type]):
+			return false
+	return true
+
+
+func _update_outliner_asset_type_filter_all_button() -> void:
+	if not is_instance_valid(outliner_asset_type_filter_all_button):
+		return
+	var shows_everything := _every_outliner_asset_type_filter_enabled()
+	# The button says what pressing it does, so its own state is never a guess.
+	outliner_asset_type_filter_all_button.text = "None" if shows_everything else "All"
+	outliner_asset_type_filter_all_button.tooltip_text = "Hide every Asset type" if shows_everything else "Show every Asset type"
 
 
 func _apply_outliner_asset_type_filter_checkboxes() -> void:
@@ -7189,6 +7240,7 @@ func _apply_outliner_asset_type_filter_checkboxes() -> void:
 		var checkbox := outliner_asset_type_filter_checkboxes[asset_type] as CheckBox
 		if checkbox != null:
 			checkbox.set_pressed_no_signal(bool(outliner_asset_type_filters.get(asset_type, true)))
+	_update_outliner_asset_type_filter_all_button()
 
 
 func _outliner_focus_asset_id() -> String:

@@ -774,6 +774,13 @@ func _test_inspector_field_wiring() -> void:
 	# along instead of leaving it under the previous name.
 	_expect(application._reference_image_filename_for("Rope Post", "asset_9") == "rope_post_ref.png" and application._reference_image_filename_for("", "asset_9") == "asset_9_ref.png", "The Reference Image filename should derive from the Asset name, with the ID as the fallback.")
 	_expect(application._asset_storage_name_for(str(asset["id"]), "Rope Post") == "Rope_Post", "The storage directory should derive from the Asset name the same way the World save derives it.")
+	# One document per ID is an assumption the loader used to make silently: the
+	# first directory found wins, so a leftover from an older rename can decide
+	# which version of an Asset a World loads.
+	_expect(application._duplicate_asset_storage_message({}, {}).is_empty()
+		and application._duplicate_asset_storage_message({"asset_20": ["Potion", "PotionT1"]}, {"asset_20": "Potion"}) == "asset_20 lies in 2 directories · loading assets/Potion"
+		and application._duplicate_asset_storage_message({"asset_20": ["Potion", "PotionT1"], "asset_7": ["Orb", "Sphere"]}, {"asset_20": "Potion"}).ends_with("· 1 more Assets affected"),
+		"A duplicate Asset document should be reported with the copy that is being loaded rather than resolved silently.")
 	# An Asset that has never been written has nothing to move, and a name whose
 	# directory does not change moves nothing either.
 	var unsaved_plan: Dictionary = application._asset_storage_move_plan("res://worlds/none", "", "Deck")

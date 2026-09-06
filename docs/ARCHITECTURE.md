@@ -116,6 +116,13 @@ stored with every type switched off — has it restored once on load. The
 lists, so the Outliner keeps applying exactly one rule; `set` is absent from
 the seven, which is why Sets never appear in Mesh or Style.
 
+The row's one button says what pressing it does rather than what it is called:
+with a type switched off it reads `All` and shows every type, and with all seven
+shown it reads `None` and clears them, so picking a single type is two presses
+instead of six unticks. An empty Create list then names its own cause — hidden
+by the filter, hidden by the search, or nothing of this kind authored yet —
+because hidden and absent look the same when the list is simply empty.
+
 Mesh is the user-facing name of the derived geometry pipeline. Existing
 internal `geometry_*` identifiers remain technical names, while UI copy uses
 Mesh. Style currently contains only Weighting. Motion code is retained but its
@@ -667,6 +674,13 @@ JSON filename, for example `assets/Wizard/Wizard.json`. The stable ID remains
 inside the JSON and in the World index. Older ID-based paths such as
 `assets/asset_1/asset.json` remain readable as a migration fallback. Motion
 Paths, Acts and Sequences live below `paths/`, `acts/` and `sequences/`.
+
+Because an Asset is found by its ID rather than by its directory, a document
+that exists twice is ambiguous, and the first directory read wins — alphabetical
+order deciding which version of an Asset a World loads. Renames used to leave
+such copies behind. `_asset_storage_scan` reports every ID it finds more than
+once when the World loads, naming the copy that was taken; it resolves nothing
+on its own, because which copy is the real one is not the editor's to guess.
 
 Because the directory is derived from the visible name, renaming an Asset moves
 files. Three things live under that directory — the document, the Reference

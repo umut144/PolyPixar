@@ -779,10 +779,24 @@ func _test_geometry_sampling_ui_shell() -> void:
 	_expect(application.outliner_asset_type_filter_panel.visible, "Create should show the shared Asset filter, because it now selects among the seven types.")
 	var filtered_view_labels := _outliner_asset_labels(application)
 	_expect(filtered_view_labels == ["Assets", "Shield", "Sword"], "An Asset type switched off in the filter should leave the Create Outliner, leaving %s." % [filtered_view_labels])
+	# A list that is empty says why, because hidden and absent look the same.
+	application._toggle_all_outliner_asset_type_filters()
+	application._toggle_all_outliner_asset_type_filters()
+	var empty_view_labels := _outliner_asset_labels(application)
+	_expect(empty_view_labels == ["Assets", "No Asset matches the Asset filter."] and application.outliner_view._empty_create_list_reason(0) == "No Asset yet.", "An empty Create list should name its cause rather than showing nothing, but showed %s." % [empty_view_labels])
+	application._toggle_all_outliner_asset_type_filters()
+	application._on_outliner_asset_type_filter_toggled(false, "character")
 	application.active_module = "Style"
 	application._render_outliner()
-	application._set_all_outliner_asset_type_filters()
-	_expect(application.outliner_asset_type_filters["character"] and application.outliner_asset_type_filter_panel.visible, "Style should show the shared Asset filter and restore all types with All.")
+	application._toggle_all_outliner_asset_type_filters()
+	_expect(application.outliner_asset_type_filters["character"] and application.outliner_asset_type_filter_panel.visible and application.outliner_asset_type_filter_all_button.text == "None", "Style should show the shared Asset filter and restore all types with All, which then offers the opposite move.")
+	# With everything shown the button has nothing left to add, so it clears —
+	# which is how a single type is picked without unticking the other six.
+	application._toggle_all_outliner_asset_type_filters()
+	_expect(not application.outliner_asset_type_filters["character"] and not application.outliner_asset_type_filters["props"] and application.outliner_asset_type_filter_all_button.text == "All", "Pressing it again with every type shown should clear the filter.")
+	application._on_outliner_asset_type_filter_toggled(true, "props")
+	_expect(application.outliner_asset_type_filters["props"] and not application.outliner_asset_type_filters["character"] and application.outliner_asset_type_filter_all_button.text == "All", "Ticking one type back on should leave the button offering to show all.")
+	application._toggle_all_outliner_asset_type_filters()
 	application._select_submodule("Create", "Single", create_section)
 	_expect(application.active_create_submodule == "Single" and application.canvas_view.visible, "Returning to Create Single should immediately render the shared asset workspace.")
 	application.selected_asset_id = "asset_1"
