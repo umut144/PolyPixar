@@ -350,9 +350,10 @@ itself.
 
 Schema 67 retires the `role` field on Reference Components. What a member is
 called in its Set is the Reference's own `name`: derived from the member's name
-when the member is made, unique inside the Set, editable, and unchanged by a
-later rename of the member Asset — which is exactly what an authored role was
-for. A stored `role` is dropped on load rather than migrated; no World authored
+when the member is made, unique inside the Set and editable — which is exactly
+what an authored role was for. It follows a later rename of the member Asset
+while it is still that Asset's own Key, and stays once it was authored to
+something else. A stored `role` is dropped on load rather than migrated; no World authored
 one. Runtime Manifest schema 19 drops `role` from every `asset_reference` to
 match, so an assembly is read from `name` and `source_asset_key` instead of from
 three strings that said the same thing, and it additionally rejects a member

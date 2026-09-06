@@ -2367,20 +2367,28 @@ func _asset_storage_name_for(asset_id: String, asset_name: String) -> String:
 
 
 func _asset_storage_directory(world_root: String, asset_id: String) -> String:
-	# The directory that holds this Asset's document today, which is not always
-	# the one its current name derives: a World written by an older build kept
-	# the directory of the name the Asset had when it was created.
+	return str(_asset_storage_directories(world_root).get(asset_id, ""))
+
+
+func _asset_storage_directories(world_root: String) -> Dictionary:
+	# Where each Asset's document actually lies, by ID. That is not always the
+	# directory its current name derives: a rename moves the files at once while
+	# the name reaches the document only at the next save, and a World written
+	# by an older build kept the directory of the name the Asset was created
+	# with. Reading this rather than deriving it is what keeps a rename that was
+	# never saved from looking like an Asset whose Geometry disappeared.
+	var directories: Dictionary = {}
 	var directory := DirAccess.open("%s/assets" % world_root)
 	if directory == null:
-		return ""
+		return directories
 	for entry in directory.get_directories():
 		for file_name in DirAccess.get_files_at(ProjectSettings.globalize_path("%s/assets/%s" % [world_root, entry])):
 			if not str(file_name).to_lower().ends_with(".json"):
 				continue
 			var candidate = WorldDocumentService.read_json("%s/assets/%s/%s" % [world_root, entry, file_name])
-			if candidate is Dictionary and str(candidate.get("id", "")) == asset_id:
-				return str(entry)
-	return ""
+			if candidate is Dictionary and not directories.has(str(candidate.get("id", ""))):
+				directories[str(candidate.get("id", ""))] = str(entry)
+	return directories
 
 
 func _asset_storage_move_plan(world_root: String, current_directory: String, new_directory: String) -> Dictionary:
@@ -2532,15 +2540,18 @@ func _read_asset_data(world_root: String, asset_id: String):
 	return legacy_data if legacy_data is Dictionary else {}
 
 
-func _save_world() -> void:
+func _save_world() -> bool:
+	# Reports whether the World reached the disk, because a caller that has
+	# already written something itself needs to know: a rename has moved the
+	# Asset's directories before it asks for this.
 	if world_name.is_empty():
 		_open_new_world_dialog(true)
-		return
+		return false
 	var catalog_build := _asset_catalog_build()
 	if not bool(catalog_build.get("valid", false)):
 		var catalog_errors: Array = catalog_build.get("errors", [])
 		_show_status_message("World not saved · %s" % (str(catalog_errors[0]) if not catalog_errors.is_empty() else "Asset Catalog is invalid."))
-		return
+		return false
 	var world_root := "%s/%s" % [WORLDS_ROOT, world_name]
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("%s/assets" % world_root))
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("%s/paths" % world_root))
@@ -2676,13 +2687,14 @@ func _save_world() -> void:
 		unwritten.append(CONFIG_PATH.get_file())
 	if not unwritten.is_empty():
 		_show_status_message(_incomplete_save_message(unwritten))
-		return
+		return false
 	if not _write_asset_catalog(catalog_build):
 		_show_status_message("World saved, but catalog.json could not be updated.")
-		return
+		return false
 	_invalidate_batch_status()
 	batch_status_snapshot = {}
 	_show_status_message("Saved World: %s!" % world_name)
+	return true
 
 
 func _incomplete_save_message(unwritten: Array[String]) -> String:
@@ -2992,11 +3004,16 @@ func _load_world(world_entry: String, persist_as_last := true) -> bool:
 		loaded_assets.append(WorldDocumentService.deserialize_asset(asset_data, asset_id))
 	assets = loaded_assets
 	var loaded_geometry_documents: Dictionary = {}
+	# Geometry lies beside its Asset's document, so it is read from where that
+	# document actually is rather than from where the Asset's name says it
+	# should be. The two differ after a rename that has not been saved yet.
+	var storage_directories := _asset_storage_directories(world_root)
 	for loaded_asset in loaded_assets:
 		var loaded_asset_id := str(loaded_asset.get("id", ""))
+		var storage_directory := str(storage_directories.get(loaded_asset_id, _asset_storage_name(loaded_asset)))
 		for loaded_component in loaded_asset.get("components", []):
 			var loaded_component_id := str(loaded_component.get("id", ""))
-			var geometry_data = WorldDocumentService.read_json("%s/geometry/%s/%s/geometry.json" % [world_root, _asset_storage_name(loaded_asset), loaded_component_id])
+			var geometry_data = WorldDocumentService.read_json("%s/geometry/%s/%s/geometry.json" % [world_root, storage_directory, loaded_component_id])
 			if WorldDocumentService.has_supported_schema(geometry_data):
 				loaded_geometry_documents[_geometry_document_key(loaded_asset_id, loaded_component_id)] = WorldDocumentService.normalize_geometry_document(geometry_data, loaded_asset_id, loaded_component_id)
 	var loaded_motion_paths: Array[Dictionary] = []
@@ -3361,11 +3378,17 @@ func _reference_image_path(asset: Dictionary) -> String:
 
 
 func _reference_image_filename(asset: Dictionary) -> String:
-	var safe_name := str(asset.get("name", asset.get("id", "asset"))).strip_edges().to_lower().replace(" ", "_")
+	return _reference_image_filename_for(str(asset.get("name", "")), str(asset.get("id", "asset")))
+
+
+func _reference_image_filename_for(asset_name: String, asset_id: String) -> String:
+	# Taken as a name rather than read off the Asset, so a rename can ask what
+	# the file would be called before it changes anything.
+	var safe_name := asset_name.strip_edges().to_lower().replace(" ", "_")
 	for character in ["/", "\\", ":", "*", "?", "\"", "<", ">", "|"]:
 		safe_name = safe_name.replace(character, "_")
 	if safe_name.is_empty():
-		safe_name = str(asset.get("id", "asset"))
+		safe_name = asset_id
 	return "%s_ref.png" % safe_name
 
 
@@ -6397,7 +6420,20 @@ func _confirm_asset_rename() -> void:
 		_show_status_message("%s was not renamed: %s." % [str(asset.get("name", "Asset")), storage_error])
 		return
 	_record_direct_change()
+	var previous_name := str(asset.get("name", ""))
 	asset["name"] = asset_name
+	_follow_reference_rename(asset_id, previous_name, asset_name)
+	# The World is written at once, because the directories have already moved.
+	# Leaving it unsaved would let the document say the old name while its
+	# directories say the new one. A save that is refused — an invalid Catalog
+	# elsewhere in the World will refuse it — says so in its own message, and
+	# this one says what that means for the rename.
+	if not world_name.is_empty() and not _save_world():
+		# The refusal names its own cause, which is the actionable half; this
+		# adds what it means here, and keeps the cause rather than replacing it.
+		var refusal := str(program_status_label.text) if is_instance_valid(program_status_label) else ""
+		_show_status_message("%s is now %s, but %s Save before reloading." % [previous_name, asset_name,
+			refusal if not refusal.is_empty() else "the World was not saved."])
 	_invalidate_render(RENDER_OUTLINER | RENDER_INSPECTOR | RENDER_CANVAS_CONTEXT)
 
 
@@ -6407,10 +6443,48 @@ func _rename_asset_storage(asset: Dictionary, new_name: String) -> String:
 		return ""
 	var world_root := _current_world_root()
 	var asset_id := str(asset.get("id", ""))
-	var plan := _asset_storage_move_plan(world_root, _asset_storage_directory(world_root, asset_id),
-		_asset_storage_name_for(asset_id, new_name))
+	var new_directory := _asset_storage_name_for(asset_id, new_name)
+	var plan := _asset_storage_move_plan(world_root, _asset_storage_directory(world_root, asset_id), new_directory)
 	var blocked := str(plan.get("blocked", ""))
-	return blocked if not blocked.is_empty() else _apply_asset_storage_moves(plan.get("moves", []))
+	if not blocked.is_empty():
+		return blocked
+	var moves: Array = plan.get("moves", [])
+	var renamed_reference_file := _append_reference_image_moves(moves,
+		"%s/assets/%s" % [world_root, _asset_storage_directory(world_root, asset_id)],
+		"%s/assets/%s" % [world_root, new_directory], asset, new_name)
+	var move_error := _apply_asset_storage_moves(moves)
+	if not move_error.is_empty():
+		return move_error
+	if not renamed_reference_file.is_empty():
+		var stored_reference_image := WorldDocumentService.normalize_reference_image(asset.get("reference_image", {}))
+		stored_reference_image["file"] = renamed_reference_file
+		asset["reference_image"] = stored_reference_image
+	return ""
+
+
+func _append_reference_image_moves(moves: Array, current_root: String, new_root: String, asset: Dictionary, new_name: String) -> String:
+	# The Reference Image is named after the Asset as well, so it follows the
+	# rename; a file that carries some other name is the user's and stays. The
+	# `.import` sidecar travels with it — PolyTools loads the image from the
+	# path itself, but a stale sidecar points at a file that is gone.
+	#
+	# What exists is asked of the directory the files are in now; where they are
+	# moved to is the directory they will be in, because these moves run after
+	# the one that renames the directory itself.
+	var asset_id := str(asset.get("id", "asset"))
+	var reference_file := str(WorldDocumentService.normalize_reference_image(asset.get("reference_image", {})).get("file", ""))
+	if reference_file.is_empty() or reference_file != _reference_image_filename_for(str(asset.get("name", "")), asset_id):
+		return ""
+	var renamed_file := _reference_image_filename_for(new_name, asset_id)
+	if renamed_file == reference_file:
+		return ""
+	if not FileAccess.file_exists(ProjectSettings.globalize_path("%s/%s" % [current_root, reference_file])):
+		return ""
+	moves.append({"from": "%s/%s" % [new_root, reference_file], "to": "%s/%s" % [new_root, renamed_file]})
+	if FileAccess.file_exists(ProjectSettings.globalize_path("%s/%s.import" % [current_root, reference_file])):
+		moves.append({"from": "%s/%s.import" % [new_root, reference_file],
+			"to": "%s/%s.import" % [new_root, renamed_file]})
+	return renamed_file
 
 
 func _confirm_asset_creation() -> void:
@@ -6523,16 +6597,52 @@ func _add_set_member_reference(owner_set: Dictionary, member_asset_id: String) -
 	return component_id
 
 
-func _unique_component_name(asset: Dictionary, base_name: String) -> String:
+func _unique_component_name(asset: Dictionary, base_name: String, excluded_component_id := "") -> String:
 	# The member's own name, made unique where one Asset fills a role twice:
 	# rope_post, rope_post_02.
 	var candidate := base_name if not base_name.is_empty() else "member"
-	if not _has_component_name(asset, candidate):
+	if not _has_component_name(asset, candidate, excluded_component_id):
 		return candidate
 	var index := 2
-	while _has_component_name(asset, "%s_%02d" % [candidate, index]):
+	while _has_component_name(asset, "%s_%02d" % [candidate, index], excluded_component_id):
 		index += 1
 	return "%s_%02d" % [candidate, index]
+
+
+func _is_derived_reference_name(reference_name: String, source_asset_name: String) -> bool:
+	# Whether a Reference carries the source Asset's own name rather than a
+	# place the user named. `rope_post` and the `rope_post_02` a second
+	# Reference to the same Asset gets both count.
+	var derived := AssetCatalogService.asset_key(source_asset_name)
+	if derived.is_empty():
+		return false
+	if reference_name == derived:
+		return true
+	if not reference_name.begins_with("%s_" % derived):
+		return false
+	var suffix := reference_name.substr(derived.length() + 1)
+	return suffix.length() == 2 and suffix.is_valid_int()
+
+
+func _follow_reference_rename(renamed_asset_id: String, previous_name: String, new_name: String) -> void:
+	# A Reference whose name is the source Asset's own name follows a rename of
+	# that Asset: leaving it behind would be two names disagreeing about the
+	# same thing, and nothing is gained by keeping it, because the Asset Key
+	# moved with the name and a consumer has to follow the rename either way.
+	# A name that was authored instead answers "which place is this" — Barde's
+	# eye_left says nothing about the Symbol it borrows — and is left alone.
+	for owner_asset in assets:
+		if not owner_asset is Dictionary:
+			continue
+		for component in owner_asset.get("components", []):
+			if not component is Dictionary or not _is_reference_component(component):
+				continue
+			if str(component.get("source_asset_id", "")) != renamed_asset_id:
+				continue
+			if not _is_derived_reference_name(WorldDocumentService.normalized_component_name(component), previous_name):
+				continue
+			component["name"] = _unique_component_name(owner_asset,
+				AssetCatalogService.asset_key(new_name), str(component.get("id", "")))
 
 
 func _open_reference_image_dialog() -> void:
@@ -9045,8 +9155,10 @@ func _next_default_component_name(asset: Dictionary) -> String:
 	return "component%02d" % index
 
 
-func _has_component_name(asset: Dictionary, component_name: String) -> bool:
+func _has_component_name(asset: Dictionary, component_name: String, excluded_component_id := "") -> bool:
 	for component in asset.get("components", []):
+		if str(component.get("id", "")) == excluded_component_id:
+			continue
 		if str(component.get("name", "")).strip_edges().to_lower() == component_name.to_lower():
 			return true
 	return false

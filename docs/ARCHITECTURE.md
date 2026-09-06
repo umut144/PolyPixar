@@ -32,8 +32,12 @@ about placement in a world, because members are authored centered on their own
 pivot so that a placing consumer sets them itself. Nothing is added for the role either: the
 Reference's own `name` is the place the member fills in the assembly. It is
 derived from the member's name when the member is made, unique inside the Set,
-editable, and unaffected by a later rename of the member Asset — which is
-exactly what a second, authored role field would have been. A member always
+and editable — which is exactly what a second, authored role field would have
+been. A Reference whose name is still the source Asset's own Key follows a
+rename of that Asset (`_follow_reference_rename`), because two names disagreeing
+about the same thing help nobody and the Key moved anyway; a name that was
+authored instead answers which place this is, not which Asset fills it, and
+stays. A member always
 sits at the Set's root, so its Inspector offers no Parent, and Runtime Export
 rejects a member hung under anything. A Set is
 authored from the `Set` module, top down: its Asset root offers
@@ -680,7 +684,11 @@ Every record is written through `WorldDocumentService.write_text_atomically`:
 a staging file is completed and then swapped in, so a failed write leaves the
 previous content rather than a truncated file, and a `.staging` or `.backup`
 residue only ever means an interrupted swap. There is no autosave; every
-save is an explicit user action.
+save is an explicit user action. Renaming an Asset is the one action that also
+writes the World, because it has already moved that Asset's directories: a
+document left behind would say the old name while its directories say the new
+one, and the next load would look for Geometry where the name points rather
+than where it lies.
 
 Loading normalizes every document to the current schema.
 `WorldDocumentService.deserialize_asset` and the `normalize_*` functions

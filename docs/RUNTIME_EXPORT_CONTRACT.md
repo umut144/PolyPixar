@@ -306,8 +306,11 @@ A **Set** — `asset_category: "set"` — is an ordinary Manifest whose Componen
 are all `asset_reference` records sitting at the Manifest root, and every member
 is an Asset of the Set's own `asset_type`. A Set publishes which Assets belong
 together and, through each Reference's `name`, which place every member fills;
-`source_asset_key` says which Asset fills that place, and the `name` is stable
-across a rename of the member Asset. Its Component transforms are ordinary
+`source_asset_key` says which Asset fills that place. Neither is stable across a
+rename of the member Asset: the Key moves with the name, and a `name` that is
+the member's own Key moves with it, so a rename is a breaking change here as it
+is everywhere else in the Catalog. A `name` that was authored rather than
+derived stays as authored. Its Component transforms are ordinary
 exported transforms in the Set's own space and say **nothing about placement in
 a world**. Where members lie centered on their own pivot, that is exactly what
 it is: not an arrangement, but the precondition for a placing source to set

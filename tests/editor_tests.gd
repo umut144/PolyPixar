@@ -305,7 +305,14 @@ func _test_set_composition() -> void:
 	_expect(str(application.asset_rename_dialog.get_meta("asset_id", "")) == str(post_asset.get("id", "")), "The member rename dialog should open on the member Asset rather than on the Set.")
 	application.asset_rename_input.text = "Deck"
 	application._confirm_asset_rename()
-	_expect(str(post_asset.get("name", "")) == "Deck" and WorldDocumentService.normalized_component_name(post_member) == "bridge_post_02", "Renaming a member should rename its Asset and leave the place it fills in the Set untouched.")
+	_expect(str(post_asset.get("name", "")) == "Deck" and WorldDocumentService.normalized_component_name(post_member) == "deck", "Renaming a member should rename its Asset, and the derived place name should follow rather than stay behind disagreeing with it.")
+	# A place the user named answers a different question than which Asset fills
+	# it, so it is left alone.
+	post_member["name"] = "left_side"
+	application.asset_rename_input.text = "Deck Plate"
+	application._confirm_asset_rename()
+	_expect(str(post_asset.get("name", "")) == "Deck Plate" and WorldDocumentService.normalized_component_name(post_member) == "left_side", "An authored place name should survive a rename of the Asset that fills it.")
+	_expect(application._is_derived_reference_name("rope_post", "Rope Post") and application._is_derived_reference_name("rope_post_02", "Rope Post") and not application._is_derived_reference_name("post_left", "Rope Post") and not application._is_derived_reference_name("rope_post_left", "Rope Post"), "A Reference name counts as derived when it is the source Asset's own Key, with or without the duplicate suffix, and not otherwise.")
 	# A member is authored where it belongs: its Components are added through
 	# the member row and drawn underneath it, without leaving the Set.
 	var member_asset_id := str(rail_member.get("source_asset_id", ""))
@@ -762,7 +769,16 @@ func _test_inspector_field_wiring() -> void:
 	application._update_asset_rename_preview("Sorcerer")
 	_expect(application.asset_rename_key_label.text == "Asset Key: sorcerer", "The dialog should show the Key the new name derives while it is typed.")
 	application._confirm_asset_rename()
-	_expect(str(asset["name"]) == "Sorcerer", "Confirming the dialog should rename the Asset.")
+	_expect(str(asset["name"]) == "Sorcerer" and application.world_name.is_empty(), "Confirming the dialog should rename the Asset; a World that was never written has nothing to save.")
+	# The Reference Image is named after the Asset too, so a rename can carry it
+	# along instead of leaving it under the previous name.
+	_expect(application._reference_image_filename_for("Rope Post", "asset_9") == "rope_post_ref.png" and application._reference_image_filename_for("", "asset_9") == "asset_9_ref.png", "The Reference Image filename should derive from the Asset name, with the ID as the fallback.")
+	_expect(application._asset_storage_name_for(str(asset["id"]), "Rope Post") == "Rope_Post", "The storage directory should derive from the Asset name the same way the World save derives it.")
+	# An Asset that has never been written has nothing to move, and a name whose
+	# directory does not change moves nothing either.
+	var unsaved_plan: Dictionary = application._asset_storage_move_plan("res://worlds/none", "", "Deck")
+	var unchanged_plan: Dictionary = application._asset_storage_move_plan("res://worlds/none", "Deck", "Deck")
+	_expect(unsaved_plan.get("moves", []).is_empty() and str(unsaved_plan.get("blocked", "")).is_empty() and unchanged_plan.get("moves", []).is_empty(), "A rename should plan no move where there is nothing to move.")
 
 	# Component level: transform, then the properties that reach the document.
 	application.selected_component_id = "component_1"
