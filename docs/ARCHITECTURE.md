@@ -128,6 +128,15 @@ internal `geometry_*` identifiers remain technical names, while UI copy uses
 Mesh. Style currently contains only Weighting. Motion code is retained but its
 category is disabled. Transform and Effects categories do not exist.
 
+Two Canvas shortcuts are routed in `_input`, ahead of the GUI: the Pivot key,
+which a focused SpinBox would otherwise swallow as text, and the caret keys the
+Outliner and a selected Point own. Reaching past the GUI means a text field
+cannot defend itself by consuming the key, so `_canvas_shortcuts_are_blocked`
+stands them down while a `LineEdit` or `TextEdit` holds the keyboard — a
+SpinBox through the `LineEdit` it holds. Without it, typing a name with the
+pointer resting over the Canvas places a Pivot and takes the focus away
+mid-word.
+
 The Create toolbar's optional `Frame` guide is editor-only canvas state. It
 stores `visible`, `half_extent`, and `offset` under `editor_state`, authored in
 centimetres and hidden by default with a `10 cm` half extent, draws around the

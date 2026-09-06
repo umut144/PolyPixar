@@ -382,9 +382,14 @@ func _input(event: InputEvent) -> void:
 	# so intercept them before Godot moves focus to an unrelated control.
 	if not event is InputEventKey or not event.pressed:
 		return
-	# Route the pointer-based Pivot shortcut before focused LineEdit/SpinBox
-	# controls can consume the printable P key. Requiring the pointer to be over
-	# the Canvas keeps ordinary text entry unaffected.
+	# Everything below runs ahead of the GUI, so a text field cannot defend
+	# itself by consuming the key: while one owns the keyboard, every key
+	# belongs to it. Without this, typing a name with the pointer resting over
+	# the Canvas places a Pivot and takes the focus away mid-word.
+	if _canvas_shortcuts_are_blocked(_keyboard_focus_owner()):
+		return
+	# Route the pointer-based Pivot shortcut before focused SpinBox controls can
+	# consume the printable P key.
 	if _is_plain_pivot_shortcut(event) and _try_place_selected_pivot_at_mouse():
 		get_viewport().set_input_as_handled()
 		return
@@ -412,6 +417,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if is_instance_valid(canvas_view) and (event.meta_pressed or event.ctrl_pressed or event.keycode in [KEY_META, KEY_CTRL]):
 		canvas_view.set_command_shortcut_active(event.meta_pressed or event.ctrl_pressed)
 	if not event.pressed:
+		return
+	# A field that does not consume the key itself — a read-only one, say —
+	# would otherwise let it through to the Canvas.
+	if _canvas_shortcuts_are_blocked(_keyboard_focus_owner()):
 		return
 	if event.echo and not _can_nudge_selected_point():
 		return
@@ -620,6 +629,19 @@ func _nudge_selected_point(direction: Vector2) -> void:
 	BezierGeometry.resolve_auto_handles(component.get("points", []), component.get("chains", []))
 	_refresh_component_geometry(component)
 	_invalidate_render(RENDER_INSPECTOR | RENDER_CANVAS_CONTEXT)
+
+
+func _keyboard_focus_owner() -> Control:
+	if not is_inside_tree() or get_viewport() == null:
+		return null
+	return get_viewport().gui_get_focus_owner()
+
+
+func _canvas_shortcuts_are_blocked(focus_owner: Control) -> bool:
+	# A text field owns the keyboard while it is focused — a SpinBox through the
+	# LineEdit it holds — so the Canvas shortcuts stand back rather than reach
+	# past it.
+	return focus_owner is LineEdit or focus_owner is TextEdit
 
 
 func _is_plain_pivot_shortcut(event: InputEventKey) -> bool:

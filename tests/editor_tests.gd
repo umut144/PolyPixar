@@ -774,6 +774,18 @@ func _test_inspector_field_wiring() -> void:
 	# along instead of leaving it under the previous name.
 	_expect(application._reference_image_filename_for("Rope Post", "asset_9") == "rope_post_ref.png" and application._reference_image_filename_for("", "asset_9") == "asset_9_ref.png", "The Reference Image filename should derive from the Asset name, with the ID as the fallback.")
 	_expect(application._asset_storage_name_for(str(asset["id"]), "Rope Post") == "Rope_Post", "The storage directory should derive from the Asset name the same way the World save derives it.")
+	# The Canvas shortcuts are routed ahead of the GUI, so a focused text field
+	# cannot defend itself by consuming the key: the shortcuts stand back while
+	# one owns the keyboard, or typing a name would place a Pivot at P.
+	var focused_field := LineEdit.new()
+	var focused_number := SpinBox.new()
+	_expect(application._canvas_shortcuts_are_blocked(focused_field)
+		and application._canvas_shortcuts_are_blocked(focused_number.get_line_edit())
+		and not application._canvas_shortcuts_are_blocked(application.canvas_view)
+		and not application._canvas_shortcuts_are_blocked(null),
+		"A focused text field should block the Canvas shortcuts, and nothing else should.")
+	focused_field.free()
+	focused_number.free()
 	# One document per ID is an assumption the loader used to make silently: the
 	# first directory found wins, so a leftover from an older rename can decide
 	# which version of an Asset a World loads.
