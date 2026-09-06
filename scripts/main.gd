@@ -1869,7 +1869,7 @@ func _create_asset_dialog() -> void:
 	# typed over: suggested and confirmed is an answer, silently substituted is
 	# an invention.
 	asset_role_input = LineEdit.new()
-	asset_role_input.placeholder_text = "Role in the Set, e.g. rope_post"
+	asset_role_input.placeholder_text = "Role — the part, not the Asset filling it"
 	asset_role_input.custom_minimum_size = Vector2(320, 32)
 	asset_role_input.focus_mode = Control.FOCUS_ALL
 	asset_role_input.text_changed.connect(_on_new_member_role_typed)
@@ -6477,11 +6477,11 @@ func _reference_role_validation_error(raw_role: String) -> String:
 	if role.is_empty():
 		return ""
 	if role.begins_with("_") or role.ends_with("_") or role.contains("__"):
-		return "Use lower_snake_case for the Role, e.g. rope_post."
+		return "Use lower_snake_case for the Role, e.g. post."
 	for character in role:
 		var code := character.unicode_at(0)
 		if not ((code >= 97 and code <= 122) or (code >= 48 and code <= 57) or code == 95):
-			return "Use lower_snake_case for the Role, e.g. rope_post."
+			return "Use lower_snake_case for the Role, e.g. post."
 	if role.unicode_at(0) >= 48 and role.unicode_at(0) <= 57:
 		return "A Role must start with a lowercase letter."
 	return ""

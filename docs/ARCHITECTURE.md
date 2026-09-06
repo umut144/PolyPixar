@@ -40,7 +40,13 @@ What a member stands for is a separate field, `role`, precisely because the name
 follows. It is authored — suggested from the name while the member is made,
 never substituted afterwards — `lower_snake_case`, may repeat where one role is
 filled twice, and Runtime Export rejects a Set whose member carries none. The
-Inspector shows it under `Role in the Set` and says so when it is missing. A member always
+Inspector shows it under `Role in the Set` and says so when it is missing.
+
+A role names the part, the Asset names the execution: `post` rather than
+`rope_post`, so a stone post can fill the same role later without the role
+having to lie about it. The suggestion drawn from the Asset name pulls the
+other way, which is why the field says what it wants rather than only showing
+an example. A member always
 sits at the Set's root, so its Inspector offers no Parent, and Runtime Export
 rejects a member hung under anything. A Set is
 authored from the `Set` module, top down: its Asset root offers

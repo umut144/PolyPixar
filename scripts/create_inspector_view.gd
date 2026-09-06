@@ -418,10 +418,12 @@ func rebuild() -> void:
 		add_child(set_member_rename_button)
 		# What this member stands for in the Set. It is the one thing a consumer
 		# cannot work out for itself: the Reference name and the member's Key
-		# both follow a rename of the member, the role does not.
+		# both follow a rename of the member, the role does not. It names the
+		# part — `post`, not `rope_post` — so a second Asset can fill the same
+		# role later without the name having to lie about it.
 		add_child(EditorWidgets.create_inspector_section("Role in the Set", section_toggled.emit))
 		reference_role_editor = EditorWidgets.create_name_editor(
-			WorldDocumentService.reference_role(component), "Role, e.g. rope_post")
+			WorldDocumentService.reference_role(component), "Role — the part, not the Asset filling it")
 		reference_role_editor.text_submitted.connect(reference_role_requested.emit)
 		reference_role_editor.focus_exited.connect(func() -> void:
 			reference_role_requested.emit(reference_role_editor.text)
