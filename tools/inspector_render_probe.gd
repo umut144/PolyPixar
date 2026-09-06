@@ -6,17 +6,20 @@
 # nothing on its own. It is run before and after a change that is meant to leave
 # the Inspector alone, and the two outputs are diffed:
 #
-#   godot --headless --path . --script tools/inspector_render_probe.gd > before.txt
+#   godot --headless --path . --script tools/inspector_render_probe.gd > .verify/probe-before.txt
 #   ...make the change...
-#   godot --headless --path . --script tools/inspector_render_probe.gd > after.txt
-#   diff before.txt after.txt
+#   godot --headless --path . --script tools/inspector_render_probe.gd > .verify/probe-after.txt
+#   diff .verify/probe-before.txt .verify/probe-after.txt
+#
+# `.verify/` is where tools/verify.sh keeps its logs and is already ignored, so
+# the two dumps do not turn up as untracked files in the next commit.
 #
 # Any difference is a rendering change. Watch stderr for SCRIPT ERROR as well:
 # a parse error here means the probe rendered nothing and the empty diff means
 # nothing.
 #
-# The state list covers Create (Asset, Set Asset root, Set member Reference with
-# its Role, Palette Asset root with its variants, Component, Group, Guide, weapon Guide,
+# The state list covers Create (Asset, Set Asset root, Set member Reference,
+# Palette Asset root with its variants, Component, Group, Guide, weapon Guide,
 # grouped Component, Contour Component, Circle, valid and invalid Hole, Hole Edge
 # modes, and Ellipse Primitive, authored
 # and Component-geometry Regions, two
