@@ -20,9 +20,11 @@ or restored as an active editor category. Transform and Effects are not
 product categories. Texture and Material authoring are not part of the
 application, and UV and SDF have no authoring surface any more.
 
-`Single` is the one view over the Asset implementation. The stable
-`asset_type` remains persisted and exported, but it no longer opens a view of
-its own: the Outliner search and the shared multi-select Asset filter select
+What an Asset is and how it is composed are two persisted fields. `asset_type`
+— the seven categories — says what kind of thing it is; `asset_category`
+— `single`, `set`, `palette` — says how it is put together, and that is what
+picks the Create module. A Bridge is therefore `props` and a Set. Inside
+`Single`, the Outliner search and the shared multi-select Asset filter select
 among the seven types. `Set` is a different thing, not an eighth category: a
 Set is an Asset whose visible Components are References to its members, each
 with the role it plays in the assembly. `Palette` is the third: several equally

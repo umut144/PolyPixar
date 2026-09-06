@@ -1,11 +1,12 @@
 # PolyTools Runtime Export Contract
 
-**Status:** Normative consumer contract for Asset Catalog schema `1` and
-runtime Manifest schema `17`.
+**Status:** Normative consumer contract for Asset Catalog schema `2` and
+runtime Manifest schema `18`.
 
 This document is the sole field-level contract for PolyTools Runtime packages.
-Manifest schema 17 replaces schema 16. Consumers must reject older schemas; there is
-no SDF/Carrier/UV compatibility fallback.
+Manifest schema 18 replaces schema 17 and Catalog schema 2 replaces schema 1.
+Consumers must reject older schemas; there is no SDF/Carrier/UV compatibility
+fallback.
 
 ## Package boundary
 
@@ -44,13 +45,13 @@ Root Transform instead of silently changing package placement or dimensions.
 
 ## Compatibility policy
 
-Catalog `schema_version` must equal `1`; Manifest `schema_version` must equal
-`17`. Missing, non-integer, older, or newer versions are rejected as complete
+Catalog `schema_version` must equal `2`; Manifest `schema_version` must equal
+`18`. Missing, non-integer, older, or newer versions are rejected as complete
 packages. Missing required geometry is an error. Consumers must not synthesize
 Fill Meshes, strokes, closed Contour regions, Semantic Keys, hierarchy links,
 or referenced Assets.
 
-Schema 17 contains no UV, SDF, mask, contour-domain, padding, or Carrier field.
+Schema 18 contains no UV, SDF, mask, contour-domain, padding, or Carrier field.
 Its optional `regions` array contains authored or Component-bound Attack, Hurt,
 and Collision geometry; consumers may use it and must retain their Component
 fallback when it is empty.
@@ -59,8 +60,10 @@ fallback when it is empty.
 
 The Catalog requires `world_key`, `world_name`, and `assets`, sorted by
 `asset_key`. Every Asset entry requires `asset_key`, `display_name`,
-`asset_type`, and the exact World-relative path
+`asset_type`, `asset_category`, and the exact World-relative path
 `PolyToolsRuntimeExports/<asset_key>/manifest.json` in `runtime_package`.
+`asset_category` lets a consumer tell a Palette from a placeable Asset without
+opening its package.
 
 ## Top-level Manifest
 
@@ -71,7 +74,8 @@ Every Manifest except a Palette requires:
 | `schema_version` | integer | Exactly `16`. |
 | `asset_key` | non-empty lower-snake-case string | Runtime identity. |
 | `display_name` | string | Informational authored name. |
-| `asset_type` | string | `character`, `props`, `weapons`, `terrain`, `items`, `icon`, `symbols`, `set`, or `palette`. |
+| `asset_type` | string | What the Asset is: `character`, `props`, `weapons`, `terrain`, `items`, `icon`, or `symbols`. |
+| `asset_category` | string | How it is composed: `single`, `set`, or `palette`. |
 | `presentation` | object | Required Asset-level presentation metadata. |
 | `coordinate_system` | object | Exact convention below. |
 | `z_order` | object | Exact convention below. |
@@ -144,7 +148,7 @@ independent Frame property.
 
 ## Gameplay Regions
 
-`regions` is always present in schema 17 and may be empty. Every record contains
+`regions` is always present in schema 18 and may be empty. Every record contains
 `region_id`, `name`, `role`, `geometry_source`, and `source_component_id`;
 `role` is one of `attack`, `hurt`, or `collision`.
 
@@ -294,27 +298,27 @@ field. Asset References also omit it.
 
 ## Compositions
 
-Two `asset_type` values describe how an Asset is composed rather than what
-category of thing it is. Neither requires a consumer to learn a new package
-shape.
+`asset_category` says how an Asset is composed, independently of what
+`asset_type` says it is. Neither composition requires a consumer to learn a new
+package shape.
 
-A **Set** — `asset_type: "set"` — is an ordinary Manifest whose Components are
+A **Set** — `asset_category: "set"` — is an ordinary Manifest whose Components are
 all `asset_reference` records. Its assembly is the Component transforms, which
 are canonical exported transforms like any other, and each member says what it
 stands for through its required `role`. A consumer that already resolves Asset
 References needs nothing further.
 
-A **Palette** — `asset_type: "palette"` — is the one Manifest without geometry.
-It publishes the Keys that may substitute for one another and the single
-ordinary category they share:
+A **Palette** — `asset_category: "palette"` — is the one Manifest without
+geometry. It publishes the Keys that may substitute for one another; every one
+of them is an Asset of the Palette's own `asset_type`:
 
 ```json
 {
-  "schema_version": 17,
+  "schema_version": 18,
   "asset_key": "grass",
   "display_name": "Grass",
-  "asset_type": "palette",
-  "variant_asset_type": "terrain",
+  "asset_type": "terrain",
+  "asset_category": "palette",
   "variants": ["grass01", "grass02", "grass03", "grass04"],
   "presentation": {"authored_facing": "neutral"},
   "coordinate_system": { },
@@ -328,15 +332,15 @@ ordinary category they share:
 
 `variants` is non-empty, sorted, and holds unique `lower_snake_case` Asset Keys
 that the Catalog also lists as packages of their own; each variant Manifest is
-an ordinary Asset Manifest of `variant_asset_type`. `components`,
-`attachment_frames` and `regions` are present and empty. No other Manifest
-carries `variants` or `variant_asset_type`.
+an ordinary `asset_category: "single"` Manifest of the same `asset_type`.
+`components`, `attachment_frames` and `regions` are present and empty. No other
+Manifest carries `variants`.
 
 A variant is chosen by the presentation, independently per client, so it may
 carry nothing the simulation would have to agree on. PolyTools enforces the
 part it owns and rejects the Palette — not the variant — when a variant has
 gameplay Regions or Attachment Frames, is hidden, is missing, or is not of the
-declared category. **`Surface`, placement rank and every other consumer-side
+Palette's `asset_type`. **`Surface`, placement rank and every other consumer-side
 gameplay property are outside PolyTools and are not checked here.** A consumer
 that owns such properties must assert their absence itself, against this same
 `variants` list. The list is also the authority for which Keys are not placed

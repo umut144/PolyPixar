@@ -1,7 +1,7 @@
 class_name AssetCatalogService
 extends RefCounted
 
-const CATALOG_SCHEMA_VERSION := 1
+const CATALOG_SCHEMA_VERSION := 2
 
 
 static func asset_key(display_name: String) -> String:
@@ -55,7 +55,10 @@ static func build_catalog(world_key: String, world_name: String, assets: Array) 
 		entries.append({
 			"asset_key": key,
 			"display_name": str(raw_asset.get("name", "")),
-			"asset_type": str(raw_asset.get("asset_type", WorldDocumentService.ASSET_TYPE_CHARACTER)),
+			"asset_type": WorldDocumentService.asset_type(raw_asset),
+			# How the Asset is composed, so a consumer can tell a Palette from a
+			# placeable Asset without opening the package.
+			"asset_category": WorldDocumentService.asset_category(raw_asset),
 			"runtime_package": "PolyToolsRuntimeExports/%s/manifest.json" % key
 		})
 	entries.sort_custom(func(left: Dictionary, right: Dictionary) -> bool:

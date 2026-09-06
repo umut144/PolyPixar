@@ -9,14 +9,20 @@ contains always-expanded Create, Mesh, and Style categories. A single
 workspace.
 
 Create has three modules. `Single` is one database view over the Asset
-implementation; `Set` and `Palette` are compositions above it. The
-stable persisted discriminator `asset_type` — `character`, `props`, `weapons`,
-`terrain`, `items`, `icon`, `symbols`; missing or invalid values normalize to
-`character` — is unchanged and still exported, but it no longer selects a view.
-It is authored in the New Asset dialog and corrected on the Asset root in the
-Inspector.
+implementation; `Set` and `Palette` are compositions above it.
 
-A **Set** is an Asset with `asset_type: "set"` whose visible Components are
+What an Asset is and how it is composed are two questions, so they are two
+persisted fields. `asset_type` — `character`, `props`, `weapons`, `terrain`,
+`items`, `icon`, `symbols`, normalizing to `character` — says what kind of
+thing it is, and is authored in the New Asset dialog and corrected on the Asset
+root. `asset_category` — `single`, `set`, `palette`, normalizing to `single` —
+says how it is put together, and it alone picks the Create module. A Bridge is
+therefore `props` **and** a Set, and a Grass Palette is `terrain` **and** a
+Palette, which is also the type of every one of its variants. The composition
+is fixed when the Asset is created and is not switched afterwards: changing it
+would leave members or variants in an Asset with no place for them.
+
+A **Set** is an Asset with `asset_category: "set"` whose visible Components are
 Asset References to its members. Nothing new is persisted for the assembly: the
 Reference already carries which member (`source_asset_id`, exported as
 `source_asset_key`), where it sits (its own transform, canonicalized at export)
@@ -56,16 +62,16 @@ and hands it to the Outliner, and `_asset_matches_create_submodule` applies the
 same rule to the module's expansion scope and its active Asset, so the three
 never disagree.
 
-A **Palette** is an Asset with `asset_type: "palette"` and needs less than an
-Asset, not more: `palette_variants`, a list of stable Asset IDs that export
-resolves to Asset Keys, and `variant_asset_type`, the one ordinary category
-every variant shares. It owns no Components, no geometry and no arrangement,
+A **Palette** is an Asset with `asset_category: "palette"` and needs less than
+an Asset, not more: `palette_variants`, a list of stable Asset IDs that export
+resolves to Asset Keys. Every variant is an Asset of the Palette's own
+`asset_type`, so nothing else has to say what they are. It owns no Components, no geometry and no arrangement,
 because the presentation chooses among the variants freely — order in the list
 means nothing and duplicates are dropped on load. That is why a variant is not
 a Reference: a Reference carries a transform, a pivot, a z-index and a depth,
-and a Palette would have to define all of them away. Its category is chosen
-where the Palette is named, so `Add → New Variant Asset` only asks for a name;
-a Set, whose members answer for themselves, asks for a category per member.
+and a Palette would have to define all of them away. Its type is chosen where the Palette is
+named, so `Add → New Variant Asset` only asks for a name; a Set, whose members
+answer for themselves, asks per member and may therefore mix types.
 Removing a variant drops it from the list and leaves the Asset alone, and a
 variant whose Asset is gone stays visible as missing rather than vanishing.
 
@@ -185,16 +191,15 @@ the four views is visible, resolves that view's context and calls `rebuild()`.
   `DRAW_MODE_PRIMITIVE`, `ROLE_OUTER`, `ROLE_HOLE`, `ROLE_CUT` and the
   predicates that read them — `component_draw_mode`, `is_closed_loop`,
   `is_contour`, `is_primitive`, `topology_role`, `is_outer_body` — and the
-  nine `ASSET_TYPE_*` constants behind `asset_type` and
-  `normalize_asset_type`, split into `SINGLE_ASSET_TYPES` (the seven the Asset
-  filter and the New Asset dialog offer) and `ASSET_TYPES` (those plus `set`
-  and `palette`), plus `is_set_asset`, `is_palette_asset`,
-  `is_composition_asset`, the `reference_role` normalization and the
-  `palette_variants` / `palette_variant_type` readers; `main.gd`'s
-  `CREATE_SUBMODULE_BY_ASSET_TYPE` maps one to its Create module — `Single` for
-  all seven, `Set` for `set` — and `_normalized_create_submodule` reads any
-  other value, including the seven module names Worlds below schema 63 stored,
-  as `Single`. `AssetGuide` owns the Guide types the same way, plus the Guide scope
+  the seven `ASSET_TYPE_*` constants behind `asset_type` and
+  `normalize_asset_type`, the three `ASSET_CATEGORY_*` constants behind
+  `asset_category` and `normalize_asset_category`, plus `is_set_asset`,
+  `is_palette_asset`, `is_composition_asset`, the `reference_role`
+  normalization and the `palette_variants` reader; `main.gd`'s
+  `CREATE_SUBMODULE_BY_ASSET_CATEGORY` maps a category to its Create module and
+  `ASSET_CATEGORY_BY_CREATE_SUBMODULE` back again, while
+  `_normalized_create_submodule` reads any unknown module name, including the
+  seven Asset-type names Worlds below schema 63 stored, as `Single`. `AssetGuide` owns the Guide types the same way, plus the Guide scope
   vocabulary — `SCOPE_COMPONENT`, `SCOPE_GROUP`, `is_group_scoped`,
   `scope_component_id`, `scope_group_id`, `scope_target_id` — read by
   `ComponentHierarchy.guide_world_transform`, the one place a Guide's scope
@@ -305,10 +310,10 @@ one of the seven Asset-type names, and every such value reads as `Single`.
 
 An Asset contains:
 
-- stable ID, name, visibility, and `asset_type` — `character`, `props`,
-  `weapons`, `terrain`, `items`, `icon`, `symbols`, or the compositions `set`
-  and `palette`; a missing or invalid value normalizes to `character`. A
-  `palette` additionally carries `palette_variants` and `variant_asset_type`;
+- stable ID, name, visibility, `asset_type` — `character`, `props`, `weapons`,
+  `terrain`, `items`, `icon`, `symbols`, normalizing to `character` — and
+  `asset_category` — `single`, `set`, `palette`, normalizing to `single`. A
+  Palette additionally carries `palette_variants`;
 - typed Asset-level `authored_facing` presentation metadata (`left`, `right`,
   `neutral`, `top`, or `down`). It is edited only on the Asset root in the
   Inspector's `Initial Pose` group, uses the `AssetPresentation.AuthoredFacing`
@@ -679,7 +684,7 @@ The normative serialized package and consumer contract is
 must not redefine its fields. The summary below describes how the editor
 produces that contract.
 
-`RuntimeExportService` builds Manifest schema 17 exclusively from current
+`RuntimeExportService` builds Manifest schema 18 exclusively from current
 accepted Fill and Contour Stroke Mesh Bakes. Ordinary Hole Components are
 authoring-only Sampling constraints and do not enter the Manifest. A visible
 ordinary Hole with no valid direct outer Parent Body blocks export, as does a
@@ -692,17 +697,17 @@ Components never derive replacement geometry during export. References emit an
 `asset_reference` record containing the local `name`, signed placement
 transform, and actual `source_asset_key`, without copying geometry into the owner.
 
-A Set exports as an ordinary Manifest whose Components are all
-`asset_reference` records, each with its `role`; a Palette exports the one
-Manifest without geometry, carrying `variants` and `variant_asset_type` and no
-Components. Its variants are validated at export — a Palette whose variant is
+Every Manifest carries both `asset_type` and `asset_category`. A Set exports as
+an ordinary Manifest whose Components are all `asset_reference` records, each
+with its `role`; a Palette exports the one Manifest without geometry, carrying
+`variants` and no Components. Its variants are validated at export — a Palette whose variant is
 missing, hidden, of another category, or carrying gameplay Regions or
 Attachment Frames is rejected, while the variant itself stays a valid package.
 `main.gd` resolves those variant facts, because they are questions about other
 Assets, and the Catalog prunes a Palette whose variant is not publishable the
 same way it prunes a dependant of an unpublishable Reference.
 
-Every schema-17 Manifest also exports the Asset-level presentation metadata as
+Every schema-18 Manifest also exports the Asset-level presentation metadata as
 `presentation.authored_facing`, oriented Asset-local Weapon Attachment Frames,
 and geometry-only closed Contour boundaries. Free semantic Regions are exported
 as triangulated Asset-local meter geometry. Component-geometry Regions instead
@@ -724,7 +729,7 @@ while fill-less Contours do not invent one. A closed Contour additionally
 exports `closed_region_mesh` as local-meter vertices and triangle indices. That
 field is engine-neutral geometry only and has no material, color, alpha, UV,
 rendering, or Fill semantics. Open Contours and Asset References omit it.
-Schema 17 contains no UV/SDF/Carrier fields and carries an optional semantic
+Schema 18 contains no UV/SDF/Carrier fields and carries an optional semantic
 gameplay Region array.
 
 Each visible Asset is exported to the active World-local
@@ -732,7 +737,7 @@ Each visible Asset is exported to the active World-local
 `manifest.json`. The batch verifies a staging package
 before atomically replacing the prior package; validation or I/O failure leaves
 the prior package intact. Once all required packages are current, the same batch
-atomically updates World-root Asset Catalog schema 1. The Catalog is the closed
+atomically updates World-root Asset Catalog schema 2. The Catalog is the closed
 consumer set; generated directories absent from it are ignored and pruned only
 after every listed package is current and the new Catalog has been committed. Package freshness is derived by comparing the expected
 Manifest bytes, not by persisting export diagnostics in the Asset.

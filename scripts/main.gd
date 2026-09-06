@@ -2,16 +2,17 @@ extends Control
 
 const SELECTION_MIRROR_SERVICE_SCRIPT = preload("res://scripts/selection_mirror_service.gd")
 const CREATE_SUBMODULES := ["Single", "Set", "Palette"]
-const CREATE_SUBMODULE_BY_ASSET_TYPE := {
-	WorldDocumentService.ASSET_TYPE_CHARACTER: "Single",
-	WorldDocumentService.ASSET_TYPE_PROPS: "Single",
-	WorldDocumentService.ASSET_TYPE_WEAPONS: "Single",
-	WorldDocumentService.ASSET_TYPE_TERRAIN: "Single",
-	WorldDocumentService.ASSET_TYPE_ITEMS: "Single",
-	WorldDocumentService.ASSET_TYPE_ICON: "Single",
-	WorldDocumentService.ASSET_TYPE_SYMBOLS: "Single",
-	WorldDocumentService.ASSET_TYPE_SET: "Set",
-	WorldDocumentService.ASSET_TYPE_PALETTE: "Palette",
+# The Create module an Asset belongs to is its composition, not its category:
+# what a thing is and how it is put together are two questions.
+const CREATE_SUBMODULE_BY_ASSET_CATEGORY := {
+	WorldDocumentService.ASSET_CATEGORY_SINGLE: "Single",
+	WorldDocumentService.ASSET_CATEGORY_SET: "Set",
+	WorldDocumentService.ASSET_CATEGORY_PALETTE: "Palette",
+}
+const ASSET_CATEGORY_BY_CREATE_SUBMODULE := {
+	"Single": WorldDocumentService.ASSET_CATEGORY_SINGLE,
+	"Set": WorldDocumentService.ASSET_CATEGORY_SET,
+	"Palette": WorldDocumentService.ASSET_CATEGORY_PALETTE,
 }
 const GEOMETRY_SUBMODULES := ["Sampling", "Seeding", "Meshing"]
 const STYLE_SUBMODULES := ["Weighting"]
@@ -907,7 +908,7 @@ func _build_ui() -> void:
 	filter_grid.columns = 2
 	filter_grid.add_theme_constant_override("h_separation", 4)
 	filter_grid.add_theme_constant_override("v_separation", 0)
-	for asset_type in WorldDocumentService.SINGLE_ASSET_TYPES:
+	for asset_type in WorldDocumentService.ASSET_TYPES:
 		var type_checkbox := CheckBox.new()
 		type_checkbox.text = asset_type.capitalize()
 		type_checkbox.button_pressed = bool(outliner_asset_type_filters.get(asset_type, true))
@@ -2478,8 +2479,8 @@ func _save_world() -> void:
 			"components": [],
 			"groups": [],
 			"guides": [],
-			"palette_variants": WorldDocumentService.palette_variants(asset),
-			"variant_asset_type": WorldDocumentService.palette_variant_type(asset)
+			"asset_category": WorldDocumentService.asset_category(asset),
+			"palette_variants": WorldDocumentService.palette_variants(asset)
 		}
 		for group in asset.get("groups", []):
 			asset_data["groups"].append({
@@ -3097,8 +3098,8 @@ func _restore_editor_state(state, source_schema_version := WorldDocumentService.
 		# A member Asset opens in the module of the composition that owns it,
 		# because that is where it is listed and authored.
 		var restored_owner_id := str(_composition_owner_by_member_id().get(selected_asset_id, ""))
-		requested_create_submodule = _asset_type_create_submodule(_asset_type(
-			_get_asset(restored_owner_id if not restored_owner_id.is_empty() else selected_asset_id)))
+		requested_create_submodule = _asset_create_submodule(
+			_get_asset(restored_owner_id if not restored_owner_id.is_empty() else selected_asset_id))
 	_set_create_submodule_context(requested_create_submodule)
 	var requested_geometry_submodule := str(state.get("active_geometry_submodule", "Sampling"))
 	var requested_style_submodule := str(state.get("active_style_submodule", "Weighting"))
@@ -6143,29 +6144,28 @@ func _new_asset_dialog_title(composition_owner_id: String) -> String:
 
 
 func _new_asset_dialog_offers_a_type(composition_owner_id: String) -> bool:
-	# A Set member answers for its own category, so a Set may mix types. Every
-	# variant of a Palette shares the Palette's one category, which is why the
-	# Palette is where that category is chosen and a variant is not asked again.
-	var owner := _get_asset(composition_owner_id)
-	if WorldDocumentService.is_palette_asset(owner):
-		return false
-	if WorldDocumentService.is_set_asset(owner):
-		return true
-	return active_create_submodule in ["Single", "Palette"]
+	# Everything answers for its own type — a Bridge is props and a Set, a
+	# member answers separately, which is why a Set may mix types. The one
+	# exception is a variant: its Palette already declared the type they share.
+	return not WorldDocumentService.is_palette_asset(_get_asset(composition_owner_id))
 
 
 func _new_asset_type(composition_owner_id: String) -> String:
-	# The module fixes the composition; the dialog fixes the category. A member
-	# or variant is an ordinary Asset whatever module it was authored from, and
-	# a variant takes the one category its Palette declares.
+	# The dialog fixes the category, except for a variant, which takes the one
+	# its Palette already has.
 	var owner := _get_asset(composition_owner_id)
 	if WorldDocumentService.is_palette_asset(owner):
-		return WorldDocumentService.palette_variant_type(owner)
-	if composition_owner_id.is_empty() and active_create_submodule == "Set":
-		return WorldDocumentService.ASSET_TYPE_SET
-	if composition_owner_id.is_empty() and active_create_submodule == "Palette":
-		return WorldDocumentService.ASSET_TYPE_PALETTE
+		# A Grass Palette is terrain, and so is each blade.
+		return WorldDocumentService.asset_type(owner)
 	return WorldDocumentService.normalize_asset_type(new_asset_type)
+
+
+func _new_asset_category(composition_owner_id: String) -> String:
+	# The module fixes the composition. A member or a variant stands on its own
+	# whatever module it was authored from.
+	if not composition_owner_id.is_empty():
+		return WorldDocumentService.ASSET_CATEGORY_SINGLE
+	return str(ASSET_CATEGORY_BY_CREATE_SUBMODULE.get(active_create_submodule, WorldDocumentService.ASSET_CATEGORY_SINGLE))
 
 
 func _sync_new_asset_type_input() -> void:
@@ -6179,7 +6179,7 @@ func _sync_new_asset_type_input() -> void:
 
 func _asset_type_option_items() -> Array:
 	var items: Array = []
-	for asset_type in WorldDocumentService.SINGLE_ASSET_TYPES:
+	for asset_type in WorldDocumentService.ASSET_TYPES:
 		items.append({"label": _asset_type_display_name(str(asset_type)), "metadata": str(asset_type)})
 	return items
 
@@ -6266,16 +6266,13 @@ func _confirm_asset_creation() -> void:
 	if not composition_owner_id.is_empty() and not WorldDocumentService.is_composition_asset(composition_owner):
 		asset_dialog.hide()
 		return
-	var created_asset_type := _new_asset_type(composition_owner_id)
+	var created_asset_category := _new_asset_category(composition_owner_id)
 	_record_direct_change()
 	var asset_id := "asset_%d" % next_asset_id
 	next_asset_id += 1
-	var created_asset := {"id": asset_id, "name": asset_name, "asset_type": created_asset_type, "authored_facing": AssetPresentation.AuthoredFacing.NEUTRAL, "visibility": true, "asset_pivot": Vector2.ZERO, "root_position": Vector2.ZERO, "root_scale": Vector2.ONE, "reference_image": WorldDocumentService.default_reference_image(), "animation": MotionWorkspace.create_default_animation_document(), "components": [], "groups": [], "guides": []}
-	if created_asset_type == WorldDocumentService.ASSET_TYPE_PALETTE:
-		# The one category every variant of this Palette will have, chosen where
-		# the Palette is named because a variant is never asked again.
+	var created_asset := {"id": asset_id, "name": asset_name, "asset_type": _new_asset_type(composition_owner_id), "asset_category": created_asset_category, "authored_facing": AssetPresentation.AuthoredFacing.NEUTRAL, "visibility": true, "asset_pivot": Vector2.ZERO, "root_position": Vector2.ZERO, "root_scale": Vector2.ONE, "reference_image": WorldDocumentService.default_reference_image(), "animation": MotionWorkspace.create_default_animation_document(), "components": [], "groups": [], "guides": []}
+	if created_asset_category == WorldDocumentService.ASSET_CATEGORY_PALETTE:
 		created_asset["palette_variants"] = [] as Array[String]
-		created_asset["variant_asset_type"] = WorldDocumentService.normalize_variant_asset_type(new_asset_type)
 	assets.append(created_asset)
 	selected_asset_id = asset_id
 	selected_component_id = ""
@@ -6634,7 +6631,7 @@ func _render_outliner() -> void:
 	outliner_view.set_documents(assets, motion_paths, motion_sequences)
 	outliner_view.set_module(active_module, active_create_submodule, active_geometry_submodule, active_motion_submodule)
 	outliner_view.set_selection(selected_asset_id, selected_component_id, selected_component_ids, selected_group_id, selected_guide_id, selected_motion_path_id, selected_motion_sequence_id, selected_weighting_style_id, motion_act_preview_asset_id)
-	outliner_view.set_filters(outliner_search_input.text.strip_edges().to_lower() if is_instance_valid(outliner_search_input) else "", _outliner_module_asset_type_filters(), _composition_owner_by_member_id())
+	outliner_view.set_filters(outliner_search_input.text.strip_edges().to_lower() if is_instance_valid(outliner_search_input) else "", outliner_asset_type_filters, _composition_owner_by_member_id(), _create_module_asset_category())
 	outliner_view.set_expansion(expanded_assets, _outliner_focus_asset_id())
 	outliner_view.set_row_status(_outliner_row_status())
 	outliner_view.set_geometry_rows(_geometry_outliner_rows())
@@ -6877,15 +6874,11 @@ func _outliner_drop_data_from_view(asset_id: String, target_id: String, payload:
 	_outliner_drop_data(Vector2.ZERO, payload, asset_id, target_id)
 
 
-func _outliner_module_asset_type_filters() -> Dictionary:
-	# The Outliner applies one rule: does this Asset's type pass the filter it
-	# was handed. The Set module has no checkbox row of its own, so it is handed
-	# the single type it lists.
-	if active_module == "Create" and active_create_submodule == "Set":
-		return {WorldDocumentService.ASSET_TYPE_SET: true}
-	if active_module == "Create" and active_create_submodule == "Palette":
-		return {WorldDocumentService.ASSET_TYPE_PALETTE: true}
-	return outliner_asset_type_filters
+func _create_module_asset_category() -> String:
+	# Which composition the active Create module lists. The seven-type filter is
+	# a separate question and applies inside Single only, which is also the one
+	# module that shows it.
+	return str(ASSET_CATEGORY_BY_CREATE_SUBMODULE.get(active_create_submodule, WorldDocumentService.ASSET_CATEGORY_SINGLE))
 
 
 func _update_outliner_asset_type_filter_visibility() -> void:
@@ -6896,7 +6889,7 @@ func _update_outliner_asset_type_filter_visibility() -> void:
 
 static func _default_outliner_asset_type_filters() -> Dictionary:
 	var filters: Dictionary = {}
-	for asset_type in WorldDocumentService.SINGLE_ASSET_TYPES:
+	for asset_type in WorldDocumentService.ASSET_TYPES:
 		filters[asset_type] = true
 	return filters
 
@@ -12985,12 +12978,11 @@ func _asset_type(asset: Dictionary) -> String:
 	return WorldDocumentService.asset_type(asset)
 
 
-func _asset_type_create_submodule(asset_type: String) -> String:
-	# The Create module an Asset belongs to. Every one of the seven Asset types
-	# is a Single: they are one Asset implementation, and search plus the
-	# Outliner Asset filter select among them, so they no longer need a module
-	# each. The table is what later composition types extend.
-	return str(CREATE_SUBMODULE_BY_ASSET_TYPE.get(WorldDocumentService.normalize_asset_type(asset_type), "Single"))
+func _asset_create_submodule(asset: Dictionary) -> String:
+	# The Create module an Asset belongs to, which is its composition. Its
+	# category is a separate question that only Single asks, through search and
+	# the Outliner Asset filter.
+	return str(CREATE_SUBMODULE_BY_ASSET_CATEGORY.get(WorldDocumentService.asset_category(asset), "Single"))
 
 
 func _normalized_create_submodule(submodule: String) -> String:
@@ -13000,7 +12992,7 @@ func _normalized_create_submodule(submodule: String) -> String:
 
 
 func _asset_matches_create_submodule(asset: Dictionary) -> bool:
-	if _asset_type_create_submodule(_asset_type(asset)) != active_create_submodule:
+	if _asset_create_submodule(asset) != active_create_submodule:
 		return false
 	# Single lists what is placed on its own. An Asset a composition already
 	# owns is reached through that composition instead, so it is not offered
@@ -13036,7 +13028,7 @@ func _create_submodule_for_asset(asset_id: String) -> String:
 	if active_module == "Create" and active_create_submodule != "Single" \
 		and _composition_owner_by_member_id().has(asset_id):
 		return active_create_submodule
-	return _asset_type_create_submodule(_asset_type(_get_asset(asset_id)))
+	return _asset_create_submodule(_get_asset(asset_id))
 
 
 func _outliner_expansion_anchor_asset_id(asset_id: String) -> String:

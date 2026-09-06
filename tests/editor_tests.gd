@@ -241,11 +241,12 @@ func _test_set_composition() -> void:
 	application._select_submodule("Create", "Set", create_section)
 	_expect(application.active_create_submodule == "Set" and application.create_action_button.text == "Create Set" and not application.outliner_asset_type_filter_panel.visible, "The Set module should create Sets and hide the seven-type Asset filter, which does not describe them.")
 	application.asset_dialog.set_meta("composition_owner_id", "")
+	application.new_asset_type = "props"
 	application.asset_name_input.text = "Bridge"
 	application._confirm_asset_creation()
 	var bridge: Dictionary = application.assets[-1]
 	var bridge_id := str(bridge.get("id", ""))
-	_expect(WorldDocumentService.is_set_asset(bridge) and application._asset_type_create_submodule(WorldDocumentService.asset_type(bridge)) == "Set", "Creating from the Set module should persist the stable set Asset type.")
+	_expect(WorldDocumentService.is_set_asset(bridge) and WorldDocumentService.asset_type(bridge) == "props" and application._asset_create_submodule(bridge) == "Set", "Creating from the Set module should persist the set category while the Asset keeps a type of its own.")
 	# The primary path: Add makes a member. The member is an ordinary Asset, and
 	# the Reference that carries it into the assembly is named after it.
 	var rail_member_id := _create_set_member(application, bridge_id, "Rope Rail", "props")
@@ -330,19 +331,19 @@ func _test_palette_composition() -> void:
 	var create_section: ModuleSection = application._find_section("Create")
 	application._select_submodule("Create", "Palette", create_section)
 	_expect(application.active_create_submodule == "Palette" and application.create_action_button.text == "Create Palette" and not application.outliner_asset_type_filter_panel.visible, "The Palette module should create Palettes and hide the seven-type Asset filter.")
-	_expect(application._new_asset_dialog_offers_a_type("") and application._new_asset_dialog_title("") == "New Palette", "A Palette declares the one category of its variants where it is named.")
+	_expect(application._new_asset_dialog_offers_a_type("") and application._new_asset_dialog_title("") == "New Palette", "A Palette declares the type of its variants where it is named.")
 	application.asset_dialog.set_meta("composition_owner_id", "")
 	application.new_asset_type = WorldDocumentService.ASSET_TYPE_TERRAIN
 	application.asset_name_input.text = "Grass"
 	application._confirm_asset_creation()
 	var palette: Dictionary = application.assets[-1]
 	var palette_id := str(palette.get("id", ""))
-	_expect(WorldDocumentService.is_palette_asset(palette) and WorldDocumentService.palette_variant_type(palette) == "terrain" and WorldDocumentService.palette_variants(palette).is_empty(), "A new Palette should carry its variant category and start empty.")
-	_expect(not application._new_asset_dialog_offers_a_type(palette_id) and application._new_asset_dialog_title(palette_id) == "New Variant Asset", "A variant is never asked for a category, because its Palette already declared one.")
+	_expect(WorldDocumentService.is_palette_asset(palette) and WorldDocumentService.asset_type(palette) == "terrain" and WorldDocumentService.palette_variants(palette).is_empty(), "A new Palette should carry the type its variants will share and start empty.")
+	_expect(not application._new_asset_dialog_offers_a_type(palette_id) and application._new_asset_dialog_title(palette_id) == "New Variant Asset", "A variant is never asked for a type, because its Palette already declared one.")
 	var first_variant_id := _create_palette_variant(application, palette_id, "Grass01")
 	var second_variant_id := _create_palette_variant(application, palette_id, "Grass02")
 	_expect(WorldDocumentService.palette_variants(palette) == [first_variant_id, second_variant_id], "Adding a variant should append its Asset ID to the Palette's list.")
-	_expect(str(application._get_asset(first_variant_id).get("asset_type", "")) == "terrain" and application._get_asset(first_variant_id).get("components", []).is_empty(), "A variant should be an ordinary Asset of the Palette's category, ready for its Components.")
+	_expect(str(application._get_asset(first_variant_id).get("asset_type", "")) == "terrain" and str(application._get_asset(first_variant_id).get("asset_category", "")) == "single" and application._get_asset(first_variant_id).get("components", []).is_empty(), "A variant should be an ordinary Asset of the Palette's type, ready for its Components.")
 	_expect(application.selected_asset_id == palette_id, "Adding a variant should leave the Palette selected.")
 	# A variant carries no Reference, no transform and no order: the list is all
 	# there is.
@@ -1458,7 +1459,8 @@ func _outliner_wiring_assets() -> Array[Dictionary]:
 		{"id": "asset_3", "name": "Rope Post", "visibility": true, "asset_type": "props",
 			"components": [member_body, member_region], "groups": [], "guides": []},
 		{"id": "asset_4", "name": "Bridge", "visibility": true,
-			"asset_type": WorldDocumentService.ASSET_TYPE_SET,
+			"asset_type": WorldDocumentService.ASSET_TYPE_PROPS,
+			"asset_category": WorldDocumentService.ASSET_CATEGORY_SET,
 			"components": [member_reference], "groups": [], "guides": []},
 	] as Array[Dictionary]
 
@@ -1873,8 +1875,8 @@ func _create_wiring_palette() -> Dictionary:
 	# A Palette is a list and one category, nothing else. One variant resolves
 	# and one no longer exists, so both row forms are drawn.
 	return {"id": "asset_10", "name": "Grass", "visibility": true,
-		"asset_type": WorldDocumentService.ASSET_TYPE_PALETTE,
-		"variant_asset_type": WorldDocumentService.ASSET_TYPE_TERRAIN,
+		"asset_type": WorldDocumentService.ASSET_TYPE_TERRAIN,
+		"asset_category": WorldDocumentService.ASSET_CATEGORY_PALETTE,
 		"palette_variants": ["asset_1", "asset_gone"],
 		"components": [], "groups": [], "guides": [],
 		"asset_pivot": Vector2.ZERO, "root_position": Vector2.ZERO, "root_scale": Vector2.ONE}
@@ -1887,7 +1889,8 @@ func _create_wiring_set() -> Dictionary:
 	member.merge({"type": "reference", "source_asset_id": "asset_1", "role": "rope_post",
 		"points": [], "edges": [], "chains": []}, true)
 	return {"id": "asset_9", "name": "Bridge", "visibility": true,
-		"asset_type": WorldDocumentService.ASSET_TYPE_SET,
+		"asset_type": WorldDocumentService.ASSET_TYPE_PROPS,
+		"asset_category": WorldDocumentService.ASSET_CATEGORY_SET,
 		"components": [member], "groups": [], "guides": [],
 		"asset_pivot": Vector2.ZERO, "root_position": Vector2.ZERO, "root_scale": Vector2.ONE}
 

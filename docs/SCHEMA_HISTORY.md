@@ -59,10 +59,12 @@ fingerprints.
 | 65 | `palette` Asset type; `palette_variants` and `variant_asset_type` | additive (missing list reads empty, missing category reads `character`) | `normalize_asset_type`, `normalized_palette_variants`, `normalize_variant_asset_type` | `_test_palette_composition`, `_test_asset_deserialization_migrations` |
 | Manifest 16 | `contour_stroke_mesh`, `closed_region_mesh`, Attachment Frames, `projection_depth_corners`, `regions` | derived | `RuntimeExportService` | `_test_runtime_export_service` |
 | Manifest 17 | required `role` on every `asset_reference`; Palette Manifests with `variants` and `variant_asset_type` | derived | `RuntimeExportService` | `_test_runtime_export_service` |
+| 66 | `asset_category` beside `asset_type`; `variant_asset_type` retired | **explicit** (< 66) | `deserialize_asset_category` | `_test_asset_deserialization_migrations` |
+| Manifest 18, Catalog 2 | `asset_category` on every Manifest and Catalog entry; `variant_asset_type` gone | derived | `RuntimeExportService`, `AssetCatalogService` | `_test_runtime_export_service`, `_test_asset_catalog_service` |
 | Sampling 6 | Junction-aware Cuts, boundary-namespaced analytic Samples, corner balancing | derived | `GeometrySamplingService` | `_test_geometry_sampling_corner_balancing` |
 | Motion 1–18 | Blink `anticipation_share` default 0.18 read as 0.5 | **explicit** (≤ 18) | `normalize_motion_act` | `_test_asset_deserialization_migrations` |
 
-Only five steps are explicit. Every other legacy form is recognized by its
+Only six steps are explicit. Every other legacy form is recognized by its
 shape or simply defaulted, which is why load-time normalization is one pass
 per document rather than a ladder of per-version functions. A row without a
 fixture is either a one-time conversion applied to the World data at the
@@ -320,6 +322,28 @@ multiplicity mean nothing among things that stand in for each other.
 Additive as well. No existing document changes: an Asset that is not a Palette
 loads with an empty variant list, and a category that is missing or names a
 composition reads `character`, the same fallback `asset_type` uses.
+
+World schema 66 separates what an Asset is from how it is composed. Schemas 64
+and 65 had put `set` and `palette` into `asset_type`, which left both without a
+category of their own: a Bridge could not also be props, and a Palette needed
+`variant_asset_type` to say what its variants were. From 66 the two are
+independent fields — `asset_type` is the seven again, `asset_category` is
+`single`, `set` or `palette` — a Bridge is props and a Set, and a Palette's own
+type is the type of every variant, so `variant_asset_type` is gone.
+
+This is the explicit step of the series. Below 66 an `asset_type` of `set` or
+`palette` is read as the category; the type it displaced cannot be recovered
+and falls back to `character` the way a missing type always has, so a Set or
+Palette authored under 64 or 65 loads as a Character and is corrected in the
+Inspector. From 66 on neither field substitutes for the other. Every Asset that
+never was a composition is untouched: it keeps its type and reads `single`.
+
+Runtime Manifest schema 18 and Asset Catalog schema 2 carry the pair across the
+boundary. Every Manifest and every Catalog entry has both `asset_type` and
+`asset_category`, so a consumer can tell a Palette from a placeable Asset
+without opening its package, and `bridge` and `grass` keep the types world01
+already expects. `variant_asset_type` is gone from the Manifest with the field
+itself.
 
 Runtime Manifest schema 17 carries what the two compositions must say across
 the boundary, and nothing more. An `asset_reference` gains a required

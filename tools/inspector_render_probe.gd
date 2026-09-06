@@ -147,13 +147,14 @@ func _init() -> void:
 			"components": [hole_source], "groups": [], "guides": []}]
 	# A Palette is a list and one category: one variant resolves, one is gone.
 	var palette_asset := {"id": "asset_4", "name": "Grass", "visibility": true,
-		"asset_type": WorldDocumentService.ASSET_TYPE_PALETTE,
-		"variant_asset_type": WorldDocumentService.ASSET_TYPE_TERRAIN,
+		"asset_type": WorldDocumentService.ASSET_TYPE_TERRAIN,
+		"asset_category": WorldDocumentService.ASSET_CATEGORY_PALETTE,
 		"palette_variants": ["asset_2", "asset_gone"],
 		"components": [], "groups": [], "guides": [],
 		"asset_pivot": Vector2.ZERO, "root_position": Vector2.ZERO, "root_scale": Vector2.ONE}
 	var set_asset := {"id": "asset_3", "name": "Bridge", "visibility": true,
-		"asset_type": WorldDocumentService.ASSET_TYPE_SET,
+		"asset_type": WorldDocumentService.ASSET_TYPE_PROPS,
+		"asset_category": WorldDocumentService.ASSET_CATEGORY_SET,
 		"components": [set_member], "groups": [], "guides": [],
 		"asset_pivot": Vector2.ZERO, "root_position": Vector2.ZERO, "root_scale": Vector2.ONE}
 	app.assets = assets

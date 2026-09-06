@@ -171,25 +171,26 @@ func rebuild() -> void:
 		add_child(asset_name_editor)
 		# The one Create view does not carry the type any more, so the Asset
 		# root is where it is read and changed.
+		# What the Asset is, and separately how it is composed. A Set is props
+		# and a Set; a Palette is terrain and a Palette, which is also the type
+		# of every one of its variants.
 		add_child(EditorWidgets.create_inspector_field_label("Asset Type"))
+		var asset_type_items: Array = []
+		for asset_type in WorldDocumentService.ASSET_TYPES:
+			asset_type_items.append({"label": asset_type.capitalize(), "metadata": asset_type})
+		asset_type_option = EditorWidgets.create_option_field(asset_type_items,
+			WorldDocumentService.asset_type(asset), asset_type_selected.emit)
+		add_child(asset_type_option)
 		if WorldDocumentService.is_composition_asset(asset):
-			# A composition is not a category to switch: changing it would leave
-			# its members or variants in an Asset with no place for them.
+			# The composition is not a choice to switch: changing it would leave
+			# members or variants in an Asset with no place for them.
+			add_child(EditorWidgets.create_inspector_field_label("Composition"))
 			add_child(EditorWidgets.create_inspector_field_label(
-				"Palette" if WorldDocumentService.is_palette_asset(asset) else "Set"))
-		else:
-			var asset_type_items: Array = []
-			for asset_type in WorldDocumentService.SINGLE_ASSET_TYPES:
-				asset_type_items.append({"label": asset_type.capitalize(), "metadata": asset_type})
-			asset_type_option = EditorWidgets.create_option_field(asset_type_items,
-				WorldDocumentService.asset_type(asset), asset_type_selected.emit)
-			add_child(asset_type_option)
+				WorldDocumentService.asset_category(asset).capitalize()))
 		if WorldDocumentService.is_palette_asset(asset):
 			# A Palette has no geometry, no pose and no arrangement. What it has
-			# is one category and the variants that may stand in for each other.
-			add_child(EditorWidgets.create_inspector_field_label("Variant Type"))
-			add_child(EditorWidgets.create_inspector_field_label(
-				WorldDocumentService.palette_variant_type(asset).capitalize()))
+			# is the variants that may stand in for one another, all of its own
+			# Asset Type.
 			_render_palette_variants()
 			return
 		add_child(EditorWidgets.create_inspector_section("Initial Pose", section_toggled.emit))

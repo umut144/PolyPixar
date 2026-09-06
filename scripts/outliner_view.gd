@@ -56,6 +56,7 @@ var motion_act_preview_asset_id := ""
 var expanded_assets: Dictionary = {}
 var outliner_asset_type_filters: Dictionary = {}
 var composition_member_asset_ids: Dictionary = {}
+var create_asset_category := "single"
 var search_text := ""
 var focus_asset_id := ""
 # Derived state the rows display, computed by main.gd so this view never has to
@@ -101,12 +102,14 @@ func set_selection(asset_id: String, component_id: String, component_ids: Array,
 	motion_act_preview_asset_id = act_preview_asset_id
 
 
-func set_filters(text: String, asset_type_filters: Dictionary, composition_member_ids := {}) -> void:
+func set_filters(text: String, asset_type_filters: Dictionary, composition_member_ids := {}, asset_category := "single") -> void:
 	search_text = text
 	outliner_asset_type_filters = asset_type_filters
 	# Which Assets a composition already owns. main.gd resolves it, because it
 	# is a question about every Asset rather than about the one being drawn.
 	composition_member_asset_ids = composition_member_ids
+	# Which composition the active Create module lists.
+	create_asset_category = asset_category
 
 
 func set_expansion(expansion: Dictionary, focused_asset_id: String) -> void:
@@ -175,11 +178,16 @@ func rebuild() -> void:
 			self.add_child(EditorWidgets.create_inspector_field_label("%s authoring will be introduced in a later phase." % active_geometry_submodule))
 		return
 	if active_module == "Create" and active_create_submodule in CREATE_SUBMODULES:
-		# The seven Asset types share one view. The Asset filter and the search
-		# select among them; the view itself tests only what main.gd pushed in.
+		# The module lists one composition. Within Single, where the seven types
+		# share one view, the Asset filter and the search select among them.
+		var lists_singles := create_asset_category == WorldDocumentService.ASSET_CATEGORY_SINGLE
 		var visible_assets: Array = []
 		for asset in assets:
-			if asset_is_visible(asset) and asset_type_filter_matches(asset) and not composition_member_asset_ids.has(str(asset.get("id", ""))) and asset_matches_search(asset, search_text):
+			if WorldDocumentService.asset_category(asset) != create_asset_category:
+				continue
+			if lists_singles and not asset_type_filter_matches(asset):
+				continue
+			if asset_is_visible(asset) and not composition_member_asset_ids.has(str(asset.get("id", ""))) and asset_matches_search(asset, search_text):
 				visible_assets.append(asset)
 		visible_assets.sort_custom(WorldDocumentService.sort_named_documents)
 		self.add_child(EditorWidgets.create_outliner_group_label(str(CREATE_GROUP_LABELS.get(active_create_submodule, "Assets"))))

@@ -1,7 +1,7 @@
 class_name RuntimeExportService
 extends RefCounted
 
-const MANIFEST_SCHEMA_VERSION := 17
+const MANIFEST_SCHEMA_VERSION := 18
 const DEFAULT_PROJECTION_DEPTH_CM := 10.0
 static func build_manifest(asset: Dictionary, sources: Dictionary, palette_variants: Array = []) -> Dictionary:
 	if WorldDocumentService.is_palette_asset(asset):
@@ -101,7 +101,8 @@ static func build_manifest(asset: Dictionary, sources: Dictionary, palette_varia
 		"schema_version": MANIFEST_SCHEMA_VERSION,
 		"asset_key": asset_key,
 		"display_name": str(asset.get("name", asset_id)),
-		"asset_type": str(asset.get("asset_type", WorldDocumentService.ASSET_TYPE_CHARACTER)),
+		"asset_type": WorldDocumentService.asset_type(asset),
+		"asset_category": WorldDocumentService.asset_category(asset),
 		"presentation": {
 			"authored_facing": AssetPresentation.serialize_authored_facing(asset.get("authored_facing", AssetPresentation.AuthoredFacing.NEUTRAL))
 		},
@@ -128,7 +129,8 @@ static func _build_palette_manifest(asset: Dictionary, palette_variants: Array) 
 		errors.append("Asset name does not derive a usable lower_snake_case Asset Key.")
 	if not bool(asset.get("visibility", true)):
 		errors.append("The Asset is hidden.")
-	var variant_type := WorldDocumentService.palette_variant_type(asset)
+	# Every variant is an Asset of the Palette's own type.
+	var variant_type := WorldDocumentService.asset_type(asset)
 	var variant_keys: Array = []
 	var seen_keys: Dictionary = {}
 	for raw_variant in palette_variants:
@@ -151,7 +153,7 @@ static func _build_palette_manifest(asset: Dictionary, palette_variants: Array) 
 			errors.append("Variant Asset Key '%s' is duplicated." % variant_key)
 			continue
 		if str(variant.get("asset_type", "")) != variant_type:
-			errors.append("Variant '%s' is not a %s; every variant of a Palette shares its one category." % [label, variant_type])
+			errors.append("Variant '%s' is not a %s; every variant shares its Palette's Asset type." % [label, variant_type])
 			continue
 		# A variant is chosen by the presentation alone, so it may not carry
 		# anything the simulation would have to agree on. This is checked here
@@ -173,8 +175,8 @@ static func _build_palette_manifest(asset: Dictionary, palette_variants: Array) 
 		"schema_version": MANIFEST_SCHEMA_VERSION,
 		"asset_key": asset_key,
 		"display_name": str(asset.get("name", "")),
-		"asset_type": WorldDocumentService.ASSET_TYPE_PALETTE,
-		"variant_asset_type": variant_type,
+		"asset_type": variant_type,
+		"asset_category": WorldDocumentService.ASSET_CATEGORY_PALETTE,
 		"variants": variant_keys,
 		"presentation": {
 			"authored_facing": AssetPresentation.serialize_authored_facing(asset.get("authored_facing", AssetPresentation.AuthoredFacing.NEUTRAL))
@@ -518,8 +520,8 @@ static func _palette_manifest_validation_issues(manifest: Dictionary) -> Array[S
 	# A Palette Manifest is the one shape without geometry: a category and the
 	# Keys that substitute for one another.
 	var errors: Array[String] = []
-	if str(manifest.get("variant_asset_type", "")) not in WorldDocumentService.SINGLE_ASSET_TYPES:
-		errors.append("A Palette Manifest requires the one ordinary Asset type its variants share.")
+	if str(manifest.get("asset_type", "")) not in WorldDocumentService.ASSET_TYPES:
+		errors.append("A Palette Manifest requires the Asset type it shares with its variants.")
 	var variants = manifest.get("variants", null)
 	if not variants is Array or variants.is_empty():
 		errors.append("A Palette Manifest requires a non-empty variants array.")
@@ -544,11 +546,16 @@ static func manifest_validation_issues(manifest: Dictionary) -> Array[String]:
 	if str(manifest.get("asset_key", "")).is_empty() or not manifest.get("components", null) is Array:
 		errors.append("Runtime Manifest requires an Asset Key and Component array.")
 		return errors
-	if str(manifest.get("asset_type", "")) == WorldDocumentService.ASSET_TYPE_PALETTE:
+	if str(manifest.get("asset_category", "")) not in WorldDocumentService.ASSET_CATEGORIES:
+		errors.append("Runtime Manifest requires a stable Asset category.")
+		return errors
+	if str(manifest.get("asset_category", "")) == WorldDocumentService.ASSET_CATEGORY_PALETTE:
 		errors.append_array(_palette_manifest_validation_issues(manifest))
 		return errors
-	if manifest.has("variants") or manifest.has("variant_asset_type"):
+	if manifest.has("variants"):
 		errors.append("Only a Palette Manifest carries variants.")
+	if str(manifest.get("asset_type", "")) not in WorldDocumentService.ASSET_TYPES:
+		errors.append("Runtime Manifest requires a stable Asset type.")
 	if not manifest.get("attachment_frames", null) is Array:
 		errors.append("Runtime Manifest schema %d requires an attachment_frames array." % MANIFEST_SCHEMA_VERSION)
 		return errors

@@ -124,7 +124,7 @@ func _test_asset_deserialization_migrations() -> void:
 	# Schema 64 is additive: a Reference without a role loads with none, which
 	# Runtime Export reads as the member's own Asset Key.
 	var references := {"schema_version": WorldDocumentService.SCHEMA_VERSION, "id": "asset_set",
-		"asset_type": WorldDocumentService.ASSET_TYPE_SET,
+		"asset_category": WorldDocumentService.ASSET_CATEGORY_SET,
 		"components": [
 			{"id": "component_1", "name": "post_left", "type": "reference",
 				"source_asset_id": "asset_post", "role": " Rope_Post ", "points": [], "edges": [], "chains": []},
@@ -141,22 +141,38 @@ func _test_asset_deserialization_migrations() -> void:
 	# Schema 65 is additive too: a Palette is a list plus the one category its
 	# variants share, and an Asset that is neither loads with neither.
 	var palette := {"schema_version": WorldDocumentService.SCHEMA_VERSION, "id": "asset_grass",
-		"asset_type": WorldDocumentService.ASSET_TYPE_PALETTE,
-		"variant_asset_type": "terrain",
+		"asset_type": "terrain",
+		"asset_category": WorldDocumentService.ASSET_CATEGORY_PALETTE,
 		"palette_variants": ["asset_1", " asset_2 ", "asset_1", ""],
 		"components": []}
 	var palette_asset: Dictionary = WorldDocumentService.deserialize_asset(palette, "asset_grass")
 	_expect(WorldDocumentService.is_palette_asset(palette_asset)
-		and WorldDocumentService.palette_variant_type(palette_asset) == "terrain"
+		and WorldDocumentService.asset_type(palette_asset) == "terrain"
 		and WorldDocumentService.palette_variants(palette_asset) == ["asset_1", "asset_2"],
 		"A Palette should load with its category and a variant list without blanks or repeats.")
 	var invalid_palette: Dictionary = WorldDocumentService.deserialize_asset(
 		{"schema_version": WorldDocumentService.SCHEMA_VERSION, "id": "asset_odd",
-			"asset_type": WorldDocumentService.ASSET_TYPE_PALETTE,
-			"variant_asset_type": WorldDocumentService.ASSET_TYPE_SET, "components": []}, "asset_odd")
-	_expect(WorldDocumentService.palette_variant_type(invalid_palette) == "character"
+			"asset_category": WorldDocumentService.ASSET_CATEGORY_PALETTE,
+			"asset_type": "set", "components": []}, "asset_odd")
+	_expect(WorldDocumentService.asset_type(invalid_palette) == "character"
 		and WorldDocumentService.palette_variants(invalid_palette).is_empty(),
-		"A variant category is an ordinary Asset type, never a composition, and a missing list loads empty.")
+		"A composition name is not an Asset type, so it falls back like any other invalid one, and a missing variant list loads empty.")
+
+	# Schema 66 separated the two fields. Below it the composition sat in
+	# asset_type and displaced the category, which cannot be recovered.
+	var legacy_set: Dictionary = WorldDocumentService.deserialize_asset(
+		{"schema_version": 65, "id": "asset_bridge", "asset_type": "set", "components": []}, "asset_bridge")
+	_expect(WorldDocumentService.is_set_asset(legacy_set) and WorldDocumentService.asset_type(legacy_set) == "character",
+		"A Set written below schema 66 should load as a Set whose displaced type falls back to Character.")
+	var current_set: Dictionary = WorldDocumentService.deserialize_asset(
+		{"schema_version": WorldDocumentService.SCHEMA_VERSION, "id": "asset_bridge", "asset_type": "set",
+			"asset_category": WorldDocumentService.ASSET_CATEGORY_SET, "components": []}, "asset_bridge")
+	_expect(WorldDocumentService.is_set_asset(current_set) and WorldDocumentService.asset_type(current_set) == "character",
+		"From schema 66 on the category comes from its own field and an invalid type is not read as one.")
+	var current_single: Dictionary = WorldDocumentService.deserialize_asset(
+		{"schema_version": WorldDocumentService.SCHEMA_VERSION, "id": "asset_plank", "asset_type": "props", "components": []}, "asset_plank")
+	_expect(WorldDocumentService.asset_category(current_single) == "single" and WorldDocumentService.asset_type(current_single) == "props",
+		"An Asset that never was a composition keeps its type and reads single.")
 
 	var blink := {"schema_version": 18, "id": "act_1", "primitive": MotionActEvaluator.BLINK,
 		"parameters": {"anticipation_share": 0.18}}
@@ -221,11 +237,13 @@ func _test_asset_catalog_service() -> void:
 	var build := AssetCatalogService.build_catalog("world01", "Secrets, Room's & Travels'", assets)
 	var catalog: Dictionary = build.get("catalog", {})
 	var entries: Array = catalog.get("assets", [])
-	_expect(bool(build.get("valid", false)) and int(catalog.get("schema_version", 0)) == 1 and str(catalog.get("world_key", "")) == "world01", "Every World should derive an independently versioned Asset Catalog.")
+	_expect(bool(build.get("valid", false)) and int(catalog.get("schema_version", 0)) == AssetCatalogService.CATALOG_SCHEMA_VERSION and str(catalog.get("world_key", "")) == "world01", "Every World should derive an independently versioned Asset Catalog.")
 	_expect(entries.size() == 3 and str(entries[0].get("asset_key", "")) == "ancient_orb" and str(entries[2].get("asset_key", "")) == "orb", "Catalog entries should be sorted alphabetically by Asset Key.")
 	_expect(not JSON.stringify(catalog).contains("asset_id") and str(entries[1].get("runtime_package", "")) == "PolyToolsRuntimeExports/magic_orb/manifest.json", "The public Asset Catalog should expose key-based package paths without internal Asset IDs.")
 	var item_catalog: Dictionary = AssetCatalogService.build_catalog("world01", "World", [{"id": "potion", "name": "Potion", "asset_type": "items", "visibility": true}]).get("catalog", {})
-	_expect(str(item_catalog.get("assets", [])[0].get("asset_type", "")) == "items", "The public Asset Catalog should retain the stable Items Asset type.")
+	_expect(str(item_catalog.get("assets", [])[0].get("asset_type", "")) == "items" and str(item_catalog.get("assets", [])[0].get("asset_category", "")) == "single", "The public Asset Catalog should retain the stable Items Asset type and say how the Asset is composed.")
+	var palette_catalog: Dictionary = AssetCatalogService.build_catalog("world01", "World", [{"id": "grass", "name": "Grass", "asset_type": "terrain", "asset_category": "palette", "visibility": true}]).get("catalog", {})
+	_expect(str(palette_catalog.get("assets", [])[0].get("asset_type", "")) == "terrain" and str(palette_catalog.get("assets", [])[0].get("asset_category", "")) == "palette", "A Palette should be recognisable from the Catalog alone, without opening its package.")
 	var collision_assets: Array[Dictionary] = assets.duplicate(true)
 	collision_assets.append({"id": "internal_4", "name": "Magic-Orb", "asset_type": "props", "visibility": false})
 	_expect(not bool(AssetCatalogService.build_catalog("world01", "World", collision_assets).get("valid", true)), "Asset Key collisions should be rejected even when one conflicting Asset is hidden.")
@@ -587,7 +605,7 @@ func _test_runtime_export_file_service() -> void:
 		"Without a World root the service should resolve no paths at all.")
 
 	# Catalog: missing, written, unchanged, changed.
-	var catalog := {"schema_version": 1, "world_key": "test_world", "world_name": "Test World", "assets": []}
+	var catalog := {"schema_version": AssetCatalogService.CATALOG_SCHEMA_VERSION, "world_key": "test_world", "world_name": "Test World", "assets": []}
 	_expect(RuntimeExportFileService.catalog_is_stale(world_root, catalog),
 		"A Catalog that has never been written should be stale.")
 	_expect(RuntimeExportFileService.write_catalog(world_root, catalog),
@@ -888,8 +906,8 @@ func _test_runtime_export_service() -> void:
 	# else; a variant that carries gameplay data invalidates the Palette rather
 	# than itself.
 	var palette_asset := {"id": "grass", "name": "Grass", "visibility": true,
-		"asset_type": WorldDocumentService.ASSET_TYPE_PALETTE,
-		"variant_asset_type": WorldDocumentService.ASSET_TYPE_TERRAIN,
+		"asset_type": WorldDocumentService.ASSET_TYPE_TERRAIN,
+		"asset_category": WorldDocumentService.ASSET_CATEGORY_PALETTE,
 		"palette_variants": ["asset_1", "asset_2"], "components": []}
 	var variant_records: Array = [
 		{"asset_id": "asset_2", "display_name": "Grass02", "exists": true, "visible": true,
@@ -899,8 +917,8 @@ func _test_runtime_export_service() -> void:
 	]
 	var palette_result := RuntimeExportService.build_manifest(palette_asset, {}, variant_records)
 	var palette_manifest: Dictionary = palette_result.get("manifest", {})
-	_expect(bool(palette_result.get("valid", false)) and palette_manifest.get("variants", []) == ["grass01", "grass02"] and str(palette_manifest.get("variant_asset_type", "")) == "terrain" and palette_manifest.get("components", []).is_empty() and palette_manifest.get("regions", []).is_empty(), "A Palette should publish sorted variant Keys and one category, with no geometry of its own.")
-	_expect(int(palette_manifest.get("schema_version", 0)) == RuntimeExportService.MANIFEST_SCHEMA_VERSION and str(palette_manifest.get("asset_type", "")) == "palette" and palette_manifest.has("asset_pivot"), "A Palette Manifest should keep the shape every other Manifest has, minus the geometry it does not own.")
+	_expect(bool(palette_result.get("valid", false)) and palette_manifest.get("variants", []) == ["grass01", "grass02"] and str(palette_manifest.get("asset_type", "")) == "terrain" and str(palette_manifest.get("asset_category", "")) == "palette" and palette_manifest.get("components", []).is_empty() and palette_manifest.get("regions", []).is_empty(), "A Palette should publish sorted variant Keys and one category, with no geometry of its own.")
+	_expect(int(palette_manifest.get("schema_version", 0)) == RuntimeExportService.MANIFEST_SCHEMA_VERSION and palette_manifest.has("asset_pivot") and palette_manifest.has("coordinate_system") and palette_manifest.has("presentation") and palette_manifest.get("attachment_frames", []).is_empty(), "A Palette Manifest should keep the shape every other Manifest has, minus the geometry it does not own.")
 	var gameplay_variants: Array = variant_records.duplicate(true)
 	gameplay_variants[0]["region_count"] = 1
 	_expect(not bool(RuntimeExportService.build_manifest(palette_asset, {}, gameplay_variants).get("valid", true)), "A variant carrying gameplay Regions should invalidate its Palette, because the client chooses variants on its own.")

@@ -767,9 +767,9 @@ func _test_geometry_sampling_ui_shell() -> void:
 	application._on_asset_type_selected(0, application.asset_type_input)
 	_expect(str(application.assets[-1].get("asset_type", "")) == "character", "The Asset root Inspector should be able to correct an Asset type after creation.")
 	var single_modules := true
-	for asset_type in WorldDocumentService.SINGLE_ASSET_TYPES:
-		single_modules = single_modules and application._asset_type_create_submodule(str(asset_type)) == "Single"
-	_expect(WorldDocumentService.normalize_asset_type("") == "character" and single_modules and application._asset_type_create_submodule(WorldDocumentService.ASSET_TYPE_SET) == "Set" and application._normalized_create_submodule("Props") == "Single", "Missing Asset types should normalize to Character while the seven map to Single and a Set to its own module.")
+	for asset_type in WorldDocumentService.ASSET_TYPES:
+		single_modules = single_modules and application._asset_create_submodule({"asset_type": asset_type}) == "Single"
+	_expect(WorldDocumentService.normalize_asset_type("") == "character" and single_modules and application._asset_create_submodule({"asset_type": "props", "asset_category": WorldDocumentService.ASSET_CATEGORY_SET}) == "Set" and application._normalized_create_submodule("Props") == "Single", "The Asset type should say what a thing is while the category says how it is composed, and only the category selects a module.")
 	for asset in application.assets:
 		application.expanded_assets[str(asset.get("id", ""))] = false
 	var single_view_labels := _outliner_asset_labels(application)
