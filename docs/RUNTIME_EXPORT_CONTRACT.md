@@ -1,10 +1,10 @@
 # PolyTools Runtime Export Contract
 
-**Status:** Normative consumer contract for Asset Catalog schema `2` and
-runtime Manifest schema `20`.
+**Status:** Normative consumer contract for Asset Catalog schema `3` and
+runtime Manifest schema `21`.
 
 This document is the sole field-level contract for PolyTools Runtime packages.
-Manifest schema 20 replaces schema 19 and Catalog schema 2 replaces schema 1.
+Manifest schema 21 replaces schema 20 and Catalog schema 3 replaces schema 2.
 Consumers must reject older schemas; there is no SDF/Carrier/UV compatibility
 fallback.
 
@@ -28,8 +28,25 @@ the sync finds no Catalog and no packages. The Export preflight names what is
 missing — a fresh clone lists every Asset plus `World Catalog — catalog.json
 missing or stale` as pending.
 
+An Asset is published under two names, because readable and stable are two
+different jobs and one field cannot do both.
+
 `asset_key` is the deterministic lower-snake-case derivation of the complete
-Asset display name. Internal editor Asset IDs never enter the contract.
+Asset display name. It names the package directory, reads well in a log and in
+a hand-written file, and **follows a rename**: rename the Asset and the Key,
+the directory and the Catalog entry all move with it.
+
+`asset_id` is the identity. It is stable across every rename, it is opaque —
+the current `asset_N` shape is not a promise and must not be parsed — and it is
+unique within its World and never handed out twice, not even after the Asset it
+belonged to was deleted. Anything a consumer stores and expects to resolve
+later belongs on the ID; the Key belongs where a person reads it.
+
+This replaces the earlier rule that internal editor IDs never cross the
+boundary. That rule protected readability, and readability is still protected —
+by the Key, which is unchanged. What it also did, unintentionally, was make
+identity a function of a label, so every rename broke every consumer that had
+written a Key down. The ID is published to end that, not to replace the Key.
 `catalog.json` is the closed authoritative Asset set; consumers must
 not discover packages by enumerating directories. An invalid visible Asset is
 excluded from the newly published Catalog so it cannot block valid siblings;
@@ -45,25 +62,38 @@ Root Transform instead of silently changing package placement or dimensions.
 
 ## Compatibility policy
 
-Catalog `schema_version` must equal `2`; Manifest `schema_version` must equal
-`20`. Missing, non-integer, older, or newer versions are rejected as complete
+Catalog `schema_version` must equal `3`; Manifest `schema_version` must equal
+`21`. Missing, non-integer, older, or newer versions are rejected as complete
 packages. Missing required geometry is an error. Consumers must not synthesize
 Fill Meshes, strokes, closed Contour regions, Semantic Keys, hierarchy links,
 or referenced Assets.
 
-Schema 20 contains no UV, SDF, mask, contour-domain, padding, or Carrier field.
+Schema 21 contains no UV, SDF, mask, contour-domain, padding, or Carrier field.
 Its optional `regions` array contains authored or Component-bound Attack, Hurt,
 and Collision geometry; consumers may use it and must retain their Component
 fallback when it is empty.
 
 ## Catalog
 
-The Catalog requires `world_key`, `world_name`, and `assets`, sorted by
-`asset_key`. Every Asset entry requires `asset_key`, `display_name`,
-`asset_type`, `asset_category`, and the exact World-relative path
-`PolyToolsRuntimeExports/<asset_key>/manifest.json` in `runtime_package`.
-`asset_category` lets a consumer tell a Palette from a placeable Asset without
-opening its package.
+The Catalog requires `world_key`, `world_name`, `assets` sorted by `asset_key`,
+and `retired_assets`. Every Asset entry requires `asset_key`, `asset_id`,
+`previous_keys`, `display_name`, `asset_type`, `asset_category`, and the exact
+World-relative path `PolyToolsRuntimeExports/<asset_key>/manifest.json` in
+`runtime_package`. `asset_category` lets a consumer tell a Palette from a
+placeable Asset without opening its package.
+
+`previous_keys` holds the Keys an Asset carried before its current one, oldest
+first. It exists for consumers whose own files name Assets by Key on purpose —
+hand-written design data, where an opaque ID would age into a lie no tool
+refreshes. A consumer that finds a Key it does not recognize may look here and
+learn which Asset now answers to another name. **A live `asset_key` always wins
+over any `previous_keys` entry**: a Key that has been taken over by another
+Asset names that Asset, not the one that used to hold it.
+
+`retired_assets` holds `{asset_id, last_asset_key}` for every ID the World has
+withdrawn. It is what separates "this Asset was deleted" from "this package is
+missing and the sync is broken" — without it the two are the same absence. A
+retired ID is never issued again.
 
 ## Top-level Manifest
 
@@ -71,7 +101,7 @@ Every Manifest except a Palette requires:
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `schema_version` | integer | Exactly `20`. |
+| `schema_version` | integer | Exactly `21`. |
 | `asset_key` | non-empty lower-snake-case string | Runtime identity. |
 | `display_name` | string | Informational authored name. |
 | `asset_type` | string | What the Asset is: `character`, `props`, `weapons`, `terrain`, `items`, `icon`, or `symbols`. |
@@ -148,7 +178,7 @@ independent Frame property.
 
 ## Gameplay Regions
 
-`regions` is always present in schema 20 and may be empty. Every record contains
+`regions` is always present in schema 21 and may be empty. Every record contains
 `region_id`, `name`, `role`, `geometry_source`, and `source_component_id`;
 `role` is one of `attack`, `hurt`, or `collision`.
 
@@ -329,7 +359,7 @@ of them is an Asset of the Palette's own `asset_type`:
 
 ```json
 {
-  "schema_version": 20,
+  "schema_version": 21,
   "asset_key": "grass",
   "display_name": "Grass",
   "asset_type": "terrain",
@@ -370,10 +400,14 @@ invalid Asset, and its variants remain valid packages of their own.
 
 ## Asset References
 
-An Asset Reference adds `kind: "asset_reference"` and a required
-`source_asset_key`. In a Set Manifest it also carries the required
-`lower_snake_case` `role` described under **Compositions**; elsewhere a
-Reference is a member of nothing and carries none. It contains neither `mesh`, `contour_stroke_mesh`, nor
+An Asset Reference adds `kind: "asset_reference"`, a required
+`source_asset_key` and the required `source_asset_id` of the Asset it
+instances — the Key for reading, the ID for pointing. Without the ID a Set's
+`role` would be stable while what it points at still followed a rename, which
+would leave the break standing in the one place the Role was meant to close. In
+a Set Manifest the Reference also carries the required `lower_snake_case`
+`role` described under **Compositions**; elsewhere a Reference is a member of
+nothing and carries none. It contains neither `mesh`, `contour_stroke_mesh`, nor
 `closed_region_mesh`, but retains its local `projection_depth_meters` value.
 An
 optional finite positive `contour_stroke_width_override_px` is local to the

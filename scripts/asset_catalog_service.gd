@@ -1,7 +1,7 @@
 class_name AssetCatalogService
 extends RefCounted
 
-const CATALOG_SCHEMA_VERSION := 2
+const CATALOG_SCHEMA_VERSION := 3
 
 
 static func asset_key(display_name: String) -> String:
@@ -41,7 +41,7 @@ static func validation_errors(assets: Array) -> Array[String]:
 	return errors
 
 
-static func build_catalog(world_key: String, world_name: String, assets: Array) -> Dictionary:
+static func build_catalog(world_key: String, world_name: String, assets: Array, retired_assets: Array = []) -> Dictionary:
 	var errors := validation_errors(assets)
 	if world_key.strip_edges().is_empty():
 		errors.append("World key is missing.")
@@ -54,6 +54,14 @@ static func build_catalog(world_key: String, world_name: String, assets: Array) 
 		var key := asset_key(str(raw_asset.get("name", "")))
 		entries.append({
 			"asset_key": key,
+			# What the Asset is, across every rename it will ever see. The Key
+			# is the readable handle and moves with the display name; this does
+			# not move at all, and is never handed out twice.
+			"asset_id": str(raw_asset.get("id", "")),
+			# The Keys this Asset carried before, newest last. A consumer whose
+			# own files name Assets by Key reads them to map an outdated name
+			# onto the current one; a live Key always wins over an entry here.
+			"previous_keys": WorldDocumentService.previous_asset_keys(raw_asset),
 			"display_name": str(raw_asset.get("name", "")),
 			"asset_type": WorldDocumentService.asset_type(raw_asset),
 			# How the Asset is composed, so a consumer can tell a Palette from a
@@ -71,6 +79,10 @@ static func build_catalog(world_key: String, world_name: String, assets: Array) 
 			"schema_version": CATALOG_SCHEMA_VERSION,
 			"world_key": world_key,
 			"world_name": world_name if not world_name.is_empty() else world_key,
-			"assets": entries
+			"assets": entries,
+			# The IDs this World has handed out and withdrawn, with the Key each
+			# carried last. Without them a deleted Asset and a broken Sync are
+			# the same absence.
+			"retired_assets": WorldDocumentService.deserialize_retired_assets(retired_assets)
 		}
 	}

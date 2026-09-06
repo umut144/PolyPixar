@@ -693,6 +693,13 @@ inside the JSON and in the World index. Older ID-based paths such as
 `assets/asset_1/asset.json` remain readable as a migration fallback. Motion
 Paths, Acts and Sequences live below `paths/`, `acts/` and `sequences/`.
 
+An Asset is published under two names: `asset_key`, derived from the display
+name and moving with it, and `asset_id`, which does not move at all. Consumers
+store the ID and read the Key; `previous_keys` on the Catalog entry carries the
+Keys an Asset left behind, for the files people write by hand and keep in Keys
+on purpose. `_confirm_asset_rename` appends to that list, which is the only
+place it grows.
+
 An Asset ID is handed out once. The counters live in the World document rather
 than being derived from what exists, and a deleted Asset's ID is kept in
 `retired_assets` with the Key it carried last; both only ever raise the derived
@@ -771,7 +778,7 @@ The normative serialized package and consumer contract is
 must not redefine its fields. The summary below describes how the editor
 produces that contract.
 
-`RuntimeExportService` builds Manifest schema 19 exclusively from current
+`RuntimeExportService` builds Manifest schema 21 exclusively from current
 accepted Fill and Contour Stroke Mesh Bakes. Ordinary Hole Components are
 authoring-only Sampling constraints and do not enter the Manifest. A visible
 ordinary Hole with no valid direct outer Parent Body blocks export, as does a
@@ -824,7 +831,7 @@ Each visible Asset is exported to the active World-local
 `manifest.json`. The batch verifies a staging package
 before atomically replacing the prior package; validation or I/O failure leaves
 the prior package intact. Once all required packages are current, the same batch
-atomically updates World-root Asset Catalog schema 2. The Catalog is the closed
+atomically updates World-root Asset Catalog schema 3. The Catalog is the closed
 consumer set; generated directories absent from it are ignored and pruned only
 after every listed package is current and the new Catalog has been committed. Package freshness is derived by comparing the expected
 Manifest bytes, not by persisting export diagnostics in the Asset.

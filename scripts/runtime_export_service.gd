@@ -1,7 +1,7 @@
 class_name RuntimeExportService
 extends RefCounted
 
-const MANIFEST_SCHEMA_VERSION := 20
+const MANIFEST_SCHEMA_VERSION := 21
 const DEFAULT_PROJECTION_DEPTH_CM := 10.0
 static func build_manifest(asset: Dictionary, sources: Dictionary, palette_variants: Array = []) -> Dictionary:
 	if WorldDocumentService.is_palette_asset(asset):
@@ -123,6 +123,9 @@ static func build_manifest(asset: Dictionary, sources: Dictionary, palette_varia
 	var manifest := {
 		"schema_version": MANIFEST_SCHEMA_VERSION,
 		"asset_key": asset_key,
+		# The identity, beside the readable handle: the Key follows the display
+		# name, this does not move and is never handed out twice.
+		"asset_id": asset_id,
 		"display_name": str(asset.get("name", asset_id)),
 		"asset_type": WorldDocumentService.asset_type(asset),
 		"asset_category": WorldDocumentService.asset_category(asset),
@@ -197,6 +200,7 @@ static func _build_palette_manifest(asset: Dictionary, palette_variants: Array) 
 	var manifest := {
 		"schema_version": MANIFEST_SCHEMA_VERSION,
 		"asset_key": asset_key,
+		"asset_id": str(asset.get("id", "")),
 		"display_name": str(asset.get("name", "")),
 		"asset_type": variant_type,
 		"asset_category": WorldDocumentService.ASSET_CATEGORY_PALETTE,
@@ -569,6 +573,8 @@ static func manifest_validation_issues(manifest: Dictionary) -> Array[String]:
 	if str(manifest.get("asset_key", "")).is_empty() or not manifest.get("components", null) is Array:
 		errors.append("Runtime Manifest requires an Asset Key and Component array.")
 		return errors
+	if str(manifest.get("asset_id", "")).is_empty():
+		errors.append("Runtime Manifest requires the stable Asset ID beside the Key.")
 	if str(manifest.get("asset_category", "")) not in WorldDocumentService.ASSET_CATEGORIES:
 		errors.append("Runtime Manifest requires a stable Asset category.")
 		return errors
@@ -627,6 +633,8 @@ static func manifest_validation_issues(manifest: Dictionary) -> Array[String]:
 		if str(component.get("kind", "")) == "asset_reference":
 			if component.has("mesh") or component.has("contour_stroke_mesh") or component.has("closed_region_mesh") or component.has("projection_depth_corners"):
 				errors.append("%s: Asset References must not contain owned geometry meshes." % label)
+			if str(component.get("source_asset_id", "")).is_empty():
+				errors.append("%s: an Asset Reference requires the stable ID of the Asset it instances." % label)
 			if str(manifest.get("asset_category", "")) == WorldDocumentService.ASSET_CATEGORY_SET and not _is_lower_snake_case(str(component.get("role", ""))):
 				errors.append("%s: a Set member Reference requires a lower_snake_case role." % label)
 			# The name is the place this Reference fills in its owner, so it is
@@ -806,6 +814,10 @@ static func _build_reference_component(component: Dictionary, source: Dictionary
 			"name": str(component.get("name", "")),
 			"kind": "asset_reference",
 			"source_asset_key": source_asset_key,
+			# Which Asset fills the role, said twice: the Key for reading, the
+			# ID for pointing. Without the ID the Role would be stable while
+			# what it points at still followed a rename.
+			"source_asset_id": str(source.get("source_asset_id", component.get("source_asset_id", ""))),
 			"parent_component_id": parent_component_id,
 			"z_index": int(component.get("z_index", 0)),
 			"projection_depth_meters": maxf(0.0, float(component.get("projection_depth_cm", DEFAULT_PROJECTION_DEPTH_CM))) * 0.01,

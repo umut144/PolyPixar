@@ -2555,7 +2555,7 @@ func _asset_catalog_build() -> Dictionary:
 				exportable_ids.erase(str(asset.get("id", "")))
 				exportable_assets.remove_at(index)
 				removed_dependency = true
-	var build := AssetCatalogService.build_catalog(world_name, world_title, exportable_assets)
+	var build := AssetCatalogService.build_catalog(world_name, world_title, exportable_assets, retired_assets)
 	var global_errors := AssetCatalogService.validation_errors(assets)
 	if not global_errors.is_empty():
 		var errors: Array = build.get("errors", [])
@@ -2655,7 +2655,8 @@ func _save_world() -> bool:
 			"groups": [],
 			"guides": [],
 			"asset_category": WorldDocumentService.asset_category(asset),
-			"palette_variants": WorldDocumentService.palette_variants(asset)
+			"palette_variants": WorldDocumentService.palette_variants(asset),
+			"previous_asset_keys": WorldDocumentService.previous_asset_keys(asset)
 		}
 		for group in asset.get("groups", []):
 			asset_data["groups"].append({
@@ -6578,6 +6579,13 @@ func _confirm_asset_rename() -> void:
 		return
 	_record_direct_change()
 	var previous_name := str(asset.get("name", ""))
+	# The Key that is being left behind is kept, so a consumer whose own files
+	# name Assets by Key can find its way from the outdated name to this Asset.
+	var previous_key := AssetCatalogService.asset_key(previous_name)
+	var recorded_keys := WorldDocumentService.previous_asset_keys(asset)
+	if not previous_key.is_empty() and previous_key != AssetCatalogService.asset_key(asset_name) and not recorded_keys.has(previous_key):
+		recorded_keys.append(previous_key)
+	asset["previous_asset_keys"] = recorded_keys
 	asset["name"] = asset_name
 	_follow_reference_rename(asset_id, previous_name, asset_name)
 	# The World is written at once, because the directories have already moved.

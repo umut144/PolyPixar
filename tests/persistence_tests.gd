@@ -251,7 +251,14 @@ func _test_asset_catalog_service() -> void:
 	var entries: Array = catalog.get("assets", [])
 	_expect(bool(build.get("valid", false)) and int(catalog.get("schema_version", 0)) == AssetCatalogService.CATALOG_SCHEMA_VERSION and str(catalog.get("world_key", "")) == "world01", "Every World should derive an independently versioned Asset Catalog.")
 	_expect(entries.size() == 3 and str(entries[0].get("asset_key", "")) == "ancient_orb" and str(entries[2].get("asset_key", "")) == "orb", "Catalog entries should be sorted alphabetically by Asset Key.")
-	_expect(not JSON.stringify(catalog).contains("asset_id") and str(entries[1].get("runtime_package", "")) == "PolyToolsRuntimeExports/magic_orb/manifest.json", "The public Asset Catalog should expose key-based package paths without internal Asset IDs.")
+	_expect(str(entries[1].get("asset_id", "")) == "internal_1" and str(entries[1].get("runtime_package", "")) == "PolyToolsRuntimeExports/magic_orb/manifest.json", "A Catalog entry should carry the stable Asset ID beside the readable Key that names its package path.")
+	# What a consumer needs to find its way from a name it wrote down earlier:
+	# the Keys an Asset carried before, and the IDs the World has withdrawn.
+	var renamed_catalog: Dictionary = AssetCatalogService.build_catalog("world01", "World",
+		[{"id": "internal_9", "name": "Post", "asset_type": "props", "visibility": true,
+			"previous_asset_keys": ["rope_post", "rope_post", " Deck "]}],
+		[{"id": "internal_4", "last_asset_key": "vial"}]).get("catalog", {})
+	_expect(renamed_catalog.get("assets", [])[0].get("previous_keys", []) == ["rope_post", "deck"] and renamed_catalog.get("retired_assets", []).size() == 1 and str(renamed_catalog.get("retired_assets", [])[0].get("last_asset_key", "")) == "vial", "The Catalog should publish the Keys an Asset left behind and the IDs the World withdrew, but published %s and %s." % [renamed_catalog.get("assets", [])[0].get("previous_keys", []), renamed_catalog.get("retired_assets", [])])
 	var item_catalog: Dictionary = AssetCatalogService.build_catalog("world01", "World", [{"id": "potion", "name": "Potion", "asset_type": "items", "visibility": true}]).get("catalog", {})
 	_expect(str(item_catalog.get("assets", [])[0].get("asset_type", "")) == "items" and str(item_catalog.get("assets", [])[0].get("asset_category", "")) == "single", "The public Asset Catalog should retain the stable Items Asset type and say how the Asset is composed.")
 	var palette_catalog: Dictionary = AssetCatalogService.build_catalog("world01", "World", [{"id": "grass", "name": "Grass", "asset_type": "terrain", "asset_category": "palette", "visibility": true}]).get("catalog", {})
@@ -775,7 +782,7 @@ func _test_runtime_export_service() -> void:
 	var result := RuntimeExportService.build_manifest(asset, {"component_a": source, "component_b": source})
 	var manifest: Dictionary = result.get("manifest", {})
 	var components: Array = manifest.get("components", [])
-	_expect(bool(result.get("valid", false)) and int(manifest.get("schema_version", 0)) == RuntimeExportService.MANIFEST_SCHEMA_VERSION and str(manifest.get("asset_key", "")) == "wizard" and not manifest.has("asset_id"), "The current Runtime export schema should identify packages only by the Asset Key derived from their display name.")
+	_expect(bool(result.get("valid", false)) and int(manifest.get("schema_version", 0)) == RuntimeExportService.MANIFEST_SCHEMA_VERSION and str(manifest.get("asset_key", "")) == "wizard" and str(manifest.get("asset_id", "")) == "wizard", "The current Runtime export schema should carry the readable Asset Key and the stable ID beside it.")
 	var item_asset: Dictionary = asset.duplicate(true)
 	item_asset["asset_type"] = "items"
 	var item_manifest: Dictionary = RuntimeExportService.build_manifest(item_asset, {"component_a": source, "component_b": source}).get("manifest", {})
@@ -905,7 +912,7 @@ func _test_runtime_export_service() -> void:
 	var referenced_components: Array = referenced_result.get("manifest", {}).get("components", [])
 	var exported_reference: Dictionary = referenced_components[2] if referenced_components.size() == 3 else {}
 	var exported_reference_scale: Array = exported_reference.get("local_transform", {}).get("scale", [])
-	_expect(bool(referenced_result.get("valid", false)) and str(exported_reference.get("kind", "")) == "asset_reference" and str(exported_reference.get("source_asset_key", "")) == "orb" and is_equal_approx(float(exported_reference.get("contour_stroke_width_override_px", 0.0)), 3.0) and not exported_reference.has("source_asset_id") and str(exported_reference.get("name", "")) == "orb_reference" and not exported_reference.has("mesh") and not exported_reference.has("contour_stroke_mesh") and not exported_reference.has("closed_region_mesh") and exported_reference_scale.size() == 2 and float(exported_reference_scale[0]) * float(exported_reference_scale[1]) < 0.0, "A Hole Reference should keep the Barde-style Runtime instance while owning no Fill or Contour Stroke geometry.")
+	_expect(bool(referenced_result.get("valid", false)) and str(exported_reference.get("kind", "")) == "asset_reference" and str(exported_reference.get("source_asset_key", "")) == "orb" and is_equal_approx(float(exported_reference.get("contour_stroke_width_override_px", 0.0)), 3.0) and str(exported_reference.get("source_asset_id", "")) == "orb" and str(exported_reference.get("name", "")) == "orb_reference" and not exported_reference.has("mesh") and not exported_reference.has("contour_stroke_mesh") and not exported_reference.has("closed_region_mesh") and exported_reference_scale.size() == 2 and float(exported_reference_scale[0]) * float(exported_reference_scale[1]) < 0.0, "A Hole Reference should keep the Barde-style Runtime instance while owning no Fill or Contour Stroke geometry.")
 	_expect(not exported_reference.has("role"), "A Reference under a Component is a member of nothing, so it carries no Role across the boundary.")
 	reference_source["source_asset_exists"] = false
 	_expect(not bool(RuntimeExportService.build_manifest(referenced_asset, {"component_a": source, "component_b": source, "component_orb": reference_source}).get("valid", true)), "Runtime export should reject a Reference whose actual source Asset cannot be resolved.")

@@ -66,6 +66,8 @@ fingerprints.
 | 68 | `role` back on Reference Components, authored and never derived | additive (missing role reads empty) | `deserialize_component` | `_test_set_composition`, `_test_asset_deserialization_migrations` |
 | Manifest 20 | `role` required on every member Reference of a Set | derived | `RuntimeExportService` | `_test_runtime_export_service` |
 | 69 | `next_ids` and `retired_assets` on the World document | additive (missing counters read as derived, missing list as empty) | `main.gd._restore_next_ids`, `deserialize_retired_assets` | `_test_retired_asset_ids`, `_test_asset_deserialization_migrations` |
+| 70 | `previous_asset_keys` on the Asset, appended by every rename | additive (missing list reads empty) | `normalized_previous_asset_keys` | `_test_create_inspector_fields`, `_test_asset_deserialization_migrations` |
+| Manifest 21, Catalog 3 | `asset_id` on every Manifest and Catalog entry, `source_asset_id` on every Reference, `previous_keys` per entry, `retired_assets` on the Catalog | derived | `RuntimeExportService`, `AssetCatalogService` | `_test_runtime_export_service`, `_test_asset_catalog_service` |
 | Sampling 6 | Junction-aware Cuts, boundary-namespaced analytic Samples, corner balancing | derived | `GeometrySamplingService` | `_test_geometry_sampling_corner_balancing` |
 | Motion 1–18 | Blink `anticipation_share` default 0.18 read as 0.5 | **explicit** (≤ 18) | `normalize_motion_act` | `_test_asset_deserialization_migrations` |
 
@@ -396,6 +398,25 @@ derived as they always were.
 Deleting an Asset leaves the References that point at it alone. They read as
 missing in the Outliner and Runtime Export refuses them; removing them quietly
 would hide the deletion in exactly the documents that describe it.
+
+Schema 70 and the pair Manifest 21 / Catalog 3 publish identity. Until then an
+Asset was known at the boundary by `asset_key`, which is derived from the
+display name, so identity changed whenever a label changed and every consumer
+that had written a Key down broke. The Key stays exactly as it was — readable,
+the package directory, the thing a person recognizes — and `asset_id` is
+published beside it: opaque, stable across renames, unique in its World and
+never issued twice. Every Reference carries `source_asset_id` as well, because
+a Set's Role is only as stable as what it points at.
+
+Two things carry the parts that are deliberately not on the ID. `previous_keys`
+lists the Keys an Asset left behind, for consumers whose own files name Assets
+by Key on purpose; a live Key always wins over that list. `retired_assets`
+publishes the IDs the World has withdrawn with the Key each carried last, which
+is what tells a deleted Asset apart from a missing package.
+
+This retracts the rule that internal editor IDs never cross the boundary. It
+protected readability, which the Key still protects; what it also did was make
+identity a function of a label.
 
 Runtime Manifest schema 17 carries what the two compositions must say across
 the boundary, and nothing more. An `asset_reference` gains a required

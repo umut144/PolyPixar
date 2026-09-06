@@ -813,6 +813,12 @@ func _test_inspector_field_wiring() -> void:
 	_expect(application.asset_rename_key_label.text == "Asset Key: sorcerer", "The dialog should show the Key the new name derives while it is typed.")
 	application._confirm_asset_rename()
 	_expect(str(asset["name"]) == "Sorcerer" and application.world_name.is_empty(), "Confirming the dialog should rename the Asset; a World that was never written has nothing to save.")
+	# The Key that was left behind is kept: a consumer whose own files name
+	# Assets by Key needs the trail from the outdated name to this Asset.
+	_expect(WorldDocumentService.previous_asset_keys(asset) == ["wizard"], "A rename should record the Key it left behind, but recorded %s." % [WorldDocumentService.previous_asset_keys(asset)])
+	application.asset_rename_input.text = "Wizard"
+	application._confirm_asset_rename()
+	_expect(WorldDocumentService.previous_asset_keys(asset) == ["wizard", "sorcerer"], "Renaming back should record that trail too rather than tidying it away.")
 	# The Reference Image is named after the Asset too, so a rename can carry it
 	# along instead of leaving it under the previous name.
 	_expect(application._reference_image_filename_for("Rope Post", "asset_9") == "rope_post_ref.png" and application._reference_image_filename_for("", "asset_9") == "asset_9_ref.png", "The Reference Image filename should derive from the Asset name, with the ID as the fallback.")

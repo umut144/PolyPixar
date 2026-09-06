@@ -10,7 +10,7 @@ extends RefCounted
 # functions that do read editor state, _serialize_editor_state and
 # _serialize_world_settings, stay in main.gd for that reason.
 
-const SCHEMA_VERSION := 69
+const SCHEMA_VERSION := 70
 const REGION_GEOMETRY_AUTHORED := "authored"
 const REGION_GEOMETRY_COMPONENT := "component"
 const REGION_GEOMETRY_SOURCES := [REGION_GEOMETRY_AUTHORED, REGION_GEOMETRY_COMPONENT]
@@ -373,7 +373,8 @@ static func deserialize_asset(asset_data: Dictionary, fallback_asset_id: String)
 		"components": components,
 		"groups": groups,
 		"guides": guides,
-		"palette_variants": normalized_palette_variants(asset_data.get("palette_variants", []))
+		"palette_variants": normalized_palette_variants(asset_data.get("palette_variants", [])),
+		"previous_asset_keys": normalized_previous_asset_keys(asset_data.get("previous_asset_keys", []))
 	}
 	ComponentHierarchy.normalize_asset(asset)
 	return asset
@@ -1175,6 +1176,25 @@ static func normalized_palette_variants(value) -> Array[String]:
 
 static func palette_variants(asset: Dictionary) -> Array[String]:
 	return normalized_palette_variants(asset.get("palette_variants", []))
+
+
+static func previous_asset_keys(asset: Dictionary) -> Array[String]:
+	return normalized_previous_asset_keys(asset.get("previous_asset_keys", []))
+
+
+static func normalized_previous_asset_keys(value) -> Array[String]:
+	# The Keys an Asset carried before its current one, oldest first. Renaming
+	# is what appends to this: the Key follows the display name, and a consumer
+	# whose own files name Assets by Key needs the trail to find its way from an
+	# outdated name to the Asset that now answers to another one.
+	var keys: Array[String] = []
+	if not value is Array:
+		return keys
+	for entry in value:
+		var key := str(entry).strip_edges().to_lower()
+		if not key.is_empty() and not keys.has(key):
+			keys.append(key)
+	return keys
 
 
 static func deserialize_retired_assets(value) -> Array:
