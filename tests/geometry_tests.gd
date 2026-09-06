@@ -236,7 +236,7 @@ func _test_geometry_sampling_service() -> void:
 	_expect(hidden_reference_holes.size() == 1 and str(hidden_reference_holes[0].get("sampling_error", "")).contains("no visible Closed Loop or Primitive boundary"), "A Hole Reference whose source has no visible Body should remain a named blocking Sampling input.")
 	source_circle_a["visibility"] = true
 	source_circle_b["visibility"] = true
-	_expect(WorldDocumentService.has_supported_schema({"schema_version": 62}) and WorldDocumentService.has_supported_schema({"schema_version": 61}) and not WorldDocumentService.has_supported_schema({"schema_version": 63}), "Schema 62 should keep current and older World documents readable and reject unknown future schemas.")
+	_expect(WorldDocumentService.has_supported_schema({"schema_version": WorldDocumentService.SCHEMA_VERSION}) and WorldDocumentService.has_supported_schema({"schema_version": WorldDocumentService.SCHEMA_VERSION - 1}) and not WorldDocumentService.has_supported_schema({"schema_version": WorldDocumentService.SCHEMA_VERSION + 1}), "The current World schema should keep current and older documents readable and reject unknown future schemas.")
 	_expect(WorldDocumentService.normalize_component_draw_mode("ribbon", 39) == "contour" and WorldDocumentService.normalize_component_draw_mode("contour", 42) == "contour", "Schema-42 loading must retain the explicit legacy Ribbon-to-Contour migration boundary.")
 	_expect(WorldDocumentService.normalize_component_draw_mode("ribbon", 42) == "ribbon", "Current-schema Ribbon data must remain visibly invalid instead of receiving a silent backward fallback.")
 	var arranged_round_trip: Dictionary = WorldDocumentService.normalize_sampling_bake(WorldDocumentService.serialize_sampling_bake(arranged_result))
@@ -247,7 +247,7 @@ func _test_geometry_sampling_service() -> void:
 	baked_result["bake_id"] = "bake_test"
 	geometry_document["sampling"]["bakes"][GeometrySamplingService.ADAPTIVE] = baked_result
 	var serialized_geometry: Dictionary = WorldDocumentService.serialize_geometry_document(geometry_document)
-	_expect(int(serialized_geometry.get("schema_version", 0)) == 62 and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as schema-62 JSON arrays.")
+	_expect(int(serialized_geometry.get("schema_version", 0)) == WorldDocumentService.SCHEMA_VERSION and serialized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Array, "Sampling bakes should serialize derived positions as current-schema JSON arrays.")
 	var normalized_geometry: Dictionary = WorldDocumentService.normalize_geometry_document(serialized_geometry, "asset_1", "component_1")
 	_expect(normalized_geometry.get("sampling", {}).get("bakes", {}).get(GeometrySamplingService.ADAPTIVE, {}).get("chains", [])[0].get("samples", [])[0].get("position", null) is Vector2, "Sampling bake loading should restore local sample positions as Vector2 values.")
 	_expect(normalized_geometry["sampling"]["bakes"].size() == 1, "Sampling should retain one Adaptive Bake.")
@@ -634,6 +634,42 @@ func _run_auto_mesh_fixture(component: Dictionary, cut_guides: Array = [], hole_
 	}
 
 
+func _create_asset_of_type(application: Control, asset_name: String, asset_type: String) -> String:
+	# Drives the New Asset dialog the way a user does: the type is chosen there,
+	# because the one Create view no longer implies one.
+	application._sync_new_asset_type_input()
+	for index in range(application.asset_type_input.item_count):
+		if str(application.asset_type_input.get_item_metadata(index)) == asset_type:
+			application.asset_type_input.select(index)
+			application.asset_type_input.item_selected.emit(index)
+			break
+	application.asset_name_input.text = asset_name
+	application._confirm_asset_creation()
+	return str(application.assets[-1].get("asset_type", ""))
+
+
+func _outliner_asset_labels(application: Control) -> Array[String]:
+	# The Create Outliner as a reader sees it: the group label plus one row per
+	# listed Asset. The visibility checkbox and the row's Add button are chrome.
+	application._render_outliner()
+	var labels: Array[String] = []
+	_collect_outliner_asset_labels(application.outliner_view, labels)
+	return labels
+
+
+func _collect_outliner_asset_labels(node: Node, labels: Array[String]) -> void:
+	# A rebuild clears with queue_free(), and a -s run never ends the frame that
+	# would drain the queue, so the previous render's rows are still parented.
+	if node.is_queued_for_deletion() or node is CheckBox or node is CheckButton:
+		return
+	if node is Label:
+		labels.append(str(node.text))
+	elif node is Button and str(node.text) != "Add":
+		labels.append(str(node.text))
+	for child in node.get_children():
+		_collect_outliner_asset_labels(child, labels)
+
+
 func _test_geometry_sampling_ui_shell() -> void:
 	var component := _component()
 	BezierTopology.add_point(component, Vector2.ZERO, "corner")
@@ -717,31 +753,38 @@ func _test_geometry_sampling_ui_shell() -> void:
 	application._restore_history_snapshot(history_snapshot)
 	_expect(is_equal_approx(float(application.geometry_documents["asset_1/component_1"]["sampling"]["recipe"]["parameters"]["spacing"]), GeometrySamplingService.DEFAULT_SPACING), "Geometry recipes and bakes should participate in World Undo/Redo snapshots.")
 	var create_section: ModuleSection = application._find_section("Create")
-	application._select_submodule("Create", "Props", create_section)
-	_expect(application.active_module == "Create" and application.active_create_submodule == "Props" and application.canvas_view.visible and not application.geometry_sampling_workspace.visible, "Selecting Create Props should immediately render the shared asset workspace.")
+	application._select_submodule("Create", "Single", create_section)
+	_expect(application.active_module == "Create" and application.active_create_submodule == "Single" and application.canvas_view.visible and not application.geometry_sampling_workspace.visible, "Selecting Create Single should immediately render the shared asset workspace.")
 	_expect(application._find_section("Mesh").active_submodule.is_empty() and application._find_section("Style").active_submodule.is_empty(), "Only the selected module should remain highlighted across always-expanded categories.")
-	application.asset_name_input.text = "Shield"
-	application._confirm_asset_creation()
-	_expect(str(application.assets[-1].get("asset_type", "")) == "props", "Create Props should persist the stable props Asset type.")
-	application._select_submodule("Create", "Weapons", create_section)
-	_expect(application.active_module == "Create" and application.active_create_submodule == "Weapons" and application.canvas_view.visible, "Selecting Create Weapons should immediately render the shared asset workspace.")
-	application.asset_name_input.text = "Sword"
-	application._confirm_asset_creation()
-	_expect(str(application.assets[-1].get("asset_type", "")) == "weapons", "Create Weapons should persist the stable weapons Asset type.")
-	application._select_submodule("Create", "Items", create_section)
-	_expect(application.active_module == "Create" and application.active_create_submodule == "Items" and application.canvas_view.visible, "Selecting Create Items should immediately render the shared asset workspace.")
-	application.asset_name_input.text = "Potion"
-	application._confirm_asset_creation()
-	_expect(str(application.assets[-1].get("asset_type", "")) == "items", "Create Items should persist the stable items Asset type.")
-	_expect(WorldDocumentService.normalize_asset_type("") == "character" and application._asset_type_create_submodule("icon") == "Icon" and application._asset_type_create_submodule("weapons") == "Weapons" and application._asset_type_create_submodule("items") == "Items", "Missing Asset types should normalize to Character while valid types map back to their Create module.")
+	_expect(create_section.content_list.get_child_count() == 1 and application.create_action_button.text == "Create Asset", "Create should expose one Single view instead of one module per Asset type.")
+	_expect(_create_asset_of_type(application, "Shield", "props") == "props", "The New Asset dialog should persist the stable props Asset type.")
+	_expect(_create_asset_of_type(application, "Sword", "weapons") == "weapons", "The New Asset dialog should persist the stable weapons Asset type.")
+	_expect(_create_asset_of_type(application, "Potion Flask", "items") == "items", "The New Asset dialog should persist the stable items Asset type.")
+	application._sync_new_asset_type_input()
+	_expect(application.new_asset_type == "items" and str(application.asset_type_input.get_item_metadata(application.asset_type_input.selected)) == "items", "The chosen Asset type should stay the offered default for the next Asset.")
+	application.selected_asset_id = str(application.assets[-1].get("id", ""))
+	application.selected_component_id = ""
+	application._on_asset_type_selected(0, application.asset_type_input)
+	_expect(str(application.assets[-1].get("asset_type", "")) == "character", "The Asset root Inspector should be able to correct an Asset type after creation.")
+	var single_modules := true
+	for asset_type in WorldDocumentService.ASSET_TYPES:
+		single_modules = single_modules and application._asset_type_create_submodule(str(asset_type)) == "Single"
+	_expect(WorldDocumentService.normalize_asset_type("") == "character" and single_modules and application._normalized_create_submodule("Props") == "Single", "Missing Asset types should normalize to Character while every valid type maps to the Single Create module.")
+	for asset in application.assets:
+		application.expanded_assets[str(asset.get("id", ""))] = false
+	var single_view_labels := _outliner_asset_labels(application)
+	_expect(single_view_labels == ["Assets", "Potion Flask", "Shield", "Sword", "Wizard"], "The Single view should list every Asset type at once, not %s." % [single_view_labels])
 	application._on_outliner_asset_type_filter_toggled(false, "character")
-	_expect(not application.outliner_asset_type_filters["character"] and application.outliner_asset_type_filters["props"], "Mesh and Style filters should support independent Asset type checkboxes.")
+	_expect(not application.outliner_asset_type_filters["character"] and application.outliner_asset_type_filters["props"], "Create, Mesh and Style filters should support independent Asset type checkboxes.")
+	_expect(application.outliner_asset_type_filter_panel.visible, "Create should show the shared Asset filter, because it now selects among the seven types.")
+	var filtered_view_labels := _outliner_asset_labels(application)
+	_expect(filtered_view_labels == ["Assets", "Shield", "Sword"], "An Asset type switched off in the filter should leave the Create Outliner, leaving %s." % [filtered_view_labels])
 	application.active_module = "Style"
 	application._render_outliner()
 	application._set_all_outliner_asset_type_filters()
 	_expect(application.outliner_asset_type_filters["character"] and application.outliner_asset_type_filter_panel.visible, "Style should show the shared Asset filter and restore all types with All.")
-	application._select_submodule("Create", "Character", create_section)
-	_expect(application.active_create_submodule == "Character" and application.canvas_view.visible, "Selecting Create Character should immediately render the shared asset workspace.")
+	application._select_submodule("Create", "Single", create_section)
+	_expect(application.active_create_submodule == "Single" and application.canvas_view.visible, "Returning to Create Single should immediately render the shared asset workspace.")
 	application.selected_asset_id = "asset_1"
 	application.selected_component_id = "component_1"
 	application._render_context_bar()

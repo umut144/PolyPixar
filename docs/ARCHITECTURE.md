@@ -8,13 +8,19 @@ contains always-expanded Create, Mesh, and Style categories. A single
 `active_module` plus its category-specific submodule identifies the one active
 workspace.
 
-Create has seven database views over the same Asset implementation:
-`Character`, `Props`, `Weapons`, `Terrain`, `Items`, `Icon`, and `Symbols`. Their stable persisted discriminator
-is `asset_type`; missing or invalid values normalize to `character`.
+Create has one database view over the Asset implementation, `Single`. The
+stable persisted discriminator `asset_type` — `character`, `props`, `weapons`,
+`terrain`, `items`, `icon`, `symbols`; missing or invalid values normalize to
+`character` — is unchanged and still exported, but it no longer selects a view.
+It is authored in the New Asset dialog and corrected on the Asset root in the
+Inspector.
 
-Mesh and Style share a multi-select Outliner Asset filter. Its seven checkbox
-states are persisted in `editor_state`; the filter is applied together with
-the Outliner search and does not alter the selected Asset or document data.
+Create, Mesh and Style share one multi-select Outliner Asset filter. Its seven
+checkbox states are persisted in `editor_state`; the filter is applied together
+with the Outliner search and does not alter the selected Asset or document
+data. In Create it is what selects among the seven types, so a World saved
+below schema 63 — where the filter gated Mesh and Style only and could be
+stored with every type switched off — has it restored once on load.
 
 Mesh is the user-facing name of the derived geometry pipeline. Existing
 internal `geometry_*` identifiers remain technical names, while UI copy uses
@@ -57,7 +63,7 @@ export data.
 - `CreateInspectorView` draws the Create module's Inspector under the same
   contract as `OutlinerView`: `main.gd` pushes a snapshot in through `set_document`,
   `set_selection`, `set_resolved_selection` and `set_mode`, `rebuild()` draws from
-  that snapshot alone, and every user action leaves as one of 43 intent signals.
+  that snapshot alone, and every user action leaves as one of 44 intent signals.
   The two lists that need the document to resolve — the Components of a multi
   selection and the Point ids that still exist — are computed in `main.gd` and
   handed over, so the view never resolves a stale id itself. The controls the
@@ -123,10 +129,11 @@ the four views is visible, resolves that view's context and calls `rebuild()`.
   predicates that read them — `component_draw_mode`, `is_closed_loop`,
   `is_contour`, `is_primitive`, `topology_role`, `is_outer_body` — and the
   seven `ASSET_TYPE_*` constants (`ASSET_TYPES`) behind `asset_type` and
-  `normalize_asset_type` for the Create module filter; `main.gd`'s
-  `_asset_type_create_submodule` turns one into its Create module's display
-  name with `String.capitalize()`, since every value is a single lower-case
-  word. `AssetGuide` owns the Guide types the same way, plus the Guide scope
+  `normalize_asset_type` for the Outliner Asset filter; `main.gd`'s
+  `CREATE_SUBMODULE_BY_ASSET_TYPE` maps one to its Create module, which is
+  `Single` for all seven, and `_normalized_create_submodule` reads any other
+  value — including the seven module names Worlds below schema 63 stored — as
+  `Single`. `AssetGuide` owns the Guide types the same way, plus the Guide scope
   vocabulary — `SCOPE_COMPONENT`, `SCOPE_GROUP`, `is_group_scoped`,
   `scope_component_id`, `scope_group_id`, `scope_target_id` — read by
   `ComponentHierarchy.guide_world_transform`, the one place a Guide's scope
@@ -229,7 +236,9 @@ not a default.
 
 `editor_state` persists the active Create/Mesh/Style module and valid
 selection, the Outliner Asset-type filters, per-Asset cameras and the `Frame`
-guide; it does not restore disabled Motion as the active category.
+guide; it does not restore disabled Motion as the active category. Its
+`active_create_submodule` holds a Create module name; below schema 63 it held
+one of the seven Asset-type names, and every such value reads as `Single`.
 
 ### Asset
 

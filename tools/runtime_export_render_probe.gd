@@ -241,7 +241,7 @@ func _init() -> void:
 	app.export_running = false
 	app.mesh_batch_running = false
 	app.active_module = "Create"
-	app.active_create_submodule = "Character"
+	app.active_create_submodule = "Single"
 	app._render_canvas_context()
 	app._render_context_bar()
 	print("### Export/left_for_create")

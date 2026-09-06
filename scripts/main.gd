@@ -1,7 +1,16 @@
 extends Control
 
 const SELECTION_MIRROR_SERVICE_SCRIPT = preload("res://scripts/selection_mirror_service.gd")
-const CREATE_SUBMODULES := ["Character", "Props", "Weapons", "Terrain", "Items", "Icon", "Symbols"]
+const CREATE_SUBMODULES := ["Single"]
+const CREATE_SUBMODULE_BY_ASSET_TYPE := {
+	WorldDocumentService.ASSET_TYPE_CHARACTER: "Single",
+	WorldDocumentService.ASSET_TYPE_PROPS: "Single",
+	WorldDocumentService.ASSET_TYPE_WEAPONS: "Single",
+	WorldDocumentService.ASSET_TYPE_TERRAIN: "Single",
+	WorldDocumentService.ASSET_TYPE_ITEMS: "Single",
+	WorldDocumentService.ASSET_TYPE_ICON: "Single",
+	WorldDocumentService.ASSET_TYPE_SYMBOLS: "Single",
+}
 const GEOMETRY_SUBMODULES := ["Sampling", "Seeding", "Meshing"]
 const STYLE_SUBMODULES := ["Weighting"]
 const EXPORT_SUBMODULES: Array[String] = []
@@ -27,7 +36,7 @@ const EYE_COMPONENT_NAME_TOKEN := "eye"
 # currently reached through the Import Preview instead of additional rows.
 const SHOW_PROCESSED_OUTLINER := false
 
-var active_create_submodule := "Character"
+var active_create_submodule := "Single"
 var active_geometry_submodule := "Sampling"
 var active_style_submodule := "Weighting"
 var active_motion_submodule := "Animation"
@@ -160,6 +169,8 @@ var next_group_id := 1
 var next_guide_id := 1
 var asset_dialog: ConfirmationDialog
 var asset_name_input: LineEdit
+var asset_type_input: OptionButton
+var new_asset_type := WorldDocumentService.ASSET_TYPE_CHARACTER
 var component_dialog: ConfirmationDialog
 var component_name_input: LineEdit
 var component_name_hint: Label
@@ -1015,6 +1026,7 @@ func _build_ui() -> void:
 	create_inspector_view = CreateInspectorView.new()
 	create_inspector_view.add_theme_constant_override("separation", 2)
 	create_inspector_view.asset_authored_facing_selected.connect(_on_asset_authored_facing_selected)
+	create_inspector_view.asset_type_selected.connect(_on_asset_type_selected)
 	create_inspector_view.asset_pivot_property_changed.connect(_on_asset_pivot_property_changed)
 	create_inspector_view.asset_rename_requested.connect(_rename_selected_asset)
 	create_inspector_view.asset_root_position_changed.connect(_on_asset_root_position_changed)
@@ -1804,14 +1816,25 @@ func _create_asset_dialog() -> void:
 	asset_dialog = ConfirmationDialog.new()
 	asset_dialog.title = "New Asset"
 	asset_dialog.dialog_text = "Enter an asset name"
-	asset_dialog.size = Vector2i(360, 160)
+	asset_dialog.size = Vector2i(360, 200)
 	asset_dialog.confirmed.connect(_confirm_asset_creation)
 	asset_name_input = LineEdit.new()
 	asset_name_input.placeholder_text = "Asset name"
 	asset_name_input.custom_minimum_size = Vector2(320, 32)
 	asset_name_input.focus_mode = Control.FOCUS_ALL
 	asset_name_input.text_submitted.connect(_submit_asset_name)
-	asset_dialog.add_child(asset_name_input)
+	# AcceptDialog gives every Control child the same content rect, so the two
+	# fields live in one container rather than on top of each other.
+	var asset_dialog_fields := VBoxContainer.new()
+	asset_dialog_fields.add_theme_constant_override("separation", 6)
+	asset_dialog_fields.add_child(asset_name_input)
+	# The one Create view no longer implies a type, so the type is chosen here
+	# and stays the offered default for the next Asset.
+	asset_type_input = EditorWidgets.create_option_field(_asset_type_option_items(),
+		new_asset_type, _on_new_asset_type_selected)
+	asset_type_input.name = "NewAssetType"
+	asset_dialog_fields.add_child(asset_type_input)
+	asset_dialog.add_child(asset_dialog_fields)
 	add_child(asset_dialog)
 
 
@@ -2055,7 +2078,7 @@ func _update_context_action_button() -> void:
 	if not show_asset_create_controls and is_instance_valid(frame_popup):
 		frame_popup.hide()
 	if active_module == "Create" and active_create_submodule in CREATE_SUBMODULES:
-		create_action_button.text = "Create Symbol" if active_create_submodule == "Symbols" else "Create %s" % active_create_submodule
+		create_action_button.text = "Create Asset"
 	elif active_module == "Style" and active_style_submodule == "Weighting":
 		create_action_button.text = "Create Weighting Style"
 	elif active_module == "Motion" and active_motion_submodule == "Path":
@@ -2718,7 +2741,7 @@ func _restore_history_snapshot(snapshot: Dictionary) -> void:
 	motion_act_preview_asset_id = str(snapshot.get("motion_act_preview_asset_id", ""))
 	active_module = str(snapshot.get("active_module", "Create"))
 	active_geometry_submodule = str(snapshot.get("active_geometry_submodule", "Sampling"))
-	active_create_submodule = str(snapshot.get("active_create_submodule", "Character"))
+	active_create_submodule = _normalized_create_submodule(str(snapshot.get("active_create_submodule", "Single")))
 	active_style_submodule = str(snapshot.get("active_style_submodule", "Weighting"))
 	active_motion_submodule = str(snapshot.get("active_motion_submodule", "Animation"))
 	expanded_assets = snapshot.get("expanded_assets", {}).duplicate(true)
@@ -2895,7 +2918,7 @@ func _load_world(world_entry: String, persist_as_last := true) -> bool:
 		_convert_asset_units(assets, 100.0)
 	world_name = str(world_data.get("name", world_entry))
 	world_title = str(world_data.get("world_name", world_name))
-	_restore_editor_state(world_data.get("editor_state", {}))
+	_restore_editor_state(world_data.get("editor_state", {}), int(world_data.get("schema_version", 0)))
 	_update_next_ids()
 	active_state = ""
 	_invalidate_render(RENDER_DOCUMENT)
@@ -2965,7 +2988,7 @@ func _serialize_world_settings() -> Dictionary:
 	return WorldSettingsService.encode(world_contour_stroke_width_px)
 
 
-func _restore_editor_state(state) -> void:
+func _restore_editor_state(state, source_schema_version := WorldDocumentService.SCHEMA_VERSION) -> void:
 	selected_asset_id = ""
 	selected_component_id = ""
 	selected_guide_id = ""
@@ -2983,7 +3006,7 @@ func _restore_editor_state(state) -> void:
 	motion_sequence_view = MotionSequenceWorkspace.VIEW_COMPOSITION
 	motion_sequence_preview_loop = true
 	active_module = "Create"
-	active_create_submodule = "Character"
+	active_create_submodule = "Single"
 	active_geometry_submodule = "Sampling"
 	active_style_submodule = "Weighting"
 	active_motion_submodule = "Animation"
@@ -3038,14 +3061,18 @@ func _restore_editor_state(state) -> void:
 	if not selected_component_id.is_empty() or not selected_guide_id.is_empty():
 		_set_outliner_asset_expanded(selected_asset_id, true)
 	active_module = "Create"
-	var requested_create_submodule := str(state.get("active_create_submodule", "Character"))
+	var requested_create_submodule := _normalized_create_submodule(str(state.get("active_create_submodule", "Single")))
 	if not selected_asset_id.is_empty():
 		requested_create_submodule = _asset_type_create_submodule(_asset_type(_get_asset(selected_asset_id)))
 	_set_create_submodule_context(requested_create_submodule)
 	var requested_geometry_submodule := str(state.get("active_geometry_submodule", "Sampling"))
 	var requested_style_submodule := str(state.get("active_style_submodule", "Weighting"))
+	# Below schema 63 the Asset filter gated Mesh and Style only, so a World
+	# could be saved with every type switched off. From 63 it also gates Create,
+	# where that state would read as an empty module. The saved value is
+	# therefore ignored exactly once, below the step, and never after it.
 	var saved_asset_type_filters = state.get("outliner_asset_type_filters", {})
-	if saved_asset_type_filters is Dictionary:
+	if saved_asset_type_filters is Dictionary and source_schema_version >= 63:
 		for asset_type in outliner_asset_type_filters.keys():
 			if saved_asset_type_filters.has(asset_type):
 				outliner_asset_type_filters[asset_type] = bool(saved_asset_type_filters[asset_type])
@@ -6028,8 +6055,50 @@ func _add_info_mode_option(text: String, active: bool) -> void:
 func _open_new_asset_dialog() -> void:
 	asset_name_input.text = ""
 	asset_dialog.dialog_text = "Enter an asset name"
+	_sync_new_asset_type_input()
 	asset_dialog.popup_centered()
 	asset_name_input.grab_focus()
+
+
+func _sync_new_asset_type_input() -> void:
+	if not is_instance_valid(asset_type_input):
+		return
+	for index in range(asset_type_input.item_count):
+		if str(asset_type_input.get_item_metadata(index)) == new_asset_type:
+			asset_type_input.select(index)
+			return
+
+
+func _asset_type_option_items() -> Array:
+	var items: Array = []
+	for asset_type in WorldDocumentService.ASSET_TYPES:
+		items.append({"label": _asset_type_display_name(str(asset_type)), "metadata": str(asset_type)})
+	return items
+
+
+func _asset_type_display_name(asset_type: String) -> String:
+	# Every Asset type is a single lower-case word, so capitalize() is exactly
+	# "uppercase the first letter": "props" -> "Props".
+	return WorldDocumentService.normalize_asset_type(asset_type).capitalize()
+
+
+func _on_new_asset_type_selected(index: int, option: OptionButton) -> void:
+	if index < 0 or index >= option.item_count:
+		return
+	new_asset_type = WorldDocumentService.normalize_asset_type(option.get_item_metadata(index))
+
+
+func _on_asset_type_selected(index: int, option: OptionButton) -> void:
+	var asset := _get_asset(selected_asset_id)
+	if asset.is_empty() or index < 0 or index >= option.item_count:
+		return
+	var asset_type := WorldDocumentService.normalize_asset_type(option.get_item_metadata(index))
+	if asset_type == _asset_type(asset):
+		return
+	_record_direct_change()
+	asset["asset_type"] = asset_type
+	new_asset_type = asset_type
+	_invalidate_render(RENDER_DOCUMENT)
 
 
 func _submit_asset_name(_submitted_text: String) -> void:
@@ -6050,7 +6119,7 @@ func _confirm_asset_creation() -> void:
 	_record_direct_change()
 	var asset_id := "asset_%d" % next_asset_id
 	next_asset_id += 1
-	assets.append({"id": asset_id, "name": asset_name, "asset_type": _create_submodule_asset_type(active_create_submodule), "authored_facing": AssetPresentation.AuthoredFacing.NEUTRAL, "visibility": true, "asset_pivot": Vector2.ZERO, "root_position": Vector2.ZERO, "root_scale": Vector2.ONE, "reference_image": WorldDocumentService.default_reference_image(), "animation": MotionWorkspace.create_default_animation_document(), "components": [], "groups": [], "guides": []})
+	assets.append({"id": asset_id, "name": asset_name, "asset_type": WorldDocumentService.normalize_asset_type(new_asset_type), "authored_facing": AssetPresentation.AuthoredFacing.NEUTRAL, "visibility": true, "asset_pivot": Vector2.ZERO, "root_position": Vector2.ZERO, "root_scale": Vector2.ONE, "reference_image": WorldDocumentService.default_reference_image(), "animation": MotionWorkspace.create_default_animation_document(), "components": [], "groups": [], "guides": []})
 	selected_asset_id = asset_id
 	selected_component_id = ""
 	selected_component_ids.clear()
@@ -6569,7 +6638,7 @@ func _outliner_drop_data_from_view(asset_id: String, target_id: String, payload:
 func _update_outliner_asset_type_filter_visibility() -> void:
 	if not is_instance_valid(outliner_asset_type_filter_panel):
 		return
-	outliner_asset_type_filter_panel.visible = active_module in ["Mesh", "Style"]
+	outliner_asset_type_filter_panel.visible = active_module in ["Create", "Mesh", "Style"]
 
 
 static func _default_outliner_asset_type_filters() -> Dictionary:
@@ -6612,7 +6681,7 @@ func _outliner_focus_asset_id() -> String:
 func _outliner_expansion_scope_matches(asset: Dictionary) -> bool:
 	if active_module != "Create":
 		return true
-	return _asset_type(asset) == _create_submodule_asset_type(active_create_submodule)
+	return _asset_matches_create_submodule(asset)
 
 
 func _set_outliner_asset_expanded(asset_id: String, expanded: bool) -> void:
@@ -12600,15 +12669,22 @@ func _asset_type(asset: Dictionary) -> String:
 	return WorldDocumentService.asset_type(asset)
 
 
-func _create_submodule_asset_type(submodule: String) -> String:
-	return WorldDocumentService.normalize_asset_type(submodule)
-
-
 func _asset_type_create_submodule(asset_type: String) -> String:
-	# Every asset_type is a single lower-case word (WorldDocumentService.ASSET_TYPES),
-	# so capitalize() reduces to "uppercase the first letter" and reproduces
-	# the Create module name exactly: "props" -> "Props", "character" -> "Character".
-	return WorldDocumentService.normalize_asset_type(asset_type).capitalize()
+	# The Create module an Asset belongs to. Every one of the seven Asset types
+	# is a Single: they are one Asset implementation, and search plus the
+	# Outliner Asset filter select among them, so they no longer need a module
+	# each. The table is what later composition types extend.
+	return str(CREATE_SUBMODULE_BY_ASSET_TYPE.get(WorldDocumentService.normalize_asset_type(asset_type), "Single"))
+
+
+func _normalized_create_submodule(submodule: String) -> String:
+	# Worlds below schema 63 stored one of the seven Asset-type names here.
+	# Every one of them, and every unknown value, is the Single view.
+	return submodule if submodule in CREATE_SUBMODULES else "Single"
+
+
+func _asset_matches_create_submodule(asset: Dictionary) -> bool:
+	return _asset_type_create_submodule(_asset_type(asset)) == active_create_submodule
 
 
 func _ensure_asset_animation(asset: Dictionary) -> Dictionary:
@@ -12827,10 +12903,10 @@ func _select_submodule(module_name: String, submodule: String, _section: ModuleS
 
 
 func _set_create_submodule_context(submodule: String) -> void:
-	active_create_submodule = submodule if submodule in CREATE_SUBMODULES else "Character"
+	active_create_submodule = _normalized_create_submodule(submodule)
 	active_state = ""
 	var selected_asset := _get_asset(selected_asset_id)
-	if selected_asset.is_empty() or _asset_type(selected_asset) != _create_submodule_asset_type(active_create_submodule):
+	if selected_asset.is_empty() or not _asset_matches_create_submodule(selected_asset):
 		selected_asset_id = _create_submodule_active_asset_id()
 		selected_component_id = ""
 		selected_guide_id = ""
@@ -12844,7 +12920,7 @@ func _create_submodule_active_asset_id() -> String:
 	if not expanded_asset_id.is_empty():
 		return expanded_asset_id
 	for asset in assets:
-		if _asset_type(asset) == _create_submodule_asset_type(active_create_submodule):
+		if _asset_matches_create_submodule(asset):
 			var asset_id := str(asset.get("id", ""))
 			_set_outliner_asset_expanded(asset_id, true)
 			return asset_id

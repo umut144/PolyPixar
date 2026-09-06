@@ -475,7 +475,7 @@ func _test_runtime_export_surface() -> void:
 
 	# 9 · Leaving the module has to give the ordinary work surfaces back.
 	application.active_module = "Create"
-	application.active_create_submodule = "Character"
+	application.active_create_submodule = "Single"
 	application._render_canvas_context()
 	application._render_context_bar()
 	_expect(not application.runtime_export_view.visible,

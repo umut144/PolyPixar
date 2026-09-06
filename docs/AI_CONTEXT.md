@@ -10,7 +10,7 @@ that another document owns.
 
 The left rail is always expanded and exposes exactly these categories:
 
-- `Create`: `Character`, `Props`, `Weapons`, `Terrain`, `Items`, `Icon`, `Symbols`
+- `Create`: `Single`
 - `Mesh`: `Sampling`, `Seeding`, `Meshing`
 - `Style`: `Weighting`
 
@@ -20,8 +20,10 @@ or restored as an active editor category. Transform and Effects are not
 product categories. Texture and Material authoring are not part of the
 application, and UV and SDF have no authoring surface any more.
 
-All seven Create views are one Asset implementation filtered by the Asset's
-stable `asset_type`. Mesh is the user-facing name of the derived geometry
+`Single` is the one view over the Asset implementation. The stable
+`asset_type` remains persisted and exported, but it no longer opens a view of
+its own: the Outliner search and the shared multi-select Asset filter select
+among the seven types. Mesh is the user-facing name of the derived geometry
 pipeline; the `geometry_*` identifiers in code are its technical names.
 
 ## What the data is

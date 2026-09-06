@@ -41,7 +41,7 @@ var assets: Array = []
 var motion_paths: Array = []
 var motion_sequences: Array = []
 var active_module := "Create"
-var active_create_submodule := "Character"
+var active_create_submodule := "Single"
 var active_geometry_submodule := "Sampling"
 var active_motion_submodule := "Animation"
 var selected_asset_id := ""
@@ -64,7 +64,7 @@ var row_status: Dictionary = {}
 # documented at _render_geometry_rows below.
 var geometry_rows: Array = []
 
-const CREATE_SUBMODULES := ["Character", "Props", "Weapons", "Terrain", "Items", "Icon", "Symbols"]
+const CREATE_SUBMODULES := ["Single"]
 const GEOMETRY_SUBMODULES := ["Sampling", "Seeding", "Meshing"]
 
 
@@ -170,12 +170,14 @@ func rebuild() -> void:
 			self.add_child(EditorWidgets.create_inspector_field_label("%s authoring will be introduced in a later phase." % active_geometry_submodule))
 		return
 	if active_module == "Create" and active_create_submodule in CREATE_SUBMODULES:
+		# The seven Asset types share one view. The Asset filter and the search
+		# select among them; the view itself tests only what main.gd pushed in.
 		var visible_assets: Array = []
 		for asset in assets:
-			if asset_is_visible(asset) and WorldDocumentService.asset_type(asset) == WorldDocumentService.normalize_asset_type(active_create_submodule) and asset_matches_search(asset, search_text):
+			if asset_is_visible(asset) and asset_type_filter_matches(asset) and asset_matches_search(asset, search_text):
 				visible_assets.append(asset)
 		visible_assets.sort_custom(WorldDocumentService.sort_named_documents)
-		self.add_child(EditorWidgets.create_outliner_group_label(active_create_submodule))
+		self.add_child(EditorWidgets.create_outliner_group_label("Assets"))
 		for asset in visible_assets:
 			_render_asset_outliner_entry(asset, not search_text.is_empty())
 

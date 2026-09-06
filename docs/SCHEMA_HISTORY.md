@@ -53,11 +53,13 @@ fingerprints.
 | 60 | Semantic Regions restored | additive | `deserialize_component` | `_test_runtime_export_service`, `_test_asset_guides` |
 | 61 | Regions Component-scoped; `region_geometry_source` | additive (missing reads `authored`) | `normalize_region_geometry_source` | `_test_asset_deserialization_migrations` |
 | 62 | `items` Asset type | additive | `normalize_asset_type` | `_test_asset_deserialization_migrations` |
+| 63 | Seven Create views merged into `Single`; `editor_state.active_create_submodule` holds a module name | shape (every old view name reads as `Single`) | `main.gd._normalized_create_submodule` | `_test_create_outliner_expansion_scope` |
+| 63 | The Outliner Asset filter gates Create as well | **explicit** (< 63) | `main.gd._restore_editor_state` | `_test_create_outliner_expansion_scope` |
 | Manifest 16 | `contour_stroke_mesh`, `closed_region_mesh`, Attachment Frames, `projection_depth_corners`, `regions` | derived | `RuntimeExportService` | `_test_runtime_export_service` |
 | Sampling 6 | Junction-aware Cuts, boundary-namespaced analytic Samples, corner balancing | derived | `GeometrySamplingService` | `_test_geometry_sampling_corner_balancing` |
 | Motion 1–18 | Blink `anticipation_share` default 0.18 read as 0.5 | **explicit** (≤ 18) | `normalize_motion_act` | `_test_asset_deserialization_migrations` |
 
-Only four steps are explicit. Every other legacy form is recognized by its
+Only five steps are explicit. Every other legacy form is recognized by its
 shape or simply defaulted, which is why load-time normalization is one pass
 per document rather than a ladder of per-version functions. A row without a
 fixture is either a one-time conversion applied to the World data at the
@@ -270,6 +272,22 @@ binding rather than copied geometry.
 World schema 62 adds the `items` Asset type and its `Items` Create view. Items
 use the same document, authoring, derived Mesh, Style, and Runtime Export paths
 as every other Asset type, without introducing a second geometry model.
+
+World schema 63 merges the seven Create views into the one `Single` view. No
+Asset document changes: `asset_type` keeps its seven values, stays persisted
+and stays exported; what it no longer does is open a view of its own. The type
+is chosen in the New Asset dialog and corrected on the Asset root in the
+Inspector, and the Outliner search plus the shared multi-select Asset filter
+select among the types.
+
+Two things in `editor_state` follow. `active_create_submodule` now holds a
+Create module name; each of the seven old view names, and any unknown value,
+reads as `Single` by its own shape, without a version gate. The Asset filter
+is the explicit step: below 63 it gated Mesh and Style only, so a World could
+be saved with every type switched off — `worlds/world01` was — and that state
+would read as an empty Create module. Loading a World below 63 therefore
+restores all seven filter entries exactly once. From 63 on the saved filter is
+authoritative in Create as well and receives no fallback.
 
 Runtime Manifest schema 16 exports `contour_stroke_mesh` independently from
 the unchanged Fill Mesh and adds geometry-only `closed_region_mesh` to closed

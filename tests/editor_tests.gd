@@ -82,7 +82,7 @@ func _test_contour_rotation_spinbox() -> void:
 	application.selected_asset_id = "asset"
 	application.selected_component_id = "contour"
 	application.active_module = "Create"
-	application.active_create_submodule = "Character"
+	application.active_create_submodule = "Single"
 	application._render_inspector()
 	var rotation_field: SpinBox = application.create_inspector_view.transform_fields.get("rotation")
 	_expect(is_instance_valid(rotation_field) and is_equal_approx(rotation_field.step, 1.0) and is_equal_approx(rotation_field.custom_arrow_step, 1.0), "Component Rotation arrows should always count in exact one-degree steps.")
@@ -152,7 +152,7 @@ func _test_create_outliner_expansion_scope() -> void:
 	var application = application_script.new()
 	application._build_ui()
 	application.active_module = "Create"
-	application.active_create_submodule = "Character"
+	application.active_create_submodule = "Single"
 	var test_assets: Array[Dictionary] = [
 		{"id": "character_a", "name": "Character A", "asset_type": "character", "visibility": true, "components": [], "guides": []},
 		{"id": "character_b", "name": "Character B", "asset_type": "character", "visibility": true, "components": [], "guides": []},
@@ -161,22 +161,21 @@ func _test_create_outliner_expansion_scope() -> void:
 	application.assets = test_assets
 	application._set_outliner_asset_expanded("character_a", true)
 	application._set_outliner_asset_expanded("character_b", true)
-	_expect(not bool(application.expanded_assets.get("character_a", false)) and bool(application.expanded_assets.get("character_b", false)), "Expanding a Character should collapse only the other Character Assets.")
-	application.active_create_submodule = "Symbols"
+	_expect(not bool(application.expanded_assets.get("character_a", false)) and bool(application.expanded_assets.get("character_b", false)), "Expanding an Asset should collapse the other Assets of the same Create module.")
+	# The expansion scope follows the Create module, not the Asset type: the
+	# seven types share the Single view, so a Symbol collapses a Character.
 	application._set_outliner_asset_expanded("symbol_a", true)
-	_expect(bool(application.expanded_assets.get("character_b", false)) and bool(application.expanded_assets.get("symbol_a", false)), "Expanding a Symbol should preserve the Character module's expanded Asset.")
-	_expect(application._outliner_focus_asset_id() == "symbol_a" and application.outliner_view.asset_is_visible(application.assets[2]), "The Symbols Outliner should retain its own visible expanded Asset.")
-	application.active_create_submodule = "Character"
-	_expect(application._outliner_focus_asset_id() == "character_b" and application.outliner_view.asset_is_visible(application.assets[1]), "Returning to Characters should restore that module's expanded Asset.")
+	_expect(not bool(application.expanded_assets.get("character_b", false)) and bool(application.expanded_assets.get("symbol_a", false)), "The merged Single view should hold one expanded Asset across all seven Asset types.")
+	application._render_outliner()
+	_expect(application._outliner_focus_asset_id() == "symbol_a" and application.outliner_view.asset_is_visible(application.assets[2]) and not application.outliner_view.asset_is_visible(application.assets[1]), "The Single Outliner should focus its one expanded Asset.")
 	application.selected_asset_id = "character_b"
 	application.selected_component_id = "component_stale"
 	application.selected_guide_id = "guide_stale"
-	application.active_create_submodule = "Character"
-	application._set_create_submodule_context("Symbols")
-	_expect(application.selected_asset_id == "symbol_a" and application.selected_component_id.is_empty() and application.selected_guide_id.is_empty(), "Switching Create modules should select the target module's expanded Asset at asset level.")
+	application._set_create_submodule_context("Single")
+	_expect(application.selected_asset_id == "character_b" and application.selected_component_id == "component_stale", "Re-entering the module an Asset already belongs to should leave the selection alone.")
 	application.canvas_view.set_camera_state(Vector2(12.0, -3.0), 13.0)
 	var camera_before: Dictionary = application.canvas_view.get_camera_state()
-	application._set_create_submodule_context("Character")
+	application._set_create_submodule_context("Single")
 	application._render_canvas_context()
 	_expect(application.canvas_view.get_camera_state() == camera_before, "Restoring a Create module's active Asset must not reset canvas pan or zoom.")
 	application.selected_asset_id = "character_b"
@@ -193,6 +192,17 @@ func _test_create_outliner_expansion_scope() -> void:
 	application._restore_editor_state(saved_editor_state)
 	application._render_canvas_context()
 	_expect(application.canvas_view.get_camera_state() == {"position": Vector2(42.0, -17.0), "zoom": 7.0}, "Reloading editor state should restore the selected Asset's saved canvas camera.")
+	# Schema 63 merged the seven Create views and let the Asset filter gate
+	# Create too. A World saved below the step could hold a type name here and
+	# every filter switched off, which would read as an empty module.
+	var legacy_state: Dictionary = saved_editor_state.duplicate(true)
+	legacy_state["active_create_submodule"] = "Props"
+	legacy_state["outliner_asset_type_filters"] = {"character": false, "props": false,
+		"weapons": false, "terrain": false, "items": false, "icon": false, "symbols": false}
+	application._restore_editor_state(legacy_state, 62)
+	_expect(application.active_create_submodule == "Single" and application.outliner_asset_type_filters["character"] and application.outliner_asset_type_filters["symbols"], "A World below schema 63 should open in the Single view with every Asset type filter restored.")
+	application._restore_editor_state(legacy_state, 63)
+	_expect(application.active_create_submodule == "Single" and not application.outliner_asset_type_filters["character"], "From schema 63 the saved Asset filter is authoritative, in Create as well, and receives no fallback.")
 	application.free()
 
 
@@ -370,7 +380,7 @@ func _test_multi_component_deletion() -> void:
 	var test_assets: Array[Dictionary] = [asset]
 	application.assets = test_assets
 	application.active_module = "Create"
-	application.active_create_submodule = "Character"
+	application.active_create_submodule = "Single"
 	application.selected_asset_id = "asset"
 	application.selected_component_id = "sibling"
 	var deletion_selection: Array[String] = ["parent", "child", "sibling"]
@@ -876,7 +886,7 @@ func _test_group_outliner_workflows() -> void:
 	var test_assets: Array[Dictionary] = [asset]
 	application.assets = test_assets
 	application.active_module = "Create"
-	application.active_create_submodule = "Character"
+	application.active_create_submodule = "Single"
 	application.expanded_assets["mage"] = true
 	application._select_group("mage", "lashes")
 	var group_button := _button_with_text(application.outliner_view, "G: eyelashes_right")
@@ -945,7 +955,7 @@ func _test_asset_guides() -> void:
 	application.assets = test_assets
 	application._build_ui()
 	application.active_module = "Create"
-	application.active_create_submodule = "Character"
+	application.active_create_submodule = "Single"
 	application.selected_asset_id = "asset_1"
 	application.selected_component_id = "component_1"
 	application.guide_dialog.set_meta("asset_id", "asset_1")
@@ -1271,10 +1281,10 @@ func _prepare_outliner_case(application: Control, case_name: String) -> void:
 	match case_name:
 		"create":
 			application.active_module = "Create"
-			application.active_create_submodule = "Character"
+			application.active_create_submodule = "Single"
 		"create_expanded":
 			application.active_module = "Create"
-			application.active_create_submodule = "Character"
+			application.active_create_submodule = "Single"
 			application.expanded_assets["asset_1"] = true
 		"style":
 			application.active_module = "Style"
@@ -1614,6 +1624,7 @@ const CREATE_SIGNAL_ROUTES := [
 	["asset_root_scale_changed", "_on_asset_root_scale_changed"],
 	["asset_root_scale_rebase_requested", "_on_rebase_asset_root_scale_pressed"],
 	["asset_scales_rebase_requested", "_on_rebase_asset_scales_pressed"],
+	["asset_type_selected", "_on_asset_type_selected"],
 	["circle_primitive_diameter_changed", "_on_circle_primitive_diameter_changed"],
 	["component_catch_parent_selected", "_on_component_catch_parent_selected"],
 	["component_contour_stroke_width_changed", "_on_component_contour_stroke_width_changed"],

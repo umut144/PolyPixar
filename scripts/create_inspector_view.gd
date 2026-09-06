@@ -12,6 +12,7 @@ extends VBoxContainer
 # redesign; giving them plain values is a separate step.
 
 signal asset_authored_facing_selected(index: int, option: OptionButton)
+signal asset_type_selected(index: int, option: OptionButton)
 signal asset_pivot_property_changed(value: float, property_name: String)
 signal asset_rename_requested(new_name: String)
 signal asset_root_position_changed(value: float, property_name: String)
@@ -87,6 +88,7 @@ var asset_root_scale_field: SpinBox
 var asset_root_scale_rebase_button: Button
 var asset_scale_rebase_button: Button
 var asset_authored_facing_option: OptionButton
+var asset_type_option: OptionButton
 var asset_name_editor: LineEdit
 var component_name_editor: LineEdit
 
@@ -127,6 +129,7 @@ func _reset_field_cache() -> void:
 	asset_root_scale_rebase_button = null
 	asset_scale_rebase_button = null
 	asset_authored_facing_option = null
+	asset_type_option = null
 	asset_name_editor = null
 	component_name_editor = null
 
@@ -154,6 +157,15 @@ func rebuild() -> void:
 			asset_rename_requested.emit(asset_name_editor.text)
 		)
 		add_child(asset_name_editor)
+		# The one Create view does not carry the type any more, so the Asset
+		# root is where it is read and changed.
+		add_child(EditorWidgets.create_inspector_field_label("Asset Type"))
+		var asset_type_items: Array = []
+		for asset_type in WorldDocumentService.ASSET_TYPES:
+			asset_type_items.append({"label": asset_type.capitalize(), "metadata": asset_type})
+		asset_type_option = EditorWidgets.create_option_field(asset_type_items,
+			WorldDocumentService.asset_type(asset), asset_type_selected.emit)
+		add_child(asset_type_option)
 		add_child(EditorWidgets.create_inspector_section("Initial Pose", section_toggled.emit))
 		add_child(EditorWidgets.create_inspector_field_label("Authored Facing"))
 		var facing_items: Array = []
