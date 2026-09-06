@@ -338,8 +338,11 @@ an ordinary `asset_category: "single"` Manifest of the same `asset_type`.
 `components`, `attachment_frames` and `regions` are present and empty. No other
 Manifest carries `variants`.
 
-A variant is chosen by the presentation, independently per client, so it may
-carry nothing the simulation would have to agree on. PolyTools enforces the
+A variant is chosen by the presentation, independently per client. Which
+variant is shown is not an authoritative statement: nobody has to agree on it,
+neither server and client nor two clients with each other. It may look the same
+everywhere; it has to match nowhere. That is why a variant carries nothing
+anyone would have to agree on. PolyTools enforces the
 part it owns and rejects the Palette — not the variant — when a variant has
 gameplay Regions or Attachment Frames, is hidden, is missing, or is not of the
 Palette's `asset_type`. **`Surface`, placement rank and every other consumer-side
