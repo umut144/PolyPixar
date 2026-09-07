@@ -1,0 +1,7009 @@
+{
+	"asset_id": "asset_29",
+	"component_id": "component_192",
+	"component_mesh": {
+		"bake_id": "meshing_bake_8105192143425139289",
+		"build_provenance": {
+			"attempts": 1,
+			"auto_recipe_version": 3,
+			"automatic_diagnostics": {
+				"accepted": {
+					"accepted": true,
+					"boundary_refinement": {
+						"added_vertex_count": 0,
+						"complete": true,
+						"enabled": true,
+						"limit_reached": false,
+						"unresolved_corner_count": 0
+					},
+					"issues": [],
+					"limits": {
+						"boundary_samples": 4096,
+						"seeds": 2500,
+						"triangles": 12000
+					},
+					"mean_quality": 0.53777337081918,
+					"minimum_angle": 17.4769680642597,
+					"retry_scope": "none",
+					"sample_count": 48,
+					"seed_count": 0,
+					"triangle_count": 48,
+					"worst_aspect_ratio": 3.329755067235
+				},
+				"attempts": [
+					{
+						"attempt": 1,
+						"boundary_spacing": 0.141314910259098,
+						"issues": [],
+						"mean_quality": 0.53777337081918,
+						"minimum_angle": 17.4769680642597,
+						"outcome": "accepted",
+						"sample_count": 48,
+						"scope": "initial",
+						"seed_count": 0,
+						"seed_spacing": 0.141314910259098,
+						"triangle_count": 48
+					}
+				],
+				"limits": {
+					"boundary_samples": 4096,
+					"seeds": 2500,
+					"triangles": 12000
+				},
+				"version": 1
+			},
+			"exact_input_hash": "046597d9e7407c37c6cd3e3428485b63288d37780e018e32cb1c13a802d3f2f1",
+			"pipeline_recipe_hash": "243706bd78bb7fffa69df4ba628c474a965aeffe466a1e884b7e48fb56a0f9be",
+			"recipe_mode": "automatic",
+			"schema_version": 1,
+			"source_signature": {
+				"geometry_tolerance": 0.000141314910259098,
+				"meshing_algorithm": 5,
+				"recipe_hash": "3c28d13efd14581ebfed6794b39a13abfb81df2c379005e2a3fde541dc6a5106",
+				"recipe_version": 2,
+				"sampling_algorithm": 6,
+				"scalars": [
+					0.360000014305115,
+					0.360000014305115,
+					0.159999996423721,
+					0.159999996423721,
+					1.0,
+					1.0
+				],
+				"seeding_algorithm": 2,
+				"topology_hash": "7decb9534fdfd1828f0936950057a3dbde454f2fbf4229f7093829ae4541a530",
+				"vectors": [
+					[
+						-1.12000000476837,
+						0.0
+					],
+					[
+						1.0,
+						0.0
+					],
+					[
+						0.0,
+						1.0
+					],
+					[
+						0.0,
+						0.0
+					],
+					[
+						-1.12000000476837,
+						0.0
+					],
+					[
+						1.0,
+						0.0
+					],
+					[
+						0.0,
+						1.0
+					],
+					[
+						0.0,
+						0.0
+					]
+				],
+				"version": 1
+			}
+		},
+		"last_error": "",
+		"last_failure_signature": {},
+		"mesh_fingerprint": "7d0ebcb9ae4d45c11a718d5b551cfd1fe75655e844caa38e4d43e8bbaccdc011",
+		"method": "constrained_mesh"
+	},
+	"meshing": {
+		"bakes": {
+			"constrained_mesh": {
+				"algorithm_version": 5,
+				"bake_id": "meshing_bake_8105192143425139289",
+				"boundary_constraints": [
+					{
+						"chain_id": "primitive:circle",
+						"segment_index": 0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:0",
+							"vertex:boundary:sample:circle:outer:1"
+						]
+					},
+					{
+						"chain_id": "primitive:circle",
+						"segment_index": 1,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:1",
+							"vertex:boundary:sample:circle:outer:2"
+						]
+					},
+					{
+						"chain_id": "primitive:circle",
+						"segment_index": 2,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:2",
+							"vertex:boundary:sample:circle:outer:3"
+						]
+					},
+					{
+						"chain_id": "primitive:circle",
+						"segment_index": 3,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:3",
+							"vertex:boundary:sample:circle:outer:4"
+						]
+					},
+					{
+						"chain_id": "primitive:circle",
+						"segment_index": 4,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:4",
+							"vertex:boundary:sample:circle:outer:5"
+						]
+					},
+					{
+						"chain_id": "primitive:circle",
+						"segment_index": 5,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:5",
+							"vertex:boundary:sample:circle:outer:6"
+						]
+					},
+					{
+						"chain_id": "primitive:circle",
+						"segment_index": 6,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:6",
+							"vertex:boundary:sample:circle:outer:7"
+						]
+					},
+					{
+						"chain_id": "primitive:circle",
+						"segment_index": 7,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:7",
+							"vertex:boundary:sample:circle:outer:8"
+						]
+					},
+					{
+						"chain_id": "primitive:circle",
+						"segment_index": 8,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:8",
+							"vertex:boundary:sample:circle:outer:9"
+						]
+					},
+					{
+						"chain_id": "primitive:circle",
+						"segment_index": 9,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:9",
+							"vertex:boundary:sample:circle:outer:10"
+						]
+					},
+					{
+						"chain_id": "primitive:circle",
+						"segment_index": 10,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:10",
+							"vertex:boundary:sample:circle:outer:11"
+						]
+					},
+					{
+						"chain_id": "primitive:circle",
+						"segment_index": 11,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:11",
+							"vertex:boundary:sample:circle:outer:12"
+						]
+					},
+					{
+						"chain_id": "primitive:circle",
+						"segment_index": 12,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:12",
+							"vertex:boundary:sample:circle:outer:13"
+						]
+					},
+					{
+						"chain_id": "primitive:circle",
+						"segment_index": 13,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:13",
+							"vertex:boundary:sample:circle:outer:14"
+						]
+					},
+					{
+						"chain_id": "primitive:circle",
+						"segment_index": 14,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:14",
+							"vertex:boundary:sample:circle:outer:15"
+						]
+					},
+					{
+						"chain_id": "primitive:circle",
+						"segment_index": 15,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:15",
+							"vertex:boundary:sample:circle:outer:16"
+						]
+					},
+					{
+						"chain_id": "primitive:circle",
+						"segment_index": 16,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:16",
+							"vertex:boundary:sample:circle:outer:17"
+						]
+					},
+					{
+						"chain_id": "primitive:circle",
+						"segment_index": 17,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:17",
+							"vertex:boundary:sample:circle:outer:18"
+						]
+					},
+					{
+						"chain_id": "primitive:circle",
+						"segment_index": 18,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:18",
+							"vertex:boundary:sample:circle:outer:19"
+						]
+					},
+					{
+						"chain_id": "primitive:circle",
+						"segment_index": 19,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:19",
+							"vertex:boundary:sample:circle:outer:20"
+						]
+					},
+					{
+						"chain_id": "primitive:circle",
+						"segment_index": 20,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:20",
+							"vertex:boundary:sample:circle:outer:21"
+						]
+					},
+					{
+						"chain_id": "primitive:circle",
+						"segment_index": 21,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:21",
+							"vertex:boundary:sample:circle:outer:22"
+						]
+					},
+					{
+						"chain_id": "primitive:circle",
+						"segment_index": 22,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:22",
+							"vertex:boundary:sample:circle:outer:23"
+						]
+					},
+					{
+						"chain_id": "primitive:circle",
+						"segment_index": 23,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:23",
+							"vertex:boundary:sample:circle:outer:24"
+						]
+					},
+					{
+						"chain_id": "primitive:circle",
+						"segment_index": 24,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:24",
+							"vertex:boundary:sample:circle:outer:25"
+						]
+					},
+					{
+						"chain_id": "primitive:circle",
+						"segment_index": 25,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:25",
+							"vertex:boundary:sample:circle:outer:26"
+						]
+					},
+					{
+						"chain_id": "primitive:circle",
+						"segment_index": 26,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:26",
+							"vertex:boundary:sample:circle:outer:27"
+						]
+					},
+					{
+						"chain_id": "primitive:circle",
+						"segment_index": 27,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:27",
+							"vertex:boundary:sample:circle:outer:28"
+						]
+					},
+					{
+						"chain_id": "primitive:circle",
+						"segment_index": 28,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:28",
+							"vertex:boundary:sample:circle:outer:29"
+						]
+					},
+					{
+						"chain_id": "primitive:circle",
+						"segment_index": 29,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:29",
+							"vertex:boundary:sample:circle:outer:30"
+						]
+					},
+					{
+						"chain_id": "primitive:circle",
+						"segment_index": 30,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:30",
+							"vertex:boundary:sample:circle:outer:31"
+						]
+					},
+					{
+						"chain_id": "primitive:circle",
+						"segment_index": 31,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:31",
+							"vertex:boundary:sample:circle:outer:0"
+						]
+					},
+					{
+						"chain_id": "hole:component_193:primitive:circle",
+						"segment_index": 0,
+						"topology_role": "hole",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:component_193:0",
+							"vertex:boundary:sample:circle:component_193:1"
+						]
+					},
+					{
+						"chain_id": "hole:component_193:primitive:circle",
+						"segment_index": 1,
+						"topology_role": "hole",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:component_193:1",
+							"vertex:boundary:sample:circle:component_193:2"
+						]
+					},
+					{
+						"chain_id": "hole:component_193:primitive:circle",
+						"segment_index": 2,
+						"topology_role": "hole",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:component_193:2",
+							"vertex:boundary:sample:circle:component_193:3"
+						]
+					},
+					{
+						"chain_id": "hole:component_193:primitive:circle",
+						"segment_index": 3,
+						"topology_role": "hole",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:component_193:3",
+							"vertex:boundary:sample:circle:component_193:4"
+						]
+					},
+					{
+						"chain_id": "hole:component_193:primitive:circle",
+						"segment_index": 4,
+						"topology_role": "hole",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:component_193:4",
+							"vertex:boundary:sample:circle:component_193:5"
+						]
+					},
+					{
+						"chain_id": "hole:component_193:primitive:circle",
+						"segment_index": 5,
+						"topology_role": "hole",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:component_193:5",
+							"vertex:boundary:sample:circle:component_193:6"
+						]
+					},
+					{
+						"chain_id": "hole:component_193:primitive:circle",
+						"segment_index": 6,
+						"topology_role": "hole",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:component_193:6",
+							"vertex:boundary:sample:circle:component_193:7"
+						]
+					},
+					{
+						"chain_id": "hole:component_193:primitive:circle",
+						"segment_index": 7,
+						"topology_role": "hole",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:component_193:7",
+							"vertex:boundary:sample:circle:component_193:8"
+						]
+					},
+					{
+						"chain_id": "hole:component_193:primitive:circle",
+						"segment_index": 8,
+						"topology_role": "hole",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:component_193:8",
+							"vertex:boundary:sample:circle:component_193:9"
+						]
+					},
+					{
+						"chain_id": "hole:component_193:primitive:circle",
+						"segment_index": 9,
+						"topology_role": "hole",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:component_193:9",
+							"vertex:boundary:sample:circle:component_193:10"
+						]
+					},
+					{
+						"chain_id": "hole:component_193:primitive:circle",
+						"segment_index": 10,
+						"topology_role": "hole",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:component_193:10",
+							"vertex:boundary:sample:circle:component_193:11"
+						]
+					},
+					{
+						"chain_id": "hole:component_193:primitive:circle",
+						"segment_index": 11,
+						"topology_role": "hole",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:component_193:11",
+							"vertex:boundary:sample:circle:component_193:12"
+						]
+					},
+					{
+						"chain_id": "hole:component_193:primitive:circle",
+						"segment_index": 12,
+						"topology_role": "hole",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:component_193:12",
+							"vertex:boundary:sample:circle:component_193:13"
+						]
+					},
+					{
+						"chain_id": "hole:component_193:primitive:circle",
+						"segment_index": 13,
+						"topology_role": "hole",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:component_193:13",
+							"vertex:boundary:sample:circle:component_193:14"
+						]
+					},
+					{
+						"chain_id": "hole:component_193:primitive:circle",
+						"segment_index": 14,
+						"topology_role": "hole",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:component_193:14",
+							"vertex:boundary:sample:circle:component_193:15"
+						]
+					},
+					{
+						"chain_id": "hole:component_193:primitive:circle",
+						"segment_index": 15,
+						"topology_role": "hole",
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:component_193:15",
+							"vertex:boundary:sample:circle:component_193:0"
+						]
+					}
+				],
+				"boundary_refinement": {
+					"added_vertex_count": 0,
+					"complete": true,
+					"enabled": true,
+					"limit_reached": false,
+					"unresolved_corner_count": 0
+				},
+				"constraint_count": 48,
+				"constraints_valid": true,
+				"cut_seam_vertex_count": 0,
+				"degenerate_triangle_count": 0,
+				"diagnostics": {
+					"domain": {
+						"boundary_seed_count": 32,
+						"candidate_triangle_count": 62,
+						"final_constraint_issue_count": 0,
+						"raw_triangle_count": 62,
+						"selected_triangle_count": 48
+					},
+					"input_constraint_count": 48,
+					"native": {
+						"fixed_edge_count": 48,
+						"input_constraint_count": 48,
+						"input_vertex_count": 48,
+						"triangle_count": 62
+					},
+					"stage": "complete"
+				},
+				"errors": [],
+				"mean_quality": 0.53777337081918,
+				"method": "constrained_mesh",
+				"minimum_angle": 17.4769680642597,
+				"optimization": {
+					"accepted_passes": 0,
+					"applied": false,
+					"attempted_passes": 1,
+					"baseline_triangles": [
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:component_193:0",
+								"vertex:boundary:sample:circle:component_193:15",
+								"vertex:boundary:sample:circle:outer:31"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:component_193:1",
+								"vertex:boundary:sample:circle:component_193:0",
+								"vertex:boundary:sample:circle:outer:1"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:component_193:1",
+								"vertex:boundary:sample:circle:outer:3",
+								"vertex:boundary:sample:circle:component_193:2"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:component_193:11",
+								"vertex:boundary:sample:circle:component_193:10",
+								"vertex:boundary:sample:circle:outer:21"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:component_193:12",
+								"vertex:boundary:sample:circle:component_193:11",
+								"vertex:boundary:sample:circle:outer:23"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:component_193:13",
+								"vertex:boundary:sample:circle:component_193:12",
+								"vertex:boundary:sample:circle:outer:25"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:component_193:13",
+								"vertex:boundary:sample:circle:outer:27",
+								"vertex:boundary:sample:circle:component_193:14"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:component_193:15",
+								"vertex:boundary:sample:circle:component_193:14",
+								"vertex:boundary:sample:circle:outer:29"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:component_193:3",
+								"vertex:boundary:sample:circle:component_193:2",
+								"vertex:boundary:sample:circle:outer:5"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:component_193:4",
+								"vertex:boundary:sample:circle:component_193:3",
+								"vertex:boundary:sample:circle:outer:7"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:component_193:4",
+								"vertex:boundary:sample:circle:outer:9",
+								"vertex:boundary:sample:circle:component_193:5"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:component_193:5",
+								"vertex:boundary:sample:circle:outer:11",
+								"vertex:boundary:sample:circle:component_193:6"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:component_193:7",
+								"vertex:boundary:sample:circle:component_193:6",
+								"vertex:boundary:sample:circle:outer:13"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:component_193:8",
+								"vertex:boundary:sample:circle:component_193:7",
+								"vertex:boundary:sample:circle:outer:15"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:component_193:8",
+								"vertex:boundary:sample:circle:outer:17",
+								"vertex:boundary:sample:circle:component_193:9"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:component_193:9",
+								"vertex:boundary:sample:circle:outer:19",
+								"vertex:boundary:sample:circle:component_193:10"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:outer:0",
+								"vertex:boundary:sample:circle:component_193:0",
+								"vertex:boundary:sample:circle:outer:31"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:outer:0",
+								"vertex:boundary:sample:circle:outer:1",
+								"vertex:boundary:sample:circle:component_193:0"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:outer:1",
+								"vertex:boundary:sample:circle:outer:2",
+								"vertex:boundary:sample:circle:component_193:1"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:outer:11",
+								"vertex:boundary:sample:circle:component_193:5",
+								"vertex:boundary:sample:circle:outer:10"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:outer:11",
+								"vertex:boundary:sample:circle:outer:12",
+								"vertex:boundary:sample:circle:component_193:6"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:outer:12",
+								"vertex:boundary:sample:circle:outer:13",
+								"vertex:boundary:sample:circle:component_193:6"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:outer:14",
+								"vertex:boundary:sample:circle:component_193:7",
+								"vertex:boundary:sample:circle:outer:13"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:outer:14",
+								"vertex:boundary:sample:circle:outer:15",
+								"vertex:boundary:sample:circle:component_193:7"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:outer:15",
+								"vertex:boundary:sample:circle:outer:16",
+								"vertex:boundary:sample:circle:component_193:8"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:outer:17",
+								"vertex:boundary:sample:circle:component_193:8",
+								"vertex:boundary:sample:circle:outer:16"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:outer:18",
+								"vertex:boundary:sample:circle:component_193:9",
+								"vertex:boundary:sample:circle:outer:17"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:outer:18",
+								"vertex:boundary:sample:circle:outer:19",
+								"vertex:boundary:sample:circle:component_193:9"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:outer:20",
+								"vertex:boundary:sample:circle:component_193:10",
+								"vertex:boundary:sample:circle:outer:19"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:outer:20",
+								"vertex:boundary:sample:circle:outer:21",
+								"vertex:boundary:sample:circle:component_193:10"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:outer:22",
+								"vertex:boundary:sample:circle:component_193:11",
+								"vertex:boundary:sample:circle:outer:21"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:outer:22",
+								"vertex:boundary:sample:circle:outer:23",
+								"vertex:boundary:sample:circle:component_193:11"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:outer:23",
+								"vertex:boundary:sample:circle:outer:24",
+								"vertex:boundary:sample:circle:component_193:12"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:outer:24",
+								"vertex:boundary:sample:circle:outer:25",
+								"vertex:boundary:sample:circle:component_193:12"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:outer:26",
+								"vertex:boundary:sample:circle:component_193:13",
+								"vertex:boundary:sample:circle:outer:25"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:outer:27",
+								"vertex:boundary:sample:circle:component_193:13",
+								"vertex:boundary:sample:circle:outer:26"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:outer:28",
+								"vertex:boundary:sample:circle:component_193:14",
+								"vertex:boundary:sample:circle:outer:27"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:outer:28",
+								"vertex:boundary:sample:circle:outer:29",
+								"vertex:boundary:sample:circle:component_193:14"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:outer:29",
+								"vertex:boundary:sample:circle:outer:30",
+								"vertex:boundary:sample:circle:component_193:15"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:outer:3",
+								"vertex:boundary:sample:circle:component_193:1",
+								"vertex:boundary:sample:circle:outer:2"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:outer:30",
+								"vertex:boundary:sample:circle:outer:31",
+								"vertex:boundary:sample:circle:component_193:15"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:outer:4",
+								"vertex:boundary:sample:circle:component_193:2",
+								"vertex:boundary:sample:circle:outer:3"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:outer:4",
+								"vertex:boundary:sample:circle:outer:5",
+								"vertex:boundary:sample:circle:component_193:2"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:outer:6",
+								"vertex:boundary:sample:circle:component_193:3",
+								"vertex:boundary:sample:circle:outer:5"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:outer:6",
+								"vertex:boundary:sample:circle:outer:7",
+								"vertex:boundary:sample:circle:component_193:3"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:outer:7",
+								"vertex:boundary:sample:circle:outer:8",
+								"vertex:boundary:sample:circle:component_193:4"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:outer:9",
+								"vertex:boundary:sample:circle:component_193:4",
+								"vertex:boundary:sample:circle:outer:8"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:circle:outer:9",
+								"vertex:boundary:sample:circle:outer:10",
+								"vertex:boundary:sample:circle:component_193:5"
+							]
+						}
+					],
+					"enabled": true,
+					"moved_seed_count": 0,
+					"movements": [],
+					"quality_after": {
+						"degenerate_triangle_count": 0,
+						"mean_quality": 0.53777337081918,
+						"minimum_angle": 17.4769680642597,
+						"worst_aspect_ratio": 3.329755067235
+					},
+					"quality_before": {
+						"degenerate_triangle_count": 0,
+						"mean_quality": 0.53777337081918,
+						"minimum_angle": 17.4769680642597,
+						"worst_aspect_ratio": 3.329755067235
+					},
+					"removed_seed_count": 0
+				},
+				"parameters": {
+					"mesh_character": 0.64,
+					"optimize_mesh": true,
+					"passes": 3,
+					"passes_override": false,
+					"relaxation": 0.402,
+					"relaxation_override": false,
+					"seeding_method": "poisson_fill"
+				},
+				"quality_warnings": [],
+				"runs": [],
+				"sampling_bake_id": "bake_7099610558745926825",
+				"sampling_fingerprint": "09ef1cc779e1f5b3a80744dd59773cf2806fedecfc859b611b800f92f42be5f1",
+				"seeding_bake_id": "seeding_bake_1571769064075059886",
+				"seeding_fingerprint": "aa0d337e507653f5b43429f5c16b572d50556e251739626ff4b1f3ea630b68d3",
+				"triangle_count": 48,
+				"triangles": [
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:component_193:0",
+							"vertex:boundary:sample:circle:component_193:15",
+							"vertex:boundary:sample:circle:outer:31"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:component_193:1",
+							"vertex:boundary:sample:circle:component_193:0",
+							"vertex:boundary:sample:circle:outer:1"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:component_193:1",
+							"vertex:boundary:sample:circle:outer:3",
+							"vertex:boundary:sample:circle:component_193:2"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:component_193:11",
+							"vertex:boundary:sample:circle:component_193:10",
+							"vertex:boundary:sample:circle:outer:21"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:component_193:12",
+							"vertex:boundary:sample:circle:component_193:11",
+							"vertex:boundary:sample:circle:outer:23"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:component_193:13",
+							"vertex:boundary:sample:circle:component_193:12",
+							"vertex:boundary:sample:circle:outer:25"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:component_193:13",
+							"vertex:boundary:sample:circle:outer:27",
+							"vertex:boundary:sample:circle:component_193:14"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:component_193:15",
+							"vertex:boundary:sample:circle:component_193:14",
+							"vertex:boundary:sample:circle:outer:29"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:component_193:3",
+							"vertex:boundary:sample:circle:component_193:2",
+							"vertex:boundary:sample:circle:outer:5"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:component_193:4",
+							"vertex:boundary:sample:circle:component_193:3",
+							"vertex:boundary:sample:circle:outer:7"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:component_193:4",
+							"vertex:boundary:sample:circle:outer:9",
+							"vertex:boundary:sample:circle:component_193:5"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:component_193:5",
+							"vertex:boundary:sample:circle:outer:11",
+							"vertex:boundary:sample:circle:component_193:6"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:component_193:7",
+							"vertex:boundary:sample:circle:component_193:6",
+							"vertex:boundary:sample:circle:outer:13"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:component_193:8",
+							"vertex:boundary:sample:circle:component_193:7",
+							"vertex:boundary:sample:circle:outer:15"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:component_193:8",
+							"vertex:boundary:sample:circle:outer:17",
+							"vertex:boundary:sample:circle:component_193:9"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:component_193:9",
+							"vertex:boundary:sample:circle:outer:19",
+							"vertex:boundary:sample:circle:component_193:10"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:0",
+							"vertex:boundary:sample:circle:component_193:0",
+							"vertex:boundary:sample:circle:outer:31"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:0",
+							"vertex:boundary:sample:circle:outer:1",
+							"vertex:boundary:sample:circle:component_193:0"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:1",
+							"vertex:boundary:sample:circle:outer:2",
+							"vertex:boundary:sample:circle:component_193:1"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:11",
+							"vertex:boundary:sample:circle:component_193:5",
+							"vertex:boundary:sample:circle:outer:10"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:11",
+							"vertex:boundary:sample:circle:outer:12",
+							"vertex:boundary:sample:circle:component_193:6"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:12",
+							"vertex:boundary:sample:circle:outer:13",
+							"vertex:boundary:sample:circle:component_193:6"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:14",
+							"vertex:boundary:sample:circle:component_193:7",
+							"vertex:boundary:sample:circle:outer:13"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:14",
+							"vertex:boundary:sample:circle:outer:15",
+							"vertex:boundary:sample:circle:component_193:7"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:15",
+							"vertex:boundary:sample:circle:outer:16",
+							"vertex:boundary:sample:circle:component_193:8"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:17",
+							"vertex:boundary:sample:circle:component_193:8",
+							"vertex:boundary:sample:circle:outer:16"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:18",
+							"vertex:boundary:sample:circle:component_193:9",
+							"vertex:boundary:sample:circle:outer:17"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:18",
+							"vertex:boundary:sample:circle:outer:19",
+							"vertex:boundary:sample:circle:component_193:9"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:20",
+							"vertex:boundary:sample:circle:component_193:10",
+							"vertex:boundary:sample:circle:outer:19"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:20",
+							"vertex:boundary:sample:circle:outer:21",
+							"vertex:boundary:sample:circle:component_193:10"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:22",
+							"vertex:boundary:sample:circle:component_193:11",
+							"vertex:boundary:sample:circle:outer:21"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:22",
+							"vertex:boundary:sample:circle:outer:23",
+							"vertex:boundary:sample:circle:component_193:11"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:23",
+							"vertex:boundary:sample:circle:outer:24",
+							"vertex:boundary:sample:circle:component_193:12"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:24",
+							"vertex:boundary:sample:circle:outer:25",
+							"vertex:boundary:sample:circle:component_193:12"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:26",
+							"vertex:boundary:sample:circle:component_193:13",
+							"vertex:boundary:sample:circle:outer:25"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:27",
+							"vertex:boundary:sample:circle:component_193:13",
+							"vertex:boundary:sample:circle:outer:26"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:28",
+							"vertex:boundary:sample:circle:component_193:14",
+							"vertex:boundary:sample:circle:outer:27"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:28",
+							"vertex:boundary:sample:circle:outer:29",
+							"vertex:boundary:sample:circle:component_193:14"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:29",
+							"vertex:boundary:sample:circle:outer:30",
+							"vertex:boundary:sample:circle:component_193:15"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:3",
+							"vertex:boundary:sample:circle:component_193:1",
+							"vertex:boundary:sample:circle:outer:2"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:30",
+							"vertex:boundary:sample:circle:outer:31",
+							"vertex:boundary:sample:circle:component_193:15"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:4",
+							"vertex:boundary:sample:circle:component_193:2",
+							"vertex:boundary:sample:circle:outer:3"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:4",
+							"vertex:boundary:sample:circle:outer:5",
+							"vertex:boundary:sample:circle:component_193:2"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:6",
+							"vertex:boundary:sample:circle:component_193:3",
+							"vertex:boundary:sample:circle:outer:5"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:6",
+							"vertex:boundary:sample:circle:outer:7",
+							"vertex:boundary:sample:circle:component_193:3"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:7",
+							"vertex:boundary:sample:circle:outer:8",
+							"vertex:boundary:sample:circle:component_193:4"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:9",
+							"vertex:boundary:sample:circle:component_193:4",
+							"vertex:boundary:sample:circle:outer:8"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:circle:outer:9",
+							"vertex:boundary:sample:circle:outer:10",
+							"vertex:boundary:sample:circle:component_193:5"
+						]
+					}
+				],
+				"triangulation_backend": "artem-ogre/CDT 1.4.5",
+				"valid": true,
+				"vertex_count": 48,
+				"vertices": [
+					{
+						"id": "vertex:boundary:sample:circle:outer:0",
+						"origin": "boundary",
+						"position": [
+							-0.939999997615814,
+							0.0
+						],
+						"preserved": false,
+						"source_id": "sample:circle:outer:0"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:outer:1",
+						"origin": "boundary",
+						"position": [
+							-0.943458676338196,
+							0.035116259008646
+						],
+						"preserved": false,
+						"source_id": "sample:circle:outer:1"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:outer:2",
+						"origin": "boundary",
+						"position": [
+							-0.953701674938202,
+							0.0688830241560936
+						],
+						"preserved": false,
+						"source_id": "sample:circle:outer:2"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:outer:3",
+						"origin": "boundary",
+						"position": [
+							-0.970335483551025,
+							0.100002646446228
+						],
+						"preserved": false,
+						"source_id": "sample:circle:outer:3"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:outer:4",
+						"origin": "boundary",
+						"position": [
+							-0.992720782756805,
+							0.127279222011566
+						],
+						"preserved": false,
+						"source_id": "sample:circle:outer:4"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:outer:5",
+						"origin": "boundary",
+						"position": [
+							-1.01999735832214,
+							0.149664536118507
+						],
+						"preserved": false,
+						"source_id": "sample:circle:outer:5"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:outer:6",
+						"origin": "boundary",
+						"position": [
+							-1.05111694335938,
+							0.16629832983017
+						],
+						"preserved": false,
+						"source_id": "sample:circle:outer:6"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:outer:7",
+						"origin": "boundary",
+						"position": [
+							-1.08488368988037,
+							0.176541358232498
+						],
+						"preserved": false,
+						"source_id": "sample:circle:outer:7"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:outer:8",
+						"origin": "boundary",
+						"position": [
+							-1.12000000476837,
+							0.180000007152557
+						],
+						"preserved": false,
+						"source_id": "sample:circle:outer:8"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:outer:9",
+						"origin": "boundary",
+						"position": [
+							-1.15511631965637,
+							0.176541358232498
+						],
+						"preserved": false,
+						"source_id": "sample:circle:outer:9"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:outer:10",
+						"origin": "boundary",
+						"position": [
+							-1.18888306617737,
+							0.16629832983017
+						],
+						"preserved": false,
+						"source_id": "sample:circle:outer:10"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:outer:11",
+						"origin": "boundary",
+						"position": [
+							-1.2200026512146,
+							0.149664536118507
+						],
+						"preserved": false,
+						"source_id": "sample:circle:outer:11"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:outer:12",
+						"origin": "boundary",
+						"position": [
+							-1.24727916717529,
+							0.127279222011566
+						],
+						"preserved": false,
+						"source_id": "sample:circle:outer:12"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:outer:13",
+						"origin": "boundary",
+						"position": [
+							-1.26966452598572,
+							0.100002646446228
+						],
+						"preserved": false,
+						"source_id": "sample:circle:outer:13"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:outer:14",
+						"origin": "boundary",
+						"position": [
+							-1.2862982749939,
+							0.0688830241560936
+						],
+						"preserved": false,
+						"source_id": "sample:circle:outer:14"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:outer:15",
+						"origin": "boundary",
+						"position": [
+							-1.29654133319855,
+							0.035116259008646
+						],
+						"preserved": false,
+						"source_id": "sample:circle:outer:15"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:outer:16",
+						"origin": "boundary",
+						"position": [
+							-1.29999995231628,
+							0.0000000000000000220436436774053
+						],
+						"preserved": false,
+						"source_id": "sample:circle:outer:16"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:outer:17",
+						"origin": "boundary",
+						"position": [
+							-1.29654133319855,
+							-0.035116259008646
+						],
+						"preserved": false,
+						"source_id": "sample:circle:outer:17"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:outer:18",
+						"origin": "boundary",
+						"position": [
+							-1.2862982749939,
+							-0.0688830241560936
+						],
+						"preserved": false,
+						"source_id": "sample:circle:outer:18"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:outer:19",
+						"origin": "boundary",
+						"position": [
+							-1.26966452598572,
+							-0.100002646446228
+						],
+						"preserved": false,
+						"source_id": "sample:circle:outer:19"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:outer:20",
+						"origin": "boundary",
+						"position": [
+							-1.24727916717529,
+							-0.127279222011566
+						],
+						"preserved": false,
+						"source_id": "sample:circle:outer:20"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:outer:21",
+						"origin": "boundary",
+						"position": [
+							-1.2200026512146,
+							-0.149664536118507
+						],
+						"preserved": false,
+						"source_id": "sample:circle:outer:21"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:outer:22",
+						"origin": "boundary",
+						"position": [
+							-1.18888306617737,
+							-0.16629832983017
+						],
+						"preserved": false,
+						"source_id": "sample:circle:outer:22"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:outer:23",
+						"origin": "boundary",
+						"position": [
+							-1.15511631965637,
+							-0.176541358232498
+						],
+						"preserved": false,
+						"source_id": "sample:circle:outer:23"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:outer:24",
+						"origin": "boundary",
+						"position": [
+							-1.12000000476837,
+							-0.180000007152557
+						],
+						"preserved": false,
+						"source_id": "sample:circle:outer:24"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:outer:25",
+						"origin": "boundary",
+						"position": [
+							-1.08488368988037,
+							-0.176541358232498
+						],
+						"preserved": false,
+						"source_id": "sample:circle:outer:25"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:outer:26",
+						"origin": "boundary",
+						"position": [
+							-1.05111694335938,
+							-0.16629832983017
+						],
+						"preserved": false,
+						"source_id": "sample:circle:outer:26"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:outer:27",
+						"origin": "boundary",
+						"position": [
+							-1.01999735832214,
+							-0.149664536118507
+						],
+						"preserved": false,
+						"source_id": "sample:circle:outer:27"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:outer:28",
+						"origin": "boundary",
+						"position": [
+							-0.992720782756805,
+							-0.127279222011566
+						],
+						"preserved": false,
+						"source_id": "sample:circle:outer:28"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:outer:29",
+						"origin": "boundary",
+						"position": [
+							-0.970335483551025,
+							-0.100002646446228
+						],
+						"preserved": false,
+						"source_id": "sample:circle:outer:29"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:outer:30",
+						"origin": "boundary",
+						"position": [
+							-0.953701674938202,
+							-0.0688830241560936
+						],
+						"preserved": false,
+						"source_id": "sample:circle:outer:30"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:outer:31",
+						"origin": "boundary",
+						"position": [
+							-0.943458676338196,
+							-0.035116259008646
+						],
+						"preserved": false,
+						"source_id": "sample:circle:outer:31"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:component_193:0",
+						"origin": "boundary",
+						"position": [
+							-1.03999996185303,
+							0.0
+						],
+						"preserved": false,
+						"source_id": "sample:circle:component_193:0"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:component_193:1",
+						"origin": "boundary",
+						"position": [
+							-1.04608964920044,
+							0.0306146740913391
+						],
+						"preserved": false,
+						"source_id": "sample:circle:component_193:1"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:component_193:2",
+						"origin": "boundary",
+						"position": [
+							-1.06343150138855,
+							0.0565685406327248
+						],
+						"preserved": false,
+						"source_id": "sample:circle:component_193:2"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:component_193:3",
+						"origin": "boundary",
+						"position": [
+							-1.08938527107239,
+							0.0739103630185127
+						],
+						"preserved": false,
+						"source_id": "sample:circle:component_193:3"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:component_193:4",
+						"origin": "boundary",
+						"position": [
+							-1.12000000476837,
+							0.0799999982118607
+						],
+						"preserved": false,
+						"source_id": "sample:circle:component_193:4"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:component_193:5",
+						"origin": "boundary",
+						"position": [
+							-1.15061473846436,
+							0.0739103630185127
+						],
+						"preserved": false,
+						"source_id": "sample:circle:component_193:5"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:component_193:6",
+						"origin": "boundary",
+						"position": [
+							-1.17656850814819,
+							0.0565685406327248
+						],
+						"preserved": false,
+						"source_id": "sample:circle:component_193:6"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:component_193:7",
+						"origin": "boundary",
+						"position": [
+							-1.1939103603363,
+							0.0306146740913391
+						],
+						"preserved": false,
+						"source_id": "sample:circle:component_193:7"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:component_193:8",
+						"origin": "boundary",
+						"position": [
+							-1.20000004768372,
+							0.00000000000000000979717432437298
+						],
+						"preserved": false,
+						"source_id": "sample:circle:component_193:8"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:component_193:9",
+						"origin": "boundary",
+						"position": [
+							-1.1939103603363,
+							-0.0306146740913391
+						],
+						"preserved": false,
+						"source_id": "sample:circle:component_193:9"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:component_193:10",
+						"origin": "boundary",
+						"position": [
+							-1.17656850814819,
+							-0.0565685406327248
+						],
+						"preserved": false,
+						"source_id": "sample:circle:component_193:10"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:component_193:11",
+						"origin": "boundary",
+						"position": [
+							-1.15061473846436,
+							-0.0739103630185127
+						],
+						"preserved": false,
+						"source_id": "sample:circle:component_193:11"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:component_193:12",
+						"origin": "boundary",
+						"position": [
+							-1.12000000476837,
+							-0.0799999982118607
+						],
+						"preserved": false,
+						"source_id": "sample:circle:component_193:12"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:component_193:13",
+						"origin": "boundary",
+						"position": [
+							-1.08938527107239,
+							-0.0739103630185127
+						],
+						"preserved": false,
+						"source_id": "sample:circle:component_193:13"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:component_193:14",
+						"origin": "boundary",
+						"position": [
+							-1.06343150138855,
+							-0.0565685406327248
+						],
+						"preserved": false,
+						"source_id": "sample:circle:component_193:14"
+					},
+					{
+						"id": "vertex:boundary:sample:circle:component_193:15",
+						"origin": "boundary",
+						"position": [
+							-1.04608964920044,
+							-0.0306146740913391
+						],
+						"preserved": false,
+						"source_id": "sample:circle:component_193:15"
+					}
+				],
+				"worst_aspect_ratio": 3.329755067235
+			},
+			"contour_stroke": {
+				"algorithm_version": 5,
+				"bake_id": "contour_stroke_bake_1424977096119834196",
+				"boundary_constraints": [],
+				"errors": [],
+				"geometry_diagnostics": {
+					"minimum_nonadjacent_clearance_meters": 0.00352861247956753,
+					"narrow_overlap_pair_count": 192,
+					"self_intersection_count": 0,
+					"triangle_validation": "complete"
+				},
+				"has_outline": true,
+				"mean_quality": 0.0,
+				"method": "contour_stroke",
+				"minimum_angle": 0.0,
+				"optimization": {
+					"baseline_triangles": [],
+					"movements": []
+				},
+				"parameters": {
+					"cap": "butt",
+					"join": "miter",
+					"miter_limit": 4.0,
+					"reference_pixels_per_meter": 192.0,
+					"stroke_width_meters": 0.0208333333333333,
+					"stroke_width_px": 4.0
+				},
+				"runs": [
+					{
+						"bevel_join_count": 0,
+						"centerline": [
+							{
+								"curve_t": 0.0,
+								"edge_id": "primitive:circle:edge:0",
+								"position": [
+									-0.939999997615814,
+									0.0
+								],
+								"source_point_id": "primitive:circle:point:0"
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "primitive:circle:edge:0",
+								"position": [
+									-0.943458676338196,
+									0.035116259008646
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "primitive:circle:edge:1",
+								"position": [
+									-0.953701674938202,
+									0.0688830241560936
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "primitive:circle:edge:2",
+								"position": [
+									-0.970335483551025,
+									0.100002646446228
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "primitive:circle:edge:3",
+								"position": [
+									-0.992720782756805,
+									0.127279222011566
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "primitive:circle:edge:4",
+								"position": [
+									-1.01999735832214,
+									0.149664536118507
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "primitive:circle:edge:5",
+								"position": [
+									-1.05111694335938,
+									0.16629832983017
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "primitive:circle:edge:6",
+								"position": [
+									-1.08488368988037,
+									0.176541358232498
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "primitive:circle:edge:7",
+								"position": [
+									-1.12000000476837,
+									0.180000007152557
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "primitive:circle:edge:8",
+								"position": [
+									-1.15511631965637,
+									0.176541358232498
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "primitive:circle:edge:9",
+								"position": [
+									-1.18888306617737,
+									0.16629832983017
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "primitive:circle:edge:10",
+								"position": [
+									-1.2200026512146,
+									0.149664536118507
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "primitive:circle:edge:11",
+								"position": [
+									-1.24727916717529,
+									0.127279222011566
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "primitive:circle:edge:12",
+								"position": [
+									-1.26966452598572,
+									0.100002646446228
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "primitive:circle:edge:13",
+								"position": [
+									-1.2862982749939,
+									0.0688830241560936
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "primitive:circle:edge:14",
+								"position": [
+									-1.29654133319855,
+									0.035116259008646
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "primitive:circle:edge:15",
+								"position": [
+									-1.29999995231628,
+									0.0000000000000000220436436774053
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "primitive:circle:edge:16",
+								"position": [
+									-1.29654133319855,
+									-0.035116259008646
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "primitive:circle:edge:17",
+								"position": [
+									-1.2862982749939,
+									-0.0688830241560936
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "primitive:circle:edge:18",
+								"position": [
+									-1.26966452598572,
+									-0.100002646446228
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "primitive:circle:edge:19",
+								"position": [
+									-1.24727916717529,
+									-0.127279222011566
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "primitive:circle:edge:20",
+								"position": [
+									-1.2200026512146,
+									-0.149664536118507
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "primitive:circle:edge:21",
+								"position": [
+									-1.18888306617737,
+									-0.16629832983017
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "primitive:circle:edge:22",
+								"position": [
+									-1.15511631965637,
+									-0.176541358232498
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "primitive:circle:edge:23",
+								"position": [
+									-1.12000000476837,
+									-0.180000007152557
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "primitive:circle:edge:24",
+								"position": [
+									-1.08488368988037,
+									-0.176541358232498
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "primitive:circle:edge:25",
+								"position": [
+									-1.05111694335938,
+									-0.16629832983017
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "primitive:circle:edge:26",
+								"position": [
+									-1.01999735832214,
+									-0.149664536118507
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "primitive:circle:edge:27",
+								"position": [
+									-0.992720782756805,
+									-0.127279222011566
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "primitive:circle:edge:28",
+								"position": [
+									-0.970335483551025,
+									-0.100002646446228
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "primitive:circle:edge:29",
+								"position": [
+									-0.953701674938202,
+									-0.0688830241560936
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "primitive:circle:edge:30",
+								"position": [
+									-0.943458676338196,
+									-0.035116259008646
+								],
+								"source_point_id": ""
+							}
+						],
+						"closed": true,
+						"edge_ids": [
+							"primitive:circle:edge:0",
+							"primitive:circle:edge:1",
+							"primitive:circle:edge:2",
+							"primitive:circle:edge:3",
+							"primitive:circle:edge:4",
+							"primitive:circle:edge:5",
+							"primitive:circle:edge:6",
+							"primitive:circle:edge:7",
+							"primitive:circle:edge:8",
+							"primitive:circle:edge:9",
+							"primitive:circle:edge:10",
+							"primitive:circle:edge:11",
+							"primitive:circle:edge:12",
+							"primitive:circle:edge:13",
+							"primitive:circle:edge:14",
+							"primitive:circle:edge:15",
+							"primitive:circle:edge:16",
+							"primitive:circle:edge:17",
+							"primitive:circle:edge:18",
+							"primitive:circle:edge:19",
+							"primitive:circle:edge:20",
+							"primitive:circle:edge:21",
+							"primitive:circle:edge:22",
+							"primitive:circle:edge:23",
+							"primitive:circle:edge:24",
+							"primitive:circle:edge:25",
+							"primitive:circle:edge:26",
+							"primitive:circle:edge:27",
+							"primitive:circle:edge:28",
+							"primitive:circle:edge:29",
+							"primitive:circle:edge:30",
+							"primitive:circle:edge:31"
+						],
+						"end_cap": "none",
+						"geometry_diagnostics": {
+							"centerline_segment_count": 32,
+							"minimum_nonadjacent_clearance_tool_units": 0.0352861247956753,
+							"narrow_overlap_pair_count": 192,
+							"self_intersection_count": 0
+						},
+						"index_count": 384,
+						"index_offset": 0,
+						"miter_join_count": 32,
+						"run_id": "primitive:circle:run:0",
+						"start_cap": "none",
+						"triangle_count": 128,
+						"vertex_count": 256,
+						"vertex_offset": 0
+					}
+				],
+				"source_chain_closed": true,
+				"source_draw_mode": "primitive",
+				"source_fingerprint": "adea8d0fa9c6fa2bc527ae2865b14ff472358959ceb71c20600930af5f1c7c80",
+				"topology_role": "outer",
+				"triangle_count": 128,
+				"triangles": [
+					{
+						"id": "triangle:contour:0",
+						"vertex_ids": [
+							"vertex:contour:0",
+							"vertex:contour:1",
+							"vertex:contour:2"
+						]
+					},
+					{
+						"id": "triangle:contour:1",
+						"vertex_ids": [
+							"vertex:contour:2",
+							"vertex:contour:1",
+							"vertex:contour:3"
+						]
+					},
+					{
+						"id": "triangle:contour:2",
+						"vertex_ids": [
+							"vertex:contour:4",
+							"vertex:contour:5",
+							"vertex:contour:6"
+						]
+					},
+					{
+						"id": "triangle:contour:3",
+						"vertex_ids": [
+							"vertex:contour:6",
+							"vertex:contour:5",
+							"vertex:contour:7"
+						]
+					},
+					{
+						"id": "triangle:contour:4",
+						"vertex_ids": [
+							"vertex:contour:8",
+							"vertex:contour:9",
+							"vertex:contour:10"
+						]
+					},
+					{
+						"id": "triangle:contour:5",
+						"vertex_ids": [
+							"vertex:contour:10",
+							"vertex:contour:9",
+							"vertex:contour:11"
+						]
+					},
+					{
+						"id": "triangle:contour:6",
+						"vertex_ids": [
+							"vertex:contour:12",
+							"vertex:contour:13",
+							"vertex:contour:14"
+						]
+					},
+					{
+						"id": "triangle:contour:7",
+						"vertex_ids": [
+							"vertex:contour:14",
+							"vertex:contour:13",
+							"vertex:contour:15"
+						]
+					},
+					{
+						"id": "triangle:contour:8",
+						"vertex_ids": [
+							"vertex:contour:16",
+							"vertex:contour:17",
+							"vertex:contour:18"
+						]
+					},
+					{
+						"id": "triangle:contour:9",
+						"vertex_ids": [
+							"vertex:contour:18",
+							"vertex:contour:17",
+							"vertex:contour:19"
+						]
+					},
+					{
+						"id": "triangle:contour:10",
+						"vertex_ids": [
+							"vertex:contour:20",
+							"vertex:contour:21",
+							"vertex:contour:22"
+						]
+					},
+					{
+						"id": "triangle:contour:11",
+						"vertex_ids": [
+							"vertex:contour:22",
+							"vertex:contour:21",
+							"vertex:contour:23"
+						]
+					},
+					{
+						"id": "triangle:contour:12",
+						"vertex_ids": [
+							"vertex:contour:24",
+							"vertex:contour:25",
+							"vertex:contour:26"
+						]
+					},
+					{
+						"id": "triangle:contour:13",
+						"vertex_ids": [
+							"vertex:contour:26",
+							"vertex:contour:25",
+							"vertex:contour:27"
+						]
+					},
+					{
+						"id": "triangle:contour:14",
+						"vertex_ids": [
+							"vertex:contour:28",
+							"vertex:contour:29",
+							"vertex:contour:30"
+						]
+					},
+					{
+						"id": "triangle:contour:15",
+						"vertex_ids": [
+							"vertex:contour:30",
+							"vertex:contour:29",
+							"vertex:contour:31"
+						]
+					},
+					{
+						"id": "triangle:contour:16",
+						"vertex_ids": [
+							"vertex:contour:32",
+							"vertex:contour:33",
+							"vertex:contour:34"
+						]
+					},
+					{
+						"id": "triangle:contour:17",
+						"vertex_ids": [
+							"vertex:contour:34",
+							"vertex:contour:33",
+							"vertex:contour:35"
+						]
+					},
+					{
+						"id": "triangle:contour:18",
+						"vertex_ids": [
+							"vertex:contour:36",
+							"vertex:contour:37",
+							"vertex:contour:38"
+						]
+					},
+					{
+						"id": "triangle:contour:19",
+						"vertex_ids": [
+							"vertex:contour:38",
+							"vertex:contour:37",
+							"vertex:contour:39"
+						]
+					},
+					{
+						"id": "triangle:contour:20",
+						"vertex_ids": [
+							"vertex:contour:40",
+							"vertex:contour:41",
+							"vertex:contour:42"
+						]
+					},
+					{
+						"id": "triangle:contour:21",
+						"vertex_ids": [
+							"vertex:contour:42",
+							"vertex:contour:41",
+							"vertex:contour:43"
+						]
+					},
+					{
+						"id": "triangle:contour:22",
+						"vertex_ids": [
+							"vertex:contour:44",
+							"vertex:contour:45",
+							"vertex:contour:46"
+						]
+					},
+					{
+						"id": "triangle:contour:23",
+						"vertex_ids": [
+							"vertex:contour:46",
+							"vertex:contour:45",
+							"vertex:contour:47"
+						]
+					},
+					{
+						"id": "triangle:contour:24",
+						"vertex_ids": [
+							"vertex:contour:48",
+							"vertex:contour:49",
+							"vertex:contour:50"
+						]
+					},
+					{
+						"id": "triangle:contour:25",
+						"vertex_ids": [
+							"vertex:contour:50",
+							"vertex:contour:49",
+							"vertex:contour:51"
+						]
+					},
+					{
+						"id": "triangle:contour:26",
+						"vertex_ids": [
+							"vertex:contour:52",
+							"vertex:contour:53",
+							"vertex:contour:54"
+						]
+					},
+					{
+						"id": "triangle:contour:27",
+						"vertex_ids": [
+							"vertex:contour:54",
+							"vertex:contour:53",
+							"vertex:contour:55"
+						]
+					},
+					{
+						"id": "triangle:contour:28",
+						"vertex_ids": [
+							"vertex:contour:56",
+							"vertex:contour:57",
+							"vertex:contour:58"
+						]
+					},
+					{
+						"id": "triangle:contour:29",
+						"vertex_ids": [
+							"vertex:contour:58",
+							"vertex:contour:57",
+							"vertex:contour:59"
+						]
+					},
+					{
+						"id": "triangle:contour:30",
+						"vertex_ids": [
+							"vertex:contour:60",
+							"vertex:contour:61",
+							"vertex:contour:62"
+						]
+					},
+					{
+						"id": "triangle:contour:31",
+						"vertex_ids": [
+							"vertex:contour:62",
+							"vertex:contour:61",
+							"vertex:contour:63"
+						]
+					},
+					{
+						"id": "triangle:contour:32",
+						"vertex_ids": [
+							"vertex:contour:64",
+							"vertex:contour:65",
+							"vertex:contour:66"
+						]
+					},
+					{
+						"id": "triangle:contour:33",
+						"vertex_ids": [
+							"vertex:contour:66",
+							"vertex:contour:65",
+							"vertex:contour:67"
+						]
+					},
+					{
+						"id": "triangle:contour:34",
+						"vertex_ids": [
+							"vertex:contour:68",
+							"vertex:contour:69",
+							"vertex:contour:70"
+						]
+					},
+					{
+						"id": "triangle:contour:35",
+						"vertex_ids": [
+							"vertex:contour:70",
+							"vertex:contour:69",
+							"vertex:contour:71"
+						]
+					},
+					{
+						"id": "triangle:contour:36",
+						"vertex_ids": [
+							"vertex:contour:72",
+							"vertex:contour:73",
+							"vertex:contour:74"
+						]
+					},
+					{
+						"id": "triangle:contour:37",
+						"vertex_ids": [
+							"vertex:contour:74",
+							"vertex:contour:73",
+							"vertex:contour:75"
+						]
+					},
+					{
+						"id": "triangle:contour:38",
+						"vertex_ids": [
+							"vertex:contour:76",
+							"vertex:contour:77",
+							"vertex:contour:78"
+						]
+					},
+					{
+						"id": "triangle:contour:39",
+						"vertex_ids": [
+							"vertex:contour:78",
+							"vertex:contour:77",
+							"vertex:contour:79"
+						]
+					},
+					{
+						"id": "triangle:contour:40",
+						"vertex_ids": [
+							"vertex:contour:80",
+							"vertex:contour:81",
+							"vertex:contour:82"
+						]
+					},
+					{
+						"id": "triangle:contour:41",
+						"vertex_ids": [
+							"vertex:contour:82",
+							"vertex:contour:81",
+							"vertex:contour:83"
+						]
+					},
+					{
+						"id": "triangle:contour:42",
+						"vertex_ids": [
+							"vertex:contour:84",
+							"vertex:contour:85",
+							"vertex:contour:86"
+						]
+					},
+					{
+						"id": "triangle:contour:43",
+						"vertex_ids": [
+							"vertex:contour:86",
+							"vertex:contour:85",
+							"vertex:contour:87"
+						]
+					},
+					{
+						"id": "triangle:contour:44",
+						"vertex_ids": [
+							"vertex:contour:88",
+							"vertex:contour:89",
+							"vertex:contour:90"
+						]
+					},
+					{
+						"id": "triangle:contour:45",
+						"vertex_ids": [
+							"vertex:contour:90",
+							"vertex:contour:89",
+							"vertex:contour:91"
+						]
+					},
+					{
+						"id": "triangle:contour:46",
+						"vertex_ids": [
+							"vertex:contour:92",
+							"vertex:contour:93",
+							"vertex:contour:94"
+						]
+					},
+					{
+						"id": "triangle:contour:47",
+						"vertex_ids": [
+							"vertex:contour:94",
+							"vertex:contour:93",
+							"vertex:contour:95"
+						]
+					},
+					{
+						"id": "triangle:contour:48",
+						"vertex_ids": [
+							"vertex:contour:96",
+							"vertex:contour:97",
+							"vertex:contour:98"
+						]
+					},
+					{
+						"id": "triangle:contour:49",
+						"vertex_ids": [
+							"vertex:contour:98",
+							"vertex:contour:97",
+							"vertex:contour:99"
+						]
+					},
+					{
+						"id": "triangle:contour:50",
+						"vertex_ids": [
+							"vertex:contour:100",
+							"vertex:contour:101",
+							"vertex:contour:102"
+						]
+					},
+					{
+						"id": "triangle:contour:51",
+						"vertex_ids": [
+							"vertex:contour:102",
+							"vertex:contour:101",
+							"vertex:contour:103"
+						]
+					},
+					{
+						"id": "triangle:contour:52",
+						"vertex_ids": [
+							"vertex:contour:104",
+							"vertex:contour:105",
+							"vertex:contour:106"
+						]
+					},
+					{
+						"id": "triangle:contour:53",
+						"vertex_ids": [
+							"vertex:contour:106",
+							"vertex:contour:105",
+							"vertex:contour:107"
+						]
+					},
+					{
+						"id": "triangle:contour:54",
+						"vertex_ids": [
+							"vertex:contour:108",
+							"vertex:contour:109",
+							"vertex:contour:110"
+						]
+					},
+					{
+						"id": "triangle:contour:55",
+						"vertex_ids": [
+							"vertex:contour:110",
+							"vertex:contour:109",
+							"vertex:contour:111"
+						]
+					},
+					{
+						"id": "triangle:contour:56",
+						"vertex_ids": [
+							"vertex:contour:112",
+							"vertex:contour:113",
+							"vertex:contour:114"
+						]
+					},
+					{
+						"id": "triangle:contour:57",
+						"vertex_ids": [
+							"vertex:contour:114",
+							"vertex:contour:113",
+							"vertex:contour:115"
+						]
+					},
+					{
+						"id": "triangle:contour:58",
+						"vertex_ids": [
+							"vertex:contour:116",
+							"vertex:contour:117",
+							"vertex:contour:118"
+						]
+					},
+					{
+						"id": "triangle:contour:59",
+						"vertex_ids": [
+							"vertex:contour:118",
+							"vertex:contour:117",
+							"vertex:contour:119"
+						]
+					},
+					{
+						"id": "triangle:contour:60",
+						"vertex_ids": [
+							"vertex:contour:120",
+							"vertex:contour:121",
+							"vertex:contour:122"
+						]
+					},
+					{
+						"id": "triangle:contour:61",
+						"vertex_ids": [
+							"vertex:contour:122",
+							"vertex:contour:121",
+							"vertex:contour:123"
+						]
+					},
+					{
+						"id": "triangle:contour:62",
+						"vertex_ids": [
+							"vertex:contour:124",
+							"vertex:contour:125",
+							"vertex:contour:126"
+						]
+					},
+					{
+						"id": "triangle:contour:63",
+						"vertex_ids": [
+							"vertex:contour:126",
+							"vertex:contour:125",
+							"vertex:contour:127"
+						]
+					},
+					{
+						"id": "triangle:contour:64",
+						"vertex_ids": [
+							"vertex:contour:128",
+							"vertex:contour:129",
+							"vertex:contour:130"
+						]
+					},
+					{
+						"id": "triangle:contour:65",
+						"vertex_ids": [
+							"vertex:contour:128",
+							"vertex:contour:130",
+							"vertex:contour:131"
+						]
+					},
+					{
+						"id": "triangle:contour:66",
+						"vertex_ids": [
+							"vertex:contour:132",
+							"vertex:contour:133",
+							"vertex:contour:134"
+						]
+					},
+					{
+						"id": "triangle:contour:67",
+						"vertex_ids": [
+							"vertex:contour:132",
+							"vertex:contour:134",
+							"vertex:contour:135"
+						]
+					},
+					{
+						"id": "triangle:contour:68",
+						"vertex_ids": [
+							"vertex:contour:136",
+							"vertex:contour:137",
+							"vertex:contour:138"
+						]
+					},
+					{
+						"id": "triangle:contour:69",
+						"vertex_ids": [
+							"vertex:contour:136",
+							"vertex:contour:138",
+							"vertex:contour:139"
+						]
+					},
+					{
+						"id": "triangle:contour:70",
+						"vertex_ids": [
+							"vertex:contour:140",
+							"vertex:contour:141",
+							"vertex:contour:142"
+						]
+					},
+					{
+						"id": "triangle:contour:71",
+						"vertex_ids": [
+							"vertex:contour:140",
+							"vertex:contour:142",
+							"vertex:contour:143"
+						]
+					},
+					{
+						"id": "triangle:contour:72",
+						"vertex_ids": [
+							"vertex:contour:144",
+							"vertex:contour:145",
+							"vertex:contour:146"
+						]
+					},
+					{
+						"id": "triangle:contour:73",
+						"vertex_ids": [
+							"vertex:contour:144",
+							"vertex:contour:146",
+							"vertex:contour:147"
+						]
+					},
+					{
+						"id": "triangle:contour:74",
+						"vertex_ids": [
+							"vertex:contour:148",
+							"vertex:contour:149",
+							"vertex:contour:150"
+						]
+					},
+					{
+						"id": "triangle:contour:75",
+						"vertex_ids": [
+							"vertex:contour:148",
+							"vertex:contour:150",
+							"vertex:contour:151"
+						]
+					},
+					{
+						"id": "triangle:contour:76",
+						"vertex_ids": [
+							"vertex:contour:152",
+							"vertex:contour:153",
+							"vertex:contour:154"
+						]
+					},
+					{
+						"id": "triangle:contour:77",
+						"vertex_ids": [
+							"vertex:contour:152",
+							"vertex:contour:154",
+							"vertex:contour:155"
+						]
+					},
+					{
+						"id": "triangle:contour:78",
+						"vertex_ids": [
+							"vertex:contour:156",
+							"vertex:contour:157",
+							"vertex:contour:158"
+						]
+					},
+					{
+						"id": "triangle:contour:79",
+						"vertex_ids": [
+							"vertex:contour:156",
+							"vertex:contour:158",
+							"vertex:contour:159"
+						]
+					},
+					{
+						"id": "triangle:contour:80",
+						"vertex_ids": [
+							"vertex:contour:160",
+							"vertex:contour:161",
+							"vertex:contour:162"
+						]
+					},
+					{
+						"id": "triangle:contour:81",
+						"vertex_ids": [
+							"vertex:contour:160",
+							"vertex:contour:162",
+							"vertex:contour:163"
+						]
+					},
+					{
+						"id": "triangle:contour:82",
+						"vertex_ids": [
+							"vertex:contour:164",
+							"vertex:contour:165",
+							"vertex:contour:166"
+						]
+					},
+					{
+						"id": "triangle:contour:83",
+						"vertex_ids": [
+							"vertex:contour:164",
+							"vertex:contour:166",
+							"vertex:contour:167"
+						]
+					},
+					{
+						"id": "triangle:contour:84",
+						"vertex_ids": [
+							"vertex:contour:168",
+							"vertex:contour:169",
+							"vertex:contour:170"
+						]
+					},
+					{
+						"id": "triangle:contour:85",
+						"vertex_ids": [
+							"vertex:contour:168",
+							"vertex:contour:170",
+							"vertex:contour:171"
+						]
+					},
+					{
+						"id": "triangle:contour:86",
+						"vertex_ids": [
+							"vertex:contour:172",
+							"vertex:contour:173",
+							"vertex:contour:174"
+						]
+					},
+					{
+						"id": "triangle:contour:87",
+						"vertex_ids": [
+							"vertex:contour:172",
+							"vertex:contour:174",
+							"vertex:contour:175"
+						]
+					},
+					{
+						"id": "triangle:contour:88",
+						"vertex_ids": [
+							"vertex:contour:176",
+							"vertex:contour:177",
+							"vertex:contour:178"
+						]
+					},
+					{
+						"id": "triangle:contour:89",
+						"vertex_ids": [
+							"vertex:contour:176",
+							"vertex:contour:178",
+							"vertex:contour:179"
+						]
+					},
+					{
+						"id": "triangle:contour:90",
+						"vertex_ids": [
+							"vertex:contour:180",
+							"vertex:contour:181",
+							"vertex:contour:182"
+						]
+					},
+					{
+						"id": "triangle:contour:91",
+						"vertex_ids": [
+							"vertex:contour:180",
+							"vertex:contour:182",
+							"vertex:contour:183"
+						]
+					},
+					{
+						"id": "triangle:contour:92",
+						"vertex_ids": [
+							"vertex:contour:184",
+							"vertex:contour:185",
+							"vertex:contour:186"
+						]
+					},
+					{
+						"id": "triangle:contour:93",
+						"vertex_ids": [
+							"vertex:contour:184",
+							"vertex:contour:186",
+							"vertex:contour:187"
+						]
+					},
+					{
+						"id": "triangle:contour:94",
+						"vertex_ids": [
+							"vertex:contour:188",
+							"vertex:contour:189",
+							"vertex:contour:190"
+						]
+					},
+					{
+						"id": "triangle:contour:95",
+						"vertex_ids": [
+							"vertex:contour:188",
+							"vertex:contour:190",
+							"vertex:contour:191"
+						]
+					},
+					{
+						"id": "triangle:contour:96",
+						"vertex_ids": [
+							"vertex:contour:192",
+							"vertex:contour:193",
+							"vertex:contour:194"
+						]
+					},
+					{
+						"id": "triangle:contour:97",
+						"vertex_ids": [
+							"vertex:contour:192",
+							"vertex:contour:194",
+							"vertex:contour:195"
+						]
+					},
+					{
+						"id": "triangle:contour:98",
+						"vertex_ids": [
+							"vertex:contour:196",
+							"vertex:contour:197",
+							"vertex:contour:198"
+						]
+					},
+					{
+						"id": "triangle:contour:99",
+						"vertex_ids": [
+							"vertex:contour:196",
+							"vertex:contour:198",
+							"vertex:contour:199"
+						]
+					},
+					{
+						"id": "triangle:contour:100",
+						"vertex_ids": [
+							"vertex:contour:200",
+							"vertex:contour:201",
+							"vertex:contour:202"
+						]
+					},
+					{
+						"id": "triangle:contour:101",
+						"vertex_ids": [
+							"vertex:contour:200",
+							"vertex:contour:202",
+							"vertex:contour:203"
+						]
+					},
+					{
+						"id": "triangle:contour:102",
+						"vertex_ids": [
+							"vertex:contour:204",
+							"vertex:contour:205",
+							"vertex:contour:206"
+						]
+					},
+					{
+						"id": "triangle:contour:103",
+						"vertex_ids": [
+							"vertex:contour:204",
+							"vertex:contour:206",
+							"vertex:contour:207"
+						]
+					},
+					{
+						"id": "triangle:contour:104",
+						"vertex_ids": [
+							"vertex:contour:208",
+							"vertex:contour:209",
+							"vertex:contour:210"
+						]
+					},
+					{
+						"id": "triangle:contour:105",
+						"vertex_ids": [
+							"vertex:contour:208",
+							"vertex:contour:210",
+							"vertex:contour:211"
+						]
+					},
+					{
+						"id": "triangle:contour:106",
+						"vertex_ids": [
+							"vertex:contour:212",
+							"vertex:contour:213",
+							"vertex:contour:214"
+						]
+					},
+					{
+						"id": "triangle:contour:107",
+						"vertex_ids": [
+							"vertex:contour:212",
+							"vertex:contour:214",
+							"vertex:contour:215"
+						]
+					},
+					{
+						"id": "triangle:contour:108",
+						"vertex_ids": [
+							"vertex:contour:216",
+							"vertex:contour:217",
+							"vertex:contour:218"
+						]
+					},
+					{
+						"id": "triangle:contour:109",
+						"vertex_ids": [
+							"vertex:contour:216",
+							"vertex:contour:218",
+							"vertex:contour:219"
+						]
+					},
+					{
+						"id": "triangle:contour:110",
+						"vertex_ids": [
+							"vertex:contour:220",
+							"vertex:contour:221",
+							"vertex:contour:222"
+						]
+					},
+					{
+						"id": "triangle:contour:111",
+						"vertex_ids": [
+							"vertex:contour:220",
+							"vertex:contour:222",
+							"vertex:contour:223"
+						]
+					},
+					{
+						"id": "triangle:contour:112",
+						"vertex_ids": [
+							"vertex:contour:224",
+							"vertex:contour:225",
+							"vertex:contour:226"
+						]
+					},
+					{
+						"id": "triangle:contour:113",
+						"vertex_ids": [
+							"vertex:contour:224",
+							"vertex:contour:226",
+							"vertex:contour:227"
+						]
+					},
+					{
+						"id": "triangle:contour:114",
+						"vertex_ids": [
+							"vertex:contour:228",
+							"vertex:contour:229",
+							"vertex:contour:230"
+						]
+					},
+					{
+						"id": "triangle:contour:115",
+						"vertex_ids": [
+							"vertex:contour:228",
+							"vertex:contour:230",
+							"vertex:contour:231"
+						]
+					},
+					{
+						"id": "triangle:contour:116",
+						"vertex_ids": [
+							"vertex:contour:232",
+							"vertex:contour:233",
+							"vertex:contour:234"
+						]
+					},
+					{
+						"id": "triangle:contour:117",
+						"vertex_ids": [
+							"vertex:contour:232",
+							"vertex:contour:234",
+							"vertex:contour:235"
+						]
+					},
+					{
+						"id": "triangle:contour:118",
+						"vertex_ids": [
+							"vertex:contour:236",
+							"vertex:contour:237",
+							"vertex:contour:238"
+						]
+					},
+					{
+						"id": "triangle:contour:119",
+						"vertex_ids": [
+							"vertex:contour:236",
+							"vertex:contour:238",
+							"vertex:contour:239"
+						]
+					},
+					{
+						"id": "triangle:contour:120",
+						"vertex_ids": [
+							"vertex:contour:240",
+							"vertex:contour:241",
+							"vertex:contour:242"
+						]
+					},
+					{
+						"id": "triangle:contour:121",
+						"vertex_ids": [
+							"vertex:contour:240",
+							"vertex:contour:242",
+							"vertex:contour:243"
+						]
+					},
+					{
+						"id": "triangle:contour:122",
+						"vertex_ids": [
+							"vertex:contour:244",
+							"vertex:contour:245",
+							"vertex:contour:246"
+						]
+					},
+					{
+						"id": "triangle:contour:123",
+						"vertex_ids": [
+							"vertex:contour:244",
+							"vertex:contour:246",
+							"vertex:contour:247"
+						]
+					},
+					{
+						"id": "triangle:contour:124",
+						"vertex_ids": [
+							"vertex:contour:248",
+							"vertex:contour:249",
+							"vertex:contour:250"
+						]
+					},
+					{
+						"id": "triangle:contour:125",
+						"vertex_ids": [
+							"vertex:contour:248",
+							"vertex:contour:250",
+							"vertex:contour:251"
+						]
+					},
+					{
+						"id": "triangle:contour:126",
+						"vertex_ids": [
+							"vertex:contour:252",
+							"vertex:contour:253",
+							"vertex:contour:254"
+						]
+					},
+					{
+						"id": "triangle:contour:127",
+						"vertex_ids": [
+							"vertex:contour:252",
+							"vertex:contour:254",
+							"vertex:contour:255"
+						]
+					}
+				],
+				"valid": true,
+				"vertex_count": 256,
+				"vertices": [
+					{
+						"curve_t": 0.0,
+						"edge_id": "primitive:circle:edge:0",
+						"id": "vertex:contour:0",
+						"origin": "segment_left",
+						"position": [
+							-1.04366505146027,
+							-0.0102102039381862
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:0@0.000000000"
+					},
+					{
+						"curve_t": 0.0,
+						"edge_id": "primitive:circle:edge:0",
+						"id": "vertex:contour:1",
+						"origin": "segment_right",
+						"position": [
+							-0.836334943771362,
+							0.0102102039381862
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:0@0.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:0",
+						"id": "vertex:contour:2",
+						"origin": "segment_left",
+						"position": [
+							-1.04712378978729,
+							0.0249060541391373
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:0@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:0",
+						"id": "vertex:contour:3",
+						"origin": "segment_right",
+						"position": [
+							-0.839793622493744,
+							0.0453264638781548
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:0@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:0",
+						"id": "vertex:contour:4",
+						"origin": "segment_left",
+						"position": [
+							-1.04313993453979,
+							0.00487837381660938
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:0@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:0",
+						"id": "vertex:contour:5",
+						"origin": "segment_right",
+						"position": [
+							-0.843777358531952,
+							0.0653541460633278
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:0@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:1",
+						"id": "vertex:contour:6",
+						"origin": "segment_left",
+						"position": [
+							-1.05338299274445,
+							0.0386451408267021
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:1@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:1",
+						"id": "vertex:contour:7",
+						"origin": "segment_right",
+						"position": [
+							-0.854020357131958,
+							0.0991209074854851
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:1@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:1",
+						"id": "vertex:contour:8",
+						"origin": "segment_left",
+						"position": [
+							-1.04556846618652,
+							0.0197791457176208
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:1@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:1",
+						"id": "vertex:contour:9",
+						"origin": "segment_right",
+						"position": [
+							-0.86183488368988,
+							0.117986902594566
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:1@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:2",
+						"id": "vertex:contour:10",
+						"origin": "segment_left",
+						"position": [
+							-1.0622022151947,
+							0.0508987680077553
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:2@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:2",
+						"id": "vertex:contour:11",
+						"origin": "segment_right",
+						"position": [
+							-0.878468751907349,
+							0.149106532335281
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:2@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:2",
+						"id": "vertex:contour:12",
+						"origin": "segment_left",
+						"position": [
+							-1.05085742473602,
+							0.0339200273156166
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:2@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:2",
+						"id": "vertex:contour:13",
+						"origin": "segment_right",
+						"position": [
+							-0.889813542366028,
+							0.16608527302742
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:2@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:3",
+						"id": "vertex:contour:14",
+						"origin": "segment_left",
+						"position": [
+							-1.07324266433716,
+							0.0611966028809547
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:3@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:3",
+						"id": "vertex:contour:15",
+						"origin": "segment_right",
+						"position": [
+							-0.912198841571808,
+							0.193361848592758
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:3@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:3",
+						"id": "vertex:contour:16",
+						"origin": "segment_left",
+						"position": [
+							-1.05880343914032,
+							0.0467573180794716
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:3@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:3",
+						"id": "vertex:contour:17",
+						"origin": "segment_right",
+						"position": [
+							-0.926638126373291,
+							0.207801133394241
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:3@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:4",
+						"id": "vertex:contour:18",
+						"origin": "segment_left",
+						"position": [
+							-1.08607995510101,
+							0.0691426321864128
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:4@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:4",
+						"id": "vertex:contour:19",
+						"origin": "segment_right",
+						"position": [
+							-0.953914701938629,
+							0.230186432600021
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:4@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:4",
+						"id": "vertex:contour:20",
+						"origin": "segment_left",
+						"position": [
+							-1.06910121440887,
+							0.0577977746725082
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:4@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:4",
+						"id": "vertex:contour:21",
+						"origin": "segment_right",
+						"position": [
+							-0.970893442630768,
+							0.241531297564507
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:4@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:5",
+						"id": "vertex:contour:22",
+						"origin": "segment_left",
+						"position": [
+							-1.10022079944611,
+							0.0744315683841705
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:5@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:5",
+						"id": "vertex:contour:23",
+						"origin": "segment_right",
+						"position": [
+							-1.00201308727264,
+							0.258165091276169
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:5@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:5",
+						"id": "vertex:contour:24",
+						"origin": "segment_left",
+						"position": [
+							-1.08135497570038,
+							0.0666170492768288
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:5@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:5",
+						"id": "vertex:contour:25",
+						"origin": "segment_right",
+						"position": [
+							-1.02087891101837,
+							0.265979617834091
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:5@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:6",
+						"id": "vertex:contour:26",
+						"origin": "segment_left",
+						"position": [
+							-1.11512172222137,
+							0.0768600776791573
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:6@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:6",
+						"id": "vertex:contour:27",
+						"origin": "segment_right",
+						"position": [
+							-1.05464565753937,
+							0.27622264623642
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:6@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:6",
+						"id": "vertex:contour:28",
+						"origin": "segment_left",
+						"position": [
+							-1.09509384632111,
+							0.0728762894868851
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:6@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:6",
+						"id": "vertex:contour:29",
+						"origin": "segment_right",
+						"position": [
+							-1.07467353343964,
+							0.280206441879272
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:6@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:7",
+						"id": "vertex:contour:30",
+						"origin": "segment_left",
+						"position": [
+							-1.13021016120911,
+							0.0763349384069443
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:7@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:7",
+						"id": "vertex:contour:31",
+						"origin": "segment_right",
+						"position": [
+							-1.10978984832764,
+							0.283665060997009
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:7@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:7",
+						"id": "vertex:contour:32",
+						"origin": "segment_left",
+						"position": [
+							-1.10978984832764,
+							0.0763349384069443
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:7@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:7",
+						"id": "vertex:contour:33",
+						"origin": "segment_right",
+						"position": [
+							-1.13021016120911,
+							0.283665060997009
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:7@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:8",
+						"id": "vertex:contour:34",
+						"origin": "segment_left",
+						"position": [
+							-1.14490616321564,
+							0.0728762894868851
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:8@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:8",
+						"id": "vertex:contour:35",
+						"origin": "segment_right",
+						"position": [
+							-1.16532647609711,
+							0.280206441879272
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:8@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:8",
+						"id": "vertex:contour:36",
+						"origin": "segment_left",
+						"position": [
+							-1.12487828731537,
+							0.0768600776791573
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:8@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:8",
+						"id": "vertex:contour:37",
+						"origin": "segment_right",
+						"position": [
+							-1.18535435199738,
+							0.27622264623642
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:8@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:9",
+						"id": "vertex:contour:38",
+						"origin": "segment_left",
+						"position": [
+							-1.15864503383636,
+							0.0666170492768288
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:9@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:9",
+						"id": "vertex:contour:39",
+						"origin": "segment_right",
+						"position": [
+							-1.21912109851837,
+							0.265979617834091
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:9@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:9",
+						"id": "vertex:contour:40",
+						"origin": "segment_left",
+						"position": [
+							-1.13977921009064,
+							0.0744315683841705
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:9@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:9",
+						"id": "vertex:contour:41",
+						"origin": "segment_right",
+						"position": [
+							-1.2379869222641,
+							0.258165091276169
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:9@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:10",
+						"id": "vertex:contour:42",
+						"origin": "segment_left",
+						"position": [
+							-1.17089879512787,
+							0.0577977746725082
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:10@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:10",
+						"id": "vertex:contour:43",
+						"origin": "segment_right",
+						"position": [
+							-1.26910650730133,
+							0.241531297564507
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:10@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:10",
+						"id": "vertex:contour:44",
+						"origin": "segment_left",
+						"position": [
+							-1.15391993522644,
+							0.0691426992416382
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:10@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:10",
+						"id": "vertex:contour:45",
+						"origin": "segment_right",
+						"position": [
+							-1.28608536720276,
+							0.230186372995377
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:10@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:11",
+						"id": "vertex:contour:46",
+						"origin": "segment_left",
+						"position": [
+							-1.18119645118713,
+							0.046757385134697
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:11@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:11",
+						"id": "vertex:contour:47",
+						"origin": "segment_right",
+						"position": [
+							-1.31336188316345,
+							0.207801058888435
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:11@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:11",
+						"id": "vertex:contour:48",
+						"origin": "segment_left",
+						"position": [
+							-1.16675734519958,
+							0.0611964985728264
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:11@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:11",
+						"id": "vertex:contour:49",
+						"origin": "segment_right",
+						"position": [
+							-1.327800989151,
+							0.193361937999725
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:11@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:12",
+						"id": "vertex:contour:50",
+						"origin": "segment_left",
+						"position": [
+							-1.18914270401001,
+							0.0339199230074883
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:12@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:12",
+						"id": "vertex:contour:51",
+						"origin": "segment_right",
+						"position": [
+							-1.35018634796143,
+							0.166085362434387
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:12@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:12",
+						"id": "vertex:contour:52",
+						"origin": "segment_left",
+						"position": [
+							-1.17779767513275,
+							0.050898902118206
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:12@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:12",
+						"id": "vertex:contour:53",
+						"origin": "segment_right",
+						"position": [
+							-1.36153137683868,
+							0.149106383323669
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:12@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:13",
+						"id": "vertex:contour:54",
+						"origin": "segment_left",
+						"position": [
+							-1.19443142414093,
+							0.0197792798280716
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:13@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:13",
+						"id": "vertex:contour:55",
+						"origin": "segment_right",
+						"position": [
+							-1.37816512584686,
+							0.117986768484116
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:13@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:13",
+						"id": "vertex:contour:56",
+						"origin": "segment_left",
+						"position": [
+							-1.1866170167923,
+							0.0386449806392193
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:13@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:13",
+						"id": "vertex:contour:57",
+						"origin": "segment_right",
+						"position": [
+							-1.3859795331955,
+							0.0991210639476776
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:13@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:14",
+						"id": "vertex:contour:58",
+						"origin": "segment_left",
+						"position": [
+							-1.19686007499695,
+							0.0048782154917717
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:14@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:14",
+						"id": "vertex:contour:59",
+						"origin": "segment_right",
+						"position": [
+							-1.39622259140015,
+							0.0653543025255203
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:14@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:14",
+						"id": "vertex:contour:60",
+						"origin": "segment_left",
+						"position": [
+							-1.19287621974945,
+							0.0249062292277813
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:14@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:14",
+						"id": "vertex:contour:61",
+						"origin": "segment_right",
+						"position": [
+							-1.40020644664764,
+							0.0453262887895107
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:14@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:15",
+						"id": "vertex:contour:62",
+						"origin": "segment_left",
+						"position": [
+							-1.19633483886719,
+							-0.0102100297808647
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:15@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:15",
+						"id": "vertex:contour:63",
+						"origin": "segment_right",
+						"position": [
+							-1.40366506576538,
+							0.0102100297808647
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:15@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:15",
+						"id": "vertex:contour:64",
+						"origin": "segment_left",
+						"position": [
+							-1.19633483886719,
+							0.0102100297808647
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:15@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:15",
+						"id": "vertex:contour:65",
+						"origin": "segment_right",
+						"position": [
+							-1.40366506576538,
+							-0.0102100297808647
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:15@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:16",
+						"id": "vertex:contour:66",
+						"origin": "segment_left",
+						"position": [
+							-1.19287621974945,
+							-0.0249062292277813
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:16@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:16",
+						"id": "vertex:contour:67",
+						"origin": "segment_right",
+						"position": [
+							-1.40020644664764,
+							-0.0453262887895107
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:16@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:16",
+						"id": "vertex:contour:68",
+						"origin": "segment_left",
+						"position": [
+							-1.19686007499695,
+							-0.0048782154917717
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:16@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:16",
+						"id": "vertex:contour:69",
+						"origin": "segment_right",
+						"position": [
+							-1.39622259140015,
+							-0.0653543025255203
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:16@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:17",
+						"id": "vertex:contour:70",
+						"origin": "segment_left",
+						"position": [
+							-1.1866170167923,
+							-0.0386449806392193
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:17@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:17",
+						"id": "vertex:contour:71",
+						"origin": "segment_right",
+						"position": [
+							-1.3859795331955,
+							-0.0991210639476776
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:17@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:17",
+						"id": "vertex:contour:72",
+						"origin": "segment_left",
+						"position": [
+							-1.19443142414093,
+							-0.0197792798280716
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:17@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:17",
+						"id": "vertex:contour:73",
+						"origin": "segment_right",
+						"position": [
+							-1.37816512584686,
+							-0.117986768484116
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:17@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:18",
+						"id": "vertex:contour:74",
+						"origin": "segment_left",
+						"position": [
+							-1.17779767513275,
+							-0.050898902118206
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:18@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:18",
+						"id": "vertex:contour:75",
+						"origin": "segment_right",
+						"position": [
+							-1.36153137683868,
+							-0.149106383323669
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:18@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:18",
+						"id": "vertex:contour:76",
+						"origin": "segment_left",
+						"position": [
+							-1.18914270401001,
+							-0.0339199230074883
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:18@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:18",
+						"id": "vertex:contour:77",
+						"origin": "segment_right",
+						"position": [
+							-1.35018634796143,
+							-0.166085362434387
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:18@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:19",
+						"id": "vertex:contour:78",
+						"origin": "segment_left",
+						"position": [
+							-1.16675734519958,
+							-0.0611964985728264
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:19@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:19",
+						"id": "vertex:contour:79",
+						"origin": "segment_right",
+						"position": [
+							-1.327800989151,
+							-0.193361937999725
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:19@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:19",
+						"id": "vertex:contour:80",
+						"origin": "segment_left",
+						"position": [
+							-1.18119645118713,
+							-0.046757385134697
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:19@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:19",
+						"id": "vertex:contour:81",
+						"origin": "segment_right",
+						"position": [
+							-1.31336188316345,
+							-0.207801058888435
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:19@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:20",
+						"id": "vertex:contour:82",
+						"origin": "segment_left",
+						"position": [
+							-1.15391993522644,
+							-0.0691426992416382
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:20@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:20",
+						"id": "vertex:contour:83",
+						"origin": "segment_right",
+						"position": [
+							-1.28608536720276,
+							-0.230186372995377
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:20@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:20",
+						"id": "vertex:contour:84",
+						"origin": "segment_left",
+						"position": [
+							-1.17089879512787,
+							-0.0577977746725082
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:20@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:20",
+						"id": "vertex:contour:85",
+						"origin": "segment_right",
+						"position": [
+							-1.26910650730133,
+							-0.241531297564507
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:20@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:21",
+						"id": "vertex:contour:86",
+						"origin": "segment_left",
+						"position": [
+							-1.13977921009064,
+							-0.0744315683841705
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:21@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:21",
+						"id": "vertex:contour:87",
+						"origin": "segment_right",
+						"position": [
+							-1.2379869222641,
+							-0.258165091276169
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:21@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:21",
+						"id": "vertex:contour:88",
+						"origin": "segment_left",
+						"position": [
+							-1.15864503383636,
+							-0.0666170492768288
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:21@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:21",
+						"id": "vertex:contour:89",
+						"origin": "segment_right",
+						"position": [
+							-1.21912109851837,
+							-0.265979617834091
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:21@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:22",
+						"id": "vertex:contour:90",
+						"origin": "segment_left",
+						"position": [
+							-1.12487828731537,
+							-0.0768600776791573
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:22@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:22",
+						"id": "vertex:contour:91",
+						"origin": "segment_right",
+						"position": [
+							-1.18535435199738,
+							-0.27622264623642
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:22@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:22",
+						"id": "vertex:contour:92",
+						"origin": "segment_left",
+						"position": [
+							-1.14490616321564,
+							-0.0728762894868851
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:22@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:22",
+						"id": "vertex:contour:93",
+						"origin": "segment_right",
+						"position": [
+							-1.16532647609711,
+							-0.280206441879272
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:22@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:23",
+						"id": "vertex:contour:94",
+						"origin": "segment_left",
+						"position": [
+							-1.10978984832764,
+							-0.0763349384069443
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:23@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:23",
+						"id": "vertex:contour:95",
+						"origin": "segment_right",
+						"position": [
+							-1.13021016120911,
+							-0.283665060997009
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:23@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:23",
+						"id": "vertex:contour:96",
+						"origin": "segment_left",
+						"position": [
+							-1.13021016120911,
+							-0.0763349384069443
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:23@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:23",
+						"id": "vertex:contour:97",
+						"origin": "segment_right",
+						"position": [
+							-1.10978984832764,
+							-0.283665060997009
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:23@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:24",
+						"id": "vertex:contour:98",
+						"origin": "segment_left",
+						"position": [
+							-1.09509384632111,
+							-0.0728762894868851
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:24@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:24",
+						"id": "vertex:contour:99",
+						"origin": "segment_right",
+						"position": [
+							-1.07467353343964,
+							-0.280206441879272
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:24@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:24",
+						"id": "vertex:contour:100",
+						"origin": "segment_left",
+						"position": [
+							-1.11512172222137,
+							-0.0768600776791573
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:24@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:24",
+						"id": "vertex:contour:101",
+						"origin": "segment_right",
+						"position": [
+							-1.05464565753937,
+							-0.27622264623642
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:24@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:25",
+						"id": "vertex:contour:102",
+						"origin": "segment_left",
+						"position": [
+							-1.08135497570038,
+							-0.0666170492768288
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:25@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:25",
+						"id": "vertex:contour:103",
+						"origin": "segment_right",
+						"position": [
+							-1.02087891101837,
+							-0.265979617834091
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:25@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:25",
+						"id": "vertex:contour:104",
+						"origin": "segment_left",
+						"position": [
+							-1.10022079944611,
+							-0.0744315683841705
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:25@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:25",
+						"id": "vertex:contour:105",
+						"origin": "segment_right",
+						"position": [
+							-1.00201308727264,
+							-0.258165091276169
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:25@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:26",
+						"id": "vertex:contour:106",
+						"origin": "segment_left",
+						"position": [
+							-1.06910121440887,
+							-0.0577977746725082
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:26@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:26",
+						"id": "vertex:contour:107",
+						"origin": "segment_right",
+						"position": [
+							-0.970893442630768,
+							-0.241531297564507
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:26@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:26",
+						"id": "vertex:contour:108",
+						"origin": "segment_left",
+						"position": [
+							-1.08607995510101,
+							-0.0691426321864128
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:26@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:26",
+						"id": "vertex:contour:109",
+						"origin": "segment_right",
+						"position": [
+							-0.953914701938629,
+							-0.230186432600021
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:26@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:27",
+						"id": "vertex:contour:110",
+						"origin": "segment_left",
+						"position": [
+							-1.05880343914032,
+							-0.0467573180794716
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:27@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:27",
+						"id": "vertex:contour:111",
+						"origin": "segment_right",
+						"position": [
+							-0.926638126373291,
+							-0.207801133394241
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:27@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:27",
+						"id": "vertex:contour:112",
+						"origin": "segment_left",
+						"position": [
+							-1.07324266433716,
+							-0.0611966028809547
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:27@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:27",
+						"id": "vertex:contour:113",
+						"origin": "segment_right",
+						"position": [
+							-0.912198841571808,
+							-0.193361848592758
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:27@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:28",
+						"id": "vertex:contour:114",
+						"origin": "segment_left",
+						"position": [
+							-1.05085742473602,
+							-0.0339200273156166
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:28@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:28",
+						"id": "vertex:contour:115",
+						"origin": "segment_right",
+						"position": [
+							-0.889813542366028,
+							-0.16608527302742
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:28@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:28",
+						"id": "vertex:contour:116",
+						"origin": "segment_left",
+						"position": [
+							-1.0622022151947,
+							-0.0508987680077553
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:28@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:28",
+						"id": "vertex:contour:117",
+						"origin": "segment_right",
+						"position": [
+							-0.878468751907349,
+							-0.149106532335281
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:28@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:29",
+						"id": "vertex:contour:118",
+						"origin": "segment_left",
+						"position": [
+							-1.04556846618652,
+							-0.0197791457176208
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:29@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:29",
+						"id": "vertex:contour:119",
+						"origin": "segment_right",
+						"position": [
+							-0.86183488368988,
+							-0.117986902594566
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:29@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:29",
+						"id": "vertex:contour:120",
+						"origin": "segment_left",
+						"position": [
+							-1.05338299274445,
+							-0.0386451408267021
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:29@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:29",
+						"id": "vertex:contour:121",
+						"origin": "segment_right",
+						"position": [
+							-0.854020357131958,
+							-0.0991209074854851
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:29@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:30",
+						"id": "vertex:contour:122",
+						"origin": "segment_left",
+						"position": [
+							-1.04313993453979,
+							-0.00487837381660938
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:30@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:30",
+						"id": "vertex:contour:123",
+						"origin": "segment_right",
+						"position": [
+							-0.843777358531952,
+							-0.0653541460633278
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:30@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:30",
+						"id": "vertex:contour:124",
+						"origin": "segment_left",
+						"position": [
+							-1.04712378978729,
+							-0.0249060541391373
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:30@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:30",
+						"id": "vertex:contour:125",
+						"origin": "segment_right",
+						"position": [
+							-0.839793622493744,
+							-0.0453264638781548
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:30@1.000000000"
+					},
+					{
+						"curve_t": 0.0,
+						"edge_id": "primitive:circle:edge:0",
+						"id": "vertex:contour:126",
+						"origin": "segment_left",
+						"position": [
+							-1.04366505146027,
+							0.0102102039381862
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:0@0.000000000"
+					},
+					{
+						"curve_t": 0.0,
+						"edge_id": "primitive:circle:edge:0",
+						"id": "vertex:contour:127",
+						"origin": "segment_right",
+						"position": [
+							-0.836334943771362,
+							-0.0102102039381862
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:0@0.000000000"
+					},
+					{
+						"curve_t": 0.0,
+						"edge_id": "primitive:circle:edge:0",
+						"id": "vertex:contour:128",
+						"origin": "join_center",
+						"position": [
+							-0.939999997615814,
+							0.0
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:0@0.000000000"
+					},
+					{
+						"curve_t": 0.0,
+						"edge_id": "primitive:circle:edge:0",
+						"id": "vertex:contour:129",
+						"origin": "join_outer_previous",
+						"position": [
+							-0.836334943771362,
+							-0.0102102039381862
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:0@0.000000000"
+					},
+					{
+						"curve_t": 0.0,
+						"edge_id": "primitive:circle:edge:0",
+						"id": "vertex:contour:130",
+						"origin": "join_miter",
+						"position": [
+							-0.835329294204712,
+							0.0
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:0@0.000000000"
+					},
+					{
+						"curve_t": 0.0,
+						"edge_id": "primitive:circle:edge:0",
+						"id": "vertex:contour:131",
+						"origin": "join_outer_next",
+						"position": [
+							-0.836334943771362,
+							0.0102102039381862
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:0@0.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:0",
+						"id": "vertex:contour:132",
+						"origin": "join_center",
+						"position": [
+							-0.943458676338196,
+							0.035116259008646
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:0@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:0",
+						"id": "vertex:contour:133",
+						"origin": "join_outer_previous",
+						"position": [
+							-0.839793622493744,
+							0.0453264638781548
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:0@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:0",
+						"id": "vertex:contour:134",
+						"origin": "join_miter",
+						"position": [
+							-0.84079921245575,
+							0.0555365607142448
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:0@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:0",
+						"id": "vertex:contour:135",
+						"origin": "join_outer_next",
+						"position": [
+							-0.843777358531952,
+							0.0653541460633278
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:0@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:1",
+						"id": "vertex:contour:136",
+						"origin": "join_center",
+						"position": [
+							-0.953701674938202,
+							0.0688830241560936
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:1@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:1",
+						"id": "vertex:contour:137",
+						"origin": "join_outer_previous",
+						"position": [
+							-0.854020357131958,
+							0.0991209074854851
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:1@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:1",
+						"id": "vertex:contour:138",
+						"origin": "join_miter",
+						"position": [
+							-0.856998562812805,
+							0.108938828110695
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:1@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:1",
+						"id": "vertex:contour:139",
+						"origin": "join_outer_next",
+						"position": [
+							-0.86183488368988,
+							0.117986902594566
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:1@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:2",
+						"id": "vertex:contour:140",
+						"origin": "join_center",
+						"position": [
+							-0.970335483551025,
+							0.100002646446228
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:2@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:2",
+						"id": "vertex:contour:141",
+						"origin": "join_outer_previous",
+						"position": [
+							-0.878468751907349,
+							0.149106532335281
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:2@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:2",
+						"id": "vertex:contour:142",
+						"origin": "join_miter",
+						"position": [
+							-0.883305132389069,
+							0.158154755830765
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:2@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:2",
+						"id": "vertex:contour:143",
+						"origin": "join_outer_next",
+						"position": [
+							-0.889813542366028,
+							0.16608527302742
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:2@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:3",
+						"id": "vertex:contour:144",
+						"origin": "join_center",
+						"position": [
+							-0.992720782756805,
+							0.127279222011566
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:3@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:3",
+						"id": "vertex:contour:145",
+						"origin": "join_outer_previous",
+						"position": [
+							-0.912198841571808,
+							0.193361848592758
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:3@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:3",
+						"id": "vertex:contour:146",
+						"origin": "join_miter",
+						"position": [
+							-0.918707370758057,
+							0.201292544603348
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:3@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:3",
+						"id": "vertex:contour:147",
+						"origin": "join_outer_next",
+						"position": [
+							-0.926638126373291,
+							0.207801133394241
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:3@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:4",
+						"id": "vertex:contour:148",
+						"origin": "join_center",
+						"position": [
+							-1.01999735832214,
+							0.149664536118507
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:4@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:4",
+						"id": "vertex:contour:149",
+						"origin": "join_outer_previous",
+						"position": [
+							-0.953914701938629,
+							0.230186432600021
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:4@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:4",
+						"id": "vertex:contour:150",
+						"origin": "join_miter",
+						"position": [
+							-0.961845457553864,
+							0.236695051193237
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:4@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:4",
+						"id": "vertex:contour:151",
+						"origin": "join_outer_next",
+						"position": [
+							-0.970893442630768,
+							0.241531297564507
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:4@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:5",
+						"id": "vertex:contour:152",
+						"origin": "join_center",
+						"position": [
+							-1.05111694335938,
+							0.16629832983017
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:5@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:5",
+						"id": "vertex:contour:153",
+						"origin": "join_outer_previous",
+						"position": [
+							-1.00201308727264,
+							0.258165091276169
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:5@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:5",
+						"id": "vertex:contour:154",
+						"origin": "join_miter",
+						"position": [
+							-1.01106131076813,
+							0.263001501560211
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:5@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:5",
+						"id": "vertex:contour:155",
+						"origin": "join_outer_next",
+						"position": [
+							-1.02087891101837,
+							0.265979617834091
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:5@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:6",
+						"id": "vertex:contour:156",
+						"origin": "join_center",
+						"position": [
+							-1.08488368988037,
+							0.176541358232498
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:6@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:6",
+						"id": "vertex:contour:157",
+						"origin": "join_outer_previous",
+						"position": [
+							-1.05464565753937,
+							0.27622264623642
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:6@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:6",
+						"id": "vertex:contour:158",
+						"origin": "join_miter",
+						"position": [
+							-1.06446349620819,
+							0.279200851917267
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:6@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:6",
+						"id": "vertex:contour:159",
+						"origin": "join_outer_next",
+						"position": [
+							-1.07467353343964,
+							0.280206441879272
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:6@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:7",
+						"id": "vertex:contour:160",
+						"origin": "join_center",
+						"position": [
+							-1.12000000476837,
+							0.180000007152557
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:7@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:7",
+						"id": "vertex:contour:161",
+						"origin": "join_outer_previous",
+						"position": [
+							-1.10978984832764,
+							0.283665060997009
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:7@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:7",
+						"id": "vertex:contour:162",
+						"origin": "join_miter",
+						"position": [
+							-1.12000000476837,
+							0.284670680761337
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:7@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:7",
+						"id": "vertex:contour:163",
+						"origin": "join_outer_next",
+						"position": [
+							-1.13021016120911,
+							0.283665060997009
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:7@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:8",
+						"id": "vertex:contour:164",
+						"origin": "join_center",
+						"position": [
+							-1.15511631965637,
+							0.176541358232498
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:8@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:8",
+						"id": "vertex:contour:165",
+						"origin": "join_outer_previous",
+						"position": [
+							-1.16532647609711,
+							0.280206441879272
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:8@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:8",
+						"id": "vertex:contour:166",
+						"origin": "join_miter",
+						"position": [
+							-1.17553651332855,
+							0.279200851917267
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:8@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:8",
+						"id": "vertex:contour:167",
+						"origin": "join_outer_next",
+						"position": [
+							-1.18535435199738,
+							0.27622264623642
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:8@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:9",
+						"id": "vertex:contour:168",
+						"origin": "join_center",
+						"position": [
+							-1.18888306617737,
+							0.16629832983017
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:9@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:9",
+						"id": "vertex:contour:169",
+						"origin": "join_outer_previous",
+						"position": [
+							-1.21912109851837,
+							0.265979617834091
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:9@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:9",
+						"id": "vertex:contour:170",
+						"origin": "join_miter",
+						"position": [
+							-1.22893869876862,
+							0.263001501560211
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:9@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:9",
+						"id": "vertex:contour:171",
+						"origin": "join_outer_next",
+						"position": [
+							-1.2379869222641,
+							0.258165091276169
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:9@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:10",
+						"id": "vertex:contour:172",
+						"origin": "join_center",
+						"position": [
+							-1.2200026512146,
+							0.149664536118507
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:10@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:10",
+						"id": "vertex:contour:173",
+						"origin": "join_outer_previous",
+						"position": [
+							-1.26910650730133,
+							0.241531297564507
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:10@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:10",
+						"id": "vertex:contour:174",
+						"origin": "join_miter",
+						"position": [
+							-1.27815461158752,
+							0.236694946885109
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:10@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:10",
+						"id": "vertex:contour:175",
+						"origin": "join_outer_next",
+						"position": [
+							-1.28608536720276,
+							0.230186372995377
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:10@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:11",
+						"id": "vertex:contour:176",
+						"origin": "join_center",
+						"position": [
+							-1.24727916717529,
+							0.127279222011566
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:11@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:11",
+						"id": "vertex:contour:177",
+						"origin": "join_outer_previous",
+						"position": [
+							-1.31336188316345,
+							0.207801058888435
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:11@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:11",
+						"id": "vertex:contour:178",
+						"origin": "join_miter",
+						"position": [
+							-1.32129240036011,
+							0.201292589306831
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:11@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:11",
+						"id": "vertex:contour:179",
+						"origin": "join_outer_next",
+						"position": [
+							-1.327800989151,
+							0.193361937999725
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:11@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:12",
+						"id": "vertex:contour:180",
+						"origin": "join_center",
+						"position": [
+							-1.26966452598572,
+							0.100002646446228
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:12@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:12",
+						"id": "vertex:contour:181",
+						"origin": "join_outer_previous",
+						"position": [
+							-1.35018634796143,
+							0.166085362434387
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:12@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:12",
+						"id": "vertex:contour:182",
+						"origin": "join_miter",
+						"position": [
+							-1.35669505596161,
+							0.15815444290638
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:12@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:12",
+						"id": "vertex:contour:183",
+						"origin": "join_outer_next",
+						"position": [
+							-1.36153137683868,
+							0.149106383323669
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:12@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:13",
+						"id": "vertex:contour:184",
+						"origin": "join_center",
+						"position": [
+							-1.2862982749939,
+							0.0688830241560936
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:13@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:13",
+						"id": "vertex:contour:185",
+						"origin": "join_outer_previous",
+						"position": [
+							-1.37816512584686,
+							0.117986768484116
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:13@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:13",
+						"id": "vertex:contour:186",
+						"origin": "join_miter",
+						"position": [
+							-1.38300132751465,
+							0.108938828110695
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:13@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:13",
+						"id": "vertex:contour:187",
+						"origin": "join_outer_next",
+						"position": [
+							-1.3859795331955,
+							0.0991210639476776
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:13@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:14",
+						"id": "vertex:contour:188",
+						"origin": "join_center",
+						"position": [
+							-1.29654133319855,
+							0.035116259008646
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:14@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:14",
+						"id": "vertex:contour:189",
+						"origin": "join_outer_previous",
+						"position": [
+							-1.39622259140015,
+							0.0653543025255203
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:14@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:14",
+						"id": "vertex:contour:190",
+						"origin": "join_miter",
+						"position": [
+							-1.39920091629028,
+							0.0555362962186337
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:14@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:14",
+						"id": "vertex:contour:191",
+						"origin": "join_outer_next",
+						"position": [
+							-1.40020644664764,
+							0.0453262887895107
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:14@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:15",
+						"id": "vertex:contour:192",
+						"origin": "join_center",
+						"position": [
+							-1.29999995231628,
+							0.0000000000000000220436436774053
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:15@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:15",
+						"id": "vertex:contour:193",
+						"origin": "join_outer_previous",
+						"position": [
+							-1.40366506576538,
+							0.0102100297808647
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:15@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:15",
+						"id": "vertex:contour:194",
+						"origin": "join_miter",
+						"position": [
+							-1.40467071533203,
+							-0.000000000931322574615479
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:15@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:15",
+						"id": "vertex:contour:195",
+						"origin": "join_outer_next",
+						"position": [
+							-1.40366506576538,
+							-0.0102100297808647
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:15@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:16",
+						"id": "vertex:contour:196",
+						"origin": "join_center",
+						"position": [
+							-1.29654133319855,
+							-0.035116259008646
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:16@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:16",
+						"id": "vertex:contour:197",
+						"origin": "join_outer_previous",
+						"position": [
+							-1.40020644664764,
+							-0.0453262887895107
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:16@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:16",
+						"id": "vertex:contour:198",
+						"origin": "join_miter",
+						"position": [
+							-1.39920091629028,
+							-0.0555362962186337
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:16@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:16",
+						"id": "vertex:contour:199",
+						"origin": "join_outer_next",
+						"position": [
+							-1.39622259140015,
+							-0.0653543025255203
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:16@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:17",
+						"id": "vertex:contour:200",
+						"origin": "join_center",
+						"position": [
+							-1.2862982749939,
+							-0.0688830241560936
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:17@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:17",
+						"id": "vertex:contour:201",
+						"origin": "join_outer_previous",
+						"position": [
+							-1.3859795331955,
+							-0.0991210639476776
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:17@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:17",
+						"id": "vertex:contour:202",
+						"origin": "join_miter",
+						"position": [
+							-1.38300132751465,
+							-0.108938828110695
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:17@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:17",
+						"id": "vertex:contour:203",
+						"origin": "join_outer_next",
+						"position": [
+							-1.37816512584686,
+							-0.117986768484116
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:17@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:18",
+						"id": "vertex:contour:204",
+						"origin": "join_center",
+						"position": [
+							-1.26966452598572,
+							-0.100002646446228
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:18@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:18",
+						"id": "vertex:contour:205",
+						"origin": "join_outer_previous",
+						"position": [
+							-1.36153137683868,
+							-0.149106383323669
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:18@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:18",
+						"id": "vertex:contour:206",
+						"origin": "join_miter",
+						"position": [
+							-1.35669505596161,
+							-0.15815444290638
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:18@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:18",
+						"id": "vertex:contour:207",
+						"origin": "join_outer_next",
+						"position": [
+							-1.35018634796143,
+							-0.166085362434387
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:18@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:19",
+						"id": "vertex:contour:208",
+						"origin": "join_center",
+						"position": [
+							-1.24727916717529,
+							-0.127279222011566
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:19@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:19",
+						"id": "vertex:contour:209",
+						"origin": "join_outer_previous",
+						"position": [
+							-1.327800989151,
+							-0.193361937999725
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:19@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:19",
+						"id": "vertex:contour:210",
+						"origin": "join_miter",
+						"position": [
+							-1.32129240036011,
+							-0.201292589306831
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:19@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:19",
+						"id": "vertex:contour:211",
+						"origin": "join_outer_next",
+						"position": [
+							-1.31336188316345,
+							-0.207801058888435
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:19@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:20",
+						"id": "vertex:contour:212",
+						"origin": "join_center",
+						"position": [
+							-1.2200026512146,
+							-0.149664536118507
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:20@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:20",
+						"id": "vertex:contour:213",
+						"origin": "join_outer_previous",
+						"position": [
+							-1.28608536720276,
+							-0.230186372995377
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:20@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:20",
+						"id": "vertex:contour:214",
+						"origin": "join_miter",
+						"position": [
+							-1.27815461158752,
+							-0.236694946885109
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:20@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:20",
+						"id": "vertex:contour:215",
+						"origin": "join_outer_next",
+						"position": [
+							-1.26910650730133,
+							-0.241531297564507
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:20@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:21",
+						"id": "vertex:contour:216",
+						"origin": "join_center",
+						"position": [
+							-1.18888306617737,
+							-0.16629832983017
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:21@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:21",
+						"id": "vertex:contour:217",
+						"origin": "join_outer_previous",
+						"position": [
+							-1.2379869222641,
+							-0.258165091276169
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:21@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:21",
+						"id": "vertex:contour:218",
+						"origin": "join_miter",
+						"position": [
+							-1.22893869876862,
+							-0.263001501560211
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:21@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:21",
+						"id": "vertex:contour:219",
+						"origin": "join_outer_next",
+						"position": [
+							-1.21912109851837,
+							-0.265979617834091
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:21@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:22",
+						"id": "vertex:contour:220",
+						"origin": "join_center",
+						"position": [
+							-1.15511631965637,
+							-0.176541358232498
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:22@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:22",
+						"id": "vertex:contour:221",
+						"origin": "join_outer_previous",
+						"position": [
+							-1.18535435199738,
+							-0.27622264623642
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:22@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:22",
+						"id": "vertex:contour:222",
+						"origin": "join_miter",
+						"position": [
+							-1.17553651332855,
+							-0.279200851917267
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:22@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:22",
+						"id": "vertex:contour:223",
+						"origin": "join_outer_next",
+						"position": [
+							-1.16532647609711,
+							-0.280206441879272
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:22@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:23",
+						"id": "vertex:contour:224",
+						"origin": "join_center",
+						"position": [
+							-1.12000000476837,
+							-0.180000007152557
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:23@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:23",
+						"id": "vertex:contour:225",
+						"origin": "join_outer_previous",
+						"position": [
+							-1.13021016120911,
+							-0.283665060997009
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:23@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:23",
+						"id": "vertex:contour:226",
+						"origin": "join_miter",
+						"position": [
+							-1.12000000476837,
+							-0.284670680761337
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:23@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:23",
+						"id": "vertex:contour:227",
+						"origin": "join_outer_next",
+						"position": [
+							-1.10978984832764,
+							-0.283665060997009
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:23@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:24",
+						"id": "vertex:contour:228",
+						"origin": "join_center",
+						"position": [
+							-1.08488368988037,
+							-0.176541358232498
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:24@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:24",
+						"id": "vertex:contour:229",
+						"origin": "join_outer_previous",
+						"position": [
+							-1.07467353343964,
+							-0.280206441879272
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:24@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:24",
+						"id": "vertex:contour:230",
+						"origin": "join_miter",
+						"position": [
+							-1.06446349620819,
+							-0.279200851917267
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:24@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:24",
+						"id": "vertex:contour:231",
+						"origin": "join_outer_next",
+						"position": [
+							-1.05464565753937,
+							-0.27622264623642
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:24@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:25",
+						"id": "vertex:contour:232",
+						"origin": "join_center",
+						"position": [
+							-1.05111694335938,
+							-0.16629832983017
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:25@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:25",
+						"id": "vertex:contour:233",
+						"origin": "join_outer_previous",
+						"position": [
+							-1.02087891101837,
+							-0.265979617834091
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:25@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:25",
+						"id": "vertex:contour:234",
+						"origin": "join_miter",
+						"position": [
+							-1.01106131076813,
+							-0.263001501560211
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:25@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:25",
+						"id": "vertex:contour:235",
+						"origin": "join_outer_next",
+						"position": [
+							-1.00201308727264,
+							-0.258165091276169
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:25@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:26",
+						"id": "vertex:contour:236",
+						"origin": "join_center",
+						"position": [
+							-1.01999735832214,
+							-0.149664536118507
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:26@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:26",
+						"id": "vertex:contour:237",
+						"origin": "join_outer_previous",
+						"position": [
+							-0.970893442630768,
+							-0.241531297564507
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:26@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:26",
+						"id": "vertex:contour:238",
+						"origin": "join_miter",
+						"position": [
+							-0.961845457553864,
+							-0.236695051193237
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:26@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:26",
+						"id": "vertex:contour:239",
+						"origin": "join_outer_next",
+						"position": [
+							-0.953914701938629,
+							-0.230186432600021
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:26@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:27",
+						"id": "vertex:contour:240",
+						"origin": "join_center",
+						"position": [
+							-0.992720782756805,
+							-0.127279222011566
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:27@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:27",
+						"id": "vertex:contour:241",
+						"origin": "join_outer_previous",
+						"position": [
+							-0.926638126373291,
+							-0.207801133394241
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:27@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:27",
+						"id": "vertex:contour:242",
+						"origin": "join_miter",
+						"position": [
+							-0.918707370758057,
+							-0.201292559504509
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:27@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:27",
+						"id": "vertex:contour:243",
+						"origin": "join_outer_next",
+						"position": [
+							-0.912198841571808,
+							-0.193361848592758
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:27@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:28",
+						"id": "vertex:contour:244",
+						"origin": "join_center",
+						"position": [
+							-0.970335483551025,
+							-0.100002646446228
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:28@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:28",
+						"id": "vertex:contour:245",
+						"origin": "join_outer_previous",
+						"position": [
+							-0.889813542366028,
+							-0.16608527302742
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:28@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:28",
+						"id": "vertex:contour:246",
+						"origin": "join_miter",
+						"position": [
+							-0.883305132389069,
+							-0.158154755830765
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:28@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:28",
+						"id": "vertex:contour:247",
+						"origin": "join_outer_next",
+						"position": [
+							-0.878468751907349,
+							-0.149106532335281
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:28@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:29",
+						"id": "vertex:contour:248",
+						"origin": "join_center",
+						"position": [
+							-0.953701674938202,
+							-0.0688830241560936
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:29@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:29",
+						"id": "vertex:contour:249",
+						"origin": "join_outer_previous",
+						"position": [
+							-0.86183488368988,
+							-0.117986902594566
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:29@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:29",
+						"id": "vertex:contour:250",
+						"origin": "join_miter",
+						"position": [
+							-0.856998562812805,
+							-0.108938828110695
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:29@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:29",
+						"id": "vertex:contour:251",
+						"origin": "join_outer_next",
+						"position": [
+							-0.854020357131958,
+							-0.0991209074854851
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:29@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:30",
+						"id": "vertex:contour:252",
+						"origin": "join_center",
+						"position": [
+							-0.943458676338196,
+							-0.035116259008646
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:30@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:30",
+						"id": "vertex:contour:253",
+						"origin": "join_outer_previous",
+						"position": [
+							-0.843777358531952,
+							-0.0653541460633278
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:30@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:30",
+						"id": "vertex:contour:254",
+						"origin": "join_miter",
+						"position": [
+							-0.84079921245575,
+							-0.0555365607142448
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:30@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "primitive:circle:edge:30",
+						"id": "vertex:contour:255",
+						"origin": "join_outer_next",
+						"position": [
+							-0.839793622493744,
+							-0.0453264638781548
+						],
+						"preserved": false,
+						"source_id": "primitive:circle:edge:30@1.000000000"
+					}
+				],
+				"worst_aspect_ratio": 0.0
+			}
+		},
+		"recipe": {
+			"method": "constrained_mesh",
+			"parameters": {
+				"mesh_character": 0.64,
+				"optimize_mesh": true,
+				"passes": 3,
+				"passes_override": false,
+				"relaxation": 0.402,
+				"relaxation_override": false,
+				"seeding_method": "poisson_fill"
+			}
+		}
+	},
+	"sampling": {
+		"bakes": {
+			"adaptive": {
+				"algorithm_version": 6,
+				"bake_id": "bake_7099610558745926825",
+				"boundary_refinement_complete": true,
+				"boundary_refinement_count": 0,
+				"boundary_refinement_limit_reached": false,
+				"boundary_refinement_unresolved_corner_count": 0,
+				"boundary_stats": [
+					{
+						"effective_spacing": 0.141314910259098,
+						"input_id": "",
+						"role": "outer",
+						"sample_count": 32
+					},
+					{
+						"effective_spacing": 0.188419880345464,
+						"input_id": "component_193",
+						"role": "hole",
+						"sample_count": 16
+					}
+				],
+				"chains": [
+					{
+						"chain_id": "primitive:circle",
+						"closed": true,
+						"effective_spacing": 0.141314910259098,
+						"input_id": "",
+						"samples": [
+							{
+								"curve_t": 0.0,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:outer:0",
+								"position": [
+									-0.939999997615814,
+									0.0
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.03125,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:outer:1",
+								"position": [
+									-0.943458676338196,
+									0.035116259008646
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.0625,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:outer:2",
+								"position": [
+									-0.953701674938202,
+									0.0688830241560936
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.09375,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:outer:3",
+								"position": [
+									-0.970335483551025,
+									0.100002646446228
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.125,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:outer:4",
+								"position": [
+									-0.992720782756805,
+									0.127279222011566
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.15625,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:outer:5",
+								"position": [
+									-1.01999735832214,
+									0.149664536118507
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.1875,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:outer:6",
+								"position": [
+									-1.05111694335938,
+									0.16629832983017
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.21875,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:outer:7",
+								"position": [
+									-1.08488368988037,
+									0.176541358232498
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.25,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:outer:8",
+								"position": [
+									-1.12000000476837,
+									0.180000007152557
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.28125,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:outer:9",
+								"position": [
+									-1.15511631965637,
+									0.176541358232498
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.3125,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:outer:10",
+								"position": [
+									-1.18888306617737,
+									0.16629832983017
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.34375,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:outer:11",
+								"position": [
+									-1.2200026512146,
+									0.149664536118507
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.375,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:outer:12",
+								"position": [
+									-1.24727916717529,
+									0.127279222011566
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.40625,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:outer:13",
+								"position": [
+									-1.26966452598572,
+									0.100002646446228
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.4375,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:outer:14",
+								"position": [
+									-1.2862982749939,
+									0.0688830241560936
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.46875,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:outer:15",
+								"position": [
+									-1.29654133319855,
+									0.035116259008646
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.5,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:outer:16",
+								"position": [
+									-1.29999995231628,
+									0.0000000000000000220436436774053
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.53125,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:outer:17",
+								"position": [
+									-1.29654133319855,
+									-0.035116259008646
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.5625,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:outer:18",
+								"position": [
+									-1.2862982749939,
+									-0.0688830241560936
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.59375,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:outer:19",
+								"position": [
+									-1.26966452598572,
+									-0.100002646446228
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.625,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:outer:20",
+								"position": [
+									-1.24727916717529,
+									-0.127279222011566
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.65625,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:outer:21",
+								"position": [
+									-1.2200026512146,
+									-0.149664536118507
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.6875,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:outer:22",
+								"position": [
+									-1.18888306617737,
+									-0.16629832983017
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.71875,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:outer:23",
+								"position": [
+									-1.15511631965637,
+									-0.176541358232498
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.75,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:outer:24",
+								"position": [
+									-1.12000000476837,
+									-0.180000007152557
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.78125,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:outer:25",
+								"position": [
+									-1.08488368988037,
+									-0.176541358232498
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.8125,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:outer:26",
+								"position": [
+									-1.05111694335938,
+									-0.16629832983017
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.84375,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:outer:27",
+								"position": [
+									-1.01999735832214,
+									-0.149664536118507
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.875,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:outer:28",
+								"position": [
+									-0.992720782756805,
+									-0.127279222011566
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.90625,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:outer:29",
+								"position": [
+									-0.970335483551025,
+									-0.100002646446228
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.9375,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:outer:30",
+								"position": [
+									-0.953701674938202,
+									-0.0688830241560936
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.96875,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:outer:31",
+								"position": [
+									-0.943458676338196,
+									-0.035116259008646
+								],
+								"preserved": false,
+								"source_point_id": ""
+							}
+						],
+						"topology_role": "outer"
+					},
+					{
+						"chain_id": "hole:component_193:primitive:circle",
+						"closed": true,
+						"effective_spacing": 0.188419880345464,
+						"input_id": "component_193",
+						"samples": [
+							{
+								"curve_t": 0.0,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:component_193:0",
+								"position": [
+									-1.03999996185303,
+									0.0
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.0625,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:component_193:1",
+								"position": [
+									-1.04608964920044,
+									0.0306146740913391
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.125,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:component_193:2",
+								"position": [
+									-1.06343150138855,
+									0.0565685406327248
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.1875,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:component_193:3",
+								"position": [
+									-1.08938527107239,
+									0.0739103630185127
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.25,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:component_193:4",
+								"position": [
+									-1.12000000476837,
+									0.0799999982118607
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.3125,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:component_193:5",
+								"position": [
+									-1.15061473846436,
+									0.0739103630185127
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.375,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:component_193:6",
+								"position": [
+									-1.17656850814819,
+									0.0565685406327248
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.4375,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:component_193:7",
+								"position": [
+									-1.1939103603363,
+									0.0306146740913391
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.5,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:component_193:8",
+								"position": [
+									-1.20000004768372,
+									0.00000000000000000979717432437298
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.5625,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:component_193:9",
+								"position": [
+									-1.1939103603363,
+									-0.0306146740913391
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.625,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:component_193:10",
+								"position": [
+									-1.17656850814819,
+									-0.0565685406327248
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.6875,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:component_193:11",
+								"position": [
+									-1.15061473846436,
+									-0.0739103630185127
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.75,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:component_193:12",
+								"position": [
+									-1.12000000476837,
+									-0.0799999982118607
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.8125,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:component_193:13",
+								"position": [
+									-1.08938527107239,
+									-0.0739103630185127
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.875,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:component_193:14",
+								"position": [
+									-1.06343150138855,
+									-0.0565685406327248
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.9375,
+								"edge_id": "primitive:circle",
+								"id": "sample:circle:component_193:15",
+								"position": [
+									-1.04608964920044,
+									-0.0306146740913391
+								],
+								"preserved": false,
+								"source_point_id": ""
+							}
+						],
+						"topology_role": "hole"
+					}
+				],
+				"constraint_sample_count": 48,
+				"cuts": [],
+				"errors": [],
+				"hole_count": 1,
+				"method": "adaptive",
+				"parameters": {
+					"boundary_refinements": {
+						"component_193": {
+							"factor": 0.75
+						}
+					},
+					"feature_detail": 0.55,
+					"spacing": 0.141314910259098
+				},
+				"preserve_count": 0,
+				"sample_count": 48,
+				"semantic_source_signature": {
+					"geometry_tolerance": 0.000141314910259098,
+					"meshing_algorithm": 5,
+					"recipe_hash": "5d436df28dc9e10794c8ebd7e31762e3fdb645ea657b541f3556294fd9b86760",
+					"recipe_version": 2,
+					"sampling_algorithm": 6,
+					"scalars": [
+						0.360000014305115,
+						0.360000014305115,
+						0.159999996423721,
+						0.159999996423721,
+						1.0,
+						1.0
+					],
+					"seeding_algorithm": 2,
+					"topology_hash": "7decb9534fdfd1828f0936950057a3dbde454f2fbf4229f7093829ae4541a530",
+					"vectors": [
+						[
+							-1.12000000476837,
+							0.0
+						],
+						[
+							1.0,
+							0.0
+						],
+						[
+							0.0,
+							1.0
+						],
+						[
+							0.0,
+							0.0
+						],
+						[
+							-1.12000000476837,
+							0.0
+						],
+						[
+							1.0,
+							0.0
+						],
+						[
+							0.0,
+							1.0
+						],
+						[
+							0.0,
+							0.0
+						]
+					],
+					"version": 1
+				},
+				"source_fingerprint": "fb4007b42be55e20708973a7a426cee857288b344a727575ce73764b47374d79",
+				"valid": true
+			}
+		},
+		"recipe": {
+			"method": "adaptive",
+			"parameters": {
+				"boundary_refinements": {
+					"component_193": {
+						"factor": 0.75
+					}
+				},
+				"feature_detail": 0.55,
+				"spacing": 0.141314910259098
+			}
+		}
+	},
+	"schema_version": 70,
+	"sdf": {
+		"bake": {},
+		"last_error": "",
+		"last_failure_fingerprint": "",
+		"recipe": {
+			"method": "single_channel_sdf",
+			"parameters": {
+				"resolution": 256,
+				"spread_px": 16.0
+			}
+		}
+	},
+	"seeding": {
+		"bakes": {
+			"poisson_fill": {
+				"algorithm_version": 2,
+				"bake_id": "seeding_bake_1571769064075059886",
+				"edited": false,
+				"errors": [],
+				"flow_seed_count": 0,
+				"gap_seed_count": 0,
+				"guide_fingerprint": "",
+				"guide_id": "",
+				"guide_ids": [],
+				"guide_stats": [],
+				"guides_fingerprint": "2e1cfa82b035c26cbbbdae632cea070514eb8b773f616aaeaf668e2f0be8f10d",
+				"method": "poisson_fill",
+				"parameters": {
+					"constraint_clearance_factor": 0.5,
+					"seed": 1,
+					"spacing": 0.141314910259098
+				},
+				"sampling_bake_id": "bake_7099610558745926825",
+				"sampling_fingerprint": "09ef1cc779e1f5b3a80744dd59773cf2806fedecfc859b611b800f92f42be5f1",
+				"seed_count": 0,
+				"seeds": [],
+				"valid": true
+			}
+		},
+		"recipe": {
+			"method": "poisson_fill",
+			"parameters": {
+				"constraint_clearance_factor": 0.5,
+				"seed": 1,
+				"spacing": 0.141314910259098
+			}
+		}
+	},
+	"uv_mapping": {
+		"bakes": {},
+		"last_error": "",
+		"last_failure_fingerprint": "",
+		"recipe": {
+			"method": "bounds_planar",
+			"parameters": {
+				"mesh_method": "constrained_mesh",
+				"offset_u": 0.0,
+				"offset_v": 0.0,
+				"padding": 0.0625,
+				"preserve_aspect": true,
+				"rotation": 0.0,
+				"scale": 1.0
+			}
+		}
+	},
+	"weighting": {
+		"next_style_index": 1,
+		"styles": []
+	}
+}

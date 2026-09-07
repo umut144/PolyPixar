@@ -28,7 +28,9 @@
 		"asset_25",
 		"asset_26",
 		"asset_27",
-		"asset_28"
+		"asset_28",
+		"asset_29",
+		"asset_30"
 	],
 	"editor_state": {
 		"active_create_submodule": "Single",
@@ -156,12 +158,26 @@
 				],
 				"zoom": 70.4740919464816
 			},
+			"asset_29": {
+				"position": [
+					0.0781813263893127,
+					-0.321240276098251
+				],
+				"zoom": 357.335981550456
+			},
 			"asset_3": {
 				"position": [
 					-0.126418218016624,
 					3.18325662612915
 				],
 				"zoom": 66.6696674382242
+			},
+			"asset_30": {
+				"position": [
+					-0.0977138802409172,
+					-0.0622772946953773
+				],
+				"zoom": 830.435356186597
 			},
 			"asset_4": {
 				"position": [
@@ -217,18 +233,20 @@
 			"asset_16": false,
 			"asset_17": false,
 			"asset_18": false,
-			"asset_19": true,
+			"asset_19": false,
 			"asset_2": false,
 			"asset_20": false,
-			"asset_21": true,
+			"asset_21": false,
 			"asset_22": false,
 			"asset_23": false,
 			"asset_24": false,
 			"asset_25": false,
 			"asset_26": false,
-			"asset_27": true,
-			"asset_28": true,
+			"asset_27": false,
+			"asset_28": false,
+			"asset_29": false,
 			"asset_3": false,
+			"asset_30": true,
 			"asset_4": false,
 			"asset_5": false,
 			"asset_6": false,
@@ -253,16 +271,16 @@
 		"motion_sequence_preview_loop": true,
 		"motion_sequence_view": "composition",
 		"outliner_asset_type_filters": {
-			"character": true,
-			"icon": true,
-			"items": true,
-			"props": true,
-			"symbols": true,
-			"terrain": true,
+			"character": false,
+			"icon": false,
+			"items": false,
+			"props": false,
+			"symbols": false,
+			"terrain": false,
 			"weapons": true
 		},
-		"selected_asset_id": "asset_8",
-		"selected_component_id": "",
+		"selected_asset_id": "asset_30",
+		"selected_component_id": "component_194",
 		"selected_edge_ids": [],
 		"selected_guide_id": "",
 		"selected_motion_act_id": "",
@@ -272,8 +290,8 @@
 		"selected_weighting_style_id": "",
 		"snap": {
 			"enabled": true,
-			"grid_step": 0.1,
-			"mode": "fine",
+			"grid_step": 0.01,
+			"mode": "ultra_fine",
 			"rotation_step": 15.0
 		},
 		"world_scale": {
@@ -282,8 +300,18 @@
 		}
 	},
 	"name": "world01",
+	"next_ids": {
+		"asset": 31,
+		"component": 195,
+		"group": 10,
+		"guide": 9,
+		"motion_act": 1,
+		"motion_path": 1,
+		"motion_sequence": 1
+	},
 	"paths": [],
-	"schema_version": 67,
+	"retired_assets": [],
+	"schema_version": 70,
 	"sequences": [],
 	"world_name": "Secrets, Room's & Travels'",
 	"world_settings": {
