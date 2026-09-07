@@ -13520,6 +13520,19 @@ func _normalized_create_submodule(submodule: String) -> String:
 	return submodule if submodule in CREATE_SUBMODULES else "Single"
 
 
+## What the module lists and what it may keep selected are two questions. A
+## composition member is not listed on its own — it is reached one row below its
+## owner — but authoring it is exactly what that module is for, so it stays a
+## valid selection there. Without this an undo or a session restore inside a
+## Palette variant re-anchors to the Palette root and drops the user out of the
+## Asset they were drawing in.
+func _create_submodule_can_select(asset: Dictionary) -> bool:
+	if _asset_matches_create_submodule(asset):
+		return true
+	var owner_id := str(_composition_owner_by_member_id().get(str(asset.get("id", "")), ""))
+	return not owner_id.is_empty() and _asset_matches_create_submodule(_get_asset(owner_id))
+
+
 func _asset_matches_create_submodule(asset: Dictionary) -> bool:
 	if _asset_create_submodule(asset) != active_create_submodule:
 		return false
@@ -13789,7 +13802,7 @@ func _set_create_submodule_context(submodule: String) -> void:
 	active_create_submodule = _normalized_create_submodule(submodule)
 	active_state = ""
 	var selected_asset := _get_asset(selected_asset_id)
-	if selected_asset.is_empty() or not _asset_matches_create_submodule(selected_asset):
+	if selected_asset.is_empty() or not _create_submodule_can_select(selected_asset):
 		selected_asset_id = _create_submodule_active_asset_id()
 		selected_component_id = ""
 		selected_guide_id = ""

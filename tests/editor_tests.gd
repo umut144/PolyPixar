@@ -471,6 +471,17 @@ func _test_palette_composition() -> void:
 	application.component_name_input.text = "body"
 	application._confirm_component_creation()
 	_expect(application.selected_asset_id == first_variant_id and application.active_create_submodule == "Palette" and application._outliner_focus_asset_id() == palette_id, "Authoring inside a variant should keep the Palette module and keep the Palette as the expanded row.")
+	# A variant is not listed by the Palette module on its own, but authoring it
+	# is what that module is for, so History must not re-anchor to the Palette.
+	var authored_component_id: String = application.selected_component_id
+	var authored_component: Dictionary = application._get_component(application._get_asset(first_variant_id), authored_component_id)
+	application._record_direct_change()
+	BezierTopology.add_point(authored_component, Vector2.ZERO, "linear")
+	application._undo()
+	_expect(not authored_component_id.is_empty() and application.selected_asset_id == first_variant_id and application.selected_component_id == authored_component_id and application.active_create_submodule == "Palette", "Undo while authoring a variant must stay in that variant instead of dropping back to the Palette root.")
+	# History replaces the Asset array with deep copies, so every reference taken
+	# before the undo now points at a document the editor no longer owns.
+	palette = application._get_asset(palette_id)
 	application._render_outliner()
 	_expect(_button_with_text(application.outliner_view, "Grass") != null and _button_with_text(application.outliner_view, "Grass01") != null and _button_with_text(application.outliner_view, "body") != null, "The Palette Outliner should list the Palette, its variants and each variant's Components.")
 	# Single lists what is placed on its own; a variant is reached through its

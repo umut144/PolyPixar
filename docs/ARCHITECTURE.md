@@ -79,6 +79,14 @@ composition that owns the member, so the module's one expanded row stays the
 composition. The Canvas follows the selection and shows the member alone, the
 same way Single would.
 
+What a module lists and what it may keep selected are therefore two different
+questions, and `_create_submodule_can_select` is the second one. The listing
+rule skips a member on purpose, so anything that re-establishes the module
+context — `_set_create_submodule_context`, reached from Undo, from a session
+restore and from selecting an Asset — has to consult the owner as well.
+Consulting only the listing rule re-anchored the selection to the composition
+root and dropped the user out of the member they were drawing in.
+
 A member Asset is ordinary in every other way, References included — but a
 Reference under a Component and a Set are two different tools, and they are kept
 apart. `_reference_source_candidates` in `main.gd` is what a Component's
