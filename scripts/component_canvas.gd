@@ -26,6 +26,8 @@ signal primitive_placed(center: Vector2, diameter_cm: float)
 signal primitive_center_changed(center: Vector2)
 signal primitive_preview_cancelled()
 
+const MIRROR_AXIS_VERTICAL := "vertical"
+const MIRROR_AXIS_HORIZONTAL := "horizontal"
 const PAN_SPEED := 420.0
 const MIN_ZOOM := 0.25
 # Allows detailed sub-millimeter editing while keeping the existing zoom
@@ -60,6 +62,7 @@ var bezier_points: Array[Dictionary] = []
 var bezier_edges: Array[Dictionary] = []
 var bezier_chains: Array[Dictionary] = []
 var mirror_command_stage := ""
+var mirror_axis_orientation := MIRROR_AXIS_VERTICAL
 var mirror_axis_start := Vector2.ZERO
 var mirror_axis_end := Vector2.ZERO
 var mirror_axis_candidate_visible := false
@@ -180,16 +183,8 @@ func _gui_input(event: InputEvent) -> void:
 			queue_redraw()
 			return
 		if event.button_index == MOUSE_BUTTON_LEFT and not mirror_command_stage.is_empty():
-			var axis_point := _snap_to_grid(_world_to_local(_screen_to_world(event.position)))
-			mirror_axis_candidate_visible = true
-			if mirror_command_stage == "first":
-				mirror_axis_start = axis_point
-				mirror_axis_end = axis_point
-				mirror_command_stage = "second"
-				mirror_axis_stage_changed.emit("second")
-				queue_redraw()
-			elif mirror_command_stage == "second" and mirror_axis_start.distance_squared_to(axis_point) > 0.00000001:
-				_confirm_mirror_axis(axis_point)
+			_set_mirror_axis_from_screen(event.position)
+			_confirm_mirror_axis()
 			return
 		if event.button_index == MOUSE_BUTTON_LEFT and interaction_state == "draw" and active_tool == "point" and _draw_anchor_point_id().is_empty():
 			var endpoint_id := _open_endpoint_at(event.position)
@@ -334,13 +329,8 @@ func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:
 		cursor_over_canvas = true
 		cursor_world = constrain_draw_position(_snap_to_canvas_position(_world_to_local(_screen_to_world(event.position))))
-		if mirror_command_stage == "first":
-			mirror_axis_end = _snap_to_grid(_world_to_local(_screen_to_world(event.position)))
-			mirror_axis_candidate_visible = true
-			queue_redraw()
-			return
-		if mirror_command_stage == "second":
-			mirror_axis_end = _snap_to_grid(_world_to_local(_screen_to_world(event.position)))
+		if not mirror_command_stage.is_empty():
+			_set_mirror_axis_from_screen(event.position)
 			_update_selection_mirror_preview()
 			queue_redraw()
 			return
@@ -453,8 +443,8 @@ func _gui_input(event: InputEvent) -> void:
 		if not mirror_command_stage.is_empty():
 			if event.keycode == KEY_ESCAPE:
 				cancel_mirror_command()
-			elif event.keycode in [KEY_ENTER, KEY_KP_ENTER] and mirror_command_stage == "second" and mirror_axis_start.distance_squared_to(mirror_axis_end) > 0.00000001:
-				_confirm_mirror_axis(mirror_axis_end)
+			elif event.keycode in [KEY_ENTER, KEY_KP_ENTER] and mirror_axis_candidate_visible:
+				_confirm_mirror_axis()
 			return
 		if event.keycode == KEY_ESCAPE and interaction_state == "edit":
 			clear_selection()
@@ -847,16 +837,20 @@ func set_bezier_geometry(points: Array, edges: Array, chains: Array) -> void:
 	queue_redraw()
 
 
-func start_mirror_command() -> bool:
-	if selected_point_ids.is_empty():
+## The axis orientation is fixed by the invoking command. Mirror Y reflects
+## across a vertical axis, Mirror X across a horizontal one, so the user only
+## places the axis line itself.
+func start_mirror_command(axis_orientation := MIRROR_AXIS_VERTICAL) -> bool:
+	if selected_point_ids.is_empty() or axis_orientation not in [MIRROR_AXIS_VERTICAL, MIRROR_AXIS_HORIZONTAL]:
 		return false
-	mirror_command_stage = "first"
+	mirror_command_stage = "axis"
+	mirror_axis_orientation = axis_orientation
 	mirror_axis_start = Vector2.ZERO
 	mirror_axis_end = Vector2.ZERO
 	mirror_axis_candidate_visible = false
 	selection_mirror_preview_points.clear()
 	selection_mirror_preview_edges.clear()
-	mirror_axis_stage_changed.emit("first")
+	mirror_axis_stage_changed.emit("axis")
 	queue_redraw()
 	return true
 
@@ -919,11 +913,45 @@ func mouse_local_position() -> Vector2:
 	return _snap_pivot_position(_world_to_local(_screen_to_world(get_local_mouse_position())))
 
 
-func _confirm_mirror_axis(axis_end: Vector2) -> void:
+func _confirm_mirror_axis() -> void:
+	if not mirror_axis_candidate_visible:
+		return
 	var confirmed_start := mirror_axis_start
-	var confirmed_end := axis_end
+	var confirmed_end := mirror_axis_end
 	cancel_mirror_command(false)
 	mirror_axis_confirmed.emit(confirmed_start, confirmed_end)
+
+
+func _set_mirror_axis_from_screen(screen_position: Vector2) -> void:
+	mirror_axis_start = _snap_to_grid(_world_to_local(_screen_to_world(screen_position)))
+	mirror_axis_end = mirror_axis_start + _mirror_axis_direction()
+	mirror_axis_candidate_visible = true
+
+
+func _mirror_axis_direction() -> Vector2:
+	return Vector2(1.0, 0.0) if mirror_axis_orientation == MIRROR_AXIS_HORIZONTAL else Vector2(0.0, 1.0)
+
+
+## The fixed axis is conceptually infinite, so it is drawn across the visible
+## Canvas rather than between two placed Points.
+func _mirror_axis_screen_endpoints() -> PackedVector2Array:
+	var min_local := _world_to_local(_screen_to_world(Vector2.ZERO))
+	var max_local := min_local
+	var screen_corners: Array[Vector2] = [Vector2(size.x, 0.0), size, Vector2(0.0, size.y)]
+	for screen_corner in screen_corners:
+		var local_corner := _world_to_local(_screen_to_world(screen_corner))
+		min_local = Vector2(minf(min_local.x, local_corner.x), minf(min_local.y, local_corner.y))
+		max_local = Vector2(maxf(max_local.x, local_corner.x), maxf(max_local.y, local_corner.y))
+	var margin := maxf(max_local.x - min_local.x, max_local.y - min_local.y) * 0.1 + 1.0
+	var first_local := Vector2(mirror_axis_start.x, min_local.y - margin)
+	var second_local := Vector2(mirror_axis_start.x, max_local.y + margin)
+	if mirror_axis_orientation == MIRROR_AXIS_HORIZONTAL:
+		first_local = Vector2(min_local.x - margin, mirror_axis_start.y)
+		second_local = Vector2(max_local.x + margin, mirror_axis_start.y)
+	return PackedVector2Array([
+		_world_to_screen(_local_to_world(first_local)),
+		_world_to_screen(_local_to_world(second_local))
+	])
 
 
 func _update_selection_mirror_preview() -> void:
@@ -1029,15 +1057,12 @@ func _active_grid_package_level() -> int:
 
 
 func _draw_selection_mirror_command() -> void:
-	if mirror_command_stage == "first" and mirror_axis_candidate_visible:
-		draw_circle(_world_to_screen(mirror_axis_end), 6.0, Color("#f2c94c"), false, 2.5)
-		draw_circle(_world_to_screen(mirror_axis_end), 2.0, Color("#f2c94c"))
-	elif mirror_command_stage == "second":
-		_draw_dashed_line(_world_to_screen(mirror_axis_start), _world_to_screen(mirror_axis_end), Color("#f2c94c"))
-		draw_circle(_world_to_screen(mirror_axis_start), 6.0, Color("#f2c94c"), false, 2.5)
-		draw_circle(_world_to_screen(mirror_axis_start), 2.0, Color("#f2c94c"))
-		draw_circle(_world_to_screen(mirror_axis_end), 6.0, Color("#f2c94c"), false, 2.5)
-		draw_circle(_world_to_screen(mirror_axis_end), 2.0, Color("#f2c94c"))
+	if not mirror_command_stage.is_empty() and mirror_axis_candidate_visible:
+		var axis_endpoints := _mirror_axis_screen_endpoints()
+		_draw_dashed_line(axis_endpoints[0], axis_endpoints[1], Color("#f2c94c"))
+		var axis_marker := _world_to_screen(_local_to_world(mirror_axis_start))
+		draw_circle(axis_marker, 6.0, Color("#f2c94c"), false, 2.5)
+		draw_circle(axis_marker, 2.0, Color("#f2c94c"))
 	var points_by_id: Dictionary = {}
 	for point in selection_mirror_preview_points:
 		points_by_id[str(point.get("id", ""))] = point

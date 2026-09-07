@@ -450,6 +450,41 @@ func _test_closed_loop_selection_mirror() -> void:
 	_expect(not reflected_source_point.is_empty() and Vector2(reflected_source_point.get("handle_in", Vector2.ZERO)).is_equal_approx(Vector2(-0.6, -0.2)) and Vector2(reflected_source_point.get("handle_out", Vector2.ZERO)).is_equal_approx(Vector2(0.3, 0.7)), "Reversing the reflected Chain during Mirror should retain its directed cubic controls.")
 
 
+func _test_mirror_axis_orientation_commands() -> void:
+	var canvas := ComponentCanvas.new()
+	canvas.size = Vector2(400.0, 400.0)
+	canvas.set_camera_state(Vector2.ZERO, 20.0)
+	canvas.set_component_transform({"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO})
+	canvas.snap_enabled = false
+	_expect(not canvas.start_mirror_command(ComponentCanvas.MIRROR_AXIS_VERTICAL), "The Mirror command must not start without a Point selection.")
+	var source := _component()
+	source["draw_mode"] = "closed_loop"
+	var source_ids: Array[String] = []
+	for point_position in [Vector2(0.0, 0.0), Vector2(-1.0, 1.0), Vector2(0.0, 4.0)]:
+		source_ids.append(BezierTopology.add_point(source, point_position, "linear"))
+	canvas.set_bezier_geometry(source.get("points", []), source.get("edges", []), source.get("chains", []))
+	canvas.set_selected_point_ids(source_ids)
+	_expect(canvas.selected_point_ids.size() == source_ids.size(), "The Mirror axis test needs the authored source run selected on the Canvas.")
+	var reported_stages: Array = []
+	canvas.mirror_axis_stage_changed.connect(func(stage: String) -> void: reported_stages.append(stage))
+	var confirmed_directions: Array = []
+	canvas.mirror_axis_confirmed.connect(func(axis_start: Vector2, axis_end: Vector2) -> void: confirmed_directions.append(axis_end - axis_start))
+	_expect(not canvas.start_mirror_command("diagonal"), "An unknown axis orientation must not start the Mirror command.")
+	_expect(canvas.start_mirror_command(ComponentCanvas.MIRROR_AXIS_VERTICAL) and reported_stages == ["axis"], "Mirror Y should enter one axis stage because its orientation is already fixed.")
+	canvas._set_mirror_axis_from_screen(Vector2(240.0, 160.0))
+	_expect((canvas.mirror_axis_end - canvas.mirror_axis_start).is_equal_approx(Vector2(0.0, 1.0)), "Mirror Y must derive a vertical axis from the single placed axis position.")
+	canvas._confirm_mirror_axis()
+	_expect(confirmed_directions.size() == 1 and confirmed_directions[0].is_equal_approx(Vector2(0.0, 1.0)) and canvas.mirror_command_stage.is_empty(), "Confirming Mirror Y should emit the vertical axis once and end the command.")
+	_expect(canvas.start_mirror_command(ComponentCanvas.MIRROR_AXIS_HORIZONTAL), "Mirror X should start from the same selection state as Mirror Y.")
+	canvas._set_mirror_axis_from_screen(Vector2(240.0, 160.0))
+	_expect((canvas.mirror_axis_end - canvas.mirror_axis_start).is_equal_approx(Vector2(1.0, 0.0)), "Mirror X must derive a horizontal axis from the single placed axis position.")
+	var axis_endpoints := canvas._mirror_axis_screen_endpoints()
+	_expect(axis_endpoints.size() == 2 and is_equal_approx(axis_endpoints[0].y, axis_endpoints[1].y) and axis_endpoints[0].x < 0.0 and axis_endpoints[1].x > canvas.size.x, "A fixed Mirror axis must be drawn past both visible Canvas borders.")
+	canvas.cancel_mirror_command(false)
+	_expect(canvas.mirror_command_stage.is_empty() and not canvas.mirror_axis_candidate_visible, "Cancelling the Mirror command must clear its axis candidate.")
+	canvas.free()
+
+
 func _test_contour_stroke_mesh() -> void:
 	var contour := _component()
 	contour["draw_mode"] = "contour"

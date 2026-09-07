@@ -262,6 +262,7 @@ var active_edit_mode := "point"
 var edit_bezier_handles := false
 var edit_point_set_mode := false
 var active_transform_mode := "transform"
+var active_mirror_axis_orientation := ComponentCanvas.MIRROR_AXIS_VERTICAL
 var snap_enabled := true
 var snap_mode := "coarse"
 var snap_grid_step := 16.0
@@ -5164,22 +5165,20 @@ func _render_context_bar() -> void:
 		var mirror_spacer := Control.new()
 		mirror_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		context_bar.add_child(mirror_spacer)
-		var flip_x_button := Button.new()
-		flip_x_button.text = "Flip X"
-		flip_x_button.tooltip_text = "Flip the complete Closed Loop around the Component Pivot's vertical axis"
-		flip_x_button.focus_mode = Control.FOCUS_NONE
-		flip_x_button.disabled = geometry_locked
-		EditorWidgets.style_context_command_button(flip_x_button, false)
-		flip_x_button.pressed.connect(_flip_selected_component_geometry_x)
-		context_bar.add_child(flip_x_button)
-		var mirror_button := Button.new()
-		mirror_button.text = "Mirror Y"
-		mirror_button.tooltip_text = "Mirror a contiguous selection from the open source Chain across an interactively defined axis"
-		mirror_button.focus_mode = Control.FOCUS_NONE
-		mirror_button.disabled = geometry_locked or not _can_activate_selection_mirror(selected_component)
-		EditorWidgets.style_context_command_button(mirror_button, _context_command_is("asset.mirror"))
-		mirror_button.pressed.connect(_activate_selection_mirror)
-		context_bar.add_child(mirror_button)
+		var mirror_menu := MenuButton.new()
+		mirror_menu.text = "Mirror  ▼"
+		mirror_menu.custom_minimum_size = Vector2(100, 32)
+		mirror_menu.tooltip_text = "Mirror a contiguous selection from the open source Chain across a placed vertical or horizontal axis"
+		mirror_menu.focus_mode = Control.FOCUS_NONE
+		EditorWidgets.style_context_command_button(mirror_menu, _context_command_is("asset.mirror"))
+		mirror_menu.get_popup().add_item("Mirror Y", 0)
+		mirror_menu.get_popup().add_item("Mirror X", 1)
+		EditorWidgets.style_popup_menu(mirror_menu.get_popup())
+		mirror_menu.get_popup().id_pressed.connect(_on_mirror_menu_id)
+		mirror_menu.disabled = geometry_locked or not _can_activate_selection_mirror(selected_component)
+		if geometry_locked:
+			mirror_menu.tooltip_text = draw_menu.tooltip_text
+		context_bar.add_child(mirror_menu)
 func _next_default_guide_name(asset: Dictionary, guide_type: String) -> String:
 	var base := AssetGuide.display_name(guide_type)
 	var index := 1
@@ -6019,55 +6018,35 @@ func _can_activate_selection_mirror(component: Dictionary) -> bool:
 	return SELECTION_MIRROR_SERVICE_SCRIPT.selection_issues(component, selected_point_ids).is_empty()
 
 
-func _flip_selected_component_geometry_x() -> void:
-	_flip_component_geometry_x(selected_asset_id, selected_component_id)
+func _on_mirror_menu_id(action_id: int) -> void:
+	_activate_selection_mirror(ComponentCanvas.MIRROR_AXIS_HORIZONTAL if action_id == 1 else ComponentCanvas.MIRROR_AXIS_VERTICAL)
 
 
-func _flip_component_geometry_x(asset_id: String, component_id: String) -> void:
-	var asset := _get_asset(asset_id)
-	var component := _get_component(asset, component_id)
-	if asset.is_empty() or component.is_empty() or _region_uses_component_geometry(component) or str(component.get("draw_mode", "")) != WorldDocumentService.DRAW_MODE_CLOSED_LOOP:
-		return
-	var points: Array = component.get("points", [])
-	if points.is_empty():
-		return
-	var transform: Dictionary = component.get("transform", {})
-	var pivot: Vector2 = transform.get("pivot", Vector2.ZERO)
-	_record_direct_change()
-	for point_data in points:
-		if not point_data is Dictionary:
-			continue
-		var point_position: Vector2 = point_data.get("position", Vector2.ZERO)
-		point_position.x = 2.0 * pivot.x - point_position.x
-		point_data["position"] = point_position
-		var handle_in: Vector2 = point_data.get("handle_in", Vector2.ZERO)
-		handle_in.x = -handle_in.x
-		point_data["handle_in"] = handle_in
-		var handle_out: Vector2 = point_data.get("handle_out", Vector2.ZERO)
-		handle_out.x = -handle_out.x
-		point_data["handle_out"] = handle_out
-	BezierGeometry.resolve_auto_handles(points, component.get("chains", []))
-	if asset_id == selected_asset_id and component_id == selected_component_id:
-		_refresh_component_geometry(component)
-		_invalidate_render(RENDER_INSPECTOR | RENDER_CANVAS_CONTEXT)
-	_show_status_message("Flipped Closed Loop across the Pivot's vertical axis.")
+func _mirror_command_label() -> String:
+	return "Mirror X" if active_mirror_axis_orientation == ComponentCanvas.MIRROR_AXIS_HORIZONTAL else "Mirror Y"
 
 
-func _activate_selection_mirror() -> void:
+func _activate_selection_mirror(axis_orientation := ComponentCanvas.MIRROR_AXIS_VERTICAL) -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	if not _can_activate_selection_mirror(component):
 		return
+	active_mirror_axis_orientation = axis_orientation
 	_set_active_context_command("asset.mirror")
-	if not canvas_view.start_mirror_command():
+	if not canvas_view.start_mirror_command(axis_orientation):
 		_set_active_context_command("asset.edit_point")
 		return
 	_invalidate_render(RENDER_CONTEXT_BAR)
-	_show_mirror_prompt("Mirror Y · Set the first axis Point on the snapped grid")
+	_show_mirror_prompt(_mirror_axis_prompt())
+
+
+func _mirror_axis_prompt() -> String:
+	var axis_name := "horizontal" if active_mirror_axis_orientation == ComponentCanvas.MIRROR_AXIS_HORIZONTAL else "vertical"
+	return "%s · Place the %s axis on the snapped grid · Click or Enter to confirm · Escape to cancel" % [_mirror_command_label(), axis_name]
 
 
 func _on_mirror_axis_stage_changed(stage: String) -> void:
-	if stage == "second":
-		_show_mirror_prompt("Mirror Y · Move the second axis Point · Click or Enter to confirm · Escape to cancel")
+	if stage == "axis":
+		_show_mirror_prompt(_mirror_axis_prompt())
 
 
 func _on_mirror_axis_confirmed(axis_start: Vector2, axis_end: Vector2) -> void:
@@ -6078,7 +6057,7 @@ func _on_mirror_axis_confirmed(axis_start: Vector2, axis_end: Vector2) -> void:
 	var result: Dictionary = SELECTION_MIRROR_SERVICE_SCRIPT.apply(component, selected_point_ids, axis_start, axis_end)
 	if not bool(result.get("valid", false)):
 		var errors: Array = result.get("errors", [])
-		_show_status_message(str(errors[0]) if not errors.is_empty() else "Mirror Y could not be applied.")
+		_show_status_message(str(errors[0]) if not errors.is_empty() else "%s could not be applied." % _mirror_command_label())
 		_set_active_context_command("asset.edit_point")
 		_invalidate_render(RENDER_CONTEXT_BAR)
 		return
@@ -6096,15 +6075,15 @@ func _on_mirror_axis_confirmed(axis_start: Vector2, axis_end: Vector2) -> void:
 	_invalidate_render(RENDER_OUTLINER | RENDER_INSPECTOR | RENDER_CONTEXT_BAR)
 	var auto_connected_count := int(result.get("auto_connected_count", 0))
 	if auto_connected_count > 0:
-		_show_status_message("Mirror Y applied · Overlapping endpoints connected")
+		_show_status_message("%s applied · Overlapping endpoints connected" % _mirror_command_label())
 	else:
-		_show_status_message("Mirror Y applied · The two open Chains remain unconnected")
+		_show_status_message("%s applied · The two open Chains remain unconnected" % _mirror_command_label())
 
 
 func _on_mirror_axis_cancelled() -> void:
 	_set_active_context_command("asset.edit_point")
 	_invalidate_render(RENDER_CONTEXT_BAR)
-	_show_status_message("Mirror Y cancelled")
+	_show_status_message("%s cancelled" % _mirror_command_label())
 
 
 func _show_mirror_prompt(message: String) -> void:

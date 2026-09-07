@@ -83,8 +83,13 @@ but owns no Fill or Contour Stroke Mesh of its own.
 ## Closed Loop drafts
 
 Closed Loop validation requires exactly one closed Chain. While authoring, a
-Mirror Y operation may create a second open Chain from a selected contiguous
-run of the sole open source Chain. If both mirrored endpoints coincide with
+Mirror operation may create a second open Chain from a selected contiguous
+run of the sole open source Chain. The Create context bar offers it as one
+`Mirror` menu with two commands that differ only in axis orientation: Mirror Y
+reflects across a vertical axis, Mirror X across a horizontal one. The axis
+direction is fixed by the chosen command, so the user places only the axis line
+itself on the snapped grid and confirms it with a click or Enter. If both
+mirrored endpoints coincide with
 the source endpoints, Mirror automatically joins and closes the two halves
 into the final single Chain. A single coincident endpoint remains an open
 joined Chain so the remaining endpoint can be authored manually. A closed
@@ -92,6 +97,9 @@ Chain cannot be mirrored. Mirror command availability checks only source
 topology and the contiguous Point selection because no axis exists yet. Preview
 and apply validate the chosen axis separately and reject an interior selected
 Point on that axis; only open Chain endpoints may be coincident there.
+`SelectionMirrorService` itself still reflects across any axis given as two
+distinct Points, so a freely oriented axis remains possible without a service
+change.
 
 ## Fill boundary sampling
 
