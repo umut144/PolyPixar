@@ -1,6 +1,15 @@
 class_name GeometryMeshingWorkspace
 extends Control
 
+## A Component Mesh is inspected at the scale it was authored at, and these are
+## centimetres: a Stone chip measures a few tool units across, so the previous
+## ceiling of 128 pixels per unit left it under a hundred pixels wide at full
+## zoom - too small to judge a triangle by. The floor is unchanged; only getting
+## closer was ever the problem.
+const MIN_CAMERA_ZOOM := 0.05
+const MAX_CAMERA_ZOOM := 1280.0
+const CAMERA_ZOOM_STEP := 1.12
+
 const BACKGROUND := Color("#1b1e24")
 const GRID_MINOR := Color("#252a33")
 const GRID_MAJOR := Color("#303744")
@@ -72,13 +81,9 @@ func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed:
 		grab_focus()
 		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
-			camera_zoom = clampf(camera_zoom * 1.12, 0.05, 128.0)
-			fitted = true
-			queue_redraw()
+			_zoom_by(CAMERA_ZOOM_STEP)
 		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-			camera_zoom = clampf(camera_zoom / 1.12, 0.05, 128.0)
-			fitted = true
-			queue_redraw()
+			_zoom_by(1.0 / CAMERA_ZOOM_STEP)
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
@@ -90,8 +95,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		KEY_D: camera_position.x += pan_step
 		KEY_W: camera_position.y += pan_step
 		KEY_S: camera_position.y -= pan_step
-		KEY_Q: camera_zoom = clampf(camera_zoom / 1.12, 0.05, 128.0)
-		KEY_E: camera_zoom = clampf(camera_zoom * 1.12, 0.05, 128.0)
+		KEY_Q: _zoom_by(1.0 / CAMERA_ZOOM_STEP)
+		KEY_E: _zoom_by(CAMERA_ZOOM_STEP)
 		_: return
 	fitted = true
 	queue_redraw()
@@ -155,7 +160,7 @@ func _fit_boundary() -> void:
 	camera_position = bounds.get_center()
 	var available := Vector2(maxf(size.x - 96.0, 1.0), maxf(size.y - 96.0, 1.0))
 	var extent := Vector2(maxf(bounds.size.x, 1.0), maxf(bounds.size.y, 1.0))
-	camera_zoom = clampf(minf(available.x / extent.x, available.y / extent.y), 0.05, 128.0)
+	camera_zoom = clampf(minf(available.x / extent.x, available.y / extent.y), MIN_CAMERA_ZOOM, MAX_CAMERA_ZOOM)
 	fitted = true
 
 
@@ -276,3 +281,11 @@ func _to_screen(local_position: Vector2) -> Vector2:
 
 func _draw_centered_message(message: String) -> void:
 	draw_string(ThemeDB.fallback_font, Vector2(0.0, size.y * 0.5), message, HORIZONTAL_ALIGNMENT_CENTER, size.x, 14, Color("#737f91"))
+
+
+## One place decides how far the camera may come in, so the wheel, the keyboard
+## and the initial fit cannot drift apart.
+func _zoom_by(factor: float) -> void:
+	camera_zoom = clampf(camera_zoom * factor, MIN_CAMERA_ZOOM, MAX_CAMERA_ZOOM)
+	fitted = true
+	queue_redraw()

@@ -1509,3 +1509,23 @@ func _test_weighting_service_and_ui() -> void:
 	application._create_weighting_style("asset_weighting", "component_weighting_hole")
 	_expect(not application.geometry_documents.has("asset_weighting/component_weighting_hole"), "Creating a Weighting Style must not create a Geometry document for an ordinary Hole.")
 	application.free()
+
+
+func _test_mesh_workspace_zoom_range() -> void:
+	# A Stone chip measures well under one tool unit; at 128 pixels per unit it
+	# stayed under a hundred pixels wide, which is not a view you can judge a
+	# triangle in.
+	var workspaces: Array[Control] = [GeometrySamplingWorkspace.new(), GeometrySeedingWorkspace.new(), GeometryMeshingWorkspace.new()]
+	for workspace in workspaces:
+		workspace.camera_zoom = 100.0
+		workspace._zoom_by(2.0)
+		_expect(is_equal_approx(workspace.camera_zoom, 200.0), "%s should zoom past the old ceiling of 128." % workspace.get_class())
+		for _step in range(64):
+			workspace._zoom_by(1.12)
+		_expect(is_equal_approx(workspace.camera_zoom, 1280.0), "Zooming in must stop at the shared ceiling instead of running away.")
+		for _step in range(400):
+			workspace._zoom_by(1.0 / 1.12)
+		_expect(is_equal_approx(workspace.camera_zoom, 0.05), "The floor is unchanged; only coming closer was ever the problem.")
+		var smallest_stone_extent := 0.3182
+		_expect(smallest_stone_extent * workspace.MAX_CAMERA_ZOOM > 400.0, "The ceiling has to carry the smallest authored Component to a size worth inspecting.")
+		workspace.free()
