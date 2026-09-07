@@ -1060,7 +1060,7 @@ func place_asset_pivot_at_mouse() -> bool:
 func _place_asset_pivot_at_screen_position(screen_position: Vector2) -> bool:
 	if context_name.is_empty() or interaction_state != "asset":
 		return false
-	asset_pivot = _snap_to_grid(_screen_to_world(screen_position))
+	asset_pivot = _snap_asset_pivot_position(_screen_to_world(screen_position))
 	asset_pivot_changed.emit(asset_pivot)
 	queue_redraw()
 	return true
@@ -2084,6 +2084,49 @@ func _snap_to_canvas_position(local_position: Vector2) -> Vector2:
 	if bool(reference_snap.get("found", false)):
 		return reference_snap.get("position", local_position)
 	return _snap_to_grid(_snap_to_catch_parent(local_position))
+
+
+## The Asset Pivot is placed in World space over the whole Asset, so it takes its
+## targets from the reference shapes rather than from one Component: the authored
+## Points of everything visible, and for a Primitive its centre instead of the
+## rim samples its outline is made of. Same pick radius and same grid fallback as
+## the Component Pivot, so both behave alike.
+func _snap_asset_pivot_position(world_position: Vector2) -> Vector2:
+	var cursor_screen := _world_to_screen(world_position)
+	var best_position := world_position
+	var best_distance := HANDLE_HIT_RADIUS
+	var found := false
+	for shape in reference_shapes:
+		if not bool(shape.get("visibility", true)):
+			continue
+		var shape_transform: Dictionary = shape.get("transform", {})
+		for candidate in _asset_pivot_candidates(shape):
+			var candidate_world := _local_to_world_with_transform(candidate, shape_transform)
+			var candidate_distance := cursor_screen.distance_to(_world_to_screen(candidate_world))
+			if candidate_distance <= best_distance:
+				best_distance = candidate_distance
+				best_position = candidate_world
+				found = true
+	return best_position if found else _snap_to_grid(world_position)
+
+
+func _asset_pivot_candidates(shape: Dictionary) -> Array[Vector2]:
+	var candidates: Array[Vector2] = []
+	if bool(shape.get("primitive", false)):
+		var contour: Array = shape.get("points", [])
+		var centroid := Vector2.ZERO
+		var contour_size := 0
+		for point in contour:
+			if point is Vector2:
+				centroid += point
+				contour_size += 1
+		if contour_size > 0:
+			candidates.append(centroid / float(contour_size))
+		return candidates
+	for point in shape.get("bezier_points", []):
+		if point is Dictionary:
+			candidates.append(Vector2(point.get("position", Vector2.ZERO)))
+	return candidates
 
 
 func _snap_pivot_position(local_position: Vector2) -> Vector2:

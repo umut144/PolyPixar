@@ -2536,3 +2536,40 @@ func _test_primitive_pivot_snapping() -> void:
 	canvas.set_display_polygon([])
 	_expect(canvas._snap_pivot_position(near_center).is_equal_approx(near_center), "Without a Primitive outline there is no centre to snap to, and an unsnapped Pivot stays where it was put.")
 	canvas.free()
+
+
+func _test_asset_pivot_snapping() -> void:
+	var canvas := ComponentCanvas.new()
+	canvas.size = Vector2(400.0, 400.0)
+	canvas.set_camera_state(Vector2.ZERO, 20.0)
+	canvas.set_component_transform({"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO})
+	canvas.set_context("Asset 1")
+	canvas.interaction_state = "asset"
+	canvas.snap_enabled = false
+	var identity := WorldDocumentService.default_component_transform()
+	var primitive_contour: Array[Vector2] = []
+	for step in range(16):
+		var angle := TAU * float(step) / 16.0
+		primitive_contour.append(Vector2(2.0, 1.0) + Vector2(cos(angle), sin(angle)))
+	canvas.set_reference_shapes([
+		{"id": "component_1", "primitive": true, "points": primitive_contour, "bezier_points": [], "transform": identity, "visibility": true},
+		{"id": "component_2", "primitive": false, "points": [], "bezier_points": [{"id": "point_1", "position": Vector2(-3.0, 0.5)}], "transform": identity, "visibility": true},
+		{"id": "component_3", "primitive": true, "points": primitive_contour, "bezier_points": [], "transform": identity, "visibility": false}
+	])
+	var center_screen := canvas._world_to_screen(Vector2(2.0, 1.0))
+	_expect(canvas._place_asset_pivot_at_screen_position(center_screen + Vector2(5.0, -4.0)) and canvas.asset_pivot.is_equal_approx(Vector2(2.0, 1.0)), "The Asset Pivot should snap onto a Primitive's centre rather than the rim samples its outline is made of.")
+	# Dropped just beside a rim sample the Pivot must stay where it was put: a
+	# Primitive contributes its centre only, never the outline it is drawn from.
+	var beside_rim := canvas._world_to_screen(Vector2(3.0, 1.0)) + Vector2(5.0, -4.0)
+	canvas._place_asset_pivot_at_screen_position(beside_rim)
+	_expect(canvas.asset_pivot.is_equal_approx(canvas._screen_to_world(beside_rim)), "A Primitive's outline samples must not attract the Asset Pivot the way its centre does.")
+	var authored_screen := canvas._world_to_screen(Vector2(-3.0, 0.5))
+	canvas._place_asset_pivot_at_screen_position(authored_screen + Vector2(-4.0, 3.0))
+	_expect(canvas.asset_pivot.is_equal_approx(Vector2(-3.0, 0.5)), "The Asset Pivot should reach the authored Points of the Asset the same way the Component Pivot does.")
+	canvas.snap_enabled = true
+	canvas.grid_step = 1.0
+	canvas.world_grid_size = 1.0
+	var empty_area := canvas._world_to_screen(Vector2(7.2, -6.3))
+	canvas._place_asset_pivot_at_screen_position(empty_area)
+	_expect(canvas.asset_pivot.is_equal_approx(Vector2(7.0, -6.0)), "Away from every target the Asset Pivot must still fall back to the grid.")
+	canvas.free()

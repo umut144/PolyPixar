@@ -12909,6 +12909,7 @@ func _build_reference_shapes(asset: Dictionary, excluded_component_id := "", emp
 			"edges": component.get("edges", []).duplicate(true),
 			"chains": component.get("chains", []).duplicate(true),
 			"closed": primitive_component or BezierTopology.outer_chain_closed(component),
+			"primitive": primitive_component,
 			"transform": _asset_preview_world_record(asset, ComponentHierarchy.world_transform_record(asset, str(component.get("id", "")))),
 			"visibility": asset_is_visible and _effective_component_visibility(asset, component),
 			"z_index": _effective_component_z_index(asset, component),
@@ -12944,7 +12945,7 @@ func _reference_asset_shapes(target_asset: Dictionary, reference: Dictionary, em
 		for source_point in source_component.get("points", []):
 			if source_point is Dictionary:
 				authored_points.append({"id": str(source_point.get("id", "")), "position": _transform_point(_transform_point(Vector2(source_point.get("position", Vector2.ZERO)), source_transform), reference_transform)})
-		result.append({"id": str(reference.get("id", "")), "points": points, "bezier_points": authored_points, "closed": PrimitiveGeometryService.has_analytic_shape(source_component) or BezierTopology.outer_chain_closed(source_component), "transform": WorldDocumentService.default_component_transform(), "visibility": bool(target_asset.get("visibility", true)) and bool(reference.get("visibility", true)), "z_index": int(reference.get("z_index", 0)), "emphasized": str(reference.get("id", "")) == emphasized_component_id, "topology_role": WorldDocumentService.topology_role(reference)})
+		result.append({"id": str(reference.get("id", "")), "points": points, "bezier_points": authored_points, "closed": PrimitiveGeometryService.has_analytic_shape(source_component) or BezierTopology.outer_chain_closed(source_component), "primitive": PrimitiveGeometryService.has_analytic_shape(source_component), "transform": WorldDocumentService.default_component_transform(), "visibility": bool(target_asset.get("visibility", true)) and bool(reference.get("visibility", true)), "z_index": int(reference.get("z_index", 0)), "emphasized": str(reference.get("id", "")) == emphasized_component_id, "topology_role": WorldDocumentService.topology_role(reference)})
 	return result
 
 
