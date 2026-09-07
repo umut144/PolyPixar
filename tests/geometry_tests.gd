@@ -827,6 +827,23 @@ func _test_geometry_sampling_ui_shell() -> void:
 	_expect(application.active_context_command == "asset.edit_point" and application.active_edit_mode == "point" and point_command != null and point_command.button_pressed and not point_command.flat, "Returning to Asset Edit Point should update its central command and highlight immediately.")
 	var measure_menu := _context_menu(application, "Measure")
 	_expect(measure_menu != null and not measure_menu.disabled, "Measure should offer its Ruler in the Create context bar for every Component.")
+	# The Primitive branch returns before the Bezier context bar is built, so it
+	# needs its own call rather than inheriting one further down.
+	var primitive_asset: Dictionary = {"id": "asset_primitive", "name": "Bomb", "asset_type": "props", "visibility": true, "groups": [], "guides": [],
+		"components": [{"id": "component_primitive", "name": "shell", "type": "component",
+			"draw_mode": WorldDocumentService.DRAW_MODE_PRIMITIVE, "topology_role": WorldDocumentService.ROLE_OUTER,
+			"primitive": {"type": "circle", "center": Vector2.ZERO, "diameter_cm": 4.0},
+			"points": [], "edges": [], "chains": [], "visibility": true,
+			"transform": WorldDocumentService.default_component_transform()}]}
+	application.assets.append(primitive_asset)
+	application.selected_asset_id = "asset_primitive"
+	application.selected_component_id = "component_primitive"
+	application._render_context_bar()
+	_expect(_context_menu(application, "Measure") != null, "A Primitive's context bar should offer Measure as well; measuring changes no geometry.")
+	application.assets.erase(primitive_asset)
+	application.selected_asset_id = "asset_1"
+	application.selected_component_id = "component_1"
+	application._render_context_bar()
 	application._toggle_measure_ruler()
 	application._render_context_bar()
 	var active_measure_menu := _context_menu(application, "Measure")

@@ -5137,6 +5137,7 @@ func _render_context_bar() -> void:
 		transform_reference_button.focus_mode = Control.FOCUS_NONE
 		transform_reference_button.pressed.connect(_activate_transform_state)
 		context_bar.add_child(transform_reference_button)
+		_add_context_measure_menu()
 		_render_info_bar()
 		return
 	if WorldDocumentService.is_primitive(primitive_component):
@@ -5154,6 +5155,7 @@ func _render_context_bar() -> void:
 		transform_primitive_button.text = "⌘2  Transform"
 		transform_primitive_button.pressed.connect(_activate_transform_state)
 		context_bar.add_child(transform_primitive_button)
+		_add_context_measure_menu()
 		_render_info_bar()
 		return
 	var draw_menu := MenuButton.new()
@@ -5215,23 +5217,7 @@ func _render_context_bar() -> void:
 		if geometry_locked:
 			edit_face_menu.tooltip_text = draw_menu.tooltip_text
 		context_bar.add_child(edit_face_menu)
-	var context_command_spacer := Control.new()
-	context_command_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	context_bar.add_child(context_command_spacer)
-	var measure_menu := MenuButton.new()
-	measure_menu.text = "Measure  ▼"
-	measure_menu.custom_minimum_size = Vector2(112, 32)
-	measure_menu.tooltip_text = "Measure distances on the Canvas · Ruler guides are transient and never change geometry"
-	measure_menu.focus_mode = Control.FOCUS_NONE
-	# The highlight reports that a Measure tool is on, not that Measure currently
-	# owns the Canvas, because the Ruler keeps running underneath other commands.
-	var ruler_enabled := is_instance_valid(canvas_view) and canvas_view.is_measure_ruler_enabled()
-	EditorWidgets.style_context_command_button(measure_menu, ruler_enabled)
-	measure_menu.get_popup().add_check_item("Ruler", 0)
-	measure_menu.get_popup().set_item_checked(0, ruler_enabled)
-	EditorWidgets.style_popup_menu(measure_menu.get_popup())
-	measure_menu.get_popup().id_pressed.connect(_on_measure_menu_id)
-	context_bar.add_child(measure_menu)
+	_add_context_measure_menu()
 	if closed_loop_component:
 		var mirror_menu := MenuButton.new()
 		mirror_menu.text = "Mirror  ▼"
@@ -6084,6 +6070,29 @@ func _can_activate_selection_mirror(component: Dictionary) -> bool:
 	if component.is_empty() or _region_uses_component_geometry(component) or not WorldDocumentService.is_closed_loop(component):
 		return false
 	return SELECTION_MIRROR_SERVICE_SCRIPT.selection_issues(component, selected_point_ids).is_empty()
+
+
+## Measure changes no geometry, so it belongs in every Create context bar - the
+## Primitive and Asset Reference branches return before the Bezier one is built,
+## which is the only reason they went without it.
+func _add_context_measure_menu() -> void:
+	var context_command_spacer := Control.new()
+	context_command_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	context_bar.add_child(context_command_spacer)
+	var measure_menu := MenuButton.new()
+	measure_menu.text = "Measure  ▼"
+	measure_menu.custom_minimum_size = Vector2(112, 32)
+	measure_menu.tooltip_text = "Measure distances on the Canvas · Ruler guides are transient and never change geometry"
+	measure_menu.focus_mode = Control.FOCUS_NONE
+	# The highlight reports that a Measure tool is on, not that Measure currently
+	# owns the Canvas, because the Ruler keeps running underneath other commands.
+	var ruler_enabled := is_instance_valid(canvas_view) and canvas_view.is_measure_ruler_enabled()
+	EditorWidgets.style_context_command_button(measure_menu, ruler_enabled)
+	measure_menu.get_popup().add_check_item("Ruler", 0)
+	measure_menu.get_popup().set_item_checked(0, ruler_enabled)
+	EditorWidgets.style_popup_menu(measure_menu.get_popup())
+	measure_menu.get_popup().id_pressed.connect(_on_measure_menu_id)
+	context_bar.add_child(measure_menu)
 
 
 func _on_measure_menu_id(action_id: int) -> void:
