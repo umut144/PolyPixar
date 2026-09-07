@@ -37,7 +37,7 @@ request was dropped without a result, after a watcher restart or because it
 sat too long: request a new run instead of waiting for one that will never
 arrive. `3` means no watcher is running.
 
-`3` is the only case that needs the developer: say plainly that the watcher is
+Exit code `3` always needs the developer: say plainly that the watcher is
 off, ask them to type `checkw start` in a terminal tab, and wait for their
 confirmation instead of falling back to "please run it by hand".
 
