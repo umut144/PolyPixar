@@ -30,12 +30,14 @@
 		"asset_27",
 		"asset_28",
 		"asset_29",
-		"asset_30"
+		"asset_30",
+		"asset_31",
+		"asset_32"
 	],
 	"editor_state": {
-		"active_create_submodule": "Single",
-		"active_geometry_submodule": "Meshing",
-		"active_module": "Create",
+		"active_create_submodule": "Palette",
+		"active_geometry_submodule": "Sampling",
+		"active_module": "Export",
 		"active_motion_submodule": "Animation",
 		"active_style_submodule": "Weighting",
 		"asset_cameras": {
@@ -179,6 +181,20 @@
 				],
 				"zoom": 869.167863726134
 			},
+			"asset_31": {
+				"position": [
+					0.217181697487831,
+					-0.219387486577034
+				],
+				"zoom": 138.020272988024
+			},
+			"asset_32": {
+				"position": [
+					-0.228413760662079,
+					-0.200724631547928
+				],
+				"zoom": 149.596873675432
+			},
 			"asset_4": {
 				"position": [
 					-0.138385653495789,
@@ -233,8 +249,8 @@
 			"asset_16": false,
 			"asset_17": false,
 			"asset_18": false,
-			"asset_19": false,
-			"asset_2": true,
+			"asset_19": true,
+			"asset_2": false,
 			"asset_20": false,
 			"asset_21": false,
 			"asset_22": false,
@@ -247,6 +263,8 @@
 			"asset_29": false,
 			"asset_3": false,
 			"asset_30": false,
+			"asset_31": true,
+			"asset_32": true,
 			"asset_4": false,
 			"asset_5": false,
 			"asset_6": false,
@@ -279,8 +297,8 @@
 			"terrain": false,
 			"weapons": true
 		},
-		"selected_asset_id": "asset_2",
-		"selected_component_id": "component_154",
+		"selected_asset_id": "asset_32",
+		"selected_component_id": "",
 		"selected_edge_ids": [],
 		"selected_guide_id": "",
 		"selected_motion_act_id": "",
@@ -301,8 +319,8 @@
 	},
 	"name": "world01",
 	"next_ids": {
-		"asset": 31,
-		"component": 196,
+		"asset": 33,
+		"component": 199,
 		"group": 10,
 		"guide": 9,
 		"motion_act": 1,

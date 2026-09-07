@@ -1,162 +1,126 @@
 {
-	"asset_id": "asset_26",
-	"component_id": "component_156",
+	"asset_id": "asset_32",
+	"component_id": "component_198",
 	"component_mesh": {
-		"bake_id": "meshing_bake_3786590530043292740",
+		"bake_id": "meshing_bake_3970372852977442855",
 		"build_provenance": {
-			"attempts": 1.0,
-			"auto_recipe_version": 0.0,
+			"attempts": 1,
+			"auto_recipe_version": 0,
 			"automatic_diagnostics": {},
-			"exact_input_hash": "844aad933e94b4e07e2f3dec110b4e7611fe5d4eeb90f5d15f5ce52b42b8b000",
+			"exact_input_hash": "2648d73825d3d313704114b5e8683f6eb837ead27cec68161f8dc18067892774",
 			"pipeline_recipe_hash": "",
 			"recipe_mode": "derived",
-			"schema_version": 1.0,
+			"schema_version": 1,
 			"source_signature": {
 				"geometry_tolerance": 0.00055,
-				"meshing_algorithm": 5.0,
+				"meshing_algorithm": 5,
 				"recipe_hash": "d0856c7333acc91ff92367f7a7b0d59f6a00ad1134806c375ed5708606712a44",
-				"recipe_version": 2.0,
-				"sampling_algorithm": 6.0,
+				"recipe_version": 2,
+				"sampling_algorithm": 6,
 				"scalars": [
 					4.0,
 					5.0,
 					1.0,
 					1.0
 				],
-				"seeding_algorithm": 2.0,
-				"topology_hash": "1dd55cc23e39755b71c9674ffc3a153e238282c748f78d44b234c1f88e975611",
+				"seeding_algorithm": 2,
+				"topology_hash": "5e7d12f3f9d7984c4579240204b588e4f7543316ff453f9684e3c3a5051cac6c",
 				"vectors": [
 					[
-						-0.584999978542328,
-						-2.06699991226196
+						0.25,
+						-2.00999999046326
 					],
 					[
-						0.129999995231628,
-						0.0953333452343941
-					],
-					[
-						0.0,
-						0.0
-					],
-					[
-						-0.194999992847443,
-						-1.78099989891052
-					],
-					[
-						0.129304632544518,
-						0.143734276294708
-					],
-					[
-						-0.104707829654217,
-						-0.116392619907856
-					],
-					[
-						0.105000011622906,
-						-1.29999995231628
-					],
-					[
-						0.0678605735301971,
-						0.183223515748978
-					],
-					[
-						-0.0642729103565216,
-						-0.173536852002144
-					],
-					[
-						0.195000022649765,
-						-0.728000044822693
-					],
-					[
-						0.00964785553514957,
-						0.177681297063828
-					],
-					[
-						-0.0104372054338455,
-						-0.192218467593193
-					],
-					[
-						0.165000021457672,
-						-0.195000037550926
-					],
-					[
-						-0.0295049212872982,
-						0.1683419495821
-					],
-					[
-						0.0308227092027664,
-						-0.175860658288002
-					],
-					[
-						0.0150000136345625,
-						0.298999935388565
-					],
-					[
-						-0.0560989268124104,
-						0.154312700033188
-					],
-					[
-						0.0590400621294975,
-						-0.162402957677841
-					],
-					[
-						-0.179999977350235,
-						0.753999948501587
-					],
-					[
-						-0.0465100705623627,
-						0.148505821824074
-					],
-					[
-						0.0489013530313969,
-						-0.156141147017479
-					],
-					[
-						-0.269999980926514,
-						1.20899987220764
-					],
-					[
-						-0.00762519426643848,
-						0.156401172280312
-					],
-					[
-						0.0074955434538424,
-						-0.153741896152496
-					],
-					[
-						-0.224999994039536,
-						1.67699992656708
-					],
-					[
-						0.0482706129550934,
-						0.13177877664566
-					],
-					[
-						-0.0546530336141586,
-						-0.149202764034271
-					],
-					[
-						0.0299999993294477,
-						2.02799987792969
-					],
-					[
-						0.103698693215847,
-						0.0920120254158974
-					],
-					[
-						-0.111470296978951,
-						-0.0989077761769295
-					],
-					[
-						0.405000030994415,
-						2.23600006103516
+						-0.16833333671093,
+						0.163333341479301
 					],
 					[
 						0.0,
 						0.0
 					],
 					[
-						-0.125,
-						-0.0693333670496941
+						-0.254999995231628,
+						-1.51999998092651
+					],
+					[
+						-0.0974080115556717,
+						0.205346629023552
+					],
+					[
+						0.100524596869946,
+						-0.211916729807854
+					],
+					[
+						-0.305000007152557,
+						-0.839999973773956
+					],
+					[
+						0.0492949150502682,
+						0.22886922955513
+					],
+					[
+						-0.0478548929095268,
+						-0.222183406352997
+					],
+					[
+						0.025000000372529,
+						-0.219999998807907
+					],
+					[
+						0.109687596559525,
+						0.226284638047218
+					],
+					[
+						-0.102119632065296,
+						-0.210671991109848
+					],
+					[
+						0.330000013113022,
+						0.469999998807907
+					],
+					[
+						0.0500143207609653,
+						0.251796245574951
+					],
+					[
+						-0.0489919893443584,
+						-0.246649339795113
+					],
+					[
+						0.314999997615814,
+						1.24000000953674
+					],
+					[
+						-0.0764831453561783,
+						0.263244301080704
+					],
+					[
+						0.0716244131326675,
+						-0.246521219611168
+					],
+					[
+						-0.100000001490116,
+						1.95000004768372
+					],
+					[
+						-0.0558611899614334,
+						0.0791733488440514
+					],
+					[
+						0.158037275075912,
+						-0.223989859223366
+					],
+					[
+						-0.319999992847443,
+						2.14000010490417
+					],
+					[
+						0.0,
+						0.0
+					],
+					[
+						0.0733333304524422,
+						-0.0633333548903465
 					],
 					[
 						1.0,
@@ -171,25 +135,25 @@
 						0.0
 					]
 				],
-				"version": 1.0
+				"version": 1
 			}
 		},
 		"last_error": "",
 		"last_failure_signature": {},
-		"mesh_fingerprint": "4756d319726f85b4067ec35f5e56aaab95025bb10ab1e1ff06c46b2fd423d2ab",
+		"mesh_fingerprint": "1bb8d459575e97d91da48f45c3085258964a952b99c600cb337e8393caf3cf98",
 		"method": "contour_stroke"
 	},
 	"meshing": {
 		"bakes": {
 			"contour_stroke": {
 				"algorithm_version": 5,
-				"bake_id": "meshing_bake_3786590530043292740",
+				"bake_id": "meshing_bake_3970372852977442855",
 				"boundary_constraints": [],
 				"errors": [],
 				"geometry_diagnostics": {
-					"minimum_nonadjacent_clearance_meters": 0.0104763619601727,
-					"narrow_overlap_pair_count": 30.0,
-					"self_intersection_count": 0.0,
+					"minimum_nonadjacent_clearance_meters": 0.00721403881907463,
+					"narrow_overlap_pair_count": 40,
+					"self_intersection_count": 0,
 					"triangle_validation": "complete"
 				},
 				"has_outline": true,
@@ -210,260 +174,266 @@
 				},
 				"runs": [
 					{
-						"bevel_join_count": 0.0,
+						"bevel_join_count": 0,
 						"centerline": [
 							{
 								"curve_t": 0.0,
-								"edge_id": "edge_877528896333286341",
+								"edge_id": "edge_6433256813641958479",
 								"position": [
-									0.405000030994415,
-									2.23600006103516
+									-0.319999992847443,
+									2.14000010490417
 								],
-								"source_point_id": "point_1187044881057369621"
+								"source_point_id": "point_3114254218087588958"
 							},
 							{
 								"curve_t": 0.5,
-								"edge_id": "edge_877528896333286341",
+								"edge_id": "edge_6433256813641958479",
 								"position": [
-									0.209512025117874,
-									2.14050436019897
+									-0.203447952866554,
+									2.05094003677368
 								],
 								"source_point_id": ""
 							},
 							{
 								"curve_t": 0.75,
-								"edge_id": "edge_877528896333286341",
+								"edge_id": "edge_6433256813641958479",
 								"position": [
-									0.114763520658016,
-									2.08956742286682
+									-0.147628933191299,
+									2.0041823387146
 								],
 								"source_point_id": ""
 							},
 							{
 								"curve_t": 1.0,
-								"edge_id": "edge_877528896333286341",
+								"edge_id": "edge_6433256813641958479",
 								"position": [
-									0.0299999993294477,
-									2.02799987792969
+									-0.100000001490116,
+									1.95000004768372
 								],
 								"source_point_id": ""
 							},
 							{
 								"curve_t": 0.5,
-								"edge_id": "edge_7773223606891625238",
+								"edge_id": "edge_1552146009699277202",
 								"position": [
-									-0.121199876070023,
-									1.86482644081116
+									0.138082802295685,
+									1.60972046852112
 								],
 								"source_point_id": ""
 							},
 							{
 								"curve_t": 0.75,
-								"edge_id": "edge_7773223606891625238",
+								"edge_id": "edge_1552146009699277202",
 								"position": [
-									-0.180467575788498,
-									1.77352905273438
+									0.240113914012909,
+									1.43049514293671
 								],
 								"source_point_id": ""
 							},
 							{
 								"curve_t": 1.0,
-								"edge_id": "edge_7773223606891625238",
+								"edge_id": "edge_1552146009699277202",
 								"position": [
-									-0.224999994039536,
-									1.67699992656708
+									0.314999997615814,
+									1.24000000953674
 								],
 								"source_point_id": ""
 							},
 							{
 								"curve_t": 0.25,
-								"edge_id": "edge_5730663254267866973",
+								"edge_id": "edge_7140330866151802208",
 								"position": [
-									-0.256160259246826,
-									1.56292390823364
+									0.354593545198441,
+									1.05109524726868
 								],
 								"source_point_id": ""
 							},
 							{
 								"curve_t": 0.5,
-								"edge_id": "edge_5730663254267866973",
+								"edge_id": "edge_7140330866151802208",
 								"position": [
-									-0.270854294300079,
-									1.44569933414459
+									0.368114531040192,
+									0.856978178024292
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.75,
+								"edge_id": "edge_7140330866151802208",
+								"position": [
+									0.358828246593475,
+									0.661872029304504
 								],
 								"source_point_id": ""
 							},
 							{
 								"curve_t": 1.0,
-								"edge_id": "edge_5730663254267866973",
+								"edge_id": "edge_7140330866151802208",
 								"position": [
-									-0.269999980926514,
-									1.20899987220764
+									0.330000013113022,
+									0.469999998807907
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.25,
+								"edge_id": "edge_4413285148037994718",
+								"position": [
+									0.277100086212158,
+									0.289953589439392
 								],
 								"source_point_id": ""
 							},
 							{
 								"curve_t": 0.5,
-								"edge_id": "edge_2891102933527841661",
+								"edge_id": "edge_4413285148037994718",
 								"position": [
-									-0.239630430936813,
-									0.979536414146423
+									0.200260877609253,
+									0.11736323684454
 								],
 								"source_point_id": ""
 							},
 							{
 								"curve_t": 1.0,
-								"edge_id": "edge_2891102933527841661",
+								"edge_id": "edge_4413285148037994718",
 								"position": [
-									-0.179999977350235,
-									0.753999948501587
+									0.025000000372529,
+									-0.219999998807907
 								],
 								"source_point_id": ""
 							},
 							{
 								"curve_t": 0.5,
-								"edge_id": "edge_4188659272440607880",
+								"edge_id": "edge_8981789297422366892",
 								"position": [
-									-0.0851990729570389,
-									0.525814294815063
+									-0.15980926156044,
+									-0.523175954818726
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.75,
+								"edge_id": "edge_8981789297422366892",
+								"position": [
+									-0.247001767158508,
+									-0.676196455955505
 								],
 								"source_point_id": ""
 							},
 							{
 								"curve_t": 1.0,
-								"edge_id": "edge_4188659272440607880",
+								"edge_id": "edge_8981789297422366892",
 								"position": [
-									0.0150000136345625,
-									0.298999935388565
+									-0.305000007152557,
+									-0.839999973773956
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.25,
+								"edge_id": "edge_4059461920517444949",
+								"position": [
+									-0.331074297428131,
+									-1.01110672950745
 								],
 								"source_point_id": ""
 							},
 							{
 								"curve_t": 0.5,
-								"edge_id": "edge_2917663390365411260",
+								"edge_id": "edge_4059461920517444949",
 								"position": [
-									0.101075693964958,
-									0.0542270690202713
+									-0.334473609924316,
+									-1.18631386756897
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.75,
+								"edge_id": "edge_4059461920517444949",
+								"position": [
+									-0.310636103153229,
+									-1.35836386680603
 								],
 								"source_point_id": ""
 							},
 							{
 								"curve_t": 1.0,
-								"edge_id": "edge_2917663390365411260",
+								"edge_id": "edge_4059461920517444949",
 								"position": [
-									0.165000021457672,
-									-0.195000037550926
+									-0.254999995231628,
+									-1.51999998092651
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.125,
+								"edge_id": "edge_6998393424652245373",
+								"position": [
+									-0.21134352684021,
+									-1.59519875049591
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.25,
+								"edge_id": "edge_6998393424652245373",
+								"position": [
+									-0.157356813549995,
+									-1.66299605369568
 								],
 								"source_point_id": ""
 							},
 							{
 								"curve_t": 0.5,
-								"edge_id": "edge_8455631879724837109",
+								"edge_id": "edge_6998393424652245373",
 								"position": [
-									0.195176482200623,
-									-0.460817277431488
+									-0.0279282778501511,
+									-1.78321862220764
 								],
 								"source_point_id": ""
 							},
 							{
 								"curve_t": 1.0,
-								"edge_id": "edge_8455631879724837109",
+								"edge_id": "edge_6998393424652245373",
 								"position": [
-									0.195000022649765,
-									-0.728000044822693
-								],
-								"source_point_id": ""
-							},
-							{
-								"curve_t": 0.5,
-								"edge_id": "edge_8012751513947800700",
-								"position": [
-									0.171533793210983,
-									-1.01737308502197
-								],
-								"source_point_id": ""
-							},
-							{
-								"curve_t": 1.0,
-								"edge_id": "edge_8012751513947800700",
-								"position": [
-									0.105000011622906,
-									-1.29999995231628
-								],
-								"source_point_id": ""
-							},
-							{
-								"curve_t": 0.5,
-								"edge_id": "edge_2046987571971542697",
-								"position": [
-									-0.0206130929291248,
-									-1.55167591571808
-								],
-								"source_point_id": ""
-							},
-							{
-								"curve_t": 1.0,
-								"edge_id": "edge_2046987571971542697",
-								"position": [
-									-0.194999992847443,
-									-1.78099989891052
-								],
-								"source_point_id": ""
-							},
-							{
-								"curve_t": 0.5,
-								"edge_id": "edge_4483877010316811700",
-								"position": [
-									-0.380515426397324,
-									-1.93189716339111
-								],
-								"source_point_id": ""
-							},
-							{
-								"curve_t": 1.0,
-								"edge_id": "edge_4483877010316811700",
-								"position": [
-									-0.584999978542328,
-									-2.06699991226196
+									0.25,
+									-2.00999999046326
 								],
 								"source_point_id": ""
 							}
 						],
 						"closed": false,
 						"edge_ids": [
-							"edge_877528896333286341",
-							"edge_7773223606891625238",
-							"edge_5730663254267866973",
-							"edge_2891102933527841661",
-							"edge_4188659272440607880",
-							"edge_2917663390365411260",
-							"edge_8455631879724837109",
-							"edge_8012751513947800700",
-							"edge_2046987571971542697",
-							"edge_4483877010316811700"
+							"edge_6433256813641958479",
+							"edge_1552146009699277202",
+							"edge_7140330866151802208",
+							"edge_4413285148037994718",
+							"edge_8981789297422366892",
+							"edge_4059461920517444949",
+							"edge_6998393424652245373"
 						],
 						"end_cap": "butt",
 						"geometry_diagnostics": {
-							"centerline_segment_count": 23.0,
-							"minimum_nonadjacent_clearance_tool_units": 0.104763619601727,
-							"narrow_overlap_pair_count": 30.0,
-							"self_intersection_count": 0.0
+							"centerline_segment_count": 24,
+							"minimum_nonadjacent_clearance_tool_units": 0.0721403881907463,
+							"narrow_overlap_pair_count": 40,
+							"self_intersection_count": 0
 						},
-						"index_count": 270.0,
-						"index_offset": 0.0,
-						"miter_join_count": 22.0,
-						"run_id": "chain_2087096691907215627:run:0",
+						"index_count": 282,
+						"index_offset": 0,
+						"miter_join_count": 23,
+						"run_id": "chain_8534727393820626388:run:0",
 						"start_cap": "butt",
-						"triangle_count": 90.0,
-						"vertex_count": 180.0,
-						"vertex_offset": 0.0
+						"triangle_count": 94,
+						"vertex_count": 188,
+						"vertex_offset": 0
 					}
 				],
 				"source_chain_closed": false,
 				"source_draw_mode": "contour",
-				"source_fingerprint": "e4937524fa6c47aefa06c9d9440373b267eb687e78781fdb0ea8ee53d4db9079",
+				"source_fingerprint": "8e961b89198fc5f24ff445b2870cd85ec80477626760e09d1df3121e87386b9a",
 				"topology_role": "outer",
-				"triangle_count": 90,
+				"triangle_count": 94,
 				"triangles": [
 					{
 						"id": "triangle:contour:0",
@@ -844,8 +814,8 @@
 					{
 						"id": "triangle:contour:47",
 						"vertex_ids": [
-							"vertex:contour:92",
 							"vertex:contour:94",
+							"vertex:contour:93",
 							"vertex:contour:95"
 						]
 					},
@@ -853,176 +823,176 @@
 						"id": "triangle:contour:48",
 						"vertex_ids": [
 							"vertex:contour:96",
-							"vertex:contour:97",
-							"vertex:contour:98"
+							"vertex:contour:98",
+							"vertex:contour:97"
 						]
 					},
 					{
 						"id": "triangle:contour:49",
 						"vertex_ids": [
 							"vertex:contour:96",
-							"vertex:contour:98",
-							"vertex:contour:99"
+							"vertex:contour:99",
+							"vertex:contour:98"
 						]
 					},
 					{
 						"id": "triangle:contour:50",
 						"vertex_ids": [
 							"vertex:contour:100",
-							"vertex:contour:101",
-							"vertex:contour:102"
+							"vertex:contour:102",
+							"vertex:contour:101"
 						]
 					},
 					{
 						"id": "triangle:contour:51",
 						"vertex_ids": [
 							"vertex:contour:100",
-							"vertex:contour:102",
-							"vertex:contour:103"
+							"vertex:contour:103",
+							"vertex:contour:102"
 						]
 					},
 					{
 						"id": "triangle:contour:52",
 						"vertex_ids": [
 							"vertex:contour:104",
-							"vertex:contour:105",
-							"vertex:contour:106"
+							"vertex:contour:106",
+							"vertex:contour:105"
 						]
 					},
 					{
 						"id": "triangle:contour:53",
 						"vertex_ids": [
 							"vertex:contour:104",
-							"vertex:contour:106",
-							"vertex:contour:107"
+							"vertex:contour:107",
+							"vertex:contour:106"
 						]
 					},
 					{
 						"id": "triangle:contour:54",
 						"vertex_ids": [
 							"vertex:contour:108",
-							"vertex:contour:109",
-							"vertex:contour:110"
+							"vertex:contour:110",
+							"vertex:contour:109"
 						]
 					},
 					{
 						"id": "triangle:contour:55",
 						"vertex_ids": [
 							"vertex:contour:108",
-							"vertex:contour:110",
-							"vertex:contour:111"
+							"vertex:contour:111",
+							"vertex:contour:110"
 						]
 					},
 					{
 						"id": "triangle:contour:56",
 						"vertex_ids": [
 							"vertex:contour:112",
-							"vertex:contour:113",
-							"vertex:contour:114"
+							"vertex:contour:114",
+							"vertex:contour:113"
 						]
 					},
 					{
 						"id": "triangle:contour:57",
 						"vertex_ids": [
 							"vertex:contour:112",
-							"vertex:contour:114",
-							"vertex:contour:115"
+							"vertex:contour:115",
+							"vertex:contour:114"
 						]
 					},
 					{
 						"id": "triangle:contour:58",
 						"vertex_ids": [
 							"vertex:contour:116",
-							"vertex:contour:117",
-							"vertex:contour:118"
+							"vertex:contour:118",
+							"vertex:contour:117"
 						]
 					},
 					{
 						"id": "triangle:contour:59",
 						"vertex_ids": [
 							"vertex:contour:116",
-							"vertex:contour:118",
-							"vertex:contour:119"
+							"vertex:contour:119",
+							"vertex:contour:118"
 						]
 					},
 					{
 						"id": "triangle:contour:60",
 						"vertex_ids": [
 							"vertex:contour:120",
-							"vertex:contour:121",
-							"vertex:contour:122"
+							"vertex:contour:122",
+							"vertex:contour:121"
 						]
 					},
 					{
 						"id": "triangle:contour:61",
 						"vertex_ids": [
 							"vertex:contour:120",
-							"vertex:contour:122",
-							"vertex:contour:123"
+							"vertex:contour:123",
+							"vertex:contour:122"
 						]
 					},
 					{
 						"id": "triangle:contour:62",
 						"vertex_ids": [
 							"vertex:contour:124",
-							"vertex:contour:125",
-							"vertex:contour:126"
+							"vertex:contour:126",
+							"vertex:contour:125"
 						]
 					},
 					{
 						"id": "triangle:contour:63",
 						"vertex_ids": [
 							"vertex:contour:124",
-							"vertex:contour:126",
-							"vertex:contour:127"
+							"vertex:contour:127",
+							"vertex:contour:126"
 						]
 					},
 					{
 						"id": "triangle:contour:64",
 						"vertex_ids": [
 							"vertex:contour:128",
-							"vertex:contour:129",
-							"vertex:contour:130"
+							"vertex:contour:130",
+							"vertex:contour:129"
 						]
 					},
 					{
 						"id": "triangle:contour:65",
 						"vertex_ids": [
 							"vertex:contour:128",
-							"vertex:contour:130",
-							"vertex:contour:131"
+							"vertex:contour:131",
+							"vertex:contour:130"
 						]
 					},
 					{
 						"id": "triangle:contour:66",
 						"vertex_ids": [
 							"vertex:contour:132",
-							"vertex:contour:133",
-							"vertex:contour:134"
+							"vertex:contour:134",
+							"vertex:contour:133"
 						]
 					},
 					{
 						"id": "triangle:contour:67",
 						"vertex_ids": [
 							"vertex:contour:132",
-							"vertex:contour:134",
-							"vertex:contour:135"
+							"vertex:contour:135",
+							"vertex:contour:134"
 						]
 					},
 					{
 						"id": "triangle:contour:68",
 						"vertex_ids": [
 							"vertex:contour:136",
-							"vertex:contour:137",
-							"vertex:contour:138"
+							"vertex:contour:138",
+							"vertex:contour:137"
 						]
 					},
 					{
 						"id": "triangle:contour:69",
 						"vertex_ids": [
 							"vertex:contour:136",
-							"vertex:contour:138",
-							"vertex:contour:139"
+							"vertex:contour:139",
+							"vertex:contour:138"
 						]
 					},
 					{
@@ -1061,2293 +1031,2421 @@
 						"id": "triangle:contour:74",
 						"vertex_ids": [
 							"vertex:contour:148",
-							"vertex:contour:150",
-							"vertex:contour:149"
+							"vertex:contour:149",
+							"vertex:contour:150"
 						]
 					},
 					{
 						"id": "triangle:contour:75",
 						"vertex_ids": [
 							"vertex:contour:148",
-							"vertex:contour:151",
-							"vertex:contour:150"
+							"vertex:contour:150",
+							"vertex:contour:151"
 						]
 					},
 					{
 						"id": "triangle:contour:76",
 						"vertex_ids": [
 							"vertex:contour:152",
-							"vertex:contour:154",
-							"vertex:contour:153"
+							"vertex:contour:153",
+							"vertex:contour:154"
 						]
 					},
 					{
 						"id": "triangle:contour:77",
 						"vertex_ids": [
 							"vertex:contour:152",
-							"vertex:contour:155",
-							"vertex:contour:154"
+							"vertex:contour:154",
+							"vertex:contour:155"
 						]
 					},
 					{
 						"id": "triangle:contour:78",
 						"vertex_ids": [
 							"vertex:contour:156",
-							"vertex:contour:158",
-							"vertex:contour:157"
+							"vertex:contour:157",
+							"vertex:contour:158"
 						]
 					},
 					{
 						"id": "triangle:contour:79",
 						"vertex_ids": [
 							"vertex:contour:156",
-							"vertex:contour:159",
-							"vertex:contour:158"
+							"vertex:contour:158",
+							"vertex:contour:159"
 						]
 					},
 					{
 						"id": "triangle:contour:80",
 						"vertex_ids": [
 							"vertex:contour:160",
-							"vertex:contour:162",
-							"vertex:contour:161"
+							"vertex:contour:161",
+							"vertex:contour:162"
 						]
 					},
 					{
 						"id": "triangle:contour:81",
 						"vertex_ids": [
 							"vertex:contour:160",
-							"vertex:contour:163",
-							"vertex:contour:162"
+							"vertex:contour:162",
+							"vertex:contour:163"
 						]
 					},
 					{
 						"id": "triangle:contour:82",
 						"vertex_ids": [
 							"vertex:contour:164",
-							"vertex:contour:166",
-							"vertex:contour:165"
+							"vertex:contour:165",
+							"vertex:contour:166"
 						]
 					},
 					{
 						"id": "triangle:contour:83",
 						"vertex_ids": [
 							"vertex:contour:164",
-							"vertex:contour:167",
-							"vertex:contour:166"
+							"vertex:contour:166",
+							"vertex:contour:167"
 						]
 					},
 					{
 						"id": "triangle:contour:84",
 						"vertex_ids": [
 							"vertex:contour:168",
-							"vertex:contour:170",
-							"vertex:contour:169"
+							"vertex:contour:169",
+							"vertex:contour:170"
 						]
 					},
 					{
 						"id": "triangle:contour:85",
 						"vertex_ids": [
 							"vertex:contour:168",
-							"vertex:contour:171",
-							"vertex:contour:170"
+							"vertex:contour:170",
+							"vertex:contour:171"
 						]
 					},
 					{
 						"id": "triangle:contour:86",
 						"vertex_ids": [
 							"vertex:contour:172",
-							"vertex:contour:174",
-							"vertex:contour:173"
+							"vertex:contour:173",
+							"vertex:contour:174"
 						]
 					},
 					{
 						"id": "triangle:contour:87",
 						"vertex_ids": [
 							"vertex:contour:172",
-							"vertex:contour:175",
-							"vertex:contour:174"
+							"vertex:contour:174",
+							"vertex:contour:175"
 						]
 					},
 					{
 						"id": "triangle:contour:88",
 						"vertex_ids": [
 							"vertex:contour:176",
-							"vertex:contour:178",
-							"vertex:contour:177"
+							"vertex:contour:177",
+							"vertex:contour:178"
 						]
 					},
 					{
 						"id": "triangle:contour:89",
 						"vertex_ids": [
 							"vertex:contour:176",
-							"vertex:contour:179",
-							"vertex:contour:178"
+							"vertex:contour:178",
+							"vertex:contour:179"
+						]
+					},
+					{
+						"id": "triangle:contour:90",
+						"vertex_ids": [
+							"vertex:contour:180",
+							"vertex:contour:181",
+							"vertex:contour:182"
+						]
+					},
+					{
+						"id": "triangle:contour:91",
+						"vertex_ids": [
+							"vertex:contour:180",
+							"vertex:contour:182",
+							"vertex:contour:183"
+						]
+					},
+					{
+						"id": "triangle:contour:92",
+						"vertex_ids": [
+							"vertex:contour:184",
+							"vertex:contour:185",
+							"vertex:contour:186"
+						]
+					},
+					{
+						"id": "triangle:contour:93",
+						"vertex_ids": [
+							"vertex:contour:184",
+							"vertex:contour:186",
+							"vertex:contour:187"
 						]
 					}
 				],
 				"valid": true,
-				"vertex_count": 180,
+				"vertex_count": 188,
 				"vertices": [
 					{
 						"curve_t": 0.0,
-						"edge_id": "edge_877528896333286341",
+						"edge_id": "edge_6433256813641958479",
 						"id": "vertex:contour:0",
 						"origin": "segment_left",
 						"position": [
-							0.496443241834641,
-							2.04880785942078
+							-0.193508803844452,
+							2.30553793907166
 						],
 						"preserved": false,
-						"source_id": "edge_877528896333286341@0.000000000"
+						"source_id": "edge_6433256813641958479@0.000000000"
 					},
 					{
 						"curve_t": 0.0,
-						"edge_id": "edge_877528896333286341",
+						"edge_id": "edge_6433256813641958479",
 						"id": "vertex:contour:1",
 						"origin": "segment_right",
 						"position": [
-							0.31355682015419,
-							2.42319226264954
+							-0.446491181850433,
+							1.97446238994598
 						],
 						"preserved": false,
-						"source_id": "edge_877528896333286341@0.000000000"
+						"source_id": "edge_6433256813641958479@0.000000000"
 					},
 					{
 						"curve_t": 0.5,
-						"edge_id": "edge_877528896333286341",
+						"edge_id": "edge_6433256813641958479",
 						"id": "vertex:contour:2",
 						"origin": "segment_left",
 						"position": [
-							0.300955235958099,
-							1.95331215858459
+							-0.0769567638635635,
+							2.21647787094116
 						],
 						"preserved": false,
-						"source_id": "edge_877528896333286341@0.500000000"
+						"source_id": "edge_6433256813641958479@0.500000000"
 					},
 					{
 						"curve_t": 0.5,
-						"edge_id": "edge_877528896333286341",
+						"edge_id": "edge_6433256813641958479",
 						"id": "vertex:contour:3",
 						"origin": "segment_right",
 						"position": [
-							0.11806882172823,
-							2.32769656181335
+							-0.329939126968384,
+							1.88540232181549
 						],
 						"preserved": false,
-						"source_id": "edge_877528896333286341@0.500000000"
+						"source_id": "edge_6433256813641958479@0.500000000"
 					},
 					{
 						"curve_t": 0.5,
-						"edge_id": "edge_877528896333286341",
+						"edge_id": "edge_6433256813641958479",
 						"id": "vertex:contour:4",
 						"origin": "segment_left",
 						"position": [
-							0.308160454034805,
-							1.95700705051422
+							-0.0696682631969452,
+							2.21064519882202
 						],
 						"preserved": false,
-						"source_id": "edge_877528896333286341@0.500000000"
+						"source_id": "edge_6433256813641958479@0.500000000"
 					},
 					{
 						"curve_t": 0.5,
-						"edge_id": "edge_877528896333286341",
+						"edge_id": "edge_6433256813641958479",
 						"id": "vertex:contour:5",
 						"origin": "segment_right",
 						"position": [
-							0.110863596200943,
-							2.32400178909302
+							-0.337227642536163,
+							1.89123475551605
 						],
 						"preserved": false,
-						"source_id": "edge_877528896333286341@0.500000000"
+						"source_id": "edge_6433256813641958479@0.500000000"
 					},
 					{
 						"curve_t": 0.75,
-						"edge_id": "edge_877528896333286341",
+						"edge_id": "edge_6433256813641958479",
 						"id": "vertex:contour:6",
 						"origin": "segment_left",
 						"position": [
-							0.213411957025528,
-							1.90607011318207
+							-0.0138492435216904,
+							2.16388750076294
 						],
 						"preserved": false,
-						"source_id": "edge_877528896333286341@0.750000000"
+						"source_id": "edge_6433256813641958479@0.750000000"
 					},
 					{
 						"curve_t": 0.75,
-						"edge_id": "edge_877528896333286341",
+						"edge_id": "edge_6433256813641958479",
 						"id": "vertex:contour:7",
 						"origin": "segment_right",
 						"position": [
-							0.0161150917410851,
-							2.27306461334229
+							-0.281408607959747,
+							1.84447705745697
 						],
 						"preserved": false,
-						"source_id": "edge_877528896333286341@0.750000000"
+						"source_id": "edge_6433256813641958479@0.750000000"
 					},
 					{
 						"curve_t": 0.75,
-						"edge_id": "edge_877528896333286341",
+						"edge_id": "edge_6433256813641958479",
 						"id": "vertex:contour:8",
 						"origin": "segment_left",
 						"position": [
-							0.237196981906891,
-							1.92100632190704
+							0.00884342193603516,
+							2.1417293548584
 						],
 						"preserved": false,
-						"source_id": "edge_877528896333286341@0.750000000"
+						"source_id": "edge_6433256813641958479@0.750000000"
 					},
 					{
 						"curve_t": 0.75,
-						"edge_id": "edge_877528896333286341",
+						"edge_id": "edge_6433256813641958479",
 						"id": "vertex:contour:9",
 						"origin": "segment_right",
 						"position": [
-							-0.00766993314027786,
-							2.25812840461731
+							-0.304101288318634,
+							1.8666353225708
 						],
 						"preserved": false,
-						"source_id": "edge_877528896333286341@0.750000000"
+						"source_id": "edge_6433256813641958479@0.750000000"
 					},
 					{
 						"curve_t": 1.0,
-						"edge_id": "edge_877528896333286341",
+						"edge_id": "edge_6433256813641958479",
 						"id": "vertex:contour:10",
 						"origin": "segment_left",
 						"position": [
-							0.152433454990387,
-							1.85943877696991
+							0.0564723536372185,
+							2.08754706382751
 						],
 						"preserved": false,
-						"source_id": "edge_877528896333286341@1.000000000"
+						"source_id": "edge_6433256813641958479@1.000000000"
 					},
 					{
 						"curve_t": 1.0,
-						"edge_id": "edge_877528896333286341",
+						"edge_id": "edge_6433256813641958479",
 						"id": "vertex:contour:11",
 						"origin": "segment_right",
 						"position": [
-							-0.0924334526062012,
-							2.19656085968018
+							-0.25647234916687,
+							1.81245303153992
 						],
 						"preserved": false,
-						"source_id": "edge_877528896333286341@1.000000000"
+						"source_id": "edge_6433256813641958479@1.000000000"
 					},
 					{
 						"curve_t": 1.0,
-						"edge_id": "edge_877528896333286341",
+						"edge_id": "edge_6433256813641958479",
 						"id": "vertex:contour:12",
 						"origin": "segment_left",
 						"position": [
-							0.182813867926598,
-							1.88639938831329
+							0.0706999227404594,
+							2.06943345069885
 						],
 						"preserved": false,
-						"source_id": "edge_877528896333286341@1.000000000"
+						"source_id": "edge_6433256813641958479@1.000000000"
 					},
 					{
 						"curve_t": 1.0,
-						"edge_id": "edge_877528896333286341",
+						"edge_id": "edge_6433256813641958479",
 						"id": "vertex:contour:13",
 						"origin": "segment_right",
 						"position": [
-							-0.122813865542412,
-							2.16960048675537
+							-0.270699918270111,
+							1.83056676387787
 						],
 						"preserved": false,
-						"source_id": "edge_877528896333286341@1.000000000"
+						"source_id": "edge_6433256813641958479@1.000000000"
 					},
 					{
 						"curve_t": 0.5,
-						"edge_id": "edge_7773223606891625238",
+						"edge_id": "edge_1552146009699277202",
 						"id": "vertex:contour:14",
 						"origin": "segment_left",
 						"position": [
-							0.0316139906644821,
-							1.72322595119476
+							0.30878272652626,
+							1.72915375232697
 						],
 						"preserved": false,
-						"source_id": "edge_7773223606891625238@0.500000000"
+						"source_id": "edge_1552146009699277202@0.500000000"
 					},
 					{
 						"curve_t": 0.5,
-						"edge_id": "edge_7773223606891625238",
+						"edge_id": "edge_1552146009699277202",
 						"id": "vertex:contour:15",
 						"origin": "segment_right",
 						"position": [
-							-0.274013757705688,
-							2.00642681121826
+							-0.0326171219348907,
+							1.49028718471527
 						],
 						"preserved": false,
-						"source_id": "edge_7773223606891625238@0.500000000"
+						"source_id": "edge_1552146009699277202@0.500000000"
 					},
 					{
 						"curve_t": 0.5,
-						"edge_id": "edge_7773223606891625238",
+						"edge_id": "edge_1552146009699277202",
 						"id": "vertex:contour:16",
 						"origin": "segment_left",
 						"position": [
-							0.0535419583320618,
-							1.75138890743256
+							0.319133371114731,
+							1.71279072761536
 						],
 						"preserved": false,
-						"source_id": "edge_7773223606891625238@0.500000000"
+						"source_id": "edge_1552146009699277202@0.500000000"
 					},
 					{
 						"curve_t": 0.5,
-						"edge_id": "edge_7773223606891625238",
+						"edge_id": "edge_1552146009699277202",
 						"id": "vertex:contour:17",
 						"origin": "segment_right",
 						"position": [
-							-0.295941710472107,
-							1.97826397418976
+							-0.0429677665233612,
+							1.50665020942688
 						],
 						"preserved": false,
-						"source_id": "edge_7773223606891625238@0.500000000"
+						"source_id": "edge_1552146009699277202@0.500000000"
 					},
 					{
 						"curve_t": 0.75,
-						"edge_id": "edge_7773223606891625238",
+						"edge_id": "edge_1552146009699277202",
 						"id": "vertex:contour:18",
 						"origin": "segment_left",
 						"position": [
-							-0.00572574138641357,
-							1.66009151935577
+							0.421164482831955,
+							1.53356528282166
 						],
 						"preserved": false,
-						"source_id": "edge_7773223606891625238@0.750000000"
+						"source_id": "edge_1552146009699277202@0.750000000"
 					},
 					{
 						"curve_t": 0.75,
-						"edge_id": "edge_7773223606891625238",
+						"edge_id": "edge_1552146009699277202",
 						"id": "vertex:contour:19",
 						"origin": "segment_right",
 						"position": [
-							-0.355209410190582,
-							1.88696658611298
+							0.0590633451938629,
+							1.32742500305176
 						],
 						"preserved": false,
-						"source_id": "edge_7773223606891625238@0.750000000"
+						"source_id": "edge_1552146009699277202@0.750000000"
 					},
 					{
 						"curve_t": 0.75,
-						"edge_id": "edge_7773223606891625238",
+						"edge_id": "edge_1552146009699277202",
 						"id": "vertex:contour:20",
 						"origin": "segment_left",
 						"position": [
-							0.00870513916015625,
-							1.68625676631927
+							0.434003591537476,
+							1.50671565532684
 						],
 						"preserved": false,
-						"source_id": "edge_7773223606891625238@0.750000000"
+						"source_id": "edge_1552146009699277202@0.750000000"
 					},
 					{
 						"curve_t": 0.75,
-						"edge_id": "edge_7773223606891625238",
+						"edge_id": "edge_1552146009699277202",
 						"id": "vertex:contour:21",
 						"origin": "segment_right",
 						"position": [
-							-0.369640290737152,
-							1.86080133914948
+							0.0462242364883423,
+							1.35427463054657
 						],
 						"preserved": false,
-						"source_id": "edge_7773223606891625238@0.750000000"
+						"source_id": "edge_1552146009699277202@0.750000000"
 					},
 					{
 						"curve_t": 1.0,
-						"edge_id": "edge_7773223606891625238",
+						"edge_id": "edge_1552146009699277202",
 						"id": "vertex:contour:22",
 						"origin": "segment_left",
 						"position": [
-							-0.0358272790908813,
-							1.58972764015198
+							0.508889675140381,
+							1.31622052192688
 						],
 						"preserved": false,
-						"source_id": "edge_7773223606891625238@1.000000000"
+						"source_id": "edge_1552146009699277202@1.000000000"
 					},
 					{
 						"curve_t": 1.0,
-						"edge_id": "edge_7773223606891625238",
+						"edge_id": "edge_1552146009699277202",
 						"id": "vertex:contour:23",
 						"origin": "segment_right",
 						"position": [
-							-0.41417270898819,
-							1.76427221298218
+							0.121110320091248,
+							1.16377949714661
 						],
 						"preserved": false,
-						"source_id": "edge_7773223606891625238@1.000000000"
+						"source_id": "edge_1552146009699277202@1.000000000"
 					},
 					{
 						"curve_t": 1.0,
-						"edge_id": "edge_7773223606891625238",
+						"edge_id": "edge_1552146009699277202",
 						"id": "vertex:contour:24",
 						"origin": "segment_left",
 						"position": [
-							-0.0240292996168137,
-							1.62210404872894
+							0.518902719020844,
+							1.28273701667786
 						],
 						"preserved": false,
-						"source_id": "edge_7773223606891625238@1.000000000"
+						"source_id": "edge_1552146009699277202@1.000000000"
 					},
 					{
 						"curve_t": 1.0,
-						"edge_id": "edge_7773223606891625238",
+						"edge_id": "edge_1552146009699277202",
 						"id": "vertex:contour:25",
 						"origin": "segment_right",
 						"position": [
-							-0.425970673561096,
-							1.73189580440521
+							0.111097276210785,
+							1.19726300239563
 						],
 						"preserved": false,
-						"source_id": "edge_7773223606891625238@1.000000000"
+						"source_id": "edge_1552146009699277202@1.000000000"
 					},
 					{
 						"curve_t": 0.25,
-						"edge_id": "edge_5730663254267866973",
+						"edge_id": "edge_7140330866151802208",
 						"id": "vertex:contour:26",
 						"origin": "segment_left",
 						"position": [
-							-0.0551895648241043,
-							1.50802803039551
+							0.558496236801147,
+							1.09383225440979
 						],
 						"preserved": false,
-						"source_id": "edge_5730663254267866973@0.250000000"
+						"source_id": "edge_7140330866151802208@0.250000000"
 					},
 					{
 						"curve_t": 0.25,
-						"edge_id": "edge_5730663254267866973",
+						"edge_id": "edge_7140330866151802208",
 						"id": "vertex:contour:27",
 						"origin": "segment_right",
 						"position": [
-							-0.457130968570709,
-							1.61781978607178
+							0.150690823793411,
+							1.00835824012756
 						],
 						"preserved": false,
-						"source_id": "edge_5730663254267866973@0.250000000"
+						"source_id": "edge_7140330866151802208@0.250000000"
 					},
 					{
 						"curve_t": 0.25,
-						"edge_id": "edge_5730663254267866973",
+						"edge_id": "edge_7140330866151802208",
 						"id": "vertex:contour:28",
 						"origin": "segment_left",
 						"position": [
-							-0.0494446009397507,
-							1.53701221942902
+							0.562423348426819,
+							1.06557142734528
 						],
 						"preserved": false,
-						"source_id": "edge_5730663254267866973@0.250000000"
+						"source_id": "edge_7140330866151802208@0.250000000"
 					},
 					{
 						"curve_t": 0.25,
-						"edge_id": "edge_5730663254267866973",
+						"edge_id": "edge_7140330866151802208",
 						"id": "vertex:contour:29",
 						"origin": "segment_right",
 						"position": [
-							-0.46287590265274,
-							1.58883559703827
+							0.146763756871223,
+							1.03661906719208
 						],
 						"preserved": false,
-						"source_id": "edge_5730663254267866973@0.250000000"
+						"source_id": "edge_7140330866151802208@0.250000000"
 					},
 					{
 						"curve_t": 0.5,
-						"edge_id": "edge_5730663254267866973",
+						"edge_id": "edge_7140330866151802208",
 						"id": "vertex:contour:30",
 						"origin": "segment_left",
 						"position": [
-							-0.0641386359930038,
-							1.41978764533997
+							0.575944304466248,
+							0.871454298496246
 						],
 						"preserved": false,
-						"source_id": "edge_5730663254267866973@0.500000000"
+						"source_id": "edge_7140330866151802208@0.500000000"
 					},
 					{
 						"curve_t": 0.5,
-						"edge_id": "edge_5730663254267866973",
+						"edge_id": "edge_7140330866151802208",
 						"id": "vertex:contour:31",
 						"origin": "segment_right",
 						"position": [
-							-0.477569937705994,
-							1.47161102294922
+							0.160284742712975,
+							0.842502057552338
 						],
 						"preserved": false,
-						"source_id": "edge_5730663254267866973@0.500000000"
+						"source_id": "edge_7140330866151802208@0.500000000"
 					},
 					{
 						"curve_t": 0.5,
-						"edge_id": "edge_5730663254267866973",
+						"edge_id": "edge_7140330866151802208",
 						"id": "vertex:contour:32",
 						"origin": "segment_left",
 						"position": [
-							-0.0625223219394684,
-							1.44645130634308
+							0.576212286949158,
+							0.847073554992676
 						],
 						"preserved": false,
-						"source_id": "edge_5730663254267866973@0.500000000"
+						"source_id": "edge_7140330866151802208@0.500000000"
 					},
 					{
 						"curve_t": 0.5,
-						"edge_id": "edge_5730663254267866973",
+						"edge_id": "edge_7140330866151802208",
 						"id": "vertex:contour:33",
 						"origin": "segment_right",
 						"position": [
-							-0.47918626666069,
-							1.44494736194611
+							0.160016790032387,
+							0.866882801055908
 						],
 						"preserved": false,
-						"source_id": "edge_5730663254267866973@0.500000000"
+						"source_id": "edge_7140330866151802208@0.500000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_5730663254267866973",
+						"curve_t": 0.75,
+						"edge_id": "edge_7140330866151802208",
 						"id": "vertex:contour:34",
 						"origin": "segment_left",
 						"position": [
-							-0.0616680085659027,
-							1.20975184440613
+							0.566926002502441,
+							0.651967406272888
 						],
 						"preserved": false,
-						"source_id": "edge_5730663254267866973@1.000000000"
+						"source_id": "edge_7140330866151802208@0.750000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_5730663254267866973",
+						"curve_t": 0.75,
+						"edge_id": "edge_7140330866151802208",
 						"id": "vertex:contour:35",
 						"origin": "segment_right",
 						"position": [
-							-0.478331953287125,
-							1.20824790000916
+							0.15073050558567,
+							0.671776652336121
 						],
 						"preserved": false,
-						"source_id": "edge_5730663254267866973@1.000000000"
+						"source_id": "edge_7140330866151802208@0.750000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_5730663254267866973",
+						"curve_t": 0.75,
+						"edge_id": "edge_7140330866151802208",
 						"id": "vertex:contour:36",
 						"origin": "segment_left",
 						"position": [
-							-0.0634676665067673,
-							1.23633444309235
+							0.564849197864532,
+							0.630917966365814
 						],
 						"preserved": false,
-						"source_id": "edge_5730663254267866973@1.000000000"
+						"source_id": "edge_7140330866151802208@0.750000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_5730663254267866973",
+						"curve_t": 0.75,
+						"edge_id": "edge_7140330866151802208",
 						"id": "vertex:contour:37",
 						"origin": "segment_right",
 						"position": [
-							-0.476532280445099,
-							1.18166530132294
+							0.152807310223579,
+							0.692826092243195
 						],
 						"preserved": false,
-						"source_id": "edge_5730663254267866973@1.000000000"
+						"source_id": "edge_7140330866151802208@0.750000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_2891102933527841661",
+						"curve_t": 1.0,
+						"edge_id": "edge_7140330866151802208",
 						"id": "vertex:contour:38",
 						"origin": "segment_left",
 						"position": [
-							-0.033098116517067,
-							1.00687098503113
+							0.536020934581757,
+							0.439045935869217
 						],
 						"preserved": false,
-						"source_id": "edge_2891102933527841661@0.500000000"
+						"source_id": "edge_7140330866151802208@1.000000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_2891102933527841661",
+						"curve_t": 1.0,
+						"edge_id": "edge_7140330866151802208",
 						"id": "vertex:contour:39",
 						"origin": "segment_right",
 						"position": [
-							-0.446162760257721,
-							0.952201783657074
+							0.123979076743126,
+							0.50095409154892
 						],
 						"preserved": false,
-						"source_id": "edge_2891102933527841661@0.500000000"
+						"source_id": "edge_7140330866151802208@1.000000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_2891102933527841661",
+						"curve_t": 1.0,
+						"edge_id": "edge_7140330866151802208",
 						"id": "vertex:contour:40",
 						"origin": "segment_left",
 						"position": [
-							-0.0382179766893387,
-							1.03278863430023
+							0.529884338378906,
+							0.411271452903748
 						],
 						"preserved": false,
-						"source_id": "edge_2891102933527841661@0.500000000"
+						"source_id": "edge_7140330866151802208@1.000000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_2891102933527841661",
+						"curve_t": 1.0,
+						"edge_id": "edge_7140330866151802208",
 						"id": "vertex:contour:41",
 						"origin": "segment_right",
 						"position": [
-							-0.441042900085449,
-							0.926284193992615
+							0.130115702748299,
+							0.528728544712067
 						],
 						"preserved": false,
-						"source_id": "edge_2891102933527841661@0.500000000"
+						"source_id": "edge_7140330866151802208@1.000000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_2891102933527841661",
+						"curve_t": 0.25,
+						"edge_id": "edge_4413285148037994718",
 						"id": "vertex:contour:42",
 						"origin": "segment_left",
 						"position": [
-							0.0214124768972397,
-							0.807252168655396
+							0.47698438167572,
+							0.231225043535233
 						],
 						"preserved": false,
-						"source_id": "edge_2891102933527841661@1.000000000"
+						"source_id": "edge_4413285148037994718@0.250000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_2891102933527841661",
+						"curve_t": 0.25,
+						"edge_id": "edge_4413285148037994718",
 						"id": "vertex:contour:43",
 						"origin": "segment_right",
 						"position": [
-							-0.381412446498871,
-							0.700747728347778
+							0.077215775847435,
+							0.348682135343552
 						],
 						"preserved": false,
-						"source_id": "edge_2891102933527841661@1.000000000"
+						"source_id": "edge_4413285148037994718@0.250000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_2891102933527841661",
+						"curve_t": 0.25,
+						"edge_id": "edge_4413285148037994718",
 						"id": "vertex:contour:44",
 						"origin": "segment_left",
 						"position": [
-							0.0123903602361679,
-							0.833929479122162
+							0.467423260211945,
+							0.205219507217407
 						],
 						"preserved": false,
-						"source_id": "edge_2891102933527841661@1.000000000"
+						"source_id": "edge_4413285148037994718@0.250000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_2891102933527841661",
+						"curve_t": 0.25,
+						"edge_id": "edge_4413285148037994718",
 						"id": "vertex:contour:45",
 						"origin": "segment_right",
 						"position": [
-							-0.372390329837799,
-							0.674070417881012
+							0.0867769122123718,
+							0.374687671661377
 						],
 						"preserved": false,
-						"source_id": "edge_2891102933527841661@1.000000000"
+						"source_id": "edge_4413285148037994718@0.250000000"
 					},
 					{
 						"curve_t": 0.5,
-						"edge_id": "edge_4188659272440607880",
+						"edge_id": "edge_4413285148037994718",
 						"id": "vertex:contour:46",
 						"origin": "segment_left",
 						"position": [
-							0.107191264629364,
-							0.605743825435638
+							0.390584051609039,
+							0.0326291620731354
 						],
 						"preserved": false,
-						"source_id": "edge_4188659272440607880@0.500000000"
+						"source_id": "edge_4413285148037994718@0.500000000"
 					},
 					{
 						"curve_t": 0.5,
-						"edge_id": "edge_4188659272440607880",
+						"edge_id": "edge_4413285148037994718",
 						"id": "vertex:contour:47",
 						"origin": "segment_right",
 						"position": [
-							-0.277589410543442,
-							0.445884734392166
+							0.00993770360946655,
+							0.202097311615944
 						],
 						"preserved": false,
-						"source_id": "edge_4188659272440607880@0.500000000"
+						"source_id": "edge_4413285148037994718@0.500000000"
 					},
 					{
 						"curve_t": 0.5,
-						"edge_id": "edge_4188659272440607880",
+						"edge_id": "edge_4413285148037994718",
 						"id": "vertex:contour:48",
 						"origin": "segment_left",
 						"position": [
-							0.105367213487625,
-							0.610000193119049
+							0.385135382413864,
+							0.021320566534996
 						],
 						"preserved": false,
-						"source_id": "edge_4188659272440607880@0.500000000"
+						"source_id": "edge_4413285148037994718@0.500000000"
 					},
 					{
 						"curve_t": 0.5,
-						"edge_id": "edge_4188659272440607880",
+						"edge_id": "edge_4413285148037994718",
 						"id": "vertex:contour:49",
 						"origin": "segment_right",
 						"position": [
-							-0.275765359401703,
-							0.441628396511078
+							0.0153863728046417,
+							0.213405907154083
 						],
 						"preserved": false,
-						"source_id": "edge_4188659272440607880@0.500000000"
+						"source_id": "edge_4413285148037994718@0.500000000"
 					},
 					{
 						"curve_t": 1.0,
-						"edge_id": "edge_4188659272440607880",
+						"edge_id": "edge_4413285148037994718",
 						"id": "vertex:contour:50",
 						"origin": "segment_left",
 						"position": [
-							0.205566301941872,
-							0.383185833692551
+							0.209874510765076,
+							-0.31604266166687
 						],
 						"preserved": false,
-						"source_id": "edge_4188659272440607880@1.000000000"
+						"source_id": "edge_4413285148037994718@1.000000000"
 					},
 					{
 						"curve_t": 1.0,
-						"edge_id": "edge_4188659272440607880",
+						"edge_id": "edge_4413285148037994718",
 						"id": "vertex:contour:51",
 						"origin": "segment_right",
 						"position": [
-							-0.175566270947456,
-							0.214814037084579
+							-0.159874498844147,
+							-0.123957328498363
 						],
 						"preserved": false,
-						"source_id": "edge_4188659272440607880@1.000000000"
+						"source_id": "edge_4413285148037994718@1.000000000"
 					},
 					{
 						"curve_t": 1.0,
-						"edge_id": "edge_4188659272440607880",
+						"edge_id": "edge_4413285148037994718",
 						"id": "vertex:contour:52",
 						"origin": "segment_left",
 						"position": [
-							0.211535528302193,
-							0.368112683296204
+							0.202888309955597,
+							-0.328436732292175
 						],
 						"preserved": false,
-						"source_id": "edge_4188659272440607880@1.000000000"
+						"source_id": "edge_4413285148037994718@1.000000000"
 					},
 					{
 						"curve_t": 1.0,
-						"edge_id": "edge_4188659272440607880",
+						"edge_id": "edge_4413285148037994718",
 						"id": "vertex:contour:53",
 						"origin": "segment_right",
 						"position": [
-							-0.181535497307777,
-							0.229887187480927
+							-0.152888298034668,
+							-0.11156327277422
 						],
 						"preserved": false,
-						"source_id": "edge_4188659272440607880@1.000000000"
+						"source_id": "edge_4413285148037994718@1.000000000"
 					},
 					{
 						"curve_t": 0.5,
-						"edge_id": "edge_2917663390365411260",
+						"edge_id": "edge_8981789297422366892",
 						"id": "vertex:contour:54",
 						"origin": "segment_left",
 						"position": [
-							0.297611206769943,
-							0.12333982437849
+							0.0180790424346924,
+							-0.631612658500671
 						],
 						"preserved": false,
-						"source_id": "edge_2917663390365411260@0.500000000"
+						"source_id": "edge_8981789297422366892@0.500000000"
 					},
 					{
 						"curve_t": 0.5,
-						"edge_id": "edge_2917663390365411260",
+						"edge_id": "edge_8981789297422366892",
 						"id": "vertex:contour:55",
 						"origin": "segment_right",
 						"position": [
-							-0.0954598188400269,
-							-0.0148856863379478
+							-0.337697565555573,
+							-0.414739221334457
 						],
 						"preserved": false,
-						"source_id": "edge_2917663390365411260@0.500000000"
+						"source_id": "edge_8981789297422366892@0.500000000"
 					},
 					{
 						"curve_t": 0.5,
-						"edge_id": "edge_2917663390365411260",
+						"edge_id": "edge_8981789297422366892",
 						"id": "vertex:contour:56",
 						"origin": "segment_left",
 						"position": [
-							0.302876770496368,
-							0.105987079441547
+							0.0212008357048035,
+							-0.626317203044891
 						],
 						"preserved": false,
-						"source_id": "edge_2917663390365411260@0.500000000"
+						"source_id": "edge_8981789297422366892@0.500000000"
 					},
 					{
 						"curve_t": 0.5,
-						"edge_id": "edge_2917663390365411260",
+						"edge_id": "edge_8981789297422366892",
 						"id": "vertex:contour:57",
 						"origin": "segment_right",
 						"position": [
-							-0.100725382566452,
-							0.00246705859899521
+							-0.340819358825684,
+							-0.42003470659256
 						],
 						"preserved": false,
-						"source_id": "edge_2917663390365411260@0.500000000"
+						"source_id": "edge_8981789297422366892@0.500000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_2917663390365411260",
+						"curve_t": 0.75,
+						"edge_id": "edge_8981789297422366892",
 						"id": "vertex:contour:58",
 						"origin": "segment_left",
 						"position": [
-							0.366801083087921,
-							-0.143240034580231
+							-0.0659916698932648,
+							-0.779337704181671
 						],
 						"preserved": false,
-						"source_id": "edge_2917663390365411260@1.000000000"
+						"source_id": "edge_8981789297422366892@0.750000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_2917663390365411260",
+						"curve_t": 0.75,
+						"edge_id": "edge_8981789297422366892",
 						"id": "vertex:contour:59",
 						"origin": "segment_right",
 						"position": [
-							-0.0368010550737381,
-							-0.246760040521622
+							-0.428011864423752,
+							-0.57305520772934
 						],
 						"preserved": false,
-						"source_id": "edge_2917663390365411260@1.000000000"
+						"source_id": "edge_8981789297422366892@0.750000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_2917663390365411260",
+						"curve_t": 0.75,
+						"edge_id": "edge_8981789297422366892",
 						"id": "vertex:contour:60",
 						"origin": "segment_left",
 						"position": [
-							0.372003734111786,
-							-0.171500280499458
+							-0.0506152510643005,
+							-0.74573141336441
 						],
 						"preserved": false,
-						"source_id": "edge_2917663390365411260@1.000000000"
+						"source_id": "edge_8981789297422366892@0.750000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_2917663390365411260",
+						"curve_t": 0.75,
+						"edge_id": "edge_8981789297422366892",
 						"id": "vertex:contour:61",
 						"origin": "segment_right",
 						"position": [
-							-0.0420037060976028,
-							-0.218499794602394
+							-0.443388283252716,
+							-0.6066614985466
 						],
 						"preserved": false,
-						"source_id": "edge_2917663390365411260@1.000000000"
+						"source_id": "edge_8981789297422366892@0.750000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_8455631879724837109",
+						"curve_t": 1.0,
+						"edge_id": "edge_8981789297422366892",
 						"id": "vertex:contour:62",
 						"origin": "segment_left",
 						"position": [
-							0.402180194854736,
-							-0.43731752038002
+							-0.10861349105835,
+							-0.909534931182861
 						],
 						"preserved": false,
-						"source_id": "edge_8455631879724837109@0.500000000"
+						"source_id": "edge_8981789297422366892@1.000000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_8455631879724837109",
+						"curve_t": 1.0,
+						"edge_id": "edge_8981789297422366892",
 						"id": "vertex:contour:63",
 						"origin": "segment_right",
 						"position": [
-							-0.0118272453546524,
-							-0.484317034482956
+							-0.501386523246765,
+							-0.770465016365051
 						],
 						"preserved": false,
-						"source_id": "edge_8455631879724837109@0.500000000"
+						"source_id": "edge_8981789297422366892@1.000000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_8455631879724837109",
+						"curve_t": 1.0,
+						"edge_id": "edge_8981789297422366892",
 						"id": "vertex:contour:64",
 						"origin": "segment_left",
 						"position": [
-							0.403509765863419,
-							-0.460954874753952
+							-0.0990442633628845,
+							-0.871384739875793
 						],
 						"preserved": false,
-						"source_id": "edge_8455631879724837109@0.500000000"
+						"source_id": "edge_8981789297422366892@1.000000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_8455631879724837109",
+						"curve_t": 1.0,
+						"edge_id": "edge_8981789297422366892",
 						"id": "vertex:contour:65",
 						"origin": "segment_right",
 						"position": [
-							-0.0131568014621735,
-							-0.460679680109024
+							-0.51095575094223,
+							-0.808615207672119
 						],
 						"preserved": false,
-						"source_id": "edge_8455631879724837109@0.500000000"
+						"source_id": "edge_8981789297422366892@1.000000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_8455631879724837109",
+						"curve_t": 0.25,
+						"edge_id": "edge_4059461920517444949",
 						"id": "vertex:contour:66",
 						"origin": "segment_left",
 						"position": [
-							0.403333306312561,
-							-0.728137612342834
+							-0.125118553638458,
+							-1.04249155521393
 						],
 						"preserved": false,
-						"source_id": "edge_8455631879724837109@1.000000000"
+						"source_id": "edge_4059461920517444949@0.250000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_8455631879724837109",
+						"curve_t": 0.25,
+						"edge_id": "edge_4059461920517444949",
 						"id": "vertex:contour:67",
 						"origin": "segment_right",
 						"position": [
-							-0.013333261013031,
-							-0.727862477302551
+							-0.537030041217804,
+							-0.979721963405609
 						],
 						"preserved": false,
-						"source_id": "edge_8455631879724837109@1.000000000"
+						"source_id": "edge_4059461920517444949@0.250000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_8455631879724837109",
+						"curve_t": 0.25,
+						"edge_id": "edge_4059461920517444949",
 						"id": "vertex:contour:68",
 						"origin": "segment_left",
 						"position": [
-							0.402651697397232,
-							-0.744839191436768
+							-0.122780174016953,
+							-1.01514804363251
 						],
 						"preserved": false,
-						"source_id": "edge_8455631879724837109@1.000000000"
+						"source_id": "edge_4059461920517444949@0.250000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_8455631879724837109",
+						"curve_t": 0.25,
+						"edge_id": "edge_4059461920517444949",
 						"id": "vertex:contour:69",
 						"origin": "segment_right",
 						"position": [
-							-0.012651652097702,
-							-0.711160898208618
+							-0.539368391036987,
+							-1.00706541538239
 						],
 						"preserved": false,
-						"source_id": "edge_8455631879724837109@1.000000000"
+						"source_id": "edge_4059461920517444949@0.250000000"
 					},
 					{
 						"curve_t": 0.5,
-						"edge_id": "edge_8012751513947800700",
+						"edge_id": "edge_4059461920517444949",
 						"id": "vertex:contour:70",
 						"origin": "segment_left",
 						"position": [
-							0.37918546795845,
-							-1.03421223163605
+							-0.126179486513138,
+							-1.19035518169403
 						],
 						"preserved": false,
-						"source_id": "edge_8012751513947800700@0.500000000"
+						"source_id": "edge_4059461920517444949@0.500000000"
 					},
 					{
 						"curve_t": 0.5,
-						"edge_id": "edge_8012751513947800700",
+						"edge_id": "edge_4059461920517444949",
 						"id": "vertex:contour:71",
 						"origin": "segment_right",
 						"position": [
-							-0.0361178815364838,
-							-1.0005339384079
+							-0.542767763137817,
+							-1.18227255344391
 						],
 						"preserved": false,
-						"source_id": "edge_8012751513947800700@0.500000000"
+						"source_id": "edge_4059461920517444949@0.500000000"
 					},
 					{
 						"curve_t": 0.5,
-						"edge_id": "edge_8012751513947800700",
+						"edge_id": "edge_4059461920517444949",
 						"id": "vertex:contour:72",
 						"origin": "segment_left",
 						"position": [
-							0.374323695898056,
-							-1.06511223316193
+							-0.12811154127121,
+							-1.15772247314453
 						],
 						"preserved": false,
-						"source_id": "edge_8012751513947800700@0.500000000"
+						"source_id": "edge_4059461920517444949@0.500000000"
 					},
 					{
 						"curve_t": 0.5,
-						"edge_id": "edge_8012751513947800700",
+						"edge_id": "edge_4059461920517444949",
 						"id": "vertex:contour:73",
 						"origin": "segment_right",
 						"position": [
-							-0.0312561094760895,
-							-0.969633877277374
+							-0.540835678577423,
+							-1.21490526199341
 						],
 						"preserved": false,
-						"source_id": "edge_8012751513947800700@0.500000000"
+						"source_id": "edge_4059461920517444949@0.500000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_8012751513947800700",
+						"curve_t": 0.75,
+						"edge_id": "edge_4059461920517444949",
 						"id": "vertex:contour:74",
 						"origin": "segment_left",
 						"position": [
-							0.307789921760559,
-							-1.34773910045624
+							-0.104274034500122,
+							-1.32977247238159
 						],
 						"preserved": false,
-						"source_id": "edge_8012751513947800700@1.000000000"
+						"source_id": "edge_4059461920517444949@0.750000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_8012751513947800700",
+						"curve_t": 0.75,
+						"edge_id": "edge_4059461920517444949",
 						"id": "vertex:contour:75",
 						"origin": "segment_right",
 						"position": [
-							-0.097789891064167,
-							-1.25226080417633
+							-0.516998171806335,
+							-1.38695526123047
 						],
 						"preserved": false,
-						"source_id": "edge_8012751513947800700@1.000000000"
+						"source_id": "edge_4059461920517444949@0.750000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_8012751513947800700",
+						"curve_t": 0.75,
+						"edge_id": "edge_4059461920517444949",
 						"id": "vertex:contour:76",
 						"origin": "segment_left",
 						"position": [
-							0.291405588388443,
-							-1.39303612709045
+							-0.113645702600479,
+							-1.29055857658386
 						],
 						"preserved": false,
-						"source_id": "edge_8012751513947800700@1.000000000"
+						"source_id": "edge_4059461920517444949@0.750000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_8012751513947800700",
+						"curve_t": 0.75,
+						"edge_id": "edge_4059461920517444949",
 						"id": "vertex:contour:77",
 						"origin": "segment_right",
 						"position": [
-							-0.0814055576920509,
-							-1.20696377754211
+							-0.507626533508301,
+							-1.4261691570282
 						],
 						"preserved": false,
-						"source_id": "edge_8012751513947800700@1.000000000"
+						"source_id": "edge_4059461920517444949@0.750000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_2046987571971542697",
+						"curve_t": 1.0,
+						"edge_id": "edge_4059461920517444949",
 						"id": "vertex:contour:78",
 						"origin": "segment_left",
 						"position": [
-							0.165792480111122,
-							-1.64471209049225
+							-0.0580095946788788,
+							-1.45219469070435
 						],
 						"preserved": false,
-						"source_id": "edge_2046987571971542697@0.500000000"
+						"source_id": "edge_4059461920517444949@1.000000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_2046987571971542697",
+						"curve_t": 1.0,
+						"edge_id": "edge_4059461920517444949",
 						"id": "vertex:contour:79",
 						"origin": "segment_right",
 						"position": [
-							-0.207018658518791,
-							-1.45863974094391
+							-0.451990395784378,
+							-1.58780527114868
 						],
 						"preserved": false,
-						"source_id": "edge_2046987571971542697@0.500000000"
+						"source_id": "edge_4059461920517444949@1.000000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_2046987571971542697",
+						"curve_t": 1.0,
+						"edge_id": "edge_4059461920517444949",
 						"id": "vertex:contour:80",
 						"origin": "segment_left",
 						"position": [
-							0.145218938589096,
-							-1.6777811050415
+							-0.0748280137777328,
+							-1.41540157794952
 						],
 						"preserved": false,
-						"source_id": "edge_2046987571971542697@0.500000000"
+						"source_id": "edge_4059461920517444949@1.000000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_2046987571971542697",
+						"curve_t": 1.0,
+						"edge_id": "edge_4059461920517444949",
 						"id": "vertex:contour:81",
 						"origin": "segment_right",
 						"position": [
-							-0.186445116996765,
-							-1.42557072639465
+							-0.435171961784363,
+							-1.6245983839035
 						],
 						"preserved": false,
-						"source_id": "edge_2046987571971542697@0.500000000"
+						"source_id": "edge_4059461920517444949@1.000000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_2046987571971542697",
+						"curve_t": 0.125,
+						"edge_id": "edge_6998393424652245373",
 						"id": "vertex:contour:82",
 						"origin": "segment_left",
 						"position": [
-							-0.029167965054512,
-							-1.90710508823395
+							-0.0311715453863144,
+							-1.49060034751892
 						],
 						"preserved": false,
-						"source_id": "edge_2046987571971542697@1.000000000"
+						"source_id": "edge_6998393424652245373@0.125000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_2046987571971542697",
+						"curve_t": 0.125,
+						"edge_id": "edge_6998393424652245373",
 						"id": "vertex:contour:83",
 						"origin": "segment_right",
 						"position": [
-							-0.360832035541534,
-							-1.6548947095871
+							-0.391515493392944,
+							-1.6997971534729
 						],
 						"preserved": false,
-						"source_id": "edge_2046987571971542697@1.000000000"
+						"source_id": "edge_6998393424652245373@0.125000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_2046987571971542697",
+						"curve_t": 0.125,
+						"edge_id": "edge_6998393424652245373",
 						"id": "vertex:contour:84",
 						"origin": "segment_left",
 						"position": [
-							-0.0635394603013992,
-							-1.94261956214905
+							-0.0483684688806534,
+							-1.46542239189148
 						],
 						"preserved": false,
-						"source_id": "edge_2046987571971542697@1.000000000"
+						"source_id": "edge_6998393424652245373@0.125000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_2046987571971542697",
+						"curve_t": 0.125,
+						"edge_id": "edge_6998393424652245373",
 						"id": "vertex:contour:85",
 						"origin": "segment_right",
 						"position": [
-							-0.326460540294647,
-							-1.619380235672
+							-0.374318599700928,
+							-1.72497510910034
 						],
 						"preserved": false,
-						"source_id": "edge_2046987571971542697@1.000000000"
+						"source_id": "edge_6998393424652245373@0.125000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_4483877010316811700",
+						"curve_t": 0.25,
+						"edge_id": "edge_6998393424652245373",
 						"id": "vertex:contour:86",
 						"origin": "segment_left",
 						"position": [
-							-0.24905489385128,
-							-2.09351682662964
+							0.00561824440956116,
+							-1.53321969509125
 						],
 						"preserved": false,
-						"source_id": "edge_4483877010316811700@0.500000000"
+						"source_id": "edge_6998393424652245373@0.250000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_4483877010316811700",
+						"curve_t": 0.25,
+						"edge_id": "edge_6998393424652245373",
 						"id": "vertex:contour:87",
 						"origin": "segment_right",
 						"position": [
-							-0.511975944042206,
-							-1.77027750015259
+							-0.320331871509552,
+							-1.79277241230011
 						],
 						"preserved": false,
-						"source_id": "edge_4483877010316811700@0.500000000"
+						"source_id": "edge_6998393424652245373@0.250000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_4483877010316811700",
+						"curve_t": 0.25,
+						"edge_id": "edge_6998393424652245373",
 						"id": "vertex:contour:88",
 						"origin": "segment_left",
 						"position": [
-							-0.265671998262405,
-							-2.10571813583374
+							-0.0155715197324753,
+							-1.51035368442535
 						],
 						"preserved": false,
-						"source_id": "edge_4483877010316811700@0.500000000"
+						"source_id": "edge_6998393424652245373@0.250000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_4483877010316811700",
+						"curve_t": 0.25,
+						"edge_id": "edge_6998393424652245373",
 						"id": "vertex:contour:89",
 						"origin": "segment_right",
 						"position": [
-							-0.495358854532242,
-							-1.7580760717392
+							-0.299142122268677,
+							-1.815638422966
 						],
 						"preserved": false,
-						"source_id": "edge_4483877010316811700@0.500000000"
+						"source_id": "edge_6998393424652245373@0.250000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_4483877010316811700",
+						"curve_t": 0.5,
+						"edge_id": "edge_6998393424652245373",
 						"id": "vertex:contour:90",
 						"origin": "segment_left",
 						"position": [
-							-0.47015655040741,
-							-2.24082088470459
+							0.113857015967369,
+							-1.63057625293732
 						],
 						"preserved": false,
-						"source_id": "edge_4483877010316811700@1.000000000"
+						"source_id": "edge_6998393424652245373@0.500000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_4483877010316811700",
+						"curve_t": 0.5,
+						"edge_id": "edge_6998393424652245373",
 						"id": "vertex:contour:91",
 						"origin": "segment_right",
 						"position": [
-							-0.699843406677246,
-							-1.89317882061005
+							-0.169713571667671,
+							-1.93586099147797
 						],
 						"preserved": false,
-						"source_id": "edge_4483877010316811700@1.000000000"
+						"source_id": "edge_6998393424652245373@0.500000000"
 					},
 					{
 						"curve_t": 0.5,
-						"edge_id": "edge_877528896333286341",
+						"edge_id": "edge_6998393424652245373",
 						"id": "vertex:contour:92",
-						"origin": "join_center",
+						"origin": "segment_left",
 						"position": [
-							0.209512025117874,
-							2.14050436019897
+							0.10378235578537,
+							-1.62180280685425
 						],
 						"preserved": false,
-						"source_id": "edge_877528896333286341@0.500000000"
+						"source_id": "edge_6998393424652245373@0.500000000"
 					},
 					{
 						"curve_t": 0.5,
-						"edge_id": "edge_877528896333286341",
+						"edge_id": "edge_6998393424652245373",
 						"id": "vertex:contour:93",
-						"origin": "join_outer_previous",
+						"origin": "segment_right",
 						"position": [
-							0.11806882172823,
-							2.32769656181335
+							-0.159638911485672,
+							-1.94463443756104
 						],
 						"preserved": false,
-						"source_id": "edge_877528896333286341@0.500000000"
+						"source_id": "edge_6998393424652245373@0.500000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_877528896333286341",
+						"curve_t": 1.0,
+						"edge_id": "edge_6998393424652245373",
 						"id": "vertex:contour:94",
-						"origin": "join_miter",
+						"origin": "segment_left",
 						"position": [
-							0.114428132772446,
-							2.32591819763184
+							0.381710648536682,
+							-1.84858417510986
 						],
 						"preserved": false,
-						"source_id": "edge_877528896333286341@0.500000000"
+						"source_id": "edge_6998393424652245373@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_6998393424652245373",
+						"id": "vertex:contour:95",
+						"origin": "segment_right",
+						"position": [
+							0.118289366364479,
+							-2.17141580581665
+						],
+						"preserved": false,
+						"source_id": "edge_6998393424652245373@1.000000000"
 					},
 					{
 						"curve_t": 0.5,
-						"edge_id": "edge_877528896333286341",
-						"id": "vertex:contour:95",
-						"origin": "join_outer_next",
-						"position": [
-							0.110863596200943,
-							2.32400178909302
-						],
-						"preserved": false,
-						"source_id": "edge_877528896333286341@0.500000000"
-					},
-					{
-						"curve_t": 0.75,
-						"edge_id": "edge_877528896333286341",
+						"edge_id": "edge_6433256813641958479",
 						"id": "vertex:contour:96",
 						"origin": "join_center",
 						"position": [
-							0.114763520658016,
-							2.08956742286682
+							-0.203447952866554,
+							2.05094003677368
 						],
 						"preserved": false,
-						"source_id": "edge_877528896333286341@0.750000000"
+						"source_id": "edge_6433256813641958479@0.500000000"
 					},
 					{
-						"curve_t": 0.75,
-						"edge_id": "edge_877528896333286341",
+						"curve_t": 0.5,
+						"edge_id": "edge_6433256813641958479",
 						"id": "vertex:contour:97",
 						"origin": "join_outer_previous",
 						"position": [
-							0.0161150917410851,
-							2.27306461334229
+							-0.0769567638635635,
+							2.21647787094116
 						],
 						"preserved": false,
-						"source_id": "edge_877528896333286341@0.750000000"
+						"source_id": "edge_6433256813641958479@0.500000000"
 					},
 					{
-						"curve_t": 0.75,
-						"edge_id": "edge_877528896333286341",
+						"curve_t": 0.5,
+						"edge_id": "edge_6433256813641958479",
 						"id": "vertex:contour:98",
 						"origin": "join_miter",
 						"position": [
-							0.00371772609651089,
-							2.26639986038208
+							-0.0732493177056313,
+							2.21364498138428
 						],
 						"preserved": false,
-						"source_id": "edge_877528896333286341@0.750000000"
+						"source_id": "edge_6433256813641958479@0.500000000"
 					},
 					{
-						"curve_t": 0.75,
-						"edge_id": "edge_877528896333286341",
+						"curve_t": 0.5,
+						"edge_id": "edge_6433256813641958479",
 						"id": "vertex:contour:99",
 						"origin": "join_outer_next",
 						"position": [
-							-0.00766993314027786,
-							2.25812840461731
+							-0.0696682631969452,
+							2.21064519882202
 						],
 						"preserved": false,
-						"source_id": "edge_877528896333286341@0.750000000"
+						"source_id": "edge_6433256813641958479@0.500000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_877528896333286341",
+						"curve_t": 0.75,
+						"edge_id": "edge_6433256813641958479",
 						"id": "vertex:contour:100",
 						"origin": "join_center",
 						"position": [
-							0.0299999993294477,
-							2.02799987792969
+							-0.147628933191299,
+							2.0041823387146
 						],
 						"preserved": false,
-						"source_id": "edge_877528896333286341@1.000000000"
+						"source_id": "edge_6433256813641958479@0.750000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_877528896333286341",
+						"curve_t": 0.75,
+						"edge_id": "edge_6433256813641958479",
 						"id": "vertex:contour:101",
 						"origin": "join_outer_previous",
 						"position": [
-							-0.0924334526062012,
-							2.19656085968018
+							-0.0138492435216904,
+							2.16388750076294
 						],
 						"preserved": false,
-						"source_id": "edge_877528896333286341@1.000000000"
+						"source_id": "edge_6433256813641958479@0.750000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_877528896333286341",
+						"curve_t": 0.75,
+						"edge_id": "edge_6433256813641958479",
 						"id": "vertex:contour:102",
 						"origin": "join_miter",
 						"position": [
-							-0.108944565057755,
-							2.18456816673279
+							-0.00165674462914467,
+							2.15367436408997
 						],
 						"preserved": false,
-						"source_id": "edge_877528896333286341@1.000000000"
+						"source_id": "edge_6433256813641958479@0.750000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_877528896333286341",
+						"curve_t": 0.75,
+						"edge_id": "edge_6433256813641958479",
 						"id": "vertex:contour:103",
 						"origin": "join_outer_next",
 						"position": [
-							-0.122813865542412,
-							2.16960048675537
+							0.00884342193603516,
+							2.1417293548584
 						],
 						"preserved": false,
-						"source_id": "edge_877528896333286341@1.000000000"
+						"source_id": "edge_6433256813641958479@0.750000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_7773223606891625238",
+						"curve_t": 1.0,
+						"edge_id": "edge_6433256813641958479",
 						"id": "vertex:contour:104",
 						"origin": "join_center",
 						"position": [
-							-0.121199876070023,
-							1.86482644081116
+							-0.100000001490116,
+							1.95000004768372
 						],
 						"preserved": false,
-						"source_id": "edge_7773223606891625238@0.500000000"
+						"source_id": "edge_6433256813641958479@1.000000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_7773223606891625238",
+						"curve_t": 1.0,
+						"edge_id": "edge_6433256813641958479",
 						"id": "vertex:contour:105",
 						"origin": "join_outer_previous",
 						"position": [
-							-0.274013757705688,
-							2.00642681121826
+							0.0564723536372185,
+							2.08754706382751
 						],
 						"preserved": false,
-						"source_id": "edge_7773223606891625238@0.500000000"
+						"source_id": "edge_6433256813641958479@1.000000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_7773223606891625238",
+						"curve_t": 1.0,
+						"edge_id": "edge_6433256813641958479",
 						"id": "vertex:contour:106",
 						"origin": "join_miter",
 						"position": [
-							-0.286188721656799,
-							1.99328768253326
+							0.0640878900885582,
+							2.0788836479187
 						],
 						"preserved": false,
-						"source_id": "edge_7773223606891625238@0.500000000"
+						"source_id": "edge_6433256813641958479@1.000000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_7773223606891625238",
+						"curve_t": 1.0,
+						"edge_id": "edge_6433256813641958479",
 						"id": "vertex:contour:107",
 						"origin": "join_outer_next",
 						"position": [
-							-0.295941710472107,
-							1.97826397418976
+							0.0706999227404594,
+							2.06943345069885
 						],
 						"preserved": false,
-						"source_id": "edge_7773223606891625238@0.500000000"
+						"source_id": "edge_6433256813641958479@1.000000000"
 					},
 					{
-						"curve_t": 0.75,
-						"edge_id": "edge_7773223606891625238",
+						"curve_t": 0.5,
+						"edge_id": "edge_1552146009699277202",
 						"id": "vertex:contour:108",
 						"origin": "join_center",
 						"position": [
-							-0.180467575788498,
-							1.77352905273438
+							0.138082802295685,
+							1.60972046852112
 						],
 						"preserved": false,
-						"source_id": "edge_7773223606891625238@0.750000000"
+						"source_id": "edge_1552146009699277202@0.500000000"
 					},
 					{
-						"curve_t": 0.75,
-						"edge_id": "edge_7773223606891625238",
+						"curve_t": 0.5,
+						"edge_id": "edge_1552146009699277202",
 						"id": "vertex:contour:109",
 						"origin": "join_outer_previous",
 						"position": [
-							-0.355209410190582,
-							1.88696658611298
+							0.30878272652626,
+							1.72915375232697
 						],
 						"preserved": false,
-						"source_id": "edge_7773223606891625238@0.750000000"
+						"source_id": "edge_1552146009699277202@0.500000000"
 					},
 					{
-						"curve_t": 0.75,
-						"edge_id": "edge_7773223606891625238",
+						"curve_t": 0.5,
+						"edge_id": "edge_1552146009699277202",
 						"id": "vertex:contour:110",
 						"origin": "join_miter",
 						"position": [
-							-0.3633653819561,
-							1.87440299987793
+							0.314338833093643,
+							1.72121262550354
 						],
 						"preserved": false,
-						"source_id": "edge_7773223606891625238@0.750000000"
+						"source_id": "edge_1552146009699277202@0.500000000"
 					},
 					{
-						"curve_t": 0.75,
-						"edge_id": "edge_7773223606891625238",
+						"curve_t": 0.5,
+						"edge_id": "edge_1552146009699277202",
 						"id": "vertex:contour:111",
 						"origin": "join_outer_next",
 						"position": [
-							-0.369640290737152,
-							1.86080133914948
+							0.319133371114731,
+							1.71279072761536
 						],
 						"preserved": false,
-						"source_id": "edge_7773223606891625238@0.750000000"
+						"source_id": "edge_1552146009699277202@0.500000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_7773223606891625238",
+						"curve_t": 0.75,
+						"edge_id": "edge_1552146009699277202",
 						"id": "vertex:contour:112",
 						"origin": "join_center",
 						"position": [
-							-0.224999994039536,
-							1.67699992656708
+							0.240113914012909,
+							1.43049514293671
 						],
 						"preserved": false,
-						"source_id": "edge_7773223606891625238@1.000000000"
+						"source_id": "edge_1552146009699277202@0.750000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_7773223606891625238",
+						"curve_t": 0.75,
+						"edge_id": "edge_1552146009699277202",
 						"id": "vertex:contour:113",
 						"origin": "join_outer_previous",
 						"position": [
-							-0.41417270898819,
-							1.76427221298218
+							0.421164482831955,
+							1.53356528282166
 						],
 						"preserved": false,
-						"source_id": "edge_7773223606891625238@1.000000000"
+						"source_id": "edge_1552146009699277202@0.750000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_7773223606891625238",
+						"curve_t": 0.75,
+						"edge_id": "edge_1552146009699277202",
 						"id": "vertex:contour:114",
 						"origin": "join_miter",
 						"position": [
-							-0.421415120363235,
-							1.74857354164124
+							0.428545475006104,
+							1.52060008049011
 						],
 						"preserved": false,
-						"source_id": "edge_7773223606891625238@1.000000000"
+						"source_id": "edge_1552146009699277202@0.750000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_7773223606891625238",
+						"curve_t": 0.75,
+						"edge_id": "edge_1552146009699277202",
 						"id": "vertex:contour:115",
 						"origin": "join_outer_next",
 						"position": [
-							-0.425970673561096,
-							1.73189580440521
+							0.434003591537476,
+							1.50671565532684
 						],
 						"preserved": false,
-						"source_id": "edge_7773223606891625238@1.000000000"
+						"source_id": "edge_1552146009699277202@0.750000000"
 					},
 					{
-						"curve_t": 0.25,
-						"edge_id": "edge_5730663254267866973",
+						"curve_t": 1.0,
+						"edge_id": "edge_1552146009699277202",
 						"id": "vertex:contour:116",
 						"origin": "join_center",
 						"position": [
-							-0.256160259246826,
-							1.56292390823364
+							0.314999997615814,
+							1.24000000953674
 						],
 						"preserved": false,
-						"source_id": "edge_5730663254267866973@0.250000000"
+						"source_id": "edge_1552146009699277202@1.000000000"
 					},
 					{
-						"curve_t": 0.25,
-						"edge_id": "edge_5730663254267866973",
+						"curve_t": 1.0,
+						"edge_id": "edge_1552146009699277202",
 						"id": "vertex:contour:117",
 						"origin": "join_outer_previous",
 						"position": [
-							-0.457130968570709,
-							1.61781978607178
+							0.508889675140381,
+							1.31622052192688
 						],
 						"preserved": false,
-						"source_id": "edge_5730663254267866973@0.250000000"
+						"source_id": "edge_1552146009699277202@1.000000000"
 					},
 					{
-						"curve_t": 0.25,
-						"edge_id": "edge_5730663254267866973",
+						"curve_t": 1.0,
+						"edge_id": "edge_1552146009699277202",
 						"id": "vertex:contour:118",
 						"origin": "join_miter",
 						"position": [
-							-0.461033701896667,
-							1.60353207588196
+							0.515305399894714,
+							1.29990029335022
 						],
 						"preserved": false,
-						"source_id": "edge_5730663254267866973@0.250000000"
+						"source_id": "edge_1552146009699277202@1.000000000"
 					},
 					{
-						"curve_t": 0.25,
-						"edge_id": "edge_5730663254267866973",
+						"curve_t": 1.0,
+						"edge_id": "edge_1552146009699277202",
 						"id": "vertex:contour:119",
 						"origin": "join_outer_next",
 						"position": [
-							-0.46287590265274,
-							1.58883559703827
+							0.518902719020844,
+							1.28273701667786
 						],
 						"preserved": false,
-						"source_id": "edge_5730663254267866973@0.250000000"
+						"source_id": "edge_1552146009699277202@1.000000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_5730663254267866973",
+						"curve_t": 0.25,
+						"edge_id": "edge_7140330866151802208",
 						"id": "vertex:contour:120",
 						"origin": "join_center",
 						"position": [
-							-0.270854294300079,
-							1.44569933414459
+							0.354593545198441,
+							1.05109524726868
 						],
 						"preserved": false,
-						"source_id": "edge_5730663254267866973@0.500000000"
+						"source_id": "edge_7140330866151802208@0.250000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_5730663254267866973",
+						"curve_t": 0.25,
+						"edge_id": "edge_7140330866151802208",
 						"id": "vertex:contour:121",
 						"origin": "join_outer_previous",
 						"position": [
-							-0.477569937705994,
-							1.47161102294922
+							0.558496236801147,
+							1.09383225440979
 						],
 						"preserved": false,
-						"source_id": "edge_5730663254267866973@0.500000000"
+						"source_id": "edge_7140330866151802208@0.250000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_5730663254267866973",
+						"curve_t": 0.25,
+						"edge_id": "edge_7140330866151802208",
 						"id": "vertex:contour:122",
 						"origin": "join_miter",
 						"position": [
-							-0.479234576225281,
-							1.45833110809326
+							0.561429738998413,
+							1.07983613014221
 						],
 						"preserved": false,
-						"source_id": "edge_5730663254267866973@0.500000000"
+						"source_id": "edge_7140330866151802208@0.250000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_5730663254267866973",
+						"curve_t": 0.25,
+						"edge_id": "edge_7140330866151802208",
 						"id": "vertex:contour:123",
 						"origin": "join_outer_next",
 						"position": [
-							-0.47918626666069,
-							1.44494736194611
+							0.562423348426819,
+							1.06557142734528
 						],
 						"preserved": false,
-						"source_id": "edge_5730663254267866973@0.500000000"
+						"source_id": "edge_7140330866151802208@0.250000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_5730663254267866973",
+						"curve_t": 0.5,
+						"edge_id": "edge_7140330866151802208",
 						"id": "vertex:contour:124",
 						"origin": "join_center",
 						"position": [
-							-0.269999980926514,
-							1.20899987220764
+							0.368114531040192,
+							0.856978178024292
 						],
 						"preserved": false,
-						"source_id": "edge_5730663254267866973@1.000000000"
+						"source_id": "edge_7140330866151802208@0.500000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_5730663254267866973",
+						"curve_t": 0.5,
+						"edge_id": "edge_7140330866151802208",
 						"id": "vertex:contour:125",
 						"origin": "join_outer_previous",
 						"position": [
-							-0.478331953287125,
-							1.20824790000916
+							0.575944304466248,
+							0.871454298496246
 						],
 						"preserved": false,
-						"source_id": "edge_5730663254267866973@1.000000000"
+						"source_id": "edge_7140330866151802208@0.500000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_5730663254267866973",
+						"curve_t": 0.5,
+						"edge_id": "edge_7140330866151802208",
 						"id": "vertex:contour:126",
 						"origin": "join_miter",
 						"position": [
-							-0.478283762931824,
-							1.19489908218384
+							0.576792895793915,
+							0.859271705150604
 						],
 						"preserved": false,
-						"source_id": "edge_5730663254267866973@1.000000000"
+						"source_id": "edge_7140330866151802208@0.500000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_5730663254267866973",
+						"curve_t": 0.5,
+						"edge_id": "edge_7140330866151802208",
 						"id": "vertex:contour:127",
 						"origin": "join_outer_next",
 						"position": [
-							-0.476532280445099,
-							1.18166530132294
+							0.576212286949158,
+							0.847073554992676
 						],
 						"preserved": false,
-						"source_id": "edge_5730663254267866973@1.000000000"
+						"source_id": "edge_7140330866151802208@0.500000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_2891102933527841661",
+						"curve_t": 0.75,
+						"edge_id": "edge_7140330866151802208",
 						"id": "vertex:contour:128",
 						"origin": "join_center",
 						"position": [
-							-0.239630430936813,
-							0.979536414146423
+							0.358828246593475,
+							0.661872029304504
 						],
 						"preserved": false,
-						"source_id": "edge_2891102933527841661@0.500000000"
+						"source_id": "edge_7140330866151802208@0.750000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_2891102933527841661",
+						"curve_t": 0.75,
+						"edge_id": "edge_7140330866151802208",
 						"id": "vertex:contour:129",
 						"origin": "join_outer_previous",
 						"position": [
-							-0.446162760257721,
-							0.952201783657074
+							0.566926002502441,
+							0.651967406272888
 						],
 						"preserved": false,
-						"source_id": "edge_2891102933527841661@0.500000000"
+						"source_id": "edge_7140330866151802208@0.750000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_2891102933527841661",
+						"curve_t": 0.75,
+						"edge_id": "edge_7140330866151802208",
 						"id": "vertex:contour:130",
 						"origin": "join_miter",
 						"position": [
-							-0.444426149129868,
-							0.939080417156219
+							0.566422522068024,
+							0.641389667987823
 						],
 						"preserved": false,
-						"source_id": "edge_2891102933527841661@0.500000000"
+						"source_id": "edge_7140330866151802208@0.750000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_2891102933527841661",
+						"curve_t": 0.75,
+						"edge_id": "edge_7140330866151802208",
 						"id": "vertex:contour:131",
 						"origin": "join_outer_next",
 						"position": [
-							-0.441042900085449,
-							0.926284193992615
+							0.564849197864532,
+							0.630917966365814
 						],
 						"preserved": false,
-						"source_id": "edge_2891102933527841661@0.500000000"
+						"source_id": "edge_7140330866151802208@0.750000000"
 					},
 					{
 						"curve_t": 1.0,
-						"edge_id": "edge_2891102933527841661",
+						"edge_id": "edge_7140330866151802208",
 						"id": "vertex:contour:132",
 						"origin": "join_center",
 						"position": [
-							-0.179999977350235,
-							0.753999948501587
+							0.330000013113022,
+							0.469999998807907
 						],
 						"preserved": false,
-						"source_id": "edge_2891102933527841661@1.000000000"
+						"source_id": "edge_7140330866151802208@1.000000000"
 					},
 					{
 						"curve_t": 1.0,
-						"edge_id": "edge_2891102933527841661",
+						"edge_id": "edge_7140330866151802208",
 						"id": "vertex:contour:133",
 						"origin": "join_outer_previous",
 						"position": [
-							-0.381412446498871,
-							0.700747728347778
+							0.536020934581757,
+							0.439045935869217
 						],
 						"preserved": false,
-						"source_id": "edge_2891102933527841661@1.000000000"
+						"source_id": "edge_7140330866151802208@1.000000000"
 					},
 					{
 						"curve_t": 1.0,
-						"edge_id": "edge_2891102933527841661",
+						"edge_id": "edge_7140330866151802208",
 						"id": "vertex:contour:134",
 						"origin": "join_miter",
 						"position": [
-							-0.37780499458313,
-							0.687103509902954
+							0.533902823925018,
+							0.424948543310165
 						],
 						"preserved": false,
-						"source_id": "edge_2891102933527841661@1.000000000"
+						"source_id": "edge_7140330866151802208@1.000000000"
 					},
 					{
 						"curve_t": 1.0,
-						"edge_id": "edge_2891102933527841661",
+						"edge_id": "edge_7140330866151802208",
 						"id": "vertex:contour:135",
 						"origin": "join_outer_next",
 						"position": [
-							-0.372390329837799,
-							0.674070417881012
+							0.529884338378906,
+							0.411271452903748
 						],
 						"preserved": false,
-						"source_id": "edge_2891102933527841661@1.000000000"
+						"source_id": "edge_7140330866151802208@1.000000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_4188659272440607880",
+						"curve_t": 0.25,
+						"edge_id": "edge_4413285148037994718",
 						"id": "vertex:contour:136",
 						"origin": "join_center",
 						"position": [
-							-0.0851990729570389,
-							0.525814294815063
+							0.277100086212158,
+							0.289953589439392
 						],
 						"preserved": false,
-						"source_id": "edge_4188659272440607880@0.500000000"
+						"source_id": "edge_4413285148037994718@0.250000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_4188659272440607880",
+						"curve_t": 0.25,
+						"edge_id": "edge_4413285148037994718",
 						"id": "vertex:contour:137",
 						"origin": "join_outer_previous",
 						"position": [
-							-0.277589410543442,
-							0.445884734392166
+							0.47698438167572,
+							0.231225043535233
 						],
 						"preserved": false,
-						"source_id": "edge_4188659272440607880@0.500000000"
+						"source_id": "edge_4413285148037994718@0.250000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_4188659272440607880",
+						"curve_t": 0.25,
+						"edge_id": "edge_4413285148037994718",
 						"id": "vertex:contour:138",
 						"origin": "join_miter",
 						"position": [
-							-0.276701122522354,
-							0.443746596574783
+							0.473070383071899,
+							0.217903658747673
 						],
 						"preserved": false,
-						"source_id": "edge_4188659272440607880@0.500000000"
+						"source_id": "edge_4413285148037994718@0.250000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_4188659272440607880",
+						"curve_t": 0.25,
+						"edge_id": "edge_4413285148037994718",
 						"id": "vertex:contour:139",
 						"origin": "join_outer_next",
 						"position": [
-							-0.275765359401703,
-							0.441628396511078
+							0.467423260211945,
+							0.205219507217407
 						],
 						"preserved": false,
-						"source_id": "edge_4188659272440607880@0.500000000"
+						"source_id": "edge_4413285148037994718@0.250000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_4188659272440607880",
+						"curve_t": 0.5,
+						"edge_id": "edge_4413285148037994718",
 						"id": "vertex:contour:140",
 						"origin": "join_center",
 						"position": [
-							0.0150000136345625,
-							0.298999935388565
+							0.200260877609253,
+							0.11736323684454
 						],
 						"preserved": false,
-						"source_id": "edge_4188659272440607880@1.000000000"
+						"source_id": "edge_4413285148037994718@0.500000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_4188659272440607880",
+						"curve_t": 0.5,
+						"edge_id": "edge_4413285148037994718",
 						"id": "vertex:contour:141",
 						"origin": "join_outer_previous",
 						"position": [
-							0.205566301941872,
-							0.383185833692551
+							0.390584051609039,
+							0.0326291620731354
 						],
 						"preserved": false,
-						"source_id": "edge_4188659272440607880@1.000000000"
+						"source_id": "edge_4413285148037994718@0.500000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_4188659272440607880",
+						"curve_t": 0.5,
+						"edge_id": "edge_4413285148037994718",
 						"id": "vertex:contour:142",
 						"origin": "join_miter",
 						"position": [
-							0.208844423294067,
-							0.375765353441238
+							0.388030081987381,
+							0.0268926471471786
 						],
 						"preserved": false,
-						"source_id": "edge_4188659272440607880@1.000000000"
+						"source_id": "edge_4413285148037994718@0.500000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_4188659272440607880",
+						"curve_t": 0.5,
+						"edge_id": "edge_4413285148037994718",
 						"id": "vertex:contour:143",
 						"origin": "join_outer_next",
 						"position": [
-							0.211535528302193,
-							0.368112683296204
+							0.385135382413864,
+							0.021320566534996
 						],
 						"preserved": false,
-						"source_id": "edge_4188659272440607880@1.000000000"
+						"source_id": "edge_4413285148037994718@0.500000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_2917663390365411260",
+						"curve_t": 1.0,
+						"edge_id": "edge_4413285148037994718",
 						"id": "vertex:contour:144",
 						"origin": "join_center",
 						"position": [
-							0.101075693964958,
-							0.0542270690202713
+							0.025000000372529,
+							-0.219999998807907
 						],
 						"preserved": false,
-						"source_id": "edge_2917663390365411260@0.500000000"
+						"source_id": "edge_4413285148037994718@1.000000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_2917663390365411260",
+						"curve_t": 1.0,
+						"edge_id": "edge_4413285148037994718",
 						"id": "vertex:contour:145",
 						"origin": "join_outer_previous",
 						"position": [
-							0.297611206769943,
-							0.12333982437849
+							0.209874510765076,
+							-0.31604266166687
 						],
 						"preserved": false,
-						"source_id": "edge_2917663390365411260@0.500000000"
+						"source_id": "edge_4413285148037994718@1.000000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_2917663390365411260",
+						"curve_t": 1.0,
+						"edge_id": "edge_4413285148037994718",
 						"id": "vertex:contour:146",
 						"origin": "join_miter",
 						"position": [
-							0.300621896982193,
-							0.114778347313404
+							0.206593170762062,
+							-0.322358995676041
 						],
 						"preserved": false,
-						"source_id": "edge_2917663390365411260@0.500000000"
+						"source_id": "edge_4413285148037994718@1.000000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_2917663390365411260",
+						"curve_t": 1.0,
+						"edge_id": "edge_4413285148037994718",
 						"id": "vertex:contour:147",
 						"origin": "join_outer_next",
 						"position": [
-							0.302876770496368,
-							0.105987079441547
+							0.202888309955597,
+							-0.328436732292175
 						],
 						"preserved": false,
-						"source_id": "edge_2917663390365411260@0.500000000"
+						"source_id": "edge_4413285148037994718@1.000000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_2917663390365411260",
+						"curve_t": 0.5,
+						"edge_id": "edge_8981789297422366892",
 						"id": "vertex:contour:148",
 						"origin": "join_center",
 						"position": [
-							0.165000021457672,
-							-0.195000037550926
+							-0.15980926156044,
+							-0.523175954818726
 						],
 						"preserved": false,
-						"source_id": "edge_2917663390365411260@1.000000000"
+						"source_id": "edge_8981789297422366892@0.500000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_2917663390365411260",
+						"curve_t": 0.5,
+						"edge_id": "edge_8981789297422366892",
 						"id": "vertex:contour:149",
 						"origin": "join_outer_previous",
 						"position": [
-							0.366801083087921,
-							-0.143240034580231
+							-0.337697565555573,
+							-0.414739221334457
 						],
 						"preserved": false,
-						"source_id": "edge_2917663390365411260@1.000000000"
+						"source_id": "edge_8981789297422366892@0.500000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_2917663390365411260",
+						"curve_t": 0.5,
+						"edge_id": "edge_8981789297422366892",
 						"id": "vertex:contour:150",
 						"origin": "join_miter",
 						"position": [
-							0.370379239320755,
-							-0.15719048678875
+							-0.339297473430634,
+							-0.417363822460175
 						],
 						"preserved": false,
-						"source_id": "edge_2917663390365411260@1.000000000"
+						"source_id": "edge_8981789297422366892@0.500000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_2917663390365411260",
+						"curve_t": 0.5,
+						"edge_id": "edge_8981789297422366892",
 						"id": "vertex:contour:151",
 						"origin": "join_outer_next",
 						"position": [
-							0.372003734111786,
-							-0.171500280499458
+							-0.340819358825684,
+							-0.42003470659256
 						],
 						"preserved": false,
-						"source_id": "edge_2917663390365411260@1.000000000"
+						"source_id": "edge_8981789297422366892@0.500000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_8455631879724837109",
+						"curve_t": 0.75,
+						"edge_id": "edge_8981789297422366892",
 						"id": "vertex:contour:152",
 						"origin": "join_center",
 						"position": [
-							0.195176482200623,
-							-0.460817277431488
+							-0.247001767158508,
+							-0.676196455955505
 						],
 						"preserved": false,
-						"source_id": "edge_8455631879724837109@0.500000000"
+						"source_id": "edge_8981789297422366892@0.750000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_8455631879724837109",
+						"curve_t": 0.75,
+						"edge_id": "edge_8981789297422366892",
 						"id": "vertex:contour:153",
 						"origin": "join_outer_previous",
 						"position": [
-							0.402180194854736,
-							-0.43731752038002
+							-0.428011864423752,
+							-0.57305520772934
 						],
 						"preserved": false,
-						"source_id": "edge_8455631879724837109@0.500000000"
+						"source_id": "edge_8981789297422366892@0.750000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_8455631879724837109",
+						"curve_t": 0.75,
+						"edge_id": "edge_8981789297422366892",
 						"id": "vertex:contour:154",
 						"origin": "join_miter",
 						"position": [
-							0.403517603874207,
-							-0.449098378419876
+							-0.437196373939514,
+							-0.58917373418808
 						],
 						"preserved": false,
-						"source_id": "edge_8455631879724837109@0.500000000"
+						"source_id": "edge_8981789297422366892@0.750000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_8455631879724837109",
+						"curve_t": 0.75,
+						"edge_id": "edge_8981789297422366892",
 						"id": "vertex:contour:155",
 						"origin": "join_outer_next",
 						"position": [
-							0.403509765863419,
-							-0.460954874753952
+							-0.443388283252716,
+							-0.6066614985466
 						],
 						"preserved": false,
-						"source_id": "edge_8455631879724837109@0.500000000"
+						"source_id": "edge_8981789297422366892@0.750000000"
 					},
 					{
 						"curve_t": 1.0,
-						"edge_id": "edge_8455631879724837109",
+						"edge_id": "edge_8981789297422366892",
 						"id": "vertex:contour:156",
 						"origin": "join_center",
 						"position": [
-							0.195000022649765,
-							-0.728000044822693
+							-0.305000007152557,
+							-0.839999973773956
 						],
 						"preserved": false,
-						"source_id": "edge_8455631879724837109@1.000000000"
+						"source_id": "edge_8981789297422366892@1.000000000"
 					},
 					{
 						"curve_t": 1.0,
-						"edge_id": "edge_8455631879724837109",
+						"edge_id": "edge_8981789297422366892",
 						"id": "vertex:contour:157",
 						"origin": "join_outer_previous",
 						"position": [
-							0.403333306312561,
-							-0.728137612342834
+							-0.501386523246765,
+							-0.770465016365051
 						],
 						"preserved": false,
-						"source_id": "edge_8455631879724837109@1.000000000"
+						"source_id": "edge_8981789297422366892@1.000000000"
 					},
 					{
 						"curve_t": 1.0,
-						"edge_id": "edge_8455631879724837109",
+						"edge_id": "edge_8981789297422366892",
 						"id": "vertex:contour:158",
 						"origin": "join_miter",
 						"position": [
-							0.403327792882919,
-							-0.736502051353455
+							-0.507979810237885,
+							-0.789086401462555
 						],
 						"preserved": false,
-						"source_id": "edge_8455631879724837109@1.000000000"
+						"source_id": "edge_8981789297422366892@1.000000000"
 					},
 					{
 						"curve_t": 1.0,
-						"edge_id": "edge_8455631879724837109",
+						"edge_id": "edge_8981789297422366892",
 						"id": "vertex:contour:159",
 						"origin": "join_outer_next",
 						"position": [
-							0.402651697397232,
-							-0.744839191436768
+							-0.51095575094223,
+							-0.808615207672119
 						],
 						"preserved": false,
-						"source_id": "edge_8455631879724837109@1.000000000"
+						"source_id": "edge_8981789297422366892@1.000000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_8012751513947800700",
+						"curve_t": 0.25,
+						"edge_id": "edge_4059461920517444949",
 						"id": "vertex:contour:160",
 						"origin": "join_center",
 						"position": [
-							0.171533793210983,
-							-1.01737308502197
+							-0.331074297428131,
+							-1.01110672950745
 						],
 						"preserved": false,
-						"source_id": "edge_8012751513947800700@0.500000000"
+						"source_id": "edge_4059461920517444949@0.250000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_8012751513947800700",
+						"curve_t": 0.25,
+						"edge_id": "edge_4059461920517444949",
 						"id": "vertex:contour:161",
 						"origin": "join_outer_previous",
 						"position": [
-							0.37918546795845,
-							-1.03421223163605
+							-0.537030041217804,
+							-0.979721963405609
 						],
 						"preserved": false,
-						"source_id": "edge_8012751513947800700@0.500000000"
+						"source_id": "edge_4059461920517444949@0.250000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_8012751513947800700",
+						"curve_t": 0.25,
+						"edge_id": "edge_4059461920517444949",
 						"id": "vertex:contour:162",
 						"origin": "join_miter",
 						"position": [
-							0.377917736768723,
-							-1.04984521865845
+							-0.539101660251617,
+							-0.993316352367401
 						],
 						"preserved": false,
-						"source_id": "edge_8012751513947800700@0.500000000"
+						"source_id": "edge_4059461920517444949@0.250000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_8012751513947800700",
+						"curve_t": 0.25,
+						"edge_id": "edge_4059461920517444949",
 						"id": "vertex:contour:163",
 						"origin": "join_outer_next",
 						"position": [
-							0.374323695898056,
-							-1.06511223316193
+							-0.539368391036987,
+							-1.00706541538239
 						],
 						"preserved": false,
-						"source_id": "edge_8012751513947800700@0.500000000"
+						"source_id": "edge_4059461920517444949@0.250000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_8012751513947800700",
+						"curve_t": 0.5,
+						"edge_id": "edge_4059461920517444949",
 						"id": "vertex:contour:164",
 						"origin": "join_center",
 						"position": [
-							0.105000011622906,
-							-1.29999995231628
+							-0.334473609924316,
+							-1.18631386756897
 						],
 						"preserved": false,
-						"source_id": "edge_8012751513947800700@1.000000000"
+						"source_id": "edge_4059461920517444949@0.500000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_8012751513947800700",
+						"curve_t": 0.5,
+						"edge_id": "edge_4059461920517444949",
 						"id": "vertex:contour:165",
 						"origin": "join_outer_previous",
 						"position": [
-							0.307789921760559,
-							-1.34773910045624
+							-0.542767763137817,
+							-1.18227255344391
 						],
 						"preserved": false,
-						"source_id": "edge_8012751513947800700@1.000000000"
+						"source_id": "edge_4059461920517444949@0.500000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_8012751513947800700",
+						"curve_t": 0.5,
+						"edge_id": "edge_4059461920517444949",
 						"id": "vertex:contour:166",
 						"origin": "join_miter",
 						"position": [
-							0.302233725786209,
-							-1.37134110927582
+							-0.543085813522339,
+							-1.19866478443146
 						],
 						"preserved": false,
-						"source_id": "edge_8012751513947800700@1.000000000"
+						"source_id": "edge_4059461920517444949@0.500000000"
 					},
 					{
-						"curve_t": 1.0,
-						"edge_id": "edge_8012751513947800700",
+						"curve_t": 0.5,
+						"edge_id": "edge_4059461920517444949",
 						"id": "vertex:contour:167",
 						"origin": "join_outer_next",
 						"position": [
-							0.291405588388443,
-							-1.39303612709045
+							-0.540835678577423,
+							-1.21490526199341
 						],
 						"preserved": false,
-						"source_id": "edge_8012751513947800700@1.000000000"
+						"source_id": "edge_4059461920517444949@0.500000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_2046987571971542697",
+						"curve_t": 0.75,
+						"edge_id": "edge_4059461920517444949",
 						"id": "vertex:contour:168",
 						"origin": "join_center",
 						"position": [
-							-0.0206130929291248,
-							-1.55167591571808
+							-0.310636103153229,
+							-1.35836386680603
 						],
 						"preserved": false,
-						"source_id": "edge_2046987571971542697@0.500000000"
+						"source_id": "edge_4059461920517444949@0.750000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_2046987571971542697",
+						"curve_t": 0.75,
+						"edge_id": "edge_4059461920517444949",
 						"id": "vertex:contour:169",
 						"origin": "join_outer_previous",
 						"position": [
-							0.165792480111122,
-							-1.64471209049225
+							-0.516998171806335,
+							-1.38695526123047
 						],
 						"preserved": false,
-						"source_id": "edge_2046987571971542697@0.500000000"
+						"source_id": "edge_4059461920517444949@0.750000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_2046987571971542697",
+						"curve_t": 0.75,
+						"edge_id": "edge_4059461920517444949",
 						"id": "vertex:contour:170",
 						"origin": "join_miter",
 						"position": [
-							0.157057911157608,
-							-1.66221249103546
+							-0.514218509197235,
+							-1.40701794624329
 						],
 						"preserved": false,
-						"source_id": "edge_2046987571971542697@0.500000000"
+						"source_id": "edge_4059461920517444949@0.750000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_2046987571971542697",
+						"curve_t": 0.75,
+						"edge_id": "edge_4059461920517444949",
 						"id": "vertex:contour:171",
 						"origin": "join_outer_next",
 						"position": [
-							0.145218938589096,
-							-1.6777811050415
+							-0.507626533508301,
+							-1.4261691570282
 						],
 						"preserved": false,
-						"source_id": "edge_2046987571971542697@0.500000000"
+						"source_id": "edge_4059461920517444949@0.750000000"
 					},
 					{
 						"curve_t": 1.0,
-						"edge_id": "edge_2046987571971542697",
+						"edge_id": "edge_4059461920517444949",
 						"id": "vertex:contour:172",
 						"origin": "join_center",
 						"position": [
-							-0.194999992847443,
-							-1.78099989891052
+							-0.254999995231628,
+							-1.51999998092651
 						],
 						"preserved": false,
-						"source_id": "edge_2046987571971542697@1.000000000"
+						"source_id": "edge_4059461920517444949@1.000000000"
 					},
 					{
 						"curve_t": 1.0,
-						"edge_id": "edge_2046987571971542697",
+						"edge_id": "edge_4059461920517444949",
 						"id": "vertex:contour:173",
 						"origin": "join_outer_previous",
 						"position": [
-							-0.029167965054512,
-							-1.90710508823395
+							-0.451990395784378,
+							-1.58780527114868
 						],
 						"preserved": false,
-						"source_id": "edge_2046987571971542697@1.000000000"
+						"source_id": "edge_4059461920517444949@1.000000000"
 					},
 					{
 						"curve_t": 1.0,
-						"edge_id": "edge_2046987571971542697",
+						"edge_id": "edge_4059461920517444949",
 						"id": "vertex:contour:174",
 						"origin": "join_miter",
 						"position": [
-							-0.0442324616014957,
-							-1.92691540718079
+							-0.445375889539719,
+							-1.60702204704285
 						],
 						"preserved": false,
-						"source_id": "edge_2046987571971542697@1.000000000"
+						"source_id": "edge_4059461920517444949@1.000000000"
 					},
 					{
 						"curve_t": 1.0,
-						"edge_id": "edge_2046987571971542697",
+						"edge_id": "edge_4059461920517444949",
 						"id": "vertex:contour:175",
 						"origin": "join_outer_next",
 						"position": [
-							-0.0635394603013992,
-							-1.94261956214905
+							-0.435171961784363,
+							-1.6245983839035
 						],
 						"preserved": false,
-						"source_id": "edge_2046987571971542697@1.000000000"
+						"source_id": "edge_4059461920517444949@1.000000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_4483877010316811700",
+						"curve_t": 0.125,
+						"edge_id": "edge_6998393424652245373",
 						"id": "vertex:contour:176",
 						"origin": "join_center",
 						"position": [
-							-0.380515426397324,
-							-1.93189716339111
+							-0.21134352684021,
+							-1.59519875049591
 						],
 						"preserved": false,
-						"source_id": "edge_4483877010316811700@0.500000000"
+						"source_id": "edge_6998393424652245373@0.125000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_4483877010316811700",
+						"curve_t": 0.125,
+						"edge_id": "edge_6998393424652245373",
 						"id": "vertex:contour:177",
 						"origin": "join_outer_previous",
 						"position": [
-							-0.24905489385128,
-							-2.09351682662964
+							-0.391515493392944,
+							-1.6997971534729
 						],
 						"preserved": false,
-						"source_id": "edge_4483877010316811700@0.500000000"
+						"source_id": "edge_6998393424652245373@0.125000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_4483877010316811700",
+						"curve_t": 0.125,
+						"edge_id": "edge_6998393424652245373",
 						"id": "vertex:contour:178",
 						"origin": "join_miter",
 						"position": [
-							-0.257060378789902,
-							-2.10002851486206
+							-0.383840620517731,
+							-1.7130172252655
 						],
 						"preserved": false,
-						"source_id": "edge_4483877010316811700@0.500000000"
+						"source_id": "edge_6998393424652245373@0.125000000"
 					},
 					{
-						"curve_t": 0.5,
-						"edge_id": "edge_4483877010316811700",
+						"curve_t": 0.125,
+						"edge_id": "edge_6998393424652245373",
 						"id": "vertex:contour:179",
 						"origin": "join_outer_next",
 						"position": [
-							-0.265671998262405,
-							-2.10571813583374
+							-0.374318599700928,
+							-1.72497510910034
 						],
 						"preserved": false,
-						"source_id": "edge_4483877010316811700@0.500000000"
+						"source_id": "edge_6998393424652245373@0.125000000"
+					},
+					{
+						"curve_t": 0.25,
+						"edge_id": "edge_6998393424652245373",
+						"id": "vertex:contour:180",
+						"origin": "join_center",
+						"position": [
+							-0.157356813549995,
+							-1.66299605369568
+						],
+						"preserved": false,
+						"source_id": "edge_6998393424652245373@0.250000000"
+					},
+					{
+						"curve_t": 0.25,
+						"edge_id": "edge_6998393424652245373",
+						"id": "vertex:contour:181",
+						"origin": "join_outer_previous",
+						"position": [
+							-0.320331871509552,
+							-1.79277241230011
+						],
+						"preserved": false,
+						"source_id": "edge_6998393424652245373@0.250000000"
+					},
+					{
+						"curve_t": 0.25,
+						"edge_id": "edge_6998393424652245373",
+						"id": "vertex:contour:182",
+						"origin": "join_miter",
+						"position": [
+							-0.310594856739044,
+							-1.80500030517578
+						],
+						"preserved": false,
+						"source_id": "edge_6998393424652245373@0.250000000"
+					},
+					{
+						"curve_t": 0.25,
+						"edge_id": "edge_6998393424652245373",
+						"id": "vertex:contour:183",
+						"origin": "join_outer_next",
+						"position": [
+							-0.299142122268677,
+							-1.815638422966
+						],
+						"preserved": false,
+						"source_id": "edge_6998393424652245373@0.250000000"
+					},
+					{
+						"curve_t": 0.5,
+						"edge_id": "edge_6998393424652245373",
+						"id": "vertex:contour:184",
+						"origin": "join_center",
+						"position": [
+							-0.0279282778501511,
+							-1.78321862220764
+						],
+						"preserved": false,
+						"source_id": "edge_6998393424652245373@0.500000000"
+					},
+					{
+						"curve_t": 0.5,
+						"edge_id": "edge_6998393424652245373",
+						"id": "vertex:contour:185",
+						"origin": "join_outer_previous",
+						"position": [
+							-0.169713571667671,
+							-1.93586099147797
+						],
+						"preserved": false,
+						"source_id": "edge_6998393424652245373@0.500000000"
+					},
+					{
+						"curve_t": 0.5,
+						"edge_id": "edge_6998393424652245373",
+						"id": "vertex:contour:186",
+						"origin": "join_miter",
+						"position": [
+							-0.164817109704018,
+							-1.9404091835022
+						],
+						"preserved": false,
+						"source_id": "edge_6998393424652245373@0.500000000"
+					},
+					{
+						"curve_t": 0.5,
+						"edge_id": "edge_6998393424652245373",
+						"id": "vertex:contour:187",
+						"origin": "join_outer_next",
+						"position": [
+							-0.159638911485672,
+							-1.94463443756104
+						],
+						"preserved": false,
+						"source_id": "edge_6998393424652245373@0.500000000"
 					}
 				],
 				"worst_aspect_ratio": 0.0
