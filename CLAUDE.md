@@ -29,6 +29,22 @@ already running in a terminal tab:
 ./scripts/check-agent-run.sh --full     # the whole output instead of a tail
 ```
 
+The runner takes only the arguments of its whitelist, `--tests` by default, so
+the step names that check.sh forwards — `editor`, `smoke`, `tests`,
+`whitespace` — are refused with exit code `2`, the same code a `--poll`
+without an open request gives. A deliberately narrow run allows them for that
+one call:
+
+```bash
+CHECK_AGENT_ARGS='--tests editor smoke tests whitespace' \
+  ./scripts/check-agent-run.sh tests
+```
+
+The three repositories share this script and the other two do not have these
+step names, so the allowance stays per call and never becomes the default.
+`./scripts/check-agent-run.sh --tests` remains the routine path; verify.sh
+runs all four steps anyway, a failed one included.
+
 Exit code `0` means the run succeeded and `1` that it failed, with check.sh's
 own code in the `exit=` line of the header. `4` means the run is still going —
 then call again with `--poll` rather than requesting a second one — and `2`
