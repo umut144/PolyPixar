@@ -34,7 +34,7 @@
 	],
 	"editor_state": {
 		"active_create_submodule": "Single",
-		"active_geometry_submodule": "Sampling",
+		"active_geometry_submodule": "Meshing",
 		"active_module": "Create",
 		"active_motion_submodule": "Animation",
 		"active_style_submodule": "Weighting",
@@ -174,10 +174,10 @@
 			},
 			"asset_30": {
 				"position": [
-					-0.0977138802409172,
-					-0.0622772946953773
+					-0.0353433601558208,
+					-0.0986359566450119
 				],
-				"zoom": 830.435356186597
+				"zoom": 869.167863726134
 			},
 			"asset_4": {
 				"position": [
@@ -234,7 +234,7 @@
 			"asset_17": false,
 			"asset_18": false,
 			"asset_19": false,
-			"asset_2": false,
+			"asset_2": true,
 			"asset_20": false,
 			"asset_21": false,
 			"asset_22": false,
@@ -246,7 +246,7 @@
 			"asset_28": false,
 			"asset_29": false,
 			"asset_3": false,
-			"asset_30": true,
+			"asset_30": false,
 			"asset_4": false,
 			"asset_5": false,
 			"asset_6": false,
@@ -265,13 +265,13 @@
 			],
 			"visible": false
 		},
-		"motion_act_preview_asset_id": "asset_1",
+		"motion_act_preview_asset_id": "",
 		"motion_act_preview_loop": true,
-		"motion_path_preview_asset_id": "asset_1",
+		"motion_path_preview_asset_id": "",
 		"motion_sequence_preview_loop": true,
 		"motion_sequence_view": "composition",
 		"outliner_asset_type_filters": {
-			"character": false,
+			"character": true,
 			"icon": false,
 			"items": false,
 			"props": false,
@@ -279,8 +279,8 @@
 			"terrain": false,
 			"weapons": true
 		},
-		"selected_asset_id": "asset_30",
-		"selected_component_id": "component_194",
+		"selected_asset_id": "asset_2",
+		"selected_component_id": "component_154",
 		"selected_edge_ids": [],
 		"selected_guide_id": "",
 		"selected_motion_act_id": "",
@@ -302,7 +302,7 @@
 	"name": "world01",
 	"next_ids": {
 		"asset": 31,
-		"component": 195,
+		"component": 196,
 		"group": 10,
 		"guide": 9,
 		"motion_act": 1,
