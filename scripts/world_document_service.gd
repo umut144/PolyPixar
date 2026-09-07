@@ -10,6 +10,15 @@ extends RefCounted
 # functions that do read editor state, _serialize_editor_state and
 # _serialize_world_settings, stay in main.gd for that reason.
 
+## Below this the document cannot hold a number at all: Godot's JSON parser
+## reads a value written this far under the format's resolution back as zero.
+## A bake that emitted one would therefore come back changed from the very file
+## it was written to, and every fingerprint taken over it would disagree with
+## its own package. The threshold is the resolution the fingerprints already
+## declare by formatting coordinates with %.9f, so nothing meaningful is at
+## stake below it - in a geometry measured in centimetres these values are the
+## numerical zeros a rotation leaves behind.
+const DOCUMENT_ZERO_EPSILON := 0.000000001
 const SCHEMA_VERSION := 70
 const REGION_GEOMETRY_AUTHORED := "authored"
 const REGION_GEOMETRY_COMPONENT := "component"
@@ -53,6 +62,28 @@ const ASSET_CATEGORY_SET := "set"
 const ASSET_CATEGORY_PALETTE := "palette"
 const ASSET_CATEGORIES := [ASSET_CATEGORY_SINGLE, ASSET_CATEGORY_SET, ASSET_CATEGORY_PALETTE]
 
+
+## Makes a value safe to store: anything under the document resolution becomes
+## an exact zero, everything else is untouched. Applied to a bake before it
+## enters a geometry document, so what is held in memory, what reaches the file
+## and what comes back from it are the same numbers.
+static func document_safe(value: Variant) -> Variant:
+	if value is float:
+		return 0.0 if absf(value) < DOCUMENT_ZERO_EPSILON else value
+	if value is Vector2:
+		var vector: Vector2 = value
+		return Vector2(document_safe(vector.x), document_safe(vector.y))
+	if value is Array:
+		var safe_array: Array = []
+		for entry in value:
+			safe_array.append(document_safe(entry))
+		return safe_array
+	if value is Dictionary:
+		var safe_dictionary: Dictionary = {}
+		for key in value:
+			safe_dictionary[key] = document_safe(value[key])
+		return safe_dictionary
+	return value
 
 static func serialize_bezier_points(points: Array) -> Array:
 	var serialized: Array = []

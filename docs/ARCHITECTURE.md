@@ -365,6 +365,18 @@ resetting around it. Nothing about a measurement reaches the World document, so
 Measure stays available for every Component, including one whose geometry is
 locked by a Region.
 
+A geometry document must be able to read back what it wrote. Godot's JSON
+parser returns zero for a number written far below the format's resolution, so
+a bake that emitted one — the `1e-17` numerical zeros a rotation leaves behind —
+came back changed from its own file. Nothing looked edited, but the Manifest
+rebuilt after the next load no longer matched the exported one, and
+`RuntimeExportFileService.package_is_stale` compares that text byte for byte, so
+the package reported itself stale on every open. `WorldDocumentService.document_safe`
+turns anything under `DOCUMENT_ZERO_EPSILON` into an exact zero and is applied to
+every bake as it enters a document, which keeps memory, file and Manifest on the
+same numbers. The threshold is the resolution the fingerprints already declare by
+formatting coordinates with `%.9f`.
+
 Each Component declares a geometry source. Bézier sources contain only
 `points`, `edges`, and `chains`; primitive sources contain one typed primitive
 definition: authored `circle` with `center` and `diameter_cm`, or an `ellipse`

@@ -4429,12 +4429,12 @@ func _commit_component_mesh_build(asset_id: String, component_id: String, build:
 		document["meshing"]["recipe"] = recipes["meshing"].duplicate(true)
 		var sampling: Dictionary = build["sampling"]
 		var seeding: Dictionary = build["seeding"]
-		document["sampling"]["bakes"][str(sampling.get("method", ""))] = sampling
-		document["seeding"]["bakes"][str(seeding.get("method", ""))] = seeding
-	document["meshing"]["bakes"][str(mesh.get("method", ""))] = mesh
+		document["sampling"]["bakes"][str(sampling.get("method", ""))] = WorldDocumentService.document_safe(sampling)
+		document["seeding"]["bakes"][str(seeding.get("method", ""))] = WorldDocumentService.document_safe(seeding)
+	document["meshing"]["bakes"][str(mesh.get("method", ""))] = WorldDocumentService.document_safe(mesh)
 	var contour_stroke = build.get("contour_stroke", mesh if str(mesh.get("method", "")) == ContourMeshService.METHOD else {})
 	if contour_stroke is Dictionary and bool(contour_stroke.get("valid", false)):
-		document["meshing"]["bakes"][ContourMeshService.METHOD] = contour_stroke
+		document["meshing"]["bakes"][ContourMeshService.METHOD] = WorldDocumentService.document_safe(contour_stroke)
 	document["component_mesh"] = {
 		"bake_id": str(mesh.get("bake_id", "")),
 		"method": str(mesh.get("method", "")),
@@ -10070,7 +10070,7 @@ func _bake_geometry_sampling_preview() -> void:
 	var cut_guides := _cut_guides_for_component(asset, selected_component_id)
 	var hole_components := _geometry_sampling_hole_components(asset, selected_component_id)
 	bake["semantic_source_signature"] = GeometryAutoBuildService.source_signature(component, cut_guides, hole_components, {"sampling": _geometry_sampling_recipe(selected_asset_id, selected_component_id)})
-	document["sampling"]["bakes"][str(bake.get("method", ""))] = bake
+	document["sampling"]["bakes"][str(bake.get("method", ""))] = WorldDocumentService.document_safe(bake)
 	selected_geometry_bake_method = str(bake.get("method", ""))
 	geometry_sampling_preview = {}
 	geometry_sampling_preview_key = ""
@@ -10502,7 +10502,7 @@ func _confirm_bake_geometry_seeding_preview() -> void:
 	var bake := geometry_seeding_preview.duplicate(true)
 	bake["bake_id"] = "seeding_bake_%d" % ResourceUID.create_id()
 	bake["edited"] = false
-	document["seeding"]["bakes"][str(bake.get("method", ""))] = bake
+	document["seeding"]["bakes"][str(bake.get("method", ""))] = WorldDocumentService.document_safe(bake)
 	selected_geometry_bake_method = str(bake.get("method", ""))
 	geometry_seeding_preview = {}
 	geometry_seeding_preview_key = ""
@@ -10782,7 +10782,7 @@ func _bake_geometry_meshing_preview() -> void:
 	var document := _mutable_geometry_document(selected_asset_id, selected_component_id)
 	var bake := geometry_meshing_preview.duplicate(true)
 	bake["bake_id"] = "meshing_bake_%d" % ResourceUID.create_id()
-	document["meshing"]["bakes"][str(bake.get("method", ""))] = bake
+	document["meshing"]["bakes"][str(bake.get("method", ""))] = WorldDocumentService.document_safe(bake)
 	selected_geometry_bake_method = str(bake.get("method", ""))
 	var asset := _get_asset(selected_asset_id)
 	var recipes := _geometry_build_recipes(

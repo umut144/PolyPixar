@@ -988,3 +988,24 @@ func _test_runtime_export_service() -> void:
 	invalid_name_asset["components"][0]["name"] = "Body"
 	_expect(not bool(RuntimeExportService.build_manifest(invalid_name_asset, {"component_a": source, "component_b": source}).get("valid", true)), "Runtime export should reject Component Names outside lower_snake_case.")
 	application.free()
+
+
+func _test_document_number_round_trip() -> void:
+	# Godot's JSON parser reads a number written far below the document
+	# resolution back as zero. A bake that emitted one came back changed from
+	# the very file it was written to, so the Manifest rebuilt on the next open
+	# no longer matched the exported one and the package reported itself stale
+	# without anybody touching the Asset.
+	var unrepresentable := 8.87868868862573e-18
+	var round_tripped = JSON.parse_string(JSON.stringify({"value": unrepresentable}))
+	_expect(round_tripped is Dictionary and float(round_tripped["value"]) != unrepresentable, "This test guards a real parser limit; if %s survives its own round trip now, the guard and the sanitising it justifies can go." % unrepresentable)
+	for authored_value in [0.438765976577997, 0.000438765976577997, -1.5, 0.25, 0.0]:
+		_expect(WorldDocumentService.document_safe(authored_value) == authored_value, "A value above the document resolution must reach the document unchanged, but %s did not." % authored_value)
+	for noise_value in [8.87868868862573e-18, 1.77573773772515e-17, -2.66360677202384e-17]:
+		_expect(WorldDocumentService.document_safe(noise_value) == 0.0, "A value below the document resolution must become an exact zero before it is stored, but %s survived." % noise_value)
+	_expect(Vector2(WorldDocumentService.document_safe(Vector2(8.87868868862573e-18, 0.25))) == Vector2(0.0, 0.25), "Sanitising must reach into a Vector without disturbing the component that carries real geometry.")
+	var bake := {"method": "adaptive", "parameters": {"spacing": 0.438765976577997},
+		"chains": [{"samples": [{"id": "s0", "position": [8.87868868862573e-18, 0.25]}, {"id": "s1", "position": [-2.66360677202384e-17, -1.5]}]}]}
+	var stored_text := JSON.stringify(WorldDocumentService.document_safe(bake), "\t")
+	var reloaded = JSON.parse_string(stored_text)
+	_expect(reloaded is Dictionary and JSON.stringify(WorldDocumentService.document_safe(reloaded), "\t") == stored_text, "A sanitised bake must reproduce itself across a save and a load; otherwise its exported package goes stale on every open.")
