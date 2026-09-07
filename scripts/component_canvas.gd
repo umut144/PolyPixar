@@ -1580,21 +1580,25 @@ func _draw_primitive_geometry() -> void:
 	var outline := screen_points.duplicate()
 	outline.append(screen_points[0])
 	draw_polyline(outline, Color("#55c7d9"), 2.0, true)
-	var center := Vector2.ZERO
-	for point in display_polygon:
-		center += point
-	center /= float(display_polygon.size())
-	draw_circle(_world_to_screen(_local_to_world(center)), 6.0, Color("#f2c94c"))
+	draw_circle(_world_to_screen(_local_to_world(_primitive_center())), 6.0, Color("#f2c94c"))
 
 
 func _is_near_primitive_center(screen_position: Vector2) -> bool:
 	if display_polygon.is_empty():
 		return false
+	return screen_position.distance_to(_world_to_screen(_local_to_world(_primitive_center()))) <= 12.0
+
+
+## The Primitive's centre as the Canvas knows it: the centroid of the sampled
+## outline. Drawing the handle, hitting it and snapping the Pivot to it must all
+## mean the same point, so they all ask here.
+func _primitive_center() -> Vector2:
+	if display_polygon.is_empty():
+		return Vector2.ZERO
 	var center := Vector2.ZERO
 	for point in display_polygon:
 		center += point
-	center /= float(display_polygon.size())
-	return screen_position.distance_to(_world_to_screen(_local_to_world(center))) <= 12.0
+	return center / float(display_polygon.size())
 
 
 func _draw_bezier_geometry() -> void:
@@ -2089,6 +2093,16 @@ func _snap_pivot_position(local_position: Vector2) -> Vector2:
 	var best_position := local_position
 	var best_distance := HANDLE_HIT_RADIUS
 	var found := false
+	# A Primitive owns no authored Points, so without this its own centre - the
+	# one place a Pivot usually belongs - would be the only target on screen the
+	# Pivot could not reach.
+	if not display_polygon.is_empty():
+		var primitive_center := _primitive_center()
+		var primitive_distance := cursor_screen.distance_to(_world_to_screen(_local_to_world(primitive_center)))
+		if primitive_distance <= best_distance:
+			best_distance = primitive_distance
+			best_position = primitive_center
+			found = true
 	for point in bezier_points:
 		var point_position: Vector2 = point.get("position", Vector2.ZERO)
 		var point_distance := cursor_screen.distance_to(_world_to_screen(_local_to_world(point_position)))

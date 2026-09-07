@@ -2511,3 +2511,28 @@ func _test_measure_ruler_command() -> void:
 	canvas.disable_measure_ruler()
 	_expect(not canvas.is_measure_ruler_enabled() and canvas.measure_segments.is_empty(), "Switching the Ruler off should clear every guide.")
 	canvas.free()
+
+
+func _test_primitive_pivot_snapping() -> void:
+	var canvas := ComponentCanvas.new()
+	canvas.size = Vector2(400.0, 400.0)
+	canvas.set_camera_state(Vector2.ZERO, 20.0)
+	canvas.set_component_transform({"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO})
+	canvas.set_context("Primitive 1")
+	canvas.snap_enabled = false
+	# The sampled outline of a unit circle around (2, 1), which is what the
+	# Canvas receives for a Primitive instead of authored Points.
+	var primitive_outline: Array[Vector2] = []
+	for step in range(16):
+		var angle := TAU * float(step) / 16.0
+		primitive_outline.append(Vector2(2.0, 1.0) + Vector2(cos(angle), sin(angle)))
+	canvas.set_display_polygon(primitive_outline, true)
+	var center_screen := canvas._world_to_screen(Vector2(2.0, 1.0))
+	var near_center := canvas._world_to_local(canvas._screen_to_world(center_screen + Vector2(5.0, -4.0)))
+	_expect(canvas._snap_pivot_position(near_center).is_equal_approx(Vector2(2.0, 1.0)), "A Pivot dropped inside the pick radius of a Primitive should snap onto the Primitive's centre.")
+	var far_from_center := canvas._world_to_local(canvas._screen_to_world(center_screen + Vector2(60.0, 0.0)))
+	_expect(not canvas._snap_pivot_position(far_from_center).is_equal_approx(Vector2(2.0, 1.0)), "Outside the pick radius the Pivot must stay where it was put instead of jumping to the centre.")
+	_expect(canvas._is_near_primitive_center(center_screen) and canvas._primitive_center().is_equal_approx(Vector2(2.0, 1.0)), "The drawn centre handle, its hit test and the Pivot snap must all mean the same point.")
+	canvas.set_display_polygon([])
+	_expect(canvas._snap_pivot_position(near_center).is_equal_approx(near_center), "Without a Primitive outline there is no centre to snap to, and an unsnapped Pivot stays where it was put.")
+	canvas.free()
