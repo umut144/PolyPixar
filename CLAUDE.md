@@ -31,9 +31,8 @@ already running in a terminal tab:
 
 The runner takes only the arguments of its whitelist, `--tests` by default, so
 the step names that check.sh forwards — `editor`, `smoke`, `tests`,
-`whitespace` — are refused with exit code `2`, the same code a `--poll`
-without an open request gives. A deliberately narrow run allows them for that
-one call:
+`whitespace` — are refused with exit code `2`. A deliberately narrow run
+allows them for that one call:
 
 ```bash
 CHECK_AGENT_ARGS='--tests editor smoke tests whitespace' \
@@ -47,11 +46,12 @@ runs all four steps anyway, a failed one included.
 
 Exit code `0` means the run succeeded and `1` that it failed, with check.sh's
 own code in the `exit=` line of the header. `4` means the run is still going —
-then call again with `--poll` rather than requesting a second one — and `2`
-that `--poll` was used without an open request of this session. `5` means the
-request was dropped without a result, after a watcher restart or because it
-sat too long: request a new run instead of waiting for one that will never
-arrive. `3` means no watcher is running.
+then call again with `--poll` rather than requesting a second one. `2` means
+the call itself is wrong: `--poll` without an open request of this session, or
+an argument outside `CHECK_AGENT_ARGS`. Fix the call, do not repeat it
+unchanged. `5` means the request was dropped without a result, after a
+watcher restart or because it sat too long: request a new run instead of
+waiting for one that will never arrive. `3` means no watcher is running.
 
 Exit code `3` always needs the developer: say plainly that the watcher is
 off, ask them to type `checkw start` in a terminal tab, and wait for their
@@ -94,6 +94,15 @@ Never move or delete anything below `.git/` by hand; the `_to_delete/` rule
 below does not reach in there. A lock that a running Git still holds belongs
 to it, and taking it away destroys its commit. If a Git command fails on a
 lock, run `./scripts/git-unlock.sh`; if it refuses, say so and ask.
+
+Run `GIT_UNLOCK_AGE=5 ./scripts/git-unlock.sh` after each of your own commits,
+not only after a Git command has already failed on a lock: every commit leaves
+locks and temp objects behind that this session cannot delete, and they block
+whoever commits next. The script's own default is 15 seconds; 5 is enough at
+this call site because `lsof` is the real check and the age is only its
+fallback, and a loosened margin belongs where it can be read rather than in the
+default. If the script refuses because the leftovers are still too young, wait
+a moment and run it again; if it still refuses, say so and ask.
 
 ## Deleting files from the sandbox
 
