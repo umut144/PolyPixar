@@ -8,7 +8,7 @@ set -eu
 #   ./scripts/check.sh tests      a single step, passed through to verify.sh
 #
 # Those functions find the Git root, run its scripts/check.sh, wait for it and
-# put the whole output in the clipboard. They carry no project knowledge and
+# write the whole output to a log file. They carry no project knowledge and
 # call the script with --tests when they are invoked as checkt, so a repository
 # joins that contract by answering to this path. The verification itself stays
 # in tools/verify.sh, which also backs .github/workflows/verify.yml.
