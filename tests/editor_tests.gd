@@ -2573,3 +2573,37 @@ func _test_asset_pivot_snapping() -> void:
 	canvas._place_asset_pivot_at_screen_position(empty_area)
 	_expect(canvas.asset_pivot.is_equal_approx(Vector2(7.0, -6.0)), "Away from every target the Asset Pivot must still fall back to the grid.")
 	canvas.free()
+
+
+func _test_primitive_arrow_key_nudge() -> void:
+	var application: Control = load("res://scripts/main.gd").new()
+	application._build_ui()
+	var primitive_component := {"id": "component_1", "name": "shell", "type": "component",
+		"draw_mode": WorldDocumentService.DRAW_MODE_PRIMITIVE, "topology_role": WorldDocumentService.ROLE_OUTER,
+		"primitive": {"type": "circle", "center": Vector2(1.0, 2.0), "diameter_cm": 4.0},
+		"points": [], "edges": [], "chains": [], "visibility": true,
+		"transform": WorldDocumentService.default_component_transform()}
+	var primitive_assets: Array[Dictionary] = [{"id": "asset_1", "name": "Bomb", "asset_type": "props",
+		"visibility": true, "components": [primitive_component], "groups": [], "guides": []}]
+	application.assets = primitive_assets
+	application.selected_asset_id = "asset_1"
+	application.selected_component_id = "component_1"
+	application.snap_enabled = true
+	application.snap_grid_step = 0.5
+	_expect(application._can_nudge_selection(), "A selected Primitive must claim the arrow keys; leaving them unclaimed is what moved the focus into the Inspector.")
+	application._nudge_selection(Vector2(1.0, 0.0))
+	_expect(PrimitiveGeometryService.center(primitive_component).is_equal_approx(Vector2(1.5, 2.0)), "An arrow key should move a Primitive's centre by the Grid step, the same step a Point moves by.")
+		# The Canvas counts Y upwards, so KEY_UP builds (0, 1) rather than Godot's Vector2.UP.
+	application._nudge_selection(Vector2(0.0, 1.0))
+	_expect(PrimitiveGeometryService.center(primitive_component).is_equal_approx(Vector2(1.5, 2.5)), "Nudging must accumulate rather than restart from the authored centre.")
+	application._undo()
+	var after_undo: Dictionary = application._get_component(application._get_asset("asset_1"), "component_1")
+	_expect(PrimitiveGeometryService.center(after_undo).is_equal_approx(Vector2(1.5, 2.0)), "Each nudge should be its own History step, as a Point nudge is.")
+	application.snap_enabled = false
+	application.world_grid_size = 0.25
+	var before_unsnapped := PrimitiveGeometryService.center(application._get_component(application._get_asset("asset_1"), "component_1"))
+	application._nudge_selection(Vector2(-1.0, 0.0))
+	_expect(PrimitiveGeometryService.center(application._get_component(application._get_asset("asset_1"), "component_1")).is_equal_approx(before_unsnapped + Vector2(-0.25, 0.0)), "With Snap off the World grid size should set the step, exactly as it does for a Point.")
+	application.active_state = "draw"
+	_expect(not application._can_nudge_selection(), "While a Primitive is still being placed the arrow keys must not move it.")
+	application.free()

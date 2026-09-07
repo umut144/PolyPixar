@@ -401,7 +401,7 @@ func _input(event: InputEvent) -> void:
 		_navigate_outliner_component(-1 if event.keycode == KEY_UP else 1)
 		get_viewport().set_input_as_handled()
 		return
-	if event.meta_pressed or event.ctrl_pressed or event.keycode not in [KEY_LEFT, KEY_RIGHT, KEY_UP, KEY_DOWN] or not _can_nudge_selected_point():
+	if event.meta_pressed or event.ctrl_pressed or event.keycode not in [KEY_LEFT, KEY_RIGHT, KEY_UP, KEY_DOWN] or not _can_nudge_selection():
 		return
 	var nudge_delta := Vector2.ZERO
 	match event.keycode:
@@ -409,7 +409,7 @@ func _input(event: InputEvent) -> void:
 		KEY_RIGHT: nudge_delta.x = 1.0
 		KEY_UP: nudge_delta.y = 1.0
 		KEY_DOWN: nudge_delta.y = -1.0
-	_nudge_selected_point(nudge_delta)
+	_nudge_selection(nudge_delta)
 	if is_instance_valid(canvas_view):
 		canvas_view.grab_focus()
 	get_viewport().set_input_as_handled()
@@ -426,7 +426,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	# would otherwise let it through to the Canvas.
 	if _canvas_shortcuts_are_blocked(_keyboard_focus_owner()):
 		return
-	if event.echo and not _can_nudge_selected_point():
+	if event.echo and not _can_nudge_selection():
 		return
 	var has_command_modifier: bool = event.meta_pressed or event.ctrl_pressed
 	if _is_plain_pivot_shortcut(event) and _try_place_selected_pivot_at_mouse():
@@ -606,6 +606,46 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	elif not has_command_modifier and active_state == "edit" and active_edit_mode == "point" and event.keycode == KEY_4:
 		_activate_fuse_point_state()
 		get_viewport().set_input_as_handled()
+
+
+## An arrow key moves the selection by the Grid step, and what the selection is
+## depends on the Component: a Bezier Component answers with its Points, a
+## Primitive has none and answers with its centre. Without an answer the keys
+## fall through to Control focus navigation and the focus leaves the Canvas for
+## the Inspector, which is what a Primitive used to do.
+func _can_nudge_selection() -> bool:
+	return _can_nudge_selected_point() or _can_nudge_selected_primitive()
+
+
+func _can_nudge_selected_primitive() -> bool:
+	if Input.is_key_pressed(KEY_META) or Input.is_key_pressed(KEY_CTRL) or not selected_guide_id.is_empty():
+		return false
+	if active_state not in ["", "edit", "transform"]:
+		return false
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	return not _region_uses_component_geometry(component) and PrimitiveGeometryService.has_analytic_shape(component)
+
+
+func _nudge_selection(direction: Vector2) -> void:
+	if _can_nudge_selected_point():
+		_nudge_selected_point(direction)
+		return
+	_nudge_selected_primitive(direction)
+
+
+func _nudge_selected_primitive(direction: Vector2) -> void:
+	if not _can_nudge_selected_primitive() or direction.is_zero_approx():
+		return
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	var primitive: Dictionary = component.get("primitive", {})
+	if primitive.is_empty():
+		return
+	var step := maxf(snap_grid_step if snap_enabled else world_grid_size, 0.0001)
+	_record_direct_change()
+	primitive["center"] = PrimitiveGeometryService.center(component) + direction * step
+	component["primitive"] = primitive
+	_refresh_component_geometry(component)
+	_invalidate_render(RENDER_INSPECTOR | RENDER_CANVAS_CONTEXT)
 
 
 func _can_nudge_selected_point() -> bool:
