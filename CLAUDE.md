@@ -41,6 +41,13 @@ arrive. `3` means no watcher is running.
 off, ask them to type `checkw start` in a terminal tab, and wait for their
 confirmation instead of falling back to "please run it by hand".
 
+Beyond exit code 3, stop and ask the developer whenever the obstacle is not
+yours to remove: the same request fails or is dropped three times in a row, a
+run keeps polling far past its usual duration, or the failure names something
+about the machine rather than the code — a missing toolchain, a full disk, a
+binary that is gone. Say what you tried, what you saw, and what you need.
+Changing code in response to a broken environment is worse than waiting.
+
 The watcher answers below `.agent-check/`, which the .gitignore keeps out of
 the repository. Every run is kept on its own there, so parallel sessions do
 not disturb each other: `requests/<id>` is the request, `pending/<session>`
