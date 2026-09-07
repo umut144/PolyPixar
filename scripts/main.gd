@@ -436,6 +436,12 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 	if event.keycode == KEY_ESCAPE:
+		# The Canvas consumes Escape itself while the Ruler runs. Reaching here
+		# means focus sat elsewhere, so Measure is left alone instead of being
+		# reset out from under a half-placed measurement.
+		if is_instance_valid(canvas_view) and canvas_view.is_measure_placing():
+			get_viewport().set_input_as_handled()
+			return
 		_reset_to_default_state()
 		get_viewport().set_input_as_handled()
 		return
@@ -722,6 +728,11 @@ func _set_geometry_command_state(state: String) -> void:
 
 func _set_active_context_command(command: String) -> void:
 	active_context_command = command
+	# Only Point placement follows the active command. The Ruler toggle and its
+	# guides stay on, so a measurement keeps updating while its Points are
+	# edited under another command.
+	if is_instance_valid(canvas_view):
+		canvas_view.set_measure_placing(command == "asset.measure")
 
 
 func _context_command_is(command: String) -> bool:
@@ -1025,6 +1036,7 @@ func _build_ui() -> void:
 	canvas_view.mirror_axis_stage_changed.connect(_on_mirror_axis_stage_changed)
 	canvas_view.mirror_axis_confirmed.connect(_on_mirror_axis_confirmed)
 	canvas_view.mirror_axis_cancelled.connect(_on_mirror_axis_cancelled)
+	canvas_view.measure_stage_changed.connect(_on_measure_stage_changed)
 	canvas_view.pivot_changed.connect(_on_pivot_changed)
 	canvas_view.asset_pivot_changed.connect(_on_asset_pivot_changed)
 	canvas_view.transform_changed.connect(_on_transform_changed)
@@ -5149,7 +5161,8 @@ func _render_context_bar() -> void:
 		edit_edge_menu.tooltip_text = draw_menu.tooltip_text
 	context_bar.add_child(edit_edge_menu)
 	var selected_component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	if WorldDocumentService.is_closed_loop(selected_component):
+	var closed_loop_component := WorldDocumentService.is_closed_loop(selected_component)
+	if closed_loop_component:
 		var edit_face_menu := MenuButton.new()
 		edit_face_menu.text = "⌘4  Edit Face  ▼"
 		edit_face_menu.custom_minimum_size = Vector2(134, 32)
@@ -5162,9 +5175,24 @@ func _render_context_bar() -> void:
 		if geometry_locked:
 			edit_face_menu.tooltip_text = draw_menu.tooltip_text
 		context_bar.add_child(edit_face_menu)
-		var mirror_spacer := Control.new()
-		mirror_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		context_bar.add_child(mirror_spacer)
+	var context_command_spacer := Control.new()
+	context_command_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	context_bar.add_child(context_command_spacer)
+	var measure_menu := MenuButton.new()
+	measure_menu.text = "Measure  ▼"
+	measure_menu.custom_minimum_size = Vector2(112, 32)
+	measure_menu.tooltip_text = "Measure distances on the Canvas · Ruler guides are transient and never change geometry"
+	measure_menu.focus_mode = Control.FOCUS_NONE
+	# The highlight reports that a Measure tool is on, not that Measure currently
+	# owns the Canvas, because the Ruler keeps running underneath other commands.
+	var ruler_enabled := is_instance_valid(canvas_view) and canvas_view.is_measure_ruler_enabled()
+	EditorWidgets.style_context_command_button(measure_menu, ruler_enabled)
+	measure_menu.get_popup().add_check_item("Ruler", 0)
+	measure_menu.get_popup().set_item_checked(0, ruler_enabled)
+	EditorWidgets.style_popup_menu(measure_menu.get_popup())
+	measure_menu.get_popup().id_pressed.connect(_on_measure_menu_id)
+	context_bar.add_child(measure_menu)
+	if closed_loop_component:
 		var mirror_menu := MenuButton.new()
 		mirror_menu.text = "Mirror  ▼"
 		mirror_menu.custom_minimum_size = Vector2(100, 32)
@@ -6018,6 +6046,33 @@ func _can_activate_selection_mirror(component: Dictionary) -> bool:
 	return SELECTION_MIRROR_SERVICE_SCRIPT.selection_issues(component, selected_point_ids).is_empty()
 
 
+func _on_measure_menu_id(action_id: int) -> void:
+	if action_id == 0:
+		_toggle_measure_ruler()
+
+
+## Picking Ruler while it already owns the Canvas switches it off and clears
+## every guide. Picking it from anywhere else resumes placing with the guides
+## intact, which is what makes measure · edit · measure again possible.
+func _toggle_measure_ruler() -> void:
+	if canvas_view.is_measure_ruler_enabled() and _context_command_is("asset.measure"):
+		canvas_view.disable_measure_ruler()
+		_set_active_context_command("asset.edit_point")
+		_invalidate_render(RENDER_CONTEXT_BAR)
+		_show_status_message("Ruler off · Measure guides cleared")
+		return
+	canvas_view.enable_measure_ruler()
+	_set_active_context_command("asset.measure")
+	_invalidate_render(RENDER_CONTEXT_BAR)
+
+
+func _on_measure_stage_changed(stage: String) -> void:
+	if stage == "second":
+		_show_command_prompt("Ruler · Set the second measure Point · Escape takes the last Point back")
+	elif stage == "first":
+		_show_command_prompt("Ruler · Set the first measure Point · Escape takes the last Point back · Pick Ruler again to switch it off")
+
+
 func _on_mirror_menu_id(action_id: int) -> void:
 	_activate_selection_mirror(ComponentCanvas.MIRROR_AXIS_HORIZONTAL if action_id == 1 else ComponentCanvas.MIRROR_AXIS_VERTICAL)
 
@@ -6036,7 +6091,7 @@ func _activate_selection_mirror(axis_orientation := ComponentCanvas.MIRROR_AXIS_
 		_set_active_context_command("asset.edit_point")
 		return
 	_invalidate_render(RENDER_CONTEXT_BAR)
-	_show_mirror_prompt(_mirror_axis_prompt())
+	_show_command_prompt(_mirror_axis_prompt())
 
 
 func _mirror_axis_prompt() -> String:
@@ -6046,7 +6101,7 @@ func _mirror_axis_prompt() -> String:
 
 func _on_mirror_axis_stage_changed(stage: String) -> void:
 	if stage == "axis":
-		_show_mirror_prompt(_mirror_axis_prompt())
+		_show_command_prompt(_mirror_axis_prompt())
 
 
 func _on_mirror_axis_confirmed(axis_start: Vector2, axis_end: Vector2) -> void:
@@ -6086,7 +6141,7 @@ func _on_mirror_axis_cancelled() -> void:
 	_show_status_message("%s cancelled" % _mirror_command_label())
 
 
-func _show_mirror_prompt(message: String) -> void:
+func _show_command_prompt(message: String) -> void:
 	_show_status_message(message)
 	if is_instance_valid(status_clear_timer):
 		status_clear_timer.stop()

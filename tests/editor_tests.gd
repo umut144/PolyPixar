@@ -2434,3 +2434,69 @@ func _test_outliner_wiring() -> void:
 		"exercise": _exercise_outliner_control,
 	})
 	application.free()
+
+
+func _ruler_point(point_id: String, point_position: Vector2) -> Dictionary:
+	return {"id": point_id, "position": point_position, "handle_in": Vector2.ZERO, "handle_out": Vector2.ZERO, "mode": "linear"}
+
+
+func _test_measure_ruler_command() -> void:
+	var canvas := ComponentCanvas.new()
+	canvas.size = Vector2(400.0, 400.0)
+	canvas.set_camera_state(Vector2.ZERO, 20.0)
+	canvas.set_component_transform({"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO})
+	canvas.set_context("Component 1")
+	canvas.snap_enabled = false
+	var reported_stages: Array = []
+	canvas.measure_stage_changed.connect(func(stage: String) -> void: reported_stages.append(stage))
+	canvas.set_measure_placing(true)
+	_expect(not canvas.is_measure_placing() and reported_stages.is_empty(), "Placing must stay closed while the Ruler toggle itself is off.")
+	canvas.enable_measure_ruler()
+	canvas.set_measure_placing(true)
+	_expect(canvas.is_measure_ruler_enabled() and canvas.is_measure_placing() and reported_stages == ["first"], "Switching the Ruler on and handing it the Canvas should ask for the first measure Point.")
+	canvas._place_measure_point(Vector2(200.0, 200.0))
+	_expect(canvas.measure_stage == "second" and canvas.measure_segments.is_empty(), "The first Ruler Point should only arm the second one instead of drawing a guide.")
+	canvas._place_measure_point(Vector2(280.0, 200.0))
+	_expect(canvas.measure_segments.size() == 1 and canvas.measure_stage == "first", "Completing a Ruler guide should keep it and immediately arm the next measurement.")
+	var free_guide: Dictionary = canvas.measure_segments[0]
+	_expect(canvas._measure_anchor_position(free_guide.get("start", {})).is_equal_approx(Vector2.ZERO) and canvas._measure_anchor_position(free_guide.get("end", {})).is_equal_approx(Vector2(4.0, 0.0)), "A Ruler guide placed away from the geometry should keep both raster positions.")
+	var escape_event := InputEventKey.new()
+	escape_event.keycode = KEY_ESCAPE
+	escape_event.pressed = true
+	canvas._place_measure_point(Vector2(200.0, 240.0))
+	canvas._gui_input(escape_event)
+	_expect(canvas.measure_stage == "first" and canvas.measure_segments.size() == 1 and canvas.is_measure_ruler_enabled(), "Escape should take a pending first Ruler Point back without touching the finished guides or the toggle.")
+	_expect(canvas.measure_cursor_visible, "Taking a Ruler Point back must leave the cursor preview on so the next Point can be aimed immediately.")
+	canvas._gui_input(escape_event)
+	_expect(canvas.measure_stage == "second" and canvas.measure_segments.is_empty() and canvas._measure_anchor_position(canvas.measure_first_anchor).is_equal_approx(Vector2.ZERO), "Escape on a finished guide should take its second Point back and reopen the first one as the live anchor.")
+	canvas._place_measure_point(Vector2(200.0, 240.0))
+	_expect(canvas.measure_segments.size() == 1 and canvas._measure_anchor_position(canvas.measure_segments[0].get("end", {})).is_equal_approx(Vector2(0.0, -2.0)), "Measuring again from a reopened anchor should replace the guide instead of stacking a second one on the same Point.")
+	canvas._gui_input(escape_event)
+	canvas._gui_input(escape_event)
+	_expect(canvas.is_measure_ruler_enabled() and canvas.measure_stage == "first" and canvas.measure_segments.is_empty(), "Escape must never switch the Ruler off, even once every placed Point is taken back.")
+	var motion_event := InputEventMouseMotion.new()
+	motion_event.position = Vector2(240.0, 200.0)
+	canvas._gui_input(motion_event)
+	_expect(canvas.measure_cursor_visible and canvas._measure_anchor_position(canvas.measure_cursor_anchor).is_equal_approx(Vector2(2.0, 0.0)), "The Ruler should track the snapped cursor target before the first Point is placed so it can be previewed.")
+	canvas._on_mouse_exited()
+	_expect(not canvas.measure_cursor_visible, "Leaving the Canvas should drop the Ruler cursor preview instead of freezing it at the border.")
+	canvas.set_bezier_geometry([_ruler_point("point_1", Vector2(1.0, 1.0)), _ruler_point("point_2", Vector2(3.0, 1.0))], [], [])
+	canvas._place_measure_point(Vector2(224.0, 183.0))
+	canvas._place_measure_point(Vector2(260.0, 180.0))
+	var anchored_guide: Dictionary = canvas.measure_segments[0]
+	var anchored_start: Dictionary = anchored_guide.get("start", {})
+	var anchored_end: Dictionary = anchored_guide.get("end", {})
+	_expect(str(anchored_start.get("point_id", "")) == "point_1" and str(anchored_end.get("point_id", "")) == "point_2", "A Ruler Point inside the pick radius should keep the authored Point's identity rather than its coordinates.")
+	canvas.set_bezier_geometry([_ruler_point("point_1", Vector2(1.0, 1.0)), _ruler_point("point_2", Vector2(5.0, 1.0))], [], [])
+	_expect(canvas.measure_segments.size() == 1 and canvas._measure_anchor_position(canvas.measure_segments[0].get("end", {})).is_equal_approx(Vector2(5.0, 1.0)), "Moving an anchored Point should move the measurement with it.")
+	canvas.set_bezier_geometry([_ruler_point("point_1", Vector2(1.0, 1.0))], [], [])
+	_expect(canvas.measure_segments.is_empty(), "A guide whose anchored Point is gone should be dropped instead of freezing at a coordinate nothing occupies.")
+	canvas._place_measure_point(Vector2(200.0, 200.0))
+	canvas._place_measure_point(Vector2(280.0, 200.0))
+	canvas.set_context("Component 2")
+	_expect(canvas.measure_segments.is_empty() and canvas.is_measure_ruler_enabled(), "Moving to another Component should clear guides that only describe the previous local space, without switching the Ruler off.")
+	canvas.set_measure_placing(false)
+	_expect(canvas.is_measure_ruler_enabled() and not canvas.is_measure_placing() and canvas.measure_stage.is_empty(), "Handing the Canvas to another command should stop placing but leave the Ruler and its guides on.")
+	canvas.disable_measure_ruler()
+	_expect(not canvas.is_measure_ruler_enabled() and canvas.measure_segments.is_empty(), "Switching the Ruler off should clear every guide.")
+	canvas.free()

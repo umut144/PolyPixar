@@ -319,6 +319,44 @@ after converting the Child's composed world transform into Parent-local space.
 Whole Parent transforms exclude descendant snapping because those targets
 inherit and move with the Parent.
 
+The Create Context Bar's `Measure` menu holds view-only tools. Its `Ruler` is a
+toggle rather than a command, and the menu entry carries its on/off state while
+the Measure button stays highlighted for as long as a tool inside it is on. The
+Ruler owns two independent halves. The guides are the persistent half: they are
+drawn for as long as the toggle is on, survive every other context command, and
+are cleared only by switching the Ruler off or by moving to another Component,
+whose local space they would otherwise describe wrongly. Placing is the
+transient half: `_set_active_context_command` hands it to the Canvas exactly
+while `asset.measure` is the active command, so Edit Point keeps its clicks
+while the guides above it keep updating. Picking `Ruler` from another command
+resumes placing with the guides intact; picking it while Measure already owns
+the Canvas switches the toggle off.
+
+A Ruler Point placed inside the pick radius of an authored Point stores that
+Point's id instead of its coordinates and resolves its position on every draw,
+which is what makes a measurement follow the Point as Edit Point moves it. Every
+other Point stores the snapped raster position. `set_bezier_geometry` drops a
+guide whose anchored Point no longer exists rather than freezing it at a
+coordinate nothing occupies. A faint cross leads the cursor at the resolved snap
+target while placing, so the Point a click would place is visible before it is
+placed. A guide is drawn as three dashed lines: the measured span in orange
+labelled with the world distance in centimetres, plus the two legs that close
+the right triangle over it — the horizontal one in red carrying the x distance
+and the vertical one in green carrying the y distance. Both legs are World axis
+aligned rather than Component local so they stay horizontal and vertical on
+screen for a rotated Component, and a leg that collapses to a few pixels is left
+out rather than labelled with a zero.
+
+Escape steps back over the placed Points instead of ending the Ruler: it drops a
+pending first Point, and on a finished guide it takes the second Point back and
+reopens the first one as the live anchor, which is how several distances are
+measured from one Point without stacking a guide for each. The Canvas consumes
+that Escape, because an unconsumed one reaches the editor's global Escape reset;
+`_unhandled_key_input` therefore also leaves a placing Ruler alone rather than
+resetting around it. Nothing about a measurement reaches the World document, so
+Measure stays available for every Component, including one whose geometry is
+locked by a Region.
+
 Each Component declares a geometry source. Bézier sources contain only
 `points`, `edges`, and `chains`; primitive sources contain one typed primitive
 definition: authored `circle` with `center` and `diameter_cm`, or an `ellipse`

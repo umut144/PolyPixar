@@ -19,6 +19,7 @@ signal reference_component_selected(component_id: String)
 signal mirror_axis_stage_changed(stage: String)
 signal mirror_axis_confirmed(axis_start: Vector2, axis_end: Vector2)
 signal mirror_axis_cancelled()
+signal measure_stage_changed(stage: String)
 signal pivot_changed(pivot: Vector2)
 signal asset_pivot_changed(pivot: Vector2)
 signal transform_changed(transform: Dictionary)
@@ -26,6 +27,11 @@ signal primitive_placed(center: Vector2, diameter_cm: float)
 signal primitive_center_changed(center: Vector2)
 signal primitive_preview_cancelled()
 
+const RULER_COLOR := Color("#f2994a")
+const RULER_X_COLOR := Color("#eb5757")
+const RULER_Y_COLOR := Color("#6fcf97")
+const RULER_CROSS_RADIUS := 7.0
+const RULER_LEG_MIN_PIXELS := 6.0
 const MIRROR_AXIS_VERTICAL := "vertical"
 const MIRROR_AXIS_HORIZONTAL := "horizontal"
 const PAN_SPEED := 420.0
@@ -68,6 +74,13 @@ var mirror_axis_end := Vector2.ZERO
 var mirror_axis_candidate_visible := false
 var selection_mirror_preview_points: Array[Dictionary] = []
 var selection_mirror_preview_edges: Array[Dictionary] = []
+var measure_ruler_enabled := false
+var measure_placing := false
+var measure_stage := ""
+var measure_first_anchor: Dictionary = {}
+var measure_cursor_anchor: Dictionary = {}
+var measure_cursor_visible := false
+var measure_segments: Array[Dictionary] = []
 var guide_style := false
 var guide_color := Color("#f2c94c")
 var bezier_color_override := Color.TRANSPARENT
@@ -185,6 +198,9 @@ func _gui_input(event: InputEvent) -> void:
 		if event.button_index == MOUSE_BUTTON_LEFT and not mirror_command_stage.is_empty():
 			_set_mirror_axis_from_screen(event.position)
 			_confirm_mirror_axis()
+			return
+		if event.button_index == MOUSE_BUTTON_LEFT and measure_placing:
+			_place_measure_point(event.position)
 			return
 		if event.button_index == MOUSE_BUTTON_LEFT and interaction_state == "draw" and active_tool == "point" and _draw_anchor_point_id().is_empty():
 			var endpoint_id := _open_endpoint_at(event.position)
@@ -334,6 +350,11 @@ func _gui_input(event: InputEvent) -> void:
 			_update_selection_mirror_preview()
 			queue_redraw()
 			return
+		if measure_placing:
+			measure_cursor_anchor = _measure_anchor_at(event.position)
+			measure_cursor_visible = true
+			queue_redraw()
+			return
 		if point_marquee_dragging:
 			point_marquee_current = event.position
 			if point_marquee_start.distance_to(point_marquee_current) >= 4.0:
@@ -446,6 +467,10 @@ func _gui_input(event: InputEvent) -> void:
 			elif event.keycode in [KEY_ENTER, KEY_KP_ENTER] and mirror_axis_candidate_visible:
 				_confirm_mirror_axis()
 			return
+		if measure_placing and event.keycode == KEY_ESCAPE:
+			_undo_last_measure_point()
+			_consume_input_event()
+			return
 		if event.keycode == KEY_ESCAPE and interaction_state == "edit":
 			clear_selection()
 
@@ -486,6 +511,13 @@ func _commit_draw_pointer() -> void:
 
 
 func set_context(context_label: String) -> void:
+	# Guides are expressed in the active Component's local space, so they cannot
+	# survive a move to a different one.
+	if context_label != context_name:
+		measure_segments.clear()
+		measure_first_anchor = {}
+		if measure_placing:
+			measure_stage = "first"
 	context_name = context_label
 	queue_redraw()
 
@@ -497,6 +529,7 @@ func _on_mouse_entered() -> void:
 
 func _on_mouse_exited() -> void:
 	cursor_over_canvas = false
+	measure_cursor_visible = false
 	queue_redraw()
 
 
@@ -834,6 +867,7 @@ func set_bezier_geometry(points: Array, edges: Array, chains: Array) -> void:
 		if not _edge_by_id(edge_id).is_empty():
 			valid_edge_selection.append(edge_id)
 	_set_selected_edge_ids(valid_edge_selection)
+	_drop_stale_measure_guides()
 	queue_redraw()
 
 
@@ -853,6 +887,133 @@ func start_mirror_command(axis_orientation := MIRROR_AXIS_VERTICAL) -> bool:
 	mirror_axis_stage_changed.emit("axis")
 	queue_redraw()
 	return true
+
+
+## The Ruler is a toggle rather than a command: once on, its guides stay drawn
+## and keep resolving live while any other context command owns the Canvas, so
+## a measurement can be watched while the Points it spans are edited. Only
+## switching it off clears them.
+func enable_measure_ruler() -> void:
+	measure_ruler_enabled = true
+	queue_redraw()
+
+
+func disable_measure_ruler() -> void:
+	measure_ruler_enabled = false
+	measure_placing = false
+	measure_stage = ""
+	measure_cursor_visible = false
+	measure_first_anchor = {}
+	measure_segments.clear()
+	queue_redraw()
+
+
+func is_measure_ruler_enabled() -> bool:
+	return measure_ruler_enabled
+
+
+func is_measure_placing() -> bool:
+	return measure_placing
+
+
+## Placing is the half of the Ruler that claims Canvas clicks, so it follows the
+## active context command while the guides themselves outlive it.
+func set_measure_placing(placing: bool) -> void:
+	var next_placing := placing and measure_ruler_enabled
+	if next_placing == measure_placing:
+		return
+	measure_placing = next_placing
+	measure_cursor_visible = false
+	if measure_placing:
+		measure_stage = "first"
+		if cursor_over_canvas:
+			measure_cursor_anchor = _measure_anchor_at(get_local_mouse_position())
+			measure_cursor_visible = true
+		measure_stage_changed.emit(measure_stage)
+	else:
+		measure_stage = ""
+	queue_redraw()
+
+
+func _place_measure_point(screen_position: Vector2) -> void:
+	var measure_anchor := _measure_anchor_at(screen_position)
+	measure_cursor_anchor = measure_anchor
+	measure_cursor_visible = true
+	if measure_stage == "second":
+		measure_segments.append({"start": measure_first_anchor, "end": measure_anchor})
+		measure_stage = "first"
+	else:
+		measure_first_anchor = measure_anchor
+		measure_stage = "second"
+	measure_stage_changed.emit(measure_stage)
+	queue_redraw()
+
+
+## Escape belongs to the Ruler while it runs, so the Canvas has to consume it.
+## An unconsumed key reaches the editor's global Escape reset, which would end
+## the very command the Ruler just stepped back inside.
+func _consume_input_event() -> void:
+	var current_viewport := get_viewport()
+	if current_viewport != null:
+		current_viewport.set_input_as_handled()
+
+
+## Escape steps back over the placed Ruler Points and never ends the command.
+## Taking the second Point of a finished guide back reopens its first Point as
+## the live anchor, so several distances can be measured from one Point without
+## stacking a guide for each of them.
+func _undo_last_measure_point() -> void:
+	if measure_stage == "second":
+		measure_stage = "first"
+	elif not measure_segments.is_empty():
+		var reopened_guide: Dictionary = measure_segments.pop_back()
+		measure_first_anchor = reopened_guide.get("start", {})
+		measure_stage = "second"
+	else:
+		return
+	measure_stage_changed.emit(measure_stage)
+	queue_redraw()
+
+
+## A Ruler Point prefers an authored Point within the pick radius and then keeps
+## its identity rather than its coordinates, so moving that Point in Edit Point
+## updates the measurement instead of leaving a stale number behind. Everything
+## else falls back to the snapped raster position.
+func _measure_anchor_at(screen_position: Vector2) -> Dictionary:
+	var nearest_index := _nearest_bezier_point(screen_position)
+	if nearest_index >= 0:
+		return {
+			"point_id": str(bezier_points[nearest_index].get("id", "")),
+			"position": Vector2(bezier_points[nearest_index].get("position", Vector2.ZERO))
+		}
+	return {"point_id": "", "position": _snap_to_grid(_world_to_local(_screen_to_world(screen_position)))}
+
+
+func _measure_anchor_position(measure_anchor: Dictionary) -> Vector2:
+	var point_id := str(measure_anchor.get("point_id", ""))
+	if not point_id.is_empty():
+		var anchored_point := _point_by_id(point_id)
+		if not anchored_point.is_empty():
+			return Vector2(anchored_point.get("position", Vector2.ZERO))
+	return Vector2(measure_anchor.get("position", Vector2.ZERO))
+
+
+func _measure_anchor_is_live(measure_anchor: Dictionary) -> bool:
+	var point_id := str(measure_anchor.get("point_id", ""))
+	return point_id.is_empty() or _point_index_by_id(point_id) >= 0
+
+
+## A guide that lost the Point it was anchored to has nothing left to report, so
+## it goes rather than freezing at a coordinate the Point no longer occupies.
+func _drop_stale_measure_guides() -> void:
+	for guide_index in range(measure_segments.size() - 1, -1, -1):
+		var guide: Dictionary = measure_segments[guide_index]
+		if not _measure_anchor_is_live(guide.get("start", {})) or not _measure_anchor_is_live(guide.get("end", {})):
+			measure_segments.remove_at(guide_index)
+	if measure_stage == "second" and not _measure_anchor_is_live(measure_first_anchor):
+		measure_first_anchor = {}
+		measure_stage = "first"
+		measure_stage_changed.emit(measure_stage)
 
 
 func cancel_mirror_command(should_emit_signal := true) -> void:
@@ -1020,6 +1181,7 @@ func _draw() -> void:
 	_draw_edge_selection_marquee()
 	_draw_draw_preview()
 	_draw_primitive_preview()
+	_draw_ruler_command()
 	_draw_measurement_guides()
 
 
@@ -1089,6 +1251,64 @@ func _draw_grid_lines(step: float, line_color: Color, line_width: float) -> void
 	for grid_index in range(first_y, last_y + 1):
 		var world_y := grid_index * step
 		draw_line(_world_to_screen(Vector2(min_world.x, world_y)), _world_to_screen(Vector2(max_world.x, world_y)), line_color, line_width)
+
+
+func _draw_ruler_command() -> void:
+	if not measure_ruler_enabled:
+		return
+	for segment in measure_segments:
+		var guide_start := _measure_anchor_position(segment.get("start", {}))
+		var guide_end := _measure_anchor_position(segment.get("end", {}))
+		_draw_ruler_guide(guide_start, guide_end)
+		_draw_ruler_cross(guide_start)
+		_draw_ruler_cross(guide_end)
+	if not measure_placing:
+		return
+	var cursor_point := _measure_anchor_position(measure_cursor_anchor)
+	if measure_stage == "second":
+		var pending_start := _measure_anchor_position(measure_first_anchor)
+		if measure_cursor_visible:
+			_draw_ruler_guide(pending_start, cursor_point)
+		_draw_ruler_cross(pending_start)
+	# The cursor carries its own faint cross so the snapped target is visible
+	# before a Point is placed, which the coordinate readout alone cannot show.
+	if measure_cursor_visible:
+		_draw_ruler_cross(cursor_point, true)
+
+
+func _draw_ruler_guide(guide_start: Vector2, guide_end: Vector2) -> void:
+	var start_world := _local_to_world(guide_start)
+	var end_world := _local_to_world(guide_end)
+	var start_screen := _world_to_screen(start_world)
+	var end_screen := _world_to_screen(end_world)
+	# The two legs close a right triangle over the measured span. They are World
+	# axis aligned rather than Component local, so they stay horizontal and
+	# vertical on screen even when the Component itself is rotated.
+	var corner_screen := _world_to_screen(Vector2(end_world.x, start_world.y))
+	var x_label_offset := Vector2(0.0, 16.0 if end_screen.y < start_screen.y else -16.0)
+	var y_label_offset := Vector2(34.0 if corner_screen.x >= start_screen.x else -34.0, 0.0)
+	_draw_ruler_leg(start_screen, corner_screen, RULER_X_COLOR, absf(end_world.x - start_world.x), x_label_offset)
+	_draw_ruler_leg(corner_screen, end_screen, RULER_Y_COLOR, absf(end_world.y - start_world.y), y_label_offset)
+	_draw_dashed_line(start_screen, end_screen, RULER_COLOR)
+	var distance_label := "%.2f cm" % ToolUnits.to_centimeters(start_world.distance_to(end_world))
+	_draw_measurement_label(distance_label, (start_screen + end_screen) * 0.5 + Vector2(0.0, -14.0), RULER_COLOR)
+
+
+## A leg that collapses to a few pixels carries no readable distance, so a purely
+## horizontal or vertical measurement shows one leg rather than a stray zero.
+func _draw_ruler_leg(leg_start: Vector2, leg_end: Vector2, leg_color: Color, leg_distance: float, label_offset: Vector2) -> void:
+	if leg_start.distance_to(leg_end) < RULER_LEG_MIN_PIXELS:
+		return
+	_draw_dashed_line(leg_start, leg_end, leg_color)
+	_draw_measurement_label("%.2f cm" % ToolUnits.to_centimeters(leg_distance), (leg_start + leg_end) * 0.5 + label_offset, leg_color)
+
+
+func _draw_ruler_cross(guide_point: Vector2, pending := false) -> void:
+	var center := _world_to_screen(_local_to_world(guide_point))
+	var cross_color := Color(RULER_COLOR, 0.55) if pending else RULER_COLOR
+	var cross_width := 1.5 if pending else 2.0
+	draw_line(center - Vector2(RULER_CROSS_RADIUS, 0.0), center + Vector2(RULER_CROSS_RADIUS, 0.0), cross_color, cross_width)
+	draw_line(center - Vector2(0.0, RULER_CROSS_RADIUS), center + Vector2(0.0, RULER_CROSS_RADIUS), cross_color, cross_width)
 
 
 func _draw_measurement_guides() -> void:
