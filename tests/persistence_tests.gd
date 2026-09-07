@@ -1009,3 +1009,22 @@ func _test_document_number_round_trip() -> void:
 	var stored_text := JSON.stringify(WorldDocumentService.document_safe(bake), "\t")
 	var reloaded = JSON.parse_string(stored_text)
 	_expect(reloaded is Dictionary and JSON.stringify(WorldDocumentService.document_safe(reloaded), "\t") == stored_text, "A sanitised bake must reproduce itself across a save and a load; otherwise its exported package goes stale on every open.")
+
+
+func _test_fingerprints_ignore_the_sign_of_a_flattened_zero() -> void:
+	# Storing turns a coordinate the document cannot hold into a plain zero, and
+	# %.9f prints -1.99999996755032e-17 as "-0.000000000" against that zero's
+	# "0.000000000". A fingerprint that sees the minus sign declares an accepted
+	# Fill Mesh stale, and the Runtime Export then refuses to package it while
+	# the Mesh step keeps reporting the very same Component as built.
+	var noisy_mesh := {"bake_id": "meshing_bake_1", "method": "constrained_mesh",
+		"sampling_bake_id": "bake_1", "seeding_bake_id": "seeding_bake_1",
+		"vertices": [{"id": "v0", "position": Vector2(-1.99999996755032e-17, -0.145)}, {"id": "v1", "position": Vector2(0.5, 0.25)}],
+		"triangles": [{"vertex_ids": ["v0", "v1"]}]}
+	var stored_mesh: Dictionary = WorldDocumentService.document_safe(noisy_mesh)
+	var stored_x := Vector2(stored_mesh.get("vertices", [])[0].get("position", Vector2.ZERO)).x
+	_expect("%.9f" % stored_x == "0.000000000", "Storing must flatten the coordinate to a positive zero; without that the rest of this test proves nothing.")
+	_expect(GeometryUVMappingService.mesh_fingerprint(noisy_mesh) == GeometryUVMappingService.mesh_fingerprint(stored_mesh), "A Mesh fingerprint must not change when a coordinate the document cannot hold is flattened to zero.")
+	var noisy_sampling := {"bake_id": "bake_1", "algorithm_version": 1, "cuts": [],
+		"chains": [{"chain_id": "c0", "closed": true, "samples": [{"id": "s0", "position": Vector2(-1.99999996755032e-17, 0.5)}]}]}
+	_expect(GeometrySeedingService.sampling_fingerprint(noisy_sampling) == GeometrySeedingService.sampling_fingerprint(WorldDocumentService.document_safe(noisy_sampling)), "A Sampling fingerprint must survive the same flattening, or every Mesh built on it goes stale one save later.")

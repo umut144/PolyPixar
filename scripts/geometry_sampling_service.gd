@@ -214,9 +214,11 @@ static func source_fingerprint(component: Dictionary, cut_guides: Array = [], ho
 		var handle_in: Vector2 = point_data.get("handle_in", Vector2.ZERO)
 		var handle_out: Vector2 = point_data.get("handle_out", Vector2.ZERO)
 		parts.append("p|%s|%.9f|%.9f|%s|%d|%s|%.9f|%.9f|%.9f|%.9f" % [
-			str(point_data.get("id", "")), position.x, position.y,
+			str(point_data.get("id", "")), WorldDocumentService.document_coordinate(position.x), WorldDocumentService.document_coordinate(position.y),
 			str(point_data.get("mode", "linear")), int(bool(point_data.get("preserve_point", false))),
-			str(point_data.get("handle_source", "auto")), handle_in.x, handle_in.y, handle_out.x, handle_out.y
+			str(point_data.get("handle_source", "auto")),
+			WorldDocumentService.document_coordinate(handle_in.x), WorldDocumentService.document_coordinate(handle_in.y),
+			WorldDocumentService.document_coordinate(handle_out.x), WorldDocumentService.document_coordinate(handle_out.y)
 		])
 	for edge_data in component.get("edges", []):
 		if edge_data is Dictionary:
@@ -241,17 +243,21 @@ static func source_fingerprint(component: Dictionary, cut_guides: Array = [], ho
 		var primitive_diameters := Vector2(ToolUnits.to_centimeters(primitive_diameters_tool_units.x), ToolUnits.to_centimeters(primitive_diameters_tool_units.y))
 		parts.append("primitive|%s|%.9f|%.9f|%.9f|%.9f" % [
 			str(component.get("primitive", {}).get("type", "")),
-			primitive_center.x,
-			primitive_center.y,
-			primitive_diameters.x,
-			primitive_diameters.y
+			WorldDocumentService.document_coordinate(primitive_center.x),
+			WorldDocumentService.document_coordinate(primitive_center.y),
+			WorldDocumentService.document_coordinate(primitive_diameters.x),
+			WorldDocumentService.document_coordinate(primitive_diameters.y)
 		])
 	# Preserve the pre-schema-40 constant fingerprint slot so unrelated accepted
 	# closed meshes do not become stale. Component-local open widths no longer
 	# participate in geometry after Ribbon migration.
 	parts.append("ribbon_width_px|%.9f" % 8.0)
 	var sampling_transform: Transform2D = component.get("sampling_transform", Transform2D.IDENTITY)
-	parts.append("sampling_transform|%.9f|%.9f|%.9f|%.9f|%.9f|%.9f" % [sampling_transform.x.x, sampling_transform.x.y, sampling_transform.y.x, sampling_transform.y.y, sampling_transform.origin.x, sampling_transform.origin.y])
+	parts.append("sampling_transform|%.9f|%.9f|%.9f|%.9f|%.9f|%.9f" % [
+		WorldDocumentService.document_coordinate(sampling_transform.x.x), WorldDocumentService.document_coordinate(sampling_transform.x.y),
+		WorldDocumentService.document_coordinate(sampling_transform.y.x), WorldDocumentService.document_coordinate(sampling_transform.y.y),
+		WorldDocumentService.document_coordinate(sampling_transform.origin.x), WorldDocumentService.document_coordinate(sampling_transform.origin.y)
+	])
 	var hashing_context := HashingContext.new()
 	hashing_context.start(HashingContext.HASH_SHA256)
 	hashing_context.update("\n".join(parts).to_utf8_buffer())

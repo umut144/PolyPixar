@@ -198,7 +198,7 @@ static func mesh_fingerprint(mesh_bake: Dictionary) -> String:
 	for vertex in mesh_bake.get("vertices", []):
 		if vertex is Dictionary:
 			var position := Vector2(vertex.get("position", Vector2.ZERO))
-			parts.append("v|%s|%.9f|%.9f" % [str(vertex.get("id", "")), position.x, position.y])
+			parts.append("v|%s|%.9f|%.9f" % [str(vertex.get("id", "")), WorldDocumentService.document_coordinate(position.x), WorldDocumentService.document_coordinate(position.y)])
 	for triangle in mesh_bake.get("triangles", []):
 		if triangle is Dictionary:
 			parts.append("t|%s" % ",".join(triangle.get("vertex_ids", [])))

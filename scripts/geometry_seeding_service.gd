@@ -236,7 +236,7 @@ static func sampling_fingerprint(sampling_bake: Dictionary) -> String:
 		for sample in chain_data.get("samples", []):
 			if sample is Dictionary:
 				var position: Vector2 = sample.get("position", Vector2.ZERO)
-				parts.append("s|%s|%.9f|%.9f" % [str(sample.get("id", "")), position.x, position.y])
+				parts.append("s|%s|%.9f|%.9f" % [str(sample.get("id", "")), WorldDocumentService.document_coordinate(position.x), WorldDocumentService.document_coordinate(position.y)])
 	for cut_data in sampling_bake.get("cuts", []):
 		if not cut_data is Dictionary:
 			continue
@@ -246,13 +246,13 @@ static func sampling_fingerprint(sampling_bake: Dictionary) -> String:
 		for sample in cut_data.get("samples", []):
 			if sample is Dictionary:
 				var flat_position: Vector2 = sample.get("position", Vector2.ZERO)
-				parts.append("flat|%s|%.9f|%.9f" % [str(sample.get("id", "")), flat_position.x, flat_position.y])
+				parts.append("flat|%s|%.9f|%.9f" % [str(sample.get("id", "")), WorldDocumentService.document_coordinate(flat_position.x), WorldDocumentService.document_coordinate(flat_position.y)])
 		for fragment in GeometrySamplingService.cut_fragments(cut_data):
 			parts.append("fragment|%s" % str(fragment.get("id", "")))
 			for sample in fragment.get("samples", []):
 				if sample is Dictionary:
 					var position: Vector2 = sample.get("position", Vector2.ZERO)
-					parts.append("cs|%s|%.9f|%.9f" % [str(sample.get("id", "")), position.x, position.y])
+					parts.append("cs|%s|%.9f|%.9f" % [str(sample.get("id", "")), WorldDocumentService.document_coordinate(position.x), WorldDocumentService.document_coordinate(position.y)])
 	return _hash_parts(parts)
 
 

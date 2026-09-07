@@ -241,7 +241,7 @@ static func seeding_fingerprint(seeding_bake: Dictionary) -> String:
 	for seed_data in seeding_bake.get("seeds", []):
 		if seed_data is Dictionary:
 			var position := Vector2(seed_data.get("position", Vector2.ZERO))
-			parts.append("%s|%.9f|%.9f|%s" % [str(seed_data.get("id", "")), position.x, position.y, str(seed_data.get("origin", "generated"))])
+			parts.append("%s|%.9f|%.9f|%s" % [str(seed_data.get("id", "")), WorldDocumentService.document_coordinate(position.x), WorldDocumentService.document_coordinate(position.y), str(seed_data.get("origin", "generated"))])
 	var context := HashingContext.new()
 	context.start(HashingContext.HASH_SHA256)
 	context.update("\n".join(parts).to_utf8_buffer())

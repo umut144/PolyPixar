@@ -377,6 +377,17 @@ every bake as it enters a document, which keeps memory, file and Manifest on the
 same numbers. The threshold is the resolution the fingerprints already declare by
 formatting coordinates with `%.9f`.
 
+What the document cannot preserve, a fingerprint must not distinguish, and the
+sign of a zero is the trap there: `%.9f` prints `-1e-17` as `-0.000000000`
+against a plain zero's `0.000000000`. A bake flattened on the way in therefore
+hashed differently from the one its stored `mesh_fingerprint` was taken over,
+`_component_mesh_status` read Stale for a Mesh nothing was wrong with, and the
+Runtime Export refused it with "a current accepted Fill Mesh is required" while
+the Mesh step kept reporting the same Component as freshly built. Every
+fingerprint over coordinates therefore passes them through
+`WorldDocumentService.document_coordinate` first, which is the same threshold
+`document_safe` stores by.
+
 Each Component declares a geometry source. Bézier sources contain only
 `points`, `edges`, and `chains`; primitive sources contain one typed primitive
 definition: authored `circle` with `center` and `diameter_cm`, or an `ellipse`

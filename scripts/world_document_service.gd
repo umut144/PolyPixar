@@ -67,9 +67,19 @@ const ASSET_CATEGORIES := [ASSET_CATEGORY_SINGLE, ASSET_CATEGORY_SET, ASSET_CATE
 ## an exact zero, everything else is untouched. Applied to a bake before it
 ## enters a geometry document, so what is held in memory, what reaches the file
 ## and what comes back from it are the same numbers.
+## The number a fingerprint may depend on. What a document cannot preserve, a
+## fingerprint must not distinguish, and `%.9f` prints -1e-17 as
+## "-0.000000000" against a plain zero's "0.000000000" - so two runs that agree
+## on the geometry down to the last authored digit could still disagree on the
+## hash over the sign of a zero alone, which is exactly what marked an accepted
+## Fill Mesh stale and withheld it from the Runtime Export.
+static func document_coordinate(value: float) -> float:
+	return 0.0 if absf(value) < DOCUMENT_ZERO_EPSILON else value
+
+
 static func document_safe(value: Variant) -> Variant:
 	if value is float:
-		return 0.0 if absf(value) < DOCUMENT_ZERO_EPSILON else value
+		return document_coordinate(value)
 	if value is Vector2:
 		var vector: Vector2 = value
 		return Vector2(document_safe(vector.x), document_safe(vector.y))

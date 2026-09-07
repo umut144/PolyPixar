@@ -157,7 +157,7 @@ static func uv_fingerprint(uv_bake: Dictionary) -> String:
 	for entry in uv_bake.get("uvs", []):
 		if entry is Dictionary:
 			var uv := Vector2(entry.get("uv", Vector2.ZERO))
-			parts.append("uv|%s|%.9f|%.9f" % [str(entry.get("vertex_id", "")), uv.x, uv.y])
+			parts.append("uv|%s|%.9f|%.9f" % [str(entry.get("vertex_id", "")), WorldDocumentService.document_coordinate(uv.x), WorldDocumentService.document_coordinate(uv.y)])
 	return _strings_hash(parts)
 
 
