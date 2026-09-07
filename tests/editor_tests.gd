@@ -2607,3 +2607,16 @@ func _test_primitive_arrow_key_nudge() -> void:
 	application.active_state = "draw"
 	_expect(not application._can_nudge_selection(), "While a Primitive is still being placed the arrow keys must not move it.")
 	application.free()
+
+
+func _test_region_color_reaches_primitive_geometry() -> void:
+	var canvas := ComponentCanvas.new()
+	_expect(canvas._shape_color() == Color("#55c7d9"), "An ordinary Component should keep the Component blue.")
+	canvas.set_guide_style(true)
+	canvas.set_guide_color(Color("#f2c94c"))
+	_expect(canvas._shape_color() == Color("#f2c94c"), "A Guide should be drawn in its Guide colour.")
+	canvas.set_bezier_color_override(Color("#eb5757"))
+	_expect(canvas._shape_color() == Color("#eb5757"), "A Region colour must win over the Guide style, the same way it does for Bezier geometry.")
+	canvas.set_bezier_color_override(Color.TRANSPARENT)
+	_expect(canvas._shape_color() == Color("#f2c94c"), "Clearing the override must hand the decision back rather than latch the Region colour.")
+	canvas.free()

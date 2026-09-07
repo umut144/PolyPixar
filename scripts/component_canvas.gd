@@ -32,6 +32,7 @@ const RULER_X_COLOR := Color("#eb5757")
 const RULER_Y_COLOR := Color("#6fcf97")
 const RULER_CROSS_RADIUS := 7.0
 const RULER_LEG_MIN_PIXELS := 6.0
+const PRIMITIVE_FILL_ALPHA := 0.133
 const MIRROR_AXIS_VERTICAL := "vertical"
 const MIRROR_AXIS_HORIZONTAL := "horizontal"
 const PAN_SPEED := 420.0
@@ -1570,16 +1571,28 @@ func _draw_primitive_preview() -> void:
 	_draw_measurement_label("Circle · %.1f cm" % primitive_preview_diameter_cm, screen_center + Vector2(0.0, -radius * zoom - 16.0), Color("#f2c94c"))
 
 
+## The colour the Component's own geometry is drawn in: a Region paints it in the
+## Region colour, a Guide in its Guide colour, everything else in the ordinary
+## Component blue. Bezier and Primitive geometry have to answer the same way -
+## while only the Bezier side asked, a Region drawn from a Primitive stayed blue
+## while the identical Region on a Closed Loop turned red.
+func _shape_color() -> Color:
+	if bezier_color_override.a > 0.0:
+		return bezier_color_override
+	return guide_color if guide_style else Color("#55c7d9")
+
+
 func _draw_primitive_geometry() -> void:
 	if not bool(component_transform.get("visibility", true)):
 		return
 	var screen_points := PackedVector2Array()
 	for point in display_polygon:
 		screen_points.append(_world_to_screen(_local_to_world(point)))
-	draw_colored_polygon(screen_points, Color("#55c7d922"))
+	var shape_color := _shape_color()
+	draw_colored_polygon(screen_points, Color(shape_color, PRIMITIVE_FILL_ALPHA))
 	var outline := screen_points.duplicate()
 	outline.append(screen_points[0])
-	draw_polyline(outline, Color("#55c7d9"), 2.0, true)
+	draw_polyline(outline, shape_color, 2.0, true)
 	draw_circle(_world_to_screen(_local_to_world(_primitive_center())), 6.0, Color("#f2c94c"))
 
 
@@ -1611,7 +1624,7 @@ func _draw_bezier_geometry() -> void:
 	for edge_data in bezier_edges:
 		edges_by_id[str(edge_data.get("id", ""))] = edge_data
 	var has_color_override := bezier_color_override.a > 0.0
-	var shape_color := bezier_color_override if has_color_override else guide_color if guide_style else Color("#55c7d9")
+	var shape_color := _shape_color()
 	var edit_highlight := shape_color.lightened(0.18) if has_color_override else Color("#f2c94c")
 	var point_mode_highlight := edit_highlight if interaction_state == "edit" and edit_mode in ["point", "face"] else shape_color
 	var edge_mode_highlight := edit_highlight if interaction_state == "edit" and edit_mode in ["edge", "face"] else shape_color
