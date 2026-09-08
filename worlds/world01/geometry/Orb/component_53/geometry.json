@@ -2,7 +2,7 @@
 	"asset_id": "asset_7",
 	"component_id": "component_53",
 	"component_mesh": {
-		"bake_id": "meshing_bake_7037322955822945909",
+		"bake_id": "meshing_bake_5144782531159713306",
 		"build_provenance": {
 			"attempts": 1.0,
 			"auto_recipe_version": 3.0,
@@ -93,14 +93,14 @@
 		},
 		"last_error": "",
 		"last_failure_signature": {},
-		"mesh_fingerprint": "d427ce2d96c1a057c528917cce8ea5b49db96d223a4cfabdfdc51130324e4b5b",
+		"mesh_fingerprint": "c1ebcc6b6bcd78f45a98540b4f90a74108d5d1871970826bd21d3e0de35f7880",
 		"method": "constrained_mesh"
 	},
 	"meshing": {
 		"bakes": {
 			"constrained_mesh": {
 				"algorithm_version": 5,
-				"bake_id": "meshing_bake_7037322955822945909",
+				"bake_id": "meshing_bake_5144782531159713306",
 				"boundary_constraints": [
 					{
 						"chain_id": "primitive:circle",
@@ -850,10 +850,10 @@
 				},
 				"quality_warnings": [],
 				"runs": [],
-				"sampling_bake_id": "bake_4417067688881464556",
-				"sampling_fingerprint": "ad754c4c21109f086b57c6abd6e8729341fcdd5ea1b7de5dbedfc273f7687913",
-				"seeding_bake_id": "seeding_bake_2976453436927900133",
-				"seeding_fingerprint": "9912d2ca206e2ef8c8914d21975ea1de488242cadab144c57791e2921b8da4d1",
+				"sampling_bake_id": "bake_3933240109206644016",
+				"sampling_fingerprint": "815423792a67def05326023f0beb77e4068509cfe4ae1c1761185e3bc3924e09",
+				"seeding_bake_id": "seeding_bake_6269908781190795411",
+				"seeding_fingerprint": "a9c4facd16c43490fcba4a3e4faa7cca8b33c19c88f9aac4e5f66ba35408925d",
 				"triangle_count": 44,
 				"triangles": [
 					{
@@ -1253,7 +1253,7 @@
 						"id": "vertex:boundary:sample:circle:outer:8",
 						"origin": "boundary",
 						"position": [
-							0.000000000000000060000002335232,
+							0.0,
 							1.0
 						],
 						"preserved": false,
@@ -1334,7 +1334,7 @@
 						"origin": "boundary",
 						"position": [
 							-1.0,
-							0.000000000000000120000004670464
+							0.0
 						],
 						"preserved": false,
 						"source_id": "sample:circle:outer:16"
@@ -1413,7 +1413,7 @@
 						"id": "vertex:boundary:sample:circle:outer:24",
 						"origin": "boundary",
 						"position": [
-							-0.000000000000000170000002204861,
+							0.0,
 							-1.0
 						],
 						"preserved": false,
@@ -1564,7 +1564,7 @@
 			},
 			"contour_stroke": {
 				"algorithm_version": 5,
-				"bake_id": "contour_stroke_bake_7805797739769288984",
+				"bake_id": "contour_stroke_bake_8805713436119213952",
 				"boundary_constraints": [],
 				"errors": [],
 				"geometry_diagnostics": {
@@ -1669,7 +1669,7 @@
 								"curve_t": 1.0,
 								"edge_id": "primitive:circle:edge:7",
 								"position": [
-									0.000000000000000060000002335232,
+									0.0,
 									1.0
 								],
 								"source_point_id": ""
@@ -1742,7 +1742,7 @@
 								"edge_id": "primitive:circle:edge:15",
 								"position": [
 									-1.0,
-									0.000000000000000120000004670464
+									0.0
 								],
 								"source_point_id": ""
 							},
@@ -1813,7 +1813,7 @@
 								"curve_t": 1.0,
 								"edge_id": "primitive:circle:edge:23",
 								"position": [
-									-0.000000000000000170000002204861,
+									0.0,
 									-1.0
 								],
 								"source_point_id": ""
@@ -4535,7 +4535,7 @@
 						"origin": "join_miter",
 						"position": [
 							1.10467076301575,
-							-0.000000000931322574615479
+							0.0
 						],
 						"preserved": false,
 						"source_id": "primitive:circle:edge:0@0.000000000"
@@ -4894,7 +4894,7 @@
 						"id": "vertex:contour:160",
 						"origin": "join_center",
 						"position": [
-							0.000000000000000060000002335232,
+							0.0,
 							1.0
 						],
 						"preserved": false,
@@ -4918,7 +4918,7 @@
 						"id": "vertex:contour:162",
 						"origin": "join_miter",
 						"position": [
-							0.000000000931322574615479,
+							0.0,
 							1.10467076301575
 						],
 						"preserved": false,
@@ -5279,7 +5279,7 @@
 						"origin": "join_center",
 						"position": [
 							-1.0,
-							0.000000000000000120000004670464
+							0.0
 						],
 						"preserved": false,
 						"source_id": "primitive:circle:edge:15@1.000000000"
@@ -5303,7 +5303,7 @@
 						"origin": "join_miter",
 						"position": [
 							-1.10467076301575,
-							0.000000000931322574615479
+							0.0
 						],
 						"preserved": false,
 						"source_id": "primitive:circle:edge:15@1.000000000"
@@ -5662,7 +5662,7 @@
 						"id": "vertex:contour:224",
 						"origin": "join_center",
 						"position": [
-							-0.000000000000000170000002204861,
+							0.0,
 							-1.0
 						],
 						"preserved": false,
@@ -5686,7 +5686,7 @@
 						"id": "vertex:contour:226",
 						"origin": "join_miter",
 						"position": [
-							-0.000000000931322574615479,
+							0.0,
 							-1.10467076301575
 						],
 						"preserved": false,
@@ -6061,7 +6061,7 @@
 		"bakes": {
 			"adaptive": {
 				"algorithm_version": 6,
-				"bake_id": "bake_4417067688881464556",
+				"bake_id": "bake_3933240109206644016",
 				"boundary_refinement_complete": true,
 				"boundary_refinement_count": 0,
 				"boundary_refinement_limit_reached": false,
@@ -6174,7 +6174,7 @@
 								"edge_id": "primitive:circle",
 								"id": "sample:circle:outer:8",
 								"position": [
-									0.000000000000000060000002335232,
+									0.0,
 									1.0
 								],
 								"preserved": false,
@@ -6263,7 +6263,7 @@
 								"id": "sample:circle:outer:16",
 								"position": [
 									-1.0,
-									0.000000000000000120000004670464
+									0.0
 								],
 								"preserved": false,
 								"source_point_id": ""
@@ -6350,7 +6350,7 @@
 								"edge_id": "primitive:circle",
 								"id": "sample:circle:outer:24",
 								"position": [
-									-0.000000000000000170000002204861,
+									0.0,
 									-1.0
 								],
 								"preserved": false,
@@ -6543,7 +6543,7 @@
 		"bakes": {
 			"poisson_fill": {
 				"algorithm_version": 2.0,
-				"bake_id": "seeding_bake_2976453436927900133",
+				"bake_id": "seeding_bake_6269908781190795411",
 				"edited": false,
 				"errors": [],
 				"flow_seed_count": 0.0,
@@ -6559,8 +6559,8 @@
 					"seed": 1,
 					"spacing": 0.55
 				},
-				"sampling_bake_id": "bake_4417067688881464556",
-				"sampling_fingerprint": "ad754c4c21109f086b57c6abd6e8729341fcdd5ea1b7de5dbedfc273f7687913",
+				"sampling_bake_id": "bake_3933240109206644016",
+				"sampling_fingerprint": "815423792a67def05326023f0beb77e4068509cfe4ae1c1761185e3bc3924e09",
 				"seed_count": 7,
 				"seeds": [
 					{

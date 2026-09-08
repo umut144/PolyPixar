@@ -32,12 +32,16 @@
 		"asset_29",
 		"asset_30",
 		"asset_31",
-		"asset_32"
+		"asset_32",
+		"asset_33",
+		"asset_34",
+		"asset_35",
+		"asset_36"
 	],
 	"editor_state": {
-		"active_create_submodule": "Palette",
+		"active_create_submodule": "Single",
 		"active_geometry_submodule": "Sampling",
-		"active_module": "Export",
+		"active_module": "Create",
 		"active_motion_submodule": "Animation",
 		"active_style_submodule": "Weighting",
 		"asset_cameras": {
@@ -58,9 +62,9 @@
 			"asset_11": {
 				"position": [
 					0.906406283378601,
-					22.0905361175537
+					11.9415512084961
 				],
-				"zoom": 55.3995406065393
+				"zoom": 26.7798162692276
 			},
 			"asset_12": {
 				"position": [
@@ -179,7 +183,7 @@
 					-0.0353433601558208,
 					-0.0986359566450119
 				],
-				"zoom": 869.167863726134
+				"zoom": 568.639343225378
 			},
 			"asset_31": {
 				"position": [
@@ -194,6 +198,34 @@
 					-0.200724631547928
 				],
 				"zoom": 149.596873675432
+			},
+			"asset_33": {
+				"position": [
+					0.0623217634856701,
+					-0.32164666056633
+				],
+				"zoom": 251.885355583938
+			},
+			"asset_34": {
+				"position": [
+					0.332255721092224,
+					-0.07302325963974
+				],
+				"zoom": 308.339138967504
+			},
+			"asset_35": {
+				"position": [
+					-0.0329560935497284,
+					0.884133040904999
+				],
+				"zoom": 633.509823563864
+			},
+			"asset_36": {
+				"position": [
+					-0.0329560935497284,
+					0.884133040904999
+				],
+				"zoom": 168.519632617396
 			},
 			"asset_4": {
 				"position": [
@@ -249,7 +281,7 @@
 			"asset_16": false,
 			"asset_17": false,
 			"asset_18": false,
-			"asset_19": true,
+			"asset_19": false,
 			"asset_2": false,
 			"asset_20": false,
 			"asset_21": false,
@@ -263,8 +295,12 @@
 			"asset_29": false,
 			"asset_3": false,
 			"asset_30": false,
-			"asset_31": true,
-			"asset_32": true,
+			"asset_31": false,
+			"asset_32": false,
+			"asset_33": false,
+			"asset_34": false,
+			"asset_35": false,
+			"asset_36": true,
 			"asset_4": false,
 			"asset_5": false,
 			"asset_6": false,
@@ -289,7 +325,7 @@
 		"motion_sequence_preview_loop": true,
 		"motion_sequence_view": "composition",
 		"outliner_asset_type_filters": {
-			"character": true,
+			"character": false,
 			"icon": false,
 			"items": false,
 			"props": false,
@@ -297,7 +333,7 @@
 			"terrain": false,
 			"weapons": true
 		},
-		"selected_asset_id": "asset_32",
+		"selected_asset_id": "asset_36",
 		"selected_component_id": "",
 		"selected_edge_ids": [],
 		"selected_guide_id": "",
@@ -307,9 +343,9 @@
 		"selected_motion_sequence_id": "",
 		"selected_weighting_style_id": "",
 		"snap": {
-			"enabled": true,
-			"grid_step": 0.01,
-			"mode": "ultra_fine",
+			"enabled": false,
+			"grid_step": 0.5,
+			"mode": "none",
 			"rotation_step": 15.0
 		},
 		"world_scale": {
@@ -319,9 +355,9 @@
 	},
 	"name": "world01",
 	"next_ids": {
-		"asset": 33,
-		"component": 199,
-		"group": 10,
+		"asset": 37,
+		"component": 226,
+		"group": 11,
 		"guide": 9,
 		"motion_act": 1,
 		"motion_path": 1,

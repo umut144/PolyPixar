@@ -2,7 +2,7 @@
 	"asset_id": "asset_20",
 	"component_id": "component_181",
 	"component_mesh": {
-		"bake_id": "meshing_bake_3922774433845318771",
+		"bake_id": "meshing_bake_7512352972276280219",
 		"build_provenance": {
 			"attempts": 1.0,
 			"auto_recipe_version": 3.0,
@@ -93,14 +93,14 @@
 		},
 		"last_error": "",
 		"last_failure_signature": {},
-		"mesh_fingerprint": "f572909dd01ed2228565c5976ce281b99d19f1a0f685005c966fca89dfeacc08",
+		"mesh_fingerprint": "2bd5eca5550c5ad2144e36990e9711b3e57de1772276d4020031f83419c5093a",
 		"method": "constrained_mesh"
 	},
 	"meshing": {
 		"bakes": {
 			"constrained_mesh": {
 				"algorithm_version": 5,
-				"bake_id": "meshing_bake_3922774433845318771",
+				"bake_id": "meshing_bake_7512352972276280219",
 				"boundary_constraints": [
 					{
 						"chain_id": "primitive:ellipse",
@@ -681,10 +681,10 @@
 				},
 				"quality_warnings": [],
 				"runs": [],
-				"sampling_bake_id": "bake_6132692460242309359",
-				"sampling_fingerprint": "7b16473652e93d9d4194d05443535434026333fcc866cf11d632434ca246773f",
-				"seeding_bake_id": "seeding_bake_2019513182979768579",
-				"seeding_fingerprint": "8f9146fce7ef06622e222fc4b6accd7b9e9878ad976d5731c12e637f9eff18cc",
+				"sampling_bake_id": "bake_98255032251072184",
+				"sampling_fingerprint": "ca5fce5817b06db6cf10d5014996558a58c22324b58adea75fd27e5466e20c3e",
+				"seeding_bake_id": "seeding_bake_4787476468552104940",
+				"seeding_fingerprint": "a75ead21de81b073fb2c524998aa192e4d701fa8c69e37caf5e255af0e45aab9",
 				"triangle_count": 32,
 				"triangles": [
 					{
@@ -1160,7 +1160,7 @@
 						"id": "vertex:boundary:sample:ellipse:outer:24",
 						"origin": "boundary",
 						"position": [
-							-0.000000000000000030000001167616,
+							0.0,
 							1.7150000333786
 						],
 						"preserved": false,
@@ -1251,7 +1251,7 @@
 			},
 			"contour_stroke": {
 				"algorithm_version": 5,
-				"bake_id": "contour_stroke_bake_7217327976448384990",
+				"bake_id": "contour_stroke_bake_5255178215816477925",
 				"boundary_constraints": [],
 				"errors": [],
 				"geometry_diagnostics": {
@@ -1527,7 +1527,7 @@
 								"curve_t": 1.0,
 								"edge_id": "primitive:ellipse:edge:26",
 								"position": [
-									-0.000000000000000030000001167616,
+									0.0,
 									1.7150000333786
 								],
 								"source_point_id": ""
@@ -5013,7 +5013,7 @@
 						"id": "vertex:contour:182",
 						"origin": "join_miter",
 						"position": [
-							-0.000000000931322574615479,
+							0.0,
 							2.01980090141296
 						],
 						"preserved": false,
@@ -5853,7 +5853,7 @@
 						"id": "vertex:contour:252",
 						"origin": "join_center",
 						"position": [
-							-0.000000000000000030000001167616,
+							0.0,
 							1.7150000333786
 						],
 						"preserved": false,
@@ -5877,7 +5877,7 @@
 						"id": "vertex:contour:254",
 						"origin": "join_miter",
 						"position": [
-							0.000000000931322574615479,
+							0.0,
 							1.61019933223724
 						],
 						"preserved": false,
@@ -6300,7 +6300,7 @@
 		"bakes": {
 			"adaptive": {
 				"algorithm_version": 6,
-				"bake_id": "bake_6132692460242309359",
+				"bake_id": "bake_98255032251072184",
 				"boundary_refinement_complete": true,
 				"boundary_refinement_count": 0,
 				"boundary_refinement_limit_reached": false,
@@ -6589,7 +6589,7 @@
 								"edge_id": "primitive:ellipse",
 								"id": "sample:ellipse:outer:24",
 								"position": [
-									-0.000000000000000030000001167616,
+									0.0,
 									1.7150000333786
 								],
 								"preserved": false,
@@ -6752,7 +6752,7 @@
 		"bakes": {
 			"poisson_fill": {
 				"algorithm_version": 2.0,
-				"bake_id": "seeding_bake_2019513182979768579",
+				"bake_id": "seeding_bake_4787476468552104940",
 				"edited": false,
 				"errors": [],
 				"flow_seed_count": 0.0,
@@ -6768,8 +6768,8 @@
 					"seed": 1,
 					"spacing": 0.112166362814605
 				},
-				"sampling_bake_id": "bake_6132692460242309359",
-				"sampling_fingerprint": "7b16473652e93d9d4194d05443535434026333fcc866cf11d632434ca246773f",
+				"sampling_bake_id": "bake_98255032251072184",
+				"sampling_fingerprint": "ca5fce5817b06db6cf10d5014996558a58c22324b58adea75fd27e5466e20c3e",
 				"seed_count": 1,
 				"seeds": [
 					{
