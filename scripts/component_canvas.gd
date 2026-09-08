@@ -136,6 +136,8 @@ var reference_image: Texture2D
 var reference_image_visible := true
 var reference_image_opacity := 0.5
 var reference_image_position := Vector2.ZERO
+var reference_image_rotation := 0.0
+var reference_image_rotation_pivot := Vector2.ZERO
 var reference_image_scale := 1.0
 var navigation_locked := false
 var command_shortcut_active := false
@@ -748,11 +750,15 @@ func set_asset_pivot(pivot: Vector2) -> void:
 	queue_redraw()
 
 
-func set_reference_image(texture: Texture2D, image_visible := true, image_opacity := 0.5, image_position := Vector2.ZERO, image_scale := 1.0) -> void:
+func set_reference_image(texture: Texture2D, image_visible := true, image_opacity := 0.5, image_position := Vector2.ZERO, image_scale := 1.0, image_rotation := 0.0, image_rotation_pivot := Vector2.ZERO) -> void:
 	reference_image = texture
 	reference_image_visible = image_visible
 	reference_image_opacity = clampf(float(image_opacity), 0.0, 1.0)
 	reference_image_position = image_position
+	# Degrees, and the world point they turn around; the caller decides which
+	# point that is, so the Canvas never has to guess an Asset Pivot of its own.
+	reference_image_rotation = image_rotation if is_finite(image_rotation) else 0.0
+	reference_image_rotation_pivot = image_rotation_pivot if image_rotation_pivot.is_finite() else Vector2.ZERO
 	# Normalized reference images can require scales below 0.01 when their
 	# source resolution is large. Keep the positive guard, but do not impose a
 	# centimeter-scale minimum that changes the requested target height.
@@ -1374,7 +1380,19 @@ func _draw_reference_image() -> void:
 		return
 	var image_center := _world_to_screen(reference_image_position)
 	var image_rect := Rect2(image_center - image_size * 0.5, image_size)
-	draw_texture_rect(reference_image, image_rect, false, Color(1.0, 1.0, 1.0, reference_image_opacity))
+	var image_modulate := Color(1.0, 1.0, 1.0, reference_image_opacity)
+	if is_zero_approx(reference_image_rotation):
+		draw_texture_rect(reference_image, image_rect, false, image_modulate)
+		return
+	# The draw transform turns around the pivot in screen space, so the rect is
+	# expressed relative to that point and the transform is reset afterwards —
+	# everything drawn after this belongs to the unrotated Canvas. The screen Y
+	# axis points the other way than the world one, so the authored angle is
+	# negated to turn counter-clockwise on screen like every other rotation.
+	var pivot_screen := _world_to_screen(reference_image_rotation_pivot)
+	draw_set_transform(pivot_screen, deg_to_rad(-reference_image_rotation), Vector2.ONE)
+	draw_texture_rect(reference_image, Rect2(image_rect.position - pivot_screen, image_size), false, image_modulate)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 func _draw_pivot() -> void:

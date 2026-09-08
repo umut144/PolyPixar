@@ -19,7 +19,7 @@ extends RefCounted
 ## stake below it - in a geometry measured in centimetres these values are the
 ## numerical zeros a rotation leaves behind.
 const DOCUMENT_ZERO_EPSILON := 0.000000001
-const SCHEMA_VERSION := 70
+const SCHEMA_VERSION := 71
 const REGION_GEOMETRY_AUTHORED := "authored"
 const REGION_GEOMETRY_COMPONENT := "component"
 const REGION_GEOMETRY_SOURCES := [REGION_GEOMETRY_AUTHORED, REGION_GEOMETRY_COMPONENT]
@@ -248,6 +248,7 @@ static func default_reference_image() -> Dictionary:
 		"visible": true,
 		"opacity": 0.5,
 		"position": Vector2.ZERO,
+		"rotation": 0.0,
 		"scale": 1.0,
 		"target_height_cm": 13.0,
 		"pivot_mode": "bottom_center"
@@ -261,10 +262,20 @@ static func normalize_reference_image(raw_reference) -> Dictionary:
 	result["visible"] = bool(raw_reference.get("visible", true))
 	result["opacity"] = clampf(float(raw_reference.get("opacity", 0.5)), 0.0, 1.0)
 	result["position"] = deserialize_vector(raw_reference.get("position", [0.0, 0.0]), Vector2.ZERO)
+	result["rotation"] = normalize_reference_rotation(raw_reference.get("rotation", 0.0))
 	result["scale"] = maxf(float(raw_reference.get("scale", 1.0)), 0.01)
 	result["target_height_cm"] = maxf(float(raw_reference.get("target_height_cm", 13.0)), 0.01)
 	result["pivot_mode"] = "center" if str(raw_reference.get("pivot_mode", "bottom_center")) == "center" else "bottom_center"
 	return result
+
+static func normalize_reference_rotation(value) -> float:
+	# The Reference Image turns around the Asset Pivot, in degrees like every
+	# other authored rotation. The value is wrapped into [-180, 180) so a
+	# document never keeps an accumulated turn count, and a non-finite one
+	# reads as no rotation rather than poisoning the draw transform.
+	var degrees := float(value)
+	return wrapf(degrees, -180.0, 180.0) if is_finite(degrees) else 0.0
+
 
 static func serialize_reference_image(raw_reference) -> Dictionary:
 	var normalized := normalize_reference_image(raw_reference)
@@ -273,6 +284,7 @@ static func serialize_reference_image(raw_reference) -> Dictionary:
 		"visible": bool(normalized["visible"]),
 		"opacity": float(normalized["opacity"]),
 		"position": serialize_vector(normalized["position"]),
+		"rotation": float(normalized["rotation"]),
 		"scale": float(normalized["scale"]),
 		"target_height_cm": float(normalized["target_height_cm"]),
 		"pivot_mode": str(normalized["pivot_mode"])

@@ -445,7 +445,11 @@ An Asset contains:
   enum in memory and its stable lower-case value in JSON, and describes only
   the direction the artwork was drawn in: it has no geometry, Canvas, or
   transform behavior;
-- Asset pivot and reference-image settings;
+- Asset pivot and reference-image settings. The Reference Image carries a
+  `rotation` in degrees that turns it around the Asset Pivot as the Canvas
+  shows that point, so the authored artwork can be lined up at an angle. It
+  is an authoring aid on the Canvas only: no geometry, Bake, or Runtime
+  Export reads it;
 - an authoring-only root transform: `root_position` and a positive,
   independently two-axis `root_scale` (a legacy scalar reads as equal axes).
   Canvas presentation prefixes every Asset-space transform with the

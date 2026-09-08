@@ -7092,6 +7092,8 @@ func _on_reference_image_property_changed(value: float, property_name: String) -
 		var reference_position: Vector2 = reference_image["position"]
 		reference_position.y = _world_to_editor_units(value)
 		reference_image["position"] = reference_position
+	elif property_name == "rotation":
+		reference_image["rotation"] = WorldDocumentService.normalize_reference_rotation(value)
 	elif property_name == "scale":
 		reference_image["scale"] = maxf(value, 0.01)
 	else:
@@ -12930,12 +12932,17 @@ func _set_reference_image_canvas(asset: Dictionary) -> void:
 		reference_scale *= target_height / float(reference_texture.get_height())
 		if str(reference_image.get("pivot_mode", "bottom_center")) == "bottom_center":
 			reference_position += Vector2(0.0, target_height * 0.5 * reference_image.get("scale", 1.0))
+	# The image turns around the Asset Pivot as the Canvas shows it, so the
+	# rotation center is the same point the Pivot marker is drawn at rather than
+	# the authored pivot before the root transform.
 	canvas_view.set_reference_image(
 		reference_texture,
 		bool(reference_image.get("visible", true)),
 		float(reference_image.get("opacity", 0.5)),
 		reference_position,
-		reference_scale
+		reference_scale,
+		float(reference_image.get("rotation", 0.0)),
+		AssetScaleRebaseService.root_transform(asset) * _asset_pivot(asset)
 	)
 
 

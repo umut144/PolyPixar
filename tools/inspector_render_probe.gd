@@ -268,7 +268,7 @@ func _init() -> void:
 		if bool(c.get("ref", false)):
 			assets[0]["reference_image"] = {"file": "res://ref.png", "target_height_cm": 21.5,
 				"pivot_mode": "center", "visible": true, "opacity": 0.35,
-				"position": Vector2(2.5, -3.5), "scale": 1.25}
+				"position": Vector2(2.5, -3.5), "rotation": -12.0, "scale": 1.25}
 		else:
 			assets[0].erase("reference_image")
 		var point_count := int(c.get("pts", 0))

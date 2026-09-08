@@ -140,6 +140,22 @@ func _test_asset_deserialization_migrations() -> void:
 		and WorldDocumentService.normalized_component_name(reference_components[1]) == "plank_01",
 		"A Set should load with its category, its member names and their authored Roles, and a member without one should read empty rather than borrow a name.")
 
+	# Schema 71 is additive: a Reference Image written before it has no rotation
+	# and loads flat, an authored angle survives the round trip, and a wound-up
+	# or non-finite one is brought back into [-180, 180) rather than stored raw.
+	var flat_reference := WorldDocumentService.normalize_reference_image({"file": "ref.png"})
+	_expect(is_zero_approx(float(flat_reference.get("rotation", -1.0))),
+		"A Reference Image written before schema 71 should load unrotated.")
+	var turned_reference := WorldDocumentService.serialize_reference_image(
+		{"file": "ref.png", "rotation": -37.5})
+	_expect(is_equal_approx(float(turned_reference.get("rotation", 0.0)), -37.5),
+		"An authored Reference Image rotation should survive the round trip.")
+	_expect(is_equal_approx(WorldDocumentService.normalize_reference_rotation(450.0), 90.0)
+		and is_equal_approx(WorldDocumentService.normalize_reference_rotation(-190.0), 170.0)
+		and is_zero_approx(WorldDocumentService.normalize_reference_rotation(INF))
+		and is_zero_approx(WorldDocumentService.normalize_reference_rotation(NAN)),
+		"A Reference Image rotation should be wrapped into [-180, 180), and a non-finite one should read as none.")
+
 	# Schema 69 keeps the IDs a World has handed out: junk is dropped, an ID
 	# named twice counts once, and the order is the ID's.
 	var retired := WorldDocumentService.deserialize_retired_assets([

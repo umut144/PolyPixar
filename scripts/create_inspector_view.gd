@@ -62,6 +62,7 @@ signal weapon_frame_value_changed(value: float, property_name: String)
 
 const ASSET_ROOT_POSITION_TOOLTIP := "Preview translation for the complete Asset. Rebase before Runtime Export."
 const ASSET_ROOT_SCALE_TOOLTIP := "Positive preview Scale on the %s axis around the Asset Pivot. Rebase before Runtime Export."
+const REFERENCE_IMAGE_ROTATION_TOOLTIP := "Turns the Reference Image around the Asset Pivot. Authoring aid only; it never reaches geometry or Runtime Export."
 const CONTOUR_STROKE_WIDTH_OVERRIDE_TOOLTIP := "Overrides every Contour part of the referenced source Asset without changing that Asset."
 const PROJECTION_DEPTH_TOOLTIP := "Visible component depth used by runtime presentation; independent of Scale, Z Order, and Contour Stroke Width."
 const Z_ORDER_TOOLTIP := "Orders Components only inside this Asset; Runtime consumers choose the Asset's contextual game layer."
@@ -296,12 +297,18 @@ func rebuild() -> void:
 			reference_transform_grid.add_theme_constant_override("v_separation", 4)
 			var reference_position: Vector2 = reference_image.get("position", Vector2.ZERO)
 			# Arrows move in tenths while the text field keeps hundredth precision.
-			# Scale is clamped positive; the offsets are free.
+			# Scale is clamped positive; the offsets are free. Rotation steps in
+			# whole degrees and turns the image around the Asset Pivot, so it is
+			# read against the Pivot fields above rather than the image center.
 			EditorWidgets.build_number_grid(reference_transform_grid, [
 				{"caption": "Position X (cm)", "property": "position_x",
 					"value": ToolUnits.to_centimeters(reference_position.x), "silent": false},
 				{"caption": "Position Y (cm)", "property": "position_y",
 					"value": ToolUnits.to_centimeters(reference_position.y), "silent": false},
+				{"caption": "Rotation (deg)", "property": "rotation",
+					"value": float(reference_image.get("rotation", 0.0)), "min": -360.0, "max": 360.0,
+					"step": 1.0, "arrow_step": 1.0, "tooltip": REFERENCE_IMAGE_ROTATION_TOOLTIP,
+					"silent": false},
 				{"caption": "Scale", "property": "scale",
 					"value": float(reference_image.get("scale", 1.0)), "min": 0.01, "silent": false},
 			], reference_image_property_changed.emit)

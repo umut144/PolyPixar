@@ -814,6 +814,22 @@ func _test_inspector_field_wiring() -> void:
 	_expect(is_equal_approx(Vector2(AssetScaleRebaseService.root_position(asset)).y, application._world_to_editor_units(7.0)), "The Root Position Y field should write the Asset root position.")
 	_edit_inspector_value(application.create_inspector_view.asset_root_scale_fields["scale_x"], 2.5)
 	_expect(is_equal_approx(Vector2(AssetScaleRebaseService.root_scale(asset)).x, 2.5), "The Root Scale X field should write the Asset root scale.")
+	# The Reference Image turns around the Asset Pivot rather than around its own
+	# center, so the Canvas needs the angle and that point together; a field that
+	# reached only one of them would look right until the Pivot moves.
+	asset["reference_image"] = {"file": "ref.png", "visible": true, "opacity": 0.5,
+		"position": Vector2.ZERO, "rotation": 0.0, "scale": 1.0,
+		"target_height_cm": 13.0, "pivot_mode": "center"}
+	application._render_inspector()
+	var reference_rotation_field := _inspector_spin(application, "Rotation (deg)")
+	_expect(reference_rotation_field != null, "A loaded Reference Image should expose its Rotation.")
+	_edit_inspector_value(reference_rotation_field, 30.0)
+	_expect(is_equal_approx(float(asset["reference_image"]["rotation"]), 30.0), "The Reference Image Rotation field should write the Asset document.")
+	application._set_reference_image_canvas(asset)
+	_expect(is_equal_approx(application.canvas_view.reference_image_rotation, 30.0)
+		and application.canvas_view.reference_image_rotation_pivot.is_equal_approx(AssetScaleRebaseService.root_transform(asset) * application._asset_pivot(asset)),
+		"The Canvas should receive the Reference Image angle and the Asset Pivot it turns around.")
+	asset.erase("reference_image")
 	# Renaming is confirmed rather than typed in place: the name derives the
 	# Asset Key and the directory the Asset's files live in.
 	_expect(is_instance_valid(application.create_inspector_view.asset_rename_button), "The Asset Inspector should offer the rename dialog rather than an inline name field.")
@@ -2143,7 +2159,7 @@ func _prepare_create_case(application: Control, case_name: String) -> void:
 		"asset_reference":
 			asset["reference_image"] = {"file": "res://ref.png", "target_height_cm": 21.5,
 				"pivot_mode": "center", "visible": true, "opacity": 0.35,
-				"position": Vector2(2.5, -3.5), "scale": 1.25}
+				"position": Vector2(2.5, -3.5), "rotation": -12.0, "scale": 1.25}
 		"set_asset":
 			application.active_create_submodule = "Set"
 			application.selected_asset_id = "asset_9"

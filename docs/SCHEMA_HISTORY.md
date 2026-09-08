@@ -67,6 +67,7 @@ fingerprints.
 | Manifest 20 | `role` required on every member Reference of a Set | derived | `RuntimeExportService` | `_test_runtime_export_service` |
 | 69 | `next_ids` and `retired_assets` on the World document | additive (missing counters read as derived, missing list as empty) | `main.gd._restore_next_ids`, `deserialize_retired_assets` | `_test_retired_asset_ids`, `_test_asset_deserialization_migrations` |
 | 70 | `previous_asset_keys` on the Asset, appended by every rename | additive (missing list reads empty) | `normalized_previous_asset_keys` | `_test_create_inspector_fields`, `_test_asset_deserialization_migrations` |
+| 71 | Reference Image `rotation` around the Asset Pivot | additive (missing angle reads as none) | `normalize_reference_rotation`, `normalize_reference_image` | `_test_asset_deserialization_migrations`, `_test_inspector_field_wiring` |
 | Manifest 21, Catalog 3 | `asset_id` on every Manifest and Catalog entry, `source_asset_id` on every Reference, `previous_keys` per entry, `retired_assets` on the Catalog | derived | `RuntimeExportService`, `AssetCatalogService` | `_test_runtime_export_service`, `_test_asset_catalog_service` |
 | Sampling 6 | Junction-aware Cuts, boundary-namespaced analytic Samples, corner balancing | derived | `GeometrySamplingService` | `_test_geometry_sampling_corner_balancing` |
 | Motion 1–18 | Blink `anticipation_share` default 0.18 read as 0.5 | **explicit** (≤ 18) | `normalize_motion_act` | `_test_asset_deserialization_migrations` |
