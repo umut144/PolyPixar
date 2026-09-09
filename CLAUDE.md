@@ -76,9 +76,19 @@ the developer makes by hand stay separate as `manual-result` and `manual.log`;
 look there for a result that already exists before asking for a new one.
 
 `scripts/check-agent.sh` (the watcher) and `scripts/check-agent-run.sh` (the
-runner for this session) are taken unchanged from world01 and carry no project
-knowledge: they ask for the Git root and call `./scripts/check.sh`. They are
-meant to stay identical in every repository, so do not change them.
+runner for this session) carry no project knowledge: they ask for the Git root
+and call `./scripts/check.sh`. Both files here are a few lines of forwarding to
+the one copy in the developer's dotfiles, found by searching upwards for a
+`dotfiles` directory, which `CHECK_AGENT_HOME` overrides. Change neither the
+forwarder nor what it points at from inside this repository: an improvement
+belongs in the dotfiles, where every repository gets it at once.
+
+They used to be three copies kept identical by a rule, and the rule lost. One
+repository gained a closing PASS/FAIL line, the other two ran the older script
+for a day, and because no copy raised its protocol number nothing reported the
+gap — an agent asked for an improvement that already existed two directories
+away. If the forwarder finds nothing it exits 127 rather than one of the
+runner's own codes, because then nothing has been checked.
 
 The validation rules of AGENTS.md apply unchanged. The watcher is only the
 transport; what counts as a pass is still decided there.
