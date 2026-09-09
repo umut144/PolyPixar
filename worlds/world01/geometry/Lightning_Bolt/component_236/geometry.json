@@ -1,0 +1,4612 @@
+{
+	"asset_id": "asset_38",
+	"component_id": "component_236",
+	"component_mesh": {
+		"bake_id": "meshing_bake_2547839150174373197",
+		"build_provenance": {
+			"attempts": 1.0,
+			"auto_recipe_version": 3.0,
+			"automatic_diagnostics": {
+				"accepted": {
+					"accepted": true,
+					"boundary_refinement": {
+						"added_vertex_count": 0.0,
+						"complete": true,
+						"enabled": true,
+						"limit_reached": false,
+						"unresolved_corner_count": 0.0
+					},
+					"issues": [],
+					"limits": {
+						"boundary_samples": 4096.0,
+						"seeds": 2500.0,
+						"triangles": 12000.0
+					},
+					"mean_quality": 0.895333974789828,
+					"minimum_angle": 30.5029506707319,
+					"retry_scope": "none",
+					"sample_count": 51.0,
+					"seed_count": 0.0,
+					"triangle_count": 49.0,
+					"worst_aspect_ratio": 2.52300276348498
+				},
+				"attempts": [
+					{
+						"attempt": 1.0,
+						"boundary_spacing": 0.55,
+						"issues": [],
+						"mean_quality": 0.895333974789828,
+						"minimum_angle": 30.5029506707319,
+						"outcome": "accepted",
+						"sample_count": 51.0,
+						"scope": "initial",
+						"seed_count": 0.0,
+						"seed_spacing": 0.55,
+						"triangle_count": 49.0
+					}
+				],
+				"limits": {
+					"boundary_samples": 4096.0,
+					"seeds": 2500.0,
+					"triangles": 12000.0
+				},
+				"version": 1.0
+			},
+			"exact_input_hash": "729949ad5413aea4cb5b17ff5c45e442b6cd265b4607c4f10d90d289b252684f",
+			"pipeline_recipe_hash": "ad0fd0d4f889505d271f8850b7a5458e031ba8b47344d2b0e60b8feac845bcaf",
+			"recipe_mode": "automatic",
+			"schema_version": 1.0,
+			"source_signature": {
+				"geometry_tolerance": 0.00055,
+				"meshing_algorithm": 5.0,
+				"recipe_hash": "da80c2a45ab554d60281da77916708a675e9f799ddde2a43661f1a7fc8fcebd9",
+				"recipe_version": 2.0,
+				"sampling_algorithm": 6.0,
+				"scalars": [
+					1.0,
+					1.0
+				],
+				"seeding_algorithm": 2.0,
+				"topology_hash": "96162abad5c41c5192d70748b4fbde55c19e6572ac249cc145b6cd51db0af98c",
+				"vectors": [
+					[
+						-0.0500000007450581,
+						5.90000009536743
+					],
+					[
+						0.100000001490116,
+						-0.0500000305473804
+					],
+					[
+						-0.416666656732559,
+						-0.850000083446503
+					],
+					[
+						0.25,
+						5.75
+					],
+					[
+						-0.300000011920929,
+						-0.599999964237213
+					],
+					[
+						-0.100000001490116,
+						0.0500000305473804
+					],
+					[
+						-0.650000035762787,
+						3.95000004768372
+					],
+					[
+						0.683333337306976,
+						0.216666623950005
+					],
+					[
+						0.300000011920929,
+						0.599999964237213
+					],
+					[
+						1.39999997615814,
+						4.59999990463257
+					],
+					[
+						-0.716666698455811,
+						-1.06666660308838
+					],
+					[
+						-0.683333337306976,
+						-0.216666623950005
+					],
+					[
+						-0.75,
+						1.39999997615814
+					],
+					[
+						0.216666653752327,
+						0.0500000305473804
+					],
+					[
+						0.716666698455811,
+						1.06666660308838
+					],
+					[
+						-0.100000008940697,
+						1.55000007152557
+					],
+					[
+						0.0333333350718021,
+						-0.0833333358168602
+					],
+					[
+						-0.216666653752327,
+						-0.0500000305473804
+					],
+					[
+						0.0,
+						1.30000007152557
+					],
+					[
+						-0.416666716337204,
+						-0.183333352208138
+					],
+					[
+						-0.0333333350718021,
+						0.0833333358168602
+					],
+					[
+						-1.25000011920929,
+						0.75
+					],
+					[
+						-0.0833332911133766,
+						0.433333307504654
+					],
+					[
+						0.416666716337204,
+						0.183333352208138
+					],
+					[
+						-1.5,
+						2.04999995231628
+					],
+					[
+						0.0999999865889549,
+						0.0
+					],
+					[
+						0.0833332911133766,
+						-0.433333307504654
+					],
+					[
+						-1.20000004768372,
+						2.04999995231628
+					],
+					[
+						0.0499999932944775,
+						-0.183333396911621
+					],
+					[
+						-0.0999999865889549,
+						0.0
+					],
+					[
+						-1.05000007152557,
+						1.49999976158142
+					],
+					[
+						0.5,
+						0.800000131130219
+					],
+					[
+						-0.0499999932944775,
+						0.183333396911621
+					],
+					[
+						0.449999988079071,
+						3.90000009536743
+					],
+					[
+						-0.583333313465118,
+						-0.183333396911621
+					],
+					[
+						-0.5,
+						-0.800000131130219
+					],
+					[
+						-1.29999995231628,
+						3.34999990463257
+					],
+					[
+						0.416666656732559,
+						0.850000083446503
+					],
+					[
+						0.583333313465118,
+						0.183333396911621
+					],
+					[
+						1.0,
+						0.0
+					],
+					[
+						0.0,
+						1.0
+					],
+					[
+						0.0,
+						0.0
+					]
+				],
+				"version": 1.0
+			}
+		},
+		"last_error": "",
+		"last_failure_signature": {},
+		"mesh_fingerprint": "f8d84f71aacdb28820d5570e443e091504430758f332e47ab7419bc8fd4e98e6",
+		"method": "constrained_mesh"
+	},
+	"meshing": {
+		"bakes": {
+			"constrained_mesh": {
+				"algorithm_version": 5,
+				"bake_id": "meshing_bake_2547839150174373197",
+				"boundary_constraints": [
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 0.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_4236798331545563309:point_3111711104369904636",
+							"vertex:boundary:sample:edge_4236798331545563309:0.250000000"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 1.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_4236798331545563309:0.250000000",
+							"vertex:boundary:sample:edge_4236798331545563309:0.500000000"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 2.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_4236798331545563309:0.500000000",
+							"vertex:boundary:sample:edge_4236798331545563309:0.750000000"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 3.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_4236798331545563309:0.750000000",
+							"vertex:boundary:sample:edge_4236798331545563309:point_2909770309667252781"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 4.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_4236798331545563309:point_2909770309667252781",
+							"vertex:boundary:sample:edge_4843633052681869758:0.125000000"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 5.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_4843633052681869758:0.125000000",
+							"vertex:boundary:sample:edge_4843633052681869758:0.250000000"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 6.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_4843633052681869758:0.250000000",
+							"vertex:boundary:sample:edge_4843633052681869758:0.375000000"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 7.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_4843633052681869758:0.375000000",
+							"vertex:boundary:sample:edge_4843633052681869758:0.500000000"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 8.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_4843633052681869758:0.500000000",
+							"vertex:boundary:sample:edge_4843633052681869758:0.625000000"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 9.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_4843633052681869758:0.625000000",
+							"vertex:boundary:sample:edge_4843633052681869758:0.750000000"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 10.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_4843633052681869758:0.750000000",
+							"vertex:boundary:sample:edge_4843633052681869758:0.875000000"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 11.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_4843633052681869758:0.875000000",
+							"vertex:boundary:sample:edge_4843633052681869758:point_4281767337458130864"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 12.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_4843633052681869758:point_4281767337458130864",
+							"vertex:boundary:sample:edge_669999475508859173:0.500000000"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 13.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_669999475508859173:0.500000000",
+							"vertex:boundary:sample:edge_669999475508859173:point_8865333175039303813"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 14.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_669999475508859173:point_8865333175039303813",
+							"vertex:boundary:sample:edge_867818737666882905:point_2501239763325254797"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 15.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_867818737666882905:point_2501239763325254797",
+							"vertex:boundary:sample:edge_6560078186558305588:0.250000000"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 16.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_6560078186558305588:0.250000000",
+							"vertex:boundary:sample:edge_6560078186558305588:0.500000000"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 17.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_6560078186558305588:0.500000000",
+							"vertex:boundary:sample:edge_6560078186558305588:0.750000000"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 18.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_6560078186558305588:0.750000000",
+							"vertex:boundary:sample:edge_6560078186558305588:point_7730126270678149234"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 19.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_6560078186558305588:point_7730126270678149234",
+							"vertex:boundary:sample:edge_8791119708715477847:0.250000000"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 20.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_8791119708715477847:0.250000000",
+							"vertex:boundary:sample:edge_8791119708715477847:0.500000000"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 21.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_8791119708715477847:0.500000000",
+							"vertex:boundary:sample:edge_8791119708715477847:0.750000000"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 22.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_8791119708715477847:0.750000000",
+							"vertex:boundary:sample:edge_8791119708715477847:point_6867145972024356861"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 23.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_8791119708715477847:point_6867145972024356861",
+							"vertex:boundary:sample:edge_9025808804380570085:point_21522006469275509"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 24.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_9025808804380570085:point_21522006469275509",
+							"vertex:boundary:sample:edge_6162007521227243459:0.500000000"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 25.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_6162007521227243459:0.500000000",
+							"vertex:boundary:sample:edge_6162007521227243459:point_3682234394956394394"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 26.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_6162007521227243459:point_3682234394956394394",
+							"vertex:boundary:sample:edge_2134750251803119128:0.125000000"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 27.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_2134750251803119128:0.125000000",
+							"vertex:boundary:sample:edge_2134750251803119128:0.250000000"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 28.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_2134750251803119128:0.250000000",
+							"vertex:boundary:sample:edge_2134750251803119128:0.375000000"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 29.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_2134750251803119128:0.375000000",
+							"vertex:boundary:sample:edge_2134750251803119128:0.500000000"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 30.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_2134750251803119128:0.500000000",
+							"vertex:boundary:sample:edge_2134750251803119128:0.625000000"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 31.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_2134750251803119128:0.625000000",
+							"vertex:boundary:sample:edge_2134750251803119128:0.750000000"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 32.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_2134750251803119128:0.750000000",
+							"vertex:boundary:sample:edge_2134750251803119128:0.875000000"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 33.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_2134750251803119128:0.875000000",
+							"vertex:boundary:sample:edge_2134750251803119128:point_8539835518405984058"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 34.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_2134750251803119128:point_8539835518405984058",
+							"vertex:boundary:sample:edge_8259360882384808152:0.250000000"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 35.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_8259360882384808152:0.250000000",
+							"vertex:boundary:sample:edge_8259360882384808152:0.500000000"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 36.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_8259360882384808152:0.500000000",
+							"vertex:boundary:sample:edge_8259360882384808152:0.750000000"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 37.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_8259360882384808152:0.750000000",
+							"vertex:boundary:sample:edge_8259360882384808152:point_3220192327744383771"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 38.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_8259360882384808152:point_3220192327744383771",
+							"vertex:boundary:sample:edge_6725932534452158106:0.250000000"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 39.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_6725932534452158106:0.250000000",
+							"vertex:boundary:sample:edge_6725932534452158106:0.500000000"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 40.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_6725932534452158106:0.500000000",
+							"vertex:boundary:sample:edge_6725932534452158106:0.750000000"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 41.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_6725932534452158106:0.750000000",
+							"vertex:boundary:sample:edge_6725932534452158106:point_1655539396643663161"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 42.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_6725932534452158106:point_1655539396643663161",
+							"vertex:boundary:sample:edge_162695404981094955:point_7925912949775006252"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 43.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_162695404981094955:point_7925912949775006252",
+							"vertex:boundary:sample:edge_5009344052863439352:0.125000000"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 44.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_5009344052863439352:0.125000000",
+							"vertex:boundary:sample:edge_5009344052863439352:0.250000000"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 45.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_5009344052863439352:0.250000000",
+							"vertex:boundary:sample:edge_5009344052863439352:0.375000000"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 46.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_5009344052863439352:0.375000000",
+							"vertex:boundary:sample:edge_5009344052863439352:0.500000000"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 47.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_5009344052863439352:0.500000000",
+							"vertex:boundary:sample:edge_5009344052863439352:0.625000000"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 48.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_5009344052863439352:0.625000000",
+							"vertex:boundary:sample:edge_5009344052863439352:0.750000000"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 49.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_5009344052863439352:0.750000000",
+							"vertex:boundary:sample:edge_5009344052863439352:0.875000000"
+						]
+					},
+					{
+						"chain_id": "chain_9126509653625594871",
+						"segment_index": 50.0,
+						"topology_role": "outer",
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_5009344052863439352:0.875000000",
+							"vertex:boundary:sample:edge_4236798331545563309:point_3111711104369904636"
+						]
+					}
+				],
+				"boundary_refinement": {
+					"added_vertex_count": 0.0,
+					"complete": true,
+					"enabled": true,
+					"limit_reached": false,
+					"unresolved_corner_count": 0.0
+				},
+				"constraint_count": 51.0,
+				"constraints_valid": true,
+				"cut_seam_vertex_count": 0.0,
+				"degenerate_triangle_count": 0.0,
+				"diagnostics": {
+					"domain": {
+						"boundary_seed_count": 45.0,
+						"candidate_triangle_count": 80.0,
+						"final_constraint_issue_count": 0.0,
+						"raw_triangle_count": 89.0,
+						"selected_triangle_count": 49.0
+					},
+					"input_constraint_count": 51.0,
+					"native": {
+						"fixed_edge_count": 51.0,
+						"input_constraint_count": 51.0,
+						"input_vertex_count": 51.0,
+						"triangle_count": 89.0
+					},
+					"stage": "complete"
+				},
+				"errors": [],
+				"mean_quality": 0.895333974789828,
+				"method": "constrained_mesh",
+				"minimum_angle": 30.5029506707319,
+				"optimization": {
+					"accepted_passes": 0.0,
+					"applied": false,
+					"attempted_passes": 1.0,
+					"baseline_triangles": [
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_2134750251803119128:0.250000000",
+								"vertex:boundary:sample:edge_4843633052681869758:0.750000000",
+								"vertex:boundary:sample:edge_2134750251803119128:0.125000000"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_2134750251803119128:0.375000000",
+								"vertex:boundary:sample:edge_4843633052681869758:0.375000000",
+								"vertex:boundary:sample:edge_4843633052681869758:0.500000000"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_2134750251803119128:0.375000000",
+								"vertex:boundary:sample:edge_4843633052681869758:0.500000000",
+								"vertex:boundary:sample:edge_2134750251803119128:0.250000000"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_2134750251803119128:0.500000000",
+								"vertex:boundary:sample:edge_2134750251803119128:0.625000000",
+								"vertex:boundary:sample:edge_4843633052681869758:0.250000000"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_2134750251803119128:0.625000000",
+								"vertex:boundary:sample:edge_2134750251803119128:0.750000000",
+								"vertex:boundary:sample:edge_4236798331545563309:point_2909770309667252781"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_2134750251803119128:0.750000000",
+								"vertex:boundary:sample:edge_8259360882384808152:0.250000000",
+								"vertex:boundary:sample:edge_4236798331545563309:point_2909770309667252781"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_2134750251803119128:0.875000000",
+								"vertex:boundary:sample:edge_8259360882384808152:0.250000000",
+								"vertex:boundary:sample:edge_2134750251803119128:0.750000000"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_2134750251803119128:point_8539835518405984058",
+								"vertex:boundary:sample:edge_8259360882384808152:0.250000000",
+								"vertex:boundary:sample:edge_2134750251803119128:0.875000000"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_4236798331545563309:0.750000000",
+								"vertex:boundary:sample:edge_4236798331545563309:point_2909770309667252781",
+								"vertex:boundary:sample:edge_8259360882384808152:0.750000000"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_4236798331545563309:0.750000000",
+								"vertex:boundary:sample:edge_8259360882384808152:0.750000000",
+								"vertex:boundary:sample:edge_4236798331545563309:0.500000000"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_4843633052681869758:0.125000000",
+								"vertex:boundary:sample:edge_2134750251803119128:0.625000000",
+								"vertex:boundary:sample:edge_4236798331545563309:point_2909770309667252781"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_4843633052681869758:0.250000000",
+								"vertex:boundary:sample:edge_2134750251803119128:0.625000000",
+								"vertex:boundary:sample:edge_4843633052681869758:0.125000000"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_4843633052681869758:0.375000000",
+								"vertex:boundary:sample:edge_2134750251803119128:0.375000000",
+								"vertex:boundary:sample:edge_2134750251803119128:0.500000000"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_4843633052681869758:0.375000000",
+								"vertex:boundary:sample:edge_2134750251803119128:0.500000000",
+								"vertex:boundary:sample:edge_4843633052681869758:0.250000000"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_4843633052681869758:0.625000000",
+								"vertex:boundary:sample:edge_2134750251803119128:0.250000000",
+								"vertex:boundary:sample:edge_4843633052681869758:0.500000000"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_4843633052681869758:0.625000000",
+								"vertex:boundary:sample:edge_4843633052681869758:0.750000000",
+								"vertex:boundary:sample:edge_2134750251803119128:0.250000000"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_4843633052681869758:0.750000000",
+								"vertex:boundary:sample:edge_4843633052681869758:0.875000000",
+								"vertex:boundary:sample:edge_2134750251803119128:0.125000000"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_4843633052681869758:0.875000000",
+								"vertex:boundary:sample:edge_6162007521227243459:point_3682234394956394394",
+								"vertex:boundary:sample:edge_2134750251803119128:0.125000000"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_4843633052681869758:point_4281767337458130864",
+								"vertex:boundary:sample:edge_669999475508859173:0.500000000",
+								"vertex:boundary:sample:edge_6560078186558305588:0.250000000"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_5009344052863439352:0.125000000",
+								"vertex:boundary:sample:edge_5009344052863439352:0.250000000",
+								"vertex:boundary:sample:edge_6725932534452158106:0.750000000"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_5009344052863439352:0.125000000",
+								"vertex:boundary:sample:edge_6725932534452158106:0.750000000",
+								"vertex:boundary:sample:edge_6725932534452158106:point_1655539396643663161"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_5009344052863439352:0.125000000",
+								"vertex:boundary:sample:edge_6725932534452158106:point_1655539396643663161",
+								"vertex:boundary:sample:edge_162695404981094955:point_7925912949775006252"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_5009344052863439352:0.375000000",
+								"vertex:boundary:sample:edge_5009344052863439352:0.500000000",
+								"vertex:boundary:sample:edge_6725932534452158106:0.500000000"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_5009344052863439352:0.375000000",
+								"vertex:boundary:sample:edge_6725932534452158106:0.500000000",
+								"vertex:boundary:sample:edge_5009344052863439352:0.250000000"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_5009344052863439352:0.500000000",
+								"vertex:boundary:sample:edge_5009344052863439352:0.625000000",
+								"vertex:boundary:sample:edge_6725932534452158106:0.250000000"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_5009344052863439352:0.625000000",
+								"vertex:boundary:sample:edge_5009344052863439352:0.750000000",
+								"vertex:boundary:sample:edge_8259360882384808152:point_3220192327744383771"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_5009344052863439352:0.625000000",
+								"vertex:boundary:sample:edge_8259360882384808152:point_3220192327744383771",
+								"vertex:boundary:sample:edge_6725932534452158106:0.250000000"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_5009344052863439352:0.875000000",
+								"vertex:boundary:sample:edge_4236798331545563309:0.250000000",
+								"vertex:boundary:sample:edge_5009344052863439352:0.750000000"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_5009344052863439352:0.875000000",
+								"vertex:boundary:sample:edge_4236798331545563309:point_3111711104369904636",
+								"vertex:boundary:sample:edge_4236798331545563309:0.250000000"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_6162007521227243459:point_3682234394956394394",
+								"vertex:boundary:sample:edge_4843633052681869758:0.875000000",
+								"vertex:boundary:sample:edge_4843633052681869758:point_4281767337458130864"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_6162007521227243459:point_3682234394956394394",
+								"vertex:boundary:sample:edge_4843633052681869758:point_4281767337458130864",
+								"vertex:boundary:sample:edge_8791119708715477847:0.250000000"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_6560078186558305588:0.250000000",
+								"vertex:boundary:sample:edge_669999475508859173:point_8865333175039303813",
+								"vertex:boundary:sample:edge_867818737666882905:point_2501239763325254797"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_6560078186558305588:0.500000000",
+								"vertex:boundary:sample:edge_4843633052681869758:point_4281767337458130864",
+								"vertex:boundary:sample:edge_6560078186558305588:0.250000000"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_6560078186558305588:0.500000000",
+								"vertex:boundary:sample:edge_6560078186558305588:0.750000000",
+								"vertex:boundary:sample:edge_4843633052681869758:point_4281767337458130864"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_6560078186558305588:0.750000000",
+								"vertex:boundary:sample:edge_6560078186558305588:point_7730126270678149234",
+								"vertex:boundary:sample:edge_8791119708715477847:0.250000000"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_6560078186558305588:0.750000000",
+								"vertex:boundary:sample:edge_8791119708715477847:0.250000000",
+								"vertex:boundary:sample:edge_4843633052681869758:point_4281767337458130864"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_669999475508859173:point_8865333175039303813",
+								"vertex:boundary:sample:edge_6560078186558305588:0.250000000",
+								"vertex:boundary:sample:edge_669999475508859173:0.500000000"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_6725932534452158106:0.250000000",
+								"vertex:boundary:sample:edge_6725932534452158106:0.500000000",
+								"vertex:boundary:sample:edge_5009344052863439352:0.500000000"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_6725932534452158106:0.750000000",
+								"vertex:boundary:sample:edge_5009344052863439352:0.250000000",
+								"vertex:boundary:sample:edge_6725932534452158106:0.500000000"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_8259360882384808152:0.500000000",
+								"vertex:boundary:sample:edge_4236798331545563309:point_2909770309667252781",
+								"vertex:boundary:sample:edge_8259360882384808152:0.250000000"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_8259360882384808152:0.500000000",
+								"vertex:boundary:sample:edge_8259360882384808152:0.750000000",
+								"vertex:boundary:sample:edge_4236798331545563309:point_2909770309667252781"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_8259360882384808152:point_3220192327744383771",
+								"vertex:boundary:sample:edge_4236798331545563309:0.250000000",
+								"vertex:boundary:sample:edge_4236798331545563309:0.500000000"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_8259360882384808152:point_3220192327744383771",
+								"vertex:boundary:sample:edge_4236798331545563309:0.500000000",
+								"vertex:boundary:sample:edge_8259360882384808152:0.750000000"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_8259360882384808152:point_3220192327744383771",
+								"vertex:boundary:sample:edge_5009344052863439352:0.750000000",
+								"vertex:boundary:sample:edge_4236798331545563309:0.250000000"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_8791119708715477847:0.500000000",
+								"vertex:boundary:sample:edge_6162007521227243459:0.500000000",
+								"vertex:boundary:sample:edge_6162007521227243459:point_3682234394956394394"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_8791119708715477847:0.500000000",
+								"vertex:boundary:sample:edge_6162007521227243459:point_3682234394956394394",
+								"vertex:boundary:sample:edge_8791119708715477847:0.250000000"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_8791119708715477847:0.500000000",
+								"vertex:boundary:sample:edge_8791119708715477847:0.750000000",
+								"vertex:boundary:sample:edge_6162007521227243459:0.500000000"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_9025808804380570085:point_21522006469275509",
+								"vertex:boundary:sample:edge_6162007521227243459:0.500000000",
+								"vertex:boundary:sample:edge_8791119708715477847:0.750000000"
+							]
+						},
+						{
+							"vertex_ids": [
+								"vertex:boundary:sample:edge_9025808804380570085:point_21522006469275509",
+								"vertex:boundary:sample:edge_8791119708715477847:0.750000000",
+								"vertex:boundary:sample:edge_8791119708715477847:point_6867145972024356861"
+							]
+						}
+					],
+					"enabled": true,
+					"moved_seed_count": 0.0,
+					"movements": [],
+					"quality_after": {
+						"degenerate_triangle_count": 0.0,
+						"mean_quality": 0.895333974789828,
+						"minimum_angle": 30.5029506707319,
+						"worst_aspect_ratio": 2.52300276348498
+					},
+					"quality_before": {
+						"degenerate_triangle_count": 0.0,
+						"mean_quality": 0.895333974789828,
+						"minimum_angle": 30.5029506707319,
+						"worst_aspect_ratio": 2.52300276348498
+					},
+					"removed_seed_count": 0.0
+				},
+				"parameters": {
+					"mesh_character": 0.64,
+					"optimize_mesh": true,
+					"passes": 3,
+					"passes_override": false,
+					"relaxation": 0.402,
+					"relaxation_override": false,
+					"seeding_method": "poisson_fill"
+				},
+				"quality_warnings": [],
+				"runs": [],
+				"sampling_bake_id": "bake_1410704832842482547",
+				"sampling_fingerprint": "2e3b46eb400c336851be19629bc1a2b6b513cc0d82fd9b1617814c138a8b1f2d",
+				"seeding_bake_id": "seeding_bake_3430697815379177539",
+				"seeding_fingerprint": "b84190f269670bcca32548bb94c4b334a8cd686324846051983cbd3eb3bedd04",
+				"triangle_count": 49,
+				"triangles": [
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_2134750251803119128:0.250000000",
+							"vertex:boundary:sample:edge_4843633052681869758:0.750000000",
+							"vertex:boundary:sample:edge_2134750251803119128:0.125000000"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_2134750251803119128:0.375000000",
+							"vertex:boundary:sample:edge_4843633052681869758:0.375000000",
+							"vertex:boundary:sample:edge_4843633052681869758:0.500000000"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_2134750251803119128:0.375000000",
+							"vertex:boundary:sample:edge_4843633052681869758:0.500000000",
+							"vertex:boundary:sample:edge_2134750251803119128:0.250000000"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_2134750251803119128:0.500000000",
+							"vertex:boundary:sample:edge_2134750251803119128:0.625000000",
+							"vertex:boundary:sample:edge_4843633052681869758:0.250000000"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_2134750251803119128:0.625000000",
+							"vertex:boundary:sample:edge_2134750251803119128:0.750000000",
+							"vertex:boundary:sample:edge_4236798331545563309:point_2909770309667252781"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_2134750251803119128:0.750000000",
+							"vertex:boundary:sample:edge_8259360882384808152:0.250000000",
+							"vertex:boundary:sample:edge_4236798331545563309:point_2909770309667252781"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_2134750251803119128:0.875000000",
+							"vertex:boundary:sample:edge_8259360882384808152:0.250000000",
+							"vertex:boundary:sample:edge_2134750251803119128:0.750000000"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_2134750251803119128:point_8539835518405984058",
+							"vertex:boundary:sample:edge_8259360882384808152:0.250000000",
+							"vertex:boundary:sample:edge_2134750251803119128:0.875000000"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_4236798331545563309:0.750000000",
+							"vertex:boundary:sample:edge_4236798331545563309:point_2909770309667252781",
+							"vertex:boundary:sample:edge_8259360882384808152:0.750000000"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_4236798331545563309:0.750000000",
+							"vertex:boundary:sample:edge_8259360882384808152:0.750000000",
+							"vertex:boundary:sample:edge_4236798331545563309:0.500000000"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_4843633052681869758:0.125000000",
+							"vertex:boundary:sample:edge_2134750251803119128:0.625000000",
+							"vertex:boundary:sample:edge_4236798331545563309:point_2909770309667252781"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_4843633052681869758:0.250000000",
+							"vertex:boundary:sample:edge_2134750251803119128:0.625000000",
+							"vertex:boundary:sample:edge_4843633052681869758:0.125000000"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_4843633052681869758:0.375000000",
+							"vertex:boundary:sample:edge_2134750251803119128:0.375000000",
+							"vertex:boundary:sample:edge_2134750251803119128:0.500000000"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_4843633052681869758:0.375000000",
+							"vertex:boundary:sample:edge_2134750251803119128:0.500000000",
+							"vertex:boundary:sample:edge_4843633052681869758:0.250000000"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_4843633052681869758:0.625000000",
+							"vertex:boundary:sample:edge_2134750251803119128:0.250000000",
+							"vertex:boundary:sample:edge_4843633052681869758:0.500000000"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_4843633052681869758:0.625000000",
+							"vertex:boundary:sample:edge_4843633052681869758:0.750000000",
+							"vertex:boundary:sample:edge_2134750251803119128:0.250000000"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_4843633052681869758:0.750000000",
+							"vertex:boundary:sample:edge_4843633052681869758:0.875000000",
+							"vertex:boundary:sample:edge_2134750251803119128:0.125000000"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_4843633052681869758:0.875000000",
+							"vertex:boundary:sample:edge_6162007521227243459:point_3682234394956394394",
+							"vertex:boundary:sample:edge_2134750251803119128:0.125000000"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_4843633052681869758:point_4281767337458130864",
+							"vertex:boundary:sample:edge_669999475508859173:0.500000000",
+							"vertex:boundary:sample:edge_6560078186558305588:0.250000000"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_5009344052863439352:0.125000000",
+							"vertex:boundary:sample:edge_5009344052863439352:0.250000000",
+							"vertex:boundary:sample:edge_6725932534452158106:0.750000000"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_5009344052863439352:0.125000000",
+							"vertex:boundary:sample:edge_6725932534452158106:0.750000000",
+							"vertex:boundary:sample:edge_6725932534452158106:point_1655539396643663161"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_5009344052863439352:0.125000000",
+							"vertex:boundary:sample:edge_6725932534452158106:point_1655539396643663161",
+							"vertex:boundary:sample:edge_162695404981094955:point_7925912949775006252"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_5009344052863439352:0.375000000",
+							"vertex:boundary:sample:edge_5009344052863439352:0.500000000",
+							"vertex:boundary:sample:edge_6725932534452158106:0.500000000"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_5009344052863439352:0.375000000",
+							"vertex:boundary:sample:edge_6725932534452158106:0.500000000",
+							"vertex:boundary:sample:edge_5009344052863439352:0.250000000"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_5009344052863439352:0.500000000",
+							"vertex:boundary:sample:edge_5009344052863439352:0.625000000",
+							"vertex:boundary:sample:edge_6725932534452158106:0.250000000"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_5009344052863439352:0.625000000",
+							"vertex:boundary:sample:edge_5009344052863439352:0.750000000",
+							"vertex:boundary:sample:edge_8259360882384808152:point_3220192327744383771"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_5009344052863439352:0.625000000",
+							"vertex:boundary:sample:edge_8259360882384808152:point_3220192327744383771",
+							"vertex:boundary:sample:edge_6725932534452158106:0.250000000"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_5009344052863439352:0.875000000",
+							"vertex:boundary:sample:edge_4236798331545563309:0.250000000",
+							"vertex:boundary:sample:edge_5009344052863439352:0.750000000"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_5009344052863439352:0.875000000",
+							"vertex:boundary:sample:edge_4236798331545563309:point_3111711104369904636",
+							"vertex:boundary:sample:edge_4236798331545563309:0.250000000"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_6162007521227243459:point_3682234394956394394",
+							"vertex:boundary:sample:edge_4843633052681869758:0.875000000",
+							"vertex:boundary:sample:edge_4843633052681869758:point_4281767337458130864"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_6162007521227243459:point_3682234394956394394",
+							"vertex:boundary:sample:edge_4843633052681869758:point_4281767337458130864",
+							"vertex:boundary:sample:edge_8791119708715477847:0.250000000"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_6560078186558305588:0.250000000",
+							"vertex:boundary:sample:edge_669999475508859173:point_8865333175039303813",
+							"vertex:boundary:sample:edge_867818737666882905:point_2501239763325254797"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_6560078186558305588:0.500000000",
+							"vertex:boundary:sample:edge_4843633052681869758:point_4281767337458130864",
+							"vertex:boundary:sample:edge_6560078186558305588:0.250000000"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_6560078186558305588:0.500000000",
+							"vertex:boundary:sample:edge_6560078186558305588:0.750000000",
+							"vertex:boundary:sample:edge_4843633052681869758:point_4281767337458130864"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_6560078186558305588:0.750000000",
+							"vertex:boundary:sample:edge_6560078186558305588:point_7730126270678149234",
+							"vertex:boundary:sample:edge_8791119708715477847:0.250000000"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_6560078186558305588:0.750000000",
+							"vertex:boundary:sample:edge_8791119708715477847:0.250000000",
+							"vertex:boundary:sample:edge_4843633052681869758:point_4281767337458130864"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_669999475508859173:point_8865333175039303813",
+							"vertex:boundary:sample:edge_6560078186558305588:0.250000000",
+							"vertex:boundary:sample:edge_669999475508859173:0.500000000"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_6725932534452158106:0.250000000",
+							"vertex:boundary:sample:edge_6725932534452158106:0.500000000",
+							"vertex:boundary:sample:edge_5009344052863439352:0.500000000"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_6725932534452158106:0.750000000",
+							"vertex:boundary:sample:edge_5009344052863439352:0.250000000",
+							"vertex:boundary:sample:edge_6725932534452158106:0.500000000"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_8259360882384808152:0.500000000",
+							"vertex:boundary:sample:edge_4236798331545563309:point_2909770309667252781",
+							"vertex:boundary:sample:edge_8259360882384808152:0.250000000"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_8259360882384808152:0.500000000",
+							"vertex:boundary:sample:edge_8259360882384808152:0.750000000",
+							"vertex:boundary:sample:edge_4236798331545563309:point_2909770309667252781"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_8259360882384808152:point_3220192327744383771",
+							"vertex:boundary:sample:edge_4236798331545563309:0.250000000",
+							"vertex:boundary:sample:edge_4236798331545563309:0.500000000"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_8259360882384808152:point_3220192327744383771",
+							"vertex:boundary:sample:edge_4236798331545563309:0.500000000",
+							"vertex:boundary:sample:edge_8259360882384808152:0.750000000"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_8259360882384808152:point_3220192327744383771",
+							"vertex:boundary:sample:edge_5009344052863439352:0.750000000",
+							"vertex:boundary:sample:edge_4236798331545563309:0.250000000"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_8791119708715477847:0.500000000",
+							"vertex:boundary:sample:edge_6162007521227243459:0.500000000",
+							"vertex:boundary:sample:edge_6162007521227243459:point_3682234394956394394"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_8791119708715477847:0.500000000",
+							"vertex:boundary:sample:edge_6162007521227243459:point_3682234394956394394",
+							"vertex:boundary:sample:edge_8791119708715477847:0.250000000"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_8791119708715477847:0.500000000",
+							"vertex:boundary:sample:edge_8791119708715477847:0.750000000",
+							"vertex:boundary:sample:edge_6162007521227243459:0.500000000"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_9025808804380570085:point_21522006469275509",
+							"vertex:boundary:sample:edge_6162007521227243459:0.500000000",
+							"vertex:boundary:sample:edge_8791119708715477847:0.750000000"
+						]
+					},
+					{
+						"vertex_ids": [
+							"vertex:boundary:sample:edge_9025808804380570085:point_21522006469275509",
+							"vertex:boundary:sample:edge_8791119708715477847:0.750000000",
+							"vertex:boundary:sample:edge_8791119708715477847:point_6867145972024356861"
+						]
+					}
+				],
+				"triangulation_backend": "artem-ogre/CDT 1.4.5",
+				"valid": true,
+				"vertex_count": 51,
+				"vertices": [
+					{
+						"id": "vertex:boundary:sample:edge_4236798331545563309:point_3111711104369904636",
+						"origin": "boundary",
+						"position": [
+							-1.29999995231628,
+							3.34999990463257
+						],
+						"preserved": true,
+						"source_id": "sample:edge_4236798331545563309:point_3111711104369904636"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_4236798331545563309:0.250000000",
+						"origin": "boundary",
+						"position": [
+							-0.862499952316284,
+							3.48749995231628
+						],
+						"preserved": false,
+						"source_id": "sample:edge_4236798331545563309:0.250000000"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_4236798331545563309:0.500000000",
+						"origin": "boundary",
+						"position": [
+							-0.424999982118607,
+							3.625
+						],
+						"preserved": false,
+						"source_id": "sample:edge_4236798331545563309:0.500000000"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_4236798331545563309:0.750000000",
+						"origin": "boundary",
+						"position": [
+							0.0125000178813934,
+							3.76250004768372
+						],
+						"preserved": false,
+						"source_id": "sample:edge_4236798331545563309:0.750000000"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_4236798331545563309:point_2909770309667252781",
+						"origin": "boundary",
+						"position": [
+							0.449999988079071,
+							3.90000009536743
+						],
+						"preserved": true,
+						"source_id": "sample:edge_4236798331545563309:point_2909770309667252781"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_4843633052681869758:0.125000000",
+						"origin": "boundary",
+						"position": [
+							0.262499988079071,
+							3.59999990463257
+						],
+						"preserved": false,
+						"source_id": "sample:edge_4843633052681869758:0.125000000"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_4843633052681869758:0.250000000",
+						"origin": "boundary",
+						"position": [
+							0.074999988079071,
+							3.29999995231628
+						],
+						"preserved": false,
+						"source_id": "sample:edge_4843633052681869758:0.250000000"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_4843633052681869758:0.375000000",
+						"origin": "boundary",
+						"position": [
+							-0.11250002682209,
+							3.0
+						],
+						"preserved": false,
+						"source_id": "sample:edge_4843633052681869758:0.375000000"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_4843633052681869758:0.500000000",
+						"origin": "boundary",
+						"position": [
+							-0.300000041723251,
+							2.69999980926514
+						],
+						"preserved": false,
+						"source_id": "sample:edge_4843633052681869758:0.500000000"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_4843633052681869758:0.625000000",
+						"origin": "boundary",
+						"position": [
+							-0.487500071525574,
+							2.39999961853027
+						],
+						"preserved": false,
+						"source_id": "sample:edge_4843633052681869758:0.625000000"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_4843633052681869758:0.750000000",
+						"origin": "boundary",
+						"position": [
+							-0.675000071525574,
+							2.09999990463257
+						],
+						"preserved": false,
+						"source_id": "sample:edge_4843633052681869758:0.750000000"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_4843633052681869758:0.875000000",
+						"origin": "boundary",
+						"position": [
+							-0.862500071525574,
+							1.79999983310699
+						],
+						"preserved": false,
+						"source_id": "sample:edge_4843633052681869758:0.875000000"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_4843633052681869758:point_4281767337458130864",
+						"origin": "boundary",
+						"position": [
+							-1.05000007152557,
+							1.49999976158142
+						],
+						"preserved": true,
+						"source_id": "sample:edge_4843633052681869758:point_4281767337458130864"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_669999475508859173:0.500000000",
+						"origin": "boundary",
+						"position": [
+							-1.125,
+							1.77499985694885
+						],
+						"preserved": false,
+						"source_id": "sample:edge_669999475508859173:0.500000000"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_669999475508859173:point_8865333175039303813",
+						"origin": "boundary",
+						"position": [
+							-1.20000004768372,
+							2.04999995231628
+						],
+						"preserved": true,
+						"source_id": "sample:edge_669999475508859173:point_8865333175039303813"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_867818737666882905:point_2501239763325254797",
+						"origin": "boundary",
+						"position": [
+							-1.5,
+							2.04999995231628
+						],
+						"preserved": true,
+						"source_id": "sample:edge_867818737666882905:point_2501239763325254797"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_6560078186558305588:0.250000000",
+						"origin": "boundary",
+						"position": [
+							-1.4375,
+							1.72499990463257
+						],
+						"preserved": false,
+						"source_id": "sample:edge_6560078186558305588:0.250000000"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_6560078186558305588:0.500000000",
+						"origin": "boundary",
+						"position": [
+							-1.375,
+							1.39999985694885
+						],
+						"preserved": false,
+						"source_id": "sample:edge_6560078186558305588:0.500000000"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_6560078186558305588:0.750000000",
+						"origin": "boundary",
+						"position": [
+							-1.3125,
+							1.07499992847443
+						],
+						"preserved": false,
+						"source_id": "sample:edge_6560078186558305588:0.750000000"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_6560078186558305588:point_7730126270678149234",
+						"origin": "boundary",
+						"position": [
+							-1.25000011920929,
+							0.75
+						],
+						"preserved": true,
+						"source_id": "sample:edge_6560078186558305588:point_7730126270678149234"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_8791119708715477847:0.250000000",
+						"origin": "boundary",
+						"position": [
+							-0.937500059604645,
+							0.887500047683716
+						],
+						"preserved": false,
+						"source_id": "sample:edge_8791119708715477847:0.250000000"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_8791119708715477847:0.500000000",
+						"origin": "boundary",
+						"position": [
+							-0.625000059604645,
+							1.02499997615814
+						],
+						"preserved": false,
+						"source_id": "sample:edge_8791119708715477847:0.500000000"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_8791119708715477847:0.750000000",
+						"origin": "boundary",
+						"position": [
+							-0.312500029802322,
+							1.16250002384186
+						],
+						"preserved": false,
+						"source_id": "sample:edge_8791119708715477847:0.750000000"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_8791119708715477847:point_6867145972024356861",
+						"origin": "boundary",
+						"position": [
+							0.0,
+							1.30000007152557
+						],
+						"preserved": true,
+						"source_id": "sample:edge_8791119708715477847:point_6867145972024356861"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_9025808804380570085:point_21522006469275509",
+						"origin": "boundary",
+						"position": [
+							-0.100000008940697,
+							1.55000007152557
+						],
+						"preserved": true,
+						"source_id": "sample:edge_9025808804380570085:point_21522006469275509"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_6162007521227243459:0.500000000",
+						"origin": "boundary",
+						"position": [
+							-0.424999982118607,
+							1.47500002384186
+						],
+						"preserved": false,
+						"source_id": "sample:edge_6162007521227243459:0.500000000"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_6162007521227243459:point_3682234394956394394",
+						"origin": "boundary",
+						"position": [
+							-0.75,
+							1.39999997615814
+						],
+						"preserved": true,
+						"source_id": "sample:edge_6162007521227243459:point_3682234394956394394"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_2134750251803119128:0.125000000",
+						"origin": "boundary",
+						"position": [
+							-0.481249988079071,
+							1.80000007152557
+						],
+						"preserved": false,
+						"source_id": "sample:edge_2134750251803119128:0.125000000"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_2134750251803119128:0.250000000",
+						"origin": "boundary",
+						"position": [
+							-0.212500005960464,
+							2.20000004768372
+						],
+						"preserved": false,
+						"source_id": "sample:edge_2134750251803119128:0.250000000"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_2134750251803119128:0.375000000",
+						"origin": "boundary",
+						"position": [
+							0.0562499836087227,
+							2.59999990463257
+						],
+						"preserved": false,
+						"source_id": "sample:edge_2134750251803119128:0.375000000"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_2134750251803119128:0.500000000",
+						"origin": "boundary",
+						"position": [
+							0.324999958276749,
+							3.0
+						],
+						"preserved": false,
+						"source_id": "sample:edge_2134750251803119128:0.500000000"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_2134750251803119128:0.625000000",
+						"origin": "boundary",
+						"position": [
+							0.593749940395355,
+							3.40000009536743
+						],
+						"preserved": false,
+						"source_id": "sample:edge_2134750251803119128:0.625000000"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_2134750251803119128:0.750000000",
+						"origin": "boundary",
+						"position": [
+							0.862499952316284,
+							3.79999995231628
+						],
+						"preserved": false,
+						"source_id": "sample:edge_2134750251803119128:0.750000000"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_2134750251803119128:0.875000000",
+						"origin": "boundary",
+						"position": [
+							1.13124990463257,
+							4.19999980926514
+						],
+						"preserved": false,
+						"source_id": "sample:edge_2134750251803119128:0.875000000"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_2134750251803119128:point_8539835518405984058",
+						"origin": "boundary",
+						"position": [
+							1.39999997615814,
+							4.59999990463257
+						],
+						"preserved": true,
+						"source_id": "sample:edge_2134750251803119128:point_8539835518405984058"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_8259360882384808152:0.250000000",
+						"origin": "boundary",
+						"position": [
+							0.887499928474426,
+							4.4375
+						],
+						"preserved": false,
+						"source_id": "sample:edge_8259360882384808152:0.250000000"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_8259360882384808152:0.500000000",
+						"origin": "boundary",
+						"position": [
+							0.374999970197678,
+							4.27499961853027
+						],
+						"preserved": false,
+						"source_id": "sample:edge_8259360882384808152:0.500000000"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_8259360882384808152:0.750000000",
+						"origin": "boundary",
+						"position": [
+							-0.137500017881393,
+							4.11250019073486
+						],
+						"preserved": false,
+						"source_id": "sample:edge_8259360882384808152:0.750000000"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_8259360882384808152:point_3220192327744383771",
+						"origin": "boundary",
+						"position": [
+							-0.650000035762787,
+							3.95000004768372
+						],
+						"preserved": true,
+						"source_id": "sample:edge_8259360882384808152:point_3220192327744383771"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_6725932534452158106:0.250000000",
+						"origin": "boundary",
+						"position": [
+							-0.425000011920929,
+							4.40000009536743
+						],
+						"preserved": false,
+						"source_id": "sample:edge_6725932534452158106:0.250000000"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_6725932534452158106:0.500000000",
+						"origin": "boundary",
+						"position": [
+							-0.200000017881393,
+							4.85000038146973
+						],
+						"preserved": false,
+						"source_id": "sample:edge_6725932534452158106:0.500000000"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_6725932534452158106:0.750000000",
+						"origin": "boundary",
+						"position": [
+							0.0249999910593033,
+							5.30000019073486
+						],
+						"preserved": false,
+						"source_id": "sample:edge_6725932534452158106:0.750000000"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_6725932534452158106:point_1655539396643663161",
+						"origin": "boundary",
+						"position": [
+							0.25,
+							5.75
+						],
+						"preserved": true,
+						"source_id": "sample:edge_6725932534452158106:point_1655539396643663161"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_162695404981094955:point_7925912949775006252",
+						"origin": "boundary",
+						"position": [
+							-0.0500000007450581,
+							5.90000009536743
+						],
+						"preserved": true,
+						"source_id": "sample:edge_162695404981094955:point_7925912949775006252"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_5009344052863439352:0.125000000",
+						"origin": "boundary",
+						"position": [
+							-0.206249997019768,
+							5.58125019073486
+						],
+						"preserved": false,
+						"source_id": "sample:edge_5009344052863439352:0.125000000"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_5009344052863439352:0.250000000",
+						"origin": "boundary",
+						"position": [
+							-0.362500011920929,
+							5.26250028610229
+						],
+						"preserved": false,
+						"source_id": "sample:edge_5009344052863439352:0.250000000"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_5009344052863439352:0.375000000",
+						"origin": "boundary",
+						"position": [
+							-0.518750011920929,
+							4.94375038146973
+						],
+						"preserved": false,
+						"source_id": "sample:edge_5009344052863439352:0.375000000"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_5009344052863439352:0.500000000",
+						"origin": "boundary",
+						"position": [
+							-0.675000011920929,
+							4.625
+						],
+						"preserved": false,
+						"source_id": "sample:edge_5009344052863439352:0.500000000"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_5009344052863439352:0.625000000",
+						"origin": "boundary",
+						"position": [
+							-0.831250011920929,
+							4.30624961853027
+						],
+						"preserved": false,
+						"source_id": "sample:edge_5009344052863439352:0.625000000"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_5009344052863439352:0.750000000",
+						"origin": "boundary",
+						"position": [
+							-0.987500011920929,
+							3.98749971389771
+						],
+						"preserved": false,
+						"source_id": "sample:edge_5009344052863439352:0.750000000"
+					},
+					{
+						"id": "vertex:boundary:sample:edge_5009344052863439352:0.875000000",
+						"origin": "boundary",
+						"position": [
+							-1.14374995231628,
+							3.66874980926514
+						],
+						"preserved": false,
+						"source_id": "sample:edge_5009344052863439352:0.875000000"
+					}
+				],
+				"worst_aspect_ratio": 2.52300276348498
+			},
+			"contour_stroke": {
+				"algorithm_version": 5,
+				"bake_id": "contour_stroke_bake_5859600894339062355",
+				"boundary_constraints": [],
+				"errors": [],
+				"geometry_diagnostics": {
+					"minimum_nonadjacent_clearance_meters": 0.0269258260726929,
+					"narrow_overlap_pair_count": 0.0,
+					"self_intersection_count": 0.0,
+					"triangle_validation": "complete"
+				},
+				"has_outline": true,
+				"mean_quality": 0.0,
+				"method": "contour_stroke",
+				"minimum_angle": 0.0,
+				"optimization": {
+					"baseline_triangles": [],
+					"movements": []
+				},
+				"parameters": {
+					"cap": "butt",
+					"join": "miter",
+					"miter_limit": 4.0,
+					"reference_pixels_per_meter": 192.0,
+					"stroke_width_meters": 0.0208333333333333,
+					"stroke_width_px": 4.0
+				},
+				"runs": [
+					{
+						"bevel_join_count": 6.0,
+						"centerline": [
+							{
+								"curve_t": 0.0,
+								"edge_id": "edge_4236798331545563309",
+								"position": [
+									-1.29999995231628,
+									3.34999990463257
+								],
+								"source_point_id": "point_3111711104369904636"
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "edge_4236798331545563309",
+								"position": [
+									0.449999988079071,
+									3.90000009536743
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "edge_4843633052681869758",
+								"position": [
+									-1.05000007152557,
+									1.49999976158142
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "edge_669999475508859173",
+								"position": [
+									-1.20000004768372,
+									2.04999995231628
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "edge_867818737666882905",
+								"position": [
+									-1.5,
+									2.04999995231628
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "edge_6560078186558305588",
+								"position": [
+									-1.25000011920929,
+									0.75
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "edge_8791119708715477847",
+								"position": [
+									0.0,
+									1.30000007152557
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "edge_9025808804380570085",
+								"position": [
+									-0.100000008940697,
+									1.55000007152557
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "edge_6162007521227243459",
+								"position": [
+									-0.75,
+									1.39999997615814
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "edge_2134750251803119128",
+								"position": [
+									1.39999997615814,
+									4.59999990463257
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "edge_8259360882384808152",
+								"position": [
+									-0.650000035762787,
+									3.95000004768372
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "edge_6725932534452158106",
+								"position": [
+									0.25,
+									5.75
+								],
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "edge_162695404981094955",
+								"position": [
+									-0.0500000007450581,
+									5.90000009536743
+								],
+								"source_point_id": ""
+							}
+						],
+						"closed": true,
+						"edge_ids": [
+							"edge_4236798331545563309",
+							"edge_4843633052681869758",
+							"edge_669999475508859173",
+							"edge_867818737666882905",
+							"edge_6560078186558305588",
+							"edge_8791119708715477847",
+							"edge_9025808804380570085",
+							"edge_6162007521227243459",
+							"edge_2134750251803119128",
+							"edge_8259360882384808152",
+							"edge_6725932534452158106",
+							"edge_162695404981094955",
+							"edge_5009344052863439352"
+						],
+						"end_cap": "none",
+						"geometry_diagnostics": {
+							"centerline_segment_count": 13.0,
+							"minimum_nonadjacent_clearance_tool_units": 0.269258260726929,
+							"narrow_overlap_pair_count": 0.0,
+							"self_intersection_count": 0.0
+						},
+						"index_count": 138.0,
+						"index_offset": 0.0,
+						"miter_join_count": 7.0,
+						"run_id": "chain_9126509653625594871:run:0",
+						"start_cap": "none",
+						"triangle_count": 46.0,
+						"vertex_count": 98.0,
+						"vertex_offset": 0.0
+					}
+				],
+				"source_chain_closed": true,
+				"source_draw_mode": "closed_loop",
+				"source_fingerprint": "37b8e8b4d2663bd45027bbc4c53f313e14c3fccf893c28b5f3f17445a64c3d0d",
+				"topology_role": "outer",
+				"triangle_count": 46,
+				"triangles": [
+					{
+						"id": "triangle:contour:0",
+						"vertex_ids": [
+							"vertex:contour:0",
+							"vertex:contour:1",
+							"vertex:contour:2"
+						]
+					},
+					{
+						"id": "triangle:contour:1",
+						"vertex_ids": [
+							"vertex:contour:2",
+							"vertex:contour:1",
+							"vertex:contour:3"
+						]
+					},
+					{
+						"id": "triangle:contour:2",
+						"vertex_ids": [
+							"vertex:contour:4",
+							"vertex:contour:5",
+							"vertex:contour:6"
+						]
+					},
+					{
+						"id": "triangle:contour:3",
+						"vertex_ids": [
+							"vertex:contour:6",
+							"vertex:contour:5",
+							"vertex:contour:7"
+						]
+					},
+					{
+						"id": "triangle:contour:4",
+						"vertex_ids": [
+							"vertex:contour:8",
+							"vertex:contour:9",
+							"vertex:contour:10"
+						]
+					},
+					{
+						"id": "triangle:contour:5",
+						"vertex_ids": [
+							"vertex:contour:10",
+							"vertex:contour:9",
+							"vertex:contour:11"
+						]
+					},
+					{
+						"id": "triangle:contour:6",
+						"vertex_ids": [
+							"vertex:contour:12",
+							"vertex:contour:13",
+							"vertex:contour:14"
+						]
+					},
+					{
+						"id": "triangle:contour:7",
+						"vertex_ids": [
+							"vertex:contour:14",
+							"vertex:contour:13",
+							"vertex:contour:15"
+						]
+					},
+					{
+						"id": "triangle:contour:8",
+						"vertex_ids": [
+							"vertex:contour:16",
+							"vertex:contour:17",
+							"vertex:contour:18"
+						]
+					},
+					{
+						"id": "triangle:contour:9",
+						"vertex_ids": [
+							"vertex:contour:18",
+							"vertex:contour:17",
+							"vertex:contour:19"
+						]
+					},
+					{
+						"id": "triangle:contour:10",
+						"vertex_ids": [
+							"vertex:contour:20",
+							"vertex:contour:21",
+							"vertex:contour:22"
+						]
+					},
+					{
+						"id": "triangle:contour:11",
+						"vertex_ids": [
+							"vertex:contour:22",
+							"vertex:contour:21",
+							"vertex:contour:23"
+						]
+					},
+					{
+						"id": "triangle:contour:12",
+						"vertex_ids": [
+							"vertex:contour:24",
+							"vertex:contour:25",
+							"vertex:contour:26"
+						]
+					},
+					{
+						"id": "triangle:contour:13",
+						"vertex_ids": [
+							"vertex:contour:26",
+							"vertex:contour:25",
+							"vertex:contour:27"
+						]
+					},
+					{
+						"id": "triangle:contour:14",
+						"vertex_ids": [
+							"vertex:contour:28",
+							"vertex:contour:29",
+							"vertex:contour:30"
+						]
+					},
+					{
+						"id": "triangle:contour:15",
+						"vertex_ids": [
+							"vertex:contour:30",
+							"vertex:contour:29",
+							"vertex:contour:31"
+						]
+					},
+					{
+						"id": "triangle:contour:16",
+						"vertex_ids": [
+							"vertex:contour:32",
+							"vertex:contour:33",
+							"vertex:contour:34"
+						]
+					},
+					{
+						"id": "triangle:contour:17",
+						"vertex_ids": [
+							"vertex:contour:34",
+							"vertex:contour:33",
+							"vertex:contour:35"
+						]
+					},
+					{
+						"id": "triangle:contour:18",
+						"vertex_ids": [
+							"vertex:contour:36",
+							"vertex:contour:37",
+							"vertex:contour:38"
+						]
+					},
+					{
+						"id": "triangle:contour:19",
+						"vertex_ids": [
+							"vertex:contour:38",
+							"vertex:contour:37",
+							"vertex:contour:39"
+						]
+					},
+					{
+						"id": "triangle:contour:20",
+						"vertex_ids": [
+							"vertex:contour:40",
+							"vertex:contour:41",
+							"vertex:contour:42"
+						]
+					},
+					{
+						"id": "triangle:contour:21",
+						"vertex_ids": [
+							"vertex:contour:42",
+							"vertex:contour:41",
+							"vertex:contour:43"
+						]
+					},
+					{
+						"id": "triangle:contour:22",
+						"vertex_ids": [
+							"vertex:contour:44",
+							"vertex:contour:45",
+							"vertex:contour:46"
+						]
+					},
+					{
+						"id": "triangle:contour:23",
+						"vertex_ids": [
+							"vertex:contour:46",
+							"vertex:contour:45",
+							"vertex:contour:47"
+						]
+					},
+					{
+						"id": "triangle:contour:24",
+						"vertex_ids": [
+							"vertex:contour:48",
+							"vertex:contour:49",
+							"vertex:contour:50"
+						]
+					},
+					{
+						"id": "triangle:contour:25",
+						"vertex_ids": [
+							"vertex:contour:50",
+							"vertex:contour:49",
+							"vertex:contour:51"
+						]
+					},
+					{
+						"id": "triangle:contour:26",
+						"vertex_ids": [
+							"vertex:contour:52",
+							"vertex:contour:53",
+							"vertex:contour:54"
+						]
+					},
+					{
+						"id": "triangle:contour:27",
+						"vertex_ids": [
+							"vertex:contour:55",
+							"vertex:contour:57",
+							"vertex:contour:56"
+						]
+					},
+					{
+						"id": "triangle:contour:28",
+						"vertex_ids": [
+							"vertex:contour:58",
+							"vertex:contour:60",
+							"vertex:contour:59"
+						]
+					},
+					{
+						"id": "triangle:contour:29",
+						"vertex_ids": [
+							"vertex:contour:61",
+							"vertex:contour:62",
+							"vertex:contour:63"
+						]
+					},
+					{
+						"id": "triangle:contour:30",
+						"vertex_ids": [
+							"vertex:contour:61",
+							"vertex:contour:63",
+							"vertex:contour:64"
+						]
+					},
+					{
+						"id": "triangle:contour:31",
+						"vertex_ids": [
+							"vertex:contour:65",
+							"vertex:contour:66",
+							"vertex:contour:67"
+						]
+					},
+					{
+						"id": "triangle:contour:32",
+						"vertex_ids": [
+							"vertex:contour:65",
+							"vertex:contour:67",
+							"vertex:contour:68"
+						]
+					},
+					{
+						"id": "triangle:contour:33",
+						"vertex_ids": [
+							"vertex:contour:69",
+							"vertex:contour:70",
+							"vertex:contour:71"
+						]
+					},
+					{
+						"id": "triangle:contour:34",
+						"vertex_ids": [
+							"vertex:contour:69",
+							"vertex:contour:71",
+							"vertex:contour:72"
+						]
+					},
+					{
+						"id": "triangle:contour:35",
+						"vertex_ids": [
+							"vertex:contour:73",
+							"vertex:contour:74",
+							"vertex:contour:75"
+						]
+					},
+					{
+						"id": "triangle:contour:36",
+						"vertex_ids": [
+							"vertex:contour:73",
+							"vertex:contour:75",
+							"vertex:contour:76"
+						]
+					},
+					{
+						"id": "triangle:contour:37",
+						"vertex_ids": [
+							"vertex:contour:77",
+							"vertex:contour:78",
+							"vertex:contour:79"
+						]
+					},
+					{
+						"id": "triangle:contour:38",
+						"vertex_ids": [
+							"vertex:contour:77",
+							"vertex:contour:79",
+							"vertex:contour:80"
+						]
+					},
+					{
+						"id": "triangle:contour:39",
+						"vertex_ids": [
+							"vertex:contour:81",
+							"vertex:contour:83",
+							"vertex:contour:82"
+						]
+					},
+					{
+						"id": "triangle:contour:40",
+						"vertex_ids": [
+							"vertex:contour:84",
+							"vertex:contour:85",
+							"vertex:contour:86"
+						]
+					},
+					{
+						"id": "triangle:contour:41",
+						"vertex_ids": [
+							"vertex:contour:87",
+							"vertex:contour:89",
+							"vertex:contour:88"
+						]
+					},
+					{
+						"id": "triangle:contour:42",
+						"vertex_ids": [
+							"vertex:contour:90",
+							"vertex:contour:91",
+							"vertex:contour:92"
+						]
+					},
+					{
+						"id": "triangle:contour:43",
+						"vertex_ids": [
+							"vertex:contour:90",
+							"vertex:contour:92",
+							"vertex:contour:93"
+						]
+					},
+					{
+						"id": "triangle:contour:44",
+						"vertex_ids": [
+							"vertex:contour:94",
+							"vertex:contour:95",
+							"vertex:contour:96"
+						]
+					},
+					{
+						"id": "triangle:contour:45",
+						"vertex_ids": [
+							"vertex:contour:94",
+							"vertex:contour:96",
+							"vertex:contour:97"
+						]
+					}
+				],
+				"valid": true,
+				"vertex_count": 98,
+				"vertices": [
+					{
+						"curve_t": 0.0,
+						"edge_id": "edge_4236798331545563309",
+						"id": "vertex:contour:0",
+						"origin": "segment_left",
+						"position": [
+							-1.33123195171356,
+							3.44937419891357
+						],
+						"preserved": false,
+						"source_id": "edge_4236798331545563309@0.000000000"
+					},
+					{
+						"curve_t": 0.0,
+						"edge_id": "edge_4236798331545563309",
+						"id": "vertex:contour:1",
+						"origin": "segment_right",
+						"position": [
+							-1.26876795291901,
+							3.25062561035156
+						],
+						"preserved": false,
+						"source_id": "edge_4236798331545563309@0.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_4236798331545563309",
+						"id": "vertex:contour:2",
+						"origin": "segment_left",
+						"position": [
+							0.418768048286438,
+							3.99937438964844
+						],
+						"preserved": false,
+						"source_id": "edge_4236798331545563309@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_4236798331545563309",
+						"id": "vertex:contour:3",
+						"origin": "segment_right",
+						"position": [
+							0.481231927871704,
+							3.80062580108643
+						],
+						"preserved": false,
+						"source_id": "edge_4236798331545563309@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_4236798331545563309",
+						"id": "vertex:contour:4",
+						"origin": "segment_left",
+						"position": [
+							0.538333177566528,
+							3.84479188919067
+						],
+						"preserved": false,
+						"source_id": "edge_4236798331545563309@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_4236798331545563309",
+						"id": "vertex:contour:5",
+						"origin": "segment_right",
+						"position": [
+							0.361666828393936,
+							3.95520830154419
+						],
+						"preserved": false,
+						"source_id": "edge_4236798331545563309@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_4843633052681869758",
+						"id": "vertex:contour:6",
+						"origin": "segment_left",
+						"position": [
+							-0.961666941642761,
+							1.44479155540466
+						],
+						"preserved": false,
+						"source_id": "edge_4843633052681869758@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_4843633052681869758",
+						"id": "vertex:contour:7",
+						"origin": "segment_right",
+						"position": [
+							-1.13833320140839,
+							1.55520796775818
+						],
+						"preserved": false,
+						"source_id": "edge_4843633052681869758@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_4843633052681869758",
+						"id": "vertex:contour:8",
+						"origin": "segment_left",
+						"position": [
+							-1.15049624443054,
+							1.47259175777435
+						],
+						"preserved": false,
+						"source_id": "edge_4843633052681869758@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_4843633052681869758",
+						"id": "vertex:contour:9",
+						"origin": "segment_right",
+						"position": [
+							-0.949503839015961,
+							1.52740776538849
+						],
+						"preserved": false,
+						"source_id": "edge_4843633052681869758@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_669999475508859173",
+						"id": "vertex:contour:10",
+						"origin": "segment_left",
+						"position": [
+							-1.30049633979797,
+							2.02259182929993
+						],
+						"preserved": false,
+						"source_id": "edge_669999475508859173@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_669999475508859173",
+						"id": "vertex:contour:11",
+						"origin": "segment_right",
+						"position": [
+							-1.09950375556946,
+							2.07740807533264
+						],
+						"preserved": false,
+						"source_id": "edge_669999475508859173@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_669999475508859173",
+						"id": "vertex:contour:12",
+						"origin": "segment_left",
+						"position": [
+							-1.20000004768372,
+							1.94583332538605
+						],
+						"preserved": false,
+						"source_id": "edge_669999475508859173@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_669999475508859173",
+						"id": "vertex:contour:13",
+						"origin": "segment_right",
+						"position": [
+							-1.20000004768372,
+							2.15416669845581
+						],
+						"preserved": false,
+						"source_id": "edge_669999475508859173@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_867818737666882905",
+						"id": "vertex:contour:14",
+						"origin": "segment_left",
+						"position": [
+							-1.5,
+							1.94583332538605
+						],
+						"preserved": false,
+						"source_id": "edge_867818737666882905@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_867818737666882905",
+						"id": "vertex:contour:15",
+						"origin": "segment_right",
+						"position": [
+							-1.5,
+							2.15416669845581
+						],
+						"preserved": false,
+						"source_id": "edge_867818737666882905@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_867818737666882905",
+						"id": "vertex:contour:16",
+						"origin": "segment_left",
+						"position": [
+							-1.39770770072937,
+							2.06967163085938
+						],
+						"preserved": false,
+						"source_id": "edge_867818737666882905@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_867818737666882905",
+						"id": "vertex:contour:17",
+						"origin": "segment_right",
+						"position": [
+							-1.60229229927063,
+							2.03032827377319
+						],
+						"preserved": false,
+						"source_id": "edge_867818737666882905@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_6560078186558305588",
+						"id": "vertex:contour:18",
+						"origin": "segment_left",
+						"position": [
+							-1.14770781993866,
+							0.769671618938446
+						],
+						"preserved": false,
+						"source_id": "edge_6560078186558305588@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_6560078186558305588",
+						"id": "vertex:contour:19",
+						"origin": "segment_right",
+						"position": [
+							-1.35229241847992,
+							0.730328381061554
+						],
+						"preserved": false,
+						"source_id": "edge_6560078186558305588@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_6560078186558305588",
+						"id": "vertex:contour:20",
+						"origin": "segment_left",
+						"position": [
+							-1.29195201396942,
+							0.845345318317413
+						],
+						"preserved": false,
+						"source_id": "edge_6560078186558305588@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_6560078186558305588",
+						"id": "vertex:contour:21",
+						"origin": "segment_right",
+						"position": [
+							-1.20804822444916,
+							0.654654681682587
+						],
+						"preserved": false,
+						"source_id": "edge_6560078186558305588@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_8791119708715477847",
+						"id": "vertex:contour:22",
+						"origin": "segment_left",
+						"position": [
+							-0.0419519394636154,
+							1.39534533023834
+						],
+						"preserved": false,
+						"source_id": "edge_8791119708715477847@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_8791119708715477847",
+						"id": "vertex:contour:23",
+						"origin": "segment_right",
+						"position": [
+							0.0419519394636154,
+							1.20465481281281
+						],
+						"preserved": false,
+						"source_id": "edge_8791119708715477847@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_8791119708715477847",
+						"id": "vertex:contour:24",
+						"origin": "segment_left",
+						"position": [
+							-0.0967163145542145,
+							1.26131355762482
+						],
+						"preserved": false,
+						"source_id": "edge_8791119708715477847@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_8791119708715477847",
+						"id": "vertex:contour:25",
+						"origin": "segment_right",
+						"position": [
+							0.0967163145542145,
+							1.33868658542633
+						],
+						"preserved": false,
+						"source_id": "edge_8791119708715477847@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_9025808804380570085",
+						"id": "vertex:contour:26",
+						"origin": "segment_left",
+						"position": [
+							-0.196716323494911,
+							1.51131355762482
+						],
+						"preserved": false,
+						"source_id": "edge_9025808804380570085@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_9025808804380570085",
+						"id": "vertex:contour:27",
+						"origin": "segment_right",
+						"position": [
+							-0.00328369438648224,
+							1.58868658542633
+						],
+						"preserved": false,
+						"source_id": "edge_9025808804380570085@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_9025808804380570085",
+						"id": "vertex:contour:28",
+						"origin": "segment_left",
+						"position": [
+							-0.0765771269798279,
+							1.44850099086761
+						],
+						"preserved": false,
+						"source_id": "edge_9025808804380570085@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_9025808804380570085",
+						"id": "vertex:contour:29",
+						"origin": "segment_right",
+						"position": [
+							-0.123422890901566,
+							1.65149915218353
+						],
+						"preserved": false,
+						"source_id": "edge_9025808804380570085@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_6162007521227243459",
+						"id": "vertex:contour:30",
+						"origin": "segment_left",
+						"position": [
+							-0.72657710313797,
+							1.29850089550018
+						],
+						"preserved": false,
+						"source_id": "edge_6162007521227243459@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_6162007521227243459",
+						"id": "vertex:contour:31",
+						"origin": "segment_right",
+						"position": [
+							-0.77342289686203,
+							1.5014990568161
+						],
+						"preserved": false,
+						"source_id": "edge_6162007521227243459@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_6162007521227243459",
+						"id": "vertex:contour:32",
+						"origin": "segment_left",
+						"position": [
+							-0.836463510990143,
+							1.45809268951416
+						],
+						"preserved": false,
+						"source_id": "edge_6162007521227243459@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_6162007521227243459",
+						"id": "vertex:contour:33",
+						"origin": "segment_right",
+						"position": [
+							-0.663536489009857,
+							1.34190726280212
+						],
+						"preserved": false,
+						"source_id": "edge_6162007521227243459@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_2134750251803119128",
+						"id": "vertex:contour:34",
+						"origin": "segment_left",
+						"position": [
+							1.31353652477264,
+							4.6580924987793
+						],
+						"preserved": false,
+						"source_id": "edge_2134750251803119128@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_2134750251803119128",
+						"id": "vertex:contour:35",
+						"origin": "segment_right",
+						"position": [
+							1.48646342754364,
+							4.54190731048584
+						],
+						"preserved": false,
+						"source_id": "edge_2134750251803119128@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_2134750251803119128",
+						"id": "vertex:contour:36",
+						"origin": "segment_left",
+						"position": [
+							1.43148374557495,
+							4.50070524215698
+						],
+						"preserved": false,
+						"source_id": "edge_2134750251803119128@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_2134750251803119128",
+						"id": "vertex:contour:37",
+						"origin": "segment_right",
+						"position": [
+							1.36851620674133,
+							4.69929456710815
+						],
+						"preserved": false,
+						"source_id": "edge_2134750251803119128@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_8259360882384808152",
+						"id": "vertex:contour:38",
+						"origin": "segment_left",
+						"position": [
+							-0.618516325950623,
+							3.85070514678955
+						],
+						"preserved": false,
+						"source_id": "edge_8259360882384808152@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_8259360882384808152",
+						"id": "vertex:contour:39",
+						"origin": "segment_right",
+						"position": [
+							-0.681483745574951,
+							4.04929494857788
+						],
+						"preserved": false,
+						"source_id": "edge_8259360882384808152@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_8259360882384808152",
+						"id": "vertex:contour:40",
+						"origin": "segment_left",
+						"position": [
+							-0.743169546127319,
+							3.99658489227295
+						],
+						"preserved": false,
+						"source_id": "edge_8259360882384808152@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_8259360882384808152",
+						"id": "vertex:contour:41",
+						"origin": "segment_right",
+						"position": [
+							-0.556830525398254,
+							3.90341520309448
+						],
+						"preserved": false,
+						"source_id": "edge_8259360882384808152@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_6725932534452158106",
+						"id": "vertex:contour:42",
+						"origin": "segment_left",
+						"position": [
+							0.156830504536629,
+							5.79658460617065
+						],
+						"preserved": false,
+						"source_id": "edge_6725932534452158106@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_6725932534452158106",
+						"id": "vertex:contour:43",
+						"origin": "segment_right",
+						"position": [
+							0.343169510364532,
+							5.70341539382935
+						],
+						"preserved": false,
+						"source_id": "edge_6725932534452158106@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_6725932534452158106",
+						"id": "vertex:contour:44",
+						"origin": "segment_left",
+						"position": [
+							0.203415229916573,
+							5.65683031082153
+						],
+						"preserved": false,
+						"source_id": "edge_6725932534452158106@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_6725932534452158106",
+						"id": "vertex:contour:45",
+						"origin": "segment_right",
+						"position": [
+							0.296584784984589,
+							5.84316968917847
+						],
+						"preserved": false,
+						"source_id": "edge_6725932534452158106@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_162695404981094955",
+						"id": "vertex:contour:46",
+						"origin": "segment_left",
+						"position": [
+							-0.0965847745537758,
+							5.80683040618896
+						],
+						"preserved": false,
+						"source_id": "edge_162695404981094955@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_162695404981094955",
+						"id": "vertex:contour:47",
+						"origin": "segment_right",
+						"position": [
+							-0.00341522693634033,
+							5.9931697845459
+						],
+						"preserved": false,
+						"source_id": "edge_162695404981094955@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_162695404981094955",
+						"id": "vertex:contour:48",
+						"origin": "segment_left",
+						"position": [
+							0.0435334034264088,
+							5.85415029525757
+						],
+						"preserved": false,
+						"source_id": "edge_162695404981094955@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_162695404981094955",
+						"id": "vertex:contour:49",
+						"origin": "segment_right",
+						"position": [
+							-0.143533408641815,
+							5.94584989547729
+						],
+						"preserved": false,
+						"source_id": "edge_162695404981094955@1.000000000"
+					},
+					{
+						"curve_t": 0.0,
+						"edge_id": "edge_4236798331545563309",
+						"id": "vertex:contour:50",
+						"origin": "segment_left",
+						"position": [
+							-1.2064665555954,
+							3.30415010452271
+						],
+						"preserved": false,
+						"source_id": "edge_4236798331545563309@0.000000000"
+					},
+					{
+						"curve_t": 0.0,
+						"edge_id": "edge_4236798331545563309",
+						"id": "vertex:contour:51",
+						"origin": "segment_right",
+						"position": [
+							-1.39353334903717,
+							3.39584970474243
+						],
+						"preserved": false,
+						"source_id": "edge_4236798331545563309@0.000000000"
+					},
+					{
+						"curve_t": 0.0,
+						"edge_id": "edge_4236798331545563309",
+						"id": "vertex:contour:52",
+						"origin": "join_center",
+						"position": [
+							-1.29999995231628,
+							3.34999990463257
+						],
+						"preserved": false,
+						"source_id": "edge_4236798331545563309@0.000000000"
+					},
+					{
+						"curve_t": 0.0,
+						"edge_id": "edge_4236798331545563309",
+						"id": "vertex:contour:53",
+						"origin": "join_outer_previous",
+						"position": [
+							-1.39353334903717,
+							3.39584970474243
+						],
+						"preserved": false,
+						"source_id": "edge_4236798331545563309@0.000000000"
+					},
+					{
+						"curve_t": 0.0,
+						"edge_id": "edge_4236798331545563309",
+						"id": "vertex:contour:54",
+						"origin": "join_outer_next",
+						"position": [
+							-1.26876795291901,
+							3.25062561035156
+						],
+						"preserved": false,
+						"source_id": "edge_4236798331545563309@0.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_4236798331545563309",
+						"id": "vertex:contour:55",
+						"origin": "join_center",
+						"position": [
+							0.449999988079071,
+							3.90000009536743
+						],
+						"preserved": false,
+						"source_id": "edge_4236798331545563309@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_4236798331545563309",
+						"id": "vertex:contour:56",
+						"origin": "join_outer_previous",
+						"position": [
+							0.418768048286438,
+							3.99937438964844
+						],
+						"preserved": false,
+						"source_id": "edge_4236798331545563309@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_4236798331545563309",
+						"id": "vertex:contour:57",
+						"origin": "join_outer_next",
+						"position": [
+							0.538333177566528,
+							3.84479188919067
+						],
+						"preserved": false,
+						"source_id": "edge_4236798331545563309@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_4843633052681869758",
+						"id": "vertex:contour:58",
+						"origin": "join_center",
+						"position": [
+							-1.05000007152557,
+							1.49999976158142
+						],
+						"preserved": false,
+						"source_id": "edge_4843633052681869758@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_4843633052681869758",
+						"id": "vertex:contour:59",
+						"origin": "join_outer_previous",
+						"position": [
+							-0.961666941642761,
+							1.44479155540466
+						],
+						"preserved": false,
+						"source_id": "edge_4843633052681869758@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_4843633052681869758",
+						"id": "vertex:contour:60",
+						"origin": "join_outer_next",
+						"position": [
+							-1.15049624443054,
+							1.47259175777435
+						],
+						"preserved": false,
+						"source_id": "edge_4843633052681869758@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_669999475508859173",
+						"id": "vertex:contour:61",
+						"origin": "join_center",
+						"position": [
+							-1.20000004768372,
+							2.04999995231628
+						],
+						"preserved": false,
+						"source_id": "edge_669999475508859173@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_669999475508859173",
+						"id": "vertex:contour:62",
+						"origin": "join_outer_previous",
+						"position": [
+							-1.09950375556946,
+							2.07740807533264
+						],
+						"preserved": false,
+						"source_id": "edge_669999475508859173@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_669999475508859173",
+						"id": "vertex:contour:63",
+						"origin": "join_miter",
+						"position": [
+							-1.12043786048889,
+							2.15416669845581
+						],
+						"preserved": false,
+						"source_id": "edge_669999475508859173@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_669999475508859173",
+						"id": "vertex:contour:64",
+						"origin": "join_outer_next",
+						"position": [
+							-1.20000004768372,
+							2.15416669845581
+						],
+						"preserved": false,
+						"source_id": "edge_669999475508859173@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_867818737666882905",
+						"id": "vertex:contour:65",
+						"origin": "join_center",
+						"position": [
+							-1.5,
+							2.04999995231628
+						],
+						"preserved": false,
+						"source_id": "edge_867818737666882905@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_867818737666882905",
+						"id": "vertex:contour:66",
+						"origin": "join_outer_previous",
+						"position": [
+							-1.5,
+							2.15416669845581
+						],
+						"preserved": false,
+						"source_id": "edge_867818737666882905@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_867818737666882905",
+						"id": "vertex:contour:67",
+						"origin": "join_miter",
+						"position": [
+							-1.62610733509064,
+							2.15416669845581
+						],
+						"preserved": false,
+						"source_id": "edge_867818737666882905@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_867818737666882905",
+						"id": "vertex:contour:68",
+						"origin": "join_outer_next",
+						"position": [
+							-1.60229229927063,
+							2.03032827377319
+						],
+						"preserved": false,
+						"source_id": "edge_867818737666882905@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_6560078186558305588",
+						"id": "vertex:contour:69",
+						"origin": "join_center",
+						"position": [
+							-1.25000011920929,
+							0.75
+						],
+						"preserved": false,
+						"source_id": "edge_6560078186558305588@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_6560078186558305588",
+						"id": "vertex:contour:70",
+						"origin": "join_outer_previous",
+						"position": [
+							-1.35229241847992,
+							0.730328381061554
+						],
+						"preserved": false,
+						"source_id": "edge_6560078186558305588@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_6560078186558305588",
+						"id": "vertex:contour:71",
+						"origin": "join_miter",
+						"position": [
+							-1.32762205600739,
+							0.602042198181152
+						],
+						"preserved": false,
+						"source_id": "edge_6560078186558305588@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_6560078186558305588",
+						"id": "vertex:contour:72",
+						"origin": "join_outer_next",
+						"position": [
+							-1.20804822444916,
+							0.654654681682587
+						],
+						"preserved": false,
+						"source_id": "edge_6560078186558305588@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_8791119708715477847",
+						"id": "vertex:contour:73",
+						"origin": "join_center",
+						"position": [
+							0.0,
+							1.30000007152557
+						],
+						"preserved": false,
+						"source_id": "edge_8791119708715477847@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_8791119708715477847",
+						"id": "vertex:contour:74",
+						"origin": "join_outer_previous",
+						"position": [
+							0.0419519394636154,
+							1.20465481281281
+						],
+						"preserved": false,
+						"source_id": "edge_8791119708715477847@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_8791119708715477847",
+						"id": "vertex:contour:75",
+						"origin": "join_miter",
+						"position": [
+							0.134109318256378,
+							1.24520409107208
+						],
+						"preserved": false,
+						"source_id": "edge_8791119708715477847@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_8791119708715477847",
+						"id": "vertex:contour:76",
+						"origin": "join_outer_next",
+						"position": [
+							0.0967163145542145,
+							1.33868658542633
+						],
+						"preserved": false,
+						"source_id": "edge_8791119708715477847@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_9025808804380570085",
+						"id": "vertex:contour:77",
+						"origin": "join_center",
+						"position": [
+							-0.100000008940697,
+							1.55000007152557
+						],
+						"preserved": false,
+						"source_id": "edge_9025808804380570085@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_9025808804380570085",
+						"id": "vertex:contour:78",
+						"origin": "join_outer_previous",
+						"position": [
+							-0.00328369438648224,
+							1.58868658542633
+						],
+						"preserved": false,
+						"source_id": "edge_9025808804380570085@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_9025808804380570085",
+						"id": "vertex:contour:79",
+						"origin": "join_miter",
+						"position": [
+							-0.0364380925893784,
+							1.67157256603241
+						],
+						"preserved": false,
+						"source_id": "edge_9025808804380570085@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_9025808804380570085",
+						"id": "vertex:contour:80",
+						"origin": "join_outer_next",
+						"position": [
+							-0.123422890901566,
+							1.65149915218353
+						],
+						"preserved": false,
+						"source_id": "edge_9025808804380570085@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_6162007521227243459",
+						"id": "vertex:contour:81",
+						"origin": "join_center",
+						"position": [
+							-0.75,
+							1.39999997615814
+						],
+						"preserved": false,
+						"source_id": "edge_6162007521227243459@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_6162007521227243459",
+						"id": "vertex:contour:82",
+						"origin": "join_outer_previous",
+						"position": [
+							-0.72657710313797,
+							1.29850089550018
+						],
+						"preserved": false,
+						"source_id": "edge_6162007521227243459@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_6162007521227243459",
+						"id": "vertex:contour:83",
+						"origin": "join_outer_next",
+						"position": [
+							-0.836463510990143,
+							1.45809268951416
+						],
+						"preserved": false,
+						"source_id": "edge_6162007521227243459@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_2134750251803119128",
+						"id": "vertex:contour:84",
+						"origin": "join_center",
+						"position": [
+							1.39999997615814,
+							4.59999990463257
+						],
+						"preserved": false,
+						"source_id": "edge_2134750251803119128@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_2134750251803119128",
+						"id": "vertex:contour:85",
+						"origin": "join_outer_previous",
+						"position": [
+							1.48646342754364,
+							4.54190731048584
+						],
+						"preserved": false,
+						"source_id": "edge_2134750251803119128@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_2134750251803119128",
+						"id": "vertex:contour:86",
+						"origin": "join_outer_next",
+						"position": [
+							1.36851620674133,
+							4.69929456710815
+						],
+						"preserved": false,
+						"source_id": "edge_2134750251803119128@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_8259360882384808152",
+						"id": "vertex:contour:87",
+						"origin": "join_center",
+						"position": [
+							-0.650000035762787,
+							3.95000004768372
+						],
+						"preserved": false,
+						"source_id": "edge_8259360882384808152@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_8259360882384808152",
+						"id": "vertex:contour:88",
+						"origin": "join_outer_previous",
+						"position": [
+							-0.618516325950623,
+							3.85070514678955
+						],
+						"preserved": false,
+						"source_id": "edge_8259360882384808152@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_8259360882384808152",
+						"id": "vertex:contour:89",
+						"origin": "join_outer_next",
+						"position": [
+							-0.743169546127319,
+							3.99658489227295
+						],
+						"preserved": false,
+						"source_id": "edge_8259360882384808152@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_6725932534452158106",
+						"id": "vertex:contour:90",
+						"origin": "join_center",
+						"position": [
+							0.25,
+							5.75
+						],
+						"preserved": false,
+						"source_id": "edge_6725932534452158106@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_6725932534452158106",
+						"id": "vertex:contour:91",
+						"origin": "join_outer_previous",
+						"position": [
+							0.343169510364532,
+							5.70341539382935
+						],
+						"preserved": false,
+						"source_id": "edge_6725932534452158106@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_6725932534452158106",
+						"id": "vertex:contour:92",
+						"origin": "join_miter",
+						"position": [
+							0.389754265546799,
+							5.79658508300781
+						],
+						"preserved": false,
+						"source_id": "edge_6725932534452158106@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_6725932534452158106",
+						"id": "vertex:contour:93",
+						"origin": "join_outer_next",
+						"position": [
+							0.296584784984589,
+							5.84316968917847
+						],
+						"preserved": false,
+						"source_id": "edge_6725932534452158106@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_162695404981094955",
+						"id": "vertex:contour:94",
+						"origin": "join_center",
+						"position": [
+							-0.0500000007450581,
+							5.90000009536743
+						],
+						"preserved": false,
+						"source_id": "edge_162695404981094955@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_162695404981094955",
+						"id": "vertex:contour:95",
+						"origin": "join_outer_previous",
+						"position": [
+							-0.00341522693634033,
+							5.9931697845459
+						],
+						"preserved": false,
+						"source_id": "edge_162695404981094955@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_162695404981094955",
+						"id": "vertex:contour:96",
+						"origin": "join_miter",
+						"position": [
+							-0.0973212048411369,
+							6.04012298583984
+						],
+						"preserved": false,
+						"source_id": "edge_162695404981094955@1.000000000"
+					},
+					{
+						"curve_t": 1.0,
+						"edge_id": "edge_162695404981094955",
+						"id": "vertex:contour:97",
+						"origin": "join_outer_next",
+						"position": [
+							-0.143533408641815,
+							5.94584989547729
+						],
+						"preserved": false,
+						"source_id": "edge_162695404981094955@1.000000000"
+					}
+				],
+				"worst_aspect_ratio": 0.0
+			}
+		},
+		"recipe": {
+			"method": "constrained_mesh",
+			"parameters": {
+				"mesh_character": 0.64,
+				"optimize_mesh": true,
+				"passes": 3,
+				"passes_override": false,
+				"relaxation": 0.402,
+				"relaxation_override": false,
+				"seeding_method": "poisson_fill"
+			}
+		}
+	},
+	"sampling": {
+		"bakes": {
+			"adaptive": {
+				"algorithm_version": 6,
+				"bake_id": "bake_1410704832842482547",
+				"boundary_refinement_complete": true,
+				"boundary_refinement_count": 0,
+				"boundary_refinement_limit_reached": false,
+				"boundary_refinement_unresolved_corner_count": 0,
+				"boundary_stats": [
+					{
+						"effective_spacing": 0.55,
+						"input_id": "",
+						"role": "outer",
+						"sample_count": 51
+					}
+				],
+				"chains": [
+					{
+						"chain_id": "chain_9126509653625594871",
+						"closed": true,
+						"effective_spacing": 0.55,
+						"input_id": "",
+						"samples": [
+							{
+								"curve_t": 0.0,
+								"edge_id": "edge_4236798331545563309",
+								"id": "sample:edge_4236798331545563309:point_3111711104369904636",
+								"position": [
+									-1.29999995231628,
+									3.34999990463257
+								],
+								"preserved": true,
+								"source_point_id": "point_3111711104369904636"
+							},
+							{
+								"curve_t": 0.25,
+								"edge_id": "edge_4236798331545563309",
+								"id": "sample:edge_4236798331545563309:0.250000000",
+								"position": [
+									-0.862499952316284,
+									3.48749995231628
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.5,
+								"edge_id": "edge_4236798331545563309",
+								"id": "sample:edge_4236798331545563309:0.500000000",
+								"position": [
+									-0.424999982118607,
+									3.625
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.75,
+								"edge_id": "edge_4236798331545563309",
+								"id": "sample:edge_4236798331545563309:0.750000000",
+								"position": [
+									0.0125000178813934,
+									3.76250004768372
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "edge_4236798331545563309",
+								"id": "sample:edge_4236798331545563309:point_2909770309667252781",
+								"position": [
+									0.449999988079071,
+									3.90000009536743
+								],
+								"preserved": true,
+								"source_point_id": "point_2909770309667252781"
+							},
+							{
+								"curve_t": 0.125,
+								"edge_id": "edge_4843633052681869758",
+								"id": "sample:edge_4843633052681869758:0.125000000",
+								"position": [
+									0.262499988079071,
+									3.59999990463257
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.25,
+								"edge_id": "edge_4843633052681869758",
+								"id": "sample:edge_4843633052681869758:0.250000000",
+								"position": [
+									0.074999988079071,
+									3.29999995231628
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.375,
+								"edge_id": "edge_4843633052681869758",
+								"id": "sample:edge_4843633052681869758:0.375000000",
+								"position": [
+									-0.11250002682209,
+									3.0
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.5,
+								"edge_id": "edge_4843633052681869758",
+								"id": "sample:edge_4843633052681869758:0.500000000",
+								"position": [
+									-0.300000041723251,
+									2.69999980926514
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.625,
+								"edge_id": "edge_4843633052681869758",
+								"id": "sample:edge_4843633052681869758:0.625000000",
+								"position": [
+									-0.487500071525574,
+									2.39999961853027
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.75,
+								"edge_id": "edge_4843633052681869758",
+								"id": "sample:edge_4843633052681869758:0.750000000",
+								"position": [
+									-0.675000071525574,
+									2.09999990463257
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.875,
+								"edge_id": "edge_4843633052681869758",
+								"id": "sample:edge_4843633052681869758:0.875000000",
+								"position": [
+									-0.862500071525574,
+									1.79999983310699
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "edge_4843633052681869758",
+								"id": "sample:edge_4843633052681869758:point_4281767337458130864",
+								"position": [
+									-1.05000007152557,
+									1.49999976158142
+								],
+								"preserved": true,
+								"source_point_id": "point_4281767337458130864"
+							},
+							{
+								"curve_t": 0.5,
+								"edge_id": "edge_669999475508859173",
+								"id": "sample:edge_669999475508859173:0.500000000",
+								"position": [
+									-1.125,
+									1.77499985694885
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "edge_669999475508859173",
+								"id": "sample:edge_669999475508859173:point_8865333175039303813",
+								"position": [
+									-1.20000004768372,
+									2.04999995231628
+								],
+								"preserved": true,
+								"source_point_id": "point_8865333175039303813"
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "edge_867818737666882905",
+								"id": "sample:edge_867818737666882905:point_2501239763325254797",
+								"position": [
+									-1.5,
+									2.04999995231628
+								],
+								"preserved": true,
+								"source_point_id": "point_2501239763325254797"
+							},
+							{
+								"curve_t": 0.25,
+								"edge_id": "edge_6560078186558305588",
+								"id": "sample:edge_6560078186558305588:0.250000000",
+								"position": [
+									-1.4375,
+									1.72499990463257
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.5,
+								"edge_id": "edge_6560078186558305588",
+								"id": "sample:edge_6560078186558305588:0.500000000",
+								"position": [
+									-1.375,
+									1.39999985694885
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.75,
+								"edge_id": "edge_6560078186558305588",
+								"id": "sample:edge_6560078186558305588:0.750000000",
+								"position": [
+									-1.3125,
+									1.07499992847443
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "edge_6560078186558305588",
+								"id": "sample:edge_6560078186558305588:point_7730126270678149234",
+								"position": [
+									-1.25000011920929,
+									0.75
+								],
+								"preserved": true,
+								"source_point_id": "point_7730126270678149234"
+							},
+							{
+								"curve_t": 0.25,
+								"edge_id": "edge_8791119708715477847",
+								"id": "sample:edge_8791119708715477847:0.250000000",
+								"position": [
+									-0.937500059604645,
+									0.887500047683716
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.5,
+								"edge_id": "edge_8791119708715477847",
+								"id": "sample:edge_8791119708715477847:0.500000000",
+								"position": [
+									-0.625000059604645,
+									1.02499997615814
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.75,
+								"edge_id": "edge_8791119708715477847",
+								"id": "sample:edge_8791119708715477847:0.750000000",
+								"position": [
+									-0.312500029802322,
+									1.16250002384186
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "edge_8791119708715477847",
+								"id": "sample:edge_8791119708715477847:point_6867145972024356861",
+								"position": [
+									0.0,
+									1.30000007152557
+								],
+								"preserved": true,
+								"source_point_id": "point_6867145972024356861"
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "edge_9025808804380570085",
+								"id": "sample:edge_9025808804380570085:point_21522006469275509",
+								"position": [
+									-0.100000008940697,
+									1.55000007152557
+								],
+								"preserved": true,
+								"source_point_id": "point_21522006469275509"
+							},
+							{
+								"curve_t": 0.5,
+								"edge_id": "edge_6162007521227243459",
+								"id": "sample:edge_6162007521227243459:0.500000000",
+								"position": [
+									-0.424999982118607,
+									1.47500002384186
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "edge_6162007521227243459",
+								"id": "sample:edge_6162007521227243459:point_3682234394956394394",
+								"position": [
+									-0.75,
+									1.39999997615814
+								],
+								"preserved": true,
+								"source_point_id": "point_3682234394956394394"
+							},
+							{
+								"curve_t": 0.125,
+								"edge_id": "edge_2134750251803119128",
+								"id": "sample:edge_2134750251803119128:0.125000000",
+								"position": [
+									-0.481249988079071,
+									1.80000007152557
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.25,
+								"edge_id": "edge_2134750251803119128",
+								"id": "sample:edge_2134750251803119128:0.250000000",
+								"position": [
+									-0.212500005960464,
+									2.20000004768372
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.375,
+								"edge_id": "edge_2134750251803119128",
+								"id": "sample:edge_2134750251803119128:0.375000000",
+								"position": [
+									0.0562499836087227,
+									2.59999990463257
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.5,
+								"edge_id": "edge_2134750251803119128",
+								"id": "sample:edge_2134750251803119128:0.500000000",
+								"position": [
+									0.324999958276749,
+									3.0
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.625,
+								"edge_id": "edge_2134750251803119128",
+								"id": "sample:edge_2134750251803119128:0.625000000",
+								"position": [
+									0.593749940395355,
+									3.40000009536743
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.75,
+								"edge_id": "edge_2134750251803119128",
+								"id": "sample:edge_2134750251803119128:0.750000000",
+								"position": [
+									0.862499952316284,
+									3.79999995231628
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.875,
+								"edge_id": "edge_2134750251803119128",
+								"id": "sample:edge_2134750251803119128:0.875000000",
+								"position": [
+									1.13124990463257,
+									4.19999980926514
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "edge_2134750251803119128",
+								"id": "sample:edge_2134750251803119128:point_8539835518405984058",
+								"position": [
+									1.39999997615814,
+									4.59999990463257
+								],
+								"preserved": true,
+								"source_point_id": "point_8539835518405984058"
+							},
+							{
+								"curve_t": 0.25,
+								"edge_id": "edge_8259360882384808152",
+								"id": "sample:edge_8259360882384808152:0.250000000",
+								"position": [
+									0.887499928474426,
+									4.4375
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.5,
+								"edge_id": "edge_8259360882384808152",
+								"id": "sample:edge_8259360882384808152:0.500000000",
+								"position": [
+									0.374999970197678,
+									4.27499961853027
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.75,
+								"edge_id": "edge_8259360882384808152",
+								"id": "sample:edge_8259360882384808152:0.750000000",
+								"position": [
+									-0.137500017881393,
+									4.11250019073486
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "edge_8259360882384808152",
+								"id": "sample:edge_8259360882384808152:point_3220192327744383771",
+								"position": [
+									-0.650000035762787,
+									3.95000004768372
+								],
+								"preserved": true,
+								"source_point_id": "point_3220192327744383771"
+							},
+							{
+								"curve_t": 0.25,
+								"edge_id": "edge_6725932534452158106",
+								"id": "sample:edge_6725932534452158106:0.250000000",
+								"position": [
+									-0.425000011920929,
+									4.40000009536743
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.5,
+								"edge_id": "edge_6725932534452158106",
+								"id": "sample:edge_6725932534452158106:0.500000000",
+								"position": [
+									-0.200000017881393,
+									4.85000038146973
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.75,
+								"edge_id": "edge_6725932534452158106",
+								"id": "sample:edge_6725932534452158106:0.750000000",
+								"position": [
+									0.0249999910593033,
+									5.30000019073486
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "edge_6725932534452158106",
+								"id": "sample:edge_6725932534452158106:point_1655539396643663161",
+								"position": [
+									0.25,
+									5.75
+								],
+								"preserved": true,
+								"source_point_id": "point_1655539396643663161"
+							},
+							{
+								"curve_t": 1.0,
+								"edge_id": "edge_162695404981094955",
+								"id": "sample:edge_162695404981094955:point_7925912949775006252",
+								"position": [
+									-0.0500000007450581,
+									5.90000009536743
+								],
+								"preserved": true,
+								"source_point_id": "point_7925912949775006252"
+							},
+							{
+								"curve_t": 0.125,
+								"edge_id": "edge_5009344052863439352",
+								"id": "sample:edge_5009344052863439352:0.125000000",
+								"position": [
+									-0.206249997019768,
+									5.58125019073486
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.25,
+								"edge_id": "edge_5009344052863439352",
+								"id": "sample:edge_5009344052863439352:0.250000000",
+								"position": [
+									-0.362500011920929,
+									5.26250028610229
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.375,
+								"edge_id": "edge_5009344052863439352",
+								"id": "sample:edge_5009344052863439352:0.375000000",
+								"position": [
+									-0.518750011920929,
+									4.94375038146973
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.5,
+								"edge_id": "edge_5009344052863439352",
+								"id": "sample:edge_5009344052863439352:0.500000000",
+								"position": [
+									-0.675000011920929,
+									4.625
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.625,
+								"edge_id": "edge_5009344052863439352",
+								"id": "sample:edge_5009344052863439352:0.625000000",
+								"position": [
+									-0.831250011920929,
+									4.30624961853027
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.75,
+								"edge_id": "edge_5009344052863439352",
+								"id": "sample:edge_5009344052863439352:0.750000000",
+								"position": [
+									-0.987500011920929,
+									3.98749971389771
+								],
+								"preserved": false,
+								"source_point_id": ""
+							},
+							{
+								"curve_t": 0.875,
+								"edge_id": "edge_5009344052863439352",
+								"id": "sample:edge_5009344052863439352:0.875000000",
+								"position": [
+									-1.14374995231628,
+									3.66874980926514
+								],
+								"preserved": false,
+								"source_point_id": ""
+							}
+						],
+						"topology_role": "outer"
+					}
+				],
+				"constraint_sample_count": 51,
+				"cuts": [],
+				"errors": [],
+				"hole_count": 0,
+				"method": "adaptive",
+				"parameters": {
+					"boundary_refinements": {},
+					"feature_detail": 0.55,
+					"spacing": 0.55
+				},
+				"preserve_count": 13,
+				"sample_count": 51,
+				"semantic_source_signature": {
+					"geometry_tolerance": 0.00055,
+					"meshing_algorithm": 5.0,
+					"recipe_hash": "83b3bb413e898ca18e00478db3e3a3d09c454bb845c409777d399d470a3b5ee4",
+					"recipe_version": 2.0,
+					"sampling_algorithm": 6.0,
+					"scalars": [
+						1.0,
+						1.0
+					],
+					"seeding_algorithm": 2.0,
+					"topology_hash": "96162abad5c41c5192d70748b4fbde55c19e6572ac249cc145b6cd51db0af98c",
+					"vectors": [
+						[
+							-0.0500000007450581,
+							5.90000009536743
+						],
+						[
+							0.100000001490116,
+							-0.0500000305473804
+						],
+						[
+							-0.416666656732559,
+							-0.850000083446503
+						],
+						[
+							0.25,
+							5.75
+						],
+						[
+							-0.300000011920929,
+							-0.599999964237213
+						],
+						[
+							-0.100000001490116,
+							0.0500000305473804
+						],
+						[
+							-0.650000035762787,
+							3.95000004768372
+						],
+						[
+							0.683333337306976,
+							0.216666623950005
+						],
+						[
+							0.300000011920929,
+							0.599999964237213
+						],
+						[
+							1.39999997615814,
+							4.59999990463257
+						],
+						[
+							-0.716666698455811,
+							-1.06666660308838
+						],
+						[
+							-0.683333337306976,
+							-0.216666623950005
+						],
+						[
+							-0.75,
+							1.39999997615814
+						],
+						[
+							0.216666653752327,
+							0.0500000305473804
+						],
+						[
+							0.716666698455811,
+							1.06666660308838
+						],
+						[
+							-0.100000008940697,
+							1.55000007152557
+						],
+						[
+							0.0333333350718021,
+							-0.0833333358168602
+						],
+						[
+							-0.216666653752327,
+							-0.0500000305473804
+						],
+						[
+							0.0,
+							1.30000007152557
+						],
+						[
+							-0.416666716337204,
+							-0.183333352208138
+						],
+						[
+							-0.0333333350718021,
+							0.0833333358168602
+						],
+						[
+							-1.25000011920929,
+							0.75
+						],
+						[
+							-0.0833332911133766,
+							0.433333307504654
+						],
+						[
+							0.416666716337204,
+							0.183333352208138
+						],
+						[
+							-1.5,
+							2.04999995231628
+						],
+						[
+							0.0999999865889549,
+							0.0
+						],
+						[
+							0.0833332911133766,
+							-0.433333307504654
+						],
+						[
+							-1.20000004768372,
+							2.04999995231628
+						],
+						[
+							0.0499999932944775,
+							-0.183333396911621
+						],
+						[
+							-0.0999999865889549,
+							0.0
+						],
+						[
+							-1.05000007152557,
+							1.49999976158142
+						],
+						[
+							0.5,
+							0.800000131130219
+						],
+						[
+							-0.0499999932944775,
+							0.183333396911621
+						],
+						[
+							0.449999988079071,
+							3.90000009536743
+						],
+						[
+							-0.583333313465118,
+							-0.183333396911621
+						],
+						[
+							-0.5,
+							-0.800000131130219
+						],
+						[
+							-1.29999995231628,
+							3.34999990463257
+						],
+						[
+							0.416666656732559,
+							0.850000083446503
+						],
+						[
+							0.583333313465118,
+							0.183333396911621
+						],
+						[
+							1.0,
+							0.0
+						],
+						[
+							0.0,
+							1.0
+						],
+						[
+							0.0,
+							0.0
+						]
+					],
+					"version": 1.0
+				},
+				"source_fingerprint": "5faf4bfdfede5dfb3e5f28b70069bfa8938ab4b848b17c391c0f9fcb9da1fc8d",
+				"valid": true
+			}
+		},
+		"recipe": {
+			"method": "adaptive",
+			"parameters": {
+				"boundary_refinements": {},
+				"feature_detail": 0.55,
+				"spacing": 0.55
+			}
+		}
+	},
+	"schema_version": 71,
+	"sdf": {
+		"bake": {},
+		"last_error": "",
+		"last_failure_fingerprint": "",
+		"recipe": {
+			"method": "single_channel_sdf",
+			"parameters": {
+				"resolution": 256,
+				"spread_px": 16.0
+			}
+		}
+	},
+	"seeding": {
+		"bakes": {
+			"poisson_fill": {
+				"algorithm_version": 2.0,
+				"bake_id": "seeding_bake_3430697815379177539",
+				"edited": false,
+				"errors": [],
+				"flow_seed_count": 0.0,
+				"gap_seed_count": 0.0,
+				"guide_fingerprint": "",
+				"guide_id": "",
+				"guide_ids": [],
+				"guide_stats": [],
+				"guides_fingerprint": "2e1cfa82b035c26cbbbdae632cea070514eb8b773f616aaeaf668e2f0be8f10d",
+				"method": "poisson_fill",
+				"parameters": {
+					"constraint_clearance_factor": 0.5,
+					"seed": 1,
+					"spacing": 0.55
+				},
+				"sampling_bake_id": "bake_1410704832842482547",
+				"sampling_fingerprint": "2e3b46eb400c336851be19629bc1a2b6b513cc0d82fd9b1617814c138a8b1f2d",
+				"seed_count": 0,
+				"seeds": [],
+				"valid": true
+			}
+		},
+		"recipe": {
+			"method": "poisson_fill",
+			"parameters": {
+				"constraint_clearance_factor": 0.5,
+				"seed": 1,
+				"spacing": 0.55
+			}
+		}
+	},
+	"uv_mapping": {
+		"bakes": {},
+		"last_error": "",
+		"last_failure_fingerprint": "",
+		"recipe": {
+			"method": "bounds_planar",
+			"parameters": {
+				"mesh_method": "constrained_mesh",
+				"offset_u": 0.0,
+				"offset_v": 0.0,
+				"padding": 0.0625,
+				"preserve_aspect": true,
+				"rotation": 0.0,
+				"scale": 1.0
+			}
+		}
+	},
+	"weighting": {
+		"next_style_index": 1,
+		"styles": []
+	}
+}

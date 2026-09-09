@@ -1,0 +1,634 @@
+{
+	"animation": {
+		"legacy_path_follow_motions": [],
+		"next_state_index": 4,
+		"simulation_contract": {
+			"next_parameter_index": 1,
+			"parameters": [
+				{
+					"id": "parameter_speed",
+					"name": "speed",
+					"type": "number"
+				},
+				{
+					"id": "parameter_grounded",
+					"name": "grounded",
+					"type": "bool"
+				}
+			],
+			"source": "Asset Animation"
+		},
+		"states": [
+			{
+				"cycle_duration": 1.0,
+				"id": "state_idle",
+				"markers": [
+					{
+						"event_id": "rustle",
+						"id": "marker_idle_01",
+						"kind": "sfx",
+						"phase": 0.52
+					}
+				],
+				"motions": [
+					{
+						"domain": "outer",
+						"enabled": true,
+						"guide_ids": [],
+						"id": "motion_idle_01",
+						"name": "Idle Bob",
+						"parameters": {
+							"cycles": 1.0,
+							"distance": 0.25
+						},
+						"phase_offset": 0.0,
+						"primitive": "bob",
+						"target_component_id": "",
+						"target_scope": "asset"
+					}
+				],
+				"name": "IDLE",
+				"next_marker_index": 2,
+				"next_motion_index": 2,
+				"next_transition_index": 2,
+				"transitions": [
+					{
+						"blend_duration": 0.15,
+						"entry_mode": "restart",
+						"exit_phase": 0.0,
+						"exit_policy": "any_phase",
+						"id": "transition_idle_01",
+						"next_rule_index": 2,
+						"rules": [
+							{
+								"id": "rule_idle_01",
+								"operator": "greater",
+								"parameter_id": "parameter_speed",
+								"value": 0.1
+							}
+						],
+						"target_state_id": "state_walk"
+					}
+				]
+			},
+			{
+				"cycle_duration": 1.0,
+				"id": "state_walk",
+				"markers": [
+					{
+						"event_id": "footstep",
+						"id": "marker_walk_01",
+						"kind": "sfx",
+						"phase": 0.25
+					}
+				],
+				"motions": [
+					{
+						"domain": "outer",
+						"enabled": true,
+						"guide_ids": [],
+						"id": "motion_walk_01",
+						"name": "Walk Bob",
+						"parameters": {
+							"cycles": 1.0,
+							"distance": 0.5
+						},
+						"phase_offset": 0.0,
+						"primitive": "bob",
+						"target_component_id": "",
+						"target_scope": "asset"
+					}
+				],
+				"name": "WALK",
+				"next_marker_index": 2,
+				"next_motion_index": 2,
+				"next_transition_index": 3,
+				"transitions": [
+					{
+						"blend_duration": 0.15,
+						"entry_mode": "restart",
+						"exit_phase": 0.0,
+						"exit_policy": "any_phase",
+						"id": "transition_walk_01",
+						"next_rule_index": 2,
+						"rules": [
+							{
+								"id": "rule_walk_idle_01",
+								"operator": "less_equal",
+								"parameter_id": "parameter_speed",
+								"value": 0.1
+							}
+						],
+						"target_state_id": "state_idle"
+					},
+					{
+						"blend_duration": 0.15,
+						"entry_mode": "preserve_phase",
+						"exit_phase": 0.0,
+						"exit_policy": "any_phase",
+						"id": "transition_walk_02",
+						"next_rule_index": 2,
+						"rules": [
+							{
+								"id": "rule_walk_run_01",
+								"operator": "greater",
+								"parameter_id": "parameter_speed",
+								"value": 0.65
+							}
+						],
+						"target_state_id": "state_run"
+					}
+				]
+			},
+			{
+				"cycle_duration": 1.0,
+				"id": "state_run",
+				"markers": [
+					{
+						"event_id": "footstep",
+						"id": "marker_run_01",
+						"kind": "sfx",
+						"phase": 0.18
+					}
+				],
+				"motions": [
+					{
+						"domain": "outer",
+						"enabled": true,
+						"guide_ids": [],
+						"id": "motion_run_01",
+						"name": "Run Bob",
+						"parameters": {
+							"cycles": 1.0,
+							"distance": 0.8
+						},
+						"phase_offset": 0.0,
+						"primitive": "bob",
+						"target_component_id": "",
+						"target_scope": "asset"
+					},
+					{
+						"domain": "inner",
+						"enabled": true,
+						"guide_ids": [],
+						"id": "motion_run_02",
+						"name": "Run Sway",
+						"parameters": {
+							"cycles": 1.0,
+							"strength": 0.5
+						},
+						"phase_offset": 0.0,
+						"primitive": "spine_sway",
+						"target_component_id": "",
+						"target_scope": "component"
+					}
+				],
+				"name": "RUN",
+				"next_marker_index": 2,
+				"next_motion_index": 3,
+				"next_transition_index": 2,
+				"transitions": [
+					{
+						"blend_duration": 0.15,
+						"entry_mode": "preserve_phase",
+						"exit_phase": 0.0,
+						"exit_policy": "any_phase",
+						"id": "transition_run_01",
+						"next_rule_index": 2,
+						"rules": [
+							{
+								"id": "rule_run_01",
+								"operator": "less_equal",
+								"parameter_id": "parameter_speed",
+								"value": 0.65
+							}
+						],
+						"target_state_id": "state_walk"
+					}
+				]
+			}
+		]
+	},
+	"asset_category": "single",
+	"asset_pivot": [
+		0.0,
+		0.0
+	],
+	"asset_type": "props",
+	"authored_facing": "neutral",
+	"components": [
+		{
+			"catch_parent_component_id": "",
+			"chains": [
+				{
+					"closed": true,
+					"edge_ids": [
+						"edge_4236798331545563309",
+						"edge_4843633052681869758",
+						"edge_669999475508859173",
+						"edge_867818737666882905",
+						"edge_6560078186558305588",
+						"edge_8791119708715477847",
+						"edge_9025808804380570085",
+						"edge_6162007521227243459",
+						"edge_2134750251803119128",
+						"edge_8259360882384808152",
+						"edge_6725932534452158106",
+						"edge_162695404981094955",
+						"edge_5009344052863439352"
+					],
+					"id": "chain_9126509653625594871",
+					"point_ids": [
+						"point_3111711104369904636",
+						"point_2909770309667252781",
+						"point_4281767337458130864",
+						"point_8865333175039303813",
+						"point_2501239763325254797",
+						"point_7730126270678149234",
+						"point_6867145972024356861",
+						"point_21522006469275509",
+						"point_3682234394956394394",
+						"point_8539835518405984058",
+						"point_3220192327744383771",
+						"point_1655539396643663161",
+						"point_7925912949775006252"
+					],
+					"topology_role": "outer"
+				}
+			],
+			"draw_mode": "closed_loop",
+			"edges": [
+				{
+					"end_point_id": "point_2909770309667252781",
+					"id": "edge_4236798331545563309",
+					"render_outline": true,
+					"start_point_id": "point_3111711104369904636"
+				},
+				{
+					"end_point_id": "point_4281767337458130864",
+					"id": "edge_4843633052681869758",
+					"render_outline": true,
+					"start_point_id": "point_2909770309667252781"
+				},
+				{
+					"end_point_id": "point_8865333175039303813",
+					"id": "edge_669999475508859173",
+					"render_outline": true,
+					"start_point_id": "point_4281767337458130864"
+				},
+				{
+					"end_point_id": "point_2501239763325254797",
+					"id": "edge_867818737666882905",
+					"render_outline": true,
+					"start_point_id": "point_8865333175039303813"
+				},
+				{
+					"end_point_id": "point_7730126270678149234",
+					"id": "edge_6560078186558305588",
+					"render_outline": true,
+					"start_point_id": "point_2501239763325254797"
+				},
+				{
+					"end_point_id": "point_6867145972024356861",
+					"id": "edge_8791119708715477847",
+					"render_outline": true,
+					"start_point_id": "point_7730126270678149234"
+				},
+				{
+					"end_point_id": "point_21522006469275509",
+					"id": "edge_9025808804380570085",
+					"render_outline": true,
+					"start_point_id": "point_6867145972024356861"
+				},
+				{
+					"end_point_id": "point_3682234394956394394",
+					"id": "edge_6162007521227243459",
+					"render_outline": true,
+					"start_point_id": "point_21522006469275509"
+				},
+				{
+					"end_point_id": "point_8539835518405984058",
+					"id": "edge_2134750251803119128",
+					"render_outline": true,
+					"start_point_id": "point_3682234394956394394"
+				},
+				{
+					"end_point_id": "point_3220192327744383771",
+					"id": "edge_8259360882384808152",
+					"render_outline": true,
+					"start_point_id": "point_8539835518405984058"
+				},
+				{
+					"end_point_id": "point_1655539396643663161",
+					"id": "edge_6725932534452158106",
+					"render_outline": true,
+					"start_point_id": "point_3220192327744383771"
+				},
+				{
+					"end_point_id": "point_7925912949775006252",
+					"id": "edge_162695404981094955",
+					"render_outline": true,
+					"start_point_id": "point_1655539396643663161"
+				},
+				{
+					"end_point_id": "point_3111711104369904636",
+					"id": "edge_5009344052863439352",
+					"render_outline": true,
+					"start_point_id": "point_7925912949775006252"
+				}
+			],
+			"group_id": "",
+			"id": "component_236",
+			"name": "bolt",
+			"parent_component_id": "",
+			"points": [
+				{
+					"handle_in": [
+						0.100000001490116,
+						-0.0500000305473804
+					],
+					"handle_out": [
+						-0.416666656732559,
+						-0.850000083446503
+					],
+					"handle_source": "auto",
+					"id": "point_7925912949775006252",
+					"mode": "corner",
+					"position": [
+						-0.0500000007450581,
+						5.90000009536743
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						-0.300000011920929,
+						-0.599999964237213
+					],
+					"handle_out": [
+						-0.100000001490116,
+						0.0500000305473804
+					],
+					"handle_source": "auto",
+					"id": "point_1655539396643663161",
+					"mode": "corner",
+					"position": [
+						0.25,
+						5.75
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						0.683333337306976,
+						0.216666623950005
+					],
+					"handle_out": [
+						0.300000011920929,
+						0.599999964237213
+					],
+					"handle_source": "auto",
+					"id": "point_3220192327744383771",
+					"mode": "corner",
+					"position": [
+						-0.650000035762787,
+						3.95000004768372
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						-0.716666698455811,
+						-1.06666660308838
+					],
+					"handle_out": [
+						-0.683333337306976,
+						-0.216666623950005
+					],
+					"handle_source": "auto",
+					"id": "point_8539835518405984058",
+					"mode": "corner",
+					"position": [
+						1.39999997615814,
+						4.59999990463257
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						0.216666653752327,
+						0.0500000305473804
+					],
+					"handle_out": [
+						0.716666698455811,
+						1.06666660308838
+					],
+					"handle_source": "auto",
+					"id": "point_3682234394956394394",
+					"mode": "corner",
+					"position": [
+						-0.75,
+						1.39999997615814
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						0.0333333350718021,
+						-0.0833333358168602
+					],
+					"handle_out": [
+						-0.216666653752327,
+						-0.0500000305473804
+					],
+					"handle_source": "auto",
+					"id": "point_21522006469275509",
+					"mode": "corner",
+					"position": [
+						-0.100000008940697,
+						1.55000007152557
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						-0.416666716337204,
+						-0.183333352208138
+					],
+					"handle_out": [
+						-0.0333333350718021,
+						0.0833333358168602
+					],
+					"handle_source": "auto",
+					"id": "point_6867145972024356861",
+					"mode": "corner",
+					"position": [
+						0.0,
+						1.30000007152557
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						-0.0833332911133766,
+						0.433333307504654
+					],
+					"handle_out": [
+						0.416666716337204,
+						0.183333352208138
+					],
+					"handle_source": "auto",
+					"id": "point_7730126270678149234",
+					"mode": "corner",
+					"position": [
+						-1.25000011920929,
+						0.75
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						0.0999999865889549,
+						0.0
+					],
+					"handle_out": [
+						0.0833332911133766,
+						-0.433333307504654
+					],
+					"handle_source": "auto",
+					"id": "point_2501239763325254797",
+					"mode": "corner",
+					"position": [
+						-1.5,
+						2.04999995231628
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						0.0499999932944775,
+						-0.183333396911621
+					],
+					"handle_out": [
+						-0.0999999865889549,
+						0.0
+					],
+					"handle_source": "auto",
+					"id": "point_8865333175039303813",
+					"mode": "corner",
+					"position": [
+						-1.20000004768372,
+						2.04999995231628
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						0.5,
+						0.800000131130219
+					],
+					"handle_out": [
+						-0.0499999932944775,
+						0.183333396911621
+					],
+					"handle_source": "auto",
+					"id": "point_4281767337458130864",
+					"mode": "corner",
+					"position": [
+						-1.05000007152557,
+						1.49999976158142
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						-0.583333313465118,
+						-0.183333396911621
+					],
+					"handle_out": [
+						-0.5,
+						-0.800000131130219
+					],
+					"handle_source": "auto",
+					"id": "point_2909770309667252781",
+					"mode": "corner",
+					"position": [
+						0.449999988079071,
+						3.90000009536743
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						0.416666656732559,
+						0.850000083446503
+					],
+					"handle_out": [
+						0.583333313465118,
+						0.183333396911621
+					],
+					"handle_source": "auto",
+					"id": "point_3111711104369904636",
+					"mode": "corner",
+					"position": [
+						-1.29999995231628,
+						3.34999990463257
+					],
+					"preserve_point": true
+				}
+			],
+			"primitive": {},
+			"projection_depth_cm": 10.0,
+			"show_point_numbers": false,
+			"source_asset_id": "",
+			"topology_role": "outer",
+			"transform": {
+				"pivot": [
+					0.0,
+					0.0
+				],
+				"position": [
+					0.0,
+					0.0
+				],
+				"rotation": 0.0,
+				"scale": [
+					1.0,
+					1.0
+				]
+			},
+			"type": "component",
+			"visibility": true,
+			"z_index": 0
+		}
+	],
+	"groups": [],
+	"guides": [],
+	"id": "asset_38",
+	"name": "Lightning Bolt",
+	"palette_variants": [],
+	"previous_asset_keys": [],
+	"reference_image": {
+		"file": "lightning_bolt_ref.png",
+		"opacity": 0.5,
+		"pivot_mode": "bottom_center",
+		"position": [
+			0.0,
+			0.0
+		],
+		"rotation": 0.0,
+		"scale": 1.0,
+		"target_height_cm": 70.0,
+		"visible": false
+	},
+	"root_position": [
+		0.0,
+		0.0
+	],
+	"root_scale": [
+		1.0,
+		1.0
+	],
+	"schema_version": 71,
+	"visibility": true
+}

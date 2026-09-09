@@ -1388,6 +1388,42 @@
 			"type": "region",
 			"visibility": true,
 			"z_index": 0
+		},
+		{
+			"catch_parent_component_id": "",
+			"chains": [],
+			"draw_mode": "closed_loop",
+			"edges": [],
+			"group_id": "",
+			"id": "component_281",
+			"name": "hurt_region",
+			"parent_component_id": "component_23",
+			"points": [],
+			"primitive": {},
+			"projection_depth_cm": 10.0,
+			"region_geometry_source": "component",
+			"region_type": "hurt",
+			"show_point_numbers": false,
+			"source_asset_id": "",
+			"topology_role": "outer",
+			"transform": {
+				"pivot": [
+					0.0,
+					0.0
+				],
+				"position": [
+					0.0,
+					0.0
+				],
+				"rotation": 0.0,
+				"scale": [
+					1.0,
+					1.0
+				]
+			},
+			"type": "region",
+			"visibility": true,
+			"z_index": 0
 		}
 	],
 	"groups": [],
@@ -1404,6 +1440,7 @@
 			-0.0500000007450581,
 			0.0
 		],
+		"rotation": 0.0,
 		"scale": 1.0,
 		"target_height_cm": 16.0,
 		"visible": false
@@ -1416,6 +1453,6 @@
 		1.0,
 		1.0
 	],
-	"schema_version": 70,
+	"schema_version": 71,
 	"visibility": true
 }
