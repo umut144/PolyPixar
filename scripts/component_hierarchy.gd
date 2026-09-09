@@ -175,12 +175,17 @@ static func can_parent_group(asset: Dictionary, group_id: String, candidate_pare
 
 
 static func can_move_group_to_component(asset: Dictionary, group_id: String, candidate_parent_id: String) -> bool:
-	if group_by_id(asset, group_id).is_empty() or component_by_id(asset, candidate_parent_id).is_empty():
+	if group_by_id(asset, group_id).is_empty():
 		return false
-	# Nesting one Group through a Component owned by another Group would apply
-	# two unrelated Group transforms to the same Component chain.
-	if not membership_group_id(asset, candidate_parent_id).is_empty():
-		return false
+	# An empty candidate_parent_id means moving the Group's direct Parts to
+	# Asset Root, mirroring an ordinary Component's own Detach from Parent.
+	if not candidate_parent_id.is_empty():
+		if component_by_id(asset, candidate_parent_id).is_empty():
+			return false
+		# Nesting one Group through a Component owned by another Group would apply
+		# two unrelated Group transforms to the same Component chain.
+		if not membership_group_id(asset, candidate_parent_id).is_empty():
+			return false
 	var members := direct_group_members(asset, group_id)
 	if members.is_empty():
 		return false

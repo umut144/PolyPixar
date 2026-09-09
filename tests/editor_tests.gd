@@ -1251,6 +1251,7 @@ func _test_group_outliner_workflows() -> void:
 	ComponentHierarchy.normalize_asset(asset)
 	_expect(not ComponentHierarchy.can_parent_group(asset, "lashes", "eye_right") and ComponentHierarchy.can_move_group_to_component(asset, "lashes", "eye_right"), "Moving a Group should allow a sibling Component target by reparenting its direct Parts atomically.")
 	_expect(not ComponentHierarchy.can_move_group_to_component(asset, "lashes", "eyelashes_right"), "A Group must not be moved beneath one of its own Parts.")
+	_expect(ComponentHierarchy.can_move_group_to_component(asset, "lashes", ""), "A Group should always be movable back to Asset Root, detaching its direct Parts along with the Group itself.")
 	var application = load("res://scripts/main.gd").new()
 	application._build_ui()
 	var test_assets: Array[Dictionary] = [asset]
@@ -1268,6 +1269,19 @@ func _test_group_outliner_workflows() -> void:
 	application._outliner_drop_data(Vector2.ZERO, drag_data, "mage", "eye_right")
 	_expect(ComponentHierarchy.group_parent_id(lashes_group) == "eye_right" and str(eyelashes_right.get("parent_component_id", "")) == "eye_right", "Dropping a Group onto a Component should move both the Group anchor and its direct Parts beneath that Component.")
 	_expect(ComponentHierarchy.world_transform(asset, "eyelashes_right").is_equal_approx(world_before), "Moving a Group to another Component must preserve every Part's visible world transform.")
+	application._render_inspector()
+	var group_parent_option := _inspector_option(application, "Root")
+	_expect(group_parent_option != null, "The Group Inspector should expose a Parent Component dropdown starting with Root.")
+	var root_item_index := -1
+	if group_parent_option != null:
+		for item_index in group_parent_option.item_count:
+			if str(group_parent_option.get_item_metadata(item_index)).is_empty():
+				root_item_index = item_index
+	var world_before_inspector_detach := ComponentHierarchy.world_transform(asset, "eyelashes_right")
+	if group_parent_option != null and root_item_index >= 0:
+		_choose_option(group_parent_option, root_item_index)
+	_expect(ComponentHierarchy.group_parent_id(lashes_group) == "" and str(eyelashes_right.get("parent_component_id", "")) == "", "Choosing Root in the Group Inspector's Parent Component dropdown must move both the Group anchor and its direct Parts, not just relabel the Group.")
+	_expect(ComponentHierarchy.world_transform(asset, "eyelashes_right").is_equal_approx(world_before_inspector_detach), "Detaching a Group to Root from the Inspector must preserve every Part's visible world transform.")
 	var world_before_delete := ComponentHierarchy.world_transform(asset, "eyelashes_right")
 	application._delete_current_outliner_selection()
 	_expect(ComponentHierarchy.group_by_id(asset, "lashes").is_empty() and not ComponentHierarchy.component_by_id(asset, "eyelashes_right").is_empty() and str(eyelashes_right.get("group_id", "")) == "", "Delete on a selected Group should remove only the Group and retain its Components.")

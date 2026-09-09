@@ -730,9 +730,7 @@ func can_drop_data(_at_position: Vector2, data, asset_id: String, target_id: Str
 	var asset := WorldDocumentService.asset_by_id(assets, asset_id)
 	if str(data.get("kind", "")) == "group":
 		var group_id := str(data.get("group_id", ""))
-		if target_id == "root":
-			return ComponentHierarchy.can_parent_group(asset, group_id, "")
-		return ComponentHierarchy.can_move_group_to_component(asset, group_id, target_id)
+		return ComponentHierarchy.can_move_group_to_component(asset, group_id, "" if target_id == "root" else target_id)
 	if str(data.get("kind", "")) != "components":
 		return false
 	var component_ids: Array = data.get("component_ids", [])

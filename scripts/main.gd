@@ -8145,10 +8145,7 @@ func _outliner_drop_data(_at_position: Vector2, data, asset_id: String, target_i
 	if str(data.get("kind", "")) == "group":
 		var group_id := str(data.get("group_id", ""))
 		_record_direct_change()
-		if target_id == "root":
-			_set_group_parent_preserving_world(asset, group_id, "")
-		else:
-			_move_group_under_component_preserving_world(asset, group_id, target_id)
+		_move_group_under_component_preserving_world(asset, group_id, "" if target_id == "root" else target_id)
 		selected_asset_id = asset_id
 		selected_group_id = group_id
 		selected_component_id = ""
@@ -9791,10 +9788,21 @@ func _on_group_hierarchy_parent_selected(index: int, option: OptionButton) -> vo
 	if group.is_empty() or index < 0:
 		return
 	var parent_id := str(option.get_item_metadata(index))
-	if ComponentHierarchy.group_parent_id(group) == parent_id or not ComponentHierarchy.can_parent_group(asset, selected_group_id, parent_id):
+	if ComponentHierarchy.group_parent_id(group) == parent_id:
 		return
-	_record_direct_change()
-	_set_group_parent_preserving_world(asset, selected_group_id, parent_id)
+	if parent_id.is_empty():
+		# Root also moves the Group's direct Parts, matching Outliner
+		# drag-and-drop; the anchor-only path below would leave them
+		# literally parented to their old Component.
+		if not ComponentHierarchy.can_move_group_to_component(asset, selected_group_id, ""):
+			return
+		_record_direct_change()
+		_move_group_under_component_preserving_world(asset, selected_group_id, "")
+	else:
+		if not ComponentHierarchy.can_parent_group(asset, selected_group_id, parent_id):
+			return
+		_record_direct_change()
+		_set_group_parent_preserving_world(asset, selected_group_id, parent_id)
 	_invalidate_render(RENDER_DOCUMENT)
 
 
