@@ -119,7 +119,7 @@ Every Manifest except a Palette requires:
 | `coordinate_system` | object | Exact convention below. |
 | `z_order` | object | Exact convention below. |
 | `asset_pivot` | two floats | Asset anchor in meters. |
-| `components` | array | Sorted ordinary outer Components and References; ordinary Hole constraints are omitted. |
+| `components` | array | Sorted outer Components and outer References; every Hole constraint, Component or Reference, is omitted. |
 | `attachment_frames` | array | Oriented Asset-local Weapon attachment frames. |
 | `regions` | array | Optional authored or Component-bound gameplay Regions. |
 
@@ -415,6 +415,12 @@ An invalid Palette is excluded from the newly published Catalog like any other
 invalid Asset, and its variants remain valid packages of their own.
 
 ## Asset References
+
+Only a Reference with the `outer` topology role is published. A Reference
+authored as a Hole is a constraint and nothing else: its boundary has already
+left the parent Component through Sampling and Meshing, so publishing it a
+second time as an Asset Reference would draw the referenced Asset back over
+the hole it cut. Ordinary Hole Components are omitted for the same reason.
 
 An Asset Reference adds `kind: "asset_reference"`, a required
 `source_asset_key` and the required `source_asset_id` of the Asset it

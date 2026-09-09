@@ -34,6 +34,14 @@ static func build_manifest(asset: Dictionary, sources: Dictionary, palette_varia
 	for raw_component in asset.get("components", []):
 		if not raw_component is Dictionary or str(raw_component.get("type", "component")) == "region" or not _effective_visibility(asset, raw_component):
 			continue
+		# A Reference authored as a Hole is only a Hole. Its boundary is already
+		# subtracted from the parent's Mesh, so publishing it a second time as an
+		# Asset Reference draws the referenced Asset straight back over the hole
+		# it just cut. Only a Reference with the outer role is an Asset the
+		# consumer instantiates.
+		if WorldDocumentService.is_reference_component(raw_component) \
+			and WorldDocumentService.topology_role(raw_component) == WorldDocumentService.ROLE_HOLE:
+			continue
 		if WorldDocumentService.is_constraint_only_hole(raw_component):
 			var hole_issue := WorldDocumentService.constraint_hole_parent_validation_issue(asset, raw_component)
 			if not hole_issue.is_empty():

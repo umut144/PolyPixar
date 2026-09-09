@@ -942,7 +942,7 @@ func _test_runtime_export_service() -> void:
 	var exported_eye_pivot: Array = exported_eye.get("component_pivot", [])
 	_expect(bool(nested_result.get("valid", false)) and exported_eye_pivot.size() == 2 and is_equal_approx(float(exported_eye_pivot[0]), -0.03) and is_equal_approx(float(exported_eye_pivot[1]), 0.85) and is_equal_approx(float(eye_local_position[0]), -0.03) and is_zero_approx(float(eye_local_position[1])) and reconstructed_eye.is_equal_approx(Vector2(-0.025, 0.85)), "Nested Wizard Head → Eye export should publish the global component pivot and reconstruct its intended asset-space world position exactly.")
 	var reference := {"id": "component_orb", "type": "reference", "name": "orb_reference", "source_asset_id": "orb", "visibility": true, "z_index": 3, "parent_component_id": "component_b", "transform": {"position": Vector2(3.0, 4.0), "pivot": Vector2.ZERO, "rotation": 0.0, "scale": Vector2(-1.0, 1.0)}}
-	reference["topology_role"] = "hole"
+	reference["topology_role"] = "outer"
 	reference["contour_stroke_width_px"] = 3.0
 	var referenced_asset: Dictionary = asset.duplicate(true)
 	referenced_asset["components"].append(reference)
@@ -951,8 +951,19 @@ func _test_runtime_export_service() -> void:
 	var referenced_components: Array = referenced_result.get("manifest", {}).get("components", [])
 	var exported_reference: Dictionary = referenced_components[2] if referenced_components.size() == 3 else {}
 	var exported_reference_scale: Array = exported_reference.get("local_transform", {}).get("scale", [])
-	_expect(bool(referenced_result.get("valid", false)) and str(exported_reference.get("kind", "")) == "asset_reference" and str(exported_reference.get("source_asset_key", "")) == "orb" and is_equal_approx(float(exported_reference.get("contour_stroke_width_override_px", 0.0)), 3.0) and str(exported_reference.get("source_asset_id", "")) == "orb" and str(exported_reference.get("name", "")) == "orb_reference" and not exported_reference.has("mesh") and not exported_reference.has("contour_stroke_mesh") and not exported_reference.has("closed_region_mesh") and exported_reference_scale.size() == 2 and float(exported_reference_scale[0]) * float(exported_reference_scale[1]) < 0.0, "A Hole Reference should keep the Barde-style Runtime instance while owning no Fill or Contour Stroke geometry.")
+	_expect(bool(referenced_result.get("valid", false)) and str(exported_reference.get("kind", "")) == "asset_reference" and str(exported_reference.get("source_asset_key", "")) == "orb" and is_equal_approx(float(exported_reference.get("contour_stroke_width_override_px", 0.0)), 3.0) and str(exported_reference.get("source_asset_id", "")) == "orb" and str(exported_reference.get("name", "")) == "orb_reference" and not exported_reference.has("mesh") and not exported_reference.has("contour_stroke_mesh") and not exported_reference.has("closed_region_mesh") and exported_reference_scale.size() == 2 and float(exported_reference_scale[0]) * float(exported_reference_scale[1]) < 0.0, "An outer Reference should keep the Barde-style Runtime instance while owning no Fill or Contour Stroke geometry.")
 	_expect(not exported_reference.has("role"), "A Reference under a Component is a member of nothing, so it carries no Role across the boundary.")
+	# The same Reference as a Hole is only a Hole. Its boundary already left the
+	# parent Mesh through Sampling and Meshing, so an exported Asset Reference
+	# would draw the Orb back over the hole it cut. Earlier schemas published it
+	# and the Barde showed a filled belly because of it.
+	var hole_reference: Dictionary = reference.duplicate(true)
+	hole_reference["topology_role"] = "hole"
+	var hole_reference_asset: Dictionary = asset.duplicate(true)
+	hole_reference_asset["components"].append(hole_reference)
+	var hole_reference_result := RuntimeExportService.build_manifest(hole_reference_asset, {"component_a": source, "component_b": source, "component_orb": reference_source})
+	var hole_reference_names: Array = hole_reference_result.get("manifest", {}).get("components", []).map(func(entry: Dictionary): return str(entry.get("name", "")))
+	_expect(bool(hole_reference_result.get("valid", false)) and not hole_reference_names.has("orb_reference"), "A Reference authored as a Hole must not be published as an Asset Reference, because its shape is already subtracted from the parent Mesh.")
 	reference_source["source_asset_exists"] = false
 	_expect(not bool(RuntimeExportService.build_manifest(referenced_asset, {"component_a": source, "component_b": source, "component_orb": reference_source}).get("valid", true)), "Runtime export should reject a Reference whose actual source Asset cannot be resolved.")
 
