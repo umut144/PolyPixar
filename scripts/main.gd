@@ -12639,6 +12639,7 @@ func _append_export_attention(stage: String, status: Dictionary) -> void:
 
 
 func _render_canvas_context() -> void:
+	canvas_view.set_transform_axes_local(false)
 	_sync_asset_camera(selected_asset_id if active_module == "Create" else "")
 	if active_module == "Motion" and active_motion_submodule == "Animation":
 		_sync_motion_player_document(_get_asset(selected_asset_id))
@@ -12911,6 +12912,10 @@ func _render_weapon_guide_canvas(asset: Dictionary, guide: Dictionary) -> void:
 	canvas_view.set_display_polygon([])
 	canvas_view.set_bezier_geometry([], [], [])
 	canvas_view.set_component_transform(_weapon_guide_world_transform_record(asset, guide))
+	# A Weapon Guide has no geometry, so the gizmo is the only thing that
+	# can show the authored frame rotation. Its axes therefore turn with
+	# the frame, unlike the world-parallel axes of a Component or Group.
+	canvas_view.set_transform_axes_local(true)
 	canvas_view.set_interaction_state("transform")
 	canvas_view.set_transform_mode(active_transform_mode if active_transform_mode in ["transform", "rotate"] else "transform")
 	canvas_view.set_tool_mode("")

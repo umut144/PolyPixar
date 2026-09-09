@@ -554,7 +554,12 @@ character-owned `weapon_socket_primary`, the carried `grip_primary` and the
 maximum endpoint `reach_limit_primary`; none of them infers its position from
 a visual Component. Weapon Guides are authored through the Component and
 Group `+` and context-menu paths and share the frame data, scope inheritance,
-Canvas gizmo, Inspector, history, Scale Rebase and persistence paths.
+Canvas gizmo, Inspector, history, Scale Rebase and persistence paths. The
+shared gizmo turns its X and Y axes with an authored frame rotation and
+constrains an axis drag to the turned axis, because a Weapon Guide carries
+no geometry and the gizmo is the only thing that can show its orientation. A
+Component or Group keeps world-parallel gizmo axes; its rotation is already
+visible in the geometry it moves.
 
 Ordinary outer Component and Group Outliner rows expose `+`; constraint-only
 Hole rows do not, because Holes cannot own children, Guides, or Regions.

@@ -144,6 +144,11 @@ var command_shortcut_active := false
 var navigation_keys_pressed: Dictionary = {}
 var pivot_dragging := false
 var asset_pivot_dragging := false
+## Whether the Transform gizmo's X/Y axes follow the authored rotation of
+## `component_transform` instead of staying parallel to the world axes.
+## Only a transform-based Weapon Guide turns this on: it carries no
+## geometry, so its gizmo is the only thing that can show its orientation.
+var transform_axes_local := false
 var transform_drag_axis := ""
 var transform_drag_start_world := Vector2.ZERO
 var transform_drag_start_position := Vector2.ZERO
@@ -431,11 +436,20 @@ func _gui_input(event: InputEvent) -> void:
 				queue_redraw()
 				return
 			var delta := current_world - transform_drag_start_world
-			if transform_drag_axis == "x":
-				delta.y = 0.0
-			elif transform_drag_axis == "y":
-				delta.x = 0.0
-			var new_position := _snap_to_grid(transform_drag_start_position + delta)
+			var drag_axis := _transform_axis_direction(transform_drag_axis) if transform_axes_local else Vector2.ZERO
+			var new_position := Vector2.ZERO
+			if drag_axis == Vector2.ZERO:
+				if transform_drag_axis == "x":
+					delta.y = 0.0
+				elif transform_drag_axis == "y":
+					delta.x = 0.0
+				new_position = _snap_to_grid(transform_drag_start_position + delta)
+			else:
+				# Snapping stays on the rotated axis rather than on the world
+				# raster, so a turned frame cannot drift sideways off its own
+				# axis while Snap is on.
+				var snapped := _snap_to_grid(transform_drag_start_position + drag_axis * delta.dot(drag_axis))
+				new_position = transform_drag_start_position + drag_axis * drag_axis.dot(snapped - transform_drag_start_position)
 			component_transform["position"] = new_position
 			transform_changed.emit(component_transform.duplicate(true))
 			queue_redraw()
@@ -1136,6 +1150,11 @@ func _update_selection_mirror_preview() -> void:
 			selection_mirror_preview_edges.append(edge)
 
 
+func set_transform_axes_local(enabled: bool) -> void:
+	transform_axes_local = enabled
+	queue_redraw()
+
+
 func set_guide_style(enabled: bool) -> void:
 	guide_style = enabled
 	queue_redraw()
@@ -1416,23 +1435,46 @@ func _draw_pivot() -> void:
 	draw_line(pivot_screen - Vector2(0.0, 11.0), pivot_screen + Vector2(0.0, 11.0), pivot_color, 1.0)
 
 
+## The world direction of one Transform gizmo axis. Without
+## `transform_axes_local` this is the world axis the handle has always
+## constrained to; with it, the same axis turned by the authored rotation.
+## Any other handle name — the free centre, rotate, scale — has no axis.
+func _transform_axis_direction(axis_name: String) -> Vector2:
+	if axis_name != "x" and axis_name != "y":
+		return Vector2.ZERO
+	var axis := Vector2(1.0, 0.0) if axis_name == "x" else Vector2(0.0, 1.0)
+	if not transform_axes_local:
+		return axis
+	return axis.rotated(deg_to_rad(float(component_transform.get("rotation", 0.0))))
+
+
+## The screen offset of an axis handle from the gizmo centre. Screen Y
+## grows downwards while world Y grows upwards, so the world direction is
+## flipped once here rather than at every call site.
+func _transform_axis_screen_offset(axis_name: String, length: float) -> Vector2:
+	var axis := _transform_axis_direction(axis_name)
+	return Vector2(axis.x, -axis.y) * length
+
+
 func _draw_transform_gizmo() -> void:
 	if interaction_state != "transform" or context_name.is_empty():
 		return
 	var center := _world_to_screen(component_transform.get("position", Vector2.ZERO))
 	if transform_mode == "rotate":
 		draw_arc(center, 34.0, 0.0, TAU, 48, Color("#f2c94c"), 2.0)
-		draw_circle(center + Vector2(0.0, -34.0), 7.0, Color("#f2c94c"))
+		draw_circle(center + _transform_axis_screen_offset("y", 34.0), 7.0, Color("#f2c94c"))
 	elif transform_mode == "scale":
 		var box := Rect2(center - Vector2(30.0, 30.0), Vector2(60.0, 60.0))
 		draw_rect(box, Color("#8ab4f8"), false, 2.0)
 		for corner in [box.position, box.position + Vector2(box.size.x, 0.0), box.position + Vector2(0.0, box.size.y), box.end]:
 			draw_circle(corner, 6.0, Color("#8ab4f8"))
 	else:
-		draw_line(center, center + Vector2(44.0, 0.0), Color("#e56b6f"), 2.0)
-		draw_line(center, center + Vector2(0.0, -44.0), Color("#6bcB77"), 2.0)
-		draw_circle(center + Vector2(44.0, 0.0), 7.0, Color("#e56b6f"))
-		draw_circle(center + Vector2(0.0, -44.0), 7.0, Color("#6bcB77"))
+		var x_handle := center + _transform_axis_screen_offset("x", 44.0)
+		var y_handle := center + _transform_axis_screen_offset("y", 44.0)
+		draw_line(center, x_handle, Color("#e56b6f"), 2.0)
+		draw_line(center, y_handle, Color("#6bcB77"), 2.0)
+		draw_circle(x_handle, 7.0, Color("#e56b6f"))
+		draw_circle(y_handle, 7.0, Color("#6bcB77"))
 		draw_rect(Rect2(center - Vector2(7.0, 7.0), Vector2(14.0, 14.0)), Color("#f2c94c"), false, 2.0)
 
 
@@ -1450,9 +1492,9 @@ func _transform_handle_at(screen_position: Vector2) -> String:
 		return ""
 	if screen_position.distance_to(center) <= 12.0:
 		return "free"
-	if screen_position.distance_to(center + Vector2(44.0, 0.0)) <= 12.0:
+	if screen_position.distance_to(center + _transform_axis_screen_offset("x", 44.0)) <= 12.0:
 		return "x"
-	if screen_position.distance_to(center + Vector2(0.0, -44.0)) <= 12.0:
+	if screen_position.distance_to(center + _transform_axis_screen_offset("y", 44.0)) <= 12.0:
 		return "y"
 	return ""
 

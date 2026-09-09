@@ -1453,6 +1453,20 @@ func _test_asset_guides() -> void:
 	application._create_weapon_guide("asset_1", "component", "component_1", AssetGuide.GRIP_SECONDARY)
 	var secondary_grip_guide: Dictionary = application._get_guide(application._get_asset("asset_1"), application.selected_guide_id)
 	_expect(str(secondary_grip_guide.get("guide_type", "")) == AssetGuide.GRIP_SECONDARY and AssetGuide.validation_issues(secondary_grip_guide).is_empty(), "Grip Secondary should be a valid transform-based Weapon Guide.")
+	application._render_canvas_context()
+	var frame_axes_local: bool = application.canvas_view.transform_axes_local
+	application._on_weapon_frame_value_changed(90.0, "rotation")
+	var rotated_guide: Dictionary = application._get_guide(application._get_asset("asset_1"), application.selected_guide_id)
+	application._render_canvas_context()
+	var rotated_canvas_angle := float(application.canvas_view.component_transform.get("rotation", 0.0))
+	var rotated_x_screen: Vector2 = application.canvas_view._transform_axis_screen_offset("x", 44.0)
+	var rotated_y_screen: Vector2 = application.canvas_view._transform_axis_screen_offset("y", 44.0)
+	# A quarter turn counter-clockwise puts local +X where screen up is and
+	# local +Y where screen left is; screen Y grows downwards.
+	_expect(frame_axes_local and is_equal_approx(float(rotated_guide.get("transform", {}).get("rotation", 0.0)), 90.0) and absf(rotated_canvas_angle - 90.0) < 0.001 and rotated_x_screen.distance_to(Vector2(0.0, -44.0)) < 0.001 and rotated_y_screen.distance_to(Vector2(-44.0, 0.0)) < 0.001, "An authored Weapon Frame rotation should turn the Transform gizmo axes with the frame.")
+	application.canvas_view.set_transform_axes_local(false)
+	application.canvas_view.set_component_transform({"position": Vector2.ZERO, "rotation": 90.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO})
+	_expect(application.canvas_view._transform_axis_screen_offset("x", 44.0).distance_to(Vector2(44.0, 0.0)) < 0.001 and application.canvas_view._transform_axis_screen_offset("y", 44.0).distance_to(Vector2(0.0, -44.0)) < 0.001, "A rotated Component or Group should keep its world-parallel Transform gizmo axes.")
 	parent_component["transform"] = {"position": Vector2(-3.0, 2.0), "rotation": 20.0, "scale": Vector2(1.0, 1.5), "pivot": Vector2.ZERO}
 	parent_component["name"] = "eyebrow_left"
 	child_component["name"] = "eye_left"
