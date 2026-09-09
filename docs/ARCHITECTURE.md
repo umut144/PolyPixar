@@ -579,7 +579,11 @@ view copy, drawing and Bézier editing are disabled while the Component source
 is active, and Runtime export emits a binding rather than copied geometry.
 A hidden Region blocks Runtime export instead of dropping out of it, because
 a Region is nonvisual and its visibility says nothing about the Asset.
-Regions are created only from a Component's `+` menu. Documents without
+Regions are created from a Component's `+` menu and from an outer
+Reference's, which offers the Region entry alone: a Reference draws another
+Asset and owns no Child, Guide or nested Reference, but it occupies a
+Component's place in the hierarchy and can be hit, hurt or collided with as
+one. Documents without
 Regions remain valid and consumers retain their Component-based fallback.
 
 ### Scale Rebase

@@ -8389,11 +8389,22 @@ func _open_component_add_menu(asset_id: String, parent_component_id: String, anc
 		component_add_menu.hide()
 		_show_status_message("Hole Components cannot own children, Guides, or Regions.")
 		return
+	var parent_is_reference := _is_reference_component(parent)
+	if parent_is_reference and WorldDocumentService.topology_role(parent) == WorldDocumentService.ROLE_HOLE:
+		component_add_menu.hide()
+		_show_status_message("A Reference authored as a Hole is a constraint and owns nothing.")
+		return
 	component_add_menu.set_meta("asset_id", asset_id)
 	component_add_menu.set_meta("parent_component_id", parent_component_id)
 	component_add_menu.set_meta("scope_kind", "component")
 	component_add_menu.set_meta("scope_id", parent_component_id)
+	# A Reference draws its own Asset, so it owns no Child, Guide or nested
+	# Reference of its own. What it can own is a Region: it stands in the
+	# hierarchy exactly where a Component would.
+	component_add_menu.set_item_disabled(component_add_menu.get_item_index(0), parent_is_reference)
+	component_add_menu.set_item_disabled(component_add_menu.get_item_index(1), parent_is_reference)
 	component_add_menu.set_item_disabled(component_add_menu.get_item_index(2), false)
+	component_add_menu.set_item_disabled(component_add_menu.get_item_index(3), parent_is_reference)
 	component_add_reference_menu.clear()
 	for source_asset in _reference_source_candidates(asset_id):
 		component_add_reference_menu.add_item(str(source_asset.get("name", "Asset")), component_add_reference_menu.item_count)
@@ -8409,7 +8420,10 @@ func _open_group_add_menu(asset_id: String, group_id: String, anchor: Control) -
 	component_add_menu.set_meta("parent_component_id", "")
 	component_add_menu.set_meta("scope_kind", "group")
 	component_add_menu.set_meta("scope_id", group_id)
+	component_add_menu.set_item_disabled(component_add_menu.get_item_index(0), false)
+	component_add_menu.set_item_disabled(component_add_menu.get_item_index(1), false)
 	component_add_menu.set_item_disabled(component_add_menu.get_item_index(2), true)
+	component_add_menu.set_item_disabled(component_add_menu.get_item_index(3), false)
 	component_add_reference_menu.clear()
 	component_add_menu.position = Vector2i(anchor.global_position + Vector2(0.0, anchor.size.y))
 	component_add_menu.popup()
@@ -8691,7 +8705,8 @@ func _create_region(asset_id: String, scope_kind: String, scope_id: String, regi
 	var source_component := _get_component(asset, scope_id)
 	if asset.is_empty() or scope_kind != "component" or source_component.is_empty() or _is_region(source_component) or region_type not in REGION_TYPES:
 		return
-	if _is_constraint_only_hole(source_component):
+	if _is_constraint_only_hole(source_component) \
+		or (_is_reference_component(source_component) and WorldDocumentService.topology_role(source_component) == WorldDocumentService.ROLE_HOLE):
 		_show_status_message("Hole Components cannot own Regions.")
 		return
 	_record_direct_change()

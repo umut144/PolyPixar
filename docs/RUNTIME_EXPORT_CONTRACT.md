@@ -203,8 +203,13 @@ With `geometry_source: "authored"`, the record additionally contains
 coordinates from the Region's own Bézier topology.
 
 With `geometry_source: "component"`, the record contains no vertices or
-indices. `source_component_id` identifies an ordinary Component in the same
-Manifest. The consumer uses that Component's `mesh`, or its
+indices. `source_component_id` identifies a Component in the same Manifest,
+which may be an outer Asset Reference: a Reference stands in the hierarchy
+where a Component would, so it carries Regions like one. A Reference owns no
+Mesh itself, so a consumer resolves its geometry through `source_asset_key`
+and the Components of the Asset it instances, placed by the Reference's own
+transform. A Reference authored as a Hole carries nothing, because it is not
+published at all. The consumer uses that Component's `mesh`, or its
 `closed_region_mesh` when it is a closed Contour, after applying the same
 current animation and deformation evaluation used for presentation. This is a
 live binding rather than an exported geometry snapshot; collision and gameplay

@@ -964,6 +964,21 @@ func _test_runtime_export_service() -> void:
 	var hole_reference_result := RuntimeExportService.build_manifest(hole_reference_asset, {"component_a": source, "component_b": source, "component_orb": reference_source})
 	var hole_reference_names: Array = hole_reference_result.get("manifest", {}).get("components", []).map(func(entry: Dictionary): return str(entry.get("name", "")))
 	_expect(bool(hole_reference_result.get("valid", false)) and not hole_reference_names.has("orb_reference"), "A Reference authored as a Hole must not be published as an Asset Reference, because its shape is already subtracted from the parent Mesh.")
+	# An outer Reference stands where a Component would, so it can carry a Region.
+	# The Reference owns no Mesh of its own — the Asset it instances does — so the
+	# record is a binding the consumer resolves through source_asset_id.
+	var reference_region: Dictionary = authored_region.duplicate(true)
+	reference_region["id"] = "region_on_reference"
+	reference_region["name"] = "reference_hurt_region"
+	reference_region["region_type"] = "hurt"
+	reference_region["parent_component_id"] = "component_orb"
+	reference_region["region_geometry_source"] = WorldDocumentService.REGION_GEOMETRY_COMPONENT
+	var reference_region_asset: Dictionary = asset.duplicate(true)
+	reference_region_asset["components"].append(reference.duplicate(true))
+	reference_region_asset["components"].append(reference_region)
+	var reference_region_result := RuntimeExportService.build_manifest(reference_region_asset, {"component_a": source, "component_b": source, "component_orb": reference_source})
+	var exported_reference_region: Dictionary = reference_region_result.get("manifest", {}).get("regions", [])[0] if bool(reference_region_result.get("valid", false)) else {}
+	_expect(bool(reference_region_result.get("valid", false)) and str(exported_reference_region.get("source_component_id", "")) == "component_orb" and str(exported_reference_region.get("geometry_source", "")) == "component" and not exported_reference_region.has("vertices"), "An outer Reference must be able to carry a Component Geometry Region, bound to the Reference rather than to a Mesh it does not own.")
 	reference_source["source_asset_exists"] = false
 	_expect(not bool(RuntimeExportService.build_manifest(referenced_asset, {"component_a": source, "component_b": source, "component_orb": reference_source}).get("valid", true)), "Runtime export should reject a Reference whose actual source Asset cannot be resolved.")
 

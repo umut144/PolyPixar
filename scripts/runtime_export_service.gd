@@ -323,9 +323,6 @@ static func _build_regions(asset: Dictionary) -> Dictionary:
 			errors.append("Region '%s' requires an attached source Component." % name)
 			continue
 		if geometry_source == WorldDocumentService.REGION_GEOMETRY_COMPONENT:
-			if WorldDocumentService.is_reference_component(source_component):
-				errors.append("Region '%s' cannot inherit geometry from an Asset Reference." % name)
-				continue
 			if WorldDocumentService.topology_role(source_component) == WorldDocumentService.ROLE_HOLE:
 				errors.append("Region '%s' cannot inherit geometry from a constraint-only Hole Component." % name)
 				continue
@@ -623,7 +620,11 @@ static func manifest_validation_issues(manifest: Dictionary) -> Array[String]:
 			if source_runtime_component.is_empty():
 				errors.append("Runtime Region '%s' references a missing Component." % str(region.get("name", region_id)))
 			if geometry_source == WorldDocumentService.REGION_GEOMETRY_COMPONENT:
-				if source_runtime_component.is_empty() or str(source_runtime_component.get("kind", "")) == "asset_reference" or not source_runtime_component.has("mesh") and not source_runtime_component.has("closed_region_mesh"):
+				# An Asset Reference owns no Mesh of its own; its geometry lives in
+				# the Asset it instances, which the consumer resolves through
+				# `source_asset_id`. So it is a valid source without carrying one.
+				var source_is_reference := str(source_runtime_component.get("kind", "")) == "asset_reference"
+				if source_runtime_component.is_empty() or (not source_is_reference and not source_runtime_component.has("mesh") and not source_runtime_component.has("closed_region_mesh")):
 					errors.append("Runtime Region '%s' references a Component without closed geometry." % str(region.get("name", region_id)))
 				if region.has("vertices") or region.has("indices"):
 					errors.append("Component-geometry Runtime Regions must not duplicate Vertex data.")

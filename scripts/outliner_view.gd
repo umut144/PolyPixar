@@ -777,16 +777,21 @@ func _render_component_outliner_tree(container: VBoxContainer, asset: Dictionary
 	component_button.gui_input.connect(_emit_row_context_menu.bind("component", asset_id, component_id, component_button))
 	component_button.set_drag_forwarding(_outliner_get_drag_data.bind(asset_id, component_id), can_drop_data.bind(asset_id, component_id), _emit_drop.bind(asset_id, component_id))
 	component_row.add_child(component_button)
-	if WorldDocumentService.is_reference_component(component):
-		return
-	if not WorldDocumentService.is_constraint_only_hole(component):
+	# An outer Reference stands in for a Component and can own a Region, so it
+	# gets the same `+`. A Reference authored as a Hole is only a constraint and
+	# owns nothing, the same rule ordinary Hole Components follow.
+	var reference_row := WorldDocumentService.is_reference_component(component)
+	var hole_row := WorldDocumentService.topology_role(component) == WorldDocumentService.ROLE_HOLE
+	if not WorldDocumentService.is_constraint_only_hole(component) and not (reference_row and hole_row):
 		var add_button := Button.new()
 		add_button.text = "+"
 		add_button.custom_minimum_size = Vector2(28, 30)
 		add_button.focus_mode = Control.FOCUS_NONE
-		add_button.tooltip_text = "Add Child or Guide"
+		add_button.tooltip_text = "Add Region" if reference_row else "Add Child or Guide"
 		add_button.pressed.connect(component_add_requested.emit.bind(asset_id, component_id, add_button))
 		component_row.add_child(add_button)
+	if reference_row:
+		return
 	var children := ComponentHierarchy.children(asset, component_id)
 	children.sort_custom(WorldDocumentService.sort_named_documents)
 	for child in children:
