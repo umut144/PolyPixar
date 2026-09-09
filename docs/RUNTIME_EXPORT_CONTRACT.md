@@ -191,6 +191,13 @@ independent Frame property.
 `region_id`, `name`, `role`, `geometry_source`, and `source_component_id`;
 `role` is one of `attack`, `hurt`, or `collision`.
 
+Region visibility is an Outliner convenience and never selects what is
+exported. A Region is nonvisual in every consumer, so a hidden one would
+leave a gameplay surface out of the package while looking authored in the
+editor, and no consumer can tell that apart from a Region that never
+existed. A hidden Region is therefore an export error, not a silent
+omission, unlike a hidden Component, which is simply not part of the Asset.
+
 With `geometry_source: "authored"`, the record additionally contains
 `vertices` and `indices`. Vertices are triangulated Asset-local meter
 coordinates from the Region's own Bézier topology.

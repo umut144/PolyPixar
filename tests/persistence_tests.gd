@@ -858,6 +858,14 @@ func _test_runtime_export_service() -> void:
 	var inherited_result := RuntimeExportService.build_manifest(inherited_asset, {"component_a": source, "component_b": source})
 	var exported_inherited_region: Dictionary = inherited_result.get("manifest", {}).get("regions", [])[0] if bool(inherited_result.get("valid", false)) else {}
 	_expect(bool(inherited_result.get("valid", false)) and exported_inherited_region.get("geometry_source", "") == "component" and exported_inherited_region.get("source_component_id", "") == "component_b" and not exported_inherited_region.has("vertices") and not exported_inherited_region.has("indices"), "Component Geometry Regions should export a live Component binding without duplicating geometry.")
+	var hidden_region: Dictionary = authored_region.duplicate(true)
+	hidden_region["id"] = "region_hidden"
+	hidden_region["name"] = "hidden_attack_region"
+	hidden_region["visibility"] = false
+	var hidden_asset: Dictionary = combat_asset.duplicate(true)
+	hidden_asset["components"].append(hidden_region)
+	var hidden_result := RuntimeExportService.build_manifest(hidden_asset, {"component_a": source, "component_b": source})
+	_expect(not bool(hidden_result.get("valid", true)) and "hidden_attack_region" in " ".join(hidden_result.get("errors", [])), "A hidden Region must block Runtime export rather than silently leaving a gameplay surface out of the Manifest.")
 	_expect(components[1].get("mesh", {}).get("vertices", []) == [[-0.2, -0.30000000000000004], [0.8, -0.30000000000000004], [-0.2, 0.7000000000000001]] and components[1].get("mesh", {}).get("indices", []) == [0, 1, 2] and not components[1].has("closed_region_mesh"), "Runtime Meshes should preserve accepted Vertex order, convert Tool units to meters, compact Triangle IDs, and remain unchanged for non-Contour Components.")
 	_expect(not components[1].get("mesh", {}).has("uvs") and not components[1].has("contour_carrier") and not components[1].has("contour_mask"), "Schema 5 must remove UV, Carrier, and SDF fields rather than retaining a silent compatibility payload.")
 	var exported_stroke: Dictionary = components[1].get("contour_stroke_mesh", {})

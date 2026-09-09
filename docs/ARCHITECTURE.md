@@ -577,6 +577,8 @@ switching back is lossless. Newly created Regions default to `component`, a
 missing value normalizes to `authored`. The Canvas receives only the resolved
 view copy, drawing and Bézier editing are disabled while the Component source
 is active, and Runtime export emits a binding rather than copied geometry.
+A hidden Region blocks Runtime export instead of dropping out of it, because
+a Region is nonvisual and its visibility says nothing about the Asset.
 Regions are created only from a Component's `+` menu. Documents without
 Regions remain valid and consumers retain their Component-based fallback.
 

@@ -300,7 +300,13 @@ static func _build_regions(asset: Dictionary) -> Dictionary:
 		if role not in ["attack", "hurt", "collision"]:
 			errors.append("Region '%s' has an unknown role." % name)
 			continue
+		# A Region is never drawn by a consumer, so its visibility is an Outliner
+		# convenience while authoring and never a property of the exported Asset.
+		# Skipping a hidden one would ship an Asset that hits, is hit, or collides
+		# less than it looks like it does, and no consumer can tell that apart from
+		# a Region that was never authored at all.
 		if not _effective_visibility(asset, region):
+			errors.append("Region '%s' is hidden and cannot be exported. Show it or delete it." % name)
 			continue
 		var geometry_source := WorldDocumentService.normalize_region_geometry_source(region.get("region_geometry_source", ""))
 		var source_component_id := str(region.get("parent_component_id", ""))
