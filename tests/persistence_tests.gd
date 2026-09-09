@@ -866,6 +866,21 @@ func _test_runtime_export_service() -> void:
 	hidden_asset["components"].append(hidden_region)
 	var hidden_result := RuntimeExportService.build_manifest(hidden_asset, {"component_a": source, "component_b": source})
 	_expect(not bool(hidden_result.get("valid", true)) and "hidden_attack_region" in " ".join(hidden_result.get("errors", [])), "A hidden Region must block Runtime export rather than silently leaving a gameplay surface out of the Manifest.")
+	# Hiding the source Component does not hide the Regions hanging off it:
+	# visibility follows the Group chain, not `parent_component_id`. The Region
+	# survives into a Manifest whose Components no longer contain its source,
+	# and the Manifest validation refuses that dangling record. This matches
+	# how a visible Component below a hidden parent is refused rather than
+	# quietly dropped, so no hierarchy edit ever ships a smaller Asset.
+	var orphaned_region: Dictionary = authored_region.duplicate(true)
+	orphaned_region["parent_component_id"] = "component_a"
+	var orphaned_asset: Dictionary = combat_asset.duplicate(true)
+	orphaned_asset["components"].append(orphaned_region)
+	for orphaned_component in orphaned_asset["components"]:
+		if str(orphaned_component.get("id", "")) == "component_a":
+			orphaned_component["visibility"] = false
+	var orphaned_result := RuntimeExportService.build_manifest(orphaned_asset, {"component_a": source, "component_b": source})
+	_expect(not bool(orphaned_result.get("valid", true)) and "references a missing Component" in " ".join(orphaned_result.get("errors", [])), "Hiding a Component while a Region still binds to it must block Runtime export, the same way a visible Component below a hidden parent does.")
 	_expect(components[1].get("mesh", {}).get("vertices", []) == [[-0.2, -0.30000000000000004], [0.8, -0.30000000000000004], [-0.2, 0.7000000000000001]] and components[1].get("mesh", {}).get("indices", []) == [0, 1, 2] and not components[1].has("closed_region_mesh"), "Runtime Meshes should preserve accepted Vertex order, convert Tool units to meters, compact Triangle IDs, and remain unchanged for non-Contour Components.")
 	_expect(not components[1].get("mesh", {}).has("uvs") and not components[1].has("contour_carrier") and not components[1].has("contour_mask"), "Schema 5 must remove UV, Carrier, and SDF fields rather than retaining a silent compatibility payload.")
 	var exported_stroke: Dictionary = components[1].get("contour_stroke_mesh", {})
