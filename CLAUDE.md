@@ -64,6 +64,23 @@ about the machine rather than the code — a missing toolchain, a full disk, a
 binary that is gone. Say what you tried, what you saw, and what you need.
 Changing code in response to a broken environment is worse than waiting.
 
+Request a run only once the change is actually in the files. A patch and the
+run that checks it belong in separate commands: a patch that failed still lets
+the run start, and the next few minutes then verify the previous state and
+report a pass for it.
+
+`--poll` does not say what a run is doing; the run's own log does. The watcher
+writes it live to `.agent-check/logs/<id>.log.tmp`, under the id the request
+printed. Read that on the first `PENDING` rather than polling a second time
+blind. A run that is working grows its log; one whose log has not grown between
+two looks and already ends in a `SCRIPT ERROR` is not slow, it is stuck, and no
+number of further polls will change that.
+
+A stuck run is the developer's to clear, not yours: it holds the watcher, and
+this session cannot reach the process. Name the run, quote the last lines of
+its log, ask them to kill it, and wait for their confirmation. Polling a stuck
+run spends their minutes twice, once in the run and once in the waiting.
+
 The watcher answers below `.agent-check/`, which the .gitignore keeps out of
 the repository. Every run is kept on its own there, so parallel sessions do
 not disturb each other: `requests/<id>` is the request, `pending/<session>`
