@@ -2850,6 +2850,38 @@ func _test_primitive_shape_placement() -> void:
 		application.free()
 
 
+## The zoom range now spans eighteen doublings, and one steady rate cannot serve
+## both ends of it: slow enough to nudge a view is far too slow to cross it. A
+## hold speeds up only once it is clearly a journey rather than an adjustment,
+## equally in both directions, and a reversal starts the hold over instead of
+## carrying the built-up speed the other way.
+func _test_canvas_zoom_hold_acceleration() -> void:
+	var canvas := ComponentCanvas.new()
+	_expect(is_equal_approx(canvas.zoom_acceleration(), 1.0), "An untouched zoom should run at its plain rate.")
+	canvas._advance_zoom(1.0, ComponentCanvas.ZOOM_ACCELERATION_DELAY)
+	_expect(is_equal_approx(canvas.zoom_acceleration(), 1.0), "Zoom must keep its plain rate for the whole delay, so a short press stays a precise adjustment.")
+	var precise_zoom := canvas.zoom
+	canvas._advance_zoom(1.0, ComponentCanvas.ZOOM_ACCELERATION_RAMP)
+	_expect(is_equal_approx(canvas.zoom_acceleration(), ComponentCanvas.ZOOM_MAXIMUM_ACCELERATION) and canvas.zoom > precise_zoom, "Holding past the ramp should reach the full zoom speed.")
+	canvas._advance_zoom(-1.0, 0.1)
+	_expect(is_equal_approx(canvas.zoom_acceleration(), 1.0), "Reversing must start the hold over rather than fly back out at the speed it flew in.")
+	canvas._advance_zoom(-1.0, ComponentCanvas.ZOOM_ACCELERATION_DELAY + ComponentCanvas.ZOOM_ACCELERATION_RAMP)
+	_expect(is_equal_approx(canvas.zoom_acceleration(), ComponentCanvas.ZOOM_MAXIMUM_ACCELERATION), "Zooming out should accelerate on the same ramp as zooming in.")
+	canvas._advance_zoom(0.0, 0.1)
+	_expect(is_equal_approx(canvas.zoom_acceleration(), 1.0) and is_zero_approx(canvas.zoom_hold_seconds), "Letting go should drop the built-up speed instead of keeping it for the next press.")
+	canvas.zoom = ComponentCanvas.MAX_ZOOM
+	canvas._advance_zoom(1.0, 10.0)
+	_expect(is_equal_approx(canvas.zoom, ComponentCanvas.MAX_ZOOM), "An accelerated hold must still stop at the zoom ceiling.")
+	canvas._advance_zoom(0.0, 0.1)
+	canvas.zoom = ComponentCanvas.MIN_ZOOM
+	canvas._advance_zoom(-1.0, 10.0)
+	_expect(is_equal_approx(canvas.zoom, ComponentCanvas.MIN_ZOOM), "And at the floor.")
+	canvas._advance_zoom(-1.0, 1.0)
+	canvas._clear_navigation_input()
+	_expect(is_zero_approx(canvas.zoom_hold_seconds), "Losing the Canvas mid-hold should clear the hold along with the rest of the navigation input.")
+	canvas.free()
+
+
 func _test_region_color_reaches_primitive_geometry() -> void:
 	var canvas := ComponentCanvas.new()
 	_expect(canvas._shape_color() == Color("#55c7d9"), "An ordinary Component should keep the Component blue.")

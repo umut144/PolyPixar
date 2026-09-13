@@ -46,15 +46,24 @@ const MIRROR_AXIS_HORIZONTAL := "horizontal"
 const PAN_SPEED := 420.0
 const MIN_ZOOM := 0.25
 # Allows detailed sub-millimeter editing while keeping the existing zoom
-# progression and grid package logic unchanged. At 16384 one Tool unit of 10 cm
-# fills 16384 pixels, so a millimetre is about 164 of them and a pixel about six
-# micrometres - the depth the thousandth-and-finer Scale fields are authored at.
-# Whoever raises it further must raise it here alone: main.gd clamps every
-# stored camera against these two, so a second copy of the number would snap a
-# deeper view back on the next asset switch.
-const MAX_ZOOM := 16384.0
+# progression and grid package logic unchanged. At 65536 one Tool unit of 10 cm
+# fills 65536 pixels, so a millimetre is about 655 of them and a pixel about one
+# and a half micrometres - the depth the hundred-thousandth Scale fields are
+# authored at. Whoever raises it further must raise it here alone: main.gd
+# clamps every stored camera against these two, so a second copy of the number
+# would snap a deeper view back on the next asset switch.
+const MAX_ZOOM := 65536.0
 const DEFAULT_ZOOM := 1.0
 const ZOOM_RATE := 1.8
+## Held zoom accelerates, because the range it has to cross is now wide enough
+## that one steady rate cannot serve both ends of it: the first seconds stay
+## slow so a view can be nudged, and only a hold that is clearly a journey
+## rather than an adjustment speeds up. The ramp is symmetric, so coming back
+## out takes as long as going in, and reversing direction starts the hold over
+## rather than carrying the built-up speed into the other direction.
+const ZOOM_ACCELERATION_DELAY := 2.0
+const ZOOM_ACCELERATION_RAMP := 3.0
+const ZOOM_MAXIMUM_ACCELERATION := 4.0
 const CLOSE_DISTANCE_PIXELS := 14.0
 const GIZMO_AXIS_LENGTH := 42.0
 const HANDLE_HIT_RADIUS := 12.0
@@ -67,6 +76,8 @@ const GRID_PACKAGE_MIN_PIXELS := 12.0
 
 var view_center := Vector2.ZERO
 var zoom := DEFAULT_ZOOM
+var zoom_hold_seconds := 0.0
+var zoom_hold_direction := 0.0
 var camera_state_restored := false
 var context_name := ""
 var active_tool := ""
@@ -880,6 +891,35 @@ func _update_navigation_input(event: InputEventKey) -> void:
 
 func _clear_navigation_input() -> void:
 	navigation_keys_pressed.clear()
+	_reset_zoom_hold()
+
+
+## One step of held zooming. Kept apart from `_process` so the acceleration can
+## be driven without a focused Canvas and a real frame.
+func _advance_zoom(zoom_input: float, delta: float) -> void:
+	if is_zero_approx(zoom_input):
+		_reset_zoom_hold()
+		return
+	var direction := signf(zoom_input)
+	if not is_equal_approx(direction, zoom_hold_direction):
+		zoom_hold_direction = direction
+		zoom_hold_seconds = 0.0
+	zoom_hold_seconds += delta
+	zoom = clampf(zoom * pow(ZOOM_RATE, zoom_input * delta * zoom_acceleration()), MIN_ZOOM, MAX_ZOOM)
+
+
+## The multiplier the held zoom rate currently runs at: one until the hold has
+## lasted past the delay, then rising evenly across the ramp to its maximum.
+func zoom_acceleration() -> float:
+	if zoom_hold_seconds <= ZOOM_ACCELERATION_DELAY:
+		return 1.0
+	var ramp_progress := clampf((zoom_hold_seconds - ZOOM_ACCELERATION_DELAY) / ZOOM_ACCELERATION_RAMP, 0.0, 1.0)
+	return lerpf(1.0, ZOOM_MAXIMUM_ACCELERATION, ramp_progress)
+
+
+func _reset_zoom_hold() -> void:
+	zoom_hold_seconds = 0.0
+	zoom_hold_direction = 0.0
 
 
 func _navigation_input_vector() -> Vector3:
@@ -1246,9 +1286,7 @@ func _process(delta: float) -> void:
 	var pan_input := Vector2(navigation_input.x, navigation_input.y)
 	if pan_input.length_squared() > 0.0:
 		view_center += pan_input.normalized() * PAN_SPEED / zoom * delta
-	var zoom_input := navigation_input.z
-	if not is_zero_approx(zoom_input):
-		zoom = clampf(zoom * pow(ZOOM_RATE, zoom_input * delta), MIN_ZOOM, MAX_ZOOM)
+	_advance_zoom(navigation_input.z, delta)
 	queue_redraw()
 
 
