@@ -292,10 +292,10 @@ static func create_number_field(value: float, minimum: float, maximum: float, st
 	return field
 
 static func format_scale_value(value: float) -> String:
-	# Four decimals with the trailing zeros trimmed, so 1.5000 reads as 1.5 and
-	# 2.0000 as 2. It matches what a Scale field accepts: a Rebase preview that
+	# Five decimals with the trailing zeros trimmed, so 1.50000 reads as 1.5 and
+	# 2.00000 as 2. It matches what a Scale field accepts: a Rebase preview that
 	# rounded shorter would name a factor other than the one it bakes.
-	var formatted := "%.4f" % value
+	var formatted := "%.5f" % value
 	while formatted.ends_with("0"):
 		formatted = formatted.substr(0, formatted.length() - 1)
 	if formatted.ends_with("."):

@@ -2701,24 +2701,24 @@ func _test_inspector_scale_precision() -> void:
 	application.selected_asset_id = "asset_1"
 	application._render_inspector()
 	var root_scale_field: SpinBox = application.create_inspector_view.asset_root_scale_fields["scale_x"]
-	_expect(is_equal_approx(root_scale_field.step, 0.0001), "The Asset Root Scale field should author a ten-thousandth.")
-	_edit_inspector_value(root_scale_field, 1.2345)
-	_expect(is_equal_approx(Vector2(application._get_asset("asset_1").get("root_scale", Vector2.ONE)).x, 1.2345), "A Root Scale of 1.2345 must reach the Asset; a coarser step would have rounded the field itself before the handler ever saw it.")
+	_expect(is_equal_approx(root_scale_field.step, 0.00001), "The Asset Root Scale field should author a hundred-thousandth.")
+	_edit_inspector_value(root_scale_field, 1.23456)
+	_expect(is_equal_approx(Vector2(application._get_asset("asset_1").get("root_scale", Vector2.ONE)).x, 1.23456), "A Root Scale of 1.23456 must reach the Asset; a coarser step would have rounded the field itself before the handler ever saw it.")
 	application.selected_component_id = "component_1"
 	application._render_inspector()
 	var component_scale_field: SpinBox = application.create_inspector_view.transform_fields["scale_x"]
 	var component_position_field: SpinBox = application.create_inspector_view.transform_fields["position_x"]
-	_expect(is_equal_approx(component_scale_field.step, 0.0001) and is_equal_approx(component_position_field.step, 0.01), "Only Scale gains the finer step; a hundredth of a centimetre stays the Position precision.")
-	_edit_inspector_value(component_scale_field, 0.8125)
-	_expect(is_equal_approx(Vector2(body["transform"]["scale"]).x, 0.8125), "A Component Scale of 0.8125 must reach the transform unrounded.")
+	_expect(is_equal_approx(component_scale_field.step, 0.00001) and is_equal_approx(component_position_field.step, 0.01), "Only Scale gains the finer step; a hundredth of a centimetre stays the Position precision.")
+	_edit_inspector_value(component_scale_field, 0.81253)
+	_expect(is_equal_approx(Vector2(body["transform"]["scale"]).x, 0.81253), "A Component Scale of 0.81253 must reach the transform unrounded.")
 	application.selected_component_id = ""
 	application.selected_group_id = "group_1"
 	application._render_inspector()
 	var group_scale_field := _inspector_spin(application, "Scale X")
-	_expect(group_scale_field != null and is_equal_approx(group_scale_field.step, 0.0001) and is_equal_approx(group_scale_field.custom_arrow_step, 0.1), "A Group Scale should be typed to a ten-thousandth while its arrows still nudge by a tenth.")
-	_edit_inspector_value(group_scale_field, 1.0005)
-	_expect(is_equal_approx(Vector2(group["transform"]["scale"]).x, 1.0005), "A Group Scale of 1.0005 must reach the Group transform unrounded.")
-	_expect(EditorWidgets.format_scale_value(1.2345) == "1.2345" and EditorWidgets.format_scale_value(1.5) == "1.5" and EditorWidgets.format_scale_value(2.0) == "2", "A Rebase preview should name every authored decimal while still trimming the trailing zeros.")
+	_expect(group_scale_field != null and is_equal_approx(group_scale_field.step, 0.00001) and is_equal_approx(group_scale_field.custom_arrow_step, 0.1), "A Group Scale should be typed to a hundred-thousandth while its arrows still nudge by a tenth.")
+	_edit_inspector_value(group_scale_field, 1.00005)
+	_expect(is_equal_approx(Vector2(group["transform"]["scale"]).x, 1.00005), "A Group Scale of 1.00005 must reach the Group transform unrounded.")
+	_expect(EditorWidgets.format_scale_value(1.23456) == "1.23456" and EditorWidgets.format_scale_value(1.5) == "1.5" and EditorWidgets.format_scale_value(2.0) == "2", "A Rebase preview should name every authored decimal while still trimming the trailing zeros.")
 	application.free()
 
 
