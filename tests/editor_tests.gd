@@ -1524,6 +1524,34 @@ func _test_asset_guides() -> void:
 	var flipped_point_position := Vector2(flipped_duplicate.get("points", [])[0].get("position", Vector2.ZERO))
 	var source_point_position := Vector2(parent_component.get("points", [])[0].get("position", Vector2.ZERO))
 	_expect(is_equal_approx(float(flipped_duplicate.get("transform", {}).get("rotation", 0.0)), -20.0) and is_equal_approx(Vector2(flipped_duplicate.get("transform", {}).get("scale", Vector2.ONE)).x, 1.0) and is_equal_approx(flipped_point_position.x, -source_point_position.x), "Flip Orientation should mirror the Component geometry and automatically Rebase its negative Scale.")
+	# The same two modes across the other axis. A reflection negates the angle
+	# whichever axis it crosses, so only the coordinate that flips tells the two
+	# apart - which is exactly what a shared code path can get wrong unnoticed.
+	for flipped_child in ComponentHierarchy.children(application._get_asset("asset_1"), str(flipped_duplicate.get("id", ""))):
+		application._get_asset("asset_1")["components"].erase(flipped_child)
+	application._get_asset("asset_1")["components"].erase(flipped_duplicate)
+	application._duplicate_component("asset_1", "component_1", "keep_orientation", ComponentCanvas.MIRROR_AXIS_HORIZONTAL)
+	var kept_x_duplicate: Dictionary = application._get_component(application._get_asset("asset_1"), application.selected_component_id)
+	var kept_x_visual_center: Vector2 = application._component_visual_center_in_parent_space(kept_x_duplicate)
+	_expect(is_equal_approx(kept_x_visual_center.y, -source_visual_center.y) and is_equal_approx(kept_x_visual_center.x, source_visual_center.x) and is_equal_approx(float(kept_x_duplicate.get("transform", {}).get("rotation", 0.0)), 20.0), "Mirror X · Keep Orientation should reflect the visible placement across the Parent X axis and leave the other coordinate alone.")
+	for kept_x_child in ComponentHierarchy.children(application._get_asset("asset_1"), str(kept_x_duplicate.get("id", ""))):
+		application._get_asset("asset_1")["components"].erase(kept_x_child)
+	application._get_asset("asset_1")["components"].erase(kept_x_duplicate)
+	application._duplicate_component("asset_1", "component_1", "flip_orientation", ComponentCanvas.MIRROR_AXIS_HORIZONTAL)
+	var flipped_x_duplicate: Dictionary = application._get_component(application._get_asset("asset_1"), application.selected_component_id)
+	var flipped_x_point_position := Vector2(flipped_x_duplicate.get("points", [])[0].get("position", Vector2.ZERO))
+	# The source carries a Y Scale of 1.5, so the Rebase that follows the flip
+	# bakes -1.5 into the geometry and leaves the Component at unit Scale. The
+	# X coordinate must come through untouched, which is the whole difference
+	# between this axis and the other one.
+	var source_scale_y := Vector2(parent_component.get("transform", {}).get("scale", Vector2.ONE)).y
+	_expect(is_equal_approx(float(flipped_x_duplicate.get("transform", {}).get("rotation", 0.0)), -20.0) and Vector2(flipped_x_duplicate.get("transform", {}).get("scale", Vector2.ONE)).is_equal_approx(Vector2.ONE) and is_equal_approx(flipped_x_point_position.y, -source_point_position.y * source_scale_y) and is_equal_approx(flipped_x_point_position.x, source_point_position.x), "Mirror X · Flip Orientation should mirror the geometry across the X axis and Rebase the negative Y Scale back to positive.")
+	_expect(application._duplicate_mirror_action(8) == {"mode": "keep_orientation", "axis": ComponentCanvas.MIRROR_AXIS_HORIZONTAL} and application._duplicate_mirror_action(1) == {"mode": "keep_orientation", "axis": ComponentCanvas.MIRROR_AXIS_VERTICAL} and application._duplicate_mirror_action(3).is_empty(), "The context menu should map each duplicating entry to its own mode and axis, and nothing else to one at all.")
+	for flipped_x_child in ComponentHierarchy.children(application._get_asset("asset_1"), str(flipped_x_duplicate.get("id", ""))):
+		application._get_asset("asset_1")["components"].erase(flipped_x_child)
+	application._get_asset("asset_1")["components"].erase(flipped_x_duplicate)
+	application._duplicate_component("asset_1", "component_1", "flip_orientation")
+	flipped_duplicate = application._get_component(application._get_asset("asset_1"), application.selected_component_id)
 	var child_world_before_detach := ComponentHierarchy.world_transform_record(application._get_asset("asset_1"), str(child_component.get("id", "")))
 	application._detach_component("asset_1", str(child_component.get("id", "")))
 	var detached_child: Dictionary = application._get_component(application._get_asset("asset_1"), str(child_component.get("id", "")))

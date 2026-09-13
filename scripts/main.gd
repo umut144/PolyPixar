@@ -2126,6 +2126,8 @@ func _create_component_context_menu() -> void:
 	component_context_menu.add_separator()
 	component_context_menu.add_item("Duplicate & Mirror Y · Keep Orientation", 1)
 	component_context_menu.add_item("Duplicate & Mirror Y · Flip Orientation", 2)
+	component_context_menu.add_item("Duplicate & Mirror X · Keep Orientation", 8)
+	component_context_menu.add_item("Duplicate & Mirror X · Flip Orientation", 9)
 	component_context_menu.add_separator()
 	component_context_menu.add_item("Detach from Parent", 3)
 	EditorWidgets.style_popup_menu(component_context_menu)
@@ -8253,10 +8255,14 @@ func _on_group_outliner_gui_input(event: InputEvent, asset_id: String, group_id:
 	component_context_menu.set_meta("asset_id", asset_id)
 	component_context_menu.set_meta("component_id", "")
 	component_context_menu.set_meta("group_id", group_id)
-	component_context_menu.set_item_disabled(component_context_menu.get_item_index(4), true)
-	component_context_menu.set_item_disabled(component_context_menu.get_item_index(5), true)
-	component_context_menu.set_item_disabled(component_context_menu.get_item_index(6), true)
-	component_context_menu.set_item_disabled(component_context_menu.get_item_index(7), true)
+	# One popup serves the Asset, Group and Component rows, so every entry has to
+	# be set here rather than left at whatever the last row wanted. A Group row
+	# that only switched its own entries off inherited the Asset row's disabled
+	# Duplicate, which read as the action being unavailable for Groups.
+	for action_id in [0, 1, 2, 8, 9]:
+		component_context_menu.set_item_disabled(component_context_menu.get_item_index(action_id), false)
+	for action_id in [3, 4, 5, 6, 7]:
+		component_context_menu.set_item_disabled(component_context_menu.get_item_index(action_id), true)
 	component_context_menu.position = Vector2i(button.global_position + event.position)
 	component_context_menu.popup()
 	get_viewport().set_input_as_handled()
@@ -8269,7 +8275,7 @@ func _on_asset_outliner_gui_input(event: InputEvent, asset_id: String, button: B
 	component_context_menu.set_meta("asset_id", asset_id)
 	component_context_menu.set_meta("component_id", "")
 	component_context_menu.set_meta("group_id", "")
-	for action_id in [0, 1, 2, 3, 4, 5]:
+	for action_id in [0, 1, 2, 3, 4, 5, 8, 9]:
 		component_context_menu.set_item_disabled(component_context_menu.get_item_index(action_id), true)
 	component_context_menu.set_item_disabled(component_context_menu.get_item_index(6), true)
 	component_context_menu.set_item_disabled(component_context_menu.get_item_index(7), component_clipboard.is_empty())
@@ -8387,7 +8393,7 @@ func _on_component_outliner_gui_input(event: InputEvent, asset_id: String, compo
 	component_context_menu.set_meta("asset_id", asset_id)
 	component_context_menu.set_meta("component_id", component_id)
 	component_context_menu.set_meta("group_id", "")
-	for action_id in [0, 1, 2]:
+	for action_id in [0, 1, 2, 8, 9]:
 		component_context_menu.set_item_disabled(component_context_menu.get_item_index(action_id), false)
 	component_context_menu.set_item_disabled(component_context_menu.get_item_index(4), false)
 	var component := _get_component(_get_asset(asset_id), component_id)
@@ -9036,6 +9042,34 @@ func _place_selected_group_pivot_at_mouse() -> bool:
 	return true
 
 
+## The duplicating entries of the Component context menu, as the mode and the
+## mirror axis each one stands for. One table answers for both duplicate paths,
+## so an axis cannot reach the Component one and miss the Group one - and an id
+## that is not a duplicate action returns nothing rather than falling through
+## into one, which the old chain of ternaries did.
+func _duplicate_mirror_action(action_id: int) -> Dictionary:
+	match action_id:
+		0:
+			return {"mode": "none", "axis": ComponentCanvas.MIRROR_AXIS_VERTICAL}
+		1:
+			return {"mode": "keep_orientation", "axis": ComponentCanvas.MIRROR_AXIS_VERTICAL}
+		2:
+			return {"mode": "flip_orientation", "axis": ComponentCanvas.MIRROR_AXIS_VERTICAL}
+		8:
+			return {"mode": "keep_orientation", "axis": ComponentCanvas.MIRROR_AXIS_HORIZONTAL}
+		9:
+			return {"mode": "flip_orientation", "axis": ComponentCanvas.MIRROR_AXIS_HORIZONTAL}
+	return {}
+
+
+## Which coordinate a mirror reflects: across the vertical axis - the menu's
+## Mirror Y - it is X, and across the horizontal axis it is Y. The transform, the
+## Group scale normalization and the visual centre all ask here, so they cannot
+## disagree about which axis they are working on.
+func _mirror_reflects_x(mirror_axis: String) -> bool:
+	return mirror_axis != ComponentCanvas.MIRROR_AXIS_HORIZONTAL
+
+
 func _on_component_context_menu_selected(action_id: int) -> void:
 	if not is_instance_valid(component_context_menu):
 		return
@@ -9069,16 +9103,15 @@ func _on_component_context_menu_selected(action_id: int) -> void:
 		_invalidate_render(RENDER_DOCUMENT)
 		_show_status_message("Removed %d Component%s from Group." % [selected_ids.size(), "" if selected_ids.size() == 1 else "s"])
 		return
-	if not group_id.is_empty() and action_id in [0, 1, 2]:
-		var group_mirror_mode := "none" if action_id == 0 else "keep_orientation" if action_id == 1 else "flip_orientation"
-		_duplicate_group(asset_id, group_id, group_mirror_mode)
+	var mirror_action := _duplicate_mirror_action(action_id)
+	if not group_id.is_empty() and not mirror_action.is_empty():
+		_duplicate_group(asset_id, group_id, str(mirror_action["mode"]), str(mirror_action["axis"]))
 		return
 	if action_id == 3:
 		_detach_component(asset_id, component_id)
 		return
-	var mirror_mode := "none" if action_id == 0 else "keep_orientation" if action_id == 1 else "flip_orientation"
-	if mirror_mode == "none" or mirror_mode == "keep_orientation" or mirror_mode == "flip_orientation":
-		_duplicate_component(asset_id, component_id, mirror_mode)
+	if not mirror_action.is_empty():
+		_duplicate_component(asset_id, component_id, str(mirror_action["mode"]), str(mirror_action["axis"]))
 
 
 func _selected_component_ids_for_clipboard(asset: Dictionary) -> Array[String]:
@@ -9204,7 +9237,7 @@ func _next_pasted_component_name(asset: Dictionary, source_name: String) -> Stri
 	return candidate if not _has_component_name(asset, candidate) else _next_duplicate_component_name(asset, candidate)
 
 
-func _duplicate_group(asset_id: String, group_id: String, mirror_mode := "none") -> void:
+func _duplicate_group(asset_id: String, group_id: String, mirror_mode := "none", mirror_axis := ComponentCanvas.MIRROR_AXIS_VERTICAL) -> void:
 	var asset := _get_asset(asset_id)
 	var source_group := ComponentHierarchy.group_by_id(asset, group_id)
 	if asset.is_empty() or source_group.is_empty():
@@ -9231,7 +9264,7 @@ func _duplicate_group(asset_id: String, group_id: String, mirror_mode := "none")
 	group_copy["id"] = new_group_id
 	group_copy["name"] = _next_duplicate_group_name(asset, str(source_group.get("name", "Group")))
 	if mirror_mode != "none":
-		group_copy["transform"] = _mirrored_group_transform(group_copy.get("transform", WorldDocumentService.default_component_transform()), mirror_mode)
+		group_copy["transform"] = _mirrored_group_transform(group_copy.get("transform", WorldDocumentService.default_component_transform()), mirror_mode, mirror_axis)
 	asset["groups"].append(group_copy)
 	var id_map: Dictionary = {}
 	var duplicated_component_ids: Array[String] = []
@@ -9253,7 +9286,10 @@ func _duplicate_group(asset_id: String, group_id: String, mirror_mode := "none")
 			mirrored_world_records[duplicated_id] = ComponentHierarchy.world_transform_record(asset, duplicated_id)
 		var normalized_group_transform: Dictionary = group_copy.get("transform", WorldDocumentService.default_component_transform()).duplicate(true)
 		var normalized_group_scale: Vector2 = normalized_group_transform.get("scale", Vector2.ONE)
-		normalized_group_scale.x = absf(normalized_group_scale.x)
+		if _mirror_reflects_x(mirror_axis):
+			normalized_group_scale.x = absf(normalized_group_scale.x)
+		else:
+			normalized_group_scale.y = absf(normalized_group_scale.y)
 		normalized_group_transform["scale"] = normalized_group_scale
 		group_copy["transform"] = normalized_group_transform
 		for duplicated_id in duplicated_component_ids:
@@ -9292,20 +9328,29 @@ func _next_duplicate_group_name(asset: Dictionary, source_name: String) -> Strin
 	return candidate
 
 
-func _mirrored_group_transform(raw_transform: Dictionary, mirror_mode: String) -> Dictionary:
+func _mirrored_group_transform(raw_transform: Dictionary, mirror_mode: String, mirror_axis: String) -> Dictionary:
 	var transform := WorldDocumentService.deserialize_transform(raw_transform).duplicate(true)
+	var reflects_x := _mirror_reflects_x(mirror_axis)
 	var mirrored_position: Vector2 = transform.get("position", Vector2.ZERO)
-	mirrored_position.x = -mirrored_position.x
+	if reflects_x:
+		mirrored_position.x = -mirrored_position.x
+	else:
+		mirrored_position.y = -mirrored_position.y
 	transform["position"] = mirrored_position
 	if mirror_mode == "flip_orientation":
+		# Reflecting a rotated frame negates its angle whichever axis it is
+		# reflected across; only the scale axis that flips differs.
 		transform["rotation"] = -float(transform.get("rotation", 0.0))
 		var mirrored_scale: Vector2 = transform.get("scale", Vector2.ONE)
-		mirrored_scale.x = -mirrored_scale.x
+		if reflects_x:
+			mirrored_scale.x = -mirrored_scale.x
+		else:
+			mirrored_scale.y = -mirrored_scale.y
 		transform["scale"] = mirrored_scale
 	return transform
 
 
-func _duplicate_component(asset_id: String, component_id: String, mirror_mode := "none") -> void:
+func _duplicate_component(asset_id: String, component_id: String, mirror_mode := "none", mirror_axis := ComponentCanvas.MIRROR_AXIS_VERTICAL) -> void:
 	var asset := _get_asset(asset_id)
 	var source := _get_component(asset, component_id)
 	if asset.is_empty() or source.is_empty():
@@ -9328,7 +9373,7 @@ func _duplicate_component(asset_id: String, component_id: String, mirror_mode :=
 		var source_parent_id := str(source_node.get("parent_component_id", ""))
 		component_copy["parent_component_id"] = str(id_map.get(source_parent_id, source_parent_id))
 		if mirror_mode != "none" and source_node_id == component_id:
-			component_copy["transform"] = _mirrored_duplicate_transform(component_copy, mirror_mode)
+			component_copy["transform"] = _mirrored_duplicate_transform(component_copy, mirror_mode, mirror_axis)
 		asset["components"].append(component_copy)
 		duplicated_component_ids.append(str(component_copy.get("id", "")))
 		if source_node_id == component_id:
@@ -9365,22 +9410,31 @@ func _next_duplicate_component_name(asset: Dictionary, source_name: String) -> S
 	return candidate
 
 
-func _mirrored_duplicate_transform(component: Dictionary, mirror_mode: String) -> Dictionary:
+func _mirrored_duplicate_transform(component: Dictionary, mirror_mode: String, mirror_axis: String) -> Dictionary:
 	var transform: Dictionary = component.get("transform", WorldDocumentService.default_component_transform()).duplicate(true)
+	var reflects_x := _mirror_reflects_x(mirror_axis)
+	var transform_position: Vector2 = transform.get("position", Vector2.ZERO)
 	if mirror_mode == "flip_orientation":
-		var transform_position: Vector2 = transform.get("position", Vector2.ZERO)
-		transform_position.x = -transform_position.x
+		# Reflecting a rotated frame negates its angle whichever axis it is
+		# reflected across; only the position and scale axis that flips differs.
+		var transform_scale: Vector2 = transform.get("scale", Vector2.ONE)
+		if reflects_x:
+			transform_position.x = -transform_position.x
+			transform_scale.x = -transform_scale.x
+		else:
+			transform_position.y = -transform_position.y
+			transform_scale.y = -transform_scale.y
 		transform["position"] = transform_position
 		transform["rotation"] = -float(transform.get("rotation", 0.0))
-		var transform_scale: Vector2 = transform.get("scale", Vector2.ONE)
-		transform_scale.x = -transform_scale.x
 		transform["scale"] = transform_scale
 	else:
 		# Keep the component orientation while reflecting its visible placement.
 		# Applying this to every local level mirrors the complete subtree.
 		var visual_center := _component_visual_center_in_parent_space(component)
-		var transform_position: Vector2 = transform.get("position", Vector2.ZERO)
-		transform_position.x -= visual_center.x * 2.0
+		if reflects_x:
+			transform_position.x -= visual_center.x * 2.0
+		else:
+			transform_position.y -= visual_center.y * 2.0
 		transform["position"] = transform_position
 	return transform
 func _duplicate_component_record(source: Dictionary, _asset: Dictionary, forced_id := "") -> Dictionary:
