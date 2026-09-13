@@ -212,7 +212,7 @@ static func _blocking_reason(_asset: Dictionary, component: Dictionary, scale: V
 	if draw_mode in [WorldDocumentService.DRAW_MODE_CLOSED_LOOP, WorldDocumentService.DRAW_MODE_CONTOUR]:
 		return "" if not component.get("points", []).is_empty() else "Component has no geometry that can absorb Scale."
 	if draw_mode == WorldDocumentService.DRAW_MODE_PRIMITIVE:
-		return "" if PrimitiveGeometryService.has_analytic_shape(component) else "Primitive must be a complete Circle or Ellipse."
+		return "" if PrimitiveGeometryService.has_analytic_shape(component) else "Primitive must be a complete Circle, Ellipse, Rectangle, or Triangle."
 	return "Draw Mode '%s' does not own rebaseable geometry." % draw_mode
 
 
@@ -223,7 +223,7 @@ static func _target_blocking_reason(component: Dictionary, scale: Vector2) -> St
 	if draw_mode in [WorldDocumentService.DRAW_MODE_CLOSED_LOOP, WorldDocumentService.DRAW_MODE_CONTOUR]:
 		return "" if not component.get("points", []).is_empty() else "Component has no geometry that can absorb Scale."
 	if draw_mode == WorldDocumentService.DRAW_MODE_PRIMITIVE:
-		return "" if PrimitiveGeometryService.has_analytic_shape(component) else "Primitive must be a complete Circle or Ellipse."
+		return "" if PrimitiveGeometryService.has_analytic_shape(component) else "Primitive must be a complete Circle, Ellipse, Rectangle, or Triangle."
 	return "Draw Mode '%s' does not own rebaseable geometry." % draw_mode
 
 
@@ -257,18 +257,9 @@ static func _bake_component_geometry(component: Dictionary, pivot: Vector2, scal
 			# cubic handles are retained instead of being regenerated afterwards.
 			point["handle_source"] = "manual"
 		return
-	var primitive: Dictionary = component.get("primitive", {})
-	primitive["center"] = pivot + (PrimitiveGeometryService.center(component) - pivot) * scale
-	var diameters_cm: Vector2
-	if PrimitiveGeometryService.has_circle(component):
-		var diameter := float(primitive.get("diameter_cm", 1.0))
-		diameters_cm = Vector2(diameter * absf(scale.x), diameter * absf(scale.y))
-	else:
-		diameters_cm = Vector2(float(primitive.get("diameter_x_cm", 1.0)) * absf(scale.x), float(primitive.get("diameter_y_cm", 1.0)) * absf(scale.y))
-	if is_equal_approx(diameters_cm.x, diameters_cm.y):
-		component["primitive"] = {"type": "circle", "center": primitive["center"], "diameter_cm": diameters_cm.x}
-	else:
-		component["primitive"] = {"type": PrimitiveGeometryService.ELLIPSE, "center": primitive["center"], "diameter_x_cm": diameters_cm.x, "diameter_y_cm": diameters_cm.y}
+	var rebased_center := pivot + (PrimitiveGeometryService.center(component) - pivot) * scale
+	var extents_cm := PrimitiveGeometryService.extents_cm(component) * Vector2(absf(scale.x), absf(scale.y))
+	component["primitive"] = PrimitiveGeometryService.build(_result_primitive_type(component, scale), rebased_center, extents_cm)
 
 
 static func _bake_component_guides(asset: Dictionary, component_id: String, pivot: Vector2, scale: Vector2) -> void:
@@ -285,11 +276,17 @@ static func _bake_component_guides(asset: Dictionary, component_id: String, pivo
 			point["handle_source"] = "manual"
 
 
+## Only the round family changes identity under an anisotropic Scale: a Circle
+## that is no longer round is an Ellipse, and one that is round again is a
+## Circle. A Rectangle and a Triangle keep their own two independent extents,
+## so Scale bakes into them without any shape-type conversion.
 static func _result_primitive_type(component: Dictionary, scale: Vector2) -> String:
 	if not PrimitiveGeometryService.has_analytic_shape(component):
 		return ""
+	if PrimitiveGeometryService.has_straight_edges(component):
+		return PrimitiveGeometryService.shape_type(component)
 	var diameters := PrimitiveGeometryService.diameters_tool_units(component) * Vector2(absf(scale.x), absf(scale.y))
-	return "circle" if is_equal_approx(diameters.x, diameters.y) else PrimitiveGeometryService.ELLIPSE
+	return PrimitiveGeometryService.CIRCLE if is_equal_approx(diameters.x, diameters.y) else PrimitiveGeometryService.ELLIPSE
 
 
 static func _component_scale(component: Dictionary) -> Vector2:

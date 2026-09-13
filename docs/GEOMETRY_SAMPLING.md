@@ -48,11 +48,15 @@ values above `1×` refine it. Boundary adjustments never
 select a separate method or Curve Detail value. Schema-28 Even Spacing recipes
 and absolute boundary overrides normalize to the adaptive recipe and factors.
 
-Circle and Ellipse Primitives remain canonical as center plus axis diameters.
-Sampling evaluates their analytic curve directly, including an ordinary Child
-or Reference transform into Body-local space, so their sample count follows
-Target Edge Length and Curve Detail rather than the fixed render-contour segment
-count.
+Circle and Ellipse Primitives remain canonical as center plus axis diameters,
+and Rectangle and Triangle Primitives as center plus their own two full
+extents. Sampling evaluates a Circle or Ellipse's analytic curve directly, and
+the exact sides of a Rectangle or Triangle, including an ordinary Child or
+Reference transform into Body-local space, so their sample count follows Target
+Edge Length (and, for the curved shapes, Curve Detail) rather than the fixed
+render-contour segment count. Straight sides have no curvature to refine, so
+only Target Edge Length affects a Rectangle's or a Triangle's sample count, and
+a Triangle is a closed boundary at three samples where a curve needs four.
 
 Before a Preview becomes a mesh-pipeline input, Sampling arranges its
 constraints into a planar straight-line graph (PSLG). Every Cut intersection

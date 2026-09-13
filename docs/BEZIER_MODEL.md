@@ -148,7 +148,12 @@ stable IDs.
 A `primitive` Component owns a typed `primitive` record rather than Bézier
 topology. Authored Circles use `{ type: "circle", center, diameter_cm }`.
 An anisotropic Scale Rebase preserves them as
-`{ type: "ellipse", center, diameter_x_cm, diameter_y_cm }`. Render contours,
+`{ type: "ellipse", center, diameter_x_cm, diameter_y_cm }`. Authored
+Rectangles use `{ type: "rectangle", center, width_cm, length_cm }` and
+authored Triangles `{ type: "triangle", center, width_cm, height_cm }`, every
+extent a full one reaching equally in both directions from `center`. A Triangle
+is isosceles, its base along the bottom of that box and its apex centred on the
+top. Render contours,
 mesh samples, hit-test polygons, and export polygons are derived
 deterministically from those parameters. The primitive center handle moves
 `center`; the Component pivot remains independent. Primitive Components cannot

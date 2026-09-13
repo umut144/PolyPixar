@@ -390,8 +390,10 @@ fingerprint over coordinates therefore passes them through
 
 Each Component declares a geometry source. Bézier sources contain only
 `points`, `edges`, and `chains`; primitive sources contain one typed primitive
-definition: authored `circle` with `center` and `diameter_cm`, or an `ellipse`
-with `center`, `diameter_x_cm`, and `diameter_y_cm` produced by Scale Rebase. Generated
+definition: authored `circle` with `center` and `diameter_cm`, an `ellipse`
+with `center`, `diameter_x_cm`, and `diameter_y_cm` produced by Scale Rebase,
+an authored `rectangle` with `center`, `width_cm`, and `length_cm`, or an
+authored isosceles `triangle` with `center`, `width_cm`, and `height_cm`. Generated
 primitive contours, samples, fill, and hit-test polygons are derived and are
 never persisted. A Primitive's center handle moves its `primitive.center`; its
 Component pivot remains an independent transform handle. Do not add `outer_shape`, Component-level `closed`, the old
@@ -597,7 +599,8 @@ Component-scoped Guides, or analytic primitive axes around the unchanged Pivot
 before setting local Scale to `(1, 1)`. Group Rebase first compensates member
 transforms. Negative axes preserve Mirror reflections in source geometry;
 analytic primitive diameters remain positive, and a non-uniform Circle becomes
-an analytic Ellipse. A parent Rebase compensates direct Child local transforms
+an analytic Ellipse, while the straight-edged shapes keep their type and bake
+Scale directly into their own two independent extents. A parent Rebase compensates direct Child local transforms
 to preserve the Child subtree's visible world transform, so Child Position,
 Rotation, or Scale may change; hierarchy and animation data remain untouched.
 Zero or non-finite Scale blocks the whole operation with no partial fallback.
@@ -657,10 +660,12 @@ Inspector keeps the invalid current Parent visible as an explicit warning
 entry until it is repaired. A Hole Reference continues to export its source Asset instance, while owning no
 Fill or Contour Stroke Mesh itself. Hole and Cut inputs
 may apply a boundary-density factor from `0.25×` through `16×`. Values below
-`1×` coarsen all adaptive criteria, while values above `1×` refine them. Primitive Circles and Ellipses
+`1×` coarsen all adaptive criteria, while values above `1×` refine them. Primitive Circles, Ellipses, Rectangles, and Triangles
 remain analytic through sampling, including their transform into Body-local
 space; they are evaluated at the Body's adaptive target edge length and
-scale-aware Curve Detail and have no fixed or user-editable sample count. On Bézier boundaries, a deterministic best-effort post-pass splits only
+scale-aware Curve Detail and have no fixed or user-editable sample count. The
+sides of a Rectangle and a Triangle are straight, so only Target Edge Length
+subdivides them; there is no curvature to refine. On Bézier boundaries, a deterministic best-effort post-pass splits only
 the longer derived curve segment beside an authored corner toward a maximum
 adjacent-length ratio of `3×`; it never adds authored Points or changes the
 curve. At most 64 derived samples are added per Chain. Untreatable intervals

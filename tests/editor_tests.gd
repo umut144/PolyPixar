@@ -1524,7 +1524,7 @@ func _test_asset_guides() -> void:
 	application._confirm_component_creation()
 	var pupil_component: Dictionary = application._get_component(application._get_asset("asset_1"), application.selected_component_id)
 	_expect(str(pupil_component.get("parent_component_id", "")) == "component_1" and str(pupil_component.get("draw_mode", "")) == "primitive" and pupil_component.get("points", []).is_empty() and pupil_component.get("edges", []).is_empty() and pupil_component.get("chains", []).is_empty() and pupil_component.get("primitive", {}).is_empty(), "Primitive Child creation should create an empty Primitive Component without generated Bézier topology.")
-	application._on_primitive_placed(Vector2(0.25, -0.5), 2.5)
+	application._on_primitive_placed(PrimitiveGeometryService.CIRCLE, Vector2(0.25, -0.5), Vector2(2.5, 2.5))
 	_expect(PrimitiveGeometryService.has_circle(pupil_component) and is_equal_approx(float(pupil_component.get("primitive", {}).get("diameter_cm", 0.0)), 2.5) and PrimitiveGeometryService.center(pupil_component).is_equal_approx(Vector2(0.25, -0.5)), "Circle placement should persist only its parametric center and diameter.")
 	application._render_inspector()
 	var primitive_topology_option := _inspector_option(application, "Outer")
@@ -2070,6 +2070,7 @@ const CREATE_SIGNAL_ROUTES := [
 	["reference_image_property_changed", "_on_reference_image_property_changed"],
 	["reference_image_target_height_changed", "_on_reference_image_target_height_changed"],
 	["reference_image_visibility_changed", "_on_reference_image_visibility_changed"],
+	["rectangle_primitive_size_changed", "_on_rectangle_primitive_size_changed"],
 	["reference_role_requested", "_on_reference_role_requested"],
 	["section_toggled", "_on_inspector_section_toggled"],
 	["selected_points_delta_changed", "_on_selected_points_delta_changed"],
@@ -2077,12 +2078,14 @@ const CREATE_SIGNAL_ROUTES := [
 	["selected_points_preserve_changed", "_on_selected_points_preserve_changed"],
 	["set_member_rename_dialog_requested", "_on_set_member_rename_dialog_requested"],
 	["transform_value_changed", "_on_transform_value_changed"],
+	["triangle_primitive_size_changed", "_on_triangle_primitive_size_changed"],
 	["weapon_frame_value_changed", "_on_weapon_frame_value_changed"],
 ]
 
 
 const CREATE_PROBE_CASES := ["asset", "asset_reference", "set_asset", "set_member", "palette_asset", "component", "component_grouped",
-	"component_contour", "primitive_circle", "primitive_hole", "primitive_ellipse", "group", "guide",
+	"component_contour", "primitive_circle", "primitive_hole", "primitive_ellipse",
+	"primitive_rectangle", "primitive_triangle", "group", "guide",
 	"guide_weapon", "region_authored", "region_component", "multi_component", "point_none", "point_one", "point_many",
 	"edge_none", "edge_one", "edge_many", "hole_edge_one", "hole_edge_many", "face"]
 
@@ -2139,6 +2142,12 @@ func _create_wiring_asset() -> Dictionary:
 	ellipse["draw_mode"] = "primitive"
 	ellipse["primitive"] = {"type": PrimitiveGeometryService.ELLIPSE,
 		"diameter_x_cm": 3.0, "diameter_y_cm": 5.0}
+	var rectangle := _outliner_test_component("component_11", "slab")
+	rectangle["draw_mode"] = "primitive"
+	rectangle["primitive"] = PrimitiveGeometryService.build(PrimitiveGeometryService.RECTANGLE, Vector2.ZERO, Vector2(6.0, 2.0))
+	var triangle := _outliner_test_component("component_12", "spike")
+	triangle["draw_mode"] = "primitive"
+	triangle["primitive"] = PrimitiveGeometryService.build(PrimitiveGeometryService.TRIANGLE, Vector2.ZERO, Vector2(4.0, 7.0))
 	var guide := {"id": "guide_1", "guide_type": AssetGuide.SAMPLE, "ordinal": 1,
 		"visibility": true, "scope": {"kind": "component", "component_id": "component_1"},
 		"points": [], "edges": [], "chains": []}
@@ -2152,7 +2161,7 @@ func _create_wiring_asset() -> Dictionary:
 	var inherited_region := authored_region.duplicate(true)
 	inherited_region.merge({"id": "component_7", "name": "hurt_region", "region_type": "hurt", "region_geometry_source": "component"}, true)
 	return {"id": "asset_1", "name": "Wizard", "visibility": true,
-		"components": [body, arm, outline, circle, ellipse, authored_region, inherited_region, hole, bezier_hole], "groups": [group],
+		"components": [body, arm, outline, circle, ellipse, rectangle, triangle, authored_region, inherited_region, hole, bezier_hole], "groups": [group],
 		"guides": [guide, weapon], "asset_pivot": Vector2(5.0, 6.0),
 		"root_position": Vector2.ZERO, "root_scale": Vector2.ONE}
 
@@ -2211,6 +2220,10 @@ func _prepare_create_case(application: Control, case_name: String) -> void:
 			application.selected_component_id = "component_8"
 		"primitive_ellipse":
 			application.selected_component_id = "component_5"
+		"primitive_rectangle":
+			application.selected_component_id = "component_11"
+		"primitive_triangle":
+			application.selected_component_id = "component_12"
 		"group":
 			application.selected_group_id = "group_1"
 		"guide":
@@ -2651,6 +2664,134 @@ func _test_primitive_arrow_key_nudge() -> void:
 	application.active_state = "draw"
 	_expect(not application._can_nudge_selection(), "While a Primitive is still being placed the arrow keys must not move it.")
 	application.free()
+
+
+func _info_option_is_active(application: Control, option_text: String) -> bool:
+	# An Info Bar option says which mode is current with its background, not with
+	# its text, so reading the text alone cannot tell a highlighted entry from a
+	# dimmed one - which is exactly the bug this test is about.
+	#
+	# A re-render clears the bar with queue_free, and that queue is never drained
+	# in a `-s` run, so the options of every earlier render are still children
+	# here. Reading the first match would answer from the render before last.
+	for child in application.info_bar.get_children():
+		if not child is PanelContainer or child.is_queued_for_deletion():
+			continue
+		for grandchild in child.get_children():
+			if grandchild is Label and str(grandchild.text) == option_text:
+				var style: StyleBox = child.get_theme_stylebox("panel")
+				return style is StyleBoxFlat and (style as StyleBoxFlat).bg_color == Color("#783943")
+	return false
+
+
+func _primitive_create_application() -> Control:
+	var application: Control = load("res://scripts/main.gd").new()
+	application._build_ui()
+	var primitive_component := {"id": "component_1", "name": "pupil", "type": "component",
+		"draw_mode": WorldDocumentService.DRAW_MODE_PRIMITIVE, "topology_role": WorldDocumentService.ROLE_OUTER,
+		"primitive": {}, "points": [], "edges": [], "chains": [], "visibility": true,
+		"transform": WorldDocumentService.default_component_transform()}
+	var primitive_assets: Array[Dictionary] = [{"id": "asset_1", "name": "Eye", "asset_type": "props",
+		"visibility": true, "components": [primitive_component], "groups": [], "guides": []}]
+	application.assets = primitive_assets
+	application.active_module = "Create"
+	application.selected_asset_id = "asset_1"
+	application.selected_component_id = "component_1"
+	application.canvas_view.snap_enabled = false
+	return application
+
+
+## A Primitive is specified, not drawn. Its two Component commands must claim
+## their own shortcuts and their own Info Bar: the Bezier ladder underneath them
+## - Draw Point with its handle modes, Edit Point, Edit Edge, Edit Face - belongs
+## to Components that own Points, and a Primitive owns none.
+func _test_primitive_create_command() -> void:
+	var application := _primitive_create_application()
+	var canvas: ComponentCanvas = application.canvas_view
+	var component: Dictionary = application._get_component(application._get_asset("asset_1"), "component_1")
+	application._activate_primitive_create_command()
+	application._render_context_bar()
+	var create_menu := _button_starting_with(application.context_bar, "⌘1  Create Primitive")
+	var transform_menu := _button_starting_with(application.context_bar, "⌘2  Transform")
+	_expect(create_menu != null and transform_menu != null, "A Primitive Component should offer Create Primitive and Transform, and nothing that edits Points.")
+	_expect(_button_starting_with(application.context_bar, "⌘1  Draw Point") == null and _button_starting_with(application.context_bar, "⌘3  Edit Edge") == null, "The Bezier commands must not appear beside a Primitive.")
+	_expect(create_menu.button_pressed and not transform_menu.button_pressed, "Create Primitive must be marked as the active command while it owns the Canvas.")
+	var command_info := _control_text(application.info_bar)
+	_expect(command_info.contains("State: Create Primitive") and command_info.contains("1: Circle") and command_info.contains("2: Rectangle") and command_info.contains("3: Triangle"), "Create Primitive should offer its three shapes in the Info Bar.")
+	_expect(not command_info.contains("Draw Point") and not command_info.contains("Linear") and not command_info.contains("Mirrored"), "Bezier handle modes must never reach a Primitive's Info Bar.")
+	_expect(not canvas.primitive_preview_is_active(), "Nothing should be previewed on the Canvas before a shape is picked.")
+	application._set_primitive_create_shape(PrimitiveGeometryService.CIRCLE)
+	application._render_info_bar()
+	_expect(canvas.primitive_preview_is_active() and canvas.primitive_preview_stage == ComponentCanvas.PRIMITIVE_STAGE_CENTER, "Picking a shape should start the preview and ask for its centre.")
+	_expect(_info_option_is_active(application, "1: Circle") and not _info_option_is_active(application, "2: Rectangle"), "The picked shape should be the highlighted one.")
+	canvas._place_primitive_preview_point(canvas._world_to_screen(Vector2(1.0, 2.0)))
+	application._render_info_bar()
+	_expect(canvas.primitive_preview_stage == ComponentCanvas.PRIMITIVE_STAGE_SIZE and application.primitive_create_stage == ComponentCanvas.PRIMITIVE_STAGE_SIZE, "The first click should pin the centre and hand the Info Bar the size step.")
+	_expect(component.get("primitive", {}).is_empty(), "A pinned centre is still a preview; nothing may reach the document before the size is confirmed.")
+	var escape_event := InputEventKey.new()
+	escape_event.keycode = KEY_ESCAPE
+	escape_event.pressed = true
+	canvas._gui_input(escape_event)
+	_expect(canvas.primitive_preview_stage == ComponentCanvas.PRIMITIVE_STAGE_CENTER and canvas.primitive_preview_is_active() and application._context_command_is("asset.create_primitive"), "Escape should take the placement back to its centre rather than out of the command.")
+	canvas._place_primitive_preview_point(canvas._world_to_screen(Vector2(1.0, 2.0)))
+	canvas._place_primitive_preview_point(canvas._world_to_screen(Vector2(3.0, 2.0)))
+	_expect(PrimitiveGeometryService.has_circle(component) and PrimitiveGeometryService.center(component).is_equal_approx(Vector2(1.0, 2.0)) and is_equal_approx(float(component.get("primitive", {}).get("diameter_cm", 0.0)), 40.0), "The second click should measure the radius from the pinned centre and commit the Circle.")
+	_expect(not canvas.primitive_preview_is_active() and application.active_state.is_empty() and application.active_context_command.is_empty(), "A committed Primitive should end the command instead of leaving the preview armed.")
+	application._render_info_bar()
+	var default_info := _control_text(application.info_bar)
+	_expect(default_info.contains("State: Default") and default_info.contains("Primitive: Circle") and default_info.contains("⌘1: Create Primitive") and default_info.contains("⌘2: Transform"), "With a shape in place the Info Bar should name it and offer the two Primitive commands.")
+	_expect(not default_info.contains("⌘3: Edit Edge") and not default_info.contains("⌘2: Edit Point"), "The Bezier command list must not be what a Primitive falls back to.")
+	application._activate_primitive_create_command()
+	_expect(application.active_context_command.is_empty() and not canvas.primitive_preview_is_active(), "Create Primitive must refuse a Component that already owns a shape rather than arm a second placement.")
+	application.free()
+
+
+## Transform is the Primitive's second command and works on the Component
+## transform, the same one every other Component is moved, turned and scaled by.
+func _test_primitive_transform_command() -> void:
+	var application := _primitive_create_application()
+	var canvas: ComponentCanvas = application.canvas_view
+	var component: Dictionary = application._get_component(application._get_asset("asset_1"), "component_1")
+	component["primitive"] = PrimitiveGeometryService.build(PrimitiveGeometryService.CIRCLE, Vector2.ZERO, Vector2(4.0, 4.0))
+	application._activate_transform_state()
+	application._render_context_bar()
+	var transform_menu := _button_starting_with(application.context_bar, "⌘2  Transform")
+	var create_menu := _button_starting_with(application.context_bar, "⌘1  Create Primitive")
+	_expect(transform_menu != null and transform_menu.button_pressed, "Transform must be marked as the active command while it owns the Canvas.")
+	_expect(create_menu != null and create_menu.disabled and not create_menu.button_pressed, "Create Primitive should be closed off once the Component owns a shape.")
+	var transform_info := _control_text(application.info_bar)
+	_expect(transform_info.contains("State: Transform") and transform_info.contains("1: Translate") and transform_info.contains("2: Rotate") and transform_info.contains("3: Scale"), "Transform should offer Translate, Rotate and Scale in the Info Bar.")
+	_expect(not transform_info.contains("⌘2: Edit Point") and not transform_info.contains("⌘4: Edit Face"), "Transform must not fall back to the Bezier command list.")
+	_expect(_info_option_is_active(application, "1: Translate"), "Entering Transform should start on Translate.")
+	application._set_transform_mode("rotate")
+	application._render_info_bar()
+	_expect(canvas.transform_mode == "rotate" and _info_option_is_active(application, "2: Rotate") and not _info_option_is_active(application, "1: Translate"), "Choosing Rotate should reach the Canvas gizmo and the Info Bar together.")
+	application._on_transform_menu_id(2)
+	_expect(canvas.transform_mode == "scale", "The Transform menu should pick the same three modes the number keys do.")
+	application._activate_primitive_create_command()
+	_expect(application._context_command_is("asset.transform"), "A refused Create Primitive must leave the running Transform command alone.")
+	application.free()
+
+
+## Placing a Rectangle or a Triangle measures a bounding box rather than a
+## radius, and the shape the preview draws is built from the very record the
+## placement commits.
+func _test_primitive_shape_placement() -> void:
+	var placement_shapes: Array[String] = [PrimitiveGeometryService.RECTANGLE, PrimitiveGeometryService.TRIANGLE]
+	for shape in placement_shapes:
+		var application := _primitive_create_application()
+		var canvas: ComponentCanvas = application.canvas_view
+		var component: Dictionary = application._get_component(application._get_asset("asset_1"), "component_1")
+		application._activate_primitive_create_command()
+		application._set_primitive_create_shape(shape)
+		canvas._place_primitive_preview_point(canvas._world_to_screen(Vector2.ZERO))
+		_expect(canvas.primitive_preview_size_cm(Vector2(1.0, 2.0)).is_equal_approx(Vector2(20.0, 40.0)), "A %s takes the cursor as a corner of its box, so both extents reach twice as far as the offset." % shape)
+		canvas._place_primitive_preview_point(canvas._world_to_screen(Vector2(1.0, 2.0)))
+		_expect(PrimitiveGeometryService.shape_type(component) == shape and PrimitiveGeometryService.extents_cm(component).is_equal_approx(Vector2(20.0, 40.0)), "Placing a %s should persist its own two extents." % shape)
+		_expect(PrimitiveGeometryService.contour(component).size() == (4 if shape == PrimitiveGeometryService.RECTANGLE else 3), "A %s should derive an exact polygon rather than a sampled curve." % shape)
+		application._render_inspector()
+		_expect(_inspector_spin(application, "Width (cm)") != null, "Every authored Primitive shape needs its own Inspector fields; a %s without them would look uneditable." % shape)
+		application.free()
 
 
 func _test_region_color_reaches_primitive_geometry() -> void:

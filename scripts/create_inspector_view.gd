@@ -35,6 +35,8 @@ signal component_visibility_changed(visibility_enabled: bool)
 signal component_z_index_changed(value: float)
 signal edge_render_outline_changed(enabled: bool)
 signal ellipse_primitive_diameter_changed(value: float, property_name: String)
+signal rectangle_primitive_size_changed(value: float, property_name: String)
+signal triangle_primitive_size_changed(value: float, property_name: String)
 signal global_transform_value_changed(value: float, property_name: String)
 signal group_hierarchy_parent_selected(index: int, option: OptionButton)
 signal group_rename_requested(new_name: String)
@@ -486,12 +488,15 @@ func rebuild() -> void:
 			{"label": "Outer", "metadata": WorldDocumentService.ROLE_OUTER},
 			{"label": "Hole", "metadata": WorldDocumentService.ROLE_HOLE},
 		], WorldDocumentService.topology_role(component), component_topology_role_selected.emit))
-	var primitive = component.get("primitive", {})
-	if primitive is Dictionary and str(primitive.get("type", "")) in ["circle", PrimitiveGeometryService.ELLIPSE]:
+	# A Primitive is specified here rather than drawn on the Canvas, so every
+	# analytic shape owns its own fields. A shape that reached the document
+	# without fields of its own would silently look uneditable.
+	var primitive_type := PrimitiveGeometryService.shape_type(component)
+	if not primitive_type.is_empty():
+		var primitive: Dictionary = component.get("primitive", {})
 		add_child(EditorWidgets.create_inspector_section("Geometry", section_toggled.emit))
-		var primitive_type := str(primitive.get("type", ""))
-		add_child(EditorWidgets.create_inspector_field_label("Type: %s" % primitive_type.capitalize()))
-		if primitive_type == "circle":
+		add_child(EditorWidgets.create_inspector_field_label("Type: %s" % PrimitiveGeometryService.display_name(primitive_type)))
+		if primitive_type == PrimitiveGeometryService.CIRCLE:
 			add_child(EditorWidgets.create_inspector_field_label("Diameter (cm)"))
 			var diameter_field := SpinBox.new()
 			diameter_field.min_value = 0.1
@@ -500,9 +505,15 @@ func rebuild() -> void:
 			diameter_field.value = float(primitive.get("diameter_cm", 1.0))
 			diameter_field.value_changed.connect(circle_primitive_diameter_changed.emit)
 			add_child(diameter_field)
+		elif primitive_type == PrimitiveGeometryService.RECTANGLE:
+			_add_primitive_size_field("Width (cm)", float(primitive.get("width_cm", 1.0)), "width_cm", rectangle_primitive_size_changed)
+			_add_primitive_size_field("Length (cm)", float(primitive.get("length_cm", 1.0)), "length_cm", rectangle_primitive_size_changed)
+		elif primitive_type == PrimitiveGeometryService.TRIANGLE:
+			_add_primitive_size_field("Width (cm)", float(primitive.get("width_cm", 1.0)), "width_cm", triangle_primitive_size_changed)
+			_add_primitive_size_field("Height (cm)", float(primitive.get("height_cm", 1.0)), "height_cm", triangle_primitive_size_changed)
 		else:
-			_add_ellipse_diameter_field("Diameter X (cm)", float(primitive.get("diameter_x_cm", 1.0)), "diameter_x_cm")
-			_add_ellipse_diameter_field("Diameter Y (cm)", float(primitive.get("diameter_y_cm", 1.0)), "diameter_y_cm")
+			_add_primitive_size_field("Diameter X (cm)", float(primitive.get("diameter_x_cm", 1.0)), "diameter_x_cm", ellipse_primitive_diameter_changed)
+			_add_primitive_size_field("Diameter Y (cm)", float(primitive.get("diameter_y_cm", 1.0)), "diameter_y_cm", ellipse_primitive_diameter_changed)
 	var validation_component := component
 	if inherited_region_geometry:
 		validation_component = WorldDocumentService.component_by_id(asset, str(component.get("parent_component_id", "")))
@@ -982,14 +993,17 @@ func _add_selected_point_settings(component: Dictionary, point_ids: Array[String
 	add_child(EditorWidgets.create_inspector_field_label(handles_label))
 
 
-func _add_ellipse_diameter_field(label_text: String, value: float, property_name: String) -> void:
+## One Inspector row for one authored extent. Every multi-extent shape uses it
+## and hands in its own signal, so adding a shape adds field names rather than
+## another copy of this control.
+func _add_primitive_size_field(label_text: String, value: float, property_name: String, changed_signal: Signal) -> void:
 	add_child(EditorWidgets.create_inspector_field_label(label_text))
 	var field := SpinBox.new()
 	field.min_value = 0.1
 	field.max_value = 100000.0
 	field.step = 0.1
 	field.value = value
-	field.value_changed.connect(ellipse_primitive_diameter_changed.emit.bind(property_name))
+	field.value_changed.connect(changed_signal.emit.bind(property_name))
 	add_child(field)
 
 

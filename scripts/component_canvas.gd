@@ -23,9 +23,10 @@ signal measure_stage_changed(stage: String)
 signal pivot_changed(pivot: Vector2)
 signal asset_pivot_changed(pivot: Vector2)
 signal transform_changed(transform: Dictionary)
-signal primitive_placed(center: Vector2, diameter_cm: float)
+signal primitive_placed(shape: String, shape_center: Vector2, size_cm: Vector2)
 signal primitive_center_changed(center: Vector2)
 signal primitive_preview_cancelled()
+signal primitive_preview_stage_changed(stage: String)
 
 const RULER_COLOR := Color("#f2994a")
 const RULER_X_COLOR := Color("#eb5757")
@@ -33,6 +34,13 @@ const RULER_Y_COLOR := Color("#6fcf97")
 const RULER_CROSS_RADIUS := 7.0
 const RULER_LEG_MIN_PIXELS := 6.0
 const PRIMITIVE_FILL_ALPHA := 0.133
+## Placing a Primitive takes two clicks: the first pins the centre, the second
+## fixes the size. Until the centre is pinned the preview follows the cursor at
+## this size, so there is something to see before there is anything to measure.
+const PRIMITIVE_STAGE_CENTER := "center"
+const PRIMITIVE_STAGE_SIZE := "size"
+const PRIMITIVE_PREVIEW_DEFAULT_CM := 1.0
+const PRIMITIVE_MINIMUM_EXTENT_CM := 0.1
 const MIRROR_AXIS_VERTICAL := "vertical"
 const MIRROR_AXIS_HORIZONTAL := "horizontal"
 const PAN_SPEED := 420.0
@@ -157,8 +165,9 @@ var transform_drag_start_rotation := 0.0
 var transform_drag_start_scale := Vector2.ONE
 var face_dragging := false
 var face_drag_start_world := Vector2.ZERO
-var primitive_preview_active := false
-var primitive_preview_diameter_cm := 1.0
+var primitive_preview_shape := ""
+var primitive_preview_stage := ""
+var primitive_preview_center := Vector2.ZERO
 
 
 func _ready() -> void:
@@ -194,14 +203,8 @@ func _gui_input(event: InputEvent) -> void:
 			command_shortcut_active = false
 	if event is InputEventMouseButton and event.pressed:
 		grab_focus()
-		if event.button_index == MOUSE_BUTTON_LEFT and primitive_preview_active:
-			primitive_placed.emit(_snap_to_canvas_position(_world_to_local(_screen_to_world(event.position))), primitive_preview_diameter_cm)
-			primitive_preview_active = false
-			queue_redraw()
-			return
-		if primitive_preview_active and event.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
-			primitive_preview_diameter_cm = maxf(0.1, primitive_preview_diameter_cm + (0.1 if event.button_index == MOUSE_BUTTON_WHEEL_UP else -0.1))
-			queue_redraw()
+		if event.button_index == MOUSE_BUTTON_LEFT and primitive_preview_is_active():
+			_place_primitive_preview_point(event.position)
 			return
 		if event.button_index == MOUSE_BUTTON_LEFT and not mirror_command_stage.is_empty():
 			_set_mirror_axis_from_screen(event.position)
@@ -298,7 +301,10 @@ func _gui_input(event: InputEvent) -> void:
 				queue_redraw()
 				return
 		elif event.button_index == MOUSE_BUTTON_LEFT and interaction_state == "transform":
-			if _is_near_primitive_center(event.position):
+			# The centre handle is a Translate handle. While Rotate or Scale owns
+			# the gizmo it stays inert, so a click near the middle cannot quietly
+			# move a shape the user meant to turn or resize.
+			if transform_mode == "transform" and _is_near_primitive_center(event.position):
 				transform_drag_axis = "primitive_move"
 				return
 			var handle_axis := _transform_handle_at(event.position)
@@ -473,10 +479,17 @@ func _gui_input(event: InputEvent) -> void:
 				return
 		queue_redraw()
 	if event is InputEventKey and event.pressed and not event.echo:
-		if event.keycode == KEY_ESCAPE and primitive_preview_active:
-			primitive_preview_active = false
+		if event.keycode == KEY_ESCAPE and primitive_preview_is_active():
+			# Escape walks the placement back one step rather than throwing it
+			# away: from the size back to the centre, and only from there out of
+			# the command.
+			if primitive_preview_stage == PRIMITIVE_STAGE_SIZE:
+				primitive_preview_stage = PRIMITIVE_STAGE_CENTER
+				primitive_preview_stage_changed.emit(primitive_preview_stage)
+				queue_redraw()
+				return
+			_clear_primitive_preview()
 			primitive_preview_cancelled.emit()
-			queue_redraw()
 			return
 		if not mirror_command_stage.is_empty():
 			if event.keycode == KEY_ESCAPE:
@@ -563,14 +576,65 @@ func set_tool_mode(tool_name: String) -> void:
 	queue_redraw()
 
 
-func start_circle_primitive_preview() -> void:
-	primitive_preview_active = true
-	primitive_preview_diameter_cm = 1.0
+func start_primitive_preview(shape: String) -> void:
+	if not shape in PrimitiveGeometryService.CREATABLE_SHAPES:
+		return
+	primitive_preview_shape = shape
+	primitive_preview_stage = PRIMITIVE_STAGE_CENTER
+	primitive_preview_center = Vector2.ZERO
+	primitive_preview_stage_changed.emit(primitive_preview_stage)
 	queue_redraw()
 
 
-func set_primitive_preview_active(active: bool) -> void:
-	primitive_preview_active = active
+func cancel_primitive_preview() -> void:
+	if not primitive_preview_is_active():
+		return
+	_clear_primitive_preview()
+
+
+func primitive_preview_is_active() -> bool:
+	return not primitive_preview_shape.is_empty()
+
+
+## One click of the two-step placement: the first pins the centre, the second
+## commits the shape. Split out from the input handler so the placement can be
+## driven without a live mouse, the way the Ruler is.
+func _place_primitive_preview_point(screen_position: Vector2) -> void:
+	var local_position := _snap_to_canvas_position(_world_to_local(_screen_to_world(screen_position)))
+	if primitive_preview_stage == PRIMITIVE_STAGE_CENTER:
+		primitive_preview_center = local_position
+		primitive_preview_stage = PRIMITIVE_STAGE_SIZE
+		primitive_preview_stage_changed.emit(primitive_preview_stage)
+		queue_redraw()
+		return
+	var placed_shape := primitive_preview_shape
+	var placed_center := primitive_preview_center
+	var placed_size := primitive_preview_size_cm(local_position)
+	_clear_primitive_preview()
+	primitive_placed.emit(placed_shape, placed_center, placed_size)
+
+
+## The size the preview stands for while its rim, or the corner of its bounding
+## box, sits at `local_position`. Before the centre is pinned there is nothing to
+## measure yet, so it is the default; afterwards a Circle measures its diameter
+## outward from the centre, and a Rectangle or Triangle takes the position as one
+## corner of its box, which is why both extents count double.
+func primitive_preview_size_cm(local_position: Vector2) -> Vector2:
+	if primitive_preview_stage != PRIMITIVE_STAGE_SIZE:
+		return Vector2(PRIMITIVE_PREVIEW_DEFAULT_CM, PRIMITIVE_PREVIEW_DEFAULT_CM)
+	var offset := local_position - primitive_preview_center
+	if primitive_preview_shape == PrimitiveGeometryService.CIRCLE:
+		var diameter := maxf(ToolUnits.to_centimeters(offset.length()) * 2.0, PRIMITIVE_MINIMUM_EXTENT_CM)
+		return Vector2(diameter, diameter)
+	return Vector2(
+		maxf(ToolUnits.to_centimeters(absf(offset.x)) * 2.0, PRIMITIVE_MINIMUM_EXTENT_CM),
+		maxf(ToolUnits.to_centimeters(absf(offset.y)) * 2.0, PRIMITIVE_MINIMUM_EXTENT_CM))
+
+
+func _clear_primitive_preview() -> void:
+	primitive_preview_shape = ""
+	primitive_preview_stage = ""
+	primitive_preview_center = Vector2.ZERO
 	queue_redraw()
 
 
@@ -1620,15 +1684,31 @@ func _reference_component_at(world_position: Vector2) -> String:
 	return nearest_id
 
 
+## The preview is drawn from the very record the placement will commit, so what
+## is on the Canvas and what lands in the document cannot drift apart.
 func _draw_primitive_preview() -> void:
-	if not primitive_preview_active or not cursor_over_canvas:
+	if not primitive_preview_is_active() or not cursor_over_canvas:
 		return
-	var center := _local_to_world(cursor_world)
-	var radius := ToolUnits.from_centimeters(primitive_preview_diameter_cm) * 0.5
-	var screen_center := _world_to_screen(center)
-	draw_arc(screen_center, radius * zoom, 0.0, TAU, 64, Color("#f2c94c"), 2.0, true)
+	var preview_center := primitive_preview_center if primitive_preview_stage == PRIMITIVE_STAGE_SIZE else cursor_world
+	var size_cm := primitive_preview_size_cm(cursor_world)
+	var outline := PrimitiveGeometryService.contour({
+		"draw_mode": WorldDocumentService.DRAW_MODE_PRIMITIVE,
+		"primitive": PrimitiveGeometryService.build(primitive_preview_shape, preview_center, size_cm)})
+	if outline.is_empty():
+		return
+	var screen_points := PackedVector2Array()
+	for point in outline:
+		screen_points.append(_world_to_screen(_local_to_world(point)))
+	screen_points.append(screen_points[0])
+	draw_polyline(screen_points, Color("#f2c94c"), 2.0, true)
+	var screen_center := _world_to_screen(_local_to_world(preview_center))
 	draw_circle(screen_center, 5.0, Color("#f2c94c"))
-	_draw_measurement_label("Circle · %.1f cm" % primitive_preview_diameter_cm, screen_center + Vector2(0.0, -radius * zoom - 16.0), Color("#f2c94c"))
+	var half_height := ToolUnits.from_centimeters(size_cm.y) * 0.5 * zoom
+	var shape_name := PrimitiveGeometryService.display_name(primitive_preview_shape)
+	var label := "%s · %.1f cm" % [shape_name, size_cm.x]
+	if primitive_preview_shape != PrimitiveGeometryService.CIRCLE:
+		label = "%s · %.1f × %.1f cm" % [shape_name, size_cm.x, size_cm.y]
+	_draw_measurement_label(label, screen_center + Vector2(0.0, -half_height - 16.0), Color("#f2c94c"))
 
 
 ## The colour the Component's own geometry is drawn in: a Region paints it in the

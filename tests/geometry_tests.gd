@@ -181,7 +181,7 @@ func _test_geometry_sampling_service() -> void:
 	direct_hole_asset["components"].append(incomplete_hole)
 	var incomplete_holes: Array = application._geometry_sampling_hole_components(direct_hole_asset, "direct_body")
 	var incomplete_issues := GeometrySamplingService.validation_issues(direct_body, [], incomplete_holes)
-	_expect(incomplete_holes.size() == 2 and "unfinished_hole: Primitive Component needs a Circle or Ellipse." in incomplete_issues, "An unfinished Primitive Hole should remain visible as a named blocking constraint instead of being silently ignored.")
+	_expect(incomplete_holes.size() == 2 and "unfinished_hole: Primitive Component needs a Circle, Ellipse, Rectangle, or Triangle." in incomplete_issues, "An unfinished Primitive Hole should remain visible as a named blocking constraint instead of being silently ignored.")
 	var invalid_hole_a: Dictionary = application._geometry_sampling_invalid_hole("invalid_hole", "invalid_hole", "Referenced source Asset is missing.")
 	var invalid_hole_b: Dictionary = application._geometry_sampling_invalid_hole("invalid_hole", "invalid_hole", "Referenced Asset has no visible closed Loop or Primitive Body.")
 	var invalid_recipes := GeometryAutoBuildService.automatic_recipes(direct_body, [], [invalid_hole_a])

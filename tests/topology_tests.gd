@@ -773,6 +773,40 @@ func _test_pivot_point_snapping_without_grid() -> void:
 	canvas.free()
 
 
+## A Triangle is the third authored Primitive shape. It is isosceles: the same
+## width and height that describe a Rectangle's box describe it too, with the
+## apex centred above the base, so nothing downstream needs a third field pair.
+func _test_triangle_primitive_geometry() -> void:
+	var triangle := {"draw_mode": WorldDocumentService.DRAW_MODE_PRIMITIVE, "points": [], "edges": [], "chains": [],
+		"primitive": PrimitiveGeometryService.build(PrimitiveGeometryService.TRIANGLE, Vector2(1.0, 2.0), Vector2(20.0, 40.0))}
+	_expect(PrimitiveGeometryService.has_triangle(triangle) and PrimitiveGeometryService.has_analytic_shape(triangle) and PrimitiveGeometryService.shape_type(triangle) == PrimitiveGeometryService.TRIANGLE, "A Triangle must count as an analytic Primitive shape everywhere a Circle does.")
+	_expect(PrimitiveGeometryService.extents_cm(triangle).is_equal_approx(Vector2(20.0, 40.0)) and PrimitiveGeometryService.validation_issues(triangle).is_empty(), "A Triangle should validate on its own two authored extents.")
+	var corners := PrimitiveGeometryService.corners(triangle)
+	_expect(corners.size() == 3 and corners[0].is_equal_approx(Vector2(0.0, 0.0)) and corners[1].is_equal_approx(Vector2(2.0, 0.0)) and corners[2].is_equal_approx(Vector2(1.0, 4.0)), "A Triangle's corners should be its exact base and its centred apex, counter-clockwise like a Rectangle's.")
+	_expect(PrimitiveGeometryService.contour(triangle) == corners, "A straight-edged Primitive must derive its exact polygon rather than a sampled curve.")
+	var degenerate := triangle.duplicate(true)
+	degenerate["primitive"]["height_cm"] = 0.0
+	_expect(not PrimitiveGeometryService.validation_issues(degenerate).is_empty(), "A Triangle with no height is not a shape and must not pass validation.")
+	var serialized: Dictionary = WorldDocumentService.serialize_primitive(triangle.get("primitive", {}))
+	var restored: Dictionary = WorldDocumentService.deserialize_primitive(serialized)
+	_expect(serialized.get("center", null) is Array and str(restored.get("type", "")) == PrimitiveGeometryService.TRIANGLE and is_equal_approx(float(restored.get("width_cm", 0.0)), 20.0) and is_equal_approx(float(restored.get("height_cm", 0.0)), 40.0), "Triangle persistence must round-trip both authored extents without storing a polygon approximation.")
+	var sampled := GeometrySamplingService.generate(triangle)
+	_expect(bool(sampled.get("valid", false)) and int(sampled.get("sample_count", 0)) >= 3 and triangle.get("points", []).is_empty(), "A Triangle must sample as three adaptively subdivided straight sides without storing Bezier topology.")
+	var straight_shapes: Array[String] = [PrimitiveGeometryService.RECTANGLE, PrimitiveGeometryService.TRIANGLE]
+	for straight_shape in straight_shapes:
+		var scaled := {"id": "scaled_%s" % straight_shape, "name": straight_shape, "type": "component", "visibility": true,
+			"draw_mode": WorldDocumentService.DRAW_MODE_PRIMITIVE, "topology_role": WorldDocumentService.ROLE_OUTER,
+			"parent_component_id": "", "group_id": "", "points": [], "edges": [], "chains": [],
+			"transform": {"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2(3.0, 0.5), "pivot": Vector2.ZERO},
+			"primitive": PrimitiveGeometryService.build(straight_shape, Vector2(2.0, 4.0), Vector2(10.0, 20.0))}
+		var scaled_asset := {"id": "straight_rebase", "name": "Straight Rebase", "asset_type": "props", "visibility": true,
+			"asset_pivot": Vector2.ZERO, "components": [scaled], "groups": [], "guides": []}
+		var rebase_result := ComponentScaleRebaseService.rebase_asset(scaled_asset)
+		var rebased: Dictionary = scaled_asset.get("components", [])[0]
+		_expect(bool(rebase_result.get("valid", false)) and PrimitiveGeometryService.shape_type(rebased) == straight_shape, "Scale Rebase must keep a %s a %s; only the round family changes identity under an anisotropic Scale." % [straight_shape, straight_shape])
+		_expect(PrimitiveGeometryService.extents_cm(rebased).is_equal_approx(Vector2(30.0, 10.0)) and PrimitiveGeometryService.center(rebased).is_equal_approx(Vector2(6.0, 2.0)) and Vector2(rebased.get("transform", {}).get("scale", Vector2.ZERO)) == Vector2.ONE, "Scale Rebase should bake both axes into a %s's own extents and centre." % straight_shape)
+
+
 func _test_contour_stroke_service() -> void:
 	var component := {
 		"id": "wizard_reference",

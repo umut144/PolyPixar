@@ -20,3 +20,25 @@ Style → Weighting und ist für neue Module verbindlich.
 
 Neue Method-Menüs sollen `_connect_context_method_menu(...)` verwenden und
 nicht eigene `id_pressed`- oder `popup_hide`-Logik implementieren.
+
+## Primitive: ein eigenes Context Menu
+
+Ein Primitive-Component besitzt weder Points noch Chains, also gilt für ihn
+keine der Bezier-Zeilen. Sein Context Bar trägt genau zwei Commands, und sein
+Info Bar zeigt nie einen Handle-Modus:
+
+| Command | `active_context_command` | Info-Leiste |
+| --- | --- | --- |
+| `⌘1  Create Primitive` | `asset.create_primitive` | `1: Circle`, `2: Rectangle`, `3: Triangle` |
+| `⌘2  Transform` | `asset.transform` | `1: Translate`, `2: Rotate`, `3: Scale` |
+
+`⌘1` beansprucht den Canvas, zeichnet aber noch nichts: Erst die Formwahl
+startet die Preview. Diese läuft dann in zwei Schritten — der erste Klick setzt
+den Mittelpunkt, der zweite die Größe und bestätigt damit. `Esc` geht einen
+Schritt zurück, von der Größe auf den Mittelpunkt und erst von dort aus dem
+Command heraus. Solange nichts bestätigt ist, erreicht auch nichts das
+Dokument.
+
+`⌘2` arbeitet auf dem Component-Transform, demselben, mit dem jeder andere
+Component verschoben, gedreht und skaliert wird. Beide Commands folgen Regel 5
+oben: Ihre Zahlenauswahl ist ein Werkzeugmodus und lässt den Command aktiv.

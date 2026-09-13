@@ -764,17 +764,32 @@ static func _sample_analytic_primitive(component: Dictionary, recipe: Dictionary
 	var center := PrimitiveGeometryService.center(component)
 	var radii := PrimitiveGeometryService.diameters_tool_units(component) * 0.5
 	var primitive_type := str(component.get("primitive", {}).get("type", ""))
-	var samples: Array = [{"position": transform * (center + Vector2.RIGHT * radii.x)}]
-	for quadrant in range(4):
-		var angle_start := TAU * float(quadrant) / 4.0
-		var angle_end := TAU * float(quadrant + 1) / 4.0
-		_append_adaptive_ellipse_segment(samples, transform, center, radii, angle_start, angle_end, spacing, flatness_tolerance, turn_tolerance, 0)
-		if samples.size() > MAX_SAMPLES_PER_CHAIN:
-			return {"valid": false, "errors": ["Sampling exceeded the safety limit of %d Points per Chain." % MAX_SAMPLES_PER_CHAIN]}
+	var samples: Array
+	var corners := PrimitiveGeometryService.corners(component)
+	if not corners.is_empty():
+		# A Rectangle and a Triangle are exact polygons: only Target Edge Length
+		# subdivides their sides, because a straight side has no curvature that
+		# Curve Detail could refine.
+		samples = [{"position": transform * corners[0]}]
+		for side in range(corners.size()):
+			_append_adaptive_straight_edge(samples, transform, corners[side], corners[(side + 1) % corners.size()], spacing, 0)
+			if samples.size() > MAX_SAMPLES_PER_CHAIN:
+				return {"valid": false, "errors": ["Sampling exceeded the safety limit of %d Points per Chain." % MAX_SAMPLES_PER_CHAIN]}
+	else:
+		samples = [{"position": transform * (center + Vector2.RIGHT * radii.x)}]
+		for quadrant in range(4):
+			var angle_start := TAU * float(quadrant) / 4.0
+			var angle_end := TAU * float(quadrant + 1) / 4.0
+			_append_adaptive_ellipse_segment(samples, transform, center, radii, angle_start, angle_end, spacing, flatness_tolerance, turn_tolerance, 0)
+			if samples.size() > MAX_SAMPLES_PER_CHAIN:
+				return {"valid": false, "errors": ["Sampling exceeded the safety limit of %d Points per Chain." % MAX_SAMPLES_PER_CHAIN]}
 	if samples.size() > 1:
 		samples.pop_back()
-	if samples.size() < 4:
-		return {"valid": false, "errors": ["A sampled analytic Primitive requires at least four boundary Points."]}
+	# A curve is only ever a closed boundary once it has four samples; a polygon
+	# already is one at its own corner count, and a Triangle has three.
+	var minimum_samples := corners.size() if not corners.is_empty() else 4
+	if samples.size() < minimum_samples:
+		return {"valid": false, "errors": ["A sampled analytic Primitive requires at least %d boundary Points." % minimum_samples]}
 	var resolved_namespace := sample_namespace if not sample_namespace.is_empty() else (input_id if not input_id.is_empty() else "outer")
 	for index in range(samples.size()):
 		samples[index] = {
@@ -791,6 +806,17 @@ static func _sample_analytic_primitive(component: Dictionary, recipe: Dictionary
 static func _hole_error(hole: Dictionary, error: String) -> String:
 	var label := str(hole.get("sampling_input_label", "")).strip_edges()
 	return error if label.is_empty() else "%s: %s" % [label, error]
+
+
+static func _append_adaptive_straight_edge(result: Array, transform: Transform2D, edge_start: Vector2, edge_end: Vector2, spacing: float, depth: int) -> void:
+	var start := transform * edge_start
+	var end := transform * edge_end
+	if start.distance_to(end) > spacing and depth < MAX_ADAPTIVE_DEPTH and result.size() < MAX_SAMPLES_PER_CHAIN:
+		var midpoint := edge_start.lerp(edge_end, 0.5)
+		_append_adaptive_straight_edge(result, transform, edge_start, midpoint, spacing, depth + 1)
+		_append_adaptive_straight_edge(result, transform, midpoint, edge_end, spacing, depth + 1)
+		return
+	result.append({"position": end})
 
 
 static func _append_adaptive_ellipse_segment(result: Array, transform: Transform2D, center: Vector2, radii: Vector2, angle_start: float, angle_end: float, spacing: float, flatness_tolerance: float, turn_tolerance: float, depth: int) -> void:

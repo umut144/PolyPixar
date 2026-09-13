@@ -28,6 +28,9 @@ const MAX_HISTORY_SIZE := 100
 const RENDER_OUTLINER := 1
 const RENDER_INSPECTOR := 2
 const RENDER_CANVAS_CONTEXT := 4
+## The Transform sub-modes in the order the Info Bar numbers them; the values
+## are the ones ComponentCanvas.set_transform_mode understands.
+const TRANSFORM_MODES: Array[String] = ["transform", "rotate", "scale"]
 const RENDER_CONTEXT_BAR := 8
 const RENDER_INFO_BAR := 16
 # The combination nearly every document mutation needs.
@@ -262,6 +265,12 @@ var active_edit_mode := "point"
 var edit_bezier_handles := false
 var edit_point_set_mode := false
 var active_transform_mode := "transform"
+## Create Primitive is a two-step command: a shape is picked first, and only
+## then does anything appear on the Canvas. `primitive_create_shape` stays empty
+## until one is picked, and `primitive_create_stage` mirrors the Canvas preview
+## so the Info Bar can say what the next click on the Canvas will do.
+var primitive_create_shape := ""
+var primitive_create_stage := ""
 var active_mirror_axis_orientation := ComponentCanvas.MIRROR_AXIS_VERTICAL
 var snap_enabled := true
 var snap_mode := "coarse"
@@ -565,15 +574,23 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		return
 	var selected_component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	if WorldDocumentService.is_primitive(selected_component):
-		if has_command_modifier and event.keycode == KEY_1 and selected_component.get("primitive", {}).is_empty():
-			_set_active_state("draw")
-			_set_active_context_command("asset.create_primitive")
-			canvas_view.start_circle_primitive_preview()
-			_invalidate_render(RENDER_CONTEXT_BAR)
+		# A Primitive owns neither Points nor Chains, so its Component shortcuts
+		# are its own two: pick a shape to create, or transform what is there.
+		# The Bezier ladder below must never be reached from here.
+		if has_command_modifier and event.keycode == KEY_1:
+			_activate_primitive_create_command()
 			get_viewport().set_input_as_handled()
 			return
 		if has_command_modifier and event.keycode == KEY_2:
 			_activate_transform_state()
+			get_viewport().set_input_as_handled()
+			return
+		if not has_command_modifier and _context_command_is("asset.create_primitive") and event.keycode in [KEY_1, KEY_2, KEY_3]:
+			_set_primitive_create_shape(PrimitiveGeometryService.CREATABLE_SHAPES[event.keycode - KEY_1])
+			get_viewport().set_input_as_handled()
+			return
+		if not has_command_modifier and _context_command_is("asset.transform") and event.keycode in [KEY_1, KEY_2, KEY_3]:
+			_set_transform_mode(TRANSFORM_MODES[event.keycode - KEY_1])
 			get_viewport().set_input_as_handled()
 			return
 		return
@@ -722,6 +739,7 @@ func _try_place_selected_pivot_at_mouse() -> bool:
 
 func _reset_to_default_state() -> void:
 	_stop_guide_draw_state()
+	_stop_primitive_create_command()
 	if is_instance_valid(canvas_view):
 		canvas_view.cancel_mirror_command(false)
 	_set_active_context_command("")
@@ -809,6 +827,16 @@ func _complete_context_method_menu(command: String, popup: PopupMenu) -> void:
 func _stop_guide_draw_state() -> void:
 	if active_draw_tool == "spine":
 		active_draw_tool = ""
+
+
+## Leaving Create Primitive takes its preview with it, whether a shape was
+## already picked or only the command was active. The preview is Canvas-only
+## state, so nothing but the Canvas has to be told.
+func _stop_primitive_create_command() -> void:
+	primitive_create_shape = ""
+	primitive_create_stage = ""
+	if is_instance_valid(canvas_view):
+		canvas_view.cancel_primitive_preview()
 
 
 func _build_ui() -> void:
@@ -1083,6 +1111,7 @@ func _build_ui() -> void:
 	canvas_view.primitive_placed.connect(_on_primitive_placed)
 	canvas_view.primitive_center_changed.connect(_on_primitive_center_changed)
 	canvas_view.primitive_preview_cancelled.connect(_on_primitive_preview_cancelled)
+	canvas_view.primitive_preview_stage_changed.connect(_on_primitive_preview_stage_changed)
 	var canvas := canvas_view
 	canvas.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	canvas.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -1134,6 +1163,8 @@ func _build_ui() -> void:
 	create_inspector_view.component_z_index_changed.connect(_on_component_z_index_changed)
 	create_inspector_view.edge_render_outline_changed.connect(_on_edge_render_outline_changed)
 	create_inspector_view.ellipse_primitive_diameter_changed.connect(_on_ellipse_primitive_diameter_changed)
+	create_inspector_view.rectangle_primitive_size_changed.connect(_on_rectangle_primitive_size_changed)
+	create_inspector_view.triangle_primitive_size_changed.connect(_on_triangle_primitive_size_changed)
 	create_inspector_view.global_transform_value_changed.connect(_on_global_transform_value_changed)
 	create_inspector_view.group_hierarchy_parent_selected.connect(_on_group_hierarchy_parent_selected)
 	create_inspector_view.group_rename_requested.connect(_rename_selected_group)
@@ -3075,8 +3106,15 @@ func _restore_history_snapshot(snapshot: Dictionary) -> void:
 		and ((not selected_component_id.is_empty() and selected_component_id == retained_component_id) \
 			or (not selected_guide_id.is_empty() and selected_guide_id == retained_guide_id))
 	if can_retain_authoring_tool:
+		# A Create Primitive preview is transient Canvas state that no snapshot
+		# carries. Restoring the command without it would leave a State label
+		# with nothing behind it, so that one tool alone drops back to Default.
+		var retains_draw_tool := retained_active_state == "draw" and retained_draw_tool != "primitive"
+		if retained_active_state == "draw" and not retains_draw_tool:
+			retained_active_state = ""
+			_set_active_context_command("")
 		active_state = retained_active_state
-		active_draw_tool = retained_draw_tool if retained_active_state == "draw" else ""
+		active_draw_tool = retained_draw_tool if retains_draw_tool else ""
 		active_draw_point_mode = retained_draw_point_mode
 		active_edit_mode = retained_edit_mode
 		edit_bezier_handles = retained_edit_handles
@@ -5135,26 +5173,41 @@ func _render_context_bar() -> void:
 		transform_reference_button.text = "⌘1  Transform"
 		transform_reference_button.custom_minimum_size = Vector2(132, 32)
 		transform_reference_button.focus_mode = Control.FOCUS_NONE
+		EditorWidgets.style_context_command_button(transform_reference_button, _context_command_is("asset.transform"))
 		transform_reference_button.pressed.connect(_activate_transform_state)
 		context_bar.add_child(transform_reference_button)
 		_add_context_measure_menu()
 		_render_info_bar()
 		return
 	if WorldDocumentService.is_primitive(primitive_component):
-		var create_primitive_button := Button.new()
-		create_primitive_button.text = "⌘1  Create Primitive"
-		create_primitive_button.disabled = not primitive_component.get("primitive", {}).is_empty()
-		create_primitive_button.pressed.connect(func() -> void:
-			_set_active_state("draw")
-			_set_active_context_command("asset.create_primitive")
-			canvas_view.start_circle_primitive_preview()
-			_render_context_bar()
-		)
-		context_bar.add_child(create_primitive_button)
-		var transform_primitive_button := Button.new()
-		transform_primitive_button.text = "⌘2  Transform"
-		transform_primitive_button.pressed.connect(_activate_transform_state)
-		context_bar.add_child(transform_primitive_button)
+		# A Primitive is specified rather than drawn, so this bar shares nothing
+		# with the Bezier one below it: no Point, Edge or Face command applies.
+		var already_shaped: bool = not primitive_component.get("primitive", {}).is_empty()
+		var create_primitive_menu := MenuButton.new()
+		create_primitive_menu.text = "⌘1  Create Primitive  ▼"
+		create_primitive_menu.custom_minimum_size = Vector2(198, 32)
+		create_primitive_menu.focus_mode = Control.FOCUS_NONE
+		EditorWidgets.style_context_command_button(create_primitive_menu, _context_command_is("asset.create_primitive"))
+		for shape_index in range(PrimitiveGeometryService.CREATABLE_SHAPES.size()):
+			var creatable_shape: String = PrimitiveGeometryService.CREATABLE_SHAPES[shape_index]
+			create_primitive_menu.get_popup().add_item("%d: %s" % [shape_index + 1, PrimitiveGeometryService.display_name(creatable_shape)], shape_index)
+		EditorWidgets.style_popup_menu(create_primitive_menu.get_popup())
+		create_primitive_menu.get_popup().id_pressed.connect(_on_create_primitive_menu_id)
+		create_primitive_menu.disabled = already_shaped
+		if already_shaped:
+			create_primitive_menu.tooltip_text = "Disabled: this Primitive Component already owns a shape. Edit it in the Inspector."
+		context_bar.add_child(create_primitive_menu)
+		var transform_primitive_menu := MenuButton.new()
+		transform_primitive_menu.text = "⌘2  Transform  ▼"
+		transform_primitive_menu.custom_minimum_size = Vector2(150, 32)
+		transform_primitive_menu.focus_mode = Control.FOCUS_NONE
+		EditorWidgets.style_context_command_button(transform_primitive_menu, _context_command_is("asset.transform"))
+		transform_primitive_menu.get_popup().add_item("1: Translate", 0)
+		transform_primitive_menu.get_popup().add_item("2: Rotate", 1)
+		transform_primitive_menu.get_popup().add_item("3: Scale", 2)
+		EditorWidgets.style_popup_menu(transform_primitive_menu.get_popup())
+		transform_primitive_menu.get_popup().id_pressed.connect(_on_transform_menu_id)
+		context_bar.add_child(transform_primitive_menu)
 		_add_context_measure_menu()
 		_render_info_bar()
 		return
@@ -5894,11 +5947,47 @@ func _on_edit_face_menu_id(id: int) -> void:
 
 
 func _on_transform_menu_id(id: int) -> void:
+	if id < 0 or id >= TRANSFORM_MODES.size():
+		return
 	_activate_transform_state()
-	if id == 1:
-		_set_transform_mode("rotate")
-	elif id == 2:
-		_set_transform_mode("scale")
+	_set_transform_mode(TRANSFORM_MODES[id])
+
+
+func _on_create_primitive_menu_id(id: int) -> void:
+	if id < 0 or id >= PrimitiveGeometryService.CREATABLE_SHAPES.size():
+		return
+	if not _context_command_is("asset.create_primitive"):
+		_activate_primitive_create_command()
+	_set_primitive_create_shape(PrimitiveGeometryService.CREATABLE_SHAPES[id])
+
+
+## Create Primitive draws nothing by itself: it claims the Canvas and waits for
+## a shape, and the preview appears with the shape rather than with the command.
+func _activate_primitive_create_command() -> void:
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if not WorldDocumentService.is_primitive(component):
+		return
+	if not component.get("primitive", {}).is_empty():
+		_show_status_message("This Primitive Component already owns a shape. Edit it in the Inspector.")
+		return
+	if not _selected_geometry_is_editable():
+		_show_status_message("Creating is disabled while the Region uses Component Geometry.")
+		return
+	_stop_primitive_create_command()
+	active_state = "draw"
+	active_draw_tool = "primitive"
+	canvas_view.set_interaction_state("draw")
+	canvas_view.set_tool_mode("primitive")
+	_set_active_context_command("asset.create_primitive")
+	_invalidate_render(RENDER_CONTEXT_BAR | RENDER_INFO_BAR | RENDER_CANVAS_CONTEXT)
+
+
+func _set_primitive_create_shape(shape: String) -> void:
+	if not _context_command_is("asset.create_primitive") or not shape in PrimitiveGeometryService.CREATABLE_SHAPES:
+		return
+	primitive_create_shape = shape
+	canvas_view.start_primitive_preview(shape)
+	_invalidate_render(RENDER_CONTEXT_BAR | RENDER_INFO_BAR | RENDER_CANVAS_CONTEXT)
 
 
 func _activate_draw_state() -> void:
@@ -6197,6 +6286,9 @@ func _show_command_prompt(message: String) -> void:
 
 
 func _activate_transform_state() -> void:
+	if selected_component_id.is_empty():
+		return
+	_set_active_context_command("asset.transform")
 	_set_active_state("transform")
 
 
@@ -6211,6 +6303,7 @@ func _set_active_state(state: String) -> void:
 		return
 	if state in ["draw", "edit"] and not _selected_geometry_is_editable():
 		return
+	_stop_primitive_create_command()
 	active_state = state
 	if state == "draw":
 		active_draw_tool = "point"
@@ -6355,6 +6448,13 @@ func _render_info_bar() -> void:
 			asset_state_label.text = "State: Default"
 			info_bar.add_child(asset_state_label)
 		return
+	var info_component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	# A Reference inherits its source Draw Mode, so one can read as a Primitive
+	# while owning neither the Create nor the Transform command of its own. The
+	# Context Bar asks in this order too.
+	if WorldDocumentService.is_primitive(info_component) and not _is_reference_component(info_component):
+		_render_primitive_info_bar(info_component)
+		return
 	var state_label := Label.new()
 	var state_name := "Default"
 	if active_state == "draw":
@@ -6395,6 +6495,46 @@ func _render_info_bar() -> void:
 			{"label": "⌘3: Edit Edge", "id": "asset.edit_edge"},
 			{"label": "⌘4: Edit Face", "id": "asset.edit_face"}
 		], active_context_command)
+
+
+## A Primitive is specified, not drawn, so its Info Bar never offers a Bezier
+## point mode. It offers the shape to create, or the transform to apply, and it
+## says what the next click on the Canvas will do.
+func _render_primitive_info_bar(component: Dictionary) -> void:
+	var state_label := Label.new()
+	if _context_command_is("asset.create_primitive"):
+		state_label.text = "State: Create Primitive"
+		info_bar.add_child(state_label)
+		var shape_modes: Array = []
+		for shape_index in range(PrimitiveGeometryService.CREATABLE_SHAPES.size()):
+			var creatable_shape: String = PrimitiveGeometryService.CREATABLE_SHAPES[shape_index]
+			shape_modes.append({"label": "%d: %s" % [shape_index + 1, PrimitiveGeometryService.display_name(creatable_shape)], "id": creatable_shape})
+		_add_info_mode_group(shape_modes, primitive_create_shape)
+		if primitive_create_shape.is_empty():
+			_add_info_option("Choose a shape · Esc: Leave")
+		elif primitive_create_stage == ComponentCanvas.PRIMITIVE_STAGE_SIZE:
+			_add_info_option("Move: Size · Click: Confirm · Esc: Set Center again")
+		else:
+			_add_info_option("Click: Set Center · Esc: Leave")
+		return
+	if _context_command_is("asset.transform"):
+		state_label.text = "State: Transform"
+		info_bar.add_child(state_label)
+		_add_info_mode_group([
+			{"label": "1: Translate", "id": "transform"},
+			{"label": "2: Rotate", "id": "rotate"},
+			{"label": "3: Scale", "id": "scale"}
+		], active_transform_mode)
+		_add_info_option("Drag: Gizmo · Esc: Leave")
+		return
+	state_label.text = "State: Default"
+	info_bar.add_child(state_label)
+	var shape := PrimitiveGeometryService.shape_type(component)
+	_add_info_option("Primitive: %s" % (PrimitiveGeometryService.display_name(shape) if not shape.is_empty() else "None"))
+	_add_info_mode_group([
+		{"label": "⌘1: Create Primitive", "id": "asset.create_primitive"},
+		{"label": "⌘2: Transform", "id": "asset.transform"}
+	], active_context_command)
 
 
 func _draw_point_mode_label(mode: String) -> String:
@@ -8567,7 +8707,7 @@ func _on_draw_mode_status_selected(index: int) -> void:
 	active_state = ""
 	active_draw_tool = ""
 	active_context_command = ""
-	canvas_view.set_primitive_preview_active(false)
+	_stop_primitive_create_command()
 	canvas_view.set_interaction_state("")
 	selected_point_id = ""
 	selected_point_ids.clear()
@@ -12006,8 +12146,23 @@ func _on_circle_primitive_diameter_changed(value: float) -> void:
 
 
 func _on_ellipse_primitive_diameter_changed(value: float, property_name: String) -> void:
+	_set_primitive_extent(PrimitiveGeometryService.ELLIPSE, value, property_name, ["diameter_x_cm", "diameter_y_cm"])
+
+
+func _on_rectangle_primitive_size_changed(value: float, property_name: String) -> void:
+	_set_primitive_extent(PrimitiveGeometryService.RECTANGLE, value, property_name, ["width_cm", "length_cm"])
+
+
+func _on_triangle_primitive_size_changed(value: float, property_name: String) -> void:
+	_set_primitive_extent(PrimitiveGeometryService.TRIANGLE, value, property_name, ["width_cm", "height_cm"])
+
+
+## One authored extent of one shape. The shape and the field names are passed in
+## so a field can never write a dimension that its shape does not own - an
+## Ellipse diameter on a Rectangle would persist and then be ignored forever.
+func _set_primitive_extent(shape: String, value: float, property_name: String, allowed_properties: Array) -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	if not PrimitiveGeometryService.has_ellipse(component) or property_name not in ["diameter_x_cm", "diameter_y_cm"]:
+	if PrimitiveGeometryService.shape_type(component) != shape or property_name not in allowed_properties:
 		return
 	_record_direct_change()
 	component["primitive"][property_name] = maxf(value, 0.1)
@@ -13069,13 +13224,16 @@ func _refresh_component_geometry(component: Dictionary) -> void:
 	canvas_view.set_bezier_geometry(component.get("points", []), component.get("edges", []), component.get("chains", []))
 
 
-func _on_primitive_placed(center: Vector2, diameter_cm: float) -> void:
+func _on_primitive_placed(shape: String, shape_center: Vector2, size_cm: Vector2) -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	if component.is_empty() or not WorldDocumentService.is_primitive(component) or not component.get("primitive", {}).is_empty():
 		return
+	var primitive := PrimitiveGeometryService.build(shape, shape_center, size_cm)
+	if primitive.is_empty():
+		return
 	_record_direct_change()
 	component["geometry_source"] = "primitive"
-	component["primitive"] = {"type": "circle", "diameter_cm": maxf(diameter_cm, 0.1), "center": center}
+	component["primitive"] = primitive
 	_set_active_state("")
 	_set_active_context_command("")
 	_refresh_component_geometry(component)
@@ -13102,6 +13260,13 @@ func _on_primitive_preview_cancelled() -> void:
 	_set_active_state("")
 	_set_active_context_command("")
 	_invalidate_render(RENDER_CANVAS_CONTEXT)
+
+
+## The Canvas owns the two placement steps; the Info Bar only reports which of
+## them the next click belongs to.
+func _on_primitive_preview_stage_changed(stage: String) -> void:
+	primitive_create_stage = stage
+	_invalidate_render(RENDER_INFO_BAR)
 
 
 func _on_bezier_point_added(world_position: Vector2, point_mode: String = "linear", drawn_handle_out: Vector2 = Vector2.ZERO) -> void:

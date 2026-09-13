@@ -19,7 +19,7 @@ extends RefCounted
 ## stake below it - in a geometry measured in centimetres these values are the
 ## numerical zeros a rotation leaves behind.
 const DOCUMENT_ZERO_EPSILON := 0.000000001
-const SCHEMA_VERSION := 71
+const SCHEMA_VERSION := 72
 const REGION_GEOMETRY_AUTHORED := "authored"
 const REGION_GEOMETRY_COMPONENT := "component"
 const REGION_GEOMETRY_SOURCES := [REGION_GEOMETRY_AUTHORED, REGION_GEOMETRY_COMPONENT]
@@ -333,6 +333,14 @@ static func serialize_primitive(raw_primitive) -> Dictionary:
 		result["diameter_x_cm"] = maxf(float(raw_primitive.get("diameter_x_cm", 1.0)), 0.001)
 		result["diameter_y_cm"] = maxf(float(raw_primitive.get("diameter_y_cm", 1.0)), 0.001)
 		return result
+	if primitive_type == PrimitiveGeometryService.RECTANGLE:
+		result["width_cm"] = maxf(float(raw_primitive.get("width_cm", 1.0)), 0.001)
+		result["length_cm"] = maxf(float(raw_primitive.get("length_cm", 1.0)), 0.001)
+		return result
+	if primitive_type == PrimitiveGeometryService.TRIANGLE:
+		result["width_cm"] = maxf(float(raw_primitive.get("width_cm", 1.0)), 0.001)
+		result["height_cm"] = maxf(float(raw_primitive.get("height_cm", 1.0)), 0.001)
+		return result
 	return {}
 
 static func deserialize_primitive(raw_primitive) -> Dictionary:
@@ -346,6 +354,14 @@ static func deserialize_primitive(raw_primitive) -> Dictionary:
 	if primitive_type == PrimitiveGeometryService.ELLIPSE:
 		result["diameter_x_cm"] = maxf(float(raw_primitive.get("diameter_x_cm", 1.0)), 0.001)
 		result["diameter_y_cm"] = maxf(float(raw_primitive.get("diameter_y_cm", 1.0)), 0.001)
+		return result
+	if primitive_type == PrimitiveGeometryService.RECTANGLE:
+		result["width_cm"] = maxf(float(raw_primitive.get("width_cm", 1.0)), 0.001)
+		result["length_cm"] = maxf(float(raw_primitive.get("length_cm", 1.0)), 0.001)
+		return result
+	if primitive_type == PrimitiveGeometryService.TRIANGLE:
+		result["width_cm"] = maxf(float(raw_primitive.get("width_cm", 1.0)), 0.001)
+		result["height_cm"] = maxf(float(raw_primitive.get("height_cm", 1.0)), 0.001)
 		return result
 	return {}
 

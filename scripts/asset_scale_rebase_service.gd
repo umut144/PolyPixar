@@ -130,23 +130,18 @@ static func _scale_component_source(component: Dictionary, scale: Vector2) -> vo
 		point["position"] = Vector2(point.get("position", Vector2.ZERO)) * scale
 		point["handle_in"] = Vector2(point.get("handle_in", Vector2.ZERO)) * scale
 		point["handle_out"] = Vector2(point.get("handle_out", Vector2.ZERO)) * scale
-	var primitive: Dictionary = component.get("primitive", {})
-	if PrimitiveGeometryService.has_circle(component):
-		primitive["center"] = PrimitiveGeometryService.center(component) * scale
-		var diameter := float(primitive.get("diameter_cm", 1.0))
-		if is_equal_approx(scale.x, scale.y):
-			primitive["diameter_cm"] = diameter * scale.x
-		else:
-			primitive["type"] = PrimitiveGeometryService.ELLIPSE
-			primitive.erase("diameter_cm")
-			primitive["diameter_x_cm"] = diameter * scale.x
-			primitive["diameter_y_cm"] = diameter * scale.y
-		component["primitive"] = primitive
-	elif PrimitiveGeometryService.has_ellipse(component):
-		primitive["center"] = PrimitiveGeometryService.center(component) * scale
-		primitive["diameter_x_cm"] = float(primitive.get("diameter_x_cm", 1.0)) * scale.x
-		primitive["diameter_y_cm"] = float(primitive.get("diameter_y_cm", 1.0)) * scale.y
-		component["primitive"] = primitive
+	if not PrimitiveGeometryService.has_analytic_shape(component):
+		return
+	# Root Scale is validated as positive on both axes before it reaches here,
+	# so the extents need no sign handling. Only a round shape can lose its
+	# identity: an anisotropic Scale turns a Circle into an Ellipse, while a
+	# Rectangle and a Triangle already own two independent extents.
+	var scaled_center := PrimitiveGeometryService.center(component) * scale
+	var scaled_extents := PrimitiveGeometryService.extents_cm(component) * scale
+	var result_shape := PrimitiveGeometryService.shape_type(component)
+	if PrimitiveGeometryService.has_circle(component) and not is_equal_approx(scale.x, scale.y):
+		result_shape = PrimitiveGeometryService.ELLIPSE
+	component["primitive"] = PrimitiveGeometryService.build(result_shape, scaled_center, scaled_extents)
 
 
 static func _affine_transform_component_source(component: Dictionary, affine: Transform2D) -> void:
