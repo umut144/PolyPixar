@@ -9263,9 +9263,11 @@ func _duplicate_group(asset_id: String, group_id: String, mirror_mode := "none",
 	var group_copy := source_group.duplicate(true)
 	group_copy["id"] = new_group_id
 	group_copy["name"] = _next_duplicate_group_name(asset, str(source_group.get("name", "Group")))
-	if mirror_mode != "none":
-		group_copy["transform"] = _mirrored_group_transform(group_copy.get("transform", WorldDocumentService.default_component_transform()), mirror_mode, mirror_axis)
 	asset["groups"].append(group_copy)
+	if mirror_mode != "none":
+		# The copy still carries the source's transform, so its world frame is
+		# the source's - the one the origin's axis has to reflect.
+		group_copy["transform"] = _mirrored_group_transform(asset, new_group_id, mirror_mode, mirror_axis)
 	var id_map: Dictionary = {}
 	var duplicated_component_ids: Array[String] = []
 	for source_node in source_tree:
@@ -9328,26 +9330,79 @@ func _next_duplicate_group_name(asset: Dictionary, source_name: String) -> Strin
 	return candidate
 
 
-func _mirrored_group_transform(raw_transform: Dictionary, mirror_mode: String, mirror_axis: String) -> Dictionary:
-	var transform := WorldDocumentService.deserialize_transform(raw_transform).duplicate(true)
-	var reflects_x := _mirror_reflects_x(mirror_axis)
-	var mirrored_position: Vector2 = transform.get("position", Vector2.ZERO)
-	if reflects_x:
-		mirrored_position.x = -mirrored_position.x
-	else:
-		mirrored_position.y = -mirrored_position.y
-	transform["position"] = mirrored_position
+## The reflection about an origin axis, expressed in Asset space.
+##
+## The axis the Canvas draws belongs to the previewed Asset - the one its root
+## Position and Scale place it at - while Component transforms live in Asset
+## space, which the root transform still has to be applied to. Reflecting in
+## Asset space therefore mirrors about an axis nobody can see: with a root
+## Position of -6.4 the copy came out 12.8 below where the drawn axis says,
+## twice the offset, because a reflection doubles whatever the axis is off by.
+## Conjugating the reflection with the root transform makes the drawn axis the
+## axis.
+func _mirror_reflection(asset: Dictionary, mirror_axis: String) -> Transform2D:
+	var axis_reflection := Transform2D(Vector2(1.0, 0.0), Vector2(0.0, -1.0), Vector2.ZERO)
+	if _mirror_reflects_x(mirror_axis):
+		axis_reflection = Transform2D(Vector2(-1.0, 0.0), Vector2(0.0, 1.0), Vector2.ZERO)
+	var root := AssetScaleRebaseService.root_transform(asset)
+	return root.affine_inverse() * axis_reflection * root
+
+
+## Where a mirrored copy stands in world space.
+##
+## The axis is the Asset origin's, never the Parent's. Reflecting a Parent-local
+## position mirrors about whatever the Parent, the Group or a moved Asset root
+## happens to sit at, so a Component nested under any of them landed at the
+## wrong distance - the further its Parent was from the origin, the further off
+## the copy. Reflecting the world frame and converting it back under the
+## unchanged Parent puts the copy where the origin's axis says, whatever sits
+## above it in the hierarchy.
+##
+## Flip reflects the whole frame; Keep leaves it alone and only carries the
+## drawing's centre across the axis, which is what keeps the copy upright.
+func _mirrored_world_affine(asset: Dictionary, component: Dictionary, component_id: String, mirror_mode: String, mirror_axis: String) -> Transform2D:
+	var reflection := _mirror_reflection(asset, mirror_axis)
+	var world_affine := ComponentHierarchy.world_transform(asset, component_id)
 	if mirror_mode == "flip_orientation":
-		# Reflecting a rotated frame negates its angle whichever axis it is
-		# reflected across; only the scale axis that flips differs.
-		transform["rotation"] = -float(transform.get("rotation", 0.0))
-		var mirrored_scale: Vector2 = transform.get("scale", Vector2.ONE)
-		if reflects_x:
-			mirrored_scale.x = -mirrored_scale.x
-		else:
-			mirrored_scale.y = -mirrored_scale.y
-		transform["scale"] = mirrored_scale
-	return transform
+		return reflection * world_affine
+	var world_center := world_affine * _component_local_bounds_center(component)
+	var moved := world_affine
+	moved.origin += (reflection * world_center) - world_center
+	return moved
+
+
+## Same frame, read with the minus sign on the axis that was actually reflected.
+##
+## Decomposing a reflected frame is ambiguous: the sign can sit on either scale
+## axis, and the two readings differ by a half turn. ComponentHierarchy always
+## puts it on Y, which would report a Component mirrored across the Y axis as
+## rotated 160 degrees with a flipped Y rather than -20 with a flipped X - the
+## same picture, an Inspector nobody can read.
+func _readable_mirrored_record(record: Dictionary, mirror_axis: String) -> Dictionary:
+	if not _mirror_reflects_x(mirror_axis) or Vector2(record.get("scale", Vector2.ONE)).y >= 0.0:
+		return record
+	var readable := record.duplicate(true)
+	readable["scale"] = -Vector2(record.get("scale", Vector2.ONE))
+	readable["rotation"] = wrapf(float(record.get("rotation", 0.0)) + 180.0, -180.0, 180.0)
+	return readable
+
+
+## A Group mirrors about the same origin axis a Component does. Keep carries the
+## Group's own Position across it and leaves the members where they sit relative
+## to each other; Flip reflects the whole frame with them.
+func _mirrored_group_transform(asset: Dictionary, group_id: String, mirror_mode: String, mirror_axis: String) -> Dictionary:
+	var reflection := _mirror_reflection(asset, mirror_axis)
+	var world_affine := ComponentHierarchy.group_world_transform(asset, group_id)
+	var pivot := Vector2(ComponentHierarchy.group_by_id(asset, group_id).get("transform", {}).get("pivot", Vector2.ZERO))
+	var mirrored_world := world_affine
+	if mirror_mode == "flip_orientation":
+		mirrored_world = reflection * world_affine
+	else:
+		var world_position := world_affine * pivot
+		mirrored_world.origin += (reflection * world_position) - world_position
+	var mirrored_record := ComponentHierarchy.transform_record_from_affine(mirrored_world, pivot)
+	return _readable_mirrored_record(
+		ComponentHierarchy.group_local_transform_from_world_record(asset, group_id, mirrored_record), mirror_axis)
 
 
 func _duplicate_component(asset_id: String, component_id: String, mirror_mode := "none", mirror_axis := ComponentCanvas.MIRROR_AXIS_VERTICAL) -> void:
@@ -9372,12 +9427,19 @@ func _duplicate_component(asset_id: String, component_id: String, mirror_mode :=
 		component_copy["name"] = _next_duplicate_component_name(asset, str(source_node.get("name", "Component")))
 		var source_parent_id := str(source_node.get("parent_component_id", ""))
 		component_copy["parent_component_id"] = str(id_map.get(source_parent_id, source_parent_id))
-		if mirror_mode != "none" and source_node_id == component_id:
-			component_copy["transform"] = _mirrored_duplicate_transform(component_copy, mirror_mode, mirror_axis)
 		asset["components"].append(component_copy)
 		duplicated_component_ids.append(str(component_copy.get("id", "")))
 		if source_node_id == component_id:
 			duplicate_root = component_copy
+	if mirror_mode != "none":
+		# Only the subtree root moves; the Children follow it through their own
+		# unchanged local transforms, which is what mirrors the whole subtree.
+		var duplicate_root_id := str(duplicate_root.get("id", ""))
+		var mirrored_world := _mirrored_world_affine(asset, duplicate_root, duplicate_root_id, mirror_mode, mirror_axis)
+		var root_pivot := Vector2(duplicate_root.get("transform", {}).get("pivot", Vector2.ZERO))
+		var mirrored_record := ComponentHierarchy.transform_record_from_affine(mirrored_world, root_pivot)
+		duplicate_root["transform"] = _readable_mirrored_record(
+			ComponentHierarchy.local_transform_from_world_record(asset, duplicate_root_id, mirrored_record), mirror_axis)
 	if mirror_mode == "flip_orientation":
 		var rebase_result := ComponentScaleRebaseService.rebase_components(asset, duplicated_component_ids)
 		if not bool(rebase_result.get("valid", false)):
@@ -9410,33 +9472,6 @@ func _next_duplicate_component_name(asset: Dictionary, source_name: String) -> S
 	return candidate
 
 
-func _mirrored_duplicate_transform(component: Dictionary, mirror_mode: String, mirror_axis: String) -> Dictionary:
-	var transform: Dictionary = component.get("transform", WorldDocumentService.default_component_transform()).duplicate(true)
-	var reflects_x := _mirror_reflects_x(mirror_axis)
-	var transform_position: Vector2 = transform.get("position", Vector2.ZERO)
-	if mirror_mode == "flip_orientation":
-		# Reflecting a rotated frame negates its angle whichever axis it is
-		# reflected across; only the position and scale axis that flips differs.
-		var transform_scale: Vector2 = transform.get("scale", Vector2.ONE)
-		if reflects_x:
-			transform_position.x = -transform_position.x
-			transform_scale.x = -transform_scale.x
-		else:
-			transform_position.y = -transform_position.y
-			transform_scale.y = -transform_scale.y
-		transform["position"] = transform_position
-		transform["rotation"] = -float(transform.get("rotation", 0.0))
-		transform["scale"] = transform_scale
-	else:
-		# Keep the component orientation while reflecting its visible placement.
-		# Applying this to every local level mirrors the complete subtree.
-		var visual_center := _component_visual_center_in_parent_space(component)
-		if reflects_x:
-			transform_position.x -= visual_center.x * 2.0
-		else:
-			transform_position.y -= visual_center.y * 2.0
-		transform["position"] = transform_position
-	return transform
 func _duplicate_component_record(source: Dictionary, _asset: Dictionary, forced_id := "") -> Dictionary:
 	var component_copy := source.duplicate(true)
 	component_copy["id"] = forced_id if not forced_id.is_empty() else "component_%d" % next_component_id
@@ -9484,7 +9519,11 @@ func _duplicate_component_record(source: Dictionary, _asset: Dictionary, forced_
 	return component_copy
 
 
-func _component_visual_center_in_parent_space(component: Dictionary) -> Vector2:
+## The middle of the box a Component's own drawing spans, in the Component's own
+## space. Parent space and world space are this one point carried through a
+## transform, so everything that mirrors, measures or places from "the middle of
+## the shape" means the same point.
+func _component_local_bounds_center(component: Dictionary) -> Vector2:
 	var points: Array = component.get("points", [])
 	if points.is_empty() and PrimitiveGeometryService.has_analytic_shape(component):
 		var primitive_contour := PrimitiveGeometryService.contour(component)
@@ -9496,9 +9535,12 @@ func _component_visual_center_in_parent_space(component: Dictionary) -> Vector2:
 				primitive_minimum.y = minf(primitive_minimum.y, primitive_point.y)
 				primitive_maximum.x = maxf(primitive_maximum.x, primitive_point.x)
 				primitive_maximum.y = maxf(primitive_maximum.y, primitive_point.y)
-			return ComponentHierarchy.local_transform(component.get("transform", {})) * ((primitive_minimum + primitive_maximum) * 0.5)
+			return (primitive_minimum + primitive_maximum) * 0.5
 	if points.is_empty():
-		return Vector2(component.get("transform", {}).get("position", Vector2.ZERO))
+		# Without geometry there is no box, and the Pivot is the one point the
+		# Component still stands for - it is what the local transform carries to
+		# the Component's Position.
+		return Vector2(component.get("transform", {}).get("pivot", Vector2.ZERO))
 	var minimum := Vector2(INF, INF)
 	var maximum := Vector2(-INF, -INF)
 	for point in points:
@@ -9507,8 +9549,11 @@ func _component_visual_center_in_parent_space(component: Dictionary) -> Vector2:
 		minimum.y = minf(minimum.y, point_position.y)
 		maximum.x = maxf(maximum.x, point_position.x)
 		maximum.y = maxf(maximum.y, point_position.y)
-	var local_center := (minimum + maximum) * 0.5
-	return ComponentHierarchy.local_transform(component.get("transform", {})) * local_center
+	return (minimum + maximum) * 0.5
+
+
+func _component_visual_center_in_parent_space(component: Dictionary) -> Vector2:
+	return ComponentHierarchy.local_transform(component.get("transform", {})) * _component_local_bounds_center(component)
 
 
 func _duplicate_guide_record(source: Dictionary, asset: Dictionary) -> Dictionary:

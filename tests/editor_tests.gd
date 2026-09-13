@@ -2707,13 +2707,14 @@ func _test_primitive_arrow_key_nudge() -> void:
 	application.free()
 
 
-## A Scale is a factor over a whole Component, so its far decimals are a visible
-## difference where a hundredth of a centimetre is not. Every Scale field in the
-## Inspector authors one, and Asset Root, Group and Component Scale multiply, so
-## a single field reading coarser than the rest would quietly round the product
-## the whole chain is judged by - and the Rebase preview must name the factor it
-## is about to bake rather than a rounded version of it.
-func _test_inspector_scale_precision() -> void:
+## What the Inspector lets you type is what reaches the document: a SpinBox
+## rounds to its own step before the handler ever sees the value, so a step is a
+## precision limit and not a display choice. Scales multiply along Asset Root,
+## Group and Component, and placements add along the same chain, so one field
+## reading coarser than the rest would round the product or the sum the whole
+## chain is judged by - and the Rebase preview has to name the factor it is
+## about to bake rather than a rounded version of it.
+func _test_inspector_value_precision() -> void:
 	var application: Control = load("res://scripts/main.gd").new()
 	application._build_ui()
 	var body := _outliner_test_component("component_1", "body")
@@ -2729,23 +2730,35 @@ func _test_inspector_scale_precision() -> void:
 	application.selected_asset_id = "asset_1"
 	application._render_inspector()
 	var root_scale_field: SpinBox = application.create_inspector_view.asset_root_scale_fields["scale_x"]
-	_expect(is_equal_approx(root_scale_field.step, 0.00001), "The Asset Root Scale field should author a hundred-thousandth.")
+	var root_position_field: SpinBox = application.create_inspector_view.asset_root_position_fields["position_x"]
+	_expect(is_equal_approx(root_scale_field.step, 0.00001) and is_equal_approx(root_position_field.step, 0.0001), "The Asset Root fields should author a hundred-thousandth of a factor and a ten-thousandth of a centimetre.")
 	_edit_inspector_value(root_scale_field, 1.23456)
 	_expect(is_equal_approx(Vector2(application._get_asset("asset_1").get("root_scale", Vector2.ONE)).x, 1.23456), "A Root Scale of 1.23456 must reach the Asset; a coarser step would have rounded the field itself before the handler ever saw it.")
+	_edit_inspector_value(root_position_field, 7.1234)
+	_expect(is_equal_approx(Vector2(application._get_asset("asset_1").get("root_position", Vector2.ZERO)).x, application._world_to_editor_units(7.1234)), "A Root Position of 7.1234 cm must reach the Asset unrounded.")
 	application.selected_component_id = "component_1"
 	application._render_inspector()
 	var component_scale_field: SpinBox = application.create_inspector_view.transform_fields["scale_x"]
 	var component_position_field: SpinBox = application.create_inspector_view.transform_fields["position_x"]
-	_expect(is_equal_approx(component_scale_field.step, 0.00001) and is_equal_approx(component_position_field.step, 0.01), "Only Scale gains the finer step; a hundredth of a centimetre stays the Position precision.")
+	var component_pivot_field: SpinBox = application.create_inspector_view.transform_fields["pivot_x"]
+	_expect(is_equal_approx(component_scale_field.step, 0.00001) and is_equal_approx(component_position_field.step, 0.0001) and is_equal_approx(component_pivot_field.step, 0.0001), "A Component's Scale, Position and Pivot should each author their own precision, and the Pivot the same one as the Position it offsets.")
 	_edit_inspector_value(component_scale_field, 0.81253)
 	_expect(is_equal_approx(Vector2(body["transform"]["scale"]).x, 0.81253), "A Component Scale of 0.81253 must reach the transform unrounded.")
+	_edit_inspector_value(component_position_field, 11.1234)
+	_expect(is_equal_approx(Vector2(body["transform"]["position"]).x, application._world_to_editor_units(11.1234)), "A Component Position of 11.1234 cm must reach the transform unrounded.")
+	var rotation_precision_field: SpinBox = application.create_inspector_view.transform_fields["rotation"]
+	_expect(is_equal_approx(rotation_precision_field.step, 1.0), "Rotation still counts in whole degrees; only the centimetre and factor fields got finer.")
 	application.selected_component_id = ""
 	application.selected_group_id = "group_1"
 	application._render_inspector()
 	var group_scale_field := _inspector_spin(application, "Scale X")
+	var group_position_field := _inspector_spin(application, "Position X (cm)")
 	_expect(group_scale_field != null and is_equal_approx(group_scale_field.step, 0.00001) and is_equal_approx(group_scale_field.custom_arrow_step, 0.1), "A Group Scale should be typed to a hundred-thousandth while its arrows still nudge by a tenth.")
+	_expect(group_position_field != null and is_equal_approx(group_position_field.step, 0.0001) and is_equal_approx(group_position_field.custom_arrow_step, 0.01), "A Group Position should be typed to a ten-thousandth while its arrows keep the hundredth they always nudged by.")
 	_edit_inspector_value(group_scale_field, 1.00005)
 	_expect(is_equal_approx(Vector2(group["transform"]["scale"]).x, 1.00005), "A Group Scale of 1.00005 must reach the Group transform unrounded.")
+	_edit_inspector_value(group_position_field, -3.0625)
+	_expect(is_equal_approx(Vector2(group["transform"]["position"]).x, application._world_to_editor_units(-3.0625)), "A Group Position of -3.0625 cm must reach the Group transform unrounded.")
 	_expect(EditorWidgets.format_scale_value(1.23456) == "1.23456" and EditorWidgets.format_scale_value(1.5) == "1.5" and EditorWidgets.format_scale_value(2.0) == "2", "A Rebase preview should name every authored decimal while still trimming the trailing zeros.")
 	application.free()
 
@@ -2876,6 +2889,68 @@ func _test_primitive_shape_placement() -> void:
 		application._render_inspector()
 		_expect(_inspector_spin(application, "Width (cm)") != null, "Every authored Primitive shape needs its own Inspector fields; a %s without them would look uneditable." % shape)
 		application.free()
+
+
+## The mirror axis is the one the Canvas draws, and two separate displacements
+## used to move it: the Parent's own transform, and the Asset root Position that
+## places the whole Asset for preview. Either one put the copy at twice its
+## offset, because a reflection doubles whatever the axis is off by - and both
+## stay invisible in a fixture that sits at the origin already. So the fixture
+## here is displaced twice over, and what has to hold is simply this: the copy's
+## drawing appears where the drawn axis reflects the source's drawing to.
+func _test_duplicate_mirror_uses_origin_axis() -> void:
+	var application: Control = load("res://scripts/main.gd").new()
+	application._build_ui()
+	var mirror_parent := _outliner_test_component("component_1", "arm")
+	mirror_parent["transform"] = {"position": Vector2(40.0, 25.0), "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}
+	var mirror_child := _outliner_test_component("component_2", "hand")
+	mirror_child["parent_component_id"] = "component_1"
+	mirror_child["transform"] = {"position": Vector2(6.0, 9.0), "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}
+	# A root Position, as every Asset that has been placed for preview carries -
+	# Totem of Mana sits at -6.4 - so Asset space and the space the axis is drawn
+	# in are not the same space.
+	var mirror_assets: Array[Dictionary] = [{"id": "asset_1", "name": "Golem", "asset_type": "character", "visibility": true,
+		"components": [mirror_parent, mirror_child], "groups": [], "guides": [],
+		"asset_pivot": Vector2(3.0, 8.0), "root_position": Vector2(-2.0, -3.0), "root_scale": Vector2.ONE}]
+	application.assets = mirror_assets
+	application.selected_asset_id = "asset_1"
+	# A fixture that names its own ids has to hand the counters over too, or the
+	# first copy is issued "component_1" again and every lookup answers with the
+	# original instead.
+	application._update_next_ids()
+	var root := AssetScaleRebaseService.root_transform(application._get_asset("asset_1"))
+	var source_center: Vector2 = ComponentHierarchy.world_transform(application._get_asset("asset_1"), "component_2") * application._component_local_bounds_center(mirror_child)
+	var drawn_source_center: Vector2 = root * source_center
+	_expect(not is_zero_approx(drawn_source_center.x) and not is_zero_approx(drawn_source_center.y) and not root.origin.is_zero_approx(), "The fixture has to sit away from both drawn axes and away from Asset-space zero, or mirroring about the wrong one would look right.")
+	for axis_case in [[ComponentCanvas.MIRROR_AXIS_VERTICAL, Vector2(-1.0, 1.0)], [ComponentCanvas.MIRROR_AXIS_HORIZONTAL, Vector2(1.0, -1.0)]]:
+		var mirror_axis := str(axis_case[0])
+		var reflection: Vector2 = axis_case[1]
+		var expected_center: Vector2 = root.affine_inverse() * (drawn_source_center * reflection)
+		for mirror_mode in ["keep_orientation", "flip_orientation"]:
+			application._duplicate_component("asset_1", "component_2", mirror_mode, mirror_axis)
+			var copy_id: String = application.selected_component_id
+			var copy: Dictionary = application._get_component(application._get_asset("asset_1"), copy_id)
+			var copy_center: Vector2 = ComponentHierarchy.world_transform(application._get_asset("asset_1"), copy_id) * application._component_local_bounds_center(copy)
+			_expect(str(copy.get("parent_component_id", "")) == "component_1", "A mirrored copy should keep the Parent it was duplicated from, and be a copy rather than the original (got %s under %s)." % [copy_id, str(copy.get("parent_component_id", ""))])
+			_expect(copy_center.is_equal_approx(expected_center), "%s across %s should land the copy where the drawn axis reflects it, not where the Parent or the Asset root Position moved that axis to (expected %v, got %v)." % [mirror_mode, mirror_axis, expected_center, copy_center])
+			application._get_asset("asset_1")["components"].erase(copy)
+	# A Group answers to the same axis: its members are mirrored about the
+	# origin, not about wherever the Group itself has been moved to.
+	var group_member := _outliner_test_component("component_3", "plate")
+	group_member["group_id"] = "group_1"
+	group_member["transform"] = {"position": Vector2(4.0, 7.0), "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}
+	application._get_asset("asset_1")["components"].append(group_member)
+	application._get_asset("asset_1")["groups"].append({"id": "group_1", "name": "shell", "visibility": true,
+		"parent_component_id": "", "transform": {"position": Vector2(30.0, 50.0), "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}})
+	application._update_next_ids()
+	var member_center: Vector2 = ComponentHierarchy.world_transform(application._get_asset("asset_1"), "component_3") * application._component_local_bounds_center(group_member)
+	var expected_member_center: Vector2 = root.affine_inverse() * ((root * member_center) * Vector2(1.0, -1.0))
+	application._duplicate_group("asset_1", "group_1", "flip_orientation", ComponentCanvas.MIRROR_AXIS_HORIZONTAL)
+	var copied_members := ComponentHierarchy.direct_group_members(application._get_asset("asset_1"), application.selected_group_id)
+	_expect(copied_members.size() == 1, "The mirrored Group should carry its one member.")
+	var copied_member_center: Vector2 = ComponentHierarchy.world_transform(application._get_asset("asset_1"), str(copied_members[0].get("id", ""))) * application._component_local_bounds_center(copied_members[0])
+	_expect(copied_member_center.is_equal_approx(expected_member_center), "A mirrored Group's members should land where the drawn axis reflects them, not where the Group's own Position or the Asset root Position moved that axis to.")
+	application.free()
 
 
 ## The zoom range now spans eighteen doublings, and one steady rate cannot serve
