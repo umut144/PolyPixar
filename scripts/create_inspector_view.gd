@@ -64,6 +64,11 @@ signal weapon_frame_value_changed(value: float, property_name: String)
 
 const ASSET_ROOT_POSITION_TOOLTIP := "Preview translation for the complete Asset. Rebase before Runtime Export."
 const ASSET_ROOT_SCALE_TOOLTIP := "Positive preview Scale on the %s axis around the Asset Pivot. Rebase before Runtime Export."
+## Every Scale in the Inspector is authored to a thousandth. They multiply -
+## Asset Root over Group over Component - so one of them reading coarser than
+## the others would quietly round the product the whole chain is judged by.
+const SCALE_STEP := 0.001
+const SCALE_ARROW_STEP := 0.1
 const REFERENCE_IMAGE_ROTATION_TOOLTIP := "Turns the Reference Image around the Asset Pivot. Authoring aid only; it never reaches geometry or Runtime Export."
 const CONTOUR_STROKE_WIDTH_OVERRIDE_TOOLTIP := "Overrides every Contour part of the referenced source Asset without changing that Asset."
 const PROJECTION_DEPTH_TOOLTIP := "Visible component depth used by runtime presentation; independent of Scale, Z Order, and Contour Stroke Width."
@@ -240,9 +245,9 @@ func rebuild() -> void:
 		], asset_pivot_property_changed.emit)
 		asset_root_scale_fields = EditorWidgets.build_number_grid(asset_transform_grid, [
 			{"caption": "Scale X", "property": "scale_x", "value": asset_root_scale.x, "min": 0.01, "max": 100.0,
-				"tooltip": ASSET_ROOT_SCALE_TOOLTIP % "X"},
+				"step": SCALE_STEP, "tooltip": ASSET_ROOT_SCALE_TOOLTIP % "X"},
 			{"caption": "Scale Y", "property": "scale_y", "value": asset_root_scale.y, "min": 0.01, "max": 100.0,
-				"tooltip": ASSET_ROOT_SCALE_TOOLTIP % "Y"},
+				"step": SCALE_STEP, "tooltip": ASSET_ROOT_SCALE_TOOLTIP % "Y"},
 		], asset_root_scale_changed.emit)
 		asset_root_scale_field = asset_root_scale_fields.get("scale_x")
 		add_child(asset_transform_grid)
@@ -312,7 +317,8 @@ func rebuild() -> void:
 					"step": 1.0, "arrow_step": 1.0, "tooltip": REFERENCE_IMAGE_ROTATION_TOOLTIP,
 					"silent": false},
 				{"caption": "Scale", "property": "scale",
-					"value": float(reference_image.get("scale", 1.0)), "min": 0.01, "silent": false},
+					"value": float(reference_image.get("scale", 1.0)), "min": 0.01,
+					"step": SCALE_STEP, "silent": false},
 			], reference_image_property_changed.emit)
 			add_child(reference_transform_grid)
 		return
@@ -635,16 +641,18 @@ func _render_palette_variants() -> void:
 
 func _component_transform_descriptors(position_x: float, position_y: float, rotation: float, scale: Vector2) -> Array:
 	# One shape for the local and the global transform block. Rotation steps and
-	# arrows in whole degrees; the other fields keep hundredth text precision with
-	# tenth-unit arrows. None of them is silent: a few callers rely on the initial
-	# value_changed.
+	# arrows in whole degrees; Position keeps hundredth text precision and Scale
+	# thousandth, because a Scale is a factor over a whole Component and its third
+	# decimal is a visible difference where a hundredth of a centimetre is not.
+	# Both keep tenth-unit arrows. None of them is silent: a few callers rely on
+	# the initial value_changed.
 	return [
 		{"caption": "Position X (cm)", "property": "position_x", "value": position_x, "silent": false},
 		{"caption": "Position Y (cm)", "property": "position_y", "value": position_y, "silent": false},
 		{"caption": "Rotation", "property": "rotation", "value": rotation,
 			"step": 1.0, "arrow_step": 1.0, "silent": false},
-		{"caption": "Scale X", "property": "scale_x", "value": scale.x, "silent": false},
-		{"caption": "Scale Y", "property": "scale_y", "value": scale.y, "silent": false},
+		{"caption": "Scale X", "property": "scale_x", "value": scale.x, "step": SCALE_STEP, "silent": false},
+		{"caption": "Scale Y", "property": "scale_y", "value": scale.y, "step": SCALE_STEP, "silent": false},
 	]
 
 
@@ -680,8 +688,8 @@ func _render_group_inspector(_asset: Dictionary, group: Dictionary) -> void:
 	_add_group_transform_field(transform_grid, "Position X (cm)", ToolUnits.to_centimeters(transform_position.x), "position_x", 0.01)
 	_add_group_transform_field(transform_grid, "Position Y (cm)", ToolUnits.to_centimeters(transform_position.y), "position_y", 0.01)
 	_add_group_transform_field(transform_grid, "Rotation", float(transform.get("rotation", 0.0)), "rotation", 1.0)
-	_add_group_transform_field(transform_grid, "Scale X", transform_scale.x, "scale_x", 0.01)
-	_add_group_transform_field(transform_grid, "Scale Y", transform_scale.y, "scale_y", 0.01)
+	_add_group_transform_field(transform_grid, "Scale X", transform_scale.x, "scale_x", SCALE_STEP, SCALE_ARROW_STEP)
+	_add_group_transform_field(transform_grid, "Scale Y", transform_scale.y, "scale_y", SCALE_STEP, SCALE_ARROW_STEP)
 	_add_group_transform_field(transform_grid, "Pivot X (cm)", ToolUnits.to_centimeters(pivot.x), "pivot_x", 0.001)
 	_add_group_transform_field(transform_grid, "Pivot Y (cm)", ToolUnits.to_centimeters(pivot.y), "pivot_y", 0.001)
 	add_child(transform_grid)
@@ -694,14 +702,16 @@ func _render_group_inspector(_asset: Dictionary, group: Dictionary) -> void:
 	add_child(visibility_toggle)
 
 
-func _add_group_transform_field(grid: GridContainer, label_text: String, value: float, property_name: String, step: float) -> void:
+## `arrow_step` defaults to the text step, which is what the cm fields want. A
+## Scale is authored finer than it is nudged, so it passes its own.
+func _add_group_transform_field(grid: GridContainer, label_text: String, value: float, property_name: String, step: float, arrow_step := 0.0) -> void:
 	var label := EditorWidgets.create_inspector_field_label(label_text)
 	grid.add_child(label)
 	var field := SpinBox.new()
 	field.min_value = -100000.0
 	field.max_value = 100000.0
 	field.step = step
-	field.custom_arrow_step = step
+	field.custom_arrow_step = arrow_step if arrow_step > 0.0 else step
 	field.value = value
 	field.custom_minimum_size = Vector2(96, 26)
 	field.add_theme_font_size_override("font_size", 11)
