@@ -203,6 +203,19 @@ func _test_create_outliner_expansion_scope() -> void:
 	application._restore_editor_state(saved_editor_state)
 	application._render_canvas_context()
 	_expect(application.canvas_view.get_camera_state() == {"position": Vector2(42.0, -17.0), "zoom": 7.0}, "Reloading editor state should restore the selected Asset's saved canvas camera.")
+	# The Canvas owns the zoom range; main.gd clamps every stored camera against
+	# it. A second copy of the maximum living here would let the deepest view a
+	# user can reach snap back one step on the next Asset switch, which is not a
+	# failure anything would report.
+	application.canvas_view.set_camera_state(Vector2(1.0, 2.0), ComponentCanvas.MAX_ZOOM)
+	application.selected_asset_id = "symbol_a"
+	application._render_canvas_context()
+	application.selected_asset_id = "character_b"
+	application._render_canvas_context()
+	_expect(is_equal_approx(float(application.canvas_view.get_camera_state().get("zoom", 0.0)), ComponentCanvas.MAX_ZOOM), "The deepest zoom the Canvas allows must survive an Asset switch instead of being clamped away by a second copy of the maximum.")
+	application._restore_editor_state(application._serialize_editor_state())
+	application._render_canvas_context()
+	_expect(is_equal_approx(float(application.canvas_view.get_camera_state().get("zoom", 0.0)), ComponentCanvas.MAX_ZOOM), "A saved World must reload the deepest zoom too, not a clamped version of it.")
 	# Schema 63 merged the seven Create views and let the Asset filter gate
 	# Create too. A World saved below the step could hold a type name here and
 	# every filter switched off, which would read as an empty module.

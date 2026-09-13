@@ -46,8 +46,13 @@ const MIRROR_AXIS_HORIZONTAL := "horizontal"
 const PAN_SPEED := 420.0
 const MIN_ZOOM := 0.25
 # Allows detailed sub-millimeter editing while keeping the existing zoom
-# progression and grid package logic unchanged.
-const MAX_ZOOM := 4096.0
+# progression and grid package logic unchanged. At 16384 one Tool unit of 10 cm
+# fills 16384 pixels, so a millimetre is about 164 of them and a pixel about six
+# micrometres - the depth the thousandth-and-finer Scale fields are authored at.
+# Whoever raises it further must raise it here alone: main.gd clamps every
+# stored camera against these two, so a second copy of the number would snap a
+# deeper view back on the next asset switch.
+const MAX_ZOOM := 16384.0
 const DEFAULT_ZOOM := 1.0
 const ZOOM_RATE := 1.8
 const CLOSE_DISTANCE_PIXELS := 14.0

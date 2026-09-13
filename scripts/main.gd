@@ -3389,7 +3389,7 @@ func _restore_editor_state(state, source_schema_version := WorldDocumentService.
 			if saved_asset_camera is Dictionary and not saved_asset_camera.is_empty():
 				asset_camera_states[asset_id] = {
 					"position": WorldDocumentService.deserialize_vector(saved_asset_camera.get("position", [0.0, 0.0]), Vector2.ZERO),
-					"zoom": clampf(float(saved_asset_camera.get("zoom", 1.0)), 0.25, 4096.0)
+					"zoom": clampf(float(saved_asset_camera.get("zoom", 1.0)), ComponentCanvas.MIN_ZOOM, ComponentCanvas.MAX_ZOOM)
 				}
 	if not selected_component_id.is_empty() or not selected_guide_id.is_empty():
 		_set_outliner_asset_expanded(selected_asset_id, true)
@@ -3437,7 +3437,7 @@ func _restore_editor_state(state, source_schema_version := WorldDocumentService.
 	if saved_camera is Dictionary and not saved_camera.is_empty() and not selected_asset_id.is_empty() and not asset_camera_states.has(selected_asset_id):
 		asset_camera_states[selected_asset_id] = {
 			"position": WorldDocumentService.deserialize_vector(saved_camera.get("position", [0.0, 0.0]), Vector2.ZERO),
-			"zoom": clampf(float(saved_camera.get("zoom", 1.0)), 0.25, 4096.0)
+			"zoom": clampf(float(saved_camera.get("zoom", 1.0)), ComponentCanvas.MIN_ZOOM, ComponentCanvas.MAX_ZOOM)
 		}
 
 
@@ -3447,7 +3447,7 @@ func _store_camera_for_asset(asset_id: String) -> void:
 	var camera_state := canvas_view.get_camera_state()
 	asset_camera_states[asset_id] = {
 		"position": camera_state.get("position", Vector2.ZERO),
-		"zoom": clampf(float(camera_state.get("zoom", 1.0)), 0.25, 4096.0)
+		"zoom": clampf(float(camera_state.get("zoom", 1.0)), ComponentCanvas.MIN_ZOOM, ComponentCanvas.MAX_ZOOM)
 	}
 
 
@@ -3459,7 +3459,7 @@ func _restore_camera_for_asset(asset_id: String) -> void:
 		return
 	canvas_view.set_camera_state(
 		camera_state.get("position", Vector2.ZERO),
-		clampf(float(camera_state.get("zoom", 1.0)), 0.25, 4096.0)
+		clampf(float(camera_state.get("zoom", 1.0)), ComponentCanvas.MIN_ZOOM, ComponentCanvas.MAX_ZOOM)
 	)
 
 
