@@ -73,6 +73,16 @@ const ASSET_ROOT_SCALE_TOOLTIP := "Positive preview Scale on the %s axis around 
 ## Root range even though it holds everywhere a Component is authored.
 const SCALE_STEP := 0.00001
 const SCALE_ARROW_STEP := 0.1
+## Every centimetre a placement is authored in - Position, Pivot, a Point's own
+## coordinates, a nudge Delta - is typed to a ten-thousandth. They add up along
+## a hierarchy the same way the Scales multiply along it, so one field reading
+## coarser than the rest would round the sum the whole chain is judged by.
+##
+## Coordinates are kept as 32-bit floats in Tool units, ten centimetres each, so
+## the fifth decimal of a centimetre stops being representable roughly ten
+## metres out from the origin. Everything an Asset is actually drawn at is far
+## inside that; a World-sized coordinate is not.
+const POSITION_STEP := 0.0001
 const REFERENCE_IMAGE_ROTATION_TOOLTIP := "Turns the Reference Image around the Asset Pivot. Authoring aid only; it never reaches geometry or Runtime Export."
 const CONTOUR_STROKE_WIDTH_OVERRIDE_TOOLTIP := "Overrides every Contour part of the referenced source Asset without changing that Asset."
 const PROJECTION_DEPTH_TOOLTIP := "Visible component depth used by runtime presentation; independent of Scale, Z Order, and Contour Stroke Width."
@@ -239,13 +249,13 @@ func rebuild() -> void:
 		var asset_root_scale := AssetScaleRebaseService.root_scale(asset)
 		asset_root_position_fields = EditorWidgets.build_number_grid(asset_transform_grid, [
 			{"caption": "Position X (cm)", "property": "position_x", "value": ToolUnits.to_centimeters(root_position.x),
-				"tooltip": ASSET_ROOT_POSITION_TOOLTIP},
+				"step": POSITION_STEP, "tooltip": ASSET_ROOT_POSITION_TOOLTIP},
 			{"caption": "Position Y (cm)", "property": "position_y", "value": ToolUnits.to_centimeters(root_position.y),
-				"tooltip": ASSET_ROOT_POSITION_TOOLTIP},
+				"step": POSITION_STEP, "tooltip": ASSET_ROOT_POSITION_TOOLTIP},
 		], asset_root_position_changed.emit)
 		asset_pivot_fields = EditorWidgets.build_number_grid(asset_transform_grid, [
-			{"caption": "Pivot X (cm)", "property": "pivot_x", "value": ToolUnits.to_centimeters(asset_pivot.x)},
-			{"caption": "Pivot Y (cm)", "property": "pivot_y", "value": ToolUnits.to_centimeters(asset_pivot.y)},
+			{"caption": "Pivot X (cm)", "property": "pivot_x", "value": ToolUnits.to_centimeters(asset_pivot.x), "step": POSITION_STEP},
+			{"caption": "Pivot Y (cm)", "property": "pivot_y", "value": ToolUnits.to_centimeters(asset_pivot.y), "step": POSITION_STEP},
 		], asset_pivot_property_changed.emit)
 		asset_root_scale_fields = EditorWidgets.build_number_grid(asset_transform_grid, [
 			{"caption": "Scale X", "property": "scale_x", "value": asset_root_scale.x, "min": 0.01, "max": 100.0,
@@ -313,9 +323,9 @@ func rebuild() -> void:
 			# read against the Pivot fields above rather than the image center.
 			EditorWidgets.build_number_grid(reference_transform_grid, [
 				{"caption": "Position X (cm)", "property": "position_x",
-					"value": ToolUnits.to_centimeters(reference_position.x), "silent": false},
+					"value": ToolUnits.to_centimeters(reference_position.x), "step": POSITION_STEP, "silent": false},
 				{"caption": "Position Y (cm)", "property": "position_y",
-					"value": ToolUnits.to_centimeters(reference_position.y), "silent": false},
+					"value": ToolUnits.to_centimeters(reference_position.y), "step": POSITION_STEP, "silent": false},
 				{"caption": "Rotation (deg)", "property": "rotation",
 					"value": float(reference_image.get("rotation", 0.0)), "min": -360.0, "max": 360.0,
 					"step": 1.0, "arrow_step": 1.0, "tooltip": REFERENCE_IMAGE_ROTATION_TOOLTIP,
@@ -352,8 +362,8 @@ func rebuild() -> void:
 			# The delta handler needs the field it belongs to, so the fields are
 			# built unconnected and wired from the returned map.
 			var delta_fields := EditorWidgets.build_number_grid(point_transform_grid, [
-				{"caption": "Delta X (cm)", "property": "position_x", "value": 0.0},
-				{"caption": "Delta Y (cm)", "property": "position_y", "value": 0.0},
+				{"caption": "Delta X (cm)", "property": "position_x", "value": 0.0, "step": POSITION_STEP},
+				{"caption": "Delta Y (cm)", "property": "position_y", "value": 0.0, "step": POSITION_STEP},
 			], Callable())
 			for delta_property in delta_fields:
 				var delta_field: SpinBox = delta_fields[delta_property]
@@ -364,9 +374,9 @@ func rebuild() -> void:
 			var point_position: Vector2 = selected_point.get("position", Vector2.ZERO)
 			EditorWidgets.build_number_grid(point_transform_grid, [
 				{"caption": "Position X (cm)", "property": "position_x",
-					"value": ToolUnits.to_centimeters(point_position.x)},
+					"value": ToolUnits.to_centimeters(point_position.x), "step": POSITION_STEP},
 				{"caption": "Position Y (cm)", "property": "position_y",
-					"value": ToolUnits.to_centimeters(point_position.y)},
+					"value": ToolUnits.to_centimeters(point_position.y), "step": POSITION_STEP},
 			], point_position_changed.emit)
 		add_child(point_transform_grid)
 		add_child(EditorWidgets.create_inspector_section("Point Settings", section_toggled.emit))
@@ -587,9 +597,9 @@ func rebuild() -> void:
 				transform_value_changed.emit)
 		transform_fields.merge(EditorWidgets.build_number_grid(transform_grid, [
 			{"caption": "Pivot X (cm)", "property": "pivot_x", "value": ToolUnits.to_centimeters(pivot.x),
-				"step": 0.001, "silent": false},
+				"step": POSITION_STEP, "silent": false},
 			{"caption": "Pivot Y (cm)", "property": "pivot_y", "value": ToolUnits.to_centimeters(pivot.y),
-				"step": 0.001, "silent": false},
+				"step": POSITION_STEP, "silent": false},
 		], transform_value_changed.emit), true)
 	add_child(EditorWidgets.create_inspector_section("Constraint" if constraint_only_hole else "Visibility / Layer", section_toggled.emit))
 	add_child(EditorWidgets.create_toggle_field(
@@ -651,8 +661,8 @@ func _component_transform_descriptors(position_x: float, position_y: float, rota
 	# centimetre is not. Both keep tenth-unit arrows. None of them is silent: a
 	# few callers rely on the initial value_changed.
 	return [
-		{"caption": "Position X (cm)", "property": "position_x", "value": position_x, "silent": false},
-		{"caption": "Position Y (cm)", "property": "position_y", "value": position_y, "silent": false},
+		{"caption": "Position X (cm)", "property": "position_x", "value": position_x, "step": POSITION_STEP, "silent": false},
+		{"caption": "Position Y (cm)", "property": "position_y", "value": position_y, "step": POSITION_STEP, "silent": false},
 		{"caption": "Rotation", "property": "rotation", "value": rotation,
 			"step": 1.0, "arrow_step": 1.0, "silent": false},
 		{"caption": "Scale X", "property": "scale_x", "value": scale.x, "step": SCALE_STEP, "silent": false},
@@ -689,13 +699,13 @@ func _render_group_inspector(_asset: Dictionary, group: Dictionary) -> void:
 	var transform_position: Vector2 = transform.get("position", Vector2.ZERO)
 	var transform_scale: Vector2 = transform.get("scale", Vector2.ONE)
 	var pivot: Vector2 = transform.get("pivot", Vector2.ZERO)
-	_add_group_transform_field(transform_grid, "Position X (cm)", ToolUnits.to_centimeters(transform_position.x), "position_x", 0.01)
-	_add_group_transform_field(transform_grid, "Position Y (cm)", ToolUnits.to_centimeters(transform_position.y), "position_y", 0.01)
+	_add_group_transform_field(transform_grid, "Position X (cm)", ToolUnits.to_centimeters(transform_position.x), "position_x", POSITION_STEP, 0.01)
+	_add_group_transform_field(transform_grid, "Position Y (cm)", ToolUnits.to_centimeters(transform_position.y), "position_y", POSITION_STEP, 0.01)
 	_add_group_transform_field(transform_grid, "Rotation", float(transform.get("rotation", 0.0)), "rotation", 1.0)
 	_add_group_transform_field(transform_grid, "Scale X", transform_scale.x, "scale_x", SCALE_STEP, SCALE_ARROW_STEP)
 	_add_group_transform_field(transform_grid, "Scale Y", transform_scale.y, "scale_y", SCALE_STEP, SCALE_ARROW_STEP)
-	_add_group_transform_field(transform_grid, "Pivot X (cm)", ToolUnits.to_centimeters(pivot.x), "pivot_x", 0.001)
-	_add_group_transform_field(transform_grid, "Pivot Y (cm)", ToolUnits.to_centimeters(pivot.y), "pivot_y", 0.001)
+	_add_group_transform_field(transform_grid, "Pivot X (cm)", ToolUnits.to_centimeters(pivot.x), "pivot_x", POSITION_STEP, 0.001)
+	_add_group_transform_field(transform_grid, "Pivot Y (cm)", ToolUnits.to_centimeters(pivot.y), "pivot_y", POSITION_STEP, 0.001)
 	add_child(transform_grid)
 	add_child(EditorWidgets.create_inspector_section("Group Visibility", section_toggled.emit))
 	var visibility_toggle := CheckButton.new()
@@ -777,8 +787,8 @@ func _render_weapon_guide_inspector(asset: Dictionary, guide: Dictionary) -> voi
 	var transform: Dictionary = guide.get("transform", WorldDocumentService.default_component_transform())
 	var grid := GridContainer.new()
 	grid.columns = 2
-	_add_weapon_frame_field(grid, "Position X (cm)", ToolUnits.to_centimeters(Vector2(transform.get("position", Vector2.ZERO)).x), "position_x")
-	_add_weapon_frame_field(grid, "Position Y (cm)", ToolUnits.to_centimeters(Vector2(transform.get("position", Vector2.ZERO)).y), "position_y")
+	_add_weapon_frame_field(grid, "Position X (cm)", ToolUnits.to_centimeters(Vector2(transform.get("position", Vector2.ZERO)).x), "position_x", POSITION_STEP)
+	_add_weapon_frame_field(grid, "Position Y (cm)", ToolUnits.to_centimeters(Vector2(transform.get("position", Vector2.ZERO)).y), "position_y", POSITION_STEP)
 	_add_weapon_frame_field(grid, "Rotation (deg)", float(transform.get("rotation", 0.0)), "rotation")
 	add_child(grid)
 	var status := EditorWidgets.create_inspector_field_label("Frame: Valid" if AssetGuide.validation_issues(guide).is_empty() and not scope_record.is_empty() else "Frame: Invalid or unassigned")
@@ -790,12 +800,15 @@ func _render_weapon_guide_inspector(asset: Dictionary, guide: Dictionary) -> voi
 	add_child(delete_button)
 
 
-func _add_weapon_frame_field(grid: GridContainer, label_text: String, value: float, property_name: String) -> void:
+## Rotation keeps the tenth of a degree it always had; a placement in
+## centimetres passes the finer POSITION_STEP.
+func _add_weapon_frame_field(grid: GridContainer, label_text: String, value: float, property_name: String, step := 0.1) -> void:
 	grid.add_child(EditorWidgets.create_inspector_field_label(label_text))
 	var field := SpinBox.new()
 	field.min_value = -100000.0
 	field.max_value = 100000.0
-	field.step = 0.1
+	field.step = step
+	field.custom_arrow_step = 0.1
 	field.set_value_no_signal(value)
 	field.value_changed.connect(weapon_frame_value_changed.emit.bind(property_name))
 	grid.add_child(field)
