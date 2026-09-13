@@ -19,7 +19,7 @@ extends RefCounted
 ## stake below it - in a geometry measured in centimetres these values are the
 ## numerical zeros a rotation leaves behind.
 const DOCUMENT_ZERO_EPSILON := 0.000000001
-const SCHEMA_VERSION := 72
+const SCHEMA_VERSION := 73
 const REGION_GEOMETRY_AUTHORED := "authored"
 const REGION_GEOMETRY_COMPONENT := "component"
 const REGION_GEOMETRY_SOURCES := [REGION_GEOMETRY_AUTHORED, REGION_GEOMETRY_COMPONENT]
@@ -506,6 +506,12 @@ static func deserialize_component(component_data: Dictionary, source_schema_vers
 		component["role"] = normalized_reference_role(component_data.get("role", ""))
 	if serialized_contour_stroke_width_is_valid(component_data):
 		component["contour_stroke_width_px"] = float(component_data["contour_stroke_width_px"])
+	# Only a decision worth persisting is stored. Centered is the absence of one,
+	# so it leaves no key and every document written before schema 73 reads back
+	# exactly as it always did.
+	var stored_alignment := str(component_data.get("contour_stroke_alignment", ContourStrokeService.ALIGNMENT_CENTERED))
+	if stored_alignment in ContourStrokeService.ALIGNMENTS and stored_alignment != ContourStrokeService.ALIGNMENT_CENTERED:
+		component["contour_stroke_alignment"] = stored_alignment
 	return component
 
 
@@ -1186,6 +1192,15 @@ static func has_contour_stroke_width_override(component: Dictionary, world_defau
 
 static func effective_contour_stroke_width_px(component: Dictionary, world_default: float) -> float:
 	return float(component["contour_stroke_width_px"]) if has_contour_stroke_width_override(component, world_default) else world_default
+
+
+## Where the Contour Stroke width sits relative to the authored Boundary. Unlike
+## the width there is no World value to fall back to: the alignment is a
+## per-Component decision, and a Component that has not made one is centered,
+## which is what every Boundary meant before the setting existed.
+static func contour_stroke_alignment(component: Dictionary) -> String:
+	var alignment := str(component.get("contour_stroke_alignment", ContourStrokeService.ALIGNMENT_CENTERED))
+	return alignment if alignment in ContourStrokeService.ALIGNMENTS else ContourStrokeService.ALIGNMENT_CENTERED
 
 
 static func component_by_id(asset: Dictionary, component_id: String) -> Dictionary:

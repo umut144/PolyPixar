@@ -807,6 +807,74 @@ func _test_triangle_primitive_geometry() -> void:
 		_expect(PrimitiveGeometryService.extents_cm(rebased).is_equal_approx(Vector2(30.0, 10.0)) and PrimitiveGeometryService.center(rebased).is_equal_approx(Vector2(6.0, 2.0)) and Vector2(rebased.get("transform", {}).get("scale", Vector2.ZERO)) == Vector2.ONE, "Scale Rebase should bake both axes into a %s's own extents and centre." % straight_shape)
 
 
+func _alignment_stroke_bounds(component: Dictionary, alignment: String) -> Rect2:
+	var stroke := ContourStrokeService.generate(component, ContourStrokeService.DEFAULT_STROKE_WIDTH_PX, alignment)
+	if not bool(stroke.get("valid", false)):
+		return Rect2()
+	var bounds := Rect2()
+	var first := true
+	for vertex in stroke.get("vertices", []):
+		var position: Vector2 = vertex.get("position", Vector2.ZERO)
+		if first:
+			bounds = Rect2(position, Vector2.ZERO)
+			first = false
+		else:
+			bounds = bounds.expand(position)
+	return bounds
+
+
+func _alignment_square(role: String, clockwise: bool) -> Dictionary:
+	var square := _component()
+	square["draw_mode"] = "closed_loop"
+	square["topology_role"] = role
+	var corners: Array[Vector2] = [Vector2.ZERO, Vector2(10.0, 0.0), Vector2(10.0, 10.0), Vector2(0.0, 10.0)]
+	if clockwise:
+		corners.reverse()
+	for corner in corners:
+		BezierTopology.add_point(square, corner, "corner")
+	BezierTopology.close_active_chain(square)
+	square["chains"][0]["topology_role"] = role
+	return square
+
+
+## The Stroke width can sit on either side of the authored Boundary instead of
+## across it. Centered is what the Boundary has always meant and stays the
+## default, so nothing an existing World carries changes shape; the two
+## one-sided alignments move the whole width to the material side or away from
+## it, which is visible as the box the mesh occupies.
+func _test_contour_stroke_alignment() -> void:
+	var width_tool_units := ContourStrokeService.stroke_width_meters(ContourStrokeService.DEFAULT_STROKE_WIDTH_PX) / ToolUnits.TO_METERS
+	for drawn_clockwise in [false, true]:
+		var outer := _alignment_square(WorldDocumentService.ROLE_OUTER, drawn_clockwise)
+		var centered_bounds := _alignment_stroke_bounds(outer, ContourStrokeService.ALIGNMENT_CENTERED)
+		var outside_bounds := _alignment_stroke_bounds(outer, ContourStrokeService.ALIGNMENT_OUTSIDE)
+		var inside_bounds := _alignment_stroke_bounds(outer, ContourStrokeService.ALIGNMENT_INSIDE)
+		_expect(centered_bounds.position.is_equal_approx(Vector2.ONE * -width_tool_units * 0.5) and centered_bounds.end.is_equal_approx(Vector2.ONE * (10.0 + width_tool_units * 0.5)), "A centered Stroke should reach half its width past the Boundary on both sides, whichever way the loop was drawn.")
+		_expect(outside_bounds.position.is_equal_approx(Vector2.ONE * -width_tool_units) and outside_bounds.end.is_equal_approx(Vector2.ONE * (10.0 + width_tool_units)), "An outside Stroke should reach its full width past the Boundary and nothing inside it.")
+		_expect(inside_bounds.position.is_equal_approx(Vector2.ZERO) and inside_bounds.end.is_equal_approx(Vector2.ONE * 10.0), "An inside Stroke should stay within the Boundary entirely.")
+		# The winding is authored, not assumed: the same square drawn the other
+		# way round has to answer with the same two boxes rather than swap them.
+		var hole := _alignment_square(WorldDocumentService.ROLE_HOLE, drawn_clockwise)
+		var hole_outside := _alignment_stroke_bounds(hole, ContourStrokeService.ALIGNMENT_OUTSIDE)
+		var hole_inside := _alignment_stroke_bounds(hole, ContourStrokeService.ALIGNMENT_INSIDE)
+		_expect(hole_inside.position.is_equal_approx(Vector2.ONE * -width_tool_units) and hole_inside.end.is_equal_approx(Vector2.ONE * (10.0 + width_tool_units)), "A Hole encloses a void, so its inside is the material around it and its inside Stroke grows away from the loop.")
+		_expect(hole_outside.position.is_equal_approx(Vector2.ZERO) and hole_outside.end.is_equal_approx(Vector2.ONE * 10.0), "A Hole's outside Stroke reaches into the void it encloses.")
+	var open_contour := _component()
+	open_contour["draw_mode"] = "contour"
+	for position in [Vector2.ZERO, Vector2(10.0, 0.0), Vector2(10.0, 10.0)]:
+		BezierTopology.add_point(open_contour, position, "corner")
+	var open_centered := ContourStrokeService.generate(open_contour, ContourStrokeService.DEFAULT_STROKE_WIDTH_PX, ContourStrokeService.ALIGNMENT_CENTERED)
+	var open_outside := ContourStrokeService.generate(open_contour, ContourStrokeService.DEFAULT_STROKE_WIDTH_PX, ContourStrokeService.ALIGNMENT_OUTSIDE)
+	_expect(bool(open_centered.get("valid", false)) and str(open_outside.get("alignment", "")) == ContourStrokeService.ALIGNMENT_CENTERED, "An open Contour encloses nothing, so it reports itself centered whatever was authored.")
+	_expect(open_outside.get("vertices", []).size() == open_centered.get("vertices", []).size() and _alignment_stroke_bounds(open_contour, ContourStrokeService.ALIGNMENT_OUTSIDE) == _alignment_stroke_bounds(open_contour, ContourStrokeService.ALIGNMENT_CENTERED), "An open Contour must derive the very same Stroke whichever alignment is asked for.")
+	var aligned_component := _alignment_square(WorldDocumentService.ROLE_OUTER, false)
+	var centered_fingerprint := ContourMeshService.source_fingerprint(aligned_component)
+	aligned_component["contour_stroke_alignment"] = ContourStrokeService.ALIGNMENT_OUTSIDE
+	_expect(ContourMeshService.source_fingerprint(aligned_component) != centered_fingerprint, "Changing the alignment must make an existing Contour Stroke Bake stale rather than leave it silently wrong.")
+	var outside_mesh := ContourMeshService.generate(aligned_component)
+	_expect(bool(outside_mesh.get("valid", false)) and ContourMeshService.matches_source(outside_mesh, aligned_component), "A one-sided Contour Stroke should still derive a valid Mesh that matches its own source.")
+
+
 func _test_contour_stroke_service() -> void:
 	var component := {
 		"id": "wizard_reference",
@@ -836,7 +904,7 @@ func _test_contour_stroke_service() -> void:
 	_expect(int(stroke.get("algorithm_version", 0)) == ContourStrokeService.ALGORITHM_VERSION, "Contour Stroke results should expose their algorithm version.")
 	_expect(is_equal_approx(float(stroke.get("reference_pixels_per_meter", 0.0)), 192.0), "Contour Stroke should use the fixed authored reference density of 192 px/m.")
 	_expect(is_equal_approx(float(stroke.get("stroke_width_px", 0.0)), 4.0) and is_equal_approx(float(stroke.get("stroke_width_meters", 0.0)), 0.020833333333333332), "The 192 px/m default should derive an exact 4 px / 0.0208333 m stroke width.")
-	_expect(is_equal_approx(float(stroke.get("centerline_offset_meters", 0.0)), 0.010416666666666666), "The stroke mesh should extend exactly half its width to either side of the authored Boundary.")
+	_expect(is_equal_approx(float(stroke.get("inner_offset_meters", 0.0)), 0.010416666666666666) and is_equal_approx(float(stroke.get("outer_offset_meters", 0.0)), 0.010416666666666666) and str(stroke.get("alignment", "")) == ContourStrokeService.ALIGNMENT_CENTERED, "A centered stroke mesh should extend exactly half its width to either side of the authored Boundary.")
 	_expect(str(stroke.get("join", "")) == "miter" and is_equal_approx(float(stroke.get("miter_limit", 0.0)), 4.0) and str(stroke.get("cap", "")) == "butt", "Contour Stroke output should state the approved join, fallback limit, and cap semantics.")
 	var vertices: Array = stroke.get("vertices", [])
 	var indices: PackedInt32Array = stroke.get("indices", PackedInt32Array())

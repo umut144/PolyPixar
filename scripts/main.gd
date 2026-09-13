@@ -1153,6 +1153,7 @@ func _build_ui() -> void:
 	create_inspector_view.circle_primitive_diameter_changed.connect(_on_circle_primitive_diameter_changed)
 	create_inspector_view.component_catch_parent_selected.connect(_on_component_catch_parent_selected)
 	create_inspector_view.component_contour_stroke_width_changed.connect(_on_component_contour_stroke_width_changed)
+	create_inspector_view.component_contour_stroke_alignment_selected.connect(_on_component_contour_stroke_alignment_selected)
 	create_inspector_view.component_debug_point_numbers_toggled.connect(_on_component_debug_point_numbers_toggled)
 	create_inspector_view.component_hierarchy_parent_selected.connect(_on_component_hierarchy_parent_selected)
 	create_inspector_view.component_projection_depth_changed.connect(_on_component_projection_depth_changed)
@@ -2795,6 +2796,9 @@ func _save_world() -> bool:
 				serialized_component["role"] = WorldDocumentService.reference_role(component)
 			if _component_has_contour_stroke_width_override(component):
 				serialized_component["contour_stroke_width_px"] = float(component["contour_stroke_width_px"])
+			var serialized_alignment := WorldDocumentService.contour_stroke_alignment(component)
+			if serialized_alignment != ContourStrokeService.ALIGNMENT_CENTERED:
+				serialized_component["contour_stroke_alignment"] = serialized_alignment
 			asset_data["components"].append(serialized_component)
 		for guide in asset.get("guides", []):
 			asset_data["guides"].append(WorldDocumentService.serialize_asset_guide(guide))
@@ -12473,6 +12477,28 @@ func _on_component_contour_stroke_width_changed(value: float) -> void:
 	else:
 		_record_direct_change()
 		component["contour_stroke_width_px"] = value
+	geometry_meshing_preview = {}
+	geometry_meshing_preview_key = ""
+	geometry_meshing_preview_state = "idle"
+	geometry_meshing_preview_revision += 1
+	_invalidate_render(RENDER_INSPECTOR | RENDER_CANVAS_CONTEXT)
+
+
+## Centered is the absence of a decision rather than one of three stored
+## values, so choosing it erases the key. A Component that never had one and a
+## Component set back to centered are then the same document.
+func _on_component_contour_stroke_alignment_selected(index: int, option: OptionButton) -> void:
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if component.is_empty() or index < 0 or index >= option.item_count:
+		return
+	var alignment := str(option.get_item_metadata(index))
+	if not alignment in ContourStrokeService.ALIGNMENTS or alignment == WorldDocumentService.contour_stroke_alignment(component):
+		return
+	_record_direct_change()
+	if alignment == ContourStrokeService.ALIGNMENT_CENTERED:
+		component.erase("contour_stroke_alignment")
+	else:
+		component["contour_stroke_alignment"] = alignment
 	geometry_meshing_preview = {}
 	geometry_meshing_preview_key = ""
 	geometry_meshing_preview_state = "idle"

@@ -14,6 +14,14 @@ const MITER_LIMIT := 4.0
 ## corners. Keep miters only when the smaller interior angle is broad enough
 ## to read as a corner rather than a needle.
 const MIN_MITER_INTERIOR_ANGLE_DEGREES := 75.0
+## Where the width sits relative to the authored Boundary. Centered is what the
+## Boundary has always meant and stays the default, so nothing an existing World
+## already carries changes shape. The one-sided alignments need an enclosed side
+## to point at, which only a closed Chain has.
+const ALIGNMENT_CENTERED := "centered"
+const ALIGNMENT_INSIDE := "inside"
+const ALIGNMENT_OUTSIDE := "outside"
+const ALIGNMENTS: Array[String] = [ALIGNMENT_INSIDE, ALIGNMENT_CENTERED, ALIGNMENT_OUTSIDE]
 const JOIN_TYPE := "miter"
 const CAP_TYPE := "butt"
 const MAX_SAMPLE_DEPTH := 18
@@ -25,6 +33,52 @@ const MAX_SEGMENT_PAIR_CHECKS := 500000
 
 static func stroke_width_meters(stroke_width_px := DEFAULT_STROKE_WIDTH_PX) -> float:
 	return stroke_width_px / REFERENCE_PIXELS_PER_METER
+
+
+## An open Contour has no enclosed side, so inside and outside mean nothing
+## there: it stays centered whatever is authored, and so does anything the
+## vocabulary does not know.
+static func effective_alignment(alignment: String, source_closed: bool) -> String:
+	if not source_closed or not alignment in ALIGNMENTS:
+		return ALIGNMENT_CENTERED
+	return alignment
+
+
+## How far the ribbon reaches along the left normal and against it. Centered
+## splits the width; a one-sided alignment gives it all to one side, so the
+## other reaches nothing and the authored Boundary becomes an edge of the ribbon
+## rather than its middle.
+static func alignment_offsets(width: float, alignment: String, outward_is_left: bool) -> Vector2:
+	if alignment != ALIGNMENT_OUTSIDE and alignment != ALIGNMENT_INSIDE:
+		return Vector2(width * 0.5, width * 0.5)
+	var left_takes_all := outward_is_left == (alignment == ALIGNMENT_OUTSIDE)
+	return Vector2(width, 0.0) if left_takes_all else Vector2(0.0, width)
+
+
+## Which side of the direction of travel faces away from the material.
+##
+## The sign comes from the authored Point order, so a loop drawn clockwise and
+## the same loop drawn counter-clockwise answer differently - which is right,
+## because that is what the drawing says. The left normal is (-dy, dx): along a
+## counter-clockwise loop, a positive signed area, it points into the enclosed
+## area, so outward is the right side. A Hole encloses a void rather than
+## material, so the side its loop calls outward is the one with material on it
+## and the answer flips.
+static func left_is_outward(component: Dictionary, chain: Dictionary) -> bool:
+	var positions: Array[Vector2] = []
+	for point_id_value in chain.get("point_ids", []):
+		var point := BezierTopology.point_by_id(component.get("points", []), str(point_id_value))
+		if not point.is_empty():
+			positions.append(Vector2(point.get("position", Vector2.ZERO)))
+	if positions.size() < 3:
+		return true
+	var area_twice := 0.0
+	for index in range(positions.size()):
+		area_twice += positions[index].cross(positions[(index + 1) % positions.size()])
+	var outward_is_left := area_twice < 0.0
+	if WorldDocumentService.topology_role(chain) == WorldDocumentService.ROLE_HOLE:
+		return not outward_is_left
+	return outward_is_left
 
 
 static func sample_complete_boundary(component: Dictionary) -> Dictionary:
@@ -76,7 +130,7 @@ static func closed_boundary_validation_issues(samples: Array) -> Array[String]:
 	return errors
 
 
-static func generate(component: Dictionary, stroke_width_px := DEFAULT_STROKE_WIDTH_PX) -> Dictionary:
+static func generate(component: Dictionary, stroke_width_px := DEFAULT_STROKE_WIDTH_PX, alignment := ALIGNMENT_CENTERED) -> Dictionary:
 	var errors := validation_issues(component, stroke_width_px)
 	if not errors.is_empty():
 		return _failed_result(errors, stroke_width_px)
@@ -89,6 +143,12 @@ static func generate(component: Dictionary, stroke_width_px := DEFAULT_STROKE_WI
 		return _failed_result(sampled.get("errors", []), stroke_width_px)
 	var width_meters := stroke_width_meters(stroke_width_px)
 	var width_tool_units := width_meters / ToolUnits.TO_METERS
+	# The side is decided once for the whole Chain, from the Chain, not per run:
+	# a hidden Edge splits the ribbon into open runs but does not change which
+	# side of the shape has material on it.
+	var resolved_alignment := effective_alignment(alignment, source_closed)
+	var outward_is_left := left_is_outward(working_component, chain) if source_closed else true
+	var offsets := alignment_offsets(width_tool_units, resolved_alignment, outward_is_left)
 	var vertices: Array = []
 	var indices := PackedInt32Array()
 	var output_runs: Array = []
@@ -101,7 +161,7 @@ static func generate(component: Dictionary, stroke_width_px := DEFAULT_STROKE_WI
 	var minimum_nonadjacent_clearance := INF
 	for run_data in sampled.get("runs", []):
 		var run_centerline: Array = run_data.get("samples", [])
-		var mesh := _build_stroke_mesh(run_centerline, width_tool_units * 0.5, bool(run_data.get("closed", false)))
+		var mesh := _build_stroke_mesh(run_centerline, offsets.x, offsets.y, bool(run_data.get("closed", false)))
 		if not bool(mesh.get("valid", false)):
 			return _failed_result(mesh.get("errors", []), stroke_width_px)
 		var vertex_offset := vertices.size()
@@ -147,7 +207,9 @@ static func generate(component: Dictionary, stroke_width_px := DEFAULT_STROKE_WI
 		"stroke_width_px": stroke_width_px,
 		"stroke_width_meters": width_meters,
 		"stroke_width_tool_units": width_tool_units,
-		"centerline_offset_meters": width_meters * 0.5,
+		"alignment": resolved_alignment,
+		"outer_offset_meters": (offsets.x if outward_is_left else offsets.y) * ToolUnits.TO_METERS,
+		"inner_offset_meters": (offsets.y if outward_is_left else offsets.x) * ToolUnits.TO_METERS,
 		"sampling_max_deviation_px": MAX_DEVIATION_PX,
 		"sampling_max_deviation_meters": MAX_DEVIATION_PX / REFERENCE_PIXELS_PER_METER,
 		"certified_max_deviation_meters": float(sampled.get("certified_max_deviation_tool_units", 0.0)) * ToolUnits.TO_METERS,
@@ -330,13 +392,19 @@ static func _centerline_sample(position: Vector2, edge_id: String, curve_t: floa
 	}
 
 
-static func _build_stroke_mesh(centerline: Array, half_width: float, closed: bool) -> Dictionary:
+## `left_offset` and `right_offset` are how far the ribbon reaches along the
+## left normal and against it. Centered passes the same value twice; a one-sided
+## alignment passes the full width and zero, and the zero side then coincides
+## with the authored Boundary.
+static func _build_stroke_mesh(centerline: Array, left_offset: float, right_offset: float, closed: bool) -> Dictionary:
 	var vertices: Array = []
 	var indices := PackedInt32Array()
 	var minimum_samples := 3 if closed else 2
 	if centerline.size() < minimum_samples:
 		return {"valid": false, "errors": ["Contour stroke run contains too few centerline samples."]}
-	var analysis := _analyze_centerline(centerline, half_width, closed)
+	# The clearance analysis is about the total width the ribbon occupies, which
+	# an alignment moves but does not change.
+	var analysis := _analyze_centerline(centerline, (left_offset + right_offset) * 0.5, closed)
 	if not bool(analysis.get("valid", false)):
 		return {"valid": false, "errors": analysis.get("errors", [])}
 	var segment_count := centerline.size() if closed else centerline.size() - 1
@@ -362,10 +430,10 @@ static func _build_stroke_mesh(centerline: Array, half_width: float, closed: boo
 		var end := Vector2(end_sample.get("position", Vector2.ZERO))
 		var normal := normals[segment_index]
 		var base := vertices.size()
-		vertices.append(_mesh_vertex(start + normal * half_width, "segment_left", start_sample))
-		vertices.append(_mesh_vertex(start - normal * half_width, "segment_right", start_sample))
-		vertices.append(_mesh_vertex(end + normal * half_width, "segment_left", end_sample))
-		vertices.append(_mesh_vertex(end - normal * half_width, "segment_right", end_sample))
+		vertices.append(_mesh_vertex(start + normal * left_offset, "segment_left", start_sample))
+		vertices.append(_mesh_vertex(start - normal * right_offset, "segment_right", start_sample))
+		vertices.append(_mesh_vertex(end + normal * left_offset, "segment_left", end_sample))
+		vertices.append(_mesh_vertex(end - normal * right_offset, "segment_right", end_sample))
 		_append_triangle(vertices, indices, base, base + 1, base + 2)
 		_append_triangle(vertices, indices, base + 2, base + 1, base + 3)
 	var miter_join_count := 0
@@ -383,15 +451,22 @@ static func _build_stroke_mesh(centerline: Array, half_width: float, closed: boo
 		# A positive turn bends toward the left normal, therefore its exposed
 		# outer corner is on the right. The inverse applies to a negative turn.
 		var outer_sign := -1.0 if turn > 0.0 else 1.0
-		var outer_previous := position + normals[previous_index] * half_width * outer_sign
-		var outer_next := position + normals[join_index] * half_width * outer_sign
+		# The corner is filled with the reach the ribbon actually has on that
+		# side. Where an alignment leaves that side at zero the two segments
+		# already meet on the Boundary: there is no gap, and emitting the wedge
+		# anyway would be a degenerate triangle the mesh validation rejects.
+		var corner_offset := left_offset if outer_sign > 0.0 else right_offset
+		if corner_offset <= GEOMETRY_EPSILON:
+			continue
+		var outer_previous := position + normals[previous_index] * corner_offset * outer_sign
+		var outer_next := position + normals[join_index] * corner_offset * outer_sign
 		var intersection := _line_intersection(outer_previous, previous_direction, outer_next, next_direction)
 		var turn_angle := absf(previous_direction.angle_to(next_direction))
 		var interior_angle := PI - turn_angle
 		var angle_allows_miter := interior_angle + GEOMETRY_EPSILON >= deg_to_rad(MIN_MITER_INTERIOR_ANGLE_DEGREES)
 		var use_miter := angle_allows_miter \
 			and bool(intersection.get("valid", false)) \
-			and position.distance_to(Vector2(intersection.get("position", position))) <= half_width * MITER_LIMIT + GEOMETRY_EPSILON
+			and position.distance_to(Vector2(intersection.get("position", position))) <= corner_offset * MITER_LIMIT + GEOMETRY_EPSILON
 		var base := vertices.size()
 		var provenance: Dictionary = centerline[join_index]
 		vertices.append(_mesh_vertex(position, "join_center", provenance))

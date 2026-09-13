@@ -1,8 +1,9 @@
 # Authored Contour Stroke
 
-PolyTools treats the final authored Bezier boundary as the exact centerline of
-the visible art contour. A contour is derived geometry and never replaces or
-mutates Component `points`, `edges`, or `chains`.
+PolyTools treats the final authored Bezier boundary as the geometric reference
+of the visible art contour, and by default as its exact centerline. A contour is
+derived geometry and never replaces or mutates Component `points`, `edges`, or
+`chains`.
 
 ## Slices 1–5: geometry and World-authored width
 
@@ -53,6 +54,7 @@ The fixed technical semantics are:
 - authored reference density: `192 px/m`;
 - new-World default width: `4 px` = `0.03125 m`;
 - centered offset: `stroke_width_px / 192 / 2` meters on each side;
+- one-sided offset: the full `stroke_width_px / 192` meters on one side and nothing on the other;
 - adaptive Bezier sampling deviation: at most `0.25 px`;
 - joins: miter only at interior angles of at least `75°` and with limit `4.0`, then bevel;
 - caps: butt (an uninterrupted closed loop has no cap).
@@ -94,3 +96,40 @@ symmetric offset metadata. UV/SDF/Carrier data is not part of that contract.
 Schema 39 and older Ribbons
 migrate explicitly to open Contours; their legacy strip Bakes never qualify as
 current Contour Stroke Bakes.
+
+## Stroke alignment
+
+A Component may place the width on one side of its Boundary instead of across
+it, through the optional `contour_stroke_alignment`: `inside`, `centered`, or
+`outside`. Centered is the default and the absence of a decision, so an
+existing World keeps exactly the geometry it had. There is no World-level
+alignment; unlike the width, it is authored per Component.
+
+Which side is which comes from the drawing, not from a convention. The signed
+area of the authored Point order gives the loop its winding, and the left normal
+`(-dy, dx)` points into the enclosed area along a counter-clockwise loop, so the
+same shape drawn the other way round answers with the same two sides. A Hole
+encloses a void rather than material, so the side its loop calls outward is the
+one with material on it and the two swap; a Primitive follows its own topology
+role the same way. The side is decided once per Chain rather than per visible
+run: a hidden Edge splits the ribbon into open runs but does not change which
+side of the shape has material on it.
+
+An open Contour encloses nothing, so inside and outside have no meaning there.
+It stays centered whatever is authored, reports itself as centered, and derives
+the identical mesh either way. The Inspector keeps the control visible on an
+open Contour and disables it, so the reason is readable rather than guessed at.
+
+Two consequences are worth knowing before choosing a one-sided alignment. The
+authored Boundary is then an edge of the ribbon rather than its middle, which is
+what the exported `inner_offset_meters` and `outer_offset_meters` report; the
+`centerline` field still names the Boundary, because that is what the geometry
+is derived from. And the tessellator lets consecutive segment quads overlap on
+the inner side rather than trimming them, which a centered stroke hides within
+half a width: pushed fully to one side the overlap reaches a full width, so a
+concavity tighter than the full stroke width renders as a filled corner rather
+than a clean ribbon. A centered stroke of width `w` tolerates a curvature radius
+down to `w/2`; a one-sided one needs `w`. The joins themselves stay exact — the
+corner wedge is filled with the reach the ribbon has on that side, and where an
+alignment leaves that side at zero the segments already meet on the Boundary and
+no wedge is emitted.

@@ -25,6 +25,7 @@ signal asset_scales_rebase_requested()
 signal circle_primitive_diameter_changed(value: float)
 signal component_catch_parent_selected(index: int, option: OptionButton)
 signal component_contour_stroke_width_changed(value: float)
+signal component_contour_stroke_alignment_selected(index: int, option: OptionButton)
 signal component_debug_point_numbers_toggled(enabled: bool)
 signal component_hierarchy_parent_selected(index: int, option: OptionButton)
 signal component_projection_depth_changed(value: float)
@@ -85,6 +86,8 @@ const SCALE_ARROW_STEP := 0.1
 const POSITION_STEP := 0.0001
 const REFERENCE_IMAGE_ROTATION_TOOLTIP := "Turns the Reference Image around the Asset Pivot. Authoring aid only; it never reaches geometry or Runtime Export."
 const CONTOUR_STROKE_WIDTH_OVERRIDE_TOOLTIP := "Overrides every Contour part of the referenced source Asset without changing that Asset."
+const CONTOUR_STROKE_ALIGNMENT_TOOLTIP := "Where the Stroke width sits on the authored Boundary. Centered splits it to both sides; Inside and Outside put all of it on the material side or away from it."
+const CONTOUR_STROKE_ALIGNMENT_OPEN_TOOLTIP := "An open Contour encloses nothing, so it has no inside. Its Stroke stays centered on the authored Boundary."
 const PROJECTION_DEPTH_TOOLTIP := "Visible component depth used by runtime presentation; independent of Scale, Z Order, and Contour Stroke Width."
 const Z_ORDER_TOOLTIP := "Orders Components only inside this Asset; Runtime consumers choose the Asset's contextual game layer."
 
@@ -615,6 +618,21 @@ func rebuild() -> void:
 		"min": 0.1, "max": 1024.0, "step": 0.1, "font_size": 11,
 		"tooltip": CONTOUR_STROKE_WIDTH_OVERRIDE_TOOLTIP if WorldDocumentService.is_reference_component(component) else "",
 	}, component_contour_stroke_width_changed.emit)
+	# Inside and outside need an enclosed side to point at, and an open Contour
+	# has none. The control stays visible there rather than vanishing, so the
+	# reason it cannot be used is readable instead of guessed at.
+	var stroke_chains: Array = component.get("chains", [])
+	var stroke_encloses := WorldDocumentService.is_primitive(component) \
+		or (stroke_chains.size() == 1 and bool(stroke_chains[0].get("closed", false)))
+	add_child(EditorWidgets.create_inspector_field_label("Contour Stroke Alignment"))
+	var alignment_option := EditorWidgets.create_option_field([
+		{"label": "Inside", "metadata": ContourStrokeService.ALIGNMENT_INSIDE},
+		{"label": "Centered", "metadata": ContourStrokeService.ALIGNMENT_CENTERED},
+		{"label": "Outside", "metadata": ContourStrokeService.ALIGNMENT_OUTSIDE},
+	], WorldDocumentService.contour_stroke_alignment(component), component_contour_stroke_alignment_selected.emit)
+	alignment_option.disabled = not stroke_encloses
+	alignment_option.tooltip_text = CONTOUR_STROKE_ALIGNMENT_TOOLTIP if stroke_encloses else CONTOUR_STROKE_ALIGNMENT_OPEN_TOOLTIP
+	add_child(alignment_option)
 	EditorWidgets.add_stacked_number_field(self, {
 		"caption": "Projection Depth (cm)", "value": WorldDocumentService.projection_depth_cm(component),
 		"min": 0.0, "max": 1000.0, "step": 0.1, "font_size": 11,

@@ -69,7 +69,8 @@ fingerprints.
 | 70 | `previous_asset_keys` on the Asset, appended by every rename | additive (missing list reads empty) | `normalized_previous_asset_keys` | `_test_create_inspector_fields`, `_test_asset_deserialization_migrations` |
 | 71 | Reference Image `rotation` around the Asset Pivot | additive (missing angle reads as none) | `normalize_reference_rotation`, `normalize_reference_image` | `_test_asset_deserialization_migrations`, `_test_inspector_field_wiring` |
 | 72 | Analytic Rectangles and Triangles | additive | `PrimitiveGeometryService`, `WorldDocumentService.serialize_primitive` / `deserialize_primitive` | `_test_asset_deserialization_migrations`, `_test_triangle_primitive_geometry` |
-| Manifest 21, Catalog 3 | `asset_id` on every Manifest and Catalog entry, `source_asset_id` on every Reference, `previous_keys` per entry, `retired_assets` on the Catalog | derived | `RuntimeExportService`, `AssetCatalogService` | `_test_runtime_export_service`, `_test_asset_catalog_service` |
+| 73 | `contour_stroke_alignment` on a Component | additive (missing reads as `centered`) | `WorldDocumentService.contour_stroke_alignment`, `ContourStrokeService` | `_test_contour_stroke_alignment` |
+| Manifest 22, Catalog 3 | `asset_id` on every Manifest and Catalog entry, `source_asset_id` on every Reference, `previous_keys` per entry, `retired_assets` on the Catalog | derived | `RuntimeExportService`, `AssetCatalogService` | `_test_runtime_export_service`, `_test_asset_catalog_service` |
 | Sampling 6 | Junction-aware Cuts, boundary-namespaced analytic Samples, corner balancing | derived | `GeometrySamplingService` | `_test_geometry_sampling_corner_balancing` |
 | Motion 1–18 | Blink `anticipation_share` default 0.18 read as 0.5 | **explicit** (≤ 18) | `normalize_motion_act` | `_test_asset_deserialization_migrations` |
 
@@ -403,7 +404,7 @@ Deleting an Asset leaves the References that point at it alone. They read as
 missing in the Outliner and Runtime Export refuses them; removing them quietly
 would hide the deletion in exactly the documents that describe it.
 
-Schema 70 and the pair Manifest 21 / Catalog 3 publish identity. Until then an
+Schema 70 and the pair Manifest 22 / Catalog 3 publish identity. Until then an
 Asset was known at the boundary by `asset_key`, which is derived from the
 display name, so identity changed whenever a label changed and every consumer
 that had written a Key down broke. The Key stays exactly as it was — readable,
@@ -459,3 +460,5 @@ consume incompatible constraint identities.
 Motion Act documents at schema 1 through 18 wrote a Blink `anticipation_share`
 default of `0.18`; that exact value is read as the later default `0.5`, while
 any other authored value is kept.
+
+Schema 73 adds the optional `contour_stroke_alignment` on a Component: `"inside"`, `"centered"`, or `"outside"`. It decides where the Contour Stroke width sits relative to the authored Boundary, and unlike the width it has no World value behind it — the alignment is a per-Component decision. Centered is the absence of one: it is what every Boundary meant before the setting existed, it is what a missing or unknown value reads as, and choosing it again erases the key, so a Component that never had one and a Component set back to centered are the same document. Only a closed Chain encloses a side, so an open Contour stays centered whatever is stored and a Primitive follows its own topology role. Manifest 22 carries the choice as `alignment` beside real `inner_offset_meters` and `outer_offset_meters`, and the stroke role loses the word `centered` it can no longer promise. An authored alignment changes the Contour Stroke fingerprint, so existing Bakes go stale rather than staying silently wrong.

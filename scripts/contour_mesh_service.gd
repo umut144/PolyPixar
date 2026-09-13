@@ -40,7 +40,9 @@ static func generate(component: Dictionary, stroke_width_px := ContourStrokeServ
 		closed_region = ClosedRegionMeshService.generate(component)
 		if not bool(closed_region.get("valid", false)):
 			return _failed_result(fingerprint, closed_region.get("errors", []))
-	var stroke := ContourStrokeService.generate(stroke_source, stroke_width_px)
+	# The alignment is read from the authored Component, never from the Primitive
+	# proxy, which only stands in for its sampled outline.
+	var stroke := ContourStrokeService.generate(stroke_source, stroke_width_px, WorldDocumentService.contour_stroke_alignment(component))
 	if not bool(stroke.get("valid", false)):
 		return _failed_result(fingerprint, stroke.get("errors", []))
 	var vertices: Array = []
@@ -121,12 +123,13 @@ static func _primitive_stroke_source(component: Dictionary) -> Dictionary:
 		edges.append({"id": edge_id, "start_point_id": point_id, "end_point_id": "", "render_outline": true})
 	for index in range(edges.size()):
 		edges[index]["end_point_id"] = point_ids[(index + 1) % point_ids.size()]
+	var primitive_role := WorldDocumentService.topology_role(component)
 	return {"valid": true, "errors": [], "component": {
 		"draw_mode": WorldDocumentService.DRAW_MODE_CLOSED_LOOP,
-		"topology_role": WorldDocumentService.ROLE_OUTER,
+		"topology_role": primitive_role,
 		"points": points,
 		"edges": edges,
-		"chains": [{"id": "primitive:%s" % primitive_type, "point_ids": point_ids, "edge_ids": edge_ids, "closed": true, "topology_role": WorldDocumentService.ROLE_OUTER}]
+		"chains": [{"id": "primitive:%s" % primitive_type, "point_ids": point_ids, "edge_ids": edge_ids, "closed": true, "topology_role": primitive_role}]
 	}}
 
 
@@ -164,11 +167,12 @@ static func source_fingerprint(component: Dictionary, stroke_width_px := Contour
 			outline_parts.append("%s:%d" % [str(edge.get("id", "")), int(bool(edge.get("render_outline", true)))])
 	var context := HashingContext.new()
 	context.start(HashingContext.HASH_SHA256)
-	var fingerprint_text := "%s\ncontour_mesh|%d|stroke|%d|width_px|%.9f|outline|%s" % [
+	var fingerprint_text := "%s\ncontour_mesh|%d|stroke|%d|width_px|%.9f|alignment|%s|outline|%s" % [
 		GeometrySamplingService.source_fingerprint(component),
 		ALGORITHM_VERSION,
 		ContourStrokeService.ALGORITHM_VERSION,
 		stroke_width_px,
+		WorldDocumentService.contour_stroke_alignment(component),
 		",".join(outline_parts)
 	]
 	var chains: Array = component.get("chains", [])

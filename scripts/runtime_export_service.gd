@@ -1,7 +1,7 @@
 class_name RuntimeExportService
 extends RefCounted
 
-const MANIFEST_SCHEMA_VERSION := 21
+const MANIFEST_SCHEMA_VERSION := 22
 const DEFAULT_PROJECTION_DEPTH_CM := 10.0
 static func build_manifest(asset: Dictionary, sources: Dictionary, palette_variants: Array = []) -> Dictionary:
 	if WorldDocumentService.is_palette_asset(asset):
@@ -428,6 +428,7 @@ static func _build_component_v8(component: Dictionary, source: Dictionary, expor
 	var parent_component_id: Variant = null
 	if not str(component.get("parent_component_id", "")).is_empty():
 		parent_component_id = str(component.get("parent_component_id", ""))
+	var stroke_alignment := str(stroke.get("alignment", ContourStrokeService.ALIGNMENT_CENTERED))
 	var runtime_component := {
 		"component_id": str(component.get("id", "")),
 		"name": str(component.get("name", "")).strip_edges(),
@@ -438,7 +439,11 @@ static func _build_component_v8(component: Dictionary, source: Dictionary, expor
 		"component_pivot": _meters(component_pivot),
 		"local_transform": {"position": _meters(position), "rotation_radians": deg_to_rad(rotation), "scale": [scale.x, scale.y]},
 		"contour_stroke_mesh": {
-			"role": "centered_boundary_stroke",
+			# The Boundary stays the centerline of record whatever the alignment
+			# does; the two offsets say where the width actually went, and a
+			# centered Stroke still reports half of it on each side.
+			"role": "boundary_stroke",
+			"alignment": stroke_alignment,
 			"has_outline": stroke_has_outline,
 			"vertices": stroke_mesh.get("vertices", []),
 			"indices": stroke_mesh.get("indices", []),
@@ -446,8 +451,8 @@ static func _build_component_v8(component: Dictionary, source: Dictionary, expor
 			"stroke_width_px": width_px,
 			"stroke_width_meters": width_meters,
 			"centerline": "original_authored_boundary",
-			"inner_offset_meters": width_meters * 0.5,
-			"outer_offset_meters": width_meters * 0.5,
+			"inner_offset_meters": float(stroke.get("inner_offset_meters", width_meters * 0.5)),
+			"outer_offset_meters": float(stroke.get("outer_offset_meters", width_meters * 0.5)),
 			"join": {"type": ContourStrokeService.JOIN_TYPE, "miter_limit": ContourStrokeService.MITER_LIMIT, "fallback": "bevel"},
 			"cap": ContourStrokeService.CAP_TYPE,
 			"topology_role": str(stroke.get("topology_role", WorldDocumentService.topology_role(component))),

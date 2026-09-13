@@ -4,7 +4,7 @@
 runtime Manifest schema `21`.
 
 This document is the sole field-level contract for PolyTools Runtime packages.
-Manifest schema 21 replaces schema 20 and Catalog schema 3 replaces schema 2.
+Manifest schema 22 replaces schema 21 and Catalog schema 3 replaces schema 2.
 Consumers must reject older schemas; there is no SDF/Carrier/UV compatibility
 fallback.
 
@@ -109,7 +109,7 @@ Every Manifest except a Palette requires:
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `schema_version` | integer | Exactly `21`. |
+| `schema_version` | integer | Exactly `22`. |
 | `asset_key` | non-empty lower-snake-case string | Readable handle; follows the display name. |
 | `asset_id` | non-empty opaque string | Stable identity; never reused, not even after deletion. |
 | `display_name` | string | Informational authored name. |
@@ -276,22 +276,27 @@ the Fill Mesh and requires:
 
 | Field | Type / exact value |
 | --- | --- |
-| `role` | `"centered_boundary_stroke"` |
+| `role` | `"boundary_stroke"` |
+| `alignment` | `"centered"`, `"inside"`, or `"outside"` |
 | `has_outline` | boolean |
 | `vertices`, `indices` | indexed Mesh arrays |
 | `reference_pixels_per_meter` | `192.0` |
 | `stroke_width_px` | finite positive effective authored value (Component override or World default) |
 | `stroke_width_meters` | `stroke_width_px / 192` |
 | `centerline` | `"original_authored_boundary"` |
-| `inner_offset_meters` | `stroke_width_meters / 2` |
-| `outer_offset_meters` | `stroke_width_meters / 2` |
+| `inner_offset_meters` | how far the Stroke reaches toward the material side |
+| `outer_offset_meters` | how far it reaches away from it |
 | `join` | `{ "type":"miter", "miter_limit":4.0, "fallback":"bevel" }` |
 | `cap` | `"butt"` |
 | `topology_role` | `"outer"` or `"hole"` |
 | `runs` | ordered visible Boundary runs |
 
-The original PolyTools Boundary is the geometric centerline. The stroke is not
-a scaled polygon and is never clipped by `mesh`. Each run requires `run_id`,
+The original PolyTools Boundary is the geometric centerline of record whatever
+the alignment does; the two offsets say where the width actually went. A
+`centered` Stroke reports half the width on each side, `inside` the full width
+as the inner offset and zero as the outer, and `outside` the reverse. Only a
+closed Boundary encloses a side to point at, so an open Contour always exports
+`centered`. The stroke is not a scaled polygon and is never clipped by `mesh`. Each run requires `run_id`,
 ordered `edge_ids`, `closed`, `start_cap`, `end_cap`, and non-negative
 `vertex_offset`, `vertex_count`, `index_offset`, and `index_count` ranges into
 the combined stroke arrays. Closed uninterrupted runs use `none` caps; every
@@ -380,7 +385,7 @@ of them is an Asset of the Palette's own `asset_type`:
 
 ```json
 {
-  "schema_version": 21,
+  "schema_version": 22,
   "asset_key": "grass",
   "display_name": "Grass",
   "asset_type": "terrain",

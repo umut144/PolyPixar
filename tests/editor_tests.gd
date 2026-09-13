@@ -2081,6 +2081,7 @@ const CREATE_SIGNAL_ROUTES := [
 	["asset_type_selected", "_on_asset_type_selected"],
 	["circle_primitive_diameter_changed", "_on_circle_primitive_diameter_changed"],
 	["component_catch_parent_selected", "_on_component_catch_parent_selected"],
+	["component_contour_stroke_alignment_selected", "_on_component_contour_stroke_alignment_selected"],
 	["component_contour_stroke_width_changed", "_on_component_contour_stroke_width_changed"],
 	["component_debug_point_numbers_toggled", "_on_component_debug_point_numbers_toggled"],
 	["component_hierarchy_parent_selected", "_on_component_hierarchy_parent_selected"],
