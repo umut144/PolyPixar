@@ -136,11 +136,11 @@ static func can_parent(asset: Dictionary, component_id: String, candidate_parent
 	if component.is_empty():
 		return false
 	if candidate_parent_id.is_empty():
-		return not _is_constraint_only_hole(component)
+		return not _is_hole_component(component)
 	var candidate_parent := component_by_id(asset, candidate_parent_id)
-	if component_id == candidate_parent_id or candidate_parent.is_empty() or _is_constraint_only_hole(candidate_parent):
+	if component_id == candidate_parent_id or candidate_parent.is_empty() or _is_hole_component(candidate_parent):
 		return false
-	if _is_constraint_only_hole(component) and not WorldDocumentService.is_outer_body(candidate_parent):
+	if _is_hole_component(component) and not WorldDocumentService.is_outer_body(candidate_parent):
 		return false
 	var cursor := candidate_parent_id
 	var visited: Dictionary = {}
@@ -152,7 +152,7 @@ static func can_parent(asset: Dictionary, component_id: String, candidate_parent
 	return true
 
 
-static func _is_constraint_only_hole(component: Dictionary) -> bool:
+static func _is_hole_component(component: Dictionary) -> bool:
 	return str(component.get("type", "component")) not in ["reference", "region"] \
 		and WorldDocumentService.topology_role(component) == WorldDocumentService.ROLE_HOLE
 

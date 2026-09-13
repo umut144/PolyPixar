@@ -2242,7 +2242,7 @@ func _update_context_action_button() -> void:
 	create_action_button.visible = (active_module == "Create" and active_create_submodule in CREATE_SUBMODULES) or (active_module == "Style" and active_style_submodule == "Weighting")
 	var selected_component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	create_action_button.disabled = active_module == "Style" and active_style_submodule == "Weighting" \
-		and (selected_component_id.is_empty() or _is_constraint_only_hole(selected_component))
+		and (selected_component_id.is_empty() or _is_hole_component(selected_component))
 	var show_asset_create_controls := active_module == "Create" and active_create_submodule in CREATE_SUBMODULES
 	if is_instance_valid(snap_button):
 		snap_button.visible = show_asset_create_controls
@@ -4048,7 +4048,7 @@ func _geometry_asset_mesh_overview(asset_id: String) -> Dictionary:
 	var mesh_component_count := 0
 	var asset_is_visible := bool(asset.get("visibility", true))
 	for component in asset.get("components", []):
-		if not component is Dictionary or str(component.get("type", "component")) in ["guide", "region"] or _is_reference_component(component) or _is_constraint_only_hole(component):
+		if not component is Dictionary or str(component.get("type", "component")) in ["guide", "region"] or _is_reference_component(component):
 			continue
 		if not asset_is_visible or not _effective_component_visibility(asset, component):
 			continue
@@ -4150,15 +4150,15 @@ func _component_mesh_source_validation_issues(asset: Dictionary, component: Dict
 		return ["Reference Components use their source Asset Meshes."]
 	if _is_region(component):
 		return ["Semantic Regions do not enter the visual Mesh pipeline."]
-	if _is_constraint_only_hole(component):
-		return ["Hole Components are constraints of their direct Parent and do not own a Mesh."]
 	var draw_mode := WorldDocumentService.component_draw_mode(component)
 	var stroke_width_px := _effective_contour_stroke_width_px(component)
-	if draw_mode == WorldDocumentService.DRAW_MODE_CONTOUR:
-		var contour_issues: Array[String] = []
+	# A Hole owns the edge it cut and nothing else, so it is validated as the
+	# stroke source it is rather than turned away for owning no Fill.
+	if WorldDocumentService.is_stroke_only(component):
+		var stroke_issues: Array[String] = []
 		for issue in ContourMeshService.validation_issues(component, stroke_width_px):
-			contour_issues.append(str(issue))
-		return contour_issues
+			stroke_issues.append(str(issue))
+		return stroke_issues
 	if draw_mode not in [WorldDocumentService.DRAW_MODE_CLOSED_LOOP, WorldDocumentService.DRAW_MODE_PRIMITIVE]:
 		return ["Draw Mode '%s' cannot be meshed." % draw_mode]
 	var component_id := str(component.get("id", ""))
@@ -4176,7 +4176,7 @@ func _component_mesh_source_validation_issues(asset: Dictionary, component: Dict
 
 func _component_mesh_needs_update(asset_id: String, component: Dictionary) -> bool:
 	var asset := _get_asset(asset_id)
-	if asset.is_empty() or not bool(asset.get("visibility", true)) or not _effective_component_visibility(asset, component) or _is_constraint_only_hole(component):
+	if asset.is_empty() or not bool(asset.get("visibility", true)) or not _effective_component_visibility(asset, component):
 		return false
 	if not _component_is_meshable_source(asset, component):
 		return false
@@ -4314,10 +4314,11 @@ func _mesh_batch_summary(candidates: Array[Dictionary]) -> Dictionary:
 		for component in asset.get("components", []):
 			if not component is Dictionary or not _effective_component_visibility(asset, component) or _is_reference_component(component) or _is_region(component):
 				continue
-			if _is_constraint_only_hole(component):
-				var hole_issue := WorldDocumentService.constraint_hole_parent_validation_issue(asset, component)
-				if not hole_issue.is_empty():
-					attention.append("%s / %s — %s" % [str(asset.get("name", "Asset")), str(component.get("name", "Component")), hole_issue])
+			# A Hole answers for the cut it makes on its Parent as well as for the
+			# Stroke it owns, and the broken cut is the more urgent of the two.
+			var hole_issue := WorldDocumentService.constraint_hole_parent_validation_issue(asset, component) if _is_hole_component(component) else ""
+			if not hole_issue.is_empty():
+				attention.append("%s / %s — %s" % [str(asset.get("name", "Asset")), str(component.get("name", "Component")), hole_issue])
 				continue
 			var issues := _component_mesh_source_validation_issues(asset, component)
 			var error_message := str(_component_mesh_reference(asset_id, str(component.get("id", ""))).get("last_error", ""))
@@ -4336,7 +4337,7 @@ func _generate_component_mesh_build(asset_id: String, component_id: String) -> D
 	var component := _get_component(asset, component_id)
 	if not _component_is_meshable_source(asset, component):
 		return {"valid": false, "errors": ["Component source is not meshable."]}
-	if WorldDocumentService.is_contour(component):
+	if WorldDocumentService.is_stroke_only(component):
 		var contour_mesh := ContourMeshService.generate(component, _effective_contour_stroke_width_px(component))
 		if bool(contour_mesh.get("valid", false)):
 			contour_mesh["bake_id"] = "meshing_bake_%d" % ResourceUID.create_id()
@@ -4639,7 +4640,7 @@ func _runtime_export_build(asset: Dictionary) -> Dictionary:
 	var sources: Dictionary = {}
 	var asset_id := str(asset.get("id", ""))
 	for component in asset.get("components", []):
-		if not component is Dictionary or not bool(component.get("visibility", true)) or _is_region(component) or _is_constraint_only_hole(component):
+		if not component is Dictionary or not bool(component.get("visibility", true)) or _is_region(component):
 			continue
 		var component_id := str(component.get("id", ""))
 		if _is_reference_component(component):
@@ -4833,7 +4834,7 @@ func _weighting_status(asset_id: String, component_id: String, component: Dictio
 
 func _create_weighting_style(asset_id: String, component_id: String) -> void:
 	var component := _get_component(_get_asset(asset_id), component_id)
-	if component.is_empty() or _is_constraint_only_hole(component):
+	if component.is_empty() or _is_hole_component(component):
 		_show_status_message("Select a Component before creating a Weighting Style.")
 		return
 	_record_direct_change()
@@ -4881,7 +4882,7 @@ func _refresh_weighting_workspace() -> void:
 	if not is_instance_valid(weighting_workspace):
 		return
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	if component.is_empty() or _is_constraint_only_hole(component):
+	if component.is_empty() or _is_hole_component(component):
 		weighting_workspace.clear_context()
 		return
 	var style := _weighting_style(selected_asset_id, selected_component_id, selected_weighting_style_id)
@@ -7363,7 +7364,11 @@ func _append_geometry_asset_rows(rows: Array, asset: Dictionary, force_expand: b
 			guides.append(component)
 		elif _is_region(component):
 			continue
-		elif _is_reference_component(component) or _is_constraint_only_hole(component):
+		elif _is_reference_component(component) or _is_hole_component(component):
+			# The Mesh module is the Fill pipeline's workspace - Sampling,
+			# Seeding, Meshing - and a Hole has none of that. Its Stroke Bake
+			# rides along with Update Meshes like every other one; it just has no
+			# Body row here to hang pipeline steps under.
 			continue
 		else:
 			components.append(component)
@@ -7516,7 +7521,7 @@ func _outliner_row_status() -> Dictionary:
 	for asset in assets:
 		var asset_id := str(asset.get("id", ""))
 		for component in asset.get("components", []):
-			if _is_constraint_only_hole(component):
+			if _is_hole_component(component):
 				continue
 			var component_id := str(component.get("id", ""))
 			var styles: Array = _weighting_styles(asset_id, component_id)
@@ -8532,7 +8537,7 @@ func _open_component_add_menu(asset_id: String, parent_component_id: String, anc
 	var parent := _get_component(_get_asset(asset_id), parent_component_id)
 	if parent.is_empty():
 		return
-	if _is_constraint_only_hole(parent):
+	if _is_hole_component(parent):
 		component_add_menu.hide()
 		_show_status_message("Hole Components cannot own children, Guides, or Regions.")
 		return
@@ -8852,7 +8857,7 @@ func _create_region(asset_id: String, scope_kind: String, scope_id: String, regi
 	var source_component := _get_component(asset, scope_id)
 	if asset.is_empty() or scope_kind != "component" or source_component.is_empty() or _is_region(source_component) or region_type not in REGION_TYPES:
 		return
-	if _is_constraint_only_hole(source_component) \
+	if _is_hole_component(source_component) \
 		or (_is_reference_component(source_component) and WorldDocumentService.topology_role(source_component) == WorldDocumentService.ROLE_HOLE):
 		_show_status_message("Hole Components cannot own Regions.")
 		return
@@ -9179,7 +9184,7 @@ func _paste_component_clipboard(target_asset_id: String, target_parent_id := "")
 		if target_parent.is_empty():
 			_show_status_message("Paste target is no longer available.")
 			return
-		if _is_constraint_only_hole(target_parent):
+		if _is_hole_component(target_parent):
 			_show_status_message("Cannot paste Components beneath a Hole constraint.")
 			return
 	var source_components: Array = component_clipboard.get("components", [])
@@ -9640,7 +9645,7 @@ func _confirm_component_creation() -> void:
 		var parent_component := _get_component(asset, parent_component_id)
 		if parent_component.is_empty():
 			parent_component_id = ""
-		elif _is_constraint_only_hole(parent_component):
+		elif _is_hole_component(parent_component):
 			component_dialog.hide()
 			canvas_view.set_navigation_locked(false)
 			_show_status_message("Cannot create a Component beneath a Hole constraint.")
@@ -10509,7 +10514,7 @@ func _geometry_sampling_hole_components(asset: Dictionary, component_id: String)
 		var reference_world := ComponentHierarchy.world_transform(asset, input_id)
 		var source_boundary_count := 0
 		for source_component in source_asset.get("components", []):
-			if not source_component is Dictionary or _is_reference_component(source_component) or _is_constraint_only_hole(source_component) or not _effective_component_visibility(source_asset, source_component) or WorldDocumentService.component_draw_mode(source_component) not in [WorldDocumentService.DRAW_MODE_CLOSED_LOOP, WorldDocumentService.DRAW_MODE_PRIMITIVE]:
+			if not source_component is Dictionary or _is_reference_component(source_component) or _is_hole_component(source_component) or not _effective_component_visibility(source_asset, source_component) or WorldDocumentService.component_draw_mode(source_component) not in [WorldDocumentService.DRAW_MODE_CLOSED_LOOP, WorldDocumentService.DRAW_MODE_PRIMITIVE]:
 				continue
 			source_boundary_count += 1
 			var hole_id := "%s:%s" % [input_id, str(source_component.get("id", ""))]
@@ -10524,8 +10529,8 @@ func _geometry_sampling_hole_components(asset: Dictionary, component_id: String)
 	return result
 
 
-func _is_constraint_only_hole(component: Variant) -> bool:
-	return component is Dictionary and WorldDocumentService.is_constraint_only_hole(component)
+func _is_hole_component(component: Variant) -> bool:
+	return component is Dictionary and WorldDocumentService.is_hole_component(component)
 
 
 func _geometry_body_accepts_holes(asset: Dictionary, component_id: String) -> bool:
@@ -11165,7 +11170,7 @@ func _weighting_inspector_context() -> Dictionary:
 	# The Weighting Inspector shows one Style of one Component plus the state of
 	# its Mesh and preview; all of that is resolved here.
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	if component.is_empty() or _is_constraint_only_hole(component):
+	if component.is_empty() or _is_hole_component(component):
 		return {}
 	var style := _weighting_style(selected_asset_id, selected_component_id, selected_weighting_style_id)
 	var result: Dictionary = weighting_preview if weighting_preview_key == _weighting_preview_id(selected_asset_id, selected_component_id, selected_weighting_style_id) else style.get("bake", {})
@@ -14255,7 +14260,7 @@ func _select_weighting_asset(asset_id: String) -> void:
 
 
 func _select_weighting_component(asset_id: String, component_id: String) -> void:
-	if _is_constraint_only_hole(_get_component(_get_asset(asset_id), component_id)):
+	if _is_hole_component(_get_component(_get_asset(asset_id), component_id)):
 		return
 	selected_asset_id = asset_id
 	selected_component_id = component_id
@@ -14265,7 +14270,7 @@ func _select_weighting_component(asset_id: String, component_id: String) -> void
 
 
 func _select_weighting_style(asset_id: String, component_id: String, style_id: String) -> void:
-	if _is_constraint_only_hole(_get_component(_get_asset(asset_id), component_id)) \
+	if _is_hole_component(_get_component(_get_asset(asset_id), component_id)) \
 		or _weighting_style(asset_id, component_id, style_id).is_empty():
 		return
 	selected_asset_id = asset_id

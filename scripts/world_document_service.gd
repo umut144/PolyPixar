@@ -1331,9 +1331,22 @@ static func is_reference_component(component: Dictionary) -> bool:
 	return str(component.get("type", "component")) == "reference"
 
 
-static func is_constraint_only_hole(component: Dictionary) -> bool:
+## An ordinary Component that cuts its direct Parent rather than standing on its
+## own. It owns no Fill - the Parent's body is what it takes material out of -
+## but the edge it cuts is drawn, so it owns a Contour Stroke exactly as a
+## Contour does. The two used to be one question under the name
+## `is_constraint_only_hole`, and every caller that meant "owns no Fill" also
+## silently meant "owns nothing at all".
+static func is_hole_component(component: Dictionary) -> bool:
 	return not is_reference_component(component) and not is_region(component) \
 		and topology_role(component) == ROLE_HOLE
+
+
+## A Component drawn as a line rather than a body, owning a Contour Stroke and
+## no Fill. A Contour is one by its Draw Mode; a Hole is one because the Parent
+## it cuts owns the body and the cut edge is all there is left to draw.
+static func is_stroke_only(component: Dictionary) -> bool:
+	return is_contour(component) or is_hole_component(component)
 
 
 # The Component's draw mode, defaulting to a Closed Loop like every reader
@@ -1385,7 +1398,7 @@ static func component_effectively_visible(asset: Dictionary, component: Dictiona
 
 
 static func constraint_hole_parent_validation_issue(asset: Dictionary, component: Dictionary) -> String:
-	if not is_constraint_only_hole(component):
+	if not is_hole_component(component):
 		return ""
 	var parent_id := str(component.get("parent_component_id", ""))
 	if parent_id.is_empty():

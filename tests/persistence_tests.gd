@@ -814,9 +814,17 @@ func _test_runtime_export_service() -> void:
 	var constraint_hole := {"id": "component_hole", "name": "body_hole", "type": "component", "draw_mode": "primitive", "topology_role": "hole", "visibility": true, "parent_component_id": "component_b", "transform": WorldDocumentService.default_component_transform(), "primitive": {"type": "circle", "center": Vector2.ZERO, "diameter_cm": 10.0}, "points": [], "edges": [], "chains": []}
 	var asset_with_constraint_hole: Dictionary = asset.duplicate(true)
 	asset_with_constraint_hole["components"].append(constraint_hole)
-	var constraint_hole_result := RuntimeExportService.build_manifest(asset_with_constraint_hole, {"component_a": source, "component_b": source})
+	# A Hole owns the edge it cut and nothing else, so it exports the shape a
+	# Contour exports: a Stroke and no Fill.
+	var hole_source := {"contour_stroke": contour_stroke}
+	var constraint_hole_result := RuntimeExportService.build_manifest(asset_with_constraint_hole, {"component_a": source, "component_b": source, "component_hole": hole_source})
 	var constraint_hole_components: Array = constraint_hole_result.get("manifest", {}).get("components", [])
-	_expect(bool(constraint_hole_result.get("valid", false)) and constraint_hole_components.size() == 2 and not constraint_hole_components.any(func(entry: Dictionary) -> bool: return str(entry.get("component_id", "")) == "component_hole"), "An ordinary Hole should remain an authoring constraint and export neither Fill nor Contour Stroke geometry.")
+	var exported_hole: Dictionary = {}
+	for entry in constraint_hole_components:
+		if str(entry.get("component_id", "")) == "component_hole":
+			exported_hole = entry
+	_expect(bool(constraint_hole_result.get("valid", false)) and constraint_hole_components.size() == 3 and not exported_hole.is_empty(), "An ordinary Hole should export as its own drawable part rather than disappearing with the body it cuts.")
+	_expect(not exported_hole.has("mesh") and exported_hole.has("contour_stroke_mesh"), "A Hole cuts its Parent's body and owns none itself, so it exports a Contour Stroke and no Fill.")
 	var orphan_hole_asset: Dictionary = asset_with_constraint_hole.duplicate(true)
 	orphan_hole_asset["components"][2]["parent_component_id"] = ""
 	var orphan_hole_result := RuntimeExportService.build_manifest(orphan_hole_asset, {"component_a": source, "component_b": source})
@@ -826,7 +834,7 @@ func _test_runtime_export_service() -> void:
 	var nested_hole_asset: Dictionary = asset_with_constraint_hole.duplicate(true)
 	nested_hole_asset["components"].append(child_of_hole)
 	var nested_hole_result := RuntimeExportService.build_manifest(nested_hole_asset, {"component_a": source, "component_b": source, "component_hole_child": source})
-	_expect(not bool(nested_hole_result.get("valid", true)) and str(nested_hole_result.get("errors", [])).contains("constraint-only Hole") and str(nested_hole_result.get("errors", [])).contains("body_hole"), "A Runtime Component below an ordinary Hole must fail with a tailored hierarchy error that names the Hole.")
+	_expect(not bool(nested_hole_result.get("valid", true)) and str(nested_hole_result.get("errors", [])).contains("is a Hole and cannot own Runtime Components") and str(nested_hole_result.get("errors", [])).contains("body_hole"), "A Runtime Component below an ordinary Hole must fail with a tailored hierarchy error that names the Hole, even now that the Hole itself is exported.")
 	var socket := AssetGuide.create_weapon_frame("guide_socket", AssetGuide.WEAPON_SOCKET_PRIMARY, "component", "component_b")
 	socket["transform"]["position"] = Vector2(3.0, 4.0)
 	var reach_limit := AssetGuide.create_weapon_frame("guide_reach_limit", AssetGuide.REACH_LIMIT_PRIMARY, "component", "component_b")

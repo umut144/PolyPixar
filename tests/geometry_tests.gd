@@ -145,7 +145,9 @@ func _test_geometry_sampling_service() -> void:
 	_expect(application._geometry_sampling_hole_components(direct_hole_asset, "direct_hole").is_empty(), "A constraint-only Hole should not act as a Body or consume nested Hole children.")
 	_expect(bool(direct_hole_mesh.get("valid", false)) and not direct_hole_was_filled, "A direct Primitive Hole should remain empty in its Parent's final constrained Mesh.")
 	_expect(direct_hole_inspector_context.get("boundary_rows", []).size() == 1 and str(direct_hole_inspector_context.get("boundary_rows", [])[0].get("input_id", "")) == "direct_hole" and application.selected_sampling_input_kind == "component", "A direct Primitive Hole should appear as a selectable Sampling boundary with its own density override identity.")
-	_expect(not application._mesh_update_candidates("direct_hole_asset").has("direct_hole") and int(application._geometry_asset_mesh_overview("direct_hole_asset").get("visible_component_count", 0)) == 2, "A direct Hole Component should remain a constraint and never become its own Fill or Stroke Mesh body.")
+	_expect(application._mesh_update_candidates("direct_hole_asset").has("direct_hole") and int(application._geometry_asset_mesh_overview("direct_hole_asset").get("visible_component_count", 0)) == 3, "A Hole owns the Stroke on the edge it cut, so it is a Mesh candidate of its own while still constraining its Parent.")
+	var direct_hole_build: Dictionary = application._generate_component_mesh_build("direct_hole_asset", "direct_hole")
+	_expect(bool(direct_hole_build.get("valid", false)) and direct_hole_build.get("recipes", {}).is_empty() and str(direct_hole_build.get("meshing", {}).get("method", "")) == ContourMeshService.METHOD, "A Hole builds the Stroke a Contour builds and never enters the Fill pipeline.")
 	direct_hole["visibility"] = false
 	_expect(application._geometry_sampling_hole_components(direct_hole_asset, "direct_body").is_empty(), "Hiding a Hole Component should disable its constraint effect on the Parent.")
 	direct_hole["visibility"] = true

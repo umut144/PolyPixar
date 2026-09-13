@@ -1573,7 +1573,7 @@ func _test_asset_guides() -> void:
 	_choose_option(primitive_topology_option, 1)
 	application._render_inspector()
 	_expect(str(pupil_component.get("topology_role", "")) == "hole" and pupil_component.get("chains", []).is_empty(), "Selecting Hole should persist Primitive topology semantics without generating Bezier topology.")
-	_expect(_inspector_toggle(application, "Visible") != null and _inspector_spin(application, "Contour Stroke Width (px)") == null and _inspector_spin(application, "Projection Depth (cm)") == null and _inspector_spin(application, "Z Order (Asset-local)") == null, "An ordinary Hole should expose only its constraint visibility, not visual Body properties.")
+	_expect(_inspector_toggle(application, "Visible") != null and _inspector_spin(application, "Contour Stroke Width (px)") != null and _inspector_option(application, "Inside") != null, "A Hole draws the edge it cut, so it authors that Stroke's width and alignment beside its constraint visibility.")
 	var inspector_controls: Array = []
 	_inspector_controls(application.inspector_content, inspector_controls)
 	var hole_parent_option: OptionButton = null

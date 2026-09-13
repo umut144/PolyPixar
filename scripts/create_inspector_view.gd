@@ -343,7 +343,7 @@ func rebuild() -> void:
 	if component.is_empty():
 		return
 	var inherited_region_geometry := WorldDocumentService.region_uses_component_geometry(component)
-	var constraint_only_hole := WorldDocumentService.is_constraint_only_hole(component)
+	var hole_component := WorldDocumentService.is_hole_component(component)
 	if not inherited_region_geometry and active_state == "edit" and active_edit_mode == "point":
 		var point_ids := valid_point_ids
 		if point_ids.is_empty():
@@ -402,7 +402,7 @@ func rebuild() -> void:
 			var edge_hint := EditorWidgets.create_inspector_field_label("Select an edge to edit it.")
 			edge_hint.add_theme_color_override("font_color", Color("#9aa3b2"))
 			add_child(edge_hint)
-		elif constraint_only_hole:
+		elif hole_component:
 			var hole_edge_hint := EditorWidgets.create_inspector_field_label("Hole boundaries do not render their own outline.")
 			hole_edge_hint.add_theme_color_override("font_color", Color("#9aa3b2"))
 			add_child(hole_edge_hint)
@@ -425,7 +425,7 @@ func rebuild() -> void:
 		if not selected_edge.is_empty():
 			add_child(EditorWidgets.create_inspector_field_label("Edge"))
 			add_child(EditorWidgets.create_inspector_section("Edge Settings", section_toggled.emit))
-			if constraint_only_hole:
+			if hole_component:
 				var hole_edge_hint := EditorWidgets.create_inspector_field_label("Hole boundaries do not render their own outline.")
 				hole_edge_hint.add_theme_color_override("font_color", Color("#9aa3b2"))
 				add_child(hole_edge_hint)
@@ -604,15 +604,16 @@ func rebuild() -> void:
 			{"caption": "Pivot Y (cm)", "property": "pivot_y", "value": ToolUnits.to_centimeters(pivot.y),
 				"step": POSITION_STEP, "silent": false},
 		], transform_value_changed.emit), true)
-	add_child(EditorWidgets.create_inspector_section("Constraint" if constraint_only_hole else "Visibility / Layer", section_toggled.emit))
+	# A Hole is a constraint and, since the edge it cuts is drawn, a layer of its
+	# own: the section now names both rather than only the half it used to be.
+	add_child(EditorWidgets.create_inspector_section("Constraint / Layer" if hole_component else "Visibility / Layer", section_toggled.emit))
 	add_child(EditorWidgets.create_toggle_field(
 		"Visible", bool(component.get("visibility", true)), component_visibility_changed.emit, 11))
-	if constraint_only_hole:
+	if hole_component:
 		var hole_issue := WorldDocumentService.constraint_hole_parent_validation_issue(asset, component)
-		var hole_hint := EditorWidgets.create_inspector_field_label(hole_issue if not hole_issue.is_empty() else "Cuts only its direct Parent · no Fill, Contour Stroke, or Runtime body")
+		var hole_hint := EditorWidgets.create_inspector_field_label(hole_issue if not hole_issue.is_empty() else "Cuts its direct Parent · no Fill of its own, but the cut edge is drawn")
 		hole_hint.add_theme_color_override("font_color", Color("#ef8354") if not hole_issue.is_empty() else Color("#9aa3b2"))
 		add_child(hole_hint)
-		return
 	EditorWidgets.add_stacked_number_field(self, {
 		"caption": "Contour Stroke Width (px)", "value": WorldDocumentService.effective_contour_stroke_width_px(component, world_contour_stroke_width_px),
 		"min": 0.1, "max": 1024.0, "step": 0.1, "font_size": 11,

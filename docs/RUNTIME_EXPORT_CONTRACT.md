@@ -119,7 +119,7 @@ Every Manifest except a Palette requires:
 | `coordinate_system` | object | Exact convention below. |
 | `z_order` | object | Exact convention below. |
 | `asset_pivot` | two floats | Asset anchor in meters. |
-| `components` | array | Sorted outer Components and outer References; every Hole constraint, Component or Reference, is omitted. |
+| `components` | array | Sorted outer Components, outer References, and Hole Components; a Hole Reference is omitted. |
 | `attachment_frames` | array | Oriented Asset-local Weapon attachment frames. |
 | `regions` | array | Optional authored or Component-bound gameplay Regions. |
 
@@ -430,7 +430,15 @@ Only a Reference with the `outer` topology role is published. A Reference
 authored as a Hole is a constraint and nothing else: its boundary has already
 left the parent Component through Sampling and Meshing, so publishing it a
 second time as an Asset Reference would draw the referenced Asset back over
-the hole it cut. Ordinary Hole Components are omitted for the same reason.
+the hole it cut.
+
+An ordinary Hole Component is published, and only its Stroke is. Its boundary
+has likewise already left the parent through Sampling and Meshing, so it
+carries no `mesh` of its own — the same shape a Contour exports — but the edge
+it cut is drawn, at its own authored width and alignment, with its own
+`z_index` and visibility. Nothing may be parented beneath it: a Hole is a cut
+in someone else's body and never a body of its own, and a Runtime Component
+naming one as its Parent fails the export.
 
 An Asset Reference adds `kind: "asset_reference"`, a required
 `source_asset_key` and the required `source_asset_id` of the Asset it

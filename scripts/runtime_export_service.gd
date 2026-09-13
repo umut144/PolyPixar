@@ -42,11 +42,14 @@ static func build_manifest(asset: Dictionary, sources: Dictionary, palette_varia
 		if WorldDocumentService.is_reference_component(raw_component) \
 			and WorldDocumentService.topology_role(raw_component) == WorldDocumentService.ROLE_HOLE:
 			continue
-		if WorldDocumentService.is_constraint_only_hole(raw_component):
+		# A Hole still cuts its Parent's body; what it now also carries is the
+		# Stroke on the edge it cut, so it is exported like a Contour - a
+		# drawable part with no Fill of its own - instead of being left out.
+		if WorldDocumentService.is_hole_component(raw_component):
 			var hole_issue := WorldDocumentService.constraint_hole_parent_validation_issue(asset, raw_component)
 			if not hole_issue.is_empty():
 				errors.append("%s: %s" % [_component_label(raw_component), hole_issue])
-			continue
+				continue
 		var component: Dictionary = raw_component.duplicate(true)
 		component["z_index"] = _effective_z_index(asset, component)
 		var component_id := str(component.get("id", ""))
@@ -69,11 +72,15 @@ static func build_manifest(asset: Dictionary, sources: Dictionary, palette_varia
 	visible_components.sort_custom(_component_less)
 	for component in visible_components:
 		var parent_id := str(component.get("parent_component_id", ""))
-		if not parent_id.is_empty() and not ids.has(parent_id):
-			var omitted_parent: Dictionary = all_components_by_id.get(parent_id, {})
-			if WorldDocumentService.is_constraint_only_hole(omitted_parent):
-				errors.append("%s: Parent '%s' is a constraint-only Hole and cannot own Runtime Components." % [_component_label(component), _component_label(omitted_parent)])
-			else:
+		if not parent_id.is_empty():
+			var parent_component: Dictionary = all_components_by_id.get(parent_id, {})
+			# A Hole is exported now, for the edge it draws, so its Children can
+			# no longer be caught by the Parent simply being absent. It is still
+			# a cut in someone else's body and never a body of its own, and
+			# nothing hangs beneath it.
+			if WorldDocumentService.is_hole_component(parent_component):
+				errors.append("%s: Parent '%s' is a Hole and cannot own Runtime Components." % [_component_label(component), _component_label(parent_component)])
+			elif not ids.has(parent_id):
 				errors.append("%s: parent '%s' is not part of the visible export set." % [_component_label(component), parent_id])
 		var authored_transform = component.get("transform", {})
 		var authored_scale := Vector2.ONE
@@ -400,7 +407,7 @@ static func _build_component_v8(component: Dictionary, source: Dictionary, expor
 	if str(stroke.get("topology_role", WorldDocumentService.topology_role(component))) not in WorldDocumentService.TOPOLOGY_ROLES:
 		errors.append("%s: Contour Stroke topology role must be outer or hole." % label)
 	var fill_mesh := {}
-	if draw_mode != WorldDocumentService.DRAW_MODE_CONTOUR:
+	if not WorldDocumentService.is_stroke_only(component):
 		var mesh = source.get("mesh", {})
 		if not mesh is Dictionary or not bool(mesh.get("valid", false)) or str(mesh.get("method", "")) == ContourMeshService.METHOD:
 			errors.append("%s: a current accepted Fill Mesh is required." % label)
@@ -459,7 +466,7 @@ static func _build_component_v8(component: Dictionary, source: Dictionary, expor
 			"runs": _serialize_stroke_runs(stroke.get("runs", []))
 		}
 	}
-	if draw_mode != WorldDocumentService.DRAW_MODE_CONTOUR:
+	if not WorldDocumentService.is_stroke_only(component):
 		runtime_component["mesh"] = {"vertices": fill_mesh.get("vertices", []), "indices": fill_mesh.get("indices", [])}
 	if requires_closed_region:
 		runtime_component["closed_region_mesh"] = {

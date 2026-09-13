@@ -399,7 +399,7 @@ func _render_weighting_outliner() -> void:
 		var asset_matches := search_text.is_empty() or str(asset.get("name", "")).to_lower().contains(search_text)
 		var component_matches := false
 		for component in asset.get("components", []):
-			if WorldDocumentService.is_constraint_only_hole(component):
+			if WorldDocumentService.is_hole_component(component):
 				continue
 			if str(component.get("name", "")).to_lower().contains(search_text):
 				component_matches = true
@@ -422,7 +422,7 @@ func _render_weighting_outliner() -> void:
 		if not bool(expanded_assets.get(asset_id, false)) and search_text.is_empty():
 			continue
 		for component in asset.get("components", []):
-			if WorldDocumentService.is_constraint_only_hole(component):
+			if WorldDocumentService.is_hole_component(component):
 				continue
 			var component_id := str(component.get("id", ""))
 			var component_row := HBoxContainer.new()
@@ -780,7 +780,7 @@ func _render_component_outliner_tree(container: VBoxContainer, asset: Dictionary
 	# owns nothing, the same rule ordinary Hole Components follow.
 	var reference_row := WorldDocumentService.is_reference_component(component)
 	var hole_row := WorldDocumentService.topology_role(component) == WorldDocumentService.ROLE_HOLE
-	if not WorldDocumentService.is_constraint_only_hole(component) and not (reference_row and hole_row):
+	if not WorldDocumentService.is_hole_component(component) and not (reference_row and hole_row):
 		var add_button := Button.new()
 		add_button.text = "+"
 		add_button.custom_minimum_size = Vector2(28, 30)

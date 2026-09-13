@@ -133,3 +133,33 @@ down to `w/2`; a one-sided one needs `w`. The joins themselves stay exact — th
 corner wedge is filled with the reach the ribbon has on that side, and where an
 alignment leaves that side at zero the segments already meet on the Boundary and
 no wedge is emitted.
+
+
+## Holes draw the edge they cut
+
+An ordinary Hole Component owns a Contour Stroke. It has no Fill — the Parent
+it cuts owns the body, and Sampling and Meshing have already taken the Hole's
+boundary out of it — but the edge left behind is drawn, at a width the Hole
+authors itself under the same World default and Component override every other
+width follows. That is why `is_constraint_only_hole` became
+`is_hole_component`: owning no Fill and owning nothing at all had been the same
+question, and they are not.
+
+The alignment reads on a Hole the way the drawing does rather than the way the
+loop does. A Hole encloses a void, so its `inside` is the material of the
+Parent around it and grows away from the loop, while its `outside` reaches into
+the void it cut. A Hole whose Parent is set to `outside` and which is set to
+`outside` itself therefore has both strokes growing away from their own
+material, which is a choice and not an accident: the two are authored
+separately and neither inherits from the other.
+
+Two things a Hole still does not have. It owns no Fill and no
+`closed_region_mesh`, so it never enters Sampling, Seeding or Meshing as a Body
+and has no row of its own in the Mesh module — its Stroke Bake rides along with
+Update Meshes like every other one. And nothing is parented beneath it; it
+remains a cut in its Parent rather than a body that can carry children.
+
+This changes what an existing World exports. Before this, a Hole was omitted
+entirely; now every visible Hole publishes a Stroke at the World width unless
+it overrides one. Assets that were drawn expecting an unstroked cut edge will
+show one.
