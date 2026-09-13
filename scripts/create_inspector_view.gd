@@ -64,10 +64,10 @@ signal weapon_frame_value_changed(value: float, property_name: String)
 
 const ASSET_ROOT_POSITION_TOOLTIP := "Preview translation for the complete Asset. Rebase before Runtime Export."
 const ASSET_ROOT_SCALE_TOOLTIP := "Positive preview Scale on the %s axis around the Asset Pivot. Rebase before Runtime Export."
-## Every Scale in the Inspector is authored to a thousandth. They multiply -
+## Every Scale in the Inspector is authored to a ten-thousandth. They multiply -
 ## Asset Root over Group over Component - so one of them reading coarser than
 ## the others would quietly round the product the whole chain is judged by.
-const SCALE_STEP := 0.001
+const SCALE_STEP := 0.0001
 const SCALE_ARROW_STEP := 0.1
 const REFERENCE_IMAGE_ROTATION_TOOLTIP := "Turns the Reference Image around the Asset Pivot. Authoring aid only; it never reaches geometry or Runtime Export."
 const CONTOUR_STROKE_WIDTH_OVERRIDE_TOOLTIP := "Overrides every Contour part of the referenced source Asset without changing that Asset."
@@ -642,10 +642,10 @@ func _render_palette_variants() -> void:
 func _component_transform_descriptors(position_x: float, position_y: float, rotation: float, scale: Vector2) -> Array:
 	# One shape for the local and the global transform block. Rotation steps and
 	# arrows in whole degrees; Position keeps hundredth text precision and Scale
-	# thousandth, because a Scale is a factor over a whole Component and its third
-	# decimal is a visible difference where a hundredth of a centimetre is not.
-	# Both keep tenth-unit arrows. None of them is silent: a few callers rely on
-	# the initial value_changed.
+	# ten-thousandth, because a Scale is a factor over a whole Component and its
+	# far decimals are a visible difference where a hundredth of a centimetre is
+	# not. Both keep tenth-unit arrows. None of them is silent: a few callers rely
+	# on the initial value_changed.
 	return [
 		{"caption": "Position X (cm)", "property": "position_x", "value": position_x, "silent": false},
 		{"caption": "Position Y (cm)", "property": "position_y", "value": position_y, "silent": false},
