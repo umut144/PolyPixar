@@ -2,7 +2,7 @@
 	"asset_id": "asset_45",
 	"component_id": "component_296",
 	"component_mesh": {
-		"bake_id": "meshing_bake_7061495199150146444",
+		"bake_id": "meshing_bake_3553689067394407346",
 		"build_provenance": {
 			"attempts": 1.0,
 			"auto_recipe_version": 3.0,
@@ -159,14 +159,14 @@
 		},
 		"last_error": "",
 		"last_failure_signature": {},
-		"mesh_fingerprint": "cddaab3a39b35313e9c6c8802ba5ee5aae0b2f99d44190a06d132506e05997fe",
+		"mesh_fingerprint": "0c48ea4bcdc92d2c9a32a1d07ea62b4c8d1187e073e7b848916b8972aa5b3f90",
 		"method": "constrained_mesh"
 	},
 	"meshing": {
 		"bakes": {
 			"constrained_mesh": {
 				"algorithm_version": 5,
-				"bake_id": "meshing_bake_7061495199150146444",
+				"bake_id": "meshing_bake_3553689067394407346",
 				"boundary_constraints": [
 					{
 						"chain_id": "chain_2192149185835443421",
@@ -1072,10 +1072,10 @@
 				},
 				"quality_warnings": [],
 				"runs": [],
-				"sampling_bake_id": "bake_3753713438426117598",
-				"sampling_fingerprint": "b7923c3526ac7ab792262023e556ce109fec2a04ed3ae55975a46bc5b2589981",
-				"seeding_bake_id": "seeding_bake_7855912041471934452",
-				"seeding_fingerprint": "e5d72b97844579fedd0767efd769a6150b878918b7ddf3e7d807d5fbe2c2cfa4",
+				"sampling_bake_id": "bake_8256441153786303059",
+				"sampling_fingerprint": "e1b32306f6d22488759b8944f2898f40ee5d09c14d000d7d2a1d65bb31f162eb",
+				"seeding_bake_id": "seeding_bake_7083298066524883569",
+				"seeding_fingerprint": "652ad7ead90a6a5c103aec97c16fa26a7ccbdbc85a8ed6948c298b09c7b78845",
 				"triangle_count": 56,
 				"triangles": [
 					{
@@ -1930,7 +1930,7 @@
 			},
 			"contour_stroke": {
 				"algorithm_version": 5,
-				"bake_id": "contour_stroke_bake_3709020905392917989",
+				"bake_id": "contour_stroke_bake_9084294565772352477",
 				"boundary_constraints": [],
 				"errors": [],
 				"geometry_diagnostics": {
@@ -2042,7 +2042,7 @@
 				],
 				"source_chain_closed": true,
 				"source_draw_mode": "closed_loop",
-				"source_fingerprint": "c2ede043671052c45b00dc36f0eef25cf67ec0c26a0420ecb985804e5eaff308",
+				"source_fingerprint": "d320c7877fb0edae9f91eb917b0a6aae2e70261fb14ad986fc5c4c03c2b59f0d",
 				"topology_role": "outer",
 				"triangle_count": 22,
 				"triangles": [
@@ -2775,7 +2775,7 @@
 		"bakes": {
 			"adaptive": {
 				"algorithm_version": 6,
-				"bake_id": "bake_3753713438426117598",
+				"bake_id": "bake_8256441153786303059",
 				"boundary_refinement_complete": true,
 				"boundary_refinement_count": 0,
 				"boundary_refinement_limit_reached": false,
@@ -3276,7 +3276,7 @@
 			}
 		}
 	},
-	"schema_version": 72,
+	"schema_version": 73,
 	"sdf": {
 		"bake": {},
 		"last_error": "",
@@ -3293,7 +3293,7 @@
 		"bakes": {
 			"poisson_fill": {
 				"algorithm_version": 2.0,
-				"bake_id": "seeding_bake_7855912041471934452",
+				"bake_id": "seeding_bake_7083298066524883569",
 				"edited": false,
 				"errors": [],
 				"flow_seed_count": 0.0,
@@ -3309,8 +3309,8 @@
 					"seed": 1,
 					"spacing": 0.55
 				},
-				"sampling_bake_id": "bake_3753713438426117598",
-				"sampling_fingerprint": "b7923c3526ac7ab792262023e556ce109fec2a04ed3ae55975a46bc5b2589981",
+				"sampling_bake_id": "bake_8256441153786303059",
+				"sampling_fingerprint": "e1b32306f6d22488759b8944f2898f40ee5d09c14d000d7d2a1d65bb31f162eb",
 				"seed_count": 13,
 				"seeds": [
 					{

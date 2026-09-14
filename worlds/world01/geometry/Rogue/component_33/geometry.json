@@ -2,7 +2,7 @@
 	"asset_id": "asset_4",
 	"component_id": "component_33",
 	"component_mesh": {
-		"bake_id": "meshing_bake_50637190693401150",
+		"bake_id": "meshing_bake_8673438496250833196",
 		"build_provenance": {
 			"attempts": 1.0,
 			"auto_recipe_version": 0.0,
@@ -140,14 +140,14 @@
 		},
 		"last_error": "",
 		"last_failure_signature": {},
-		"mesh_fingerprint": "7a91848fb4d5f686be2822cd72056f6c688319c5df8ce0f57565649d9b08f714",
+		"mesh_fingerprint": "5c7a3e13b6692429ca347258edbff196a68fe9703b8531785bc296b279399121",
 		"method": "contour_stroke"
 	},
 	"meshing": {
 		"bakes": {
 			"contour_stroke": {
 				"algorithm_version": 5,
-				"bake_id": "meshing_bake_50637190693401150",
+				"bake_id": "meshing_bake_8673438496250833196",
 				"boundary_constraints": [],
 				"closed_region": {
 					"algorithm_version": 2.0,
@@ -724,7 +724,7 @@
 				],
 				"source_chain_closed": true,
 				"source_draw_mode": "contour",
-				"source_fingerprint": "9d684740ad9927df43fc80f424d35886604ef19350ac7bb055aee837d0981129",
+				"source_fingerprint": "bc383bd2d2f44ec09129e3a066569c0e2799e7f4a06e5785164ba834ec03e013",
 				"topology_role": "outer",
 				"triangle_count": 78,
 				"triangles": [
@@ -3741,7 +3741,7 @@
 			}
 		}
 	},
-	"schema_version": 72,
+	"schema_version": 73,
 	"sdf": {
 		"bake": {
 			"algorithm_version": 1,

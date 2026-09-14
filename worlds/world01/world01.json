@@ -50,7 +50,8 @@
 		"asset_47",
 		"asset_48",
 		"asset_49",
-		"asset_50"
+		"asset_50",
+		"asset_51"
 	],
 	"editor_state": {
 		"active_create_submodule": "Single",
@@ -335,16 +336,16 @@
 			"asset_48": {
 				"position": [
 					-0.103813230991364,
-					0.824607789516449
+					31.2525215148926
 				],
-				"zoom": 76.7020607574985
+				"zoom": 12.6688225398693
 			},
 			"asset_49": {
 				"position": [
 					0.432246804237366,
-					-0.617534101009369
+					24.610315322876
 				],
-				"zoom": 73.4605837548643
+				"zoom": 9.94615151265528
 			},
 			"asset_5": {
 				"position": [
@@ -356,9 +357,16 @@
 			"asset_50": {
 				"position": [
 					-0.539496183395386,
-					-0.538148283958435
+					21.3210124969482
 				],
-				"zoom": 51.504210921111
+				"zoom": 10.0852379102906
+			},
+			"asset_51": {
+				"position": [
+					-1.37674236297607,
+					3.30317497253418
+				],
+				"zoom": 191.989443492468
 			},
 			"asset_6": {
 				"position": [
@@ -433,9 +441,10 @@
 			"asset_46": false,
 			"asset_47": false,
 			"asset_48": false,
-			"asset_49": false,
+			"asset_49": true,
 			"asset_5": false,
-			"asset_50": true,
+			"asset_50": false,
+			"asset_51": false,
 			"asset_6": false,
 			"asset_7": false,
 			"asset_8": false,
@@ -452,9 +461,9 @@
 			],
 			"visible": false
 		},
-		"motion_act_preview_asset_id": "asset_1",
+		"motion_act_preview_asset_id": "",
 		"motion_act_preview_loop": true,
-		"motion_path_preview_asset_id": "asset_1",
+		"motion_path_preview_asset_id": "",
 		"motion_sequence_preview_loop": true,
 		"motion_sequence_view": "composition",
 		"outliner_asset_type_filters": {
@@ -466,7 +475,7 @@
 			"terrain": false,
 			"weapons": false
 		},
-		"selected_asset_id": "asset_50",
+		"selected_asset_id": "asset_49",
 		"selected_component_id": "",
 		"selected_edge_ids": [],
 		"selected_guide_id": "",
@@ -488,9 +497,9 @@
 	},
 	"name": "world01",
 	"next_ids": {
-		"asset": 51,
-		"component": 378,
-		"group": 19,
+		"asset": 52,
+		"component": 400,
+		"group": 24,
 		"guide": 10,
 		"motion_act": 1,
 		"motion_path": 1,
@@ -498,7 +507,7 @@
 	},
 	"paths": [],
 	"retired_assets": [],
-	"schema_version": 72,
+	"schema_version": 73,
 	"sequences": [],
 	"world_name": "Secrets, Room's & Travels'",
 	"world_settings": {
