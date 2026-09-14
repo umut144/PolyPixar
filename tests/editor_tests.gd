@@ -711,6 +711,49 @@ func _test_multi_component_deletion() -> void:
 	application.free()
 
 
+func _test_deleting_a_group_deletes_what_is_in_it() -> void:
+	# Delete on a Group used to erase only the Group record and leave every
+	# Component it held standing loose in the Asset, which reads as a delete
+	# that did not delete. Releasing the members is what "Remove from Group" is
+	# for; Delete removes the Group, its Guides, its members and their Children.
+	var keeper := _outliner_test_component("keeper", "keeper")
+	var member_a := _outliner_test_component("member_a", "member_a")
+	member_a["group_id"] = "group_1"
+	var member_b := _outliner_test_component("member_b", "member_b")
+	member_b["group_id"] = "group_1"
+	var nested := _outliner_test_component("nested", "nested")
+	nested["parent_component_id"] = "member_a"
+	nested["group_id"] = "group_1"
+	var guides: Array = [
+		{"id": "group_guide", "guide_type": AssetGuide.SAMPLE, "ordinal": 1, "visibility": true, "scope": {"kind": AssetGuide.SCOPE_GROUP, "group_id": "group_1"}},
+		{"id": "nested_guide", "guide_type": AssetGuide.SAMPLE, "ordinal": 1, "visibility": true, "scope": {"component_id": "nested"}},
+		{"id": "keeper_guide", "guide_type": AssetGuide.SAMPLE, "ordinal": 1, "visibility": true, "scope": {"component_id": "keeper"}}
+	]
+	var asset := {"id": "asset", "name": "Asset", "asset_type": "character", "visibility": true, "asset_pivot": Vector2.ZERO,
+		"components": [keeper, member_a, member_b, nested], "guides": guides,
+		"groups": [{"id": "group_1", "name": "shell", "visibility": true, "parent_component_id": "",
+			"transform": {"position": Vector2(12.0, -4.0), "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}}]}
+	var application = load("res://scripts/main.gd").new()
+	application._build_ui()
+	var test_assets: Array[Dictionary] = [asset]
+	application.assets = test_assets
+	application.selected_asset_id = "asset"
+	application.selected_group_id = "group_1"
+	application.component_remove_dialog = null
+	application._delete_selected_group()
+	var surviving_ids: Array[String] = []
+	for surviving_component in asset.get("components", []):
+		surviving_ids.append(str(surviving_component.get("id", "")))
+	_expect(surviving_ids == ["keeper"], "Deleting a Group should delete every Component in it, Children of its members included, but %s survived." % str(surviving_ids))
+	_expect(asset.get("groups", []).is_empty() and application.selected_group_id.is_empty(), "Deleting a Group should remove the Group record itself and leave nothing selected.")
+	var surviving_guide_ids: Array[String] = []
+	for surviving_guide in asset.get("guides", []):
+		surviving_guide_ids.append(str(surviving_guide.get("id", "")))
+	_expect(surviving_guide_ids == ["keeper_guide"], "Deleting a Group should take its Group-scoped Guides and the Guides of its deleted Components with it, but %s survived." % str(surviving_guide_ids))
+	_expect(application.undo_history.size() == 1, "Deleting a Group should be one Undo step.")
+	application.free()
+
+
 func _test_outliner_selection_wiring() -> void:
 	# Every Outliner row reaches its handler through a signal connection the
 	# parser cannot check. These press the rows the Outliner actually builds, so
@@ -1295,10 +1338,9 @@ func _test_group_outliner_workflows() -> void:
 		_choose_option(group_parent_option, root_item_index)
 	_expect(ComponentHierarchy.group_parent_id(lashes_group) == "" and str(eyelashes_right.get("parent_component_id", "")) == "", "Choosing Root in the Group Inspector's Parent Component dropdown must move both the Group anchor and its direct Parts, not just relabel the Group.")
 	_expect(ComponentHierarchy.world_transform(asset, "eyelashes_right").is_equal_approx(world_before_inspector_detach), "Detaching a Group to Root from the Inspector must preserve every Part's visible world transform.")
-	var world_before_delete := ComponentHierarchy.world_transform(asset, "eyelashes_right")
+	application.component_remove_dialog = null
 	application._delete_current_outliner_selection()
-	_expect(ComponentHierarchy.group_by_id(asset, "lashes").is_empty() and not ComponentHierarchy.component_by_id(asset, "eyelashes_right").is_empty() and str(eyelashes_right.get("group_id", "")) == "", "Delete on a selected Group should remove only the Group and retain its Components.")
-	_expect(ComponentHierarchy.world_transform(asset, "eyelashes_right").is_equal_approx(world_before_delete), "Deleting a Group should keep its former Components visually fixed.")
+	_expect(ComponentHierarchy.group_by_id(asset, "lashes").is_empty() and ComponentHierarchy.component_by_id(asset, "eyelashes_right").is_empty(), "Delete on a selected Group should take the Group and every Component in it; keeping the Components is what Remove from Group is for.")
 	var opening := {"id": "opening", "name": "body_opening01", "type": "component", "draw_mode": "primitive", "topology_role": "outer", "parent_component_id": "", "group_id": "potion", "visibility": true, "primitive": {"type": "circle", "center": Vector2.ZERO, "diameter_cm": 4.0}, "transform": {"position": Vector2(3.0, 2.0), "rotation": 8.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}}
 	var opening_hole := {"id": "opening_hole", "name": "body_opening_hole01", "type": "component", "draw_mode": "primitive", "topology_role": "hole", "parent_component_id": "opening", "group_id": "potion", "visibility": true, "primitive": {"type": "circle", "center": Vector2.ZERO, "diameter_cm": 3.0}, "transform": {"position": Vector2(0.5, 0.25), "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}}
 	var potion_group := {"id": "potion", "name": "potion", "parent_component_id": "", "visibility": true, "transform": {"position": Vector2(7.0, -4.0), "rotation": 12.0, "scale": Vector2(1.2, 1.2), "pivot": Vector2.ZERO}}
@@ -2936,21 +2978,35 @@ func _test_duplicate_mirror_uses_origin_axis() -> void:
 			_expect(copy_center.is_equal_approx(expected_center), "%s across %s should land the copy where the drawn axis reflects it, not where the Parent or the Asset root Position moved that axis to (expected %v, got %v)." % [mirror_mode, mirror_axis, expected_center, copy_center])
 			application._get_asset("asset_1")["components"].erase(copy)
 	# A Group answers to the same axis: its members are mirrored about the
-	# origin, not about wherever the Group itself has been moved to.
-	var group_member := _outliner_test_component("component_3", "plate")
-	group_member["group_id"] = "group_1"
-	group_member["transform"] = {"position": Vector2(4.0, 7.0), "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}
-	application._get_asset("asset_1")["components"].append(group_member)
+	# origin, not about wherever the Group itself has been moved to. Several
+	# members, because one member cannot show whether each is placed on its own
+	# or all but one inherit somebody else's answer - and the Group is parented,
+	# with only "plate" naming that Parent in its own transform chain. A member
+	# added to a parented Group does not have to repeat the Parent, so both
+	# shapes occur in authored data and both must place the member the same way.
+	var member_names := {"component_3": "plate", "component_4": "rivet", "component_5": "strap"}
+	var member_positions := {"component_3": Vector2(4.0, 7.0), "component_4": Vector2(-11.0, 18.0), "component_5": Vector2(23.0, -5.0)}
+	var expected_member_centers: Dictionary = {}
+	for member_id in member_names:
+		var group_member := _outliner_test_component(str(member_id), str(member_names[member_id]))
+		group_member["group_id"] = "group_1"
+		group_member["parent_component_id"] = "component_1" if str(member_id) == "component_3" else ""
+		group_member["transform"] = {"position": Vector2(member_positions[member_id]), "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}
+		application._get_asset("asset_1")["components"].append(group_member)
 	application._get_asset("asset_1")["groups"].append({"id": "group_1", "name": "shell", "visibility": true,
-		"parent_component_id": "", "transform": {"position": Vector2(30.0, 50.0), "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}})
+		"parent_component_id": "component_1", "transform": {"position": Vector2(30.0, 50.0), "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}})
 	application._update_next_ids()
-	var member_center: Vector2 = ComponentHierarchy.world_transform(application._get_asset("asset_1"), "component_3") * application._component_local_bounds_center(group_member)
-	var expected_member_center: Vector2 = root.affine_inverse() * ((root * member_center) * Vector2(1.0, -1.0))
+	for member_id in member_names:
+		var member_component: Dictionary = application._get_component(application._get_asset("asset_1"), str(member_id))
+		var member_center: Vector2 = ComponentHierarchy.world_transform(application._get_asset("asset_1"), str(member_id)) * application._component_local_bounds_center(member_component)
+		expected_member_centers[str(member_names[member_id])] = root.affine_inverse() * ((root * member_center) * Vector2(1.0, -1.0))
 	application._duplicate_group("asset_1", "group_1", "flip_orientation", ComponentCanvas.MIRROR_AXIS_HORIZONTAL)
 	var copied_members := ComponentHierarchy.direct_group_members(application._get_asset("asset_1"), application.selected_group_id)
-	_expect(copied_members.size() == 1, "The mirrored Group should carry its one member.")
-	var copied_member_center: Vector2 = ComponentHierarchy.world_transform(application._get_asset("asset_1"), str(copied_members[0].get("id", ""))) * application._component_local_bounds_center(copied_members[0])
-	_expect(copied_member_center.is_equal_approx(expected_member_center), "A mirrored Group's members should land where the drawn axis reflects them, not where the Group's own Position or the Asset root Position moved that axis to.")
+	_expect(copied_members.size() == member_names.size(), "The mirrored Group should carry every one of its members, but got %d of %d." % [copied_members.size(), member_names.size()])
+	for copied_member in copied_members:
+		var copied_member_center: Vector2 = ComponentHierarchy.world_transform(application._get_asset("asset_1"), str(copied_member.get("id", ""))) * application._component_local_bounds_center(copied_member)
+		var source_name := str(copied_member.get("name", "")).trim_suffix(" Copy")
+		_expect(copied_member_center.is_equal_approx(expected_member_centers.get(source_name, Vector2.INF)), "Every member of a mirrored Group should land where the drawn axis reflects it, not only the one the pass happened to end on (%s expected %v, got %v)." % [source_name, expected_member_centers.get(source_name, Vector2.INF), copied_member_center])
 	application.free()
 
 

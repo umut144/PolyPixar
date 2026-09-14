@@ -530,14 +530,20 @@ lower-snake-case name, visibility, one shared transform/pivot, and an optional
 membership; they are not children of the Group. Descendants inherit their
 ancestor's effective Group membership unless explicitly assigned otherwise.
 When parented, a Group transform is local to its Component Parent and is applied
-once after that parent in every Part's Component chain. The parent must be an
-ancestor of every direct Part, so a Group cannot be placed beneath one of its
-own Parts. Group visibility is effective while each Component's individual Z
+exactly once in every Part's world transform: after that parent for a Part whose
+own Component chain runs through it, and as the frame the chain starts in for a
+Part that does not name the parent itself. Both shapes occur in authored data,
+because a Component added to a parented Group is not required to repeat that
+parent, and both place the Part identically. A Group cannot be placed beneath
+one of its own Parts. Group visibility is effective while each Component's individual Z
 Index remains authoritative. Outliner drag-and-drop preserves each affected
 Component's world transform when changing Group membership, Component
 parentage, or Group parentage. Dropping a Group across Component branches
-reparents its direct Parts atomically; deleting the selected Group removes the
-container while preserving those Parts and their world transforms. Groups are
+reparents its direct Parts atomically. Deleting the selected Group deletes the
+Group: the container, its Group-scoped Guides, every Part and each Part's
+Children, behind the same confirmation a Component deletion asks for. Releasing
+the Parts instead is the separate Remove from Group action, which keeps each one
+exactly where it is. Groups are
 editor-only containers: runtime export emits ordinary Components and resolves
 the Group transform into their canonical exported transforms.
 

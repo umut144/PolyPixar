@@ -230,6 +230,7 @@ var pending_guide_remove_id := ""
 var component_remove_dialog: ConfirmationDialog
 var pending_component_remove_asset_id := ""
 var pending_component_remove_ids: Array[String] = []
+var pending_component_remove_group_id := ""
 var motion_phase_value_label: Label
 var motion_phase_marks: MotionPhaseMarks
 var motion_phase_slider: HSlider
@@ -1451,6 +1452,7 @@ func _create_component_remove_dialog() -> void:
 	component_remove_dialog.canceled.connect(func() -> void:
 		pending_component_remove_asset_id = ""
 		pending_component_remove_ids.clear()
+		pending_component_remove_group_id = ""
 	)
 	add_child(component_remove_dialog)
 
@@ -9817,6 +9819,7 @@ func _delete_selected_component() -> void:
 		return
 	pending_component_remove_asset_id = selected_asset_id
 	pending_component_remove_ids = root_component_ids.duplicate()
+	pending_component_remove_group_id = ""
 	var removed_component_ids := _component_deletion_set(asset, root_component_ids)
 	var removed_guide_count := 0
 	for guide in asset.get("guides", []):
@@ -9856,14 +9859,29 @@ func _component_deletion_set(asset: Dictionary, root_component_ids: Array[String
 func _confirm_component_deletion() -> void:
 	var asset := _get_asset(pending_component_remove_asset_id)
 	var root_component_ids := pending_component_remove_ids.duplicate()
+	var removed_group_id := pending_component_remove_group_id
 	pending_component_remove_asset_id = ""
 	pending_component_remove_ids.clear()
-	if asset.is_empty() or root_component_ids.is_empty():
+	pending_component_remove_group_id = ""
+	if asset.is_empty():
 		return
 	var removed_component_ids := _component_deletion_set(asset, root_component_ids)
-	if removed_component_ids.is_empty():
+	# An empty Group still has itself to delete, so only a deletion that would
+	# remove nothing at all stops here.
+	if removed_component_ids.is_empty() and removed_group_id.is_empty():
 		return
 	_record_direct_change()
+	if not removed_group_id.is_empty():
+		var removed_group := ComponentHierarchy.group_by_id(asset, removed_group_id)
+		if not removed_group.is_empty():
+			asset["groups"].erase(removed_group)
+		var kept_guides: Array = []
+		for guide in asset.get("guides", []):
+			if guide is Dictionary and AssetGuide.is_group_scoped(guide) and AssetGuide.scope_group_id(guide) == removed_group_id:
+				continue
+			kept_guides.append(guide)
+		asset["guides"] = kept_guides
+		selected_group_id = ""
 	var surviving_components: Array = []
 	for existing_component in asset.get("components", []):
 		if not removed_component_ids.has(str(existing_component.get("id", ""))):
@@ -9899,44 +9917,46 @@ func _delete_current_outliner_selection() -> void:
 		_delete_selected_asset()
 
 
+# Deleting a Group deletes the Group: the record, its Guides and every
+# Component inside it, Children included. Releasing the members instead is a
+# separate action - "Remove from Group" keeps each one exactly where it is -
+# so the destructive reading is the one the delete command carries, and it
+# asks first, through the same confirmation the Component delete uses.
 func _delete_selected_group() -> void:
 	var asset := _get_asset(selected_asset_id)
 	var group := ComponentHierarchy.group_by_id(asset, selected_group_id)
 	if asset.is_empty() or group.is_empty():
 		return
-	var group_id := selected_group_id
-	var member_world_records: Dictionary = {}
-	for component in asset.get("components", []):
-		var component_id := str(component.get("id", "")) if component is Dictionary else ""
-		if not component_id.is_empty() and ComponentHierarchy.membership_group_id(asset, component_id) == group_id:
-			member_world_records[component_id] = ComponentHierarchy.world_transform_record(asset, component_id)
-	_record_direct_change()
-	asset["groups"].erase(group)
-	for component in asset.get("components", []):
-		if component is Dictionary and str(component.get("group_id", "")) == group_id:
-			component["group_id"] = ""
-	var surviving_guides: Array = []
+	var member_roots: Array[String] = []
+	for member in ComponentHierarchy.direct_group_members(asset, selected_group_id):
+		var member_id := str(member.get("id", ""))
+		if not member_id.is_empty():
+			member_roots.append(member_id)
+	pending_component_remove_asset_id = selected_asset_id
+	pending_component_remove_ids = member_roots.duplicate()
+	pending_component_remove_group_id = selected_group_id
+	var removed_component_ids := _component_deletion_set(asset, member_roots)
+	var removed_guide_count := 0
 	for guide in asset.get("guides", []):
-		if guide is Dictionary and AssetGuide.is_group_scoped(guide) and AssetGuide.scope_group_id(guide) == group_id:
+		if not guide is Dictionary:
 			continue
-		surviving_guides.append(guide)
-	asset["guides"] = surviving_guides
-	var member_ids: Array = member_world_records.keys()
-	member_ids.sort_custom(func(left, right) -> bool:
-		return ComponentHierarchy.component_depth(asset, str(left)) < ComponentHierarchy.component_depth(asset, str(right))
-	)
-	for component_id in member_ids:
-		var component := _get_component(asset, str(component_id))
-		if not component.is_empty():
-			component["transform"] = ComponentHierarchy.local_transform_from_world_record(asset, str(component_id), member_world_records[component_id])
-	selected_group_id = ""
-	selected_component_id = ""
-	selected_component_ids.clear()
-	selected_guide_id = ""
-	active_state = ""
-	_invalidate_render(RENDER_DOCUMENT)
-	_show_status_message("Deleted Group · Components kept in place.")
-
+		if AssetGuide.is_group_scoped(guide):
+			if AssetGuide.scope_group_id(guide) == selected_group_id:
+				removed_guide_count += 1
+		elif removed_component_ids.has(AssetGuide.scope_component_id(guide)):
+			removed_guide_count += 1
+	var description := "Delete Group ‘%s’" % str(group.get("name", "Group"))
+	if removed_component_ids.size() > 0:
+		description += " and %d Component%s" % [removed_component_ids.size(), "s" if removed_component_ids.size() != 1 else ""]
+	if removed_guide_count > 0:
+		description += " plus %d Guide%s" % [removed_guide_count, "s" if removed_guide_count != 1 else ""]
+	description += "? This cannot be undone except through Undo."
+	if is_instance_valid(component_remove_dialog):
+		component_remove_dialog.title = "Delete Group"
+		component_remove_dialog.dialog_text = description
+		component_remove_dialog.popup_centered()
+	else:
+		_confirm_component_deletion()
 
 func _delete_selected_asset() -> void:
 	if selected_asset_id.is_empty():

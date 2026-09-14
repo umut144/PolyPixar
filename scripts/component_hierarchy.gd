@@ -351,12 +351,46 @@ static func _world_transform_for_chain(asset: Dictionary, chain: Array[Dictionar
 	var group := group_by_id(asset, effective_group_id)
 	var group_parent_component_id := group_parent_id(group) if not group.is_empty() else ""
 	var group_transform := local_transform(group.get("transform", {})) if not group.is_empty() else Transform2D.IDENTITY
-	var result := group_transform if not group.is_empty() and group_parent_component_id.is_empty() else Transform2D.IDENTITY
+	var result := Transform2D.IDENTITY
+	if not group.is_empty():
+		if group_parent_component_id.is_empty():
+			result = group_transform
+		elif not _chain_contains(chain, group_parent_component_id):
+			# A Component added to a parented Group does not have to name that
+			# Parent in its own transform chain, and one that does not still
+			# hangs under the Group. Placing it from its chain alone dropped
+			# both the Parent and the Group's own transform, so such a member
+			# sat at Asset zero while its siblings that happen to repeat the
+			# Parent were placed correctly - and a Group transform they all
+			# answer to, a mirror among them, reached only those siblings.
+			result = _group_frame_above(asset, effective_group_id, group_parent_component_id) * group_transform
 	for chain_component in chain:
 		result = result * component_local_transform(chain_component)
 		if not group.is_empty() and str(chain_component.get("id", "")) == group_parent_component_id:
 			result = result * group_transform
 	return result
+
+
+static func _chain_contains(chain: Array[Dictionary], component_id: String) -> bool:
+	for chain_component in chain:
+		if str(chain_component.get("id", "")) == component_id:
+			return true
+	return false
+
+
+# The world frame a Group hangs in, resolved without asking the Group itself.
+# A Group whose Parent is one of its own members would otherwise send this
+# straight back into the Group, so that case answers with the bare Component
+# chain instead of recursing.
+static func _group_frame_above(asset: Dictionary, group_id: String, group_parent_component_id: String) -> Transform2D:
+	var parent_chain := _component_chain(asset, group_parent_component_id)
+	var parent_group_id := membership_group_id(asset, group_parent_component_id)
+	if parent_group_id == group_id:
+		var bare := Transform2D.IDENTITY
+		for chain_component in parent_chain:
+			bare = bare * component_local_transform(chain_component)
+		return bare
+	return _world_transform_for_chain(asset, parent_chain, parent_group_id)
 
 
 static func _component_chain_contains(asset: Dictionary, component_id: String, ancestor_id: String) -> bool:
