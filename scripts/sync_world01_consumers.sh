@@ -12,7 +12,9 @@ scenemaker_export="$scenemaker_project_dir/scripts/export_scene.sh"
 # inside the sandbox Game, not a Game of its own.
 scenemaker_game_key="sandbox"
 scenemaker_scene_id="overworld01"
-scenemaker_scene_export="$scenemaker_project_dir/workspaces/world01/$scenemaker_game_key/exports/$scenemaker_scene_id.scene_export.json"
+# sync_scenemaker_world.sh reads a whole exports directory, not one file,
+# and takes it as SCENEMAKER_EXPORTS.
+scenemaker_exports_dir="$scenemaker_project_dir/workspaces/world01/$scenemaker_game_key/exports"
 world01_asset_sync="$world01_project_dir/scripts/sync_polytools_characters.sh"
 world01_map_sync="$world01_project_dir/scripts/sync_scenemaker_world.sh"
 
@@ -90,7 +92,7 @@ run_step() {
 run_step 0 env POLYTOOLS_WORLD_DIR="$polytools_world_dir" "$world01_asset_sync"
 run_step 1 env POLYTOOLS_WORLD_DIR="$polytools_world_dir" "$scenemaker_sync"
 run_step 2 "$scenemaker_export" "$scenemaker_project_dir/workspaces/world01" "$scenemaker_game_key" "$scenemaker_scene_id"
-run_step 3 env SCENEMAKER_EXPORT="$scenemaker_scene_export" "$world01_map_sync"
+run_step 3 env SCENEMAKER_EXPORTS="$scenemaker_exports_dir" "$world01_map_sync"
 
 applied=0
 for index in "${!steps[@]}"; do
