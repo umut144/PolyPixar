@@ -47,12 +47,15 @@
 		"asset_44",
 		"asset_45",
 		"asset_46",
-		"asset_47"
+		"asset_47",
+		"asset_48",
+		"asset_49",
+		"asset_50"
 	],
 	"editor_state": {
-		"active_create_submodule": "Palette",
+		"active_create_submodule": "Single",
 		"active_geometry_submodule": "Sampling",
-		"active_module": "Export",
+		"active_module": "Create",
 		"active_motion_submodule": "Animation",
 		"active_style_submodule": "Weighting",
 		"asset_cameras": {
@@ -329,12 +332,33 @@
 				],
 				"zoom": 83.5188028972455
 			},
+			"asset_48": {
+				"position": [
+					-0.103813230991364,
+					0.824607789516449
+				],
+				"zoom": 76.7020607574985
+			},
+			"asset_49": {
+				"position": [
+					0.432246804237366,
+					-0.617534101009369
+				],
+				"zoom": 73.4605837548643
+			},
 			"asset_5": {
 				"position": [
 					-0.11192199587822,
 					5.50532817840576
 				],
 				"zoom": 46.2811769024854
+			},
+			"asset_50": {
+				"position": [
+					-0.539496183395386,
+					-0.538148283958435
+				],
+				"zoom": 51.504210921111
 			},
 			"asset_6": {
 				"position": [
@@ -408,7 +432,10 @@
 			"asset_45": false,
 			"asset_46": false,
 			"asset_47": false,
+			"asset_48": false,
+			"asset_49": false,
 			"asset_5": false,
+			"asset_50": true,
 			"asset_6": false,
 			"asset_7": false,
 			"asset_8": false,
@@ -416,30 +443,30 @@
 		},
 		"frame": {
 			"half_extent": [
-				5.0,
-				5.0
+				8.0,
+				6.40000009536743
 			],
 			"offset": [
 				0.0,
 				0.0
 			],
-			"visible": true
+			"visible": false
 		},
-		"motion_act_preview_asset_id": "",
+		"motion_act_preview_asset_id": "asset_1",
 		"motion_act_preview_loop": true,
-		"motion_path_preview_asset_id": "",
+		"motion_path_preview_asset_id": "asset_1",
 		"motion_sequence_preview_loop": true,
 		"motion_sequence_view": "composition",
 		"outliner_asset_type_filters": {
-			"character": true,
+			"character": false,
 			"icon": false,
 			"items": false,
-			"props": false,
+			"props": true,
 			"symbols": false,
 			"terrain": false,
 			"weapons": false
 		},
-		"selected_asset_id": "asset_46",
+		"selected_asset_id": "asset_50",
 		"selected_component_id": "",
 		"selected_edge_ids": [],
 		"selected_guide_id": "",
@@ -450,8 +477,8 @@
 		"selected_weighting_style_id": "",
 		"snap": {
 			"enabled": true,
-			"grid_step": 0.1,
-			"mode": "fine",
+			"grid_step": 0.05,
+			"mode": "finer",
 			"rotation_step": 15.0
 		},
 		"world_scale": {
@@ -461,8 +488,8 @@
 	},
 	"name": "world01",
 	"next_ids": {
-		"asset": 48,
-		"component": 319,
+		"asset": 51,
+		"component": 378,
 		"group": 19,
 		"guide": 10,
 		"motion_act": 1,
@@ -471,7 +498,7 @@
 	},
 	"paths": [],
 	"retired_assets": [],
-	"schema_version": 71,
+	"schema_version": 72,
 	"sequences": [],
 	"world_name": "Secrets, Room's & Travels'",
 	"world_settings": {

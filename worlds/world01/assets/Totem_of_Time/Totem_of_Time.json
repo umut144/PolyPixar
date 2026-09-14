@@ -1,0 +1,1964 @@
+{
+	"animation": {
+		"legacy_path_follow_motions": [],
+		"next_state_index": 4,
+		"simulation_contract": {
+			"next_parameter_index": 1,
+			"parameters": [
+				{
+					"id": "parameter_speed",
+					"name": "speed",
+					"type": "number"
+				},
+				{
+					"id": "parameter_grounded",
+					"name": "grounded",
+					"type": "bool"
+				}
+			],
+			"source": "Asset Animation"
+		},
+		"states": [
+			{
+				"cycle_duration": 1.0,
+				"id": "state_idle",
+				"markers": [
+					{
+						"event_id": "rustle",
+						"id": "marker_idle_01",
+						"kind": "sfx",
+						"phase": 0.52
+					}
+				],
+				"motions": [
+					{
+						"domain": "outer",
+						"enabled": true,
+						"guide_ids": [],
+						"id": "motion_idle_01",
+						"name": "Idle Bob",
+						"parameters": {
+							"cycles": 1.0,
+							"distance": 0.25
+						},
+						"phase_offset": 0.0,
+						"primitive": "bob",
+						"target_component_id": "",
+						"target_scope": "asset"
+					}
+				],
+				"name": "IDLE",
+				"next_marker_index": 2,
+				"next_motion_index": 2,
+				"next_transition_index": 2,
+				"transitions": [
+					{
+						"blend_duration": 0.15,
+						"entry_mode": "restart",
+						"exit_phase": 0.0,
+						"exit_policy": "any_phase",
+						"id": "transition_idle_01",
+						"next_rule_index": 2,
+						"rules": [
+							{
+								"id": "rule_idle_01",
+								"operator": "greater",
+								"parameter_id": "parameter_speed",
+								"value": 0.1
+							}
+						],
+						"target_state_id": "state_walk"
+					}
+				]
+			},
+			{
+				"cycle_duration": 1.0,
+				"id": "state_walk",
+				"markers": [
+					{
+						"event_id": "footstep",
+						"id": "marker_walk_01",
+						"kind": "sfx",
+						"phase": 0.25
+					}
+				],
+				"motions": [
+					{
+						"domain": "outer",
+						"enabled": true,
+						"guide_ids": [],
+						"id": "motion_walk_01",
+						"name": "Walk Bob",
+						"parameters": {
+							"cycles": 1.0,
+							"distance": 0.5
+						},
+						"phase_offset": 0.0,
+						"primitive": "bob",
+						"target_component_id": "",
+						"target_scope": "asset"
+					}
+				],
+				"name": "WALK",
+				"next_marker_index": 2,
+				"next_motion_index": 2,
+				"next_transition_index": 3,
+				"transitions": [
+					{
+						"blend_duration": 0.15,
+						"entry_mode": "restart",
+						"exit_phase": 0.0,
+						"exit_policy": "any_phase",
+						"id": "transition_walk_01",
+						"next_rule_index": 2,
+						"rules": [
+							{
+								"id": "rule_walk_idle_01",
+								"operator": "less_equal",
+								"parameter_id": "parameter_speed",
+								"value": 0.1
+							}
+						],
+						"target_state_id": "state_idle"
+					},
+					{
+						"blend_duration": 0.15,
+						"entry_mode": "preserve_phase",
+						"exit_phase": 0.0,
+						"exit_policy": "any_phase",
+						"id": "transition_walk_02",
+						"next_rule_index": 2,
+						"rules": [
+							{
+								"id": "rule_walk_run_01",
+								"operator": "greater",
+								"parameter_id": "parameter_speed",
+								"value": 0.65
+							}
+						],
+						"target_state_id": "state_run"
+					}
+				]
+			},
+			{
+				"cycle_duration": 1.0,
+				"id": "state_run",
+				"markers": [
+					{
+						"event_id": "footstep",
+						"id": "marker_run_01",
+						"kind": "sfx",
+						"phase": 0.18
+					}
+				],
+				"motions": [
+					{
+						"domain": "outer",
+						"enabled": true,
+						"guide_ids": [],
+						"id": "motion_run_01",
+						"name": "Run Bob",
+						"parameters": {
+							"cycles": 1.0,
+							"distance": 0.8
+						},
+						"phase_offset": 0.0,
+						"primitive": "bob",
+						"target_component_id": "",
+						"target_scope": "asset"
+					},
+					{
+						"domain": "inner",
+						"enabled": true,
+						"guide_ids": [],
+						"id": "motion_run_02",
+						"name": "Run Sway",
+						"parameters": {
+							"cycles": 1.0,
+							"strength": 0.5
+						},
+						"phase_offset": 0.0,
+						"primitive": "spine_sway",
+						"target_component_id": "",
+						"target_scope": "component"
+					}
+				],
+				"name": "RUN",
+				"next_marker_index": 2,
+				"next_motion_index": 3,
+				"next_transition_index": 2,
+				"transitions": [
+					{
+						"blend_duration": 0.15,
+						"entry_mode": "preserve_phase",
+						"exit_phase": 0.0,
+						"exit_policy": "any_phase",
+						"id": "transition_run_01",
+						"next_rule_index": 2,
+						"rules": [
+							{
+								"id": "rule_run_01",
+								"operator": "less_equal",
+								"parameter_id": "parameter_speed",
+								"value": 0.65
+							}
+						],
+						"target_state_id": "state_walk"
+					}
+				]
+			}
+		]
+	},
+	"asset_category": "single",
+	"asset_pivot": [
+		2.20000004768372,
+		-0.800000011920929
+	],
+	"asset_type": "props",
+	"authored_facing": "neutral",
+	"components": [
+		{
+			"catch_parent_component_id": "",
+			"chains": [
+				{
+					"closed": true,
+					"edge_ids": [
+						"edge_5117052399579600988",
+						"edge_7771460247611239654",
+						"edge_6550568346949168065",
+						"edge_2290339414519639116",
+						"edge_9142595045608539577",
+						"edge_5157490950882995139",
+						"edge_1168913566247691637",
+						"edge_6566333719440207862"
+					],
+					"id": "chain_6742046017365402333",
+					"point_ids": [
+						"mirror_point_4496822274110311470",
+						"mirror_point_141446686541889992",
+						"point_4775508538914152540",
+						"point_3033023708331509140",
+						"point_5486264249523716593",
+						"mirror_point_112030903649233628",
+						"mirror_point_3814464149126531486",
+						"mirror_point_3579570238069132820"
+					],
+					"topology_role": "outer"
+				}
+			],
+			"draw_mode": "closed_loop",
+			"edges": [
+				{
+					"end_point_id": "mirror_point_141446686541889992",
+					"id": "edge_5117052399579600988",
+					"render_outline": true,
+					"start_point_id": "mirror_point_4496822274110311470"
+				},
+				{
+					"end_point_id": "point_4775508538914152540",
+					"id": "edge_7771460247611239654",
+					"render_outline": true,
+					"start_point_id": "mirror_point_141446686541889992"
+				},
+				{
+					"end_point_id": "point_3033023708331509140",
+					"id": "edge_6550568346949168065",
+					"render_outline": true,
+					"start_point_id": "point_4775508538914152540"
+				},
+				{
+					"end_point_id": "point_5486264249523716593",
+					"id": "edge_2290339414519639116",
+					"render_outline": true,
+					"start_point_id": "point_3033023708331509140"
+				},
+				{
+					"end_point_id": "mirror_point_112030903649233628",
+					"id": "edge_9142595045608539577",
+					"render_outline": true,
+					"start_point_id": "point_5486264249523716593"
+				},
+				{
+					"end_point_id": "mirror_point_3814464149126531486",
+					"id": "edge_5157490950882995139",
+					"render_outline": true,
+					"start_point_id": "mirror_point_112030903649233628"
+				},
+				{
+					"end_point_id": "mirror_point_3579570238069132820",
+					"id": "edge_1168913566247691637",
+					"render_outline": true,
+					"start_point_id": "mirror_point_3814464149126531486"
+				},
+				{
+					"end_point_id": "mirror_point_4496822274110311470",
+					"id": "edge_6566333719440207862",
+					"render_outline": true,
+					"start_point_id": "mirror_point_3579570238069132820"
+				}
+			],
+			"group_id": "",
+			"id": "component_369",
+			"name": "body",
+			"parent_component_id": "",
+			"points": [
+				{
+					"handle_in": [
+						0.0,
+						0.0
+					],
+					"handle_out": [
+						0.0,
+						0.0
+					],
+					"handle_source": "auto",
+					"id": "point_5486264249523716593",
+					"mode": "linear",
+					"position": [
+						0.0,
+						6.40000009536743
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						1.16666746139526,
+						-2.13333344459534
+					],
+					"handle_out": [
+						2.58333444595337,
+						0.0
+					],
+					"handle_source": "auto",
+					"id": "point_3033023708331509140",
+					"mode": "corner",
+					"position": [
+						-7.75000333786011,
+						6.40000009536743
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						-1.16666746139526,
+						-2.13333344459534
+					],
+					"handle_out": [
+						-1.16666746139526,
+						2.13333344459534
+					],
+					"handle_source": "auto",
+					"id": "point_4775508538914152540",
+					"mode": "corner",
+					"position": [
+						-4.25000095367432,
+						0.0
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						0.0,
+						0.0
+					],
+					"handle_out": [
+						0.0,
+						0.0
+					],
+					"handle_source": "auto",
+					"id": "mirror_point_4496822274110311470",
+					"mode": "linear",
+					"position": [
+						0.0,
+						-6.40000009536743
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						2.58333444595337,
+						0.0
+					],
+					"handle_out": [
+						1.16666746139526,
+						2.13333344459534
+					],
+					"handle_source": "auto",
+					"id": "mirror_point_141446686541889992",
+					"mode": "corner",
+					"position": [
+						-7.75000333786011,
+						-6.40000009536743
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						-1.16666746139526,
+						2.13333344459534
+					],
+					"handle_out": [
+						-2.58333444595337,
+						0.0
+					],
+					"handle_source": "auto",
+					"id": "mirror_point_3579570238069132820",
+					"mode": "corner",
+					"position": [
+						7.75000333786011,
+						-6.40000009536743
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						1.16666746139526,
+						2.13333344459534
+					],
+					"handle_out": [
+						1.16666746139526,
+						-2.13333344459534
+					],
+					"handle_source": "auto",
+					"id": "mirror_point_3814464149126531486",
+					"mode": "corner",
+					"position": [
+						4.25000095367432,
+						0.0
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						-2.58333444595337,
+						0.0
+					],
+					"handle_out": [
+						-1.16666746139526,
+						-2.13333344459534
+					],
+					"handle_source": "auto",
+					"id": "mirror_point_112030903649233628",
+					"mode": "corner",
+					"position": [
+						7.75000333786011,
+						6.40000009536743
+					],
+					"preserve_point": true
+				}
+			],
+			"primitive": {},
+			"projection_depth_cm": 10.0,
+			"show_point_numbers": false,
+			"source_asset_id": "",
+			"topology_role": "outer",
+			"transform": {
+				"pivot": [
+					0.0,
+					0.0
+				],
+				"position": [
+					0.0,
+					0.0
+				],
+				"rotation": 0.0,
+				"scale": [
+					1.0,
+					1.0
+				]
+			},
+			"type": "component",
+			"visibility": true,
+			"z_index": 0
+		},
+		{
+			"catch_parent_component_id": "",
+			"chains": [
+				{
+					"closed": true,
+					"edge_ids": [
+						"edge_6642446159326286519",
+						"edge_2681269786961874971",
+						"edge_2308556666754049044",
+						"edge_2447611516302643449",
+						"edge_1518326799942442151",
+						"edge_6513554878311352185"
+					],
+					"id": "chain_7284202733051506030",
+					"point_ids": [
+						"point_3175620755789530845",
+						"point_9022477926892053631",
+						"point_8232144198703454627",
+						"point_3911614676933312894",
+						"mirror_point_3970105027593763673",
+						"mirror_point_5557019525580141942"
+					],
+					"topology_role": "outer"
+				}
+			],
+			"draw_mode": "closed_loop",
+			"edges": [
+				{
+					"end_point_id": "point_9022477926892053631",
+					"id": "edge_6642446159326286519",
+					"render_outline": true,
+					"start_point_id": "point_3175620755789530845"
+				},
+				{
+					"end_point_id": "point_8232144198703454627",
+					"id": "edge_2681269786961874971",
+					"render_outline": true,
+					"start_point_id": "point_9022477926892053631"
+				},
+				{
+					"end_point_id": "point_3911614676933312894",
+					"id": "edge_2308556666754049044",
+					"render_outline": true,
+					"start_point_id": "point_8232144198703454627"
+				},
+				{
+					"end_point_id": "mirror_point_3970105027593763673",
+					"id": "edge_2447611516302643449",
+					"render_outline": true,
+					"start_point_id": "point_3911614676933312894"
+				},
+				{
+					"end_point_id": "mirror_point_5557019525580141942",
+					"id": "edge_1518326799942442151",
+					"render_outline": true,
+					"start_point_id": "mirror_point_3970105027593763673"
+				},
+				{
+					"end_point_id": "point_3175620755789530845",
+					"id": "edge_6513554878311352185",
+					"render_outline": true,
+					"start_point_id": "mirror_point_5557019525580141942"
+				}
+			],
+			"group_id": "",
+			"id": "component_370",
+			"name": "segment01",
+			"parent_component_id": "component_369",
+			"points": [
+				{
+					"handle_in": [
+						2.32666754722595,
+						0.0
+					],
+					"handle_out": [
+						0.273334175348282,
+						-0.500003039836884
+					],
+					"handle_source": "auto",
+					"id": "point_9022477926892053631",
+					"mode": "corner",
+					"position": [
+						-6.98000288009644,
+						5.90000009536743
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						-0.273334175348282,
+						0.500003039836884
+					],
+					"handle_out": [
+						2.05333352088928,
+						0.00000301996874441102
+					],
+					"handle_source": "auto",
+					"id": "point_8232144198703454627",
+					"mode": "corner",
+					"position": [
+						-6.16000032424927,
+						4.39999103546143
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						2.32666754722595,
+						0.0
+					],
+					"handle_out": [
+						-2.32666754722595,
+						0.0
+					],
+					"handle_source": "auto",
+					"id": "point_3175620755789530845",
+					"mode": "mirrored",
+					"position": [
+						0.0,
+						5.90000009536743
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						-2.05333352088928,
+						0.0
+					],
+					"handle_out": [
+						2.05333352088928,
+						0.0
+					],
+					"handle_source": "auto",
+					"id": "point_3911614676933312894",
+					"mode": "mirrored",
+					"position": [
+						0.0,
+						4.40000009536743
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.273334175348282,
+						-0.500003039836884
+					],
+					"handle_out": [
+						-2.32666754722595,
+						0.0
+					],
+					"handle_source": "auto",
+					"id": "mirror_point_5557019525580141942",
+					"mode": "corner",
+					"position": [
+						6.98000288009644,
+						5.90000009536743
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						-2.05333352088928,
+						0.00000301996874441102
+					],
+					"handle_out": [
+						0.273334175348282,
+						0.500003039836884
+					],
+					"handle_source": "auto",
+					"id": "mirror_point_3970105027593763673",
+					"mode": "corner",
+					"position": [
+						6.16000032424927,
+						4.39999103546143
+					],
+					"preserve_point": true
+				}
+			],
+			"primitive": {},
+			"projection_depth_cm": 10.0,
+			"show_point_numbers": false,
+			"source_asset_id": "",
+			"topology_role": "outer",
+			"transform": {
+				"pivot": [
+					0.0,
+					0.0
+				],
+				"position": [
+					0.0,
+					0.0
+				],
+				"rotation": 0.0,
+				"scale": [
+					1.0,
+					1.0
+				]
+			},
+			"type": "component",
+			"visibility": true,
+			"z_index": 0
+		},
+		{
+			"catch_parent_component_id": "",
+			"chains": [
+				{
+					"closed": true,
+					"edge_ids": [
+						"edge_2857838465971226239",
+						"edge_5321323037321007918",
+						"edge_4979346999356840296",
+						"edge_8799100666734642922",
+						"edge_2225655124109167737",
+						"edge_7936833906950717610"
+					],
+					"id": "chain_8294133995709528003",
+					"point_ids": [
+						"point_4601771024476702135",
+						"point_9093913750107272678",
+						"point_1856173332459462638",
+						"point_8198933230057304081",
+						"point_2395777185991807604",
+						"point_6506723645815230015"
+					],
+					"topology_role": "outer"
+				}
+			],
+			"draw_mode": "closed_loop",
+			"edges": [
+				{
+					"end_point_id": "point_9093913750107272678",
+					"id": "edge_2857838465971226239",
+					"render_outline": true,
+					"start_point_id": "point_4601771024476702135"
+				},
+				{
+					"end_point_id": "point_1856173332459462638",
+					"id": "edge_5321323037321007918",
+					"render_outline": true,
+					"start_point_id": "point_9093913750107272678"
+				},
+				{
+					"end_point_id": "point_8198933230057304081",
+					"id": "edge_4979346999356840296",
+					"render_outline": true,
+					"start_point_id": "point_1856173332459462638"
+				},
+				{
+					"end_point_id": "point_2395777185991807604",
+					"id": "edge_8799100666734642922",
+					"render_outline": true,
+					"start_point_id": "point_8198933230057304081"
+				},
+				{
+					"end_point_id": "point_6506723645815230015",
+					"id": "edge_2225655124109167737",
+					"render_outline": true,
+					"start_point_id": "point_2395777185991807604"
+				},
+				{
+					"end_point_id": "point_4601771024476702135",
+					"id": "edge_7936833906950717610",
+					"render_outline": true,
+					"start_point_id": "point_6506723645815230015"
+				}
+			],
+			"group_id": "",
+			"id": "component_371",
+			"name": "segment06",
+			"parent_component_id": "component_369",
+			"points": [
+				{
+					"handle_in": [
+						2.07666659355164,
+						0.0
+					],
+					"handle_out": [
+						0.273334175348282,
+						0.500003039836884
+					],
+					"handle_source": "manual",
+					"id": "point_9093913750107272678",
+					"mode": "corner",
+					"position": [
+						-6.98000288009644,
+						-5.90000009536743
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						-0.273334175348282,
+						-0.500003039836884
+					],
+					"handle_out": [
+						1.80333244800568,
+						-0.00000301996874441102
+					],
+					"handle_source": "manual",
+					"id": "point_1856173332459462638",
+					"mode": "corner",
+					"position": [
+						-6.16000032424927,
+						-4.39999103546143
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						2.07666659355164,
+						0.0
+					],
+					"handle_out": [
+						-2.07666659355164,
+						0.0
+					],
+					"handle_source": "manual",
+					"id": "point_4601771024476702135",
+					"mode": "mirrored",
+					"position": [
+						0.0,
+						-5.90000009536743
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						-1.80333244800568,
+						0.0
+					],
+					"handle_out": [
+						1.80333244800568,
+						0.0
+					],
+					"handle_source": "manual",
+					"id": "point_8198933230057304081",
+					"mode": "mirrored",
+					"position": [
+						0.0,
+						-4.40000009536743
+					],
+					"preserve_point": false
+				},
+				{
+					"handle_in": [
+						-0.273334175348282,
+						0.500003039836884
+					],
+					"handle_out": [
+						-2.07666659355164,
+						0.0
+					],
+					"handle_source": "manual",
+					"id": "point_6506723645815230015",
+					"mode": "corner",
+					"position": [
+						6.98000288009644,
+						-5.90000009536743
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						-1.80333244800568,
+						-0.00000301996874441102
+					],
+					"handle_out": [
+						0.273334175348282,
+						-0.500003039836884
+					],
+					"handle_source": "manual",
+					"id": "point_2395777185991807604",
+					"mode": "corner",
+					"position": [
+						6.16000032424927,
+						-4.39999103546143
+					],
+					"preserve_point": true
+				}
+			],
+			"primitive": {},
+			"projection_depth_cm": 10.0,
+			"show_point_numbers": false,
+			"source_asset_id": "",
+			"topology_role": "outer",
+			"transform": {
+				"pivot": [
+					0.0,
+					0.0
+				],
+				"position": [
+					0.0,
+					0.0
+				],
+				"rotation": 0.0,
+				"scale": [
+					1.0,
+					1.0
+				]
+			},
+			"type": "component",
+			"visibility": true,
+			"z_index": 0
+		},
+		{
+			"catch_parent_component_id": "",
+			"chains": [
+				{
+					"closed": true,
+					"edge_ids": [
+						"edge_2821594801019629908",
+						"edge_4793773357741704085",
+						"edge_4784468019051447901",
+						"edge_6940490660242928313",
+						"edge_3651539505895131506",
+						"edge_8595544360502207958"
+					],
+					"id": "chain_4002761094121087268",
+					"point_ids": [
+						"point_2083516782577852752",
+						"point_6863406988493492599",
+						"point_2183763223722175245",
+						"point_842046854424367610",
+						"mirror_point_92235313550090623",
+						"mirror_point_6581866647700327678"
+					],
+					"topology_role": "outer"
+				}
+			],
+			"draw_mode": "closed_loop",
+			"edges": [
+				{
+					"end_point_id": "point_6863406988493492599",
+					"id": "edge_2821594801019629908",
+					"render_outline": true,
+					"start_point_id": "point_2083516782577852752"
+				},
+				{
+					"end_point_id": "point_2183763223722175245",
+					"id": "edge_4793773357741704085",
+					"render_outline": true,
+					"start_point_id": "point_6863406988493492599"
+				},
+				{
+					"end_point_id": "point_842046854424367610",
+					"id": "edge_4784468019051447901",
+					"render_outline": true,
+					"start_point_id": "point_2183763223722175245"
+				},
+				{
+					"end_point_id": "mirror_point_92235313550090623",
+					"id": "edge_6940490660242928313",
+					"render_outline": true,
+					"start_point_id": "point_842046854424367610"
+				},
+				{
+					"end_point_id": "mirror_point_6581866647700327678",
+					"id": "edge_3651539505895131506",
+					"render_outline": true,
+					"start_point_id": "mirror_point_92235313550090623"
+				},
+				{
+					"end_point_id": "point_2083516782577852752",
+					"id": "edge_8595544360502207958",
+					"render_outline": true,
+					"start_point_id": "mirror_point_6581866647700327678"
+				}
+			],
+			"group_id": "",
+			"id": "component_372",
+			"name": "segment02",
+			"parent_component_id": "component_369",
+			"points": [
+				{
+					"handle_in": [
+						0.710000574588776,
+						-1.30000007152557
+					],
+					"handle_out": [
+						0.4766665995121,
+						0.0
+					],
+					"handle_source": "auto",
+					"id": "point_6863406988493492599",
+					"mode": "corner",
+					"position": [
+						-5.88000106811523,
+						3.90000009536743
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						-0.4766665995121,
+						0.0
+					],
+					"handle_out": [
+						0.733334004878998,
+						-1.30000007152557
+					],
+					"handle_source": "auto",
+					"id": "point_2183763223722175245",
+					"mode": "corner",
+					"position": [
+						-4.45000123977661,
+						3.90000009536743
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						-0.710000574588776,
+						-1.30000007152557
+					],
+					"handle_out": [
+						-0.710000574588776,
+						1.30000007152557
+					],
+					"handle_source": "auto",
+					"id": "point_2083516782577852752",
+					"mode": "corner",
+					"position": [
+						-3.74999928474426,
+						0.0
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						-0.733334004878998,
+						1.30000007152557
+					],
+					"handle_out": [
+						-0.733334004878998,
+						-1.30000007152557
+					],
+					"handle_source": "auto",
+					"id": "point_842046854424367610",
+					"mode": "corner",
+					"position": [
+						-2.24999928474426,
+						0.0
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						0.4766665995121,
+						0.0
+					],
+					"handle_out": [
+						0.710000574588776,
+						1.30000007152557
+					],
+					"handle_source": "auto",
+					"id": "mirror_point_6581866647700327678",
+					"mode": "corner",
+					"position": [
+						-5.88000106811523,
+						-3.90000009536743
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						0.733334004878998,
+						1.30000007152557
+					],
+					"handle_out": [
+						-0.4766665995121,
+						0.0
+					],
+					"handle_source": "auto",
+					"id": "mirror_point_92235313550090623",
+					"mode": "corner",
+					"position": [
+						-4.45000123977661,
+						-3.90000009536743
+					],
+					"preserve_point": true
+				}
+			],
+			"primitive": {},
+			"projection_depth_cm": 10.0,
+			"show_point_numbers": false,
+			"source_asset_id": "",
+			"topology_role": "outer",
+			"transform": {
+				"pivot": [
+					0.0,
+					0.0
+				],
+				"position": [
+					0.0,
+					0.0
+				],
+				"rotation": 0.0,
+				"scale": [
+					1.0,
+					1.0
+				]
+			},
+			"type": "component",
+			"visibility": true,
+			"z_index": 0
+		},
+		{
+			"catch_parent_component_id": "",
+			"chains": [
+				{
+					"closed": true,
+					"edge_ids": [
+						"edge_2107791318400886089",
+						"edge_3585487720607871188",
+						"edge_5463169012677938282",
+						"edge_7790164533890683373",
+						"edge_7236753154483306526",
+						"edge_1164091085127216224"
+					],
+					"id": "chain_7189505730061138851",
+					"point_ids": [
+						"point_3470578999647613073",
+						"point_1838508189652968666",
+						"point_1067376644207433126",
+						"point_7501620006654737046",
+						"point_5032450125661435337",
+						"point_7922358764165745700"
+					],
+					"topology_role": "outer"
+				}
+			],
+			"draw_mode": "closed_loop",
+			"edges": [
+				{
+					"end_point_id": "point_1838508189652968666",
+					"id": "edge_2107791318400886089",
+					"render_outline": true,
+					"start_point_id": "point_3470578999647613073"
+				},
+				{
+					"end_point_id": "point_1067376644207433126",
+					"id": "edge_3585487720607871188",
+					"render_outline": true,
+					"start_point_id": "point_1838508189652968666"
+				},
+				{
+					"end_point_id": "point_7501620006654737046",
+					"id": "edge_5463169012677938282",
+					"render_outline": true,
+					"start_point_id": "point_1067376644207433126"
+				},
+				{
+					"end_point_id": "point_5032450125661435337",
+					"id": "edge_7790164533890683373",
+					"render_outline": true,
+					"start_point_id": "point_7501620006654737046"
+				},
+				{
+					"end_point_id": "point_7922358764165745700",
+					"id": "edge_7236753154483306526",
+					"render_outline": true,
+					"start_point_id": "point_5032450125661435337"
+				},
+				{
+					"end_point_id": "point_3470578999647613073",
+					"id": "edge_1164091085127216224",
+					"render_outline": true,
+					"start_point_id": "point_7922358764165745700"
+				}
+			],
+			"group_id": "",
+			"id": "component_373",
+			"name": "segment03",
+			"parent_component_id": "component_369",
+			"points": [
+				{
+					"handle_in": [
+						0.710000574588776,
+						-1.30000007152557
+					],
+					"handle_out": [
+						0.4766665995121,
+						0.0
+					],
+					"handle_source": "auto",
+					"id": "point_1838508189652968666",
+					"mode": "corner",
+					"position": [
+						-5.88000106811523,
+						3.90000009536743
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						-0.4766665995121,
+						0.0
+					],
+					"handle_out": [
+						0.733334004878998,
+						-1.30000007152557
+					],
+					"handle_source": "auto",
+					"id": "point_1067376644207433126",
+					"mode": "corner",
+					"position": [
+						-4.45000123977661,
+						3.90000009536743
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						-0.710000574588776,
+						-1.30000007152557
+					],
+					"handle_out": [
+						-0.710000574588776,
+						1.30000007152557
+					],
+					"handle_source": "auto",
+					"id": "point_3470578999647613073",
+					"mode": "corner",
+					"position": [
+						-3.74999928474426,
+						0.0
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						-0.733334004878998,
+						1.30000007152557
+					],
+					"handle_out": [
+						-0.733334004878998,
+						-1.30000007152557
+					],
+					"handle_source": "auto",
+					"id": "point_7501620006654737046",
+					"mode": "corner",
+					"position": [
+						-2.24999928474426,
+						0.0
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						0.4766665995121,
+						0.0
+					],
+					"handle_out": [
+						0.710000574588776,
+						1.30000007152557
+					],
+					"handle_source": "auto",
+					"id": "point_7922358764165745700",
+					"mode": "corner",
+					"position": [
+						-5.88000106811523,
+						-3.90000009536743
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						0.733334004878998,
+						1.30000007152557
+					],
+					"handle_out": [
+						-0.4766665995121,
+						0.0
+					],
+					"handle_source": "auto",
+					"id": "point_5032450125661435337",
+					"mode": "corner",
+					"position": [
+						-4.45000123977661,
+						-3.90000009536743
+					],
+					"preserve_point": true
+				}
+			],
+			"primitive": {},
+			"projection_depth_cm": 10.0,
+			"show_point_numbers": false,
+			"source_asset_id": "",
+			"topology_role": "outer",
+			"transform": {
+				"pivot": [
+					0.0,
+					0.0
+				],
+				"position": [
+					2.0,
+					0.0
+				],
+				"rotation": 0.0,
+				"scale": [
+					1.0,
+					1.0
+				]
+			},
+			"type": "component",
+			"visibility": true,
+			"z_index": 0
+		},
+		{
+			"catch_parent_component_id": "",
+			"chains": [
+				{
+					"closed": true,
+					"edge_ids": [
+						"edge_5620765895415082873",
+						"edge_6987346201979417571",
+						"edge_4661847623042650276",
+						"edge_3978702520152088361",
+						"edge_2306621079330967065",
+						"edge_824242260714737574"
+					],
+					"id": "chain_5697276665851882182",
+					"point_ids": [
+						"point_4522247152193171664",
+						"point_3961854191171788478",
+						"point_5313979859514095894",
+						"point_1390404514489437333",
+						"point_1258858191866462199",
+						"point_6062092639726712796"
+					],
+					"topology_role": "outer"
+				}
+			],
+			"draw_mode": "closed_loop",
+			"edges": [
+				{
+					"end_point_id": "point_3961854191171788478",
+					"id": "edge_5620765895415082873",
+					"render_outline": true,
+					"start_point_id": "point_4522247152193171664"
+				},
+				{
+					"end_point_id": "point_5313979859514095894",
+					"id": "edge_6987346201979417571",
+					"render_outline": true,
+					"start_point_id": "point_3961854191171788478"
+				},
+				{
+					"end_point_id": "point_1390404514489437333",
+					"id": "edge_4661847623042650276",
+					"render_outline": true,
+					"start_point_id": "point_5313979859514095894"
+				},
+				{
+					"end_point_id": "point_1258858191866462199",
+					"id": "edge_3978702520152088361",
+					"render_outline": true,
+					"start_point_id": "point_1390404514489437333"
+				},
+				{
+					"end_point_id": "point_6062092639726712796",
+					"id": "edge_2306621079330967065",
+					"render_outline": true,
+					"start_point_id": "point_1258858191866462199"
+				},
+				{
+					"end_point_id": "point_4522247152193171664",
+					"id": "edge_824242260714737574",
+					"render_outline": true,
+					"start_point_id": "point_6062092639726712796"
+				}
+			],
+			"group_id": "",
+			"id": "component_374",
+			"name": "segment05",
+			"parent_component_id": "component_369",
+			"points": [
+				{
+					"handle_in": [
+						-0.710000574588776,
+						-1.30000007152557
+					],
+					"handle_out": [
+						-0.4766665995121,
+						0.0
+					],
+					"handle_source": "manual",
+					"id": "point_3961854191171788478",
+					"mode": "corner",
+					"position": [
+						5.88000106811523,
+						3.90000009536743
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						0.4766665995121,
+						0.0
+					],
+					"handle_out": [
+						-0.733334004878998,
+						-1.30000007152557
+					],
+					"handle_source": "manual",
+					"id": "point_5313979859514095894",
+					"mode": "corner",
+					"position": [
+						4.45000123977661,
+						3.90000009536743
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						0.710000574588776,
+						-1.30000007152557
+					],
+					"handle_out": [
+						0.710000574588776,
+						1.30000007152557
+					],
+					"handle_source": "manual",
+					"id": "point_4522247152193171664",
+					"mode": "corner",
+					"position": [
+						3.74999928474426,
+						0.0
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						0.733334004878998,
+						1.30000007152557
+					],
+					"handle_out": [
+						0.733334004878998,
+						-1.30000007152557
+					],
+					"handle_source": "manual",
+					"id": "point_1390404514489437333",
+					"mode": "corner",
+					"position": [
+						2.24999928474426,
+						0.0
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						-0.4766665995121,
+						0.0
+					],
+					"handle_out": [
+						-0.710000574588776,
+						1.30000007152557
+					],
+					"handle_source": "manual",
+					"id": "point_6062092639726712796",
+					"mode": "corner",
+					"position": [
+						5.88000106811523,
+						-3.90000009536743
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						-0.733334004878998,
+						1.30000007152557
+					],
+					"handle_out": [
+						0.4766665995121,
+						0.0
+					],
+					"handle_source": "manual",
+					"id": "point_1258858191866462199",
+					"mode": "corner",
+					"position": [
+						4.45000123977661,
+						-3.90000009536743
+					],
+					"preserve_point": true
+				}
+			],
+			"primitive": {},
+			"projection_depth_cm": 10.0,
+			"show_point_numbers": false,
+			"source_asset_id": "",
+			"topology_role": "outer",
+			"transform": {
+				"pivot": [
+					0.0,
+					0.0
+				],
+				"position": [
+					0.0,
+					0.0
+				],
+				"rotation": -0.00000865142203565483,
+				"scale": [
+					1.0,
+					1.0
+				]
+			},
+			"type": "component",
+			"visibility": true,
+			"z_index": 0
+		},
+		{
+			"catch_parent_component_id": "",
+			"chains": [
+				{
+					"closed": true,
+					"edge_ids": [
+						"edge_1086854157388385432",
+						"edge_4361248029787322736",
+						"edge_8351303167129411358",
+						"edge_7494839316899762992",
+						"edge_779467852088109639",
+						"edge_7342063570431836735"
+					],
+					"id": "chain_8604943239420697450",
+					"point_ids": [
+						"point_6583358036119829580",
+						"point_8057204934502025524",
+						"point_8870919725900675802",
+						"point_8703020220786050072",
+						"point_6550940315041653336",
+						"point_2848894753471445836"
+					],
+					"topology_role": "outer"
+				}
+			],
+			"draw_mode": "closed_loop",
+			"edges": [
+				{
+					"end_point_id": "point_8057204934502025524",
+					"id": "edge_1086854157388385432",
+					"render_outline": true,
+					"start_point_id": "point_6583358036119829580"
+				},
+				{
+					"end_point_id": "point_8870919725900675802",
+					"id": "edge_4361248029787322736",
+					"render_outline": true,
+					"start_point_id": "point_8057204934502025524"
+				},
+				{
+					"end_point_id": "point_8703020220786050072",
+					"id": "edge_8351303167129411358",
+					"render_outline": true,
+					"start_point_id": "point_8870919725900675802"
+				},
+				{
+					"end_point_id": "point_6550940315041653336",
+					"id": "edge_7494839316899762992",
+					"render_outline": true,
+					"start_point_id": "point_8703020220786050072"
+				},
+				{
+					"end_point_id": "point_2848894753471445836",
+					"id": "edge_779467852088109639",
+					"render_outline": true,
+					"start_point_id": "point_6550940315041653336"
+				},
+				{
+					"end_point_id": "point_6583358036119829580",
+					"id": "edge_7342063570431836735",
+					"render_outline": true,
+					"start_point_id": "point_2848894753471445836"
+				}
+			],
+			"group_id": "",
+			"id": "component_375",
+			"name": "segment04",
+			"parent_component_id": "component_369",
+			"points": [
+				{
+					"handle_in": [
+						-0.710000574588776,
+						-1.30000007152557
+					],
+					"handle_out": [
+						-0.4766665995121,
+						0.0
+					],
+					"handle_source": "manual",
+					"id": "point_8057204934502025524",
+					"mode": "corner",
+					"position": [
+						5.88000106811523,
+						3.90000009536743
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						0.4766665995121,
+						0.0
+					],
+					"handle_out": [
+						-0.733334004878998,
+						-1.30000007152557
+					],
+					"handle_source": "manual",
+					"id": "point_8870919725900675802",
+					"mode": "corner",
+					"position": [
+						4.45000123977661,
+						3.90000009536743
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						0.710000574588776,
+						-1.30000007152557
+					],
+					"handle_out": [
+						0.710000574588776,
+						1.30000007152557
+					],
+					"handle_source": "manual",
+					"id": "point_6583358036119829580",
+					"mode": "corner",
+					"position": [
+						3.74999928474426,
+						0.0
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						0.733334004878998,
+						1.30000007152557
+					],
+					"handle_out": [
+						0.733334004878998,
+						-1.30000007152557
+					],
+					"handle_source": "manual",
+					"id": "point_8703020220786050072",
+					"mode": "corner",
+					"position": [
+						2.24999928474426,
+						0.0
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						-0.4766665995121,
+						0.0
+					],
+					"handle_out": [
+						-0.710000574588776,
+						1.30000007152557
+					],
+					"handle_source": "manual",
+					"id": "point_2848894753471445836",
+					"mode": "corner",
+					"position": [
+						5.88000106811523,
+						-3.90000009536743
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						-0.733334004878998,
+						1.30000007152557
+					],
+					"handle_out": [
+						0.4766665995121,
+						0.0
+					],
+					"handle_source": "manual",
+					"id": "point_6550940315041653336",
+					"mode": "corner",
+					"position": [
+						4.45000123977661,
+						-3.90000009536743
+					],
+					"preserve_point": true
+				}
+			],
+			"primitive": {},
+			"projection_depth_cm": 10.0,
+			"show_point_numbers": false,
+			"source_asset_id": "",
+			"topology_role": "outer",
+			"transform": {
+				"pivot": [
+					0.0,
+					0.0
+				],
+				"position": [
+					-2.0,
+					0.0
+				],
+				"rotation": -0.00000865142203565483,
+				"scale": [
+					1.0,
+					1.0
+				]
+			},
+			"type": "component",
+			"visibility": true,
+			"z_index": 0
+		},
+		{
+			"catch_parent_component_id": "",
+			"chains": [
+				{
+					"closed": true,
+					"edge_ids": [
+						"edge_2217342867684377860",
+						"edge_4538113837139859409",
+						"edge_4206581599259497305"
+					],
+					"id": "chain_6282954920203761685",
+					"point_ids": [
+						"point_4598578202926464226",
+						"point_3991978983032412240",
+						"point_8143018534125412121"
+					],
+					"topology_role": "outer"
+				}
+			],
+			"draw_mode": "closed_loop",
+			"edges": [
+				{
+					"end_point_id": "point_3991978983032412240",
+					"id": "edge_2217342867684377860",
+					"render_outline": true,
+					"start_point_id": "point_4598578202926464226"
+				},
+				{
+					"end_point_id": "point_8143018534125412121",
+					"id": "edge_4538113837139859409",
+					"render_outline": true,
+					"start_point_id": "point_3991978983032412240"
+				},
+				{
+					"end_point_id": "point_4598578202926464226",
+					"id": "edge_4206581599259497305",
+					"render_outline": true,
+					"start_point_id": "point_8143018534125412121"
+				}
+			],
+			"group_id": "",
+			"id": "component_376",
+			"name": "segment07",
+			"parent_component_id": "component_369",
+			"points": [
+				{
+					"handle_in": [
+						0.566666781902313,
+						1.13333332538605
+					],
+					"handle_out": [
+						-0.566666781902313,
+						1.13333332538605
+					],
+					"handle_source": "auto",
+					"id": "point_8143018534125412121",
+					"mode": "corner",
+					"position": [
+						0.0,
+						0.500000059604645
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						-1.13333356380463,
+						0.0
+					],
+					"handle_out": [
+						-0.566666781902313,
+						-1.13333332538605
+					],
+					"handle_source": "auto",
+					"id": "point_3991978983032412240",
+					"mode": "corner",
+					"position": [
+						1.70000028610229,
+						3.90000009536743
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						0.566666781902313,
+						-1.13333332538605
+					],
+					"handle_out": [
+						1.13333356380463,
+						0.0
+					],
+					"handle_source": "auto",
+					"id": "point_4598578202926464226",
+					"mode": "corner",
+					"position": [
+						-1.70000028610229,
+						3.90000009536743
+					],
+					"preserve_point": true
+				}
+			],
+			"primitive": {},
+			"projection_depth_cm": 10.0,
+			"show_point_numbers": false,
+			"source_asset_id": "",
+			"topology_role": "outer",
+			"transform": {
+				"pivot": [
+					0.0,
+					0.0
+				],
+				"position": [
+					0.0,
+					0.0
+				],
+				"rotation": 0.0,
+				"scale": [
+					1.0,
+					1.0
+				]
+			},
+			"type": "component",
+			"visibility": true,
+			"z_index": 0
+		},
+		{
+			"catch_parent_component_id": "",
+			"chains": [
+				{
+					"closed": true,
+					"edge_ids": [
+						"edge_5986319698046844073",
+						"edge_4462001336190781352",
+						"edge_3433369553075233719"
+					],
+					"id": "chain_8903946518586659379",
+					"point_ids": [
+						"point_5820792885448595396",
+						"point_4753925186994065625",
+						"point_3709492320981524739"
+					],
+					"topology_role": "outer"
+				}
+			],
+			"draw_mode": "closed_loop",
+			"edges": [
+				{
+					"end_point_id": "point_4753925186994065625",
+					"id": "edge_5986319698046844073",
+					"render_outline": true,
+					"start_point_id": "point_5820792885448595396"
+				},
+				{
+					"end_point_id": "point_3709492320981524739",
+					"id": "edge_4462001336190781352",
+					"render_outline": true,
+					"start_point_id": "point_4753925186994065625"
+				},
+				{
+					"end_point_id": "point_5820792885448595396",
+					"id": "edge_3433369553075233719",
+					"render_outline": true,
+					"start_point_id": "point_3709492320981524739"
+				}
+			],
+			"group_id": "",
+			"id": "component_377",
+			"name": "segment08",
+			"parent_component_id": "component_369",
+			"points": [
+				{
+					"handle_in": [
+						0.566666781902313,
+						-1.30000007152557
+					],
+					"handle_out": [
+						-0.566666781902313,
+						-1.30000007152557
+					],
+					"handle_source": "manual",
+					"id": "point_3709492320981524739",
+					"mode": "corner",
+					"position": [
+						0.0,
+						-0.500000059604645
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						-1.13333356380463,
+						0.0
+					],
+					"handle_out": [
+						-0.566666781902313,
+						1.30000007152557
+					],
+					"handle_source": "manual",
+					"id": "point_4753925186994065625",
+					"mode": "corner",
+					"position": [
+						1.70000028610229,
+						-3.90000009536743
+					],
+					"preserve_point": true
+				},
+				{
+					"handle_in": [
+						0.566666781902313,
+						1.30000007152557
+					],
+					"handle_out": [
+						1.13333356380463,
+						0.0
+					],
+					"handle_source": "manual",
+					"id": "point_5820792885448595396",
+					"mode": "corner",
+					"position": [
+						-1.70000028610229,
+						-3.90000009536743
+					],
+					"preserve_point": true
+				}
+			],
+			"primitive": {},
+			"projection_depth_cm": 10.0,
+			"show_point_numbers": false,
+			"source_asset_id": "",
+			"topology_role": "outer",
+			"transform": {
+				"pivot": [
+					0.0,
+					0.0
+				],
+				"position": [
+					0.0,
+					0.0
+				],
+				"rotation": 0.0,
+				"scale": [
+					1.0,
+					1.0
+				]
+			},
+			"type": "component",
+			"visibility": true,
+			"z_index": 0
+		}
+	],
+	"groups": [],
+	"guides": [],
+	"id": "asset_50",
+	"name": "Totem of Time",
+	"palette_variants": [],
+	"previous_asset_keys": [],
+	"reference_image": {
+		"file": "",
+		"opacity": 0.5,
+		"pivot_mode": "bottom_center",
+		"position": [
+			0.0,
+			0.0
+		],
+		"rotation": 0.0,
+		"scale": 1.0,
+		"target_height_cm": 13.0,
+		"visible": true
+	},
+	"root_position": [
+		0.0,
+		0.0
+	],
+	"root_scale": [
+		1.0,
+		1.0
+	],
+	"schema_version": 72,
+	"visibility": true
+}
