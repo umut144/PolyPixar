@@ -2768,6 +2768,7 @@ func _save_world() -> bool:
 				"visibility": bool(group.get("visibility", true))
 			})
 		for component in asset["components"]:
+			var component_topology := WorldDocumentService.serialize_component_topology(component)
 			var serialized_component := {
 				"id": str(component["id"]),
 				"type": str(component.get("type", "component")),
@@ -2775,9 +2776,9 @@ func _save_world() -> bool:
 				"source_asset_id": str(component.get("source_asset_id", "")),
 				"parent_component_id": str(component.get("parent_component_id", "")),
 				"group_id": str(component.get("group_id", "")),
-				"points": WorldDocumentService.serialize_bezier_points(component.get("points", [])),
-				"edges": WorldDocumentService.serialize_edges(component.get("edges", [])),
-				"chains": WorldDocumentService.serialize_chains(component.get("chains", [])),
+				"points": component_topology["points"],
+				"edges": component_topology["edges"],
+				"chains": component_topology["chains"],
 				"transform": WorldDocumentService.serialize_transform(component.get("transform", {})),
 				"visibility": bool(component.get("visibility", true)),
 				"z_index": int(component.get("z_index", 0)),

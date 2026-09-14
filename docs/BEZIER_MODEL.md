@@ -32,6 +32,18 @@ Handles are vectors relative to `position`. A Corner defaults to
 `preserve_point = true`. Closing a Chain also preserves its first and last
 authored Points.
 
+An `auto` handle is not authored data: it is derived from the neighbouring
+Point positions, and `BezierGeometry.resolve_auto_handles` re-derives every one
+of them when a document is read. A record must therefore store handles that its
+own loader agrees with, which `WorldDocumentService.serialize_component_topology`
+guarantees by resolving on the way out. This matters beyond tidiness, because
+`GeometrySamplingService.source_fingerprint` hashes the stored handles verbatim:
+a record whose handles the loader would recompute comes back from its own file
+changed, and every Bake built against it reports itself stale after a restart
+although nothing was edited. A transform that touches Point positions must
+re-derive the automatic handles rather than transform them alongside — the two
+agree in real arithmetic but not in the 32-bit floats a Vector2 holds.
+
 ## Edge
 
 ```text

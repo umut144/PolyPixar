@@ -141,6 +141,21 @@ static func serialize_chains(chains: Array) -> Array:
 		})
 	return serialized
 
+# The stored counterpart of `deserialize_component_topology`. Automatic handles
+# are derived from the neighbouring positions and the loader re-derives them on
+# every read, so a record that stored handles a transform left an ULP off would
+# come back from its own file changed. Every fingerprint that hashes handles
+# verbatim would then see a different source than the one the bakes were built
+# against, and a restart alone would report every Bake stale. Resolving before
+# serializing keeps the record and its Bakes agreeing across a reload.
+static func serialize_component_topology(component: Dictionary) -> Dictionary:
+	BezierGeometry.resolve_auto_handles(component.get("points", []), component.get("chains", []))
+	return {
+		"points": serialize_bezier_points(component.get("points", [])),
+		"edges": serialize_edges(component.get("edges", [])),
+		"chains": serialize_chains(component.get("chains", []))
+	}
+
 static func deserialize_component_topology(component_data: Dictionary) -> Dictionary:
 	var raw_points = component_data.get("points", [])
 	var raw_edges = component_data.get("edges", [])

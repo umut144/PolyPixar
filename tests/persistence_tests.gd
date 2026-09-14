@@ -1101,3 +1101,43 @@ func _test_fingerprints_ignore_the_sign_of_a_flattened_zero() -> void:
 	var noisy_sampling := {"bake_id": "bake_1", "algorithm_version": 1, "cuts": [],
 		"chains": [{"chain_id": "c0", "closed": true, "samples": [{"id": "s0", "position": Vector2(-1.99999996755032e-17, 0.5)}]}]}
 	_expect(GeometrySeedingService.sampling_fingerprint(noisy_sampling) == GeometrySeedingService.sampling_fingerprint(WorldDocumentService.document_safe(noisy_sampling)), "A Sampling fingerprint must survive the same flattening, or every Mesh built on it goes stale one save later.")
+
+
+func _test_stored_auto_handles_survive_their_own_reload() -> void:
+	# An automatic handle is derived from its neighbouring positions, and the
+	# loader re-derives every one it reads. A Root Scale Rebase transformed
+	# handles with the same affine as their anchors, which is exact in real
+	# arithmetic and an ULP off in 32-bit floats, so the stored record came back
+	# from its own file changed. GeometrySamplingService.source_fingerprint
+	# hashes the stored handles verbatim, so opening the World again reported
+	# every accepted Bake stale and demanded a rebuild although nothing had been
+	# edited.
+	var component := _component()
+	component.merge({"id": "slab", "name": "slab", "draw_mode": "closed_loop", "topology_role": WorldDocumentService.ROLE_OUTER,
+		"transform": {"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}})
+	# These corners and this factor are chosen so that scaling a handle rounds
+	# to a different 32-bit float than deriving it from the scaled neighbours;
+	# with a factor whose rounding happens to agree the test proves nothing.
+	for corner in [Vector2(-7.0, 0.0), Vector2(-7.0, 17.0), Vector2(7.0, 17.0), Vector2(7.0, 0.0)]:
+		BezierTopology.add_point(component, corner, "corner")
+	_expect(BezierTopology.close_chain(component, str(component["chains"][0]["id"])), "This test needs a closed chain of automatic corners; without one it proves nothing.")
+	var asset := {"id": "reload", "name": "Reload", "asset_pivot": Vector2.ZERO, "root_position": Vector2.ZERO,
+		"root_scale": Vector2(5.0, 5.0), "components": [component], "groups": [], "guides": [],
+		"animation": MotionWorkspace.create_default_animation_document()}
+	_expect(bool(AssetScaleRebaseService.rebase_asset(asset).get("valid", false)), "The Rebase has to succeed before its stored handles can be judged.")
+
+	var rebased: Dictionary = ComponentHierarchy.component_by_id(asset, "slab")
+	var rebased_fingerprint := GeometrySamplingService.source_fingerprint(rebased)
+	var re_resolved: Dictionary = rebased.duplicate(true)
+	BezierGeometry.resolve_auto_handles(re_resolved.get("points", []), re_resolved.get("chains", []))
+	_expect(GeometrySamplingService.source_fingerprint(re_resolved) == rebased_fingerprint, "A Rebase must leave automatic handles already derived from the positions it wrote, or the very next reload changes the record under its own Bakes.")
+
+	# The stored side of the same invariant, independent of how the drift got in:
+	# a record that reaches the document with handles the loader disagrees with
+	# must be repaired on the way out, not on the way back.
+	var drifted: Dictionary = rebased.duplicate(true)
+	drifted["points"][0]["handle_in"] = Vector2(drifted["points"][0]["handle_in"]) * 1.0001
+	_expect(GeometrySamplingService.source_fingerprint(drifted) != rebased_fingerprint, "The seeded drift has to be visible to the fingerprint, or the round trip below proves nothing.")
+	var stored := WorldDocumentService.serialize_component_topology(drifted)
+	var reloaded := WorldDocumentService.deserialize_component_topology(stored)
+	_expect(GeometrySamplingService.source_fingerprint(reloaded) == rebased_fingerprint, "Storing must resolve automatic handles, so a handle the loader would disagree with reaches the document as the value its neighbours derive; otherwise the record comes back from its own file changed and a restart alone reports every Bake stale.")

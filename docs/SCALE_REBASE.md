@@ -23,6 +23,12 @@ Default Motion documents are safe. Any authored non-default Motion blocks the
 whole Root Rebase because its spatial values do not yet have an exact root
 transform conversion. Runtime Export likewise rejects a Root Position other
 than `(0, 0)` or either Root Scale axis other than `1`.
+Automatic handles stay automatic and are re-derived from the positions the bake
+wrote, rather than carried through the affine beside their anchors: the two
+agree in real arithmetic but not in 32-bit floats, and a handle the loader would
+recompute makes every Bake on that Component report itself stale one reload
+later. Component Scale Rebase has no such step because it turns automatic
+handles into manual ones.
 Accepted derived geometry is not rewritten; existing fingerprints make it
 stale for an explicit rebuild.
 

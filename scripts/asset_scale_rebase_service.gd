@@ -130,6 +130,12 @@ static func _scale_component_source(component: Dictionary, scale: Vector2) -> vo
 		point["position"] = Vector2(point.get("position", Vector2.ZERO)) * scale
 		point["handle_in"] = Vector2(point.get("handle_in", Vector2.ZERO)) * scale
 		point["handle_out"] = Vector2(point.get("handle_out", Vector2.ZERO)) * scale
+	# Transforming a handle with the same affine as its anchor is exact in
+	# real arithmetic but not in 32-bit floats, so an automatic handle can
+	# end an ULP away from what the neighbouring positions now derive.
+	# Re-deriving here keeps the record self-consistent, because the
+	# sampling fingerprint hashes stored handles verbatim.
+	BezierGeometry.resolve_auto_handles(component.get("points", []), component.get("chains", []))
 	if not PrimitiveGeometryService.has_analytic_shape(component):
 		return
 	# Root Scale is validated as positive on both axes before it reaches here,
@@ -151,6 +157,12 @@ static func _affine_transform_component_source(component: Dictionary, affine: Tr
 		point["position"] = affine * Vector2(point.get("position", Vector2.ZERO))
 		point["handle_in"] = affine.basis_xform(Vector2(point.get("handle_in", Vector2.ZERO)))
 		point["handle_out"] = affine.basis_xform(Vector2(point.get("handle_out", Vector2.ZERO)))
+	# Transforming a handle with the same affine as its anchor is exact in
+	# real arithmetic but not in 32-bit floats, so an automatic handle can
+	# end an ULP away from what the neighbouring positions now derive.
+	# Re-deriving here keeps the record self-consistent, because the
+	# sampling fingerprint hashes stored handles verbatim.
+	BezierGeometry.resolve_auto_handles(component.get("points", []), component.get("chains", []))
 
 
 static func _rebase_guide(guide: Dictionary, scale: Vector2, root_offset: Vector2, asset_pivot: Vector2) -> void:
@@ -170,6 +182,12 @@ static func _affine_transform_guide_points(old_asset: Dictionary, new_asset: Dic
 		point["position"] = affine * Vector2(point.get("position", Vector2.ZERO))
 		point["handle_in"] = affine.basis_xform(Vector2(point.get("handle_in", Vector2.ZERO)))
 		point["handle_out"] = affine.basis_xform(Vector2(point.get("handle_out", Vector2.ZERO)))
+	# Transforming a handle with the same affine as its anchor is exact in
+	# real arithmetic but not in 32-bit floats, so an automatic handle can
+	# end an ULP away from what the neighbouring positions now derive.
+	# Re-deriving here keeps the record self-consistent, because the
+	# sampling fingerprint hashes stored handles verbatim.
+	BezierGeometry.resolve_auto_handles(guide.get("points", []), guide.get("chains", []))
 
 
 static func _motion_is_default(asset: Dictionary) -> bool:
