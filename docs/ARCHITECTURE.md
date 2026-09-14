@@ -941,13 +941,22 @@ what reached whom: which steps were applied, which failed, which never ran, and
 what that leaves each consumer on. A log that simply stops says none of that,
 and the reader cannot tell an untouched consumer from an updated one.
 
+Every step declares what it cannot run without, and a step is skipped only when
+its own input is missing — naming the step it was waiting for. The first two are
+siblings rather than a sequence: both need nothing but the published Catalog, so
+a failure pushing content to world01 no longer costs SceneMaker its Catalog copy
+and the scene export that follows from it. Only the map sync waits on both.
+Because the steps no longer fall over in one line, the report names each
+consumer on its own: world01 can hold new content while SceneMaker is still on
+its previous state, and the other way round.
+
 The order is world01's answer, not our convenience. The dangerous direction is
 a new map against old content, and keeping the map sync last locks that out —
 a map naming an Asset they do not have is refused at their gate. The reverse,
 new content against an old map, is a state they can see: their build fails
 loudly on a renamed file, and the next map sync refuses the stale map with a
-reason. So the independent pushes run first and a failure downstream no longer
-starves them.
+reason. So the independent pushes run first, and neither a failure downstream
+nor a failure beside them can starve the other.
 
 ## Testing
 
