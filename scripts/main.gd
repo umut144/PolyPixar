@@ -7345,6 +7345,10 @@ func _geometry_outliner_rows() -> Array:
 	var search_text := outliner_search_input.text.strip_edges().to_lower() if is_instance_valid(outliner_search_input) else ""
 	var visible_assets: Array = []
 	for asset in assets:
+		# Only a Single owns meshable Components: a Palette has none and a Set
+		# only references other Assets, so either would be an empty row here.
+		if WorldDocumentService.asset_category(asset) != WorldDocumentService.ASSET_CATEGORY_SINGLE:
+			continue
 		if outliner_view.asset_is_visible(asset) and outliner_view.asset_type_filter_matches(asset) and outliner_view.asset_matches_search(asset, search_text):
 			visible_assets.append(asset)
 	visible_assets.sort_custom(_sort_named_documents)

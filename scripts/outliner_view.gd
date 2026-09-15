@@ -393,6 +393,9 @@ func _render_weighting_outliner() -> void:
 	self.add_child(EditorWidgets.create_outliner_group_label("Weighting"))
 	var visible_asset_count := 0
 	for asset in assets:
+		# Weighting styles a Component's own Mesh, which only a Single has.
+		if WorldDocumentService.asset_category(asset) != WorldDocumentService.ASSET_CATEGORY_SINGLE:
+			continue
 		if not asset_is_visible(asset) or not asset_type_filter_matches(asset):
 			continue
 		var asset_id := str(asset.get("id", ""))

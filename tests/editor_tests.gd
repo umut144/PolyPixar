@@ -1055,7 +1055,9 @@ func _test_geometry_outliner_rows() -> void:
 	application._build_ui()
 	var test_assets: Array[Dictionary] = [
 		{"id": "asset_1", "name": "Wizard", "visibility": true, "components": [body, hole, direct_hole], "groups": [], "guides": [cut, spine]},
-		{"id": "asset_2", "name": "Orb", "visibility": true, "components": [], "groups": [], "guides": []}]
+		{"id": "asset_2", "name": "Orb", "visibility": true, "components": [], "groups": [], "guides": []},
+		{"id": "asset_3", "name": "Grass", "asset_category": WorldDocumentService.ASSET_CATEGORY_PALETTE, "variants": [], "visibility": true, "components": [], "groups": [], "guides": []},
+		{"id": "asset_4", "name": "Bridge", "asset_category": WorldDocumentService.ASSET_CATEGORY_SET, "visibility": true, "components": [hole.duplicate(true)], "groups": [], "guides": []}]
 	application.assets = test_assets
 	application.active_module = "Mesh"
 	application.expanded_assets["asset_1"] = true
@@ -1064,6 +1066,14 @@ func _test_geometry_outliner_rows() -> void:
 	application._render_outliner()
 	var sampling_rows: Array = application.outliner_view.geometry_rows
 	_expect(_geometry_row_label(sampling_rows, "asset") == "Wizard", "The Mesh tree should open with a row per visible Asset.")
+	var sampling_asset_labels: Array = sampling_rows.filter(func(row: Dictionary) -> bool: return str(row.get("kind", "")) == "asset").map(func(row: Dictionary) -> String: return str(row.get("label", "")))
+	_expect(sampling_asset_labels.has("Wizard") and not sampling_asset_labels.has("Grass") and not sampling_asset_labels.has("Bridge"), "The Mesh tree should list only Singles, never a Palette or a Set, which own no meshable Component.")
+	application.active_module = "Style"
+	application._render_outliner()
+	var weighting_asset_labels: Array = application.outliner_view.get_children().filter(func(child: Node) -> bool: return child is Button).map(func(child: Node) -> String: return (child as Button).text)
+	_expect(not weighting_asset_labels.has("Grass") and not weighting_asset_labels.has("Bridge") and weighting_asset_labels.has("Wizard"), "The Weighting tree should list only Singles, never a Palette or a Set.")
+	application.active_module = "Mesh"
+	application._render_outliner()
 	_expect(_geometry_row_label(sampling_rows, "component") == "body", "The Mesh tree should list meshable Components.")
 	_expect(_geometry_row_label(sampling_rows, "hole").begins_with("Hole · eye ← Orb"), "A Sampling Hole row should name the referenced Asset.")
 	var sampling_hole_count := sampling_rows.filter(func(row: Dictionary) -> bool: return str(row.get("kind", "")) == "hole").size()
