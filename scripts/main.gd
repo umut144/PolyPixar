@@ -12926,8 +12926,11 @@ func _parse_consumer_sync_steps(lines: PackedStringArray) -> Array:
 	# step, so the Export log can draw a plain Success/FAILED/WARNING line per
 	# step instead of the "N/4" text the script also prints for anyone reading
 	# its output by hand. maxsplit 5 keeps a stray "|" inside reason intact.
+	# OS.execute's own docs say its whole captured output lands as a single
+	# String element, not one element per line, so everything is rejoined and
+	# re-split on "\n" here regardless of how the caller chunked it.
 	var steps: Array = []
-	for line in lines:
+	for line in "\n".join(lines).split("\n"):
 		if not line.begins_with("STEP|"):
 			continue
 		var parts := line.split("|", true, 5)
