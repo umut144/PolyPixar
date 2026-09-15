@@ -63,13 +63,13 @@ func _init() -> void:
 	add_child(title)
 	summary_label = Label.new()
 	summary_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	summary_label.add_theme_font_size_override("font_size", 12)
+	summary_label.add_theme_font_size_override("font_size", 16)
 	summary_label.add_theme_color_override("font_color", Color("#aeb8c8"))
 	add_child(summary_label)
 	consumer_sync_label = Label.new()
 	consumer_sync_label.text = "Consumer Sync · noch nicht ausgeführt"
 	consumer_sync_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	consumer_sync_label.add_theme_font_size_override("font_size", 12)
+	consumer_sync_label.add_theme_font_size_override("font_size", 16)
 	consumer_sync_label.add_theme_color_override("font_color", Color("#9aa3b2"))
 	add_child(consumer_sync_label)
 	var separator := HSeparator.new()
@@ -79,7 +79,9 @@ func _init() -> void:
 	log_label.fit_content = false
 	log_label.scroll_following = true
 	log_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	log_label.add_theme_font_size_override("normal_font_size", 12)
+	log_label.add_theme_font_size_override("normal_font_size", 16)
+	log_label.add_theme_font_size_override("bold_font_size", 16)
+	log_label.add_theme_font_size_override("mono_font_size", 16)
 	log_label.add_theme_color_override("default_color", Color("#c5cedb"))
 	add_child(log_label)
 
