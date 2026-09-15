@@ -1,7 +1,7 @@
 class_name RuntimeExportService
 extends RefCounted
 
-const MANIFEST_SCHEMA_VERSION := 22
+const MANIFEST_SCHEMA_VERSION := 23
 const DEFAULT_PROJECTION_DEPTH_CM := 10.0
 static func build_manifest(asset: Dictionary, sources: Dictionary, palette_variants: Array = []) -> Dictionary:
 	if WorldDocumentService.is_palette_asset(asset):
@@ -312,7 +312,7 @@ static func _build_regions(asset: Dictionary) -> Dictionary:
 			errors.append("Every Region requires a unique stable ID and lower_snake_case name.")
 			continue
 		ids[region_id] = true
-		if role not in ["attack", "hurt", "collision"]:
+		if role not in WorldDocumentService.REGION_TYPES:
 			errors.append("Region '%s' has an unknown role." % name)
 			continue
 		# A Region is never drawn by a consumer, so its visibility is an Outliner
@@ -624,7 +624,7 @@ static func manifest_validation_issues(manifest: Dictionary) -> Array[String]:
 			var role := str(region.get("role", ""))
 			var geometry_source := str(region.get("geometry_source", ""))
 			var source_component_id := str(region.get("source_component_id", ""))
-			if region_id.is_empty() or region_ids.has(region_id) or role not in ["attack", "hurt", "collision"] or geometry_source not in WorldDocumentService.REGION_GEOMETRY_SOURCES or not _is_lower_snake_case(str(region.get("name", ""))) or source_component_id.is_empty():
+			if region_id.is_empty() or region_ids.has(region_id) or role not in WorldDocumentService.REGION_TYPES or geometry_source not in WorldDocumentService.REGION_GEOMETRY_SOURCES or not _is_lower_snake_case(str(region.get("name", ""))) or source_component_id.is_empty():
 				errors.append("Runtime Manifest contains an invalid Region record.")
 				continue
 			region_ids[region_id] = true

@@ -1474,7 +1474,7 @@ func _test_asset_guides() -> void:
 	var add_menu_labels := PackedStringArray()
 	for menu_index in application.component_add_menu.item_count:
 		add_menu_labels.append(application.component_add_menu.get_item_text(menu_index))
-	_expect(application.component_add_child_menu.item_count == 3 and application.component_add_guide_menu.item_count >= 4 and application.component_add_weapon_guide_menu.item_count == 5 and application.component_add_region_menu.item_count == 3 and add_menu_labels.has("Region"), "Every scoped add menu should expose Child, Guide, and optional Region types.")
+	_expect(application.component_add_child_menu.item_count == 3 and application.component_add_guide_menu.item_count >= 4 and application.component_add_weapon_guide_menu.item_count == 5 and application.component_add_region_menu.item_count == WorldDocumentService.REGION_TYPES.size() and application.component_add_region_menu.get_item_text(3) == "Destructible Region" and add_menu_labels.has("Region"), "Every scoped add menu should expose Child, Guide, and optional Region types.")
 	test_asset = application._get_asset("asset_1")
 	test_asset["groups"] = [{"id": "group_head", "name": "head", "parent_component_id": "component_1", "transform": {"position": Vector2(2.0, 3.0), "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}, "visibility": true}]
 	var component_count_before_group_region: int = test_asset.get("components", []).size()

@@ -575,7 +575,7 @@ Hole rows do not, because Holes cannot own children, Guides, or Regions.
 ### Regions
 
 A Region is a nonvisual `type: "region"` Component attached to a Component,
-with a `region_type` of `attack`, `hurt` or `collision`, backed by canonical
+with a `region_type` of `attack`, `hurt`, `collision` or `destructible`, backed by canonical
 `points`, `edges` and `chains`. It is excluded from visual Mesh processing and
 exported in the separate Runtime `regions` array. Its `region_geometry_source`
 is `authored` or `component`: `authored` reads the Region's own retained,

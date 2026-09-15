@@ -71,6 +71,7 @@ fingerprints.
 | 72 | Analytic Rectangles and Triangles | additive | `PrimitiveGeometryService`, `WorldDocumentService.serialize_primitive` / `deserialize_primitive` | `_test_asset_deserialization_migrations`, `_test_triangle_primitive_geometry` |
 | 73 | `contour_stroke_alignment` on a Component | additive (missing reads as `centered`) | `WorldDocumentService.contour_stroke_alignment`, `ContourStrokeService` | `_test_contour_stroke_alignment` |
 | Manifest 22, Catalog 3 | `asset_id` on every Manifest and Catalog entry, `source_asset_id` on every Reference, `previous_keys` per entry, `retired_assets` on the Catalog | derived | `RuntimeExportService`, `AssetCatalogService` | `_test_runtime_export_service`, `_test_asset_catalog_service` |
+| Manifest 23 | `destructible` Region role; World documents stay at 73, the new `region_type` value is additive | derived | `RuntimeExportService`, `WorldDocumentService.REGION_TYPES` | `_test_runtime_export_service` |
 | Sampling 6 | Junction-aware Cuts, boundary-namespaced analytic Samples, corner balancing | derived | `GeometrySamplingService` | `_test_geometry_sampling_corner_balancing` |
 | Motion 1–18 | Blink `anticipation_share` default 0.18 read as 0.5 | **explicit** (≤ 18) | `normalize_motion_act` | `_test_asset_deserialization_migrations` |
 
@@ -465,3 +466,12 @@ Schema 73 adds the optional `contour_stroke_alignment` on a Component: `"inside"
 
 
 Manifest 22 also publishes ordinary Hole Components. A Hole used to be omitted from the export along with its Fill; it now appears as its own drawable part carrying `contour_stroke_mesh` and no `mesh`, exactly the shape a Contour has, with its own width, alignment, `z_index` and visibility. It still cuts its Parent through Sampling and Meshing, and nothing may be parented beneath it. This is not additive for a consumer or for existing art: every visible Hole in every existing World gains a Stroke at the World width unless it authors an override, so an Asset drawn expecting an unstroked cut edge changes appearance on the next export.
+
+Manifest 23 adds the Region role `destructible`: the surface through which a
+placed, stationary Asset such as a Totem is hit and destroyed. It is kept apart
+from `hurt` because a consumer resolves a Character's hurt surface with facing
+and rotation that a placed Prop never has. The World document needs no step:
+`region_type` simply gains a fourth value, and a document without it loads as
+before. The version still rises because a consumer that validates roles
+strictly would otherwise reject the new Manifests as broken Regions instead of
+as a newer schema.

@@ -1,10 +1,10 @@
 # PolyTools Runtime Export Contract
 
 **Status:** Normative consumer contract for Asset Catalog schema `3` and
-runtime Manifest schema `21`.
+runtime Manifest schema `23`.
 
 This document is the sole field-level contract for PolyTools Runtime packages.
-Manifest schema 22 replaces schema 21 and Catalog schema 3 replaces schema 2.
+Manifest schema 23 replaces schema 22 and Catalog schema 3 replaces schema 2.
 Consumers must reject older schemas; there is no SDF/Carrier/UV compatibility
 fallback.
 
@@ -63,14 +63,14 @@ Root Transform instead of silently changing package placement or dimensions.
 ## Compatibility policy
 
 Catalog `schema_version` must equal `3`; Manifest `schema_version` must equal
-`21`. Missing, non-integer, older, or newer versions are rejected as complete
+`23`. Missing, non-integer, older, or newer versions are rejected as complete
 packages. Missing required geometry is an error. Consumers must not synthesize
 Fill Meshes, strokes, closed Contour regions, Semantic Keys, hierarchy links,
 or referenced Assets.
 
 Schema 21 contains no UV, SDF, mask, contour-domain, padding, or Carrier field.
 Its optional `regions` array contains authored or Component-bound Attack, Hurt,
-and Collision geometry; consumers may use it and must retain their Component
+Collision and Destructible geometry; consumers may use it and must retain their Component
 fallback when it is empty.
 
 ## Catalog
@@ -109,7 +109,7 @@ Every Manifest except a Palette requires:
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `schema_version` | integer | Exactly `22`. |
+| `schema_version` | integer | Exactly `23`. |
 | `asset_key` | non-empty lower-snake-case string | Readable handle; follows the display name. |
 | `asset_id` | non-empty opaque string | Stable identity; never reused, not even after deletion. |
 | `display_name` | string | Informational authored name. |
@@ -187,9 +187,15 @@ independent Frame property.
 
 ## Gameplay Regions
 
-`regions` is always present in schema 21 and may be empty. Every record contains
+`regions` is always present in schema 23 and may be empty. Every record contains
 `region_id`, `name`, `role`, `geometry_source`, and `source_component_id`;
-`role` is one of `attack`, `hurt`, or `collision`.
+`role` is one of `attack`, `hurt`, `collision`, or `destructible`.
+
+`destructible` (since schema 23) marks the surface through which a placed,
+stationary Asset — a Totem, for example — can be hit and destroyed. It is
+separate from `hurt`, which belongs to Characters. PolyTools publishes only the
+surface; health, damage and what destruction means are decided by the
+consumer. An Asset without a `destructible` Region is not destructible.
 
 Region visibility is an Outliner convenience and never selects what is
 exported. A Region is nonvisual in every consumer, so a hidden one would
@@ -385,7 +391,7 @@ of them is an Asset of the Palette's own `asset_type`:
 
 ```json
 {
-  "schema_version": 22,
+  "schema_version": 23,
   "asset_key": "grass",
   "display_name": "Grass",
   "asset_type": "terrain",

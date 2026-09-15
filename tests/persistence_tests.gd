@@ -866,6 +866,17 @@ func _test_runtime_export_service() -> void:
 	var inherited_result := RuntimeExportService.build_manifest(inherited_asset, {"component_a": source, "component_b": source})
 	var exported_inherited_region: Dictionary = inherited_result.get("manifest", {}).get("regions", [])[0] if bool(inherited_result.get("valid", false)) else {}
 	_expect(bool(inherited_result.get("valid", false)) and exported_inherited_region.get("geometry_source", "") == "component" and exported_inherited_region.get("source_component_id", "") == "component_b" and not exported_inherited_region.has("vertices") and not exported_inherited_region.has("indices"), "Component Geometry Regions should export a live Component binding without duplicating geometry.")
+	var destructible_region: Dictionary = inherited_region.duplicate(true)
+	destructible_region["id"] = "region_destructible"
+	destructible_region["name"] = "destructible_region"
+	destructible_region["region_type"] = "destructible"
+	var destructible_asset: Dictionary = combat_asset.duplicate(true)
+	destructible_asset["components"].append(destructible_region)
+	var destructible_result := RuntimeExportService.build_manifest(destructible_asset, {"component_a": source, "component_b": source})
+	var destructible_manifest: Dictionary = destructible_result.get("manifest", {})
+	var exported_destructible_region: Dictionary = destructible_manifest.get("regions", [])[0] if bool(destructible_result.get("valid", false)) else {}
+	_expect(bool(destructible_result.get("valid", false)) and str(exported_destructible_region.get("role", "")) == "destructible" and RuntimeExportService.manifest_validation_issues(destructible_manifest).is_empty(), "A Destructible Region should export under the destructible role and pass Manifest validation.")
+	_expect(str(WorldDocumentService.deserialize_asset({"id": "asset_totem", "components": [destructible_region]}, "fallback_id").get("components", [{}])[0].get("region_type", "")) == "destructible", "A stored destructible Region type should load unchanged rather than fall back to attack.")
 	var hidden_region: Dictionary = authored_region.duplicate(true)
 	hidden_region["id"] = "region_hidden"
 	hidden_region["name"] = "hidden_attack_region"
