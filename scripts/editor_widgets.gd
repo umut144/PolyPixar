@@ -10,6 +10,7 @@ extends RefCounted
 
 
 const REGION_COLORS := {
+	"destroy": Color("#c4b5fd"),
 	"attack": Color("#ef6c78"),
 	"hurt": Color("#68d391"),
 	"collision": Color("#f2994a")

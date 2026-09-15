@@ -23,7 +23,7 @@ const SCHEMA_VERSION := 73
 const REGION_GEOMETRY_AUTHORED := "authored"
 const REGION_GEOMETRY_COMPONENT := "component"
 const REGION_GEOMETRY_SOURCES := [REGION_GEOMETRY_AUTHORED, REGION_GEOMETRY_COMPONENT]
-const REGION_TYPES := ["attack", "hurt", "collision"]
+const REGION_TYPES := ["attack", "hurt", "collision", "destroy"]
 const DEFAULT_PROJECTION_DEPTH_CM := 10.0
 # Component discriminators. The persisted values are stable; code compares
 # against these names so a misspelling is a parse error rather than a silent

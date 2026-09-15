@@ -2080,6 +2080,7 @@ func _create_component_add_menu() -> void:
 	component_add_region_menu.add_item("Attack Region", 0)
 	component_add_region_menu.add_item("Hurt Region", 1)
 	component_add_region_menu.add_item("Collision Region", 2)
+	component_add_region_menu.add_item("Destroy Region", 3)
 	component_add_region_menu.id_pressed.connect(_on_component_add_region_selected)
 	component_add_menu.add_child(component_add_region_menu)
 	component_add_reference_menu = PopupMenu.new()
