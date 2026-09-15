@@ -475,3 +475,12 @@ and rotation that a placed Prop never has. The World document needs no step:
 before. The version still rises because a consumer that validates roles
 strictly would otherwise reject the new Manifests as broken Regions instead of
 as a newer schema.
+
+Manifest 23 also changes the descriptive `coordinate_system.component_transform`
+string, without a version step, from `T(position) * R(rotation) * S(scale) *
+T(-pivot)` to `T(position) * R(rotation) * S(scale); vertices are
+pivot-relative`. The old text described the authored Component and read as an
+instruction to subtract the pivot a second time; the exported numbers are
+unchanged. No consumer validates the string, so the version does not rise, but
+every package's bytes change and each one reads as stale until it is exported
+again.

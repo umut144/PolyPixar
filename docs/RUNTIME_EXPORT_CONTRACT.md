@@ -133,7 +133,7 @@ Every Manifest except a Palette requires:
     "tool_unit_in_meters": 0.1,
     "rotation_unit": "radian",
     "positive_rotation": "counter_clockwise",
-    "component_transform": "T(position) * R(rotation) * S(scale) * T(-pivot)"
+    "component_transform": "T(position) * R(rotation) * S(scale); vertices are pivot-relative"
   },
   "z_order": {
     "scope": "global",
@@ -242,12 +242,13 @@ Every ordinary Component requires `component_id`, unique `name` in `lower_snake_
 
 ### Placing a Component
 
-The `component_transform` string above describes the transform of the
-**authored** Component, whose geometry is still in Canvas space around its
-authored pivot. A consumer never sees that geometry. Every exported vertex
-array - `mesh`, `closed_region_mesh`, `contour_stroke_mesh` and
-`projection_depth_corners` - already has the authored pivot subtracted, so
-`T(-pivot)` is part of the numbers and must not be applied again. A consumer
+The `component_transform` string above is the transform a consumer applies.
+Every exported vertex array - `mesh`, `closed_region_mesh`,
+`contour_stroke_mesh` and `projection_depth_corners` - is relative to the
+Component's authored pivot: PolyTools has already subtracted it, so there is no
+`T(-pivot)` left to apply. Until the Manifest 23 packages exported on
+2026-09-15 the string still read `... * T(-pivot)`, describing the authored
+Component before that subtraction; the numbers were the same. A consumer
 places an exported vertex `v` with
 
 ```text

@@ -245,7 +245,7 @@ static func _coordinate_system() -> Dictionary:
 		"tool_unit_in_meters": ToolUnits.TO_METERS,
 		"rotation_unit": "radian",
 		"positive_rotation": "counter_clockwise",
-		"component_transform": "T(position) * R(rotation) * S(scale) * T(-pivot)"
+		"component_transform": "T(position) * R(rotation) * S(scale); vertices are pivot-relative"
 	}
 
 
