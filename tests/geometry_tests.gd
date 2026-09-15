@@ -709,7 +709,7 @@ func _test_geometry_sampling_ui_shell() -> void:
 	_expect(application.batch_status_snapshot_build_count == 0, "Editing workspaces must not calculate Batch status for detached toolbar controls.")
 	application._on_category_pressed("Export")
 	_expect(application.runtime_export_view.visible and application.runtime_export_view.summary_label.text.contains("Preflight abgeschlossen") and application.runtime_export_view.log_label.get_parsed_text().contains("Wizard / Body"), "Export should run one preflight on entry and list affected Asset / Component data in its read-only log.")
-	_expect(application.runtime_export_view.consumer_sync_label.text.contains("noch nicht ausgeführt") and FileAccess.file_exists(application._consumer_sync_script_path()), "Export should expose persistent downstream Consumer Sync feedback backed by the PolyTools-owned orchestration script.")
+	_expect(application.runtime_export_view.consumer_sync_label.text.contains("noch nicht ausgeführt") and application._consumer_sync_script_paths().size() == 2 and Array(application._consumer_sync_script_paths()).all(func(path: String) -> bool: return FileAccess.file_exists(path)), "Export should expose persistent downstream Consumer Sync feedback backed by the PolyTools-owned orchestration script.")
 	application._present_consumer_sync_result({"success": true, "exit_code": 0, "output": "POLYTOOLS CONSUMER SYNC SUCCESS"})
 	_expect(application.runtime_export_view.consumer_sync_label.text.contains("erfolgreich") and application.runtime_export_view.log_label.get_parsed_text().contains("Consumer Sync: Success"), "A steps-less successful Consumer Sync should still present exactly one coloured Success line.")
 	application._present_consumer_sync_result({"success": false, "exit_code": 7, "output": "test failure"})
@@ -878,6 +878,39 @@ func _test_geometry_sampling_ui_shell() -> void:
 	var nudge_step: float = application.snap_grid_step if application.snap_enabled else application.world_grid_size
 	_expect(nudge_after[0].x == nudge_before[0].x + nudge_step and nudge_after[1].x == nudge_before[1].x + nudge_step, "Arrow nudging should move every selected point by one snap step.")
 	application.free()
+
+
+func _test_consumer_sync_runs_every_orchestrator() -> void:
+	# The Sync Consumers button runs each orchestrator as its own process. One
+	# that fails before printing any STEP| line, or that is missing, must not
+	# keep the next from running, and each still shows up as a red line.
+	var directory := "user://consumer_sync_test"
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(directory))
+	var broken_path := directory + "/broken.sh"
+	var working_path := directory + "/working.sh"
+	var broken := FileAccess.open(broken_path, FileAccess.WRITE)
+	broken.store_string("#!/usr/bin/env bash\necho 'Consumer Sync 1/1: first'\necho 'ERROR: first broke' >&2\nexit 3\n")
+	broken.close()
+	var working := FileAccess.open(working_path, FileAccess.WRITE)
+	working.store_string("#!/usr/bin/env bash\necho 'STEP|1|1|applied|PolyTools -> game04 assets|'\nexit 0\n")
+	working.close()
+	var application_script = load("res://scripts/main.gd")
+	var application: Control = application_script.new()
+	var result: Dictionary = application._run_consumer_sync_scripts([
+		{"label": "first group", "path": broken_path},
+		{"label": "missing group", "path": directory + "/missing.sh"},
+		{"label": "game04", "path": working_path},
+	])
+	var steps: Array = result.get("steps", [])
+	_expect(steps.size() == 3, "Every orchestrator should contribute its lines, whatever the ones before it did.")
+	_expect(steps.size() == 3 and steps[0].get("title") == "first group" and steps[0].get("status") == "failed" and str(steps[0].get("reason")).contains("first broke"), "An orchestrator that stops before its STEP| lines should still show one red line with its last output line as the reason.")
+	_expect(steps.size() == 3 and steps[1].get("title") == "missing group" and steps[1].get("status") == "failed" and str(steps[1].get("reason")).begins_with("Sync script not found"), "A missing orchestrator should show one red line and not stop the run.")
+	_expect(steps.size() == 3 and steps[2].get("title") == "PolyTools -> game04 assets" and steps[2].get("status") == "applied", "The orchestrator after a failed and a missing one should still run.")
+	_expect(not bool(result.get("success", true)) and int(result.get("exit_code", 0)) == 3, "One failed orchestrator should fail the whole run with the first non-zero exit code.")
+	application.free()
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(broken_path))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(working_path))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(directory))
 
 
 func _test_geometry_seeding_service() -> void:

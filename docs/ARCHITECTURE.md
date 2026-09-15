@@ -931,9 +931,20 @@ consumer set; generated directories absent from it are ignored and pruned only
 after every listed package is current and the new Catalog has been committed. Package freshness is derived by comparing the expected
 Manifest bytes, not by persisting export diagnostics in the Asset.
 
-The separate `Sync Consumers` action beside `Export All Valid` runs PolyTools'
-owned `scripts/sync_world01_consumers.sh` workflow against the currently
-published Catalog. It runs by dependency rather than by consumer: world01's
+The separate `Sync Consumers` action beside `Export All Valid` runs two
+PolyTools-owned orchestrators against the currently published Catalog, one
+after the other and each as its own process: `scripts/sync_world01_consumers.sh`
+for world01 and SceneMaker, and `scripts/sync_game04_consumers.sh` for game04.
+Neither calls or reads the other, so a broken or absent world01 or SceneMaker
+never keeps game04 from syncing and the reverse; a missing script or one that
+stops before its summary still shows as one red line under its group. The
+game04 orchestrator has one step, game04's own
+`scripts/sync_polytools_assets.sh` (`GAME04_PROJECT_DIR`, default `../game04`),
+which copies every single Asset of the shared world01 World into game04's Godot
+client (game04 `docs/TASKS.md`, SYNC-02). A step missing its tool fails only
+that step, and a failed step's reason is the consumer's last `ERROR:` line.
+
+The world01 orchestrator runs by dependency rather than by consumer: world01's
 runtime content and SceneMaker's own Catalog copy depend on nothing but the
 published Catalog and go first, then SceneMaker re-exports its current
 `world01` scene, and last world01 imports that map. The script also prints one

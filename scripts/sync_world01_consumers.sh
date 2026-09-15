@@ -54,10 +54,26 @@ step_result=("pending" "pending" "pending" "pending")
 # Nothing reads it for a step that applied cleanly.
 step_reason=("" "" "" "")
 
-fail() {
-	printf 'CONSUMER SYNC FAILED: %s\n' "$1" >&2
-	printf 'Nothing was applied: the run stopped before its first step.\n' >&2
-	exit 1
+# The tool each step runs. A missing one fails only its own step, so the steps
+# that do not need it still run - and game04's sync, which is a separate
+# script, never learns about any of this.
+step_tool=(
+	"$world01_asset_sync"
+	"$scenemaker_sync"
+	"$scenemaker_export"
+	"$world01_map_sync"
+)
+
+# The short reason a failed step shows in the Editor: its last ERROR line when
+# it printed one, since the consumer scripts close with a generic banner,
+# otherwise its last non-empty line.
+failure_reason() {
+	local reason
+	reason=$(printf '%s\n' "$1" | sed -n 's/^ERROR: //p' | tail -n1)
+	if [[ -z "$reason" ]]; then
+		reason=$(printf '%s\n' "$1" | sed '/^[[:space:]]*$/d' | tail -n1)
+	fi
+	printf '%s' "$reason"
 }
 
 run_step() {
@@ -78,6 +94,18 @@ run_step() {
 			"$((index + 1))" "${#steps[@]}" "${steps[index]}" "$blocker"
 		return 0
 	fi
+	local missing=""
+	if [[ ! -d "$polytools_world_dir" ]]; then
+		missing="PolyTools World directory not found: $polytools_world_dir"
+	elif [[ ! -x "${step_tool[index]}" ]]; then
+		missing="not found or not executable: ${step_tool[index]}"
+	fi
+	if [[ -n "$missing" ]]; then
+		step_result[index]="failed"
+		step_reason[index]="$missing"
+		printf 'Consumer Sync %d/%d failed: %s (%s)\n' "$((index + 1))" "${#steps[@]}" "${steps[index]}" "$missing" >&2
+		return 0
+	fi
 	printf 'Consumer Sync %d/%d: %s\n' "$((index + 1))" "${#steps[@]}" "${steps[index]}"
 	# Captured rather than streamed, so a failure can also carry its own last
 	# line as step_reason; still printed below so a human watching the terminal
@@ -87,7 +115,7 @@ run_step() {
 		step_result[index]="applied"
 	else
 		step_result[index]="failed"
-		step_reason[index]=$(printf '%s\n' "$step_output" | sed '/^[[:space:]]*$/d' | tail -n1)
+		step_reason[index]=$(failure_reason "$step_output")
 		printf 'Consumer Sync %d/%d failed: %s\n' "$((index + 1))" "${#steps[@]}" "${steps[index]}" >&2
 	fi
 	if [[ -n "$step_output" ]]; then
@@ -95,12 +123,6 @@ run_step() {
 	fi
 	return 0
 }
-
-[[ -d "$polytools_world_dir" ]] || fail "PolyTools World directory not found: $polytools_world_dir"
-[[ -x "$scenemaker_sync" ]] || fail "SceneMaker catalog sync is not executable: $scenemaker_sync"
-[[ -x "$scenemaker_export" ]] || fail "SceneMaker export is not executable: $scenemaker_export"
-[[ -x "$world01_asset_sync" ]] || fail "world01 asset sync is not executable: $world01_asset_sync"
-[[ -x "$world01_map_sync" ]] || fail "world01 map sync is not executable: $world01_map_sync"
 
 run_step 0 env POLYTOOLS_WORLD_DIR="$polytools_world_dir" "$world01_asset_sync"
 run_step 1 env POLYTOOLS_WORLD_DIR="$polytools_world_dir" "$scenemaker_sync"

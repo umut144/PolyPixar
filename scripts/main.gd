@@ -20,7 +20,13 @@ const EXPORT_SUBMODULES: Array[String] = []
 const MOTION_SUBMODULES := ["Animation", "Path", "Act", "Sequence"]
 const WORLDS_ROOT := "res://worlds"
 const CONFIG_PATH := "res://configs/app_config.json"
-const CONSUMER_SYNC_SCRIPT := "res://scripts/sync_world01_consumers.sh"
+# One orchestrator per consumer group, each run as its own process: a group
+# that is broken or absent never keeps the next one from running (game04 docs
+# TASKS.md, SYNC-02). label only names a group whose script printed no steps.
+const CONSUMER_SYNC_SCRIPTS := [
+	{"label": "world01 / SceneMaker", "path": "res://scripts/sync_world01_consumers.sh"},
+	{"label": "game04", "path": "res://scripts/sync_game04_consumers.sh"},
+]
 const REGION_TYPES := WorldDocumentService.REGION_TYPES
 const MAX_HISTORY_SIZE := 100
 # Render targets. Mutations declare what became stale; the flush below decides
@@ -903,7 +909,7 @@ func _build_ui() -> void:
 	export_sync_button.focus_mode = Control.FOCUS_NONE
 	export_sync_button.visible = false
 	export_sync_button.disabled = true
-	export_sync_button.tooltip_text = "Sync the published catalog to SceneMaker and world01."
+	export_sync_button.tooltip_text = "Sync the published catalog to SceneMaker, world01 and game04."
 	toolbar.add_child(export_sync_button)
 	snap_button = Button.new()
 	snap_button.text = "Snap: %s  ▼" % _snap_mode_label()
@@ -12874,13 +12880,21 @@ func _run_export_runtime_stage(valid_only := false) -> Dictionary:
 	return {"succeeded": succeeded, "failed": failed}
 
 
-func _consumer_sync_script_path() -> String:
-	return ProjectSettings.globalize_path(CONSUMER_SYNC_SCRIPT)
+func _consumer_sync_script_paths() -> PackedStringArray:
+	var paths := PackedStringArray()
+	for entry in CONSUMER_SYNC_SCRIPTS:
+		paths.append(ProjectSettings.globalize_path(str(entry.get("path", ""))))
+	return paths
 
 
 func _consumer_sync_available() -> bool:
 	var catalog_path := _asset_catalog_path()
-	return not catalog_path.is_empty() and FileAccess.file_exists(catalog_path) and FileAccess.file_exists(_consumer_sync_script_path())
+	if catalog_path.is_empty() or not FileAccess.file_exists(catalog_path):
+		return false
+	for script_path in _consumer_sync_script_paths():
+		if FileAccess.file_exists(script_path):
+			return true
+	return false
 
 
 func _on_sync_consumers_pressed() -> void:
@@ -12898,27 +12912,52 @@ func _on_sync_consumers_pressed() -> void:
 
 
 func _run_consumer_sync() -> Dictionary:
-	var script_path := _consumer_sync_script_path()
-	if not FileAccess.file_exists(script_path):
-		var missing_result := {"success": false, "exit_code": -1, "output": "Sync script not found: %s" % script_path}
-		_present_consumer_sync_result(missing_result)
-		return missing_result
 	runtime_export_view.set_consumer_sync_text("Consumer Sync · läuft …", Color("#e3b341"))
 	_show_status_message("Consumer Sync läuft …")
 	await get_tree().process_frame
-	var output: Array = []
-	var exit_code := OS.execute("/bin/bash", [script_path], output, true)
-	var output_lines := PackedStringArray()
-	for line in output:
-		output_lines.append(str(line))
-	var result := {
-		"success": exit_code == 0,
-		"exit_code": exit_code,
-		"output": "\n".join(output_lines).strip_edges(),
-		"steps": _parse_consumer_sync_steps(output_lines)
-	}
+	var result := _run_consumer_sync_scripts(CONSUMER_SYNC_SCRIPTS)
 	_present_consumer_sync_result(result)
 	return result
+
+
+func _run_consumer_sync_scripts(scripts: Array) -> Dictionary:
+	# Every orchestrator runs, whatever the one before it did, and its steps are
+	# appended in order. A script that is missing, or that stops before printing
+	# its STEP| lines, still gets exactly one red line under its label.
+	var success := true
+	var exit_code := 0
+	var outputs := PackedStringArray()
+	var steps: Array = []
+	for entry in scripts:
+		var label := str(entry.get("label", ""))
+		var script_path := ProjectSettings.globalize_path(str(entry.get("path", "")))
+		if not FileAccess.file_exists(script_path):
+			success = false
+			exit_code = exit_code if exit_code != 0 else -1
+			steps.append({"title": label, "status": "failed", "reason": "Sync script not found: %s" % script_path})
+			continue
+		var output: Array = []
+		var script_exit := OS.execute("/bin/bash", [script_path], output, true)
+		var output_lines := PackedStringArray()
+		for line in output:
+			output_lines.append(str(line))
+		var output_text := "\n".join(output_lines).strip_edges()
+		outputs.append(output_text)
+		var script_steps := _parse_consumer_sync_steps(output_lines)
+		if script_exit != 0:
+			success = false
+			exit_code = exit_code if exit_code != 0 else script_exit
+			if script_steps.is_empty():
+				script_steps.append({"title": label, "status": "failed", "reason": _consumer_sync_last_line(output_text, script_exit)})
+		steps.append_array(script_steps)
+	return {"success": success, "exit_code": exit_code, "output": "\n".join(outputs).strip_edges(), "steps": steps}
+
+
+func _consumer_sync_last_line(output_text: String, exit_code: int) -> String:
+	# The last line is where a script that stopped early says why; the first is
+	# only its opening progress line.
+	var lines := output_text.strip_edges().split("\n", false)
+	return lines[lines.size() - 1].strip_edges() if not lines.is_empty() else "Exit %d" % exit_code
 
 
 func _parse_consumer_sync_steps(lines: PackedStringArray) -> Array:
@@ -12944,7 +12983,7 @@ func _parse_consumer_sync_steps(lines: PackedStringArray) -> Array:
 func _present_consumer_sync_result(result: Dictionary) -> void:
 	var success := bool(result.get("success", false))
 	runtime_export_view.set_consumer_sync_text(
-		"Consumer Sync · erfolgreich · SceneMaker und world01 sind aktuell" if success else "Consumer Sync · fehlgeschlagen · Details im Export-Protokoll",
+		"Consumer Sync · erfolgreich · alle Consumer sind aktuell" if success else "Consumer Sync · fehlgeschlagen · Details im Export-Protokoll",
 		Color("#75b88a") if success else Color("#ef8354"))
 	if not is_instance_valid(runtime_export_view):
 		return
@@ -12980,13 +13019,12 @@ func _consumer_sync_reason_suffix(reason: String) -> String:
 
 
 func _consumer_sync_fallback_bbcode(result: Dictionary) -> String:
-	# Steps are only missing when the script could not even start (e.g. the
-	# script file itself is absent) - still exactly one coloured line, never
-	# silence.
+	# _run_consumer_sync_scripts always yields at least one line per
+	# orchestrator, so this only draws a result that carries no steps at all -
+	# still exactly one coloured line, never silence.
 	if bool(result.get("success", false)):
 		return "[color=#75b88a]Consumer Sync: Success[/color]\n"
-	var output_text := str(result.get("output", "")).strip_edges()
-	var reason := output_text.split("\n")[0] if not output_text.is_empty() else "Exit %d" % int(result.get("exit_code", -1))
+	var reason := _consumer_sync_last_line(str(result.get("output", "")), int(result.get("exit_code", -1)))
 	return "[color=#ef8354]Consumer Sync: FAILED — %s[/color]\n" % reason
 
 
