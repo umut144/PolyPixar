@@ -12916,10 +12916,27 @@ func _run_consumer_sync() -> Dictionary:
 	var result := {
 		"success": exit_code == 0,
 		"exit_code": exit_code,
-		"output": "\n".join(output_lines).strip_edges()
+		"output": "\n".join(output_lines).strip_edges(),
+		"steps": _parse_consumer_sync_steps(output_lines)
 	}
 	_present_consumer_sync_result(result)
 	return result
+
+
+func _parse_consumer_sync_steps(lines: PackedStringArray) -> Array:
+	# Turns the "STEP|index|total|status|title" lines sync_world01_consumers.sh
+	# prints once per run into one Dictionary per step, so the Export log can
+	# draw a checklist instead of the "N/4" text the script also prints for
+	# anyone reading its output by hand.
+	var steps: Array = []
+	for line in lines:
+		if not line.begins_with("STEP|"):
+			continue
+		var parts := line.split("|")
+		if parts.size() < 5:
+			continue
+		steps.append({"index": int(parts[1]), "total": int(parts[2]), "status": parts[3], "title": parts[4]})
+	return steps
 
 
 func _present_consumer_sync_result(result: Dictionary) -> void:
@@ -12930,12 +12947,47 @@ func _present_consumer_sync_result(result: Dictionary) -> void:
 		Color("#75b88a") if success else Color("#ef8354"))
 	if not is_instance_valid(runtime_export_view):
 		return
+	var steps: Array = result.get("steps", [])
+	if not steps.is_empty():
+		runtime_export_view.append_log_line(_consumer_sync_steps_bbcode(steps))
+		output_text = _strip_consumer_sync_step_lines(output_text)
 	if not output_text.is_empty():
 		runtime_export_view.append_log_line("[code]%s[/code]\n" % output_text.replace("[", "[lb]"))
 	if success:
 		runtime_export_view.append_log_line("[color=#75b88a]✓ SceneMaker und world01 wurden synchronisiert.[/color]\n")
 	else:
 		runtime_export_view.append_log_line("[color=#ef8354]✕ Consumer Sync fehlgeschlagen (Exit %d). Der PolyTools Runtime Export bleibt erhalten.[/color]\n" % int(result.get("exit_code", -1)))
+
+
+func _consumer_sync_steps_bbcode(steps: Array) -> String:
+	# One coloured bullet per Consumer Sync step, in place of the "N/4" counter:
+	# green applied, red failed, grey blocked/not run - so a failure is visible
+	# at the step that caused it, not only in the summary line at the end.
+	var bbcode := "\n[b]Consumer Sync[/b]\n"
+	for step in steps:
+		if not (step is Dictionary):
+			continue
+		var title := str(step.get("title", ""))
+		match str(step.get("status", "")):
+			"applied":
+				bbcode += "[color=#75b88a]✓ %s[/color]\n" % title
+			"failed":
+				bbcode += "[color=#ef8354]✕ %s[/color]\n" % title
+			"blocked":
+				bbcode += "[color=#9aa3b2]· %s — nicht ausgeführt[/color]\n" % title
+			_:
+				bbcode += "[color=#9aa3b2]· %s[/color]\n" % title
+	return bbcode
+
+
+func _strip_consumer_sync_step_lines(text: String) -> String:
+	# The STEP| lines are the machine-readable twin of the checklist above;
+	# showing them again inside the raw-output code block would just repeat it.
+	var kept := PackedStringArray()
+	for line in text.split("\n"):
+		if not line.begins_with("STEP|"):
+			kept.append(line)
+	return "\n".join(kept).strip_edges()
 
 
 func _all_valid_runtime_export_candidates() -> Array[Dictionary]:

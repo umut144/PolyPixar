@@ -101,6 +101,16 @@ for index in "${!steps[@]}"; do
 	fi
 done
 
+# Machine-readable step summary for the Editor's checklist, printed exactly
+# once per run regardless of outcome. main.gd parses this instead of the
+# "N/4" lines above, so it can show one applied/failed/blocked line per step
+# rather than a numbered sequence. status is the first word of step_result
+# ("blocked 2" becomes "blocked"); the human-readable lines above stay
+# unchanged for anyone reading the log by hand.
+for index in "${!steps[@]}"; do
+	printf 'STEP|%d|%d|%s|%s\n' "$((index + 1))" "${#steps[@]}" "${step_result[index]%% *}" "${steps[index]}"
+done
+
 if (( applied == ${#steps[@]} )); then
 	printf 'POLYTOOLS CONSUMER SYNC SUCCESS\n'
 	exit 0
