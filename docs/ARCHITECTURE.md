@@ -906,7 +906,10 @@ Component geometry and its Runtime deformation path.
 The contract is engine-neutral: X points right, Y points up, lengths are meters,
 positive rotations are counter-clockwise radians, and one Tool unit equals
 0.1 m. Component local transforms mean
-`T(position) * R(rotation) * S(scale) * T(-pivot)`. Components are listed in
+`T(position) * R(rotation) * S(scale) * T(-pivot)` for the authored Component;
+every exported vertex already has that pivot subtracted, so a consumer applies
+only `T(position) * R(rotation) * S(scale)` and then `- asset_pivot`
+(`docs/RUNTIME_EXPORT_CONTRACT.md`, Placing a Component). Components are listed in
 Asset-global ascending `(z_index, component_id)` order from back to front. This
 is an asset-local semantic order rather than an absolute consumer Z coordinate.
 Group membership does not override a Component's individual `z_index`; the

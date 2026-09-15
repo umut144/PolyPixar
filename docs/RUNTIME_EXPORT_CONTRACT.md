@@ -240,6 +240,36 @@ Every ordinary Component requires `component_id`, unique `name` in `lower_snake_
 }
 ```
 
+### Placing a Component
+
+The `component_transform` string above describes the transform of the
+**authored** Component, whose geometry is still in Canvas space around its
+authored pivot. A consumer never sees that geometry. Every exported vertex
+array - `mesh`, `closed_region_mesh`, `contour_stroke_mesh` and
+`projection_depth_corners` - already has the authored pivot subtracted, so
+`T(-pivot)` is part of the numbers and must not be applied again. A consumer
+places an exported vertex `v` with
+
+```text
+asset_local(v) = Parent(...) * T(position) * R(rotation) * S(scale) * v - asset_pivot
+```
+
+where `Parent(...)` is the same product for each ancestor along
+`parent_component_id`, and `position`, `rotation_radians` and `scale` come from
+`local_transform`. `component_pivot` is not a term of this formula: it is a
+derived, read-only value, the Component's origin (its authored pivot) in
+Asset-local meters after `- asset_pivot`, i.e. `asset_local([0, 0])`. A
+consumer may use it as an anchor, for example to rotate a body about its pivot,
+but subtracting it from the vertices moves the Component a second time.
+
+Worked example, `card` / `mana_glyph03`, child of `body` whose
+`local_transform` is the identity: `local_transform.position`
+`(-0.275, 0.425)`, vertices within `±0.025` of `(0, 0)`, `asset_pivot`
+`(0, -0.45)`. The glyph lands around `(-0.275, 0.425) - (0, -0.45) =
+(-0.275, 0.875)`, the top-left of the card, which is also its
+`component_pivot`. Applying `T(-component_pivot)` as well would move it to
+`(0, 0)`, the bottom centre.
+
 Exported authored Component Scale is always `[1,1]`; PolyTools rejects a
 non-rebased Asset. Runtime animation may subsequently apply translate, rotate,
 or scale to the Component hierarchy. Fill, stroke, and closed region receive
