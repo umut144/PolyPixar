@@ -937,11 +937,13 @@ published Catalog. It runs by dependency rather than by consumer: world01's
 runtime content and SceneMaker's own Catalog copy depend on nothing but the
 published Catalog and go first, then SceneMaker re-exports its current
 `world01` scene, and last world01 imports that map. The script also prints one
-machine-readable `STEP|index|total|status|title` line per step, which the
-Export workspace parses into its own checklist line per step — applied green,
-failed red, blocked/not-run grey — instead of only a pass/fail summary at the
-end; the raw command output is still shown below it on failure. Export and
-synchronization are
+machine-readable `STEP|index|total|status|title|reason` line per step —
+reason is only filled in for a blocked or failed step, its own last output
+line or which step it is waiting on. The Export workspace parses these into
+one line per step and nothing else: green `<title>: Success`, red `<title>:
+FAILED — <reason>`, orange `<title>: WARNING — <reason>` for a step skipped
+because something it needed failed. No counts, no raw command output — the
+colour alone says which step needs attention. Export and synchronization are
 deliberately separate actions: a downstream failure does not alter the already
 published PolyTools Runtime packages, and each consumer script remains
 responsible for its own atomic target update.

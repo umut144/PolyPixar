@@ -12888,10 +12888,9 @@ func _on_sync_consumers_pressed() -> void:
 	export_running = true
 	_update_export_toolbar_buttons()
 	runtime_export_view.clear_log()
-	runtime_export_view.append_log_line("[b]Sync Consumers[/b]\n[color=#9aa3b2]Verteile den publizierten PolyTools-Katalog an SceneMaker und world01.[/color]\n")
 	var result := await _run_consumer_sync()
 	var success := bool(result.get("success", false))
-	runtime_export_view.set_summary_text("Consumer Sync abgeschlossen · SceneMaker und world01 sind aktuell" if success else "Consumer Sync fehlgeschlagen · PolyTools Runtime Export bleibt erhalten")
+	runtime_export_view.set_summary_text("Consumer Sync: Success" if success else "Consumer Sync: FAILED")
 	_show_status_message("Consumer Sync erfolgreich" if success else "Consumer Sync fehlgeschlagen · Details im Export-Arbeitsbereich")
 	export_running = false
 	_update_export_toolbar_buttons()
@@ -12904,8 +12903,6 @@ func _run_consumer_sync() -> Dictionary:
 		_present_consumer_sync_result(missing_result)
 		return missing_result
 	runtime_export_view.set_consumer_sync_text("Consumer Sync · läuft …", Color("#e3b341"))
-	if is_instance_valid(runtime_export_view):
-		runtime_export_view.append_log_line("\n[b]Consumer Sync[/b]\n[color=#9aa3b2]Aktualisiere SceneMaker und world01 …[/color]\n")
 	_show_status_message("Consumer Sync läuft …")
 	await get_tree().process_frame
 	var output: Array = []
@@ -12924,70 +12921,69 @@ func _run_consumer_sync() -> Dictionary:
 
 
 func _parse_consumer_sync_steps(lines: PackedStringArray) -> Array:
-	# Turns the "STEP|index|total|status|title" lines sync_world01_consumers.sh
-	# prints once per run into one Dictionary per step, so the Export log can
-	# draw a checklist instead of the "N/4" text the script also prints for
-	# anyone reading its output by hand.
+	# Turns the "STEP|index|total|status|title|reason" lines
+	# sync_world01_consumers.sh prints once per run into one Dictionary per
+	# step, so the Export log can draw a plain Success/FAILED/WARNING line per
+	# step instead of the "N/4" text the script also prints for anyone reading
+	# its output by hand. maxsplit 5 keeps a stray "|" inside reason intact.
 	var steps: Array = []
 	for line in lines:
 		if not line.begins_with("STEP|"):
 			continue
-		var parts := line.split("|")
-		if parts.size() < 5:
+		var parts := line.split("|", true, 5)
+		if parts.size() < 6:
 			continue
-		steps.append({"index": int(parts[1]), "total": int(parts[2]), "status": parts[3], "title": parts[4]})
+		steps.append({"index": int(parts[1]), "total": int(parts[2]), "status": parts[3], "title": parts[4], "reason": parts[5]})
 	return steps
 
 
 func _present_consumer_sync_result(result: Dictionary) -> void:
 	var success := bool(result.get("success", false))
-	var output_text := str(result.get("output", "")).strip_edges()
 	runtime_export_view.set_consumer_sync_text(
 		"Consumer Sync · erfolgreich · SceneMaker und world01 sind aktuell" if success else "Consumer Sync · fehlgeschlagen · Details im Export-Protokoll",
 		Color("#75b88a") if success else Color("#ef8354"))
 	if not is_instance_valid(runtime_export_view):
 		return
 	var steps: Array = result.get("steps", [])
-	if not steps.is_empty():
-		runtime_export_view.append_log_line(_consumer_sync_steps_bbcode(steps))
-		output_text = _strip_consumer_sync_step_lines(output_text)
-	if not output_text.is_empty():
-		runtime_export_view.append_log_line("[code]%s[/code]\n" % output_text.replace("[", "[lb]"))
-	if success:
-		runtime_export_view.append_log_line("[color=#75b88a]✓ SceneMaker und world01 wurden synchronisiert.[/color]\n")
-	else:
-		runtime_export_view.append_log_line("[color=#ef8354]✕ Consumer Sync fehlgeschlagen (Exit %d). Der PolyTools Runtime Export bleibt erhalten.[/color]\n" % int(result.get("exit_code", -1)))
+	runtime_export_view.append_log_line(_consumer_sync_steps_bbcode(steps) if not steps.is_empty() else _consumer_sync_fallback_bbcode(result))
 
 
 func _consumer_sync_steps_bbcode(steps: Array) -> String:
-	# One coloured bullet per Consumer Sync step, in place of the "N/4" counter:
-	# green applied, red failed, grey blocked/not run - so a failure is visible
-	# at the step that caused it, not only in the summary line at the end.
-	var bbcode := "\n[b]Consumer Sync[/b]\n"
+	# One line per Consumer Sync step. Colour is the only signal that matters:
+	# green Success, red FAILED with its short reason, orange WARNING for a step
+	# skipped because something it needed failed. No counts, no raw command
+	# output - a result should be readable by its colour alone.
+	var bbcode := ""
 	for step in steps:
 		if not (step is Dictionary):
 			continue
 		var title := str(step.get("title", ""))
+		var suffix := _consumer_sync_reason_suffix(str(step.get("reason", "")))
 		match str(step.get("status", "")):
 			"applied":
-				bbcode += "[color=#75b88a]✓ %s[/color]\n" % title
+				bbcode += "[color=#75b88a]%s: Success[/color]\n" % title
 			"failed":
-				bbcode += "[color=#ef8354]✕ %s[/color]\n" % title
+				bbcode += "[color=#ef8354]%s: FAILED%s[/color]\n" % [title, suffix]
 			"blocked":
-				bbcode += "[color=#9aa3b2]· %s — nicht ausgeführt[/color]\n" % title
+				bbcode += "[color=#e3b341]%s: WARNING%s[/color]\n" % [title, suffix]
 			_:
-				bbcode += "[color=#9aa3b2]· %s[/color]\n" % title
+				bbcode += "[color=#9aa3b2]%s: %s[/color]\n" % [title, str(step.get("status", ""))]
 	return bbcode
 
 
-func _strip_consumer_sync_step_lines(text: String) -> String:
-	# The STEP| lines are the machine-readable twin of the checklist above;
-	# showing them again inside the raw-output code block would just repeat it.
-	var kept := PackedStringArray()
-	for line in text.split("\n"):
-		if not line.begins_with("STEP|"):
-			kept.append(line)
-	return "\n".join(kept).strip_edges()
+func _consumer_sync_reason_suffix(reason: String) -> String:
+	return "" if reason.is_empty() else " — %s" % reason
+
+
+func _consumer_sync_fallback_bbcode(result: Dictionary) -> String:
+	# Steps are only missing when the script could not even start (e.g. the
+	# script file itself is absent) - still exactly one coloured line, never
+	# silence.
+	if bool(result.get("success", false)):
+		return "[color=#75b88a]Consumer Sync: Success[/color]\n"
+	var output_text := str(result.get("output", "")).strip_edges()
+	var reason := output_text.split("\n")[0] if not output_text.is_empty() else "Exit %d" % int(result.get("exit_code", -1))
+	return "[color=#ef8354]Consumer Sync: FAILED — %s[/color]\n" % reason
 
 
 func _all_valid_runtime_export_candidates() -> Array[Dictionary]:

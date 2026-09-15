@@ -49,6 +49,10 @@ step_requires=(
 	"0 2"
 )
 step_result=("pending" "pending" "pending" "pending")
+# One short line per step, filled in only when it is blocked or failed: the
+# last non-empty line of its own output, or which step it is waiting on.
+# Nothing reads it for a step that applied cleanly.
+step_reason=("" "" "" "")
 
 fail() {
 	printf 'CONSUMER SYNC FAILED: %s\n' "$1" >&2
@@ -69,16 +73,25 @@ run_step() {
 	done
 	if [[ -n "$blocker" ]]; then
 		step_result[index]="blocked $blocker"
+		step_reason[index]="wartet auf Schritt $blocker: ${steps[dependency]}"
 		printf 'Consumer Sync %d/%d not run: %s (needs step %s)\n' \
 			"$((index + 1))" "${#steps[@]}" "${steps[index]}" "$blocker"
 		return 0
 	fi
 	printf 'Consumer Sync %d/%d: %s\n' "$((index + 1))" "${#steps[@]}" "${steps[index]}"
-	if "$@"; then
+	# Captured rather than streamed, so a failure can also carry its own last
+	# line as step_reason; still printed below so a human watching the terminal
+	# sees the same thing they always did.
+	local step_output
+	if step_output=$("$@" 2>&1); then
 		step_result[index]="applied"
 	else
 		step_result[index]="failed"
+		step_reason[index]=$(printf '%s\n' "$step_output" | sed '/^[[:space:]]*$/d' | tail -n1)
 		printf 'Consumer Sync %d/%d failed: %s\n' "$((index + 1))" "${#steps[@]}" "${steps[index]}" >&2
+	fi
+	if [[ -n "$step_output" ]]; then
+		printf '%s\n' "$step_output"
 	fi
 	return 0
 }
@@ -108,7 +121,7 @@ done
 # ("blocked 2" becomes "blocked"); the human-readable lines above stay
 # unchanged for anyone reading the log by hand.
 for index in "${!steps[@]}"; do
-	printf 'STEP|%d|%d|%s|%s\n' "$((index + 1))" "${#steps[@]}" "${step_result[index]%% *}" "${steps[index]}"
+	printf 'STEP|%d|%d|%s|%s|%s\n' "$((index + 1))" "${#steps[@]}" "${step_result[index]%% *}" "${steps[index]}" "${step_reason[index]}"
 done
 
 if (( applied == ${#steps[@]} )); then
