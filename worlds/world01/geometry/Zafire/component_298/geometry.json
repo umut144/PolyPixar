@@ -4,26 +4,26 @@
 	"component_mesh": {
 		"bake_id": "meshing_bake_7800874369890855246",
 		"build_provenance": {
-			"attempts": 1,
-			"auto_recipe_version": 0,
+			"attempts": 1.0,
+			"auto_recipe_version": 0.0,
 			"automatic_diagnostics": {},
 			"exact_input_hash": "3c68e62e8b367e8a5db9112f21b760ee4a185375dee700e5e871b36de99f1d11",
 			"pipeline_recipe_hash": "",
 			"recipe_mode": "derived",
-			"schema_version": 1,
+			"schema_version": 1.0,
 			"source_signature": {
 				"geometry_tolerance": 0.00055,
-				"meshing_algorithm": 5,
+				"meshing_algorithm": 5.0,
 				"recipe_hash": "6b53ff04e86070f1066163d86cd975e192458d017ed0973dec63db4e63faeb7c",
-				"recipe_version": 2,
-				"sampling_algorithm": 6,
+				"recipe_version": 2.0,
+				"sampling_algorithm": 6.0,
 				"scalars": [
 					4.0,
 					5.0,
 					1.0,
 					1.0
 				],
-				"seeding_algorithm": 2,
+				"seeding_algorithm": 2.0,
 				"topology_hash": "cc6c1559ed6aed6faa243bffe5923708d7be171427777496ea10e432da016296",
 				"vectors": [
 					[
@@ -111,7 +111,7 @@
 						0.0
 					]
 				],
-				"version": 1
+				"version": 1.0
 			}
 		},
 		"last_error": "",
@@ -126,9 +126,9 @@
 				"bake_id": "meshing_bake_7800874369890855246",
 				"boundary_constraints": [],
 				"closed_region": {
-					"algorithm_version": 2,
+					"algorithm_version": 2.0,
 					"boundary_area_tool_units_squared": 0.520625114440918,
-					"certified_max_deviation_meters": 0.0000000819159804172057,
+					"certified_max_deviation_meters": 0.00000008191598041,
 					"errors": [],
 					"triangle_count": 4,
 					"triangles": [
@@ -227,8 +227,8 @@
 				"errors": [],
 				"geometry_diagnostics": {
 					"minimum_nonadjacent_clearance_meters": 0.0324999302625656,
-					"narrow_overlap_pair_count": 0,
-					"self_intersection_count": 0,
+					"narrow_overlap_pair_count": 0.0,
+					"self_intersection_count": 0.0,
 					"triangle_validation": "complete"
 				},
 				"has_outline": true,
@@ -249,7 +249,7 @@
 				},
 				"runs": [
 					{
-						"bevel_join_count": 0,
+						"bevel_join_count": 0.0,
 						"centerline": [
 							{
 								"curve_t": 0.0,
@@ -317,19 +317,19 @@
 						],
 						"end_cap": "none",
 						"geometry_diagnostics": {
-							"centerline_segment_count": 6,
+							"centerline_segment_count": 6.0,
 							"minimum_nonadjacent_clearance_tool_units": 0.324999302625656,
-							"narrow_overlap_pair_count": 0,
-							"self_intersection_count": 0
+							"narrow_overlap_pair_count": 0.0,
+							"self_intersection_count": 0.0
 						},
-						"index_count": 66,
-						"index_offset": 0,
-						"miter_join_count": 5,
+						"index_count": 66.0,
+						"index_offset": 0.0,
+						"miter_join_count": 5.0,
 						"run_id": "chain_6991314709504137889:run:0",
 						"start_cap": "none",
-						"triangle_count": 22,
-						"vertex_count": 44,
-						"vertex_offset": 0
+						"triangle_count": 22.0,
+						"vertex_count": 44.0,
+						"vertex_offset": 0.0
 					}
 				],
 				"source_chain_closed": true,
