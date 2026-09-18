@@ -9344,7 +9344,10 @@ func _copied_point_records(points: Array, point_ids: Array) -> Array:
 
 
 ## Pasted Points land in the Component that is being edited, as Chains of their
-## own and at the positions they were copied from. That leaves a Closed Loop or
+## own, and they land under the pointer: the centre of the copied run goes to
+## the snapped mouse position, which is where the author is looking. With the
+## pointer off the canvas there is no such position, and the run keeps the one
+## it was copied from. That leaves a Closed Loop or
 ## a Contour with more than the one Chain it is finished with, which is the
 ## author's to resolve: Fuse Point joins two Chains at a shared Point, and
 ## until then the Inspector says the Component is unfinished.
@@ -9359,8 +9362,11 @@ func _paste_point_clipboard() -> void:
 	var runs: Array = point_clipboard.get("runs", [])
 	if runs.is_empty():
 		return
+	var anchor: Dictionary = canvas_view.snapped_mouse_local_position() if is_instance_valid(canvas_view) else {}
+	var pointed_at_canvas := bool(anchor.get("found", false))
+	var offset := Vector2(anchor.get("position", Vector2.ZERO)) - _point_runs_center(runs) if pointed_at_canvas else Vector2.ZERO
 	var preview := component.duplicate(true)
-	var pasted_ids := _append_pasted_point_runs(preview, runs)
+	var pasted_ids := _append_pasted_point_runs(preview, runs, offset)
 	var errors := BezierTopology.validate(preview)
 	if pasted_ids.is_empty() or not errors.is_empty():
 		_show_status_message("Points were not pasted: %s" % (errors[0] if not errors.is_empty() else "nothing to paste"))
@@ -9378,13 +9384,29 @@ func _paste_point_clipboard() -> void:
 	_refresh_component_geometry(component)
 	if is_instance_valid(canvas_view):
 		canvas_view.set_selected_point_ids(selected_point_ids)
-	_show_status_message("Pasted %d Point%s as %d Chain%s · Fuse Point joins a Chain to the Component's own." % [
+	_show_status_message("Pasted %d Point%s as %d Chain%s %s · Fuse Point joins a Chain to the Component's own." % [
 		pasted_ids.size(), "" if pasted_ids.size() == 1 else "s",
-		runs.size(), "" if runs.size() == 1 else "s"])
+		runs.size(), "" if runs.size() == 1 else "s",
+		"at the pointer" if pointed_at_canvas else "where they were copied from"])
 	_invalidate_render(RENDER_DOCUMENT)
 
 
-func _append_pasted_point_runs(component: Dictionary, runs: Array) -> Array[String]:
+## The centre the pointer takes over: the mean of every copied Point, the same
+## centre a Point selection turns about.
+func _point_runs_center(runs: Array) -> Vector2:
+	var center := Vector2.ZERO
+	var counted := 0
+	for run in runs:
+		if not run is Dictionary:
+			continue
+		for point in run.get("points", []):
+			if point is Dictionary:
+				center += Vector2(point.get("position", Vector2.ZERO))
+				counted += 1
+	return center / float(counted) if counted > 0 else Vector2.ZERO
+
+
+func _append_pasted_point_runs(component: Dictionary, runs: Array, offset := Vector2.ZERO) -> Array[String]:
 	var pasted_ids: Array[String] = []
 	var points: Array = component.get("points", [])
 	var chains: Array = component.get("chains", [])
@@ -9400,6 +9422,7 @@ func _append_pasted_point_runs(component: Dictionary, runs: Array) -> Array[Stri
 				continue
 			var point_copy: Dictionary = source_point.duplicate(true)
 			point_copy["id"] = BezierTopology.next_id(points, "point")
+			point_copy["position"] = Vector2(source_point.get("position", Vector2.ZERO)) + offset
 			points.append(point_copy)
 			chain_point_ids.append(str(point_copy.get("id", "")))
 			pasted_ids.append(str(point_copy.get("id", "")))

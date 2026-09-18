@@ -1162,6 +1162,20 @@ func set_selected_point_ids(point_ids: Array) -> void:
 	_set_selected_point_ids(point_ids)
 
 
+## Where the pointer is, in Component-local coordinates and snapped the way a
+## drawn Point is. `found` is false while the pointer is outside the canvas,
+## because then there is no place the author is pointing at and the caller has
+## to decide for itself.
+func snapped_mouse_local_position() -> Dictionary:
+	if not is_inside_tree():
+		return {"found": false, "position": Vector2.ZERO}
+	var screen_position := get_local_mouse_position()
+	if not Rect2(Vector2.ZERO, size).has_point(screen_position):
+		return {"found": false, "position": Vector2.ZERO}
+	return {"found": true,
+		"position": _snap_to_canvas_position(_world_to_local(_screen_to_world(screen_position)))}
+
+
 func place_pivot_at_mouse() -> bool:
 	return _place_pivot_at_screen_position(get_local_mouse_position())
 

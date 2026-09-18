@@ -276,11 +276,25 @@ func _test_point_clipboard() -> void:
 	_expect(subject.get("points", []).size() == 5 and subject.get("chains", []).size() == chain_count_before + 1, "Pasting should add the copied Points as one Chain of their own rather than into the Chain they came from.")
 	_expect(application.selected_point_ids.size() == 2 and not application.selected_point_ids.has(point_ids[0]) and application.active_edit_mode == "point", "The pasted Points should be what is selected, ready to be moved.")
 	var pasted_first: Dictionary = BezierTopology.point_by_id(subject.get("points", []), application.selected_point_ids[0])
-	_expect(Vector2(pasted_first.get("position", Vector2.ZERO)).distance_to(first_source) < 0.000_001, "A pasted Point should land where it was copied from.")
+	_expect(Vector2(pasted_first.get("position", Vector2.ZERO)).distance_to(first_source) < 0.000_001, "With the pointer off the canvas a pasted Point should keep the position it was copied from.")
 	var pasted_chain: Dictionary = BezierTopology.chain_for_point(subject.get("chains", []), application.selected_point_ids[0])
 	_expect(pasted_chain.get("point_ids", []).size() == 2 and pasted_chain.get("edge_ids", []).size() == 1 and not bool(pasted_chain.get("closed", false)), "The pasted Chain should carry the run's own Points and the Edge between them.")
 	_expect(BezierTopology.validate(subject).is_empty(), "A paste that leaves the topology broken is no paste at all.")
 	_expect(application.undo_history.size() == undo_depth_before + 1, "A paste should be one undo step.")
+	# Under the pointer, the centre of the copied run goes to the pointer and
+	# every Point keeps its place relative to that centre.
+	var runs: Array = application.point_clipboard.get("runs", [])
+	var runs_center: Vector2 = application._point_runs_center(runs)
+	var pointer_target := runs_center + Vector2(4.0, -3.0)
+	var anchored := subject.duplicate(true)
+	var anchored_ids: Array = application._append_pasted_point_runs(anchored, runs, pointer_target - runs_center)
+	var anchored_center := Vector2.ZERO
+	for anchored_id in anchored_ids:
+		anchored_center += Vector2(BezierTopology.point_by_id(anchored.get("points", []), str(anchored_id)).get("position", Vector2.ZERO))
+	anchored_center /= float(anchored_ids.size())
+	_expect(anchored_ids.size() == 2 and anchored_center.distance_to(pointer_target) < 0.000_001, "Pasting at the pointer should put the centre of the copied run there.")
+	var anchored_first: Vector2 = BezierTopology.point_by_id(anchored.get("points", []), str(anchored_ids[0])).get("position", Vector2.ZERO)
+	_expect(anchored_first.distance_to(first_source + (pointer_target - runs_center)) < 0.000_001, "Every pasted Point should keep its offset from that centre.")
 	# Copying with no Point selected falls back to the Component, and Paste
 	# then pastes Components again rather than the Points from before.
 	application.selected_point_ids = [] as Array[String]

@@ -565,8 +565,10 @@ apart: with Points selected while Points are being edited they take those
 Points, otherwise the Component subtrees. Copied Points keep the runs they
 form along their Chains — a run may cross a closed Chain's seam, and a closed
 Chain selected whole stays closed — and paste into the Component being edited
-as Chains of their own, at the positions they were copied from, selected and
-ready to be moved. A Component then holds more than the one Chain it is
+as Chains of their own, selected and ready to be moved. They land under the
+pointer: the centre of the copied run goes to the snapped mouse position, and
+each Point keeps its offset from that centre. With the pointer off the canvas
+there is no such position and the run keeps the one it was copied from. A Component then holds more than the one Chain it is
 finished with, which is deliberate and the author's to resolve: Fuse Point
 joins two Chains at a shared Point, and until then the Inspector reports the
 Component as unfinished and Meshing and Runtime Export refuse it. Groups are
