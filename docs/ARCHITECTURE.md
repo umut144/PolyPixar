@@ -558,7 +558,18 @@ exactly where it is. Duplicate, with and without a mirror, reads the same
 Outliner selection as Group, Copy Components and Remove from Group: every
 selected Component is copied with its own subtree in one undo step, and a
 selected Child inside a selected Parent is not copied twice because its
-Parent's subtree already carries it. The new copies are what stays selected. Groups are
+Parent's subtree already carries it. The new copies are what stays selected.
+
+Copy and Paste follow the selection the same way, and keep two clipboards
+apart: with Points selected while Points are being edited they take those
+Points, otherwise the Component subtrees. Copied Points keep the runs they
+form along their Chains — a run may cross a closed Chain's seam, and a closed
+Chain selected whole stays closed — and paste into the Component being edited
+as Chains of their own, at the positions they were copied from, selected and
+ready to be moved. A Component then holds more than the one Chain it is
+finished with, which is deliberate and the author's to resolve: Fuse Point
+joins two Chains at a shared Point, and until then the Inspector reports the
+Component as unfinished and Meshing and Runtime Export refuse it. Groups are
 editor-only containers: runtime export emits ordinary Components and resolves
 the Group transform into their canonical exported transforms.
 

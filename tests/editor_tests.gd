@@ -243,6 +243,55 @@ func _create_set_member(application: Control, asset_id: String, member_name: Str
 	return application.selected_component_id
 
 
+func _test_point_clipboard() -> void:
+	# Copy takes what is selected: Points while Points are being edited, and
+	# the Component otherwise. Pasted Points land in the same Component as
+	# Chains of their own, at the positions they were copied from.
+	var component := _outliner_test_component("component_1", "body")
+	var application: Control = load("res://scripts/main.gd").new()
+	application._build_ui()
+	var assets: Array[Dictionary] = [{"id": "asset_1", "name": "Wizard", "visibility": true,
+		"components": [component], "groups": [], "guides": []}]
+	application.assets = assets
+	application.selected_asset_id = "asset_1"
+	application.selected_component_id = "component_1"
+	var subject: Dictionary = application._get_component(application._get_asset("asset_1"), "component_1")
+	var point_ids: Array[String] = []
+	for point in subject.get("points", []):
+		point_ids.append(str(point.get("id", "")))
+	_expect(point_ids.size() == 3, "The fixture Component should carry the three Points this test copies from.")
+	application.active_state = "edit"
+	application.active_edit_mode = "point"
+	var copied_selection: Array[String] = [point_ids[0], point_ids[1]]
+	application.selected_point_ids = copied_selection
+	application.selected_point_id = point_ids[1]
+	_expect(application._point_selection_is_copyable(), "With Points selected while Points are edited, Copy should take the Points.")
+	application._copy_selected_points()
+	_expect(application.clipboard_kind == "points" and application.point_clipboard.get("runs", []).size() == 1, "Two Points that follow each other in one Chain should be copied as one run.")
+	var first_source: Vector2 = BezierTopology.point_by_id(subject.get("points", []), point_ids[0]).get("position", Vector2.ZERO)
+	var chain_count_before: int = subject.get("chains", []).size()
+	var undo_depth_before: int = application.undo_history.size()
+	application._paste_point_clipboard()
+	subject = application._get_component(application._get_asset("asset_1"), "component_1")
+	_expect(subject.get("points", []).size() == 5 and subject.get("chains", []).size() == chain_count_before + 1, "Pasting should add the copied Points as one Chain of their own rather than into the Chain they came from.")
+	_expect(application.selected_point_ids.size() == 2 and not application.selected_point_ids.has(point_ids[0]) and application.active_edit_mode == "point", "The pasted Points should be what is selected, ready to be moved.")
+	var pasted_first: Dictionary = BezierTopology.point_by_id(subject.get("points", []), application.selected_point_ids[0])
+	_expect(Vector2(pasted_first.get("position", Vector2.ZERO)).distance_to(first_source) < 0.000_001, "A pasted Point should land where it was copied from.")
+	var pasted_chain: Dictionary = BezierTopology.chain_for_point(subject.get("chains", []), application.selected_point_ids[0])
+	_expect(pasted_chain.get("point_ids", []).size() == 2 and pasted_chain.get("edge_ids", []).size() == 1 and not bool(pasted_chain.get("closed", false)), "The pasted Chain should carry the run's own Points and the Edge between them.")
+	_expect(BezierTopology.validate(subject).is_empty(), "A paste that leaves the topology broken is no paste at all.")
+	_expect(application.undo_history.size() == undo_depth_before + 1, "A paste should be one undo step.")
+	# Copying with no Point selected falls back to the Component, and Paste
+	# then pastes Components again rather than the Points from before.
+	application.selected_point_ids = [] as Array[String]
+	application.selected_point_id = ""
+	_expect(not application._point_selection_is_copyable(), "With no Point selected, Copy should fall back to the Component selection.")
+	application.selected_component_ids = ["component_1"] as Array[String]
+	application._copy_selected_component_subtrees()
+	_expect(application.clipboard_kind == "components", "Copying Components should make Paste paste Components again.")
+	application.free()
+
+
 func _test_asset_root_reference_creation() -> void:
 	# A Symbol that belongs to the Asset rather than to one of its Components
 	# is authored at the Asset root. The document, the Inspector's Parent

@@ -152,6 +152,10 @@ var selected_asset_id := ""
 var selected_component_id := ""
 var selected_component_ids: Array[String] = []
 var component_clipboard: Dictionary = {}
+## Copy works on what is selected, and Paste on whatever was copied last, so
+## the two clipboards are kept apart and the kind decides between them.
+var point_clipboard: Dictionary = {}
+var clipboard_kind := ""
 var selected_group_id := ""
 var selected_guide_id := ""
 var selected_sampling_input_id := ""
@@ -488,9 +492,14 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		if focus_owner is LineEdit or focus_owner is TextEdit or focus_owner is SpinBox:
 			return
 		if event.keycode == KEY_C:
-			_copy_selected_component_subtrees()
+			if _point_selection_is_copyable():
+				_copy_selected_points()
+			else:
+				_copy_selected_component_subtrees()
 		elif selected_asset_id.is_empty():
 			return
+		elif clipboard_kind == "points":
+			_paste_point_clipboard()
 		else:
 			_paste_component_clipboard(selected_asset_id, selected_component_id)
 		get_viewport().set_input_as_handled()
@@ -9245,6 +9254,171 @@ func _selected_component_ids_for_clipboard(asset: Dictionary) -> Array[String]:
 	return selected_ids
 
 
+## Copy takes Points while Points are what is being edited and something is
+## selected; a Component selection is what it falls back to.
+func _point_selection_is_copyable() -> bool:
+	if active_edit_mode != "point" or not selected_guide_id.is_empty():
+		return false
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	return not component.is_empty() and not _valid_selected_point_ids(component).is_empty()
+
+
+func _copy_selected_points() -> void:
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	var point_ids := _valid_selected_point_ids(component)
+	if component.is_empty() or point_ids.is_empty():
+		return
+	var runs := _selected_point_runs(component, point_ids)
+	var copied_count := 0
+	for run in runs:
+		copied_count += run.get("points", []).size()
+	if copied_count == 0:
+		_show_status_message("Select one or more Points to copy.")
+		return
+	point_clipboard = {"runs": runs}
+	clipboard_kind = "points"
+	_show_status_message("Copied %d Point%s." % [copied_count, "" if copied_count == 1 else "s"])
+
+
+## The selection, grouped into the runs it forms along its Chains: Points that
+## follow each other keep following each other when they are pasted, which is
+## what makes a copied piece of a shape paste as that piece. A closed Chain has
+## no first and last Point, so a run may cross its seam, and a closed Chain
+## selected whole pastes as a closed Chain again.
+func _selected_point_runs(component: Dictionary, point_ids: Array) -> Array:
+	var selected: Dictionary = {}
+	for point_id_value in point_ids:
+		selected[str(point_id_value)] = true
+	var points: Array = component.get("points", [])
+	var runs: Array = []
+	var covered: Dictionary = {}
+	for chain in component.get("chains", []):
+		if not chain is Dictionary:
+			continue
+		var chain_point_ids: Array = chain.get("point_ids", [])
+		var closed := bool(chain.get("closed", false))
+		var selected_in_chain: Array[String] = []
+		for chain_point_id in chain_point_ids:
+			if selected.has(str(chain_point_id)):
+				selected_in_chain.append(str(chain_point_id))
+		if selected_in_chain.is_empty():
+			continue
+		for chain_point_id in selected_in_chain:
+			covered[chain_point_id] = true
+		if closed and selected_in_chain.size() == chain_point_ids.size():
+			runs.append({"closed": true, "points": _copied_point_records(points, chain_point_ids)})
+			continue
+		var chain_runs: Array = []
+		var current: Array[String] = []
+		for chain_point_id in chain_point_ids:
+			if selected.has(str(chain_point_id)):
+				current.append(str(chain_point_id))
+			elif not current.is_empty():
+				chain_runs.append(current.duplicate())
+				current.clear()
+		if not current.is_empty():
+			chain_runs.append(current.duplicate())
+		if closed and chain_runs.size() > 1 \
+			and selected.has(str(chain_point_ids[0])) \
+			and selected.has(str(chain_point_ids[chain_point_ids.size() - 1])):
+			var first_run: Array = chain_runs.pop_front()
+			var last_run: Array = chain_runs.pop_back()
+			chain_runs.append(last_run + first_run)
+		for run_ids in chain_runs:
+			runs.append({"closed": false, "points": _copied_point_records(points, run_ids)})
+	# A Point that belongs to no Chain is still a Point the author selected.
+	for point_id_value in point_ids:
+		var point_id := str(point_id_value)
+		if not covered.has(point_id):
+			runs.append({"closed": false, "points": _copied_point_records(points, [point_id])})
+	return runs
+
+
+func _copied_point_records(points: Array, point_ids: Array) -> Array:
+	var records: Array = []
+	for point_id_value in point_ids:
+		var point := BezierTopology.point_by_id(points, str(point_id_value))
+		if not point.is_empty():
+			records.append(point.duplicate(true))
+	return records
+
+
+## Pasted Points land in the Component that is being edited, as Chains of their
+## own and at the positions they were copied from. That leaves a Closed Loop or
+## a Contour with more than the one Chain it is finished with, which is the
+## author's to resolve: Fuse Point joins two Chains at a shared Point, and
+## until then the Inspector says the Component is unfinished.
+func _paste_point_clipboard() -> void:
+	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
+	if component.is_empty():
+		_show_status_message("Select the Component to paste the Points into.")
+		return
+	if _is_reference_component(component) or _is_region(component) or WorldDocumentService.is_primitive(component):
+		_show_status_message("Points can be pasted only into a Bezier Component.")
+		return
+	var runs: Array = point_clipboard.get("runs", [])
+	if runs.is_empty():
+		return
+	var preview := component.duplicate(true)
+	var pasted_ids := _append_pasted_point_runs(preview, runs)
+	var errors := BezierTopology.validate(preview)
+	if pasted_ids.is_empty() or not errors.is_empty():
+		_show_status_message("Points were not pasted: %s" % (errors[0] if not errors.is_empty() else "nothing to paste"))
+		return
+	_record_direct_change()
+	component["points"] = preview.get("points", [])
+	component["edges"] = preview.get("edges", [])
+	component["chains"] = preview.get("chains", [])
+	BezierGeometry.resolve_auto_handles(component.get("points", []), component.get("chains", []))
+	_activate_edit_point_state()
+	selected_point_ids = pasted_ids
+	selected_point_id = pasted_ids[0] if pasted_ids.size() == 1 else ""
+	# The canvas keeps only the Points it knows and reports that selection
+	# back, so it learns the new geometry first and the selection after.
+	_refresh_component_geometry(component)
+	if is_instance_valid(canvas_view):
+		canvas_view.set_selected_point_ids(selected_point_ids)
+	_show_status_message("Pasted %d Point%s as %d Chain%s · Fuse Point joins a Chain to the Component's own." % [
+		pasted_ids.size(), "" if pasted_ids.size() == 1 else "s",
+		runs.size(), "" if runs.size() == 1 else "s"])
+	_invalidate_render(RENDER_DOCUMENT)
+
+
+func _append_pasted_point_runs(component: Dictionary, runs: Array) -> Array[String]:
+	var pasted_ids: Array[String] = []
+	var points: Array = component.get("points", [])
+	var chains: Array = component.get("chains", [])
+	for run in runs:
+		if not run is Dictionary:
+			continue
+		var run_points: Array = run.get("points", [])
+		if run_points.is_empty():
+			continue
+		var chain_point_ids: Array[String] = []
+		for source_point in run_points:
+			if not source_point is Dictionary:
+				continue
+			var point_copy: Dictionary = source_point.duplicate(true)
+			point_copy["id"] = BezierTopology.next_id(points, "point")
+			points.append(point_copy)
+			chain_point_ids.append(str(point_copy.get("id", "")))
+			pasted_ids.append(str(point_copy.get("id", "")))
+		if chain_point_ids.is_empty():
+			continue
+		var chain := {
+			"id": BezierTopology.next_id(chains, "chain"),
+			"point_ids": chain_point_ids,
+			"edge_ids": [],
+			"closed": bool(run.get("closed", false)) and chain_point_ids.size() >= 3,
+			"topology_role": WorldDocumentService.topology_role(component)
+		}
+		chains.append(chain)
+		BezierTopology.rebuild_chain_edges(component, chain)
+	component["points"] = points
+	component["chains"] = chains
+	return pasted_ids
+
+
 func _copy_selected_component_subtrees(source_asset_id := "") -> void:
 	var asset_id := source_asset_id if not source_asset_id.is_empty() else selected_asset_id
 	var asset := _get_asset(asset_id)
@@ -9281,6 +9455,7 @@ func _copy_selected_component_subtrees(source_asset_id := "") -> void:
 		"components": copied_components,
 		"guides": copied_guides
 	}
+	clipboard_kind = "components"
 	_show_status_message("Copied %d Component%s." % [root_ids.size(), "" if root_ids.size() == 1 else "s"])
 
 
