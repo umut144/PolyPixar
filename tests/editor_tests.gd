@@ -243,6 +243,51 @@ func _create_set_member(application: Control, asset_id: String, member_name: Str
 	return application.selected_component_id
 
 
+func _test_asset_root_reference_creation() -> void:
+	# A Symbol that belongs to the Asset rather than to one of its Components
+	# is authored at the Asset root. The document, the Inspector's Parent
+	# picker and Runtime Export have always allowed a parentless Reference; the
+	# Asset's own Add menu is what was missing.
+	var application: Control = load("res://scripts/main.gd").new()
+	application._build_ui()
+	var assets: Array[Dictionary] = [
+		{"id": "asset_1", "name": "Wizard", "asset_type": "character", "visibility": true,
+			"components": [_outliner_test_component("component_1", "body")], "groups": [], "guides": []},
+		{"id": "asset_2", "name": "Orb", "asset_type": "symbols", "visibility": true,
+			"components": [_outliner_test_component("component_2", "body")], "groups": [], "guides": []},
+		{"id": "asset_3", "name": "Sword", "asset_type": "weapons", "visibility": true,
+			"components": [_outliner_test_component("component_3", "body")], "groups": [], "guides": []}]
+	application.assets = assets
+	application.next_component_id = 50
+	application.component_draw_mode_menu.set_meta("asset_id", "asset_1")
+	application._populate_asset_reference_menu("asset_1")
+	var reference_item_index: int = application.component_draw_mode_menu.get_item_index(application.ASSET_ADD_REFERENCE_ID)
+	var offered_sources: Array[String] = []
+	for item_index in application.asset_reference_menu.item_count:
+		offered_sources.append(str(application.asset_reference_menu.get_item_text(item_index)))
+	var expected_sources: Array[String] = ["Orb"]
+	_expect(reference_item_index >= 0 and not application.component_draw_mode_menu.is_item_disabled(reference_item_index) and offered_sources == expected_sources, "The Asset Add menu should offer a Reference, and the same Symbols-only sources a Component's own Reference entry offers.")
+	# The dialog the entry opens needs a Viewport, so its metadata is set here
+	# the way that entry sets it, and the creation itself is what is checked.
+	application.component_dialog.set_meta("asset_id", "asset_1")
+	application.component_dialog.set_meta("parent_component_id", "")
+	application.component_dialog.set_meta("draw_mode", "reference")
+	application.component_dialog.set_meta("source_asset_id", "asset_2")
+	application.component_dialog.set_meta("group_id", "")
+	application.component_name_input.text = "sigil"
+	application._confirm_component_creation()
+	var created: Dictionary = application._get_component(application._get_asset("asset_1"), application.selected_component_id)
+	_expect(application._is_reference_component(created) and str(created.get("source_asset_id", "")) == "asset_2" and str(created.get("parent_component_id", "")).is_empty() and str(created.get("name", "")) == "sigil", "Adding a Reference from the Asset row should create it at the Asset root, pointing at the chosen Symbol.")
+	# The entry refuses a source that would close a cycle, before any dialog.
+	application.asset_reference_menu.add_item("Wizard", application.asset_reference_menu.item_count)
+	application.asset_reference_menu.set_item_metadata(application.asset_reference_menu.item_count - 1, "asset_1")
+	application._on_asset_add_reference_selected(application.asset_reference_menu.item_count - 1)
+	_expect(str(application.program_status_label.text).contains("cannot reference itself") and application._get_asset("asset_1").get("components", []).size() == 2, "A Reference the Asset already reaches should be refused with a reason instead of opening the dialog.")
+	application._populate_asset_reference_menu("asset_2")
+	_expect(application.component_draw_mode_menu.is_item_disabled(application.component_draw_mode_menu.get_item_index(application.ASSET_ADD_REFERENCE_ID)), "With no Symbol left to instance - a Symbol cannot reference itself - the entry is offered as unavailable rather than empty.")
+	application.free()
+
+
 func _test_retired_asset_ids() -> void:
 	# An ID that was handed out once is never handed out again. Derived from
 	# what exists, the next ID drops back as soon as the highest Asset is

@@ -102,6 +102,17 @@ because it is assembled rather than placed. `_reference_cycle_issue` completes
 it — a cycle is a consumer's infinite recursion, so it is rejected where it
 would be authored rather than exported and left for the consumer to notice.
 
+A Single offers the same entry on its own Asset row, for a Symbol that belongs
+to the Asset rather than to one of its Components: the same Symbols-only
+candidates, the same cycle check, and no Parent. A parentless Reference was
+always part of the document — the Inspector's Parent picker offers `Root`, and
+Detach from Parent reaches it — so the Asset row only closes the detour of
+authoring it under some Component first and reparenting it afterwards. What a
+Parent buys is what a Parent is for: the Reference follows that Component's
+transform and visibility, and only a Reference with a direct outer Body as
+Parent can act as its Sampling Hole. A Set keeps its own rule, that every
+member sits at the Set's root, and Runtime Export still checks it.
+
 A member is an ordinary Asset, so it keeps its own type, its own Components
 and its own place in Mesh and Style. What it does not keep is a second entry in
 `Single`: that view lists what is placed on its own, and an Asset some

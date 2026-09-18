@@ -28,6 +28,9 @@ const CONSUMER_SYNC_SCRIPTS := [
 	{"label": "game04", "path": "res://scripts/sync_game04_consumers.sh"},
 ]
 const REGION_TYPES := WorldDocumentService.REGION_TYPES
+## The Asset Add menu's Reference entry, kept clear of the three Draw Mode ids
+## the same menu reports through _on_component_draw_mode_selected.
+const ASSET_ADD_REFERENCE_ID := 9
 const MAX_HISTORY_SIZE := 100
 # Render targets. Mutations declare what became stale; the flush below decides
 # what actually runs, once per frame.
@@ -194,6 +197,7 @@ var component_dialog: ConfirmationDialog
 var component_name_input: LineEdit
 var component_name_hint: Label
 var component_draw_mode_menu: PopupMenu
+var asset_reference_menu: PopupMenu
 var component_add_menu: PopupMenu
 var component_add_child_menu: PopupMenu
 var component_add_guide_menu: PopupMenu
@@ -2044,10 +2048,21 @@ func _create_group_dialog() -> void:
 
 func _create_component_draw_mode_menu() -> void:
 	component_draw_mode_menu = PopupMenu.new()
+	component_draw_mode_menu.name = "AssetAddMenu"
 	component_draw_mode_menu.add_item("Closed Loop", 0)
 	component_draw_mode_menu.add_item("Contour", 1)
 	component_draw_mode_menu.add_item("Primitive", 2)
+	# A Symbol that belongs to the Asset rather than to one of its Components
+	# is authored here, at the Asset root. The same Symbols-only candidate list
+	# and cycle check as a Component's own Reference entry; a Reference
+	# authored as a Hole still needs the Body it cuts and is reparented there.
+	asset_reference_menu = PopupMenu.new()
+	asset_reference_menu.name = "AssetReferenceSources"
+	asset_reference_menu.id_pressed.connect(_on_asset_add_reference_selected)
+	component_draw_mode_menu.add_child(asset_reference_menu)
+	component_draw_mode_menu.add_submenu_item("Reference", "AssetReferenceSources", ASSET_ADD_REFERENCE_ID)
 	EditorWidgets.style_popup_menu(component_draw_mode_menu)
+	EditorWidgets.style_popup_menu(asset_reference_menu)
 	component_draw_mode_menu.id_pressed.connect(_on_component_draw_mode_selected)
 	add_child(component_draw_mode_menu)
 
@@ -8468,8 +8483,20 @@ func _open_component_dialog(asset_id: String, anchor: Control) -> void:
 		return
 	component_draw_mode_menu.set_meta("asset_id", asset_id)
 	component_draw_mode_menu.set_meta("parent_component_id", "")
+	_populate_asset_reference_menu(asset_id)
 	component_draw_mode_menu.position = Vector2i(anchor.global_position + Vector2(0.0, anchor.size.y))
 	component_draw_mode_menu.popup()
+
+
+## The Symbols the Asset row's Reference entry offers, and whether it has any
+## to offer at all. Separate from the popup so the menu can be built - and
+## checked - without a Viewport.
+func _populate_asset_reference_menu(asset_id: String) -> void:
+	asset_reference_menu.clear()
+	for source_asset in _reference_source_candidates(asset_id):
+		asset_reference_menu.add_item(str(source_asset.get("name", "Asset")), asset_reference_menu.item_count)
+		asset_reference_menu.set_item_metadata(asset_reference_menu.item_count - 1, str(source_asset.get("id", "")))
+	component_draw_mode_menu.set_item_disabled(component_draw_mode_menu.get_item_index(ASSET_ADD_REFERENCE_ID), asset_reference_menu.item_count == 0)
 
 
 func _open_composition_add_menu(menu: PopupMenu, asset_id: String, anchor: Control) -> void:
@@ -8642,6 +8669,19 @@ func _on_component_add_reference_selected(index: int) -> void:
 		_show_status_message(cycle_issue)
 		return
 	_open_component_name_dialog(str(asset.get("id", "")), str(component_add_menu.get_meta("parent_component_id", "")), "reference", str(source_asset.get("id", "")))
+
+
+func _on_asset_add_reference_selected(index: int) -> void:
+	var item_index := asset_reference_menu.get_item_index(index)
+	var source_asset := _get_asset(str(asset_reference_menu.get_item_metadata(item_index)))
+	var asset := _get_asset(str(component_draw_mode_menu.get_meta("asset_id", "")))
+	if source_asset.is_empty() or asset.is_empty():
+		return
+	var cycle_issue := _reference_cycle_issue(str(asset.get("id", "")), str(source_asset.get("id", "")))
+	if not cycle_issue.is_empty():
+		_show_status_message(cycle_issue)
+		return
+	_open_component_name_dialog(str(asset.get("id", "")), "", "reference", str(source_asset.get("id", "")))
 
 
 func _on_component_draw_mode_selected(index: int) -> void:
