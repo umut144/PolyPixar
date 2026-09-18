@@ -364,9 +364,15 @@ func rebuild() -> void:
 		if is_multi_point_selection:
 			# The delta handler needs the field it belongs to, so the fields are
 			# built unconnected and wired from the returned map.
+			# Rotation turns the selection about its own centre, in whole
+			# degrees on the arrows, counter-clockwise for a positive value
+			# like every other authored rotation.
 			var delta_fields := EditorWidgets.build_number_grid(point_transform_grid, [
 				{"caption": "Delta X (cm)", "property": "position_x", "value": 0.0, "step": POSITION_STEP},
 				{"caption": "Delta Y (cm)", "property": "position_y", "value": 0.0, "step": POSITION_STEP},
+				{"caption": "Rotate (deg)", "property": "rotation", "value": 0.0, "min": -360.0, "max": 360.0,
+					"step": 0.1, "arrow_step": 1.0,
+					"tooltip": "Turns the selected Points around their common centre"},
 			], Callable())
 			for delta_property in delta_fields:
 				var delta_field: SpinBox = delta_fields[delta_property]

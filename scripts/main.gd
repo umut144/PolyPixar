@@ -12232,25 +12232,48 @@ func _on_selected_points_preserve_changed(enabled: bool, _point_ids: Array) -> v
 
 
 func _on_selected_points_delta_changed(value: float, property_name: String, field: SpinBox) -> void:
-	if is_zero_approx(value) or property_name not in ["position_x", "position_y"]:
+	if is_zero_approx(value) or property_name not in ["position_x", "position_y", "rotation"]:
 		return
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
 	var point_ids := _valid_selected_point_ids(component)
 	if component.is_empty() or point_ids.size() < 2:
 		return
-	var local_delta := _world_to_editor_units(value)
 	_record_direct_change()
-	for point_id in point_ids:
-		var point := BezierTopology.point_by_id(component.get("points", []), point_id)
-		var point_position: Vector2 = point.get("position", Vector2.ZERO)
-		if property_name == "position_x":
-			point_position.x += local_delta
-		else:
-			point_position.y += local_delta
-		point["position"] = point_position
+	if property_name == "rotation":
+		_rotate_points_about_center(component, point_ids, value)
+	else:
+		var local_delta := _world_to_editor_units(value)
+		for point_id in point_ids:
+			var point := BezierTopology.point_by_id(component.get("points", []), point_id)
+			var point_position: Vector2 = point.get("position", Vector2.ZERO)
+			if property_name == "position_x":
+				point_position.x += local_delta
+			else:
+				point_position.y += local_delta
+			point["position"] = point_position
 	BezierGeometry.resolve_auto_handles(component.get("points", []), component.get("chains", []))
 	_refresh_component_geometry(component)
 	field.set_value_no_signal(0.0)
+
+
+## Turns a Point selection about the mean of its own positions, which is the
+## one centre that needs nothing selected but the Points themselves and that
+## stays put while they turn. Authored handles turn with their Point so the
+## curve keeps its shape; automatic ones are resolved again by the caller
+## either way. A positive angle turns counter-clockwise, as everywhere else:
+## the document's Y axis points up.
+func _rotate_points_about_center(component: Dictionary, point_ids: Array, degrees: float) -> void:
+	var points: Array = component.get("points", [])
+	var center := Vector2.ZERO
+	for point_id in point_ids:
+		center += Vector2(BezierTopology.point_by_id(points, str(point_id)).get("position", Vector2.ZERO))
+	center /= float(point_ids.size())
+	var radians := deg_to_rad(degrees)
+	for point_id in point_ids:
+		var point := BezierTopology.point_by_id(points, str(point_id))
+		point["position"] = center + (Vector2(point.get("position", Vector2.ZERO)) - center).rotated(radians)
+		point["handle_in"] = Vector2(point.get("handle_in", Vector2.ZERO)).rotated(radians)
+		point["handle_out"] = Vector2(point.get("handle_out", Vector2.ZERO)).rotated(radians)
 
 
 func _on_point_position_changed(value: float, property_name: String) -> void:

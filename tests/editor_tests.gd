@@ -1044,6 +1044,30 @@ func _test_inspector_field_wiring() -> void:
 		and is_equal_approx(second_after.x - second_before.x, expected_delta),
 		"The Delta X field should offset every selected Point by the same amount.")
 	_expect(is_zero_approx(delta_field.value), "The Delta field should reset itself after applying the offset.")
+	# Rotation turns the same selection about the mean of its own positions:
+	# that centre stays put, every distance to it is kept, and a quarter turn
+	# counter-clockwise maps the offset (x, y) to (-y, x).
+	application._render_inspector()
+	var rotate_field := _inspector_spin(application, "Rotate (deg)")
+	_expect(rotate_field != null, "A multi-Point selection should expose its Rotate field.")
+	var rotation_first_before: Vector2 = BezierTopology.point_by_id(body["points"], point_ids[0])["position"]
+	var rotation_second_before: Vector2 = BezierTopology.point_by_id(body["points"], point_ids[1])["position"]
+	var rotation_center: Vector2 = (rotation_first_before + rotation_second_before) * 0.5
+	BezierTopology.point_by_id(body["points"], point_ids[0])["handle_out"] = Vector2(1.0, 0.0)
+	BezierTopology.point_by_id(body["points"], point_ids[0])["handle_source"] = "manual"
+	_edit_inspector_value(rotate_field, 90.0)
+	var rotation_first_after: Vector2 = BezierTopology.point_by_id(body["points"], point_ids[0])["position"]
+	var rotation_second_after: Vector2 = BezierTopology.point_by_id(body["points"], point_ids[1])["position"]
+	var expected_first := rotation_center + Vector2(-(rotation_first_before - rotation_center).y, (rotation_first_before - rotation_center).x)
+	var expected_second := rotation_center + Vector2(-(rotation_second_before - rotation_center).y, (rotation_second_before - rotation_center).x)
+	_expect(rotation_first_after.distance_to(expected_first) < 0.000_001 and rotation_second_after.distance_to(expected_second) < 0.000_001, "The Rotate field should turn every selected Point counter-clockwise about their common centre.")
+	_expect(Vector2(BezierTopology.point_by_id(body["points"], point_ids[0])["handle_out"]).distance_to(Vector2(0.0, 1.0)) < 0.000_001, "An authored handle should turn with its Point so the curve keeps its shape.")
+	_expect(is_zero_approx(rotate_field.value), "The Rotate field should reset itself after applying the turn.")
+	var single_point_selection: Array[String] = [point_ids[0]]
+	application.selected_point_ids = single_point_selection
+	application._render_inspector()
+	_expect(_inspector_spin(application, "Rotate (deg)") == null, "A single Point has no selection to turn, so the field is not offered.")
+	application.selected_point_ids = multi_selection
 
 	# Edge level: one toggle writes every selected Edge.
 	application.active_edit_mode = "edge"
