@@ -92,7 +92,8 @@ Asset names that Asset, not the one that used to hold it.
 
 A Key is not handed out twice either. The Key a deleted Asset carried last, and
 every Key still published under some Asset's `previous_keys`, are refused for a
-new or renamed Asset — a Key that once meant something must not quietly come to
+new or renamed Asset — an author may release one of those `previous_keys`
+entries in PolyTools, which stops publishing it and frees the Key again — a Key that once meant something must not quietly come to
 mean something else, and a consumer that wrote a Key down without an ID beside
 it cannot tell the difference. Keys that never existed in this Catalog are
 outside that guarantee: a consumer whose own vocabulary overlaps with a Key

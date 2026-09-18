@@ -947,6 +947,18 @@ func _test_inspector_field_wiring() -> void:
 	application.asset_rename_input.text = "Wizard"
 	application._confirm_asset_rename()
 	_expect(WorldDocumentService.previous_asset_keys(asset) == ["wizard", "sorcerer"], "Renaming back should record that trail too rather than tidying it away.")
+	# A left-behind Key is spent for every other Asset while it is published,
+	# and given back only on purpose. The dialog needs a Viewport, so what it
+	# would set is set here and the confirmation itself is what is checked.
+	_expect(application._asset_name_validation_error("Sorcerer").contains("still published as its previous Key"), "A Key another Asset left behind should be refused for a new Asset, naming the Asset that carries it.")
+	application.pending_previous_key_release_asset_id = str(asset.get("id", ""))
+	application.pending_previous_key_release = "sorcerer"
+	application._confirm_previous_key_release()
+	_expect(WorldDocumentService.previous_asset_keys(asset) == ["wizard"] and application._asset_name_validation_error("Sorcerer").is_empty(), "Releasing a previous Key should stop publishing it and hand it back for a new Asset.")
+	application.pending_previous_key_release_asset_id = str(asset.get("id", ""))
+	application.pending_previous_key_release = "sorcerer"
+	application._confirm_previous_key_release()
+	_expect(WorldDocumentService.previous_asset_keys(asset) == ["wizard"], "Releasing a Key the Asset no longer carries should change nothing.")
 	# A Key that once meant something must not come to mean something else: a
 	# consumer that wrote it down without an ID beside it cannot tell.
 	application.retired_assets = [{"id": "asset_gone", "last_asset_key": "vial"}]
@@ -2238,6 +2250,7 @@ const CREATE_SIGNAL_ROUTES := [
 	["asset_authored_facing_selected", "_on_asset_authored_facing_selected"],
 	["asset_pivot_property_changed", "_on_asset_pivot_property_changed"],
 	["asset_rename_dialog_requested", "_on_asset_rename_dialog_requested"],
+	["asset_previous_key_release_requested", "_on_asset_previous_key_release_requested"],
 	["asset_root_position_changed", "_on_asset_root_position_changed"],
 	["asset_root_scale_changed", "_on_asset_root_scale_changed"],
 	["asset_root_scale_rebase_requested", "_on_rebase_asset_root_scale_pressed"],
@@ -2289,7 +2302,7 @@ const CREATE_SIGNAL_ROUTES := [
 ]
 
 
-const CREATE_PROBE_CASES := ["asset", "asset_reference", "set_asset", "set_member", "palette_asset", "component", "component_grouped",
+const CREATE_PROBE_CASES := ["asset", "asset_previous_keys", "asset_reference", "set_asset", "set_member", "palette_asset", "component", "component_grouped",
 	"component_contour", "primitive_circle", "primitive_hole", "primitive_ellipse",
 	"primitive_rectangle", "primitive_triangle", "group", "guide",
 	"guide_weapon", "region_authored", "region_component", "multi_component", "point_none", "point_one", "point_many",
@@ -2388,6 +2401,7 @@ func _prepare_create_case(application: Control, case_name: String) -> void:
 	application.active_state = ""
 	application.active_edit_mode = ""
 	asset.erase("reference_image")
+	asset.erase("previous_asset_keys")
 	var body: Dictionary = WorldDocumentService.component_by_id(asset, "component_1")
 	body.erase("group_id")
 	var point_ids: Array[String] = []
@@ -2399,6 +2413,10 @@ func _prepare_create_case(application: Control, case_name: String) -> void:
 	match case_name:
 		"asset":
 			pass
+		"asset_previous_keys":
+			# A renamed Asset publishes the Keys it left behind, and each of
+			# them can be given back.
+			asset["previous_asset_keys"] = ["wizard_old"]
 		"asset_reference":
 			asset["reference_image"] = {"file": "res://ref.png", "target_height_cm": 21.5,
 				"pivot_mode": "center", "visible": true, "opacity": 0.35,

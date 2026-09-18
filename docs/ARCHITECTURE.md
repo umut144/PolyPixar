@@ -810,6 +810,15 @@ Keys an Asset left behind, for the files people write by hand and keep in Keys
 on purpose. `_confirm_asset_rename` appends to that list, which is the only
 place it grows.
 
+A published previous Key is spent for every other Asset, which is what keeps a
+consumer's hand-written Key from quietly meaning something else. A Key that was
+a mistake, or that no consumer ever read, has to be recoverable all the same:
+the Asset Inspector lists the Keys an Asset left behind and releases one on
+request, behind a dialog that names what it costs — a consumer whose own files
+still hold that Key stops finding this Asset through it, and another Asset may
+take it. Only the author can know that, so only the author does it; nothing
+releases a Key on its own, and the Key of a deleted Asset stays spent.
+
 An Asset ID is handed out once. The counters live in the World document rather
 than being derived from what exists, and a deleted Asset's ID is kept in
 `retired_assets` with the Key it carried last; both only ever raise the derived

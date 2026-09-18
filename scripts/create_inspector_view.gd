@@ -16,6 +16,7 @@ signal asset_type_selected(index: int, option: OptionButton)
 signal palette_variant_remove_requested(variant_asset_id: String)
 signal asset_pivot_property_changed(value: float, property_name: String)
 signal asset_rename_dialog_requested()
+signal asset_previous_key_release_requested(previous_key: String)
 signal set_member_rename_dialog_requested()
 signal reference_role_requested(new_role: String)
 signal asset_root_position_changed(value: float, property_name: String)
@@ -209,6 +210,20 @@ func rebuild() -> void:
 		asset_rename_button.focus_mode = Control.FOCUS_NONE
 		asset_rename_button.pressed.connect(asset_rename_dialog_requested.emit)
 		add_child(asset_rename_button)
+		# The Keys this Asset left behind, still published so a consumer that
+		# names Assets by Key can follow the rename. Each one is spent for every
+		# other Asset while it stands here, so each one can be given back.
+		var previous_keys := WorldDocumentService.previous_asset_keys(asset)
+		if not previous_keys.is_empty():
+			add_child(EditorWidgets.create_inspector_field_label("Previous Keys"))
+			for previous_key in previous_keys:
+				var release_button := Button.new()
+				release_button.text = "%s · Release" % previous_key
+				release_button.custom_minimum_size = Vector2(0, 30)
+				release_button.focus_mode = Control.FOCUS_NONE
+				release_button.tooltip_text = "Stops publishing this Key, so another Asset may take it"
+				release_button.pressed.connect(asset_previous_key_release_requested.emit.bind(previous_key))
+				add_child(release_button)
 		# The one Create view does not carry the type any more, so the Asset
 		# root is where it is read and changed.
 		# What the Asset is, and separately how it is composed. A Set is props

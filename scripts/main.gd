@@ -239,6 +239,9 @@ var pending_guide_remove_asset_id := ""
 var pending_guide_remove_id := ""
 var component_remove_dialog: ConfirmationDialog
 var pending_component_remove_asset_id := ""
+var previous_key_release_dialog: ConfirmationDialog
+var pending_previous_key_release_asset_id := ""
+var pending_previous_key_release := ""
 var pending_component_remove_ids: Array[String] = []
 var pending_component_remove_group_id := ""
 var motion_phase_value_label: Label
@@ -1155,6 +1158,7 @@ func _build_ui() -> void:
 	create_inspector_view.palette_variant_remove_requested.connect(_on_palette_variant_remove_requested)
 	create_inspector_view.asset_pivot_property_changed.connect(_on_asset_pivot_property_changed)
 	create_inspector_view.asset_rename_dialog_requested.connect(_on_asset_rename_dialog_requested)
+	create_inspector_view.asset_previous_key_release_requested.connect(_on_asset_previous_key_release_requested)
 	create_inspector_view.set_member_rename_dialog_requested.connect(_on_set_member_rename_dialog_requested)
 	create_inspector_view.reference_role_requested.connect(_on_reference_role_requested)
 	create_inspector_view.asset_root_position_changed.connect(_on_asset_root_position_changed)
@@ -1355,6 +1359,7 @@ func _build_ui() -> void:
 	_create_geometry_seeding_dialogs()
 	_create_guide_dialogs()
 	_create_component_remove_dialog()
+	_create_previous_key_release_dialog()
 
 
 func _create_motion_workspace(parent: Control) -> void:
@@ -1452,6 +1457,18 @@ func _create_guide_dialogs() -> void:
 		pending_guide_remove_id = ""
 	)
 	add_child(guide_remove_dialog)
+
+
+func _create_previous_key_release_dialog() -> void:
+	previous_key_release_dialog = ConfirmationDialog.new()
+	previous_key_release_dialog.title = "Release Previous Key"
+	previous_key_release_dialog.ok_button_text = "Release"
+	previous_key_release_dialog.confirmed.connect(_confirm_previous_key_release)
+	previous_key_release_dialog.canceled.connect(func() -> void:
+		pending_previous_key_release_asset_id = ""
+		pending_previous_key_release = ""
+	)
+	add_child(previous_key_release_dialog)
 
 
 func _create_component_remove_dialog() -> void:
@@ -6752,6 +6769,38 @@ func _submit_asset_rename(_submitted_text: String) -> void:
 
 func _on_asset_rename_dialog_requested() -> void:
 	_open_rename_asset_dialog(selected_asset_id)
+
+
+## A Key an Asset left behind is spent for every other Asset while it is
+## published, which is what keeps a consumer's hand-written Key from quietly
+## meaning something else. A Key that was a mistake, or that no consumer ever
+## read, has to be recoverable all the same, so it is given back here - by the
+## author, who is the only one who can know that, and against a dialog that
+## says what it costs.
+func _on_asset_previous_key_release_requested(previous_key: String) -> void:
+	var asset := _get_asset(selected_asset_id)
+	if asset.is_empty() or not WorldDocumentService.previous_asset_keys(asset).has(previous_key):
+		return
+	pending_previous_key_release_asset_id = selected_asset_id
+	pending_previous_key_release = previous_key
+	previous_key_release_dialog.dialog_text = "Stop publishing '%s' as a previous Key of %s?\n\nA consumer whose own files still name '%s' will no longer find %s through it, and another Asset may take the Key." % [
+		previous_key, str(asset.get("name", "Asset")), previous_key, str(asset.get("name", "Asset"))]
+	previous_key_release_dialog.popup_centered()
+
+
+func _confirm_previous_key_release() -> void:
+	var asset := _get_asset(pending_previous_key_release_asset_id)
+	var previous_key := pending_previous_key_release
+	pending_previous_key_release_asset_id = ""
+	pending_previous_key_release = ""
+	if asset.is_empty() or previous_key.is_empty() or not WorldDocumentService.previous_asset_keys(asset).has(previous_key):
+		return
+	_record_direct_change()
+	var recorded_keys := WorldDocumentService.previous_asset_keys(asset)
+	recorded_keys.erase(previous_key)
+	asset["previous_asset_keys"] = recorded_keys
+	_show_status_message("Key '%s' released · Export and Sync to publish the Catalog without it." % previous_key)
+	_invalidate_render(RENDER_INSPECTOR)
 
 
 func _on_set_member_rename_dialog_requested() -> void:
