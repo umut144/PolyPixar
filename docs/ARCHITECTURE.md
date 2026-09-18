@@ -543,7 +543,11 @@ reparents its direct Parts atomically. Deleting the selected Group deletes the
 Group: the container, its Group-scoped Guides, every Part and each Part's
 Children, behind the same confirmation a Component deletion asks for. Releasing
 the Parts instead is the separate Remove from Group action, which keeps each one
-exactly where it is. Groups are
+exactly where it is. Duplicate, with and without a mirror, reads the same
+Outliner selection as Group, Copy Components and Remove from Group: every
+selected Component is copied with its own subtree in one undo step, and a
+selected Child inside a selected Parent is not copied twice because its
+Parent's subtree already carries it. The new copies are what stays selected. Groups are
 editor-only containers: runtime export emits ordinary Components and resolves
 the Group transform into their canonical exported transforms.
 

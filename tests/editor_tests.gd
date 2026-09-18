@@ -1365,6 +1365,49 @@ func _test_group_outliner_workflows() -> void:
 	application.free()
 
 
+func _test_component_multi_duplicate() -> void:
+	# Duplicate follows the whole Outliner selection: two selected roots become
+	# two copies in one undo step, and a Child selected inside one of them is
+	# not copied a second time - it already rides along in its Parent's subtree.
+	var parent := _outliner_test_component("component_1", "eyebrow_left")
+	var child := _outliner_test_component("component_2", "eye_left")
+	child["parent_component_id"] = "component_1"
+	var sibling := _outliner_test_component("component_3", "cheek_left")
+	var application: Control = load("res://scripts/main.gd").new()
+	application._build_ui()
+	var assets: Array[Dictionary] = [{"id": "asset_1", "name": "Wizard", "visibility": true,
+		"components": [parent, child, sibling], "groups": [], "guides": []}]
+	application.assets = assets
+	application.next_component_id = 40
+	application.selected_asset_id = "asset_1"
+	application.selected_component_ids = ["component_1", "component_2", "component_3"] as Array[String]
+	application.selected_component_id = "component_3"
+	var asset: Dictionary = application._get_asset("asset_1")
+	var roots: Array[String] = application._selected_component_ids_for_group(asset)
+	var expected_roots: Array[String] = ["component_1", "component_3"]
+	_expect(roots == expected_roots, "A Child selected inside a selected Parent is not a root of its own.")
+	var undo_depth_before: int = application.undo_history.size()
+	application._duplicate_components("asset_1", roots)
+	asset = application._get_asset("asset_1")
+	var names: Array[String] = []
+	for component in asset.get("components", []):
+		names.append(str(component.get("name", "")))
+	names.sort()
+	var expected_names: Array[String] = ["cheek_left", "cheek_left Copy", "eye_left", "eye_left Copy", "eyebrow_left", "eyebrow_left Copy"]
+	_expect(asset.get("components", []).size() == 6 and names == expected_names, "Duplicate should copy every selected root once, carrying the Children of each along.")
+	var copied_child: Dictionary = {}
+	for component in asset.get("components", []):
+		if str(component.get("name", "")) == "eye_left Copy":
+			copied_child = component
+	var copied_parent_id := str(copied_child.get("parent_component_id", ""))
+	_expect(not copied_parent_id.is_empty() and copied_parent_id != "component_1" and str(application._get_component(asset, copied_parent_id).get("name", "")) == "eyebrow_left Copy", "A copied Child should hang under its own copied Parent, not under the source.")
+	_expect(application.selected_component_ids.size() == 2 and not application.selected_component_ids.has("component_1") and not application.selected_component_ids.has("component_3"), "Duplicating a selection should leave the new copies selected, not their sources.")
+	_expect(application.undo_history.size() == undo_depth_before + 1, "Duplicating several Components should be one undo step, not one per Component.")
+	application._undo()
+	_expect(application._get_asset("asset_1").get("components", []).size() == 3, "One Undo should take back the whole multi-Component Duplicate.")
+	application.free()
+
+
 func _test_asset_guides() -> void:
 	var component := _component()
 	component.merge({"id": "component_1", "name": "body", "visibility": true, "transform": {"position": Vector2.ZERO, "rotation": 0.0, "scale": Vector2.ONE, "pivot": Vector2.ZERO}})

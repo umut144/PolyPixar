@@ -9134,7 +9134,13 @@ func _on_component_context_menu_selected(action_id: int) -> void:
 		_detach_component(asset_id, component_id)
 		return
 	if not mirror_action.is_empty():
-		_duplicate_component(asset_id, component_id, str(mirror_action["mode"]), str(mirror_action["axis"]))
+		# Duplicate acts on the whole Outliner selection, like Group, Copy and
+		# Remove from Group above it. The clicked Component is the fallback for
+		# a right-click that did not change the selection.
+		var duplicate_ids := _selected_component_ids_for_group(_get_asset(asset_id))
+		if duplicate_ids.is_empty() and not component_id.is_empty():
+			duplicate_ids = [component_id]
+		_duplicate_components(asset_id, duplicate_ids, str(mirror_action["mode"]), str(mirror_action["axis"]))
 
 
 func _selected_component_ids_for_clipboard(asset: Dictionary) -> Array[String]:
@@ -9429,14 +9435,80 @@ func _mirrored_group_transform(asset: Dictionary, group_id: String, mirror_mode:
 
 
 func _duplicate_component(asset_id: String, component_id: String, mirror_mode := "none", mirror_axis := ComponentCanvas.MIRROR_AXIS_VERTICAL) -> void:
+	_duplicate_components(asset_id, [component_id], mirror_mode, mirror_axis)
+
+
+## Duplicates every selected Component as one undo step. A selected Child of a
+## selected Parent is not its own copy: it already rides along in its Parent's
+## subtree, which is why the callers pass the roots from
+## _selected_component_ids_for_group rather than the raw selection.
+func _duplicate_components(asset_id: String, component_ids: Array, mirror_mode := "none", mirror_axis := ComponentCanvas.MIRROR_AXIS_VERTICAL) -> void:
 	var asset := _get_asset(asset_id)
-	var source := _get_component(asset, component_id)
-	if asset.is_empty() or source.is_empty():
+	if asset.is_empty():
 		return
+	var source_ids: Array[String] = []
+	for component_id_value in component_ids:
+		var candidate_id := str(component_id_value)
+		if not candidate_id.is_empty() and not _get_component(asset, candidate_id).is_empty() and not source_ids.has(candidate_id):
+			source_ids.append(candidate_id)
+	if source_ids.is_empty():
+		return
+	_record_direct_change()
+	var duplicate_roots: Array[Dictionary] = []
+	var subtree_sizes: Array[int] = []
+	var first_error := ""
+	for source_id in source_ids:
+		var duplication := _duplicate_component_subtree(asset, source_id, mirror_mode, mirror_axis)
+		var error := str(duplication.get("error", ""))
+		if not error.is_empty():
+			if first_error.is_empty():
+				first_error = error
+			continue
+		duplicate_roots.append(duplication.get("root", {}))
+		subtree_sizes.append(int(duplication.get("size", 1)))
+	if duplicate_roots.is_empty():
+		_show_status_message("Mirrored Component was not created: %s" % (first_error if not first_error.is_empty() else "Unknown error"))
+		_invalidate_render(RENDER_DOCUMENT)
+		return
+	var duplicate_root: Dictionary = duplicate_roots.back()
+	selected_asset_id = asset_id
+	selected_component_id = str(duplicate_root.get("id", ""))
+	# A single copy is an ordinary single selection, so the multi-Component
+	# list stays empty: an Inspector that finds one id there plus the selected
+	# Component would draw the shared multi-Component form for one Component.
+	selected_component_ids.clear()
+	if duplicate_roots.size() > 1:
+		for root in duplicate_roots:
+			selected_component_ids.append(str(root.get("id", "")))
+	selected_guide_id = ""
+	selected_point_id = ""
+	selected_point_ids.clear()
+	selected_edge_id = ""
+	active_state = ""
+	_set_outliner_asset_expanded(asset_id, true)
+	var message := ""
+	if duplicate_roots.size() > 1:
+		message = "Duplicated %d Components." % duplicate_roots.size()
+	elif subtree_sizes[0] > 1:
+		message = "Duplicated %s subtree." % str(duplicate_root.get("name", "Component"))
+	else:
+		message = "Duplicated %s." % str(duplicate_root.get("name", "Component"))
+	if not first_error.is_empty():
+		message += " %d could not be mirrored: %s" % [source_ids.size() - duplicate_roots.size(), first_error]
+	_show_status_message(message)
+	_invalidate_render(RENDER_DOCUMENT)
+
+
+## One Component and its descendants, copied into the same Asset. It records no
+## undo step, moves no selection and reports nothing: the caller owns all three
+## because it may be duplicating several subtrees at once.
+func _duplicate_component_subtree(asset: Dictionary, component_id: String, mirror_mode: String, mirror_axis: String) -> Dictionary:
+	var source := _get_component(asset, component_id)
+	if source.is_empty():
+		return {"error": "Component is missing."}
 	var source_tree: Array[Dictionary] = [source]
 	for descendant in ComponentHierarchy.descendants(asset, component_id):
 		source_tree.append(descendant)
-	_record_direct_change()
 	var id_map: Dictionary = {}
 	var duplicated_component_ids: Array[String] = []
 	for source_node in source_tree:
@@ -9468,19 +9540,8 @@ func _duplicate_component(asset_id: String, component_id: String, mirror_mode :=
 		if not bool(rebase_result.get("valid", false)):
 			for duplicated_id in duplicated_component_ids:
 				asset["components"].erase(ComponentHierarchy.component_by_id(asset, duplicated_id))
-			_show_status_message("Mirrored Component was not created: %s" % str(rebase_result.get("errors", ["Unknown error"])[0]))
-			_invalidate_render(RENDER_DOCUMENT)
-			return
-	selected_asset_id = asset_id
-	selected_component_id = str(duplicate_root.get("id", ""))
-	selected_guide_id = ""
-	selected_point_id = ""
-	selected_point_ids.clear()
-	selected_edge_id = ""
-	active_state = ""
-	_set_outliner_asset_expanded(asset_id, true)
-	_show_status_message("Duplicated %s subtree." % str(duplicate_root.get("name", "Component")) if source_tree.size() > 1 else "Duplicated %s." % str(duplicate_root.get("name", "Component")))
-	_invalidate_render(RENDER_DOCUMENT)
+			return {"error": str(rebase_result.get("errors", ["Unknown error"])[0])}
+	return {"root": duplicate_root, "ids": duplicated_component_ids, "size": source_tree.size()}
 
 
 func _next_duplicate_component_name(asset: Dictionary, source_name: String) -> String:
