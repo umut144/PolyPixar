@@ -14150,10 +14150,21 @@ func _on_bezier_points_moved(point_ids: Array, world_delta: Vector2) -> void:
 		local_delta.x /= transform_scale.x
 	if not is_zero_approx(transform_scale.y):
 		local_delta.y /= transform_scale.y
-	# Snap the group's anchor position once, then apply the resulting delta to
-	# every selected point so their relative spacing remains unchanged.
+	# Snapping decides once for the whole group, so the selection keeps its own
+	# spacing. A Point it can land on wins, and every carried Point may be the
+	# one that finds it - that is what lets a run be dragged onto another
+	# Chain's endpoint by its own end. Only when none is close does the grid
+	# have its say, through the anchor as before.
+	var moved_positions: Array[Vector2] = []
+	for point_id_value in point_ids:
+		var moved_id := str(point_id_value)
+		if bezier_point_move_start_positions.has(moved_id):
+			moved_positions.append(Vector2(bezier_point_move_start_positions[moved_id]) + local_delta)
+	var point_snap: Dictionary = canvas_view.point_snap_delta(moved_positions, point_ids)
 	var anchor_id := str(point_ids[0])
-	if bezier_point_move_start_positions.has(anchor_id):
+	if bool(point_snap.get("found", false)):
+		local_delta += Vector2(point_snap.get("delta", Vector2.ZERO))
+	elif bezier_point_move_start_positions.has(anchor_id):
 		var anchor_position: Vector2 = bezier_point_move_start_positions[anchor_id]
 		local_delta = canvas_view.snap_position(anchor_position + local_delta) - anchor_position
 	_record_coalesced_change()

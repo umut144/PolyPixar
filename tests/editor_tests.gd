@@ -243,6 +243,31 @@ func _create_set_member(application: Control, asset_id: String, member_name: Str
 	return application.selected_component_id
 
 
+func _test_point_drag_snapping() -> void:
+	# A dragged Point selection snaps onto a Point rather than beside one, and
+	# any of the carried Points may be the one that finds it - the closest
+	# decides. The Points the drag carries are no targets for themselves.
+	var canvas := ComponentCanvas.new()
+	canvas.size = Vector2(800.0, 600.0)
+	canvas.set_component_transform(WorldDocumentService.default_component_transform())
+	canvas.set_bezier_geometry([
+		{"id": "target", "position": Vector2(10.0, 10.0), "mode": "corner"},
+		{"id": "dragged_low", "position": Vector2(0.0, 0.0), "mode": "corner"},
+		{"id": "dragged_high", "position": Vector2(0.0, 2.0), "mode": "corner"},
+	], [], [])
+	var moving: Array[String] = ["dragged_low", "dragged_high"]
+	# The upper carried Point is the one that comes close to the target, so the
+	# whole selection follows it.
+	var near_target: Array[Vector2] = [Vector2(8.0, 8.02), Vector2(8.0, 10.02)]
+	var snap: Dictionary = canvas.point_snap_delta(near_target, moving)
+	_expect(bool(snap.get("found", false)) and Vector2(snap.get("delta", Vector2.ZERO)).distance_to(Vector2(2.0, -0.02)) < 0.000_001, "The carried Point closest to a target should decide the snap for the whole selection.")
+	var far_away: Array[Vector2] = [Vector2(-40.0, -40.0), Vector2(-40.0, -38.0)]
+	_expect(not bool(canvas.point_snap_delta(far_away, moving).get("found", false)), "Out of reach of every target there is nothing to snap to.")
+	var onto_itself: Array[Vector2] = [Vector2(0.0, 0.0), Vector2(0.0, 2.0)]
+	_expect(not bool(canvas.point_snap_delta(onto_itself, ["target", "dragged_low", "dragged_high"]).get("found", false)), "A drag that carries every Point has nothing left to snap to.")
+	canvas.free()
+
+
 func _test_point_clipboard() -> void:
 	# Copy takes what is selected: Points while Points are being edited, and
 	# the Component otherwise. Pasted Points land in the same Component as

@@ -338,6 +338,16 @@ after converting the Child's composed world transform into Parent-local space.
 Whole Parent transforms exclude descendant snapping because those targets
 inherit and move with the Parent.
 
+A Point selection dragged by the Transform gizmo snaps the same way, and for
+the whole group at once so it keeps its own spacing: every carried Point is a
+candidate, and the one that comes closest to a Point it can land on decides.
+The Points the drag carries are no targets for themselves, and the Component's
+own authored Points are targets — reference shapes leave the edited Component
+out, so without that a Chain could be snapped to every Component but the one
+it lives in, which is exactly the Chain a paste puts beside its source. Only
+when no Point is within reach does the grid decide, through the first carried
+Point as before.
+
 The Create Context Bar's `Measure` menu holds view-only tools. Its `Ruler` is a
 toggle rather than a command, and the menu entry carries its on/off state while
 the Measure button stays highlighted for as long as a tool inside it is on. The

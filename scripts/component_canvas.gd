@@ -827,6 +827,58 @@ func snap_position(world_position: Vector2) -> Vector2:
 	return _snap_to_canvas_position(world_position)
 
 
+## What a dragged Point selection wants on top of its drag so that it lands on
+## a Point rather than beside one. Every carried Point is a candidate, not only
+## the first, so a run can be dragged onto a target by whichever of its own
+## Points reaches it - the one that comes closest decides. The Points this drag
+## carries are excluded as targets, and unlike the grid this asks nothing of
+## the snap toggle, exactly like the reference-Point snapping it extends.
+func point_snap_delta(moved_positions: Array, moving_point_ids: Array) -> Dictionary:
+	var moving: Dictionary = {}
+	for point_id_value in moving_point_ids:
+		moving[str(point_id_value)] = true
+	var best_delta := Vector2.ZERO
+	var best_distance := HANDLE_HIT_RADIUS
+	var found := false
+	for moved_position_value in moved_positions:
+		var moved_position := Vector2(moved_position_value)
+		var moved_screen := _world_to_screen(_local_to_world(moved_position))
+		var candidates: Array[Vector2] = []
+		var reference := _nearest_reference_point(moved_position)
+		if bool(reference.get("found", false)):
+			candidates.append(Vector2(reference.get("position", moved_position)))
+		var own := _nearest_own_point(moved_position, moving)
+		if bool(own.get("found", false)):
+			candidates.append(Vector2(own.get("position", moved_position)))
+		for candidate in candidates:
+			var distance := moved_screen.distance_to(_world_to_screen(_local_to_world(candidate)))
+			if distance <= best_distance:
+				best_distance = distance
+				best_delta = candidate - moved_position
+				found = true
+	return {"found": found, "delta": best_delta}
+
+
+## The nearest authored Point of the Component being edited, skipping the ones
+## a drag is carrying. Reference shapes leave the edited Component out, so
+## without this a Chain could snap to every Component but its own.
+func _nearest_own_point(local_position: Vector2, excluded_point_ids: Dictionary) -> Dictionary:
+	var cursor_screen := _world_to_screen(_local_to_world(local_position))
+	var best_position := local_position
+	var best_distance := HANDLE_HIT_RADIUS
+	var found := false
+	for point in bezier_points:
+		if not point is Dictionary or excluded_point_ids.has(str(point.get("id", ""))):
+			continue
+		var point_position: Vector2 = point.get("position", Vector2.ZERO)
+		var distance := cursor_screen.distance_to(_world_to_screen(_local_to_world(point_position)))
+		if distance <= best_distance:
+			best_distance = distance
+			best_position = point_position
+			found = true
+	return {"found": found, "position": best_position}
+
+
 func set_world_scale(new_grid_size: float) -> void:
 	world_grid_size = maxf(new_grid_size, 0.0001)
 	queue_redraw()
