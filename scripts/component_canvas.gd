@@ -23,6 +23,10 @@ signal measure_stage_changed(stage: String)
 signal pivot_changed(pivot: Vector2)
 signal asset_pivot_changed(pivot: Vector2)
 signal transform_changed(transform: Dictionary)
+## Moving a Component moves its shape, not its anchor. The Canvas reports the
+## world offset the shape travelled and leaves the authored position alone, so
+## the Pivot stays the fixed point in the Asset it is meant to be.
+signal shape_offset_changed(world_delta: Vector2)
 signal primitive_placed(shape: String, shape_center: Vector2, size_cm: Vector2)
 signal primitive_center_changed(center: Vector2)
 signal primitive_preview_cancelled()
@@ -176,6 +180,8 @@ var transform_axes_local := false
 var transform_drag_axis := ""
 var transform_drag_start_world := Vector2.ZERO
 var transform_drag_start_position := Vector2.ZERO
+var transform_drag_start_center := Vector2.ZERO
+var transform_drag_start_pivot := Vector2.ZERO
 var transform_drag_start_angle := 0.0
 var transform_drag_start_rotation := 0.0
 var transform_drag_start_scale := Vector2.ONE
@@ -328,6 +334,8 @@ func _gui_input(event: InputEvent) -> void:
 				transform_drag_axis = handle_axis
 				transform_drag_start_world = _screen_to_world(event.position)
 				transform_drag_start_position = component_transform.get("position", Vector2.ZERO)
+				transform_drag_start_center = transform_gizmo_center()
+				transform_drag_start_pivot = component_transform.get("pivot", Vector2.ZERO)
 				transform_drag_start_angle = _angle_from_transform_center(event.position)
 				transform_drag_start_rotation = float(component_transform.get("rotation", 0.0))
 				transform_drag_start_scale = component_transform.get("scale", Vector2.ONE)
@@ -459,21 +467,31 @@ func _gui_input(event: InputEvent) -> void:
 				return
 			var delta := current_world - transform_drag_start_world
 			var drag_axis := _transform_axis_direction(transform_drag_axis) if transform_axes_local else Vector2.ZERO
-			var new_position := Vector2.ZERO
+			var new_center := Vector2.ZERO
 			if drag_axis == Vector2.ZERO:
 				if transform_drag_axis == "x":
 					delta.y = 0.0
 				elif transform_drag_axis == "y":
 					delta.x = 0.0
-				new_position = _snap_to_grid(transform_drag_start_position + delta)
+				new_center = _snap_to_grid(transform_drag_start_center + delta)
 			else:
 				# Snapping stays on the rotated axis rather than on the world
 				# raster, so a turned frame cannot drift sideways off its own
 				# axis while Snap is on.
-				var snapped := _snap_to_grid(transform_drag_start_position + drag_axis * delta.dot(drag_axis))
-				new_position = transform_drag_start_position + drag_axis * drag_axis.dot(snapped - transform_drag_start_position)
-			component_transform["position"] = new_position
-			transform_changed.emit(component_transform.duplicate(true))
+				var snapped := _snap_to_grid(transform_drag_start_center + drag_axis * delta.dot(drag_axis))
+				new_center = transform_drag_start_center + drag_axis * drag_axis.dot(snapped - transform_drag_start_center)
+			if shape_follows_transform_gizmo():
+				# The shape travels, the Pivot does not. The offset is written to
+				# the local anchor, which turns the whole local frame and takes
+				# the Child Components with it, while the authored position - and
+				# with it the Pivot marker - stays exactly where it was placed.
+				component_transform["pivot"] = _local_anchor_for_world_center(new_center)
+				shape_offset_changed.emit(new_center - transform_drag_start_center)
+			else:
+				# Without an outline of its own there is no shape to move against
+				# the anchor, so such a Component still travels as a whole.
+				component_transform["position"] = new_center
+				transform_changed.emit(component_transform.duplicate(true))
 			queue_redraw()
 			return
 		if interaction_state == "edit" and edit_mode == "face" and face_dragging:
@@ -1027,6 +1045,65 @@ func _world_to_local(world_point: Vector2) -> Vector2:
 	if not is_zero_approx(transform_scale.y):
 		local_offset.y /= transform_scale.y
 	return pivot + local_offset
+
+
+## The Component's own outline as the Canvas knows it, in the Component's local
+## point coordinates. Every readout and handle that means "the shape" rather
+## than "the anchor" asks here, so the gizmo, the Inspector and the snapping
+## cannot drift apart.
+func _local_outline_points() -> Array:
+	if not display_polygon.is_empty():
+		return display_polygon
+	var positions: Array = []
+	for point_data in bezier_points:
+		positions.append(Vector2(point_data.get("position", Vector2.ZERO)))
+	return positions
+
+
+## True while this Component has an outline of its own to move against its
+## anchor. A Reference borrows its picture from another Asset and has none, so
+## it keeps travelling as a whole instead.
+func shape_follows_transform_gizmo() -> bool:
+	return not _local_outline_points().is_empty()
+
+
+## The centre of the Component's own outline, in local point coordinates. It is
+## derived from what is drawn right now, never from the authoring history, which
+## is what keeps the Inspector number readable.
+func local_bounds_center() -> Vector2:
+	var outline := _local_outline_points()
+	if outline.is_empty():
+		return component_transform.get("pivot", Vector2.ZERO)
+	var minimum: Vector2 = outline[0]
+	var maximum: Vector2 = outline[0]
+	for point in outline:
+		minimum.x = minf(minimum.x, point.x)
+		minimum.y = minf(minimum.y, point.y)
+		maximum.x = maxf(maximum.x, point.x)
+		maximum.y = maxf(maximum.y, point.y)
+	return (minimum + maximum) * 0.5
+
+
+## Where the Transform gizmo sits. Translate grabs the shape, so its handles ride
+## on the outline centre and follow the pointer; Rotate and Scale turn and size
+## the shape around its anchor, so they stay on the Pivot.
+func transform_gizmo_center() -> Vector2:
+	if transform_mode == "rotate" or transform_mode == "scale":
+		return component_transform.get("position", Vector2.ZERO)
+	return _local_to_world(local_bounds_center())
+
+
+## The local anchor that puts the outline centre at `world_center` while the
+## authored position stays put. Inverse of `transform_gizmo_center`.
+func _local_anchor_for_world_center(world_center: Vector2) -> Vector2:
+	var transform_scale: Vector2 = component_transform.get("scale", Vector2.ONE)
+	var transform_rotation := deg_to_rad(float(component_transform.get("rotation", 0.0)))
+	var offset := (world_center - Vector2(component_transform.get("position", Vector2.ZERO))).rotated(-transform_rotation)
+	if not is_zero_approx(transform_scale.x):
+		offset.x /= transform_scale.x
+	if not is_zero_approx(transform_scale.y):
+		offset.y /= transform_scale.y
+	return local_bounds_center() - offset
 
 
 func clear_selection() -> void:
@@ -1673,7 +1750,7 @@ func _transform_axis_screen_offset(axis_name: String, length: float) -> Vector2:
 func _draw_transform_gizmo() -> void:
 	if interaction_state != "transform" or context_name.is_empty():
 		return
-	var center := _world_to_screen(component_transform.get("position", Vector2.ZERO))
+	var center := _world_to_screen(transform_gizmo_center())
 	if transform_mode == "rotate":
 		draw_arc(center, 34.0, 0.0, TAU, 48, Color("#f2c94c"), 2.0)
 		draw_circle(center + _transform_axis_screen_offset("y", 34.0), 7.0, Color("#f2c94c"))
@@ -1693,7 +1770,7 @@ func _draw_transform_gizmo() -> void:
 
 
 func _transform_handle_at(screen_position: Vector2) -> String:
-	var center := _world_to_screen(component_transform.get("position", Vector2.ZERO))
+	var center := _world_to_screen(transform_gizmo_center())
 	if transform_mode == "rotate":
 		var distance_to_center := screen_position.distance_to(center)
 		if distance_to_center >= 24.0 and distance_to_center <= 46.0:

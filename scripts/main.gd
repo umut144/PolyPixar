@@ -10385,26 +10385,9 @@ func _on_group_transform_value_changed(value: float, property_name: String) -> v
 		return
 	_record_direct_change()
 	var transform: Dictionary = group.get("transform", WorldDocumentService.default_component_transform())
-	var transform_position: Vector2 = transform.get("position", Vector2.ZERO)
-	var transform_scale: Vector2 = transform.get("scale", Vector2.ONE)
-	var pivot: Vector2 = transform.get("pivot", Vector2.ZERO)
-	var previous_pivot := pivot
-	if property_name in ["position_x", "position_y", "pivot_x", "pivot_y"]:
-		value = _world_to_editor_units(value)
-	match property_name:
-		"position_x": transform_position.x = value
-		"position_y": transform_position.y = value
-		"rotation": transform["rotation"] = value
-		"scale_x": transform_scale.x = value
-		"scale_y": transform_scale.y = value
-		"pivot_x": pivot.x = value
-		"pivot_y": pivot.y = value
-	if property_name in ["pivot_x", "pivot_y"]:
-		var pivot_rotation := deg_to_rad(float(transform.get("rotation", 0.0)))
-		transform_position += ((pivot - previous_pivot) * transform_scale).rotated(pivot_rotation)
-	transform["position"] = transform_position
-	transform["scale"] = transform_scale
-	transform["pivot"] = pivot
+	# A Group draws nothing of its own, so its shape is its members' outlines.
+	var bounds_center := ComponentHierarchy.group_local_bounds_center(asset, selected_group_id)
+	_apply_transform_field(transform, bounds_center, value, property_name)
 	group["transform"] = transform
 	_invalidate_render(RENDER_INSPECTOR | RENDER_CANVAS_CONTEXT)
 
@@ -12568,28 +12551,67 @@ func _on_transform_value_changed(value: float, property_name: String) -> void:
 		return
 	_record_direct_change()
 	var transform: Dictionary = component.get("transform", WorldDocumentService.default_component_transform())
+	var bounds_center := ComponentHierarchy.local_bounds_center(component)
+	_apply_transform_field(transform, bounds_center, value, property_name)
+	component["transform"] = transform
+	_sync_transform_fields(transform, bounds_center)
+	_invalidate_render(RENDER_CANVAS_CONTEXT)
+
+
+## The Transform block names two independent things. The Pivot pair is the
+## authored position, which is where the anchor sits: moving it moves the anchor
+## and nothing else, so the local anchor absorbs the same step and the shape
+## stays on screen. The Bounds Center pair is where the shape sits against that
+## anchor: moving it writes the local anchor alone, so the shape - and every
+## Child hanging off this frame - travels while the Pivot stays put. Neither
+## number is inherited from an earlier edit, which is what the raw local pivot
+## value used to be.
+func _apply_transform_field(transform: Dictionary, bounds_center: Vector2, value: float, property_name: String) -> void:
 	var transform_position: Vector2 = transform.get("position", Vector2.ZERO)
 	var transform_scale: Vector2 = transform.get("scale", Vector2.ONE)
 	var pivot: Vector2 = transform.get("pivot", Vector2.ZERO)
-	var previous_pivot := pivot
-	if property_name == "position_x" or property_name == "position_y" or property_name == "pivot_x" or property_name == "pivot_y":
+	if property_name in ["position_x", "position_y", "bounds_center_x", "bounds_center_y"]:
 		value = _world_to_editor_units(value)
 	match property_name:
-		"position_x": transform_position.x = value
-		"position_y": transform_position.y = value
+		"position_x", "position_y":
+			var moved := transform_position
+			if property_name == "position_x":
+				moved.x = value
+			else:
+				moved.y = value
+			pivot = ComponentHierarchy.pivot_move_anchor(transform, moved - transform_position)
+			transform_position = moved
+		"bounds_center_x", "bounds_center_y":
+			var offset := ComponentHierarchy.shape_offset_for(transform, bounds_center)
+			if property_name == "bounds_center_x":
+				offset.x = value
+			else:
+				offset.y = value
+			pivot = ComponentHierarchy.pivot_for_shape_offset(transform, bounds_center, offset)
 		"rotation": transform["rotation"] = value
 		"scale_x": transform_scale.x = value
 		"scale_y": transform_scale.y = value
-		"pivot_x": pivot.x = value
-		"pivot_y": pivot.y = value
-	if property_name == "pivot_x" or property_name == "pivot_y":
-		var pivot_rotation := deg_to_rad(float(transform.get("rotation", 0.0)))
-		transform_position += ((pivot - previous_pivot) * transform_scale).rotated(pivot_rotation)
 	transform["position"] = transform_position
 	transform["scale"] = transform_scale
 	transform["pivot"] = pivot
-	component["transform"] = transform
-	_invalidate_render(RENDER_CANVAS_CONTEXT)
+
+
+## An edit to one half of the Transform block moves the other half's number, so
+## the sibling fields are refreshed in place rather than by re-rendering the
+## Inspector out from under the field being typed in.
+func _sync_transform_fields(transform: Dictionary, bounds_center: Vector2) -> void:
+	var transform_position: Vector2 = transform.get("position", Vector2.ZERO)
+	var offset := ComponentHierarchy.shape_offset_for(transform, bounds_center)
+	var values := {
+		"position_x": _editor_units_to_world(transform_position.x),
+		"position_y": _editor_units_to_world(transform_position.y),
+		"bounds_center_x": _editor_units_to_world(offset.x),
+		"bounds_center_y": _editor_units_to_world(offset.y)
+	}
+	for field_name in values:
+		var field = create_inspector_view.transform_fields.get(field_name)
+		if is_instance_valid(field):
+			field.set_value_no_signal(float(values[field_name]))
 
 
 func _on_global_transform_value_changed(value: float, property_name: String) -> void:
@@ -14037,22 +14059,17 @@ func _on_transform_changed(transform: Dictionary) -> void:
 		_record_coalesced_change()
 		var local_transform := ComponentHierarchy.local_transform_from_world_record(asset, selected_component_id, authored_world_transform)
 		component["transform"] = local_transform
-		var transform_position: Vector2 = local_transform.get("position", Vector2.ZERO)
 		var transform_scale: Vector2 = local_transform.get("scale", Vector2.ONE)
-		var pivot: Vector2 = local_transform.get("pivot", Vector2.ZERO)
 		var values := {
-			"position_x": _editor_units_to_world(transform_position.x),
-			"position_y": _editor_units_to_world(transform_position.y),
 			"rotation": float(local_transform.get("rotation", 0.0)),
 			"scale_x": transform_scale.x,
-			"scale_y": transform_scale.y,
-			"pivot_x": _editor_units_to_world(pivot.x),
-			"pivot_y": _editor_units_to_world(pivot.y)
+			"scale_y": transform_scale.y
 		}
 		for property_name in values:
 			var field = create_inspector_view.transform_fields.get(property_name)
 			if is_instance_valid(field):
 				field.set_value_no_signal(float(values[property_name]))
+		_sync_transform_fields(local_transform, ComponentHierarchy.local_bounds_center(component))
 		var selected_reference_id := selected_component_id if _is_reference_component(component) else ""
 		var excluded_reference_id := "" if _is_reference_component(component) else selected_component_id
 		canvas_view.set_reference_shapes(_build_reference_shapes(asset, excluded_reference_id, selected_reference_id))

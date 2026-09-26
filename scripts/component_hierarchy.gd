@@ -283,6 +283,117 @@ static func transform_record_from_affine(affine: Transform2D, pivot: Vector2) ->
 	}
 
 
+## The outline a Component actually draws, in its own local point coordinates.
+## A Primitive reports its sampled contour, a Bezier Component its outer control
+## polygon, and anything that has neither falls back to its raw Points. The
+## Canvas keeps the same order in `display_polygon`, so the gizmo on screen and
+## the number in the Inspector always mean the same outline.
+static func local_outline_points(component: Dictionary) -> Array:
+	if component.is_empty():
+		return []
+	if PrimitiveGeometryService.has_analytic_shape(component):
+		var contour: Array = PrimitiveGeometryService.contour(component)
+		if not contour.is_empty():
+			return contour
+	var outer: Array = BezierTopology.outer_control_polygon(component)
+	if not outer.is_empty():
+		return outer
+	var positions: Array = []
+	for point_data in component.get("points", []):
+		if point_data is Dictionary:
+			positions.append(_vector(point_data.get("position", Vector2.ZERO), Vector2.ZERO))
+	return positions
+
+
+## The centre of that outline. It is read off the geometry as it stands right
+## now, never off the authoring history, which is what keeps the Inspector's
+## Bounds Center readable no matter how often Points and Pivot have moved.
+static func local_bounds_center(component: Dictionary) -> Vector2:
+	return _bounds_center(local_outline_points(component),
+		_vector(component.get("transform", {}).get("pivot", Vector2.ZERO), Vector2.ZERO))
+
+
+## The same for a Group, whose outline is borrowed from its members.
+static func group_local_bounds_center(asset: Dictionary, group_id: String) -> Vector2:
+	var group := group_by_id(asset, group_id)
+	return _bounds_center(group_local_outline_points(asset, group_id),
+		_vector(group.get("transform", {}).get("pivot", Vector2.ZERO), Vector2.ZERO))
+
+
+## A Group draws nothing of its own, so its outline is the outlines of its
+## members, gathered in the Group-local space its own Pivot lives in.
+static func group_local_outline_points(asset: Dictionary, group_id: String) -> Array:
+	var group := group_by_id(asset, group_id)
+	if group.is_empty():
+		return []
+	var to_group_local := group_world_transform(asset, group_id).affine_inverse()
+	var points: Array = []
+	for component in group_members(asset, group_id):
+		var component_id := str(component.get("id", ""))
+		var to_world := world_transform(asset, component_id)
+		for point in local_outline_points(component):
+			points.append(to_group_local * (to_world * Vector2(point)))
+	return points
+
+
+static func _bounds_center(outline: Array, fallback: Vector2) -> Vector2:
+	if outline.is_empty():
+		return fallback
+	var minimum := Vector2(outline[0])
+	var maximum := Vector2(outline[0])
+	for point in outline:
+		var position := Vector2(point)
+		minimum.x = minf(minimum.x, position.x)
+		minimum.y = minf(minimum.y, position.y)
+		maximum.x = maxf(maximum.x, position.x)
+		maximum.y = maxf(maximum.y, position.y)
+	return (minimum + maximum) * 0.5
+
+
+## Where an outline centre sits relative to the Pivot, in the space the authored
+## position is written in. This is the second half of the Transform block: the
+## Pivot says where the anchor is, this says where the shape is against it, and
+## moving one never moves the other.
+static func shape_offset_for(transform_record: Dictionary, bounds_center: Vector2) -> Vector2:
+	var pivot := _vector(transform_record.get("pivot", Vector2.ZERO), Vector2.ZERO)
+	var scale := _vector(transform_record.get("scale", Vector2.ONE), Vector2.ONE)
+	return ((bounds_center - pivot) * scale).rotated(deg_to_rad(float(transform_record.get("rotation", 0.0))))
+
+
+## The local anchor that puts the outline centre at `offset` from the Pivot.
+## Inverse of `shape_offset_for`, and the only way the editor moves a shape
+## against its anchor.
+static func pivot_for_shape_offset(transform_record: Dictionary, bounds_center: Vector2, offset: Vector2) -> Vector2:
+	var scale := _vector(transform_record.get("scale", Vector2.ONE), Vector2.ONE)
+	var local_offset := offset.rotated(-deg_to_rad(float(transform_record.get("rotation", 0.0))))
+	if not is_zero_approx(scale.x):
+		local_offset.x /= scale.x
+	if not is_zero_approx(scale.y):
+		local_offset.y /= scale.y
+	return bounds_center - local_offset
+
+
+## Moving a record moves its shape, not its anchor: the offset is written to the
+## local anchor, which turns the whole local frame and takes Children along,
+## while the authored position - and with it the Pivot - stays put.
+static func offset_shape_by_world_delta(transform_record: Dictionary, world_affine: Transform2D, world_delta: Vector2) -> Vector2:
+	var pivot := _vector(transform_record.get("pivot", Vector2.ZERO), Vector2.ZERO)
+	return pivot - world_affine.affine_inverse().basis_xform(world_delta)
+
+
+## The authored position that puts the Pivot at `position` without taking the
+## shape along: the local anchor absorbs the same step in the other direction.
+static func pivot_move_anchor(transform_record: Dictionary, position_delta: Vector2) -> Vector2:
+	var pivot := _vector(transform_record.get("pivot", Vector2.ZERO), Vector2.ZERO)
+	var scale := _vector(transform_record.get("scale", Vector2.ONE), Vector2.ONE)
+	var local_delta := position_delta.rotated(-deg_to_rad(float(transform_record.get("rotation", 0.0))))
+	if not is_zero_approx(scale.x):
+		local_delta.x /= scale.x
+	if not is_zero_approx(scale.y):
+		local_delta.y /= scale.y
+	return pivot + local_delta
+
+
 static func local_transform(raw_transform) -> Transform2D:
 	var data: Dictionary = raw_transform if raw_transform is Dictionary else {}
 	var position := _vector(data.get("position", Vector2.ZERO), Vector2.ZERO)

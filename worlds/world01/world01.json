@@ -52,7 +52,11 @@
 		"asset_49",
 		"asset_50",
 		"asset_51",
-		"asset_52"
+		"asset_52",
+		"asset_53",
+		"asset_54",
+		"asset_55",
+		"asset_56"
 	],
 	"editor_state": {
 		"active_create_submodule": "Single",
@@ -98,10 +102,10 @@
 			},
 			"asset_14": {
 				"position": [
-					1.81158709526062,
-					4.95262384414673
+					-0.4127337038517,
+					6.13576316833496
 				],
-				"zoom": 62.0552476510405
+				"zoom": 62.7754456004685
 			},
 			"asset_15": {
 				"position": [
@@ -147,10 +151,10 @@
 			},
 			"asset_20": {
 				"position": [
-					-0.00993497669696808,
-					1.4057708978653
+					0.0753359943628311,
+					0.775802791118622
 				],
-				"zoom": 1250.7455839167
+				"zoom": 536.029972220973
 			},
 			"asset_21": {
 				"position": [
@@ -336,17 +340,17 @@
 			},
 			"asset_48": {
 				"position": [
-					-0.103813230991364,
-					9.68496322631836
+					0.847947835922241,
+					6.19613218307495
 				],
-				"zoom": 49.4120687042531
+				"zoom": 73.2341223548895
 			},
 			"asset_49": {
 				"position": [
-					0.432246804237366,
-					8.03255176544189
+					-0.256825238466263,
+					5.05554437637329
 				],
-				"zoom": 54.357050671613
+				"zoom": 67.9408743453336
 			},
 			"asset_5": {
 				"position": [
@@ -358,16 +362,16 @@
 			"asset_50": {
 				"position": [
 					-0.539496183395386,
-					21.3210124969482
+					5.46842622756958
 				],
-				"zoom": 10.0852379102906
+				"zoom": 54.9151130563419
 			},
 			"asset_51": {
 				"position": [
-					-1.37674236297607,
-					1.81662178039551
+					0.733745813369751,
+					-0.156498119235039
 				],
-				"zoom": 100.673701988287
+				"zoom": 111.327144250998
 			},
 			"asset_52": {
 				"position": [
@@ -375,6 +379,34 @@
 					-0.169421479105949
 				],
 				"zoom": 616.744620077078
+			},
+			"asset_53": {
+				"position": [
+					0.0367421619594097,
+					0.0560744479298592
+				],
+				"zoom": 191.983838525214
+			},
+			"asset_54": {
+				"position": [
+					-0.000257247709669173,
+					0.704149305820465
+				],
+				"zoom": 264.163171949569
+			},
+			"asset_55": {
+				"position": [
+					-0.0100760664790869,
+					0.477053850889206
+				],
+				"zoom": 580.627609114094
+			},
+			"asset_56": {
+				"position": [
+					0.0139094013720751,
+					0.804037690162659
+				],
+				"zoom": 910.265657085381
 			},
 			"asset_6": {
 				"position": [
@@ -453,7 +485,11 @@
 			"asset_5": false,
 			"asset_50": false,
 			"asset_51": false,
-			"asset_52": true,
+			"asset_52": false,
+			"asset_53": false,
+			"asset_54": true,
+			"asset_55": false,
+			"asset_56": false,
 			"asset_6": false,
 			"asset_7": false,
 			"asset_8": false,
@@ -470,22 +506,22 @@
 			],
 			"visible": false
 		},
-		"motion_act_preview_asset_id": "",
+		"motion_act_preview_asset_id": "asset_1",
 		"motion_act_preview_loop": true,
-		"motion_path_preview_asset_id": "",
+		"motion_path_preview_asset_id": "asset_1",
 		"motion_sequence_preview_loop": true,
 		"motion_sequence_view": "composition",
 		"outliner_asset_type_filters": {
-			"character": true,
-			"icon": true,
+			"character": false,
+			"icon": false,
 			"items": true,
-			"props": true,
-			"symbols": true,
-			"terrain": true,
-			"weapons": true
+			"props": false,
+			"symbols": false,
+			"terrain": false,
+			"weapons": false
 		},
-		"selected_asset_id": "asset_52",
-		"selected_component_id": "component_405",
+		"selected_asset_id": "asset_54",
+		"selected_component_id": "",
 		"selected_edge_ids": [],
 		"selected_guide_id": "",
 		"selected_motion_act_id": "",
@@ -506,8 +542,8 @@
 	},
 	"name": "world01",
 	"next_ids": {
-		"asset": 53,
-		"component": 407,
+		"asset": 57,
+		"component": 447,
 		"group": 24,
 		"guide": 10,
 		"motion_act": 1,

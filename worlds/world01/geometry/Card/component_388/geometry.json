@@ -2,7 +2,7 @@
 	"asset_id": "asset_51",
 	"component_id": "component_388",
 	"component_mesh": {
-		"bake_id": "meshing_bake_3851093907560687195",
+		"bake_id": "meshing_bake_3790215186667609274",
 		"build_provenance": {
 			"attempts": 1.0,
 			"auto_recipe_version": 3.0,
@@ -52,7 +52,7 @@
 				},
 				"version": 1.0
 			},
-			"exact_input_hash": "f9dc1d1654033021f6178bcd3e5e94f168fb514fdbb8fb1717f67b38c1fbdf65",
+			"exact_input_hash": "b71f843fa79bb7c2c3bf19591ffcf0a36063414fb07066d39b15ebe4350d41b1",
 			"pipeline_recipe_hash": "a172a8e1586d6986239a922ad783dedd6f91eae9b8e5f15f8ab1228c85e2f617",
 			"recipe_mode": "automatic",
 			"schema_version": 1.0,
@@ -123,14 +123,14 @@
 		},
 		"last_error": "",
 		"last_failure_signature": {},
-		"mesh_fingerprint": "d53b6e69738eebf6bd64b56182c46d6f3466e94227f14ad0a573f8079042f329",
+		"mesh_fingerprint": "c11aa50e3972b31270dad3ef7a471b5466f630083b676f16d805859f23eef65e",
 		"method": "constrained_mesh"
 	},
 	"meshing": {
 		"bakes": {
 			"constrained_mesh": {
 				"algorithm_version": 5,
-				"bake_id": "meshing_bake_3851093907560687195",
+				"bake_id": "meshing_bake_3790215186667609274",
 				"boundary_constraints": [
 					{
 						"chain_id": "chain_6048359153645131662",
@@ -404,10 +404,10 @@
 				},
 				"quality_warnings": [],
 				"runs": [],
-				"sampling_bake_id": "bake_6880888633283206016",
-				"sampling_fingerprint": "6be5d0541e0d231ffabd6f83c92348acd1d97861f53b69562c98e8127540fbb1",
-				"seeding_bake_id": "seeding_bake_1125384597771536780",
-				"seeding_fingerprint": "7f2c1fdac19a4a0545eb2270c75078ecfda68bd8c22cfade11b4bd7c740a013c",
+				"sampling_bake_id": "bake_9113465452494060198",
+				"sampling_fingerprint": "aa9a4b914ce3a127397441b69c01ea68327b68ff74df130914039ffe0e6e0662",
+				"seeding_bake_id": "seeding_bake_6183568879315077642",
+				"seeding_fingerprint": "416f739281568d4fea4619f43aeda50a9a3b38fcf03a1613f16e506f2bf1094b",
 				"triangle_count": 12,
 				"triangles": [
 					{
@@ -634,7 +634,7 @@
 			},
 			"contour_stroke": {
 				"algorithm_version": 5,
-				"bake_id": "contour_stroke_bake_2389737972985282595",
+				"bake_id": "contour_stroke_bake_6588439926774427148",
 				"boundary_constraints": [],
 				"errors": [],
 				"geometry_diagnostics": {
@@ -1089,7 +1089,7 @@
 		"bakes": {
 			"adaptive": {
 				"algorithm_version": 6,
-				"bake_id": "bake_6880888633283206016",
+				"bake_id": "bake_9113465452494060198",
 				"boundary_refinement_complete": true,
 				"boundary_refinement_count": 0,
 				"boundary_refinement_limit_reached": false,
@@ -1351,7 +1351,7 @@
 		"bakes": {
 			"poisson_fill": {
 				"algorithm_version": 2.0,
-				"bake_id": "seeding_bake_1125384597771536780",
+				"bake_id": "seeding_bake_6183568879315077642",
 				"edited": false,
 				"errors": [],
 				"flow_seed_count": 0.0,
@@ -1367,8 +1367,8 @@
 					"seed": 1,
 					"spacing": 0.213388347066939
 				},
-				"sampling_bake_id": "bake_6880888633283206016",
-				"sampling_fingerprint": "6be5d0541e0d231ffabd6f83c92348acd1d97861f53b69562c98e8127540fbb1",
+				"sampling_bake_id": "bake_9113465452494060198",
+				"sampling_fingerprint": "aa9a4b914ce3a127397441b69c01ea68327b68ff74df130914039ffe0e6e0662",
 				"seed_count": 1,
 				"seeds": [
 					{

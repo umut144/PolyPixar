@@ -2,7 +2,7 @@
 	"asset_id": "asset_49",
 	"component_id": "component_363",
 	"component_mesh": {
-		"bake_id": "meshing_bake_7196096441946698943",
+		"bake_id": "meshing_bake_2846903621127485812",
 		"build_provenance": {
 			"attempts": 1.0,
 			"auto_recipe_version": 3.0,
@@ -52,14 +52,14 @@
 				},
 				"version": 1.0
 			},
-			"exact_input_hash": "542b888199069a3752edbb7c7eaf5d345e30cd036cf7dbc536ec3ebece7478d4",
+			"exact_input_hash": "f1a60ba631d4ff32513f9df68b70a703e75bad629ccf95c3b08d9d8c8b0445a2",
 			"pipeline_recipe_hash": "ad0fd0d4f889505d271f8850b7a5458e031ba8b47344d2b0e60b8feac845bcaf",
 			"recipe_mode": "automatic",
 			"schema_version": 1.0,
 			"source_signature": {
 				"geometry_tolerance": 0.00055,
 				"meshing_algorithm": 5.0,
-				"recipe_hash": "da80c2a45ab554d60281da77916708a675e9f799ddde2a43661f1a7fc8fcebd9",
+				"recipe_hash": "fb341cd0e875ef64595355796a77a972e1acb6a4d50033a352852e53243229cb",
 				"recipe_version": 2.0,
 				"sampling_algorithm": 6.0,
 				"scalars": [
@@ -159,14 +159,14 @@
 		},
 		"last_error": "",
 		"last_failure_signature": {},
-		"mesh_fingerprint": "c671d7b5f95b238ba734cab48d85a726a7b7bce6ad246bdda6fee1b577ef2382",
+		"mesh_fingerprint": "462f1b0abf8f16e5e8a04391dca7bf6bca42fa482e3e89e644de0bdd5ae1ff72",
 		"method": "constrained_mesh"
 	},
 	"meshing": {
 		"bakes": {
 			"constrained_mesh": {
 				"algorithm_version": 5,
-				"bake_id": "meshing_bake_7196096441946698943",
+				"bake_id": "meshing_bake_2846903621127485812",
 				"boundary_constraints": [
 					{
 						"chain_id": "chain_8278457311720182083",
@@ -1612,10 +1612,10 @@
 				},
 				"quality_warnings": [],
 				"runs": [],
-				"sampling_bake_id": "bake_284064228078755245",
-				"sampling_fingerprint": "d0641f97de77a498faca4d614e38d7c6fc59a1edb8cf78903e40b4ed71e529fb",
-				"seeding_bake_id": "seeding_bake_9089461944953451270",
-				"seeding_fingerprint": "27bdcdccda56c01c8a58519af7c5a06b0b55cf0417d362b9b24df5b7870baff4",
+				"sampling_bake_id": "bake_5802663383331069787",
+				"sampling_fingerprint": "e5c7bbcd7a40f9ef13132f01ddad568fa9c340d02a7dae2b5ebeb450f1af6ff3",
+				"seeding_bake_id": "seeding_bake_2273635808574945455",
+				"seeding_fingerprint": "b2c2bb76785fe117f0ea8dddaaf901887e5d1bff19bda503df894a6117bee016",
 				"triangle_count": 92,
 				"triangles": [
 					{
@@ -3022,7 +3022,7 @@
 			},
 			"contour_stroke": {
 				"algorithm_version": 5,
-				"bake_id": "contour_stroke_bake_9054165066975802274",
+				"bake_id": "contour_stroke_bake_1441697252992860460",
 				"boundary_constraints": [],
 				"errors": [],
 				"geometry_diagnostics": {
@@ -3044,8 +3044,8 @@
 					"join": "miter",
 					"miter_limit": 4.0,
 					"reference_pixels_per_meter": 192.0,
-					"stroke_width_meters": 0.0208333333333333,
-					"stroke_width_px": 4.0
+					"stroke_width_meters": 0.0104166666666667,
+					"stroke_width_px": 2.0
 				},
 				"runs": [
 					{
@@ -3134,7 +3134,7 @@
 				],
 				"source_chain_closed": true,
 				"source_draw_mode": "closed_loop",
-				"source_fingerprint": "0e5f8bf9385aae31da5c33fde96d987254fab6bfe7cb23aa667a0c9d30ef757d",
+				"source_fingerprint": "0ba82415b9d6e648987225d18eb180c652d3cff06b6e8bbafc2104f865491bb2",
 				"topology_role": "outer",
 				"triangle_count": 22,
 				"triangles": [
@@ -3324,8 +3324,8 @@
 						"id": "vertex:contour:0",
 						"origin": "segment_left",
 						"position": [
-							6.9086275100708,
-							6.34997987747192
+							6.95431280136108,
+							6.37498950958252
 						],
 						"preserved": false,
 						"source_id": "edge_37548569294933609@0.000000000"
@@ -3336,8 +3336,8 @@
 						"id": "vertex:contour:1",
 						"origin": "segment_right",
 						"position": [
-							7.09136962890625,
-							6.45001935958862
+							7.04568433761597,
+							6.42500972747803
 						],
 						"preserved": false,
 						"source_id": "edge_37548569294933609@0.000000000"
@@ -3348,8 +3348,8 @@
 						"id": "vertex:contour:2",
 						"origin": "segment_left",
 						"position": [
-							4.77362871170044,
-							10.2499780654907
+							4.81931400299072,
+							10.2749881744385
 						],
 						"preserved": false,
 						"source_id": "edge_37548569294933609@1.000000000"
@@ -3360,8 +3360,8 @@
 						"id": "vertex:contour:3",
 						"origin": "segment_right",
 						"position": [
-							4.95637083053589,
-							10.3500185012817
+							4.91068553924561,
+							10.325008392334
 						],
 						"preserved": false,
 						"source_id": "edge_37548569294933609@1.000000000"
@@ -3373,7 +3373,7 @@
 						"origin": "segment_left",
 						"position": [
 							4.86499977111816,
-							10.1958312988281
+							10.2479152679443
 						],
 						"preserved": false,
 						"source_id": "edge_37548569294933609@1.000000000"
@@ -3385,7 +3385,7 @@
 						"origin": "segment_right",
 						"position": [
 							4.86499977111816,
-							10.4041652679443
+							10.3520812988281
 						],
 						"preserved": false,
 						"source_id": "edge_37548569294933609@1.000000000"
@@ -3397,7 +3397,7 @@
 						"origin": "segment_left",
 						"position": [
 							3.36500024795532,
-							10.1958312988281
+							10.2479152679443
 						],
 						"preserved": false,
 						"source_id": "edge_5630300979626137203@1.000000000"
@@ -3409,7 +3409,7 @@
 						"origin": "segment_right",
 						"position": [
 							3.36500024795532,
-							10.4041652679443
+							10.3520812988281
 						],
 						"preserved": false,
 						"source_id": "edge_5630300979626137203@1.000000000"
@@ -3420,8 +3420,8 @@
 						"id": "vertex:contour:8",
 						"origin": "segment_left",
 						"position": [
-							3.45637154579163,
-							10.3500185012817
+							3.41068577766418,
+							10.325008392334
 						],
 						"preserved": false,
 						"source_id": "edge_5630300979626137203@1.000000000"
@@ -3432,8 +3432,8 @@
 						"id": "vertex:contour:9",
 						"origin": "segment_right",
 						"position": [
-							3.27362895011902,
-							10.2499780654907
+							3.31931471824646,
+							10.2749881744385
 						],
 						"preserved": false,
 						"source_id": "edge_5630300979626137203@1.000000000"
@@ -3444,8 +3444,8 @@
 						"id": "vertex:contour:10",
 						"origin": "segment_left",
 						"position": [
-							5.59137105941772,
-							6.45001935958862
+							5.54568576812744,
+							6.42500972747803
 						],
 						"preserved": false,
 						"source_id": "edge_2246618002218453158@1.000000000"
@@ -3456,8 +3456,8 @@
 						"id": "vertex:contour:11",
 						"origin": "segment_right",
 						"position": [
-							5.40862894058228,
-							6.34997987747192
+							5.45431423187256,
+							6.37498950958252
 						],
 						"preserved": false,
 						"source_id": "edge_2246618002218453158@1.000000000"
@@ -3468,8 +3468,8 @@
 						"id": "vertex:contour:12",
 						"origin": "segment_left",
 						"position": [
-							5.59137105941772,
-							6.34997987747192
+							5.54568576812744,
+							6.37498950958252
 						],
 						"preserved": false,
 						"source_id": "edge_2246618002218453158@1.000000000"
@@ -3480,8 +3480,8 @@
 						"id": "vertex:contour:13",
 						"origin": "segment_right",
 						"position": [
-							5.40862894058228,
-							6.45001935958862
+							5.45431423187256,
+							6.42500972747803
 						],
 						"preserved": false,
 						"source_id": "edge_2246618002218453158@1.000000000"
@@ -3492,8 +3492,8 @@
 						"id": "vertex:contour:14",
 						"origin": "segment_left",
 						"position": [
-							3.45637154579163,
-							2.44998145103455
+							3.41068577766418,
+							2.4749915599823
 						],
 						"preserved": false,
 						"source_id": "edge_1640428428016996693@1.000000000"
@@ -3504,8 +3504,8 @@
 						"id": "vertex:contour:15",
 						"origin": "segment_right",
 						"position": [
-							3.27362895011902,
-							2.5500214099884
+							3.31931471824646,
+							2.52501130104065
 						],
 						"preserved": false,
 						"source_id": "edge_1640428428016996693@1.000000000"
@@ -3517,7 +3517,7 @@
 						"origin": "segment_left",
 						"position": [
 							3.36500024795532,
-							2.604168176651
+							2.55208468437195
 						],
 						"preserved": false,
 						"source_id": "edge_1640428428016996693@1.000000000"
@@ -3529,7 +3529,7 @@
 						"origin": "segment_right",
 						"position": [
 							3.36500024795532,
-							2.39583468437195
+							2.447918176651
 						],
 						"preserved": false,
 						"source_id": "edge_1640428428016996693@1.000000000"
@@ -3541,7 +3541,7 @@
 						"origin": "segment_left",
 						"position": [
 							4.86499977111816,
-							2.604168176651
+							2.55208468437195
 						],
 						"preserved": false,
 						"source_id": "edge_3733889455715227291@1.000000000"
@@ -3553,7 +3553,7 @@
 						"origin": "segment_right",
 						"position": [
 							4.86499977111816,
-							2.39583468437195
+							2.447918176651
 						],
 						"preserved": false,
 						"source_id": "edge_3733889455715227291@1.000000000"
@@ -3564,8 +3564,8 @@
 						"id": "vertex:contour:20",
 						"origin": "segment_left",
 						"position": [
-							4.77362871170044,
-							2.5500214099884
+							4.81931400299072,
+							2.52501130104065
 						],
 						"preserved": false,
 						"source_id": "edge_3733889455715227291@1.000000000"
@@ -3576,8 +3576,8 @@
 						"id": "vertex:contour:21",
 						"origin": "segment_right",
 						"position": [
-							4.95637083053589,
-							2.44998145103455
+							4.91068553924561,
+							2.4749915599823
 						],
 						"preserved": false,
 						"source_id": "edge_3733889455715227291@1.000000000"
@@ -3588,8 +3588,8 @@
 						"id": "vertex:contour:22",
 						"origin": "segment_left",
 						"position": [
-							6.9086275100708,
-							6.45001935958862
+							6.95431280136108,
+							6.42500972747803
 						],
 						"preserved": false,
 						"source_id": "edge_37548569294933609@0.000000000"
@@ -3600,8 +3600,8 @@
 						"id": "vertex:contour:23",
 						"origin": "segment_right",
 						"position": [
-							7.09136962890625,
-							6.34997987747192
+							7.04568433761597,
+							6.37498950958252
 						],
 						"preserved": false,
 						"source_id": "edge_37548569294933609@0.000000000"
@@ -3624,8 +3624,8 @@
 						"id": "vertex:contour:25",
 						"origin": "join_outer_previous",
 						"position": [
-							7.09136962890625,
-							6.34997987747192
+							7.04568433761597,
+							6.37498950958252
 						],
 						"preserved": false,
 						"source_id": "edge_37548569294933609@0.000000000"
@@ -3636,7 +3636,7 @@
 						"id": "vertex:contour:26",
 						"origin": "join_miter",
 						"position": [
-							7.11875200271606,
+							7.05937576293945,
 							6.39999961853027
 						],
 						"preserved": false,
@@ -3648,8 +3648,8 @@
 						"id": "vertex:contour:27",
 						"origin": "join_outer_next",
 						"position": [
-							7.09136962890625,
-							6.45001935958862
+							7.04568433761597,
+							6.42500972747803
 						],
 						"preserved": false,
 						"source_id": "edge_37548569294933609@0.000000000"
@@ -3672,8 +3672,8 @@
 						"id": "vertex:contour:29",
 						"origin": "join_outer_previous",
 						"position": [
-							4.95637083053589,
-							10.3500185012817
+							4.91068553924561,
+							10.325008392334
 						],
 						"preserved": false,
 						"source_id": "edge_37548569294933609@1.000000000"
@@ -3684,8 +3684,8 @@
 						"id": "vertex:contour:30",
 						"origin": "join_miter",
 						"position": [
-							4.92672872543335,
-							10.4041652679443
+							4.89586496353149,
+							10.3520812988281
 						],
 						"preserved": false,
 						"source_id": "edge_37548569294933609@1.000000000"
@@ -3697,7 +3697,7 @@
 						"origin": "join_outer_next",
 						"position": [
 							4.86499977111816,
-							10.4041652679443
+							10.3520812988281
 						],
 						"preserved": false,
 						"source_id": "edge_37548569294933609@1.000000000"
@@ -3721,7 +3721,7 @@
 						"origin": "join_outer_previous",
 						"position": [
 							3.36500024795532,
-							10.4041652679443
+							10.3520812988281
 						],
 						"preserved": false,
 						"source_id": "edge_5630300979626137203@1.000000000"
@@ -3732,8 +3732,8 @@
 						"id": "vertex:contour:34",
 						"origin": "join_outer_next",
 						"position": [
-							3.27362895011902,
-							10.2499780654907
+							3.31931471824646,
+							10.2749881744385
 						],
 						"preserved": false,
 						"source_id": "edge_5630300979626137203@1.000000000"
@@ -3756,8 +3756,8 @@
 						"id": "vertex:contour:36",
 						"origin": "join_outer_previous",
 						"position": [
-							5.59137105941772,
-							6.45001935958862
+							5.54568576812744,
+							6.42500972747803
 						],
 						"preserved": false,
 						"source_id": "edge_2246618002218453158@1.000000000"
@@ -3768,7 +3768,7 @@
 						"id": "vertex:contour:37",
 						"origin": "join_miter",
 						"position": [
-							5.61875343322754,
+							5.55937719345093,
 							6.39999961853027
 						],
 						"preserved": false,
@@ -3780,8 +3780,8 @@
 						"id": "vertex:contour:38",
 						"origin": "join_outer_next",
 						"position": [
-							5.59137105941772,
-							6.34997987747192
+							5.54568576812744,
+							6.37498950958252
 						],
 						"preserved": false,
 						"source_id": "edge_2246618002218453158@1.000000000"
@@ -3804,8 +3804,8 @@
 						"id": "vertex:contour:40",
 						"origin": "join_outer_previous",
 						"position": [
-							3.27362895011902,
-							2.5500214099884
+							3.31931471824646,
+							2.52501130104065
 						],
 						"preserved": false,
 						"source_id": "edge_1640428428016996693@1.000000000"
@@ -3817,7 +3817,7 @@
 						"origin": "join_outer_next",
 						"position": [
 							3.36500024795532,
-							2.39583468437195
+							2.447918176651
 						],
 						"preserved": false,
 						"source_id": "edge_1640428428016996693@1.000000000"
@@ -3841,7 +3841,7 @@
 						"origin": "join_outer_previous",
 						"position": [
 							4.86499977111816,
-							2.39583468437195
+							2.447918176651
 						],
 						"preserved": false,
 						"source_id": "edge_3733889455715227291@1.000000000"
@@ -3852,8 +3852,8 @@
 						"id": "vertex:contour:44",
 						"origin": "join_miter",
 						"position": [
-							4.92672872543335,
-							2.39583468437195
+							4.89586448669434,
+							2.447918176651
 						],
 						"preserved": false,
 						"source_id": "edge_3733889455715227291@1.000000000"
@@ -3864,8 +3864,8 @@
 						"id": "vertex:contour:45",
 						"origin": "join_outer_next",
 						"position": [
-							4.95637083053589,
-							2.44998145103455
+							4.91068553924561,
+							2.4749915599823
 						],
 						"preserved": false,
 						"source_id": "edge_3733889455715227291@1.000000000"
@@ -3891,7 +3891,7 @@
 		"bakes": {
 			"adaptive": {
 				"algorithm_version": 6,
-				"bake_id": "bake_284064228078755245",
+				"bake_id": "bake_5802663383331069787",
 				"boundary_refinement_complete": true,
 				"boundary_refinement_count": 0,
 				"boundary_refinement_limit_reached": false,
@@ -4673,7 +4673,7 @@
 		"bakes": {
 			"poisson_fill": {
 				"algorithm_version": 2.0,
-				"bake_id": "seeding_bake_9089461944953451270",
+				"bake_id": "seeding_bake_2273635808574945455",
 				"edited": false,
 				"errors": [],
 				"flow_seed_count": 0.0,
@@ -4689,8 +4689,8 @@
 					"seed": 1,
 					"spacing": 0.55
 				},
-				"sampling_bake_id": "bake_284064228078755245",
-				"sampling_fingerprint": "d0641f97de77a498faca4d614e38d7c6fc59a1edb8cf78903e40b4ed71e529fb",
+				"sampling_bake_id": "bake_5802663383331069787",
+				"sampling_fingerprint": "e5c7bbcd7a40f9ef13132f01ddad568fa9c340d02a7dae2b5ebeb450f1af6ff3",
 				"seed_count": 19,
 				"seeds": [
 					{
