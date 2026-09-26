@@ -243,6 +243,41 @@ func _create_set_member(application: Control, asset_id: String, member_name: Str
 	return application.selected_component_id
 
 
+func _test_mirror_availability_reason() -> void:
+	# A command that cannot run says why. Mirror asks a lot of its subject, and
+	# a second Chain - what pasting Points leaves behind - is the reason an
+	# author is most likely to meet without recognizing it.
+	# An open Chain, the state Mirror is authored in: it reflects a run of the
+	# Chain that is still being drawn.
+	var body := _component()
+	BezierTopology.add_point(body, Vector2.ZERO, "corner")
+	BezierTopology.add_point(body, Vector2(10.0, 0.0), "linear")
+	BezierTopology.add_point(body, Vector2(10.0, 10.0), "linear")
+	body.merge({"id": "component_1", "name": "body", "visibility": true,
+		"draw_mode": WorldDocumentService.DRAW_MODE_CLOSED_LOOP,
+		"topology_role": WorldDocumentService.ROLE_OUTER})
+	var application: Control = load("res://scripts/main.gd").new()
+	application._build_ui()
+	var assets: Array[Dictionary] = [{"id": "asset_1", "name": "Potion", "visibility": true,
+		"components": [body], "groups": [], "guides": []}]
+	application.assets = assets
+	application.selected_asset_id = "asset_1"
+	application.selected_component_id = "component_1"
+	var subject: Dictionary = application._get_component(application._get_asset("asset_1"), "component_1")
+	var point_ids: Array[String] = []
+	for point in subject.get("points", []):
+		point_ids.append(str(point.get("id", "")))
+	application.selected_point_ids = point_ids.duplicate()
+	application.selected_point_id = point_ids[0]
+	_expect(application._selection_mirror_issue(subject).is_empty() and application._can_activate_selection_mirror(subject), "One open Chain with a contiguous run is what Mirror asks for.")
+	subject.get("chains", []).append({"id": "chain_2", "point_ids": [] as Array[String], "edge_ids": [] as Array[String], "closed": false,
+		"topology_role": WorldDocumentService.ROLE_OUTER})
+	_expect(application._selection_mirror_issue(subject).contains("one open source Chain"), "A second Chain should be named as the reason Mirror cannot run.")
+	application._activate_selection_mirror()
+	_expect(str(application.program_status_label.text).begins_with("Mirror is unavailable"), "Reaching for Mirror by shortcut should say why it did nothing.")
+	application.free()
+
+
 func _test_point_drag_snapping() -> void:
 	# A dragged Point selection snaps onto a Point rather than beside one, and
 	# any of the carried Points may be the one that finds it - the closest

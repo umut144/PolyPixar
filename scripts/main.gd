@@ -5343,6 +5343,13 @@ func _render_context_bar() -> void:
 		mirror_menu.disabled = geometry_locked or not _can_activate_selection_mirror(selected_component)
 		if geometry_locked:
 			mirror_menu.tooltip_text = draw_menu.tooltip_text
+		elif mirror_menu.disabled:
+			# A command that cannot run says why where it is read: the reason is
+			# about this Component and this selection, and guessing at it costs
+			# more than the sentence it takes to name it.
+			var mirror_issue := _selection_mirror_issue(selected_component)
+			if not mirror_issue.is_empty():
+				mirror_menu.tooltip_text = "Mirror is unavailable · %s" % mirror_issue
 		context_bar.add_child(mirror_menu)
 func _next_default_guide_name(asset: Dictionary, guide_type: String) -> String:
 	var base := AssetGuide.display_name(guide_type)
@@ -6214,9 +6221,19 @@ func _activate_edit_face_state() -> void:
 
 
 func _can_activate_selection_mirror(component: Dictionary) -> bool:
-	if component.is_empty() or _region_uses_component_geometry(component) or not WorldDocumentService.is_closed_loop(component):
-		return false
-	return SELECTION_MIRROR_SERVICE_SCRIPT.selection_issues(component, selected_point_ids).is_empty()
+	return _selection_mirror_issue(component).is_empty()
+
+
+## Why Mirror cannot run right now, as one sentence, or empty while it can.
+func _selection_mirror_issue(component: Dictionary) -> String:
+	if component.is_empty():
+		return "Select a Component."
+	if _region_uses_component_geometry(component):
+		return "This Region follows its Component's geometry."
+	if not WorldDocumentService.is_closed_loop(component):
+		return "Mirror is available only for Closed Loop Components."
+	var issues: Array[String] = SELECTION_MIRROR_SERVICE_SCRIPT.selection_issues(component, selected_point_ids)
+	return str(issues[0]) if not issues.is_empty() else ""
 
 
 ## Measure changes no geometry, so it belongs in every Create context bar - the
@@ -6279,7 +6296,9 @@ func _mirror_command_label() -> String:
 
 func _activate_selection_mirror(axis_orientation := ComponentCanvas.MIRROR_AXIS_VERTICAL) -> void:
 	var component := _get_component(_get_asset(selected_asset_id), selected_component_id)
-	if not _can_activate_selection_mirror(component):
+	var mirror_issue := _selection_mirror_issue(component)
+	if not mirror_issue.is_empty():
+		_show_status_message("Mirror is unavailable · %s" % mirror_issue)
 		return
 	active_mirror_axis_orientation = axis_orientation
 	_set_active_context_command("asset.mirror")
