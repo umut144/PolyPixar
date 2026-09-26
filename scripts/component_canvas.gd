@@ -929,6 +929,28 @@ func _notification(what: int) -> void:
 		_clear_navigation_input()
 
 
+## Whether the camera keys belong to this Canvas right now. It navigates while
+## it has the keyboard, and also while nothing else does: a dialog that closes
+## hands focus back to no one, and refusing the keys in that state is what left
+## the camera dead until something happened to focus the Canvas again - a Save,
+## a selection, anything that renders the Canvas and takes the focus with it.
+## A hidden Canvas navigates only while it is the focused one, so the keys stay
+## with whichever Workspace the module actually shows.
+static func navigation_accepts_keys(locked: bool, shortcut_active: bool, focused: bool,
+	visible_in_tree: bool, another_control_focused: bool) -> bool:
+	if locked or shortcut_active:
+		return false
+	return focused or (visible_in_tree and not another_control_focused)
+
+
+func _another_control_has_focus() -> bool:
+	var viewport := get_viewport()
+	if not is_instance_valid(viewport):
+		return true
+	var focus_owner := viewport.gui_get_focus_owner()
+	return is_instance_valid(focus_owner) and focus_owner != self
+
+
 func _update_navigation_input(event: InputEventKey) -> void:
 	if event.keycode not in [KEY_W, KEY_A, KEY_S, KEY_D, KEY_Q, KEY_E]:
 		return
@@ -1364,7 +1386,8 @@ func set_bezier_color_override(color: Color) -> void:
 
 
 func _process(delta: float) -> void:
-	if navigation_locked or command_shortcut_active or not has_focus():
+	if not navigation_accepts_keys(navigation_locked, command_shortcut_active, has_focus(),
+		is_visible_in_tree(), _another_control_has_focus()):
 		return
 	var navigation_input := _navigation_input_vector()
 	var pan_input := Vector2(navigation_input.x, navigation_input.y)

@@ -243,6 +243,19 @@ func _create_set_member(application: Control, asset_id: String, member_name: Str
 	return application.selected_component_id
 
 
+func _test_canvas_navigation_ownership() -> void:
+	# The camera keys were refused whenever the Canvas did not hold the
+	# keyboard, and a closed dialog hands focus back to no one - so WASD and
+	# Q/E stayed dead until something rendered the Canvas and focused it again.
+	# Nothing else owns the keys in that state, so the Canvas does.
+	_expect(ComponentCanvas.navigation_accepts_keys(false, false, true, true, true), "A focused Canvas navigates, whatever else is on screen.")
+	_expect(ComponentCanvas.navigation_accepts_keys(false, false, false, true, false), "With focus nowhere, the visible Canvas takes the camera keys.")
+	_expect(not ComponentCanvas.navigation_accepts_keys(false, false, false, true, true), "A field or a list that holds the keyboard keeps the keys.")
+	_expect(not ComponentCanvas.navigation_accepts_keys(false, false, false, false, false), "A hidden Canvas navigates only while it is the focused one.")
+	_expect(not ComponentCanvas.navigation_accepts_keys(true, false, true, true, false), "A locked Canvas navigates for no one: a dialog is open over it.")
+	_expect(not ComponentCanvas.navigation_accepts_keys(false, true, true, true, false), "While a command modifier is held the keys are shortcuts, not camera moves.")
+
+
 func _test_mirror_axis_point_snapping() -> void:
 	# Where the axis runs decides whether the two halves join: an axis through
 	# the end of the mirrored run reflects that Point onto itself, and Mirror

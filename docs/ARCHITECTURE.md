@@ -327,6 +327,16 @@ the Context Bar and Info Bar, which it renders before it can return; the reverse
 does not hold, because `_render_context_bar` has exit paths that leave the Info
 Bar alone.
 
+The Canvas camera keys - WASD to pan, Q/E to zoom - run while the Canvas holds
+the keyboard and while nothing else does. The second half matters more than it
+sounds: a dialog hands focus back to no one when it closes, and the Canvas is
+focused again only by a render that ends in `grab_focus`. Requiring its own
+focus therefore left the camera dead after every dialog until some unrelated
+action - a Save, a selection - happened to render the Canvas. A hidden Canvas
+navigates only while it is the focused one, so the keys stay with whichever
+Workspace the module shows. `ComponentCanvas.navigation_accepts_keys` is that
+rule on its own, so it can be read and tested without a focus system.
+
 Pointer-based `P` Pivot placement is intercepted by `main.gd` during the early
 input phase because focused Inspector controls may consume printable keys
 before unhandled input. Routing requires the pointer inside the visible Canvas
