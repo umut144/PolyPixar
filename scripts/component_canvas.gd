@@ -1049,16 +1049,17 @@ func _world_to_local(world_point: Vector2) -> Vector2:
 
 
 ## The Component's own outline as the Canvas knows it, in the Component's local
-## point coordinates. Every readout and handle that means "the shape" rather
-## than "the anchor" asks here, so the gizmo, the Inspector and the snapping
-## cannot drift apart.
+## point coordinates: its Points where it has them, and the sampled Primitive
+## contour where it has none. Same two sources in the same order as
+## `ComponentHierarchy.local_outline_points`, so the gizmo on screen and the
+## number in the Inspector cannot drift apart.
 func _local_outline_points() -> Array:
-	if not display_polygon.is_empty():
-		return display_polygon
 	var positions: Array = []
 	for point_data in bezier_points:
 		positions.append(Vector2(point_data.get("position", Vector2.ZERO)))
-	return positions
+	if not positions.is_empty():
+		return positions
+	return display_polygon
 
 
 ## True while this Component has an outline of its own to move against its

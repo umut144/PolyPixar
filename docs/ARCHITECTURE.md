@@ -439,27 +439,36 @@ the Pivot's position** in the parent's space — which is why `_draw_pivot` draw
 the magenta marker there. `pivot` itself is a coordinate in the Component's own
 point space and says only *which* point of the drawing the anchor is pinned to.
 
-The Inspector therefore captions the `position` pair **Pivot X/Y (cm)** and does
-not show the raw local anchor at all. In its place the block shows **Bounds
-Center X/Y (cm)**: where the outline centre sits against the Pivot, read off the
-geometry as it stands right now through `ComponentHierarchy.local_bounds_center`
-and `shape_offset_for`. Both numbers are therefore always answerable from what
-is on screen. The raw local anchor is not: it is frozen point-space and drifts
-with every Point edit, which is how a Pivot drawn in the origin came to read
-`4.1713 cm` in the Inspector.
+The Transform block therefore keeps the order it always had — **Translate,
+Rotate, Scale, Pivot** — but the two placement pairs name what they each move.
+**Pivot X/Y (cm)** closes the block and carries the `position` pair, the anchor
+itself. **Translate X/Y (cm)** opens it and carries where the outline centre
+sits against that anchor, read off the geometry as it stands right now through
+`ComponentHierarchy.local_bounds_center` and `shape_offset_for`. The raw local
+anchor is not shown at all: it is frozen point-space and drifts with every Point
+edit, which is how a Pivot drawn in the origin came to read `4.1713 cm` in the
+Inspector. Both numbers the block does show are always answerable from what is
+on screen.
+
+One definition of the box serves all of it: `local_outline_points` reads a
+Component's Points where it has them and a Primitive's sampled contour where it
+has none, the Canvas asks those same two sources in the same order, and
+`main.gd`'s `_component_local_bounds_center` — which placement and mirroring use
+— delegates to it. Two definitions would be the same drift again in a new
+place.
 
 The two halves move independently, and that is the rule the whole editor keeps:
 
 - **Moving the Pivot moves nothing else.** The authored position takes the step
   and the local anchor absorbs the same step, so the shape does not stir.
-  Dragging the magenta marker, the `P` shortcut and the Pivot fields all go
-  through this.
+  Dragging the magenta marker, the `P` shortcut and the Pivot fields — local
+  and global — all go through this.
 - **Moving a Component moves its shape, not its anchor.** Only the local anchor
   is written, which shifts the whole local frame — Child Components included —
   while the authored position, and with it the marker, stays where it was
   placed. The Canvas reports the new anchor through `shape_anchor_changed` as an
   absolute value rather than a step, so a dropped mouse-move cannot accumulate
-  drift.
+  drift. The Translate fields write the same anchor numerically.
 
 Because Translate grabs the shape, its gizmo handles ride the outline centre
 (`transform_gizmo_center`) and follow the pointer; Rotate and Scale turn and
@@ -470,10 +479,11 @@ as a whole through `position`.
 
 A Group borrows its outline from its members
 (`ComponentHierarchy.group_local_outline_points`) and follows the same rule. The
-Asset Pivot does too: `AssetScaleRebaseService.world_asset_pivot` is what the
-Inspector shows and the marker draws, and changing `root_position` writes the
-opposite step into `asset_pivot`, so moving an Asset never moves the origin
-Runtime Export measures from.
+Asset Pivot does too, in an Asset Transform block of the same shape — Translate,
+Scale, Pivot: `AssetScaleRebaseService.world_asset_pivot` is what the Inspector
+shows and the marker draws, and changing `root_position` writes the opposite
+step into `asset_pivot`, so moving an Asset never moves the origin Runtime
+Export measures from.
 
 Closed-loop and Primitive Components also carry a persisted `topology_role`:
 `outer` by default or `hole` when authored as a hole. A Primitive retains its

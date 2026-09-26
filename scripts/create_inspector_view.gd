@@ -262,28 +262,28 @@ func rebuild() -> void:
 		asset_transform_grid.columns = 2
 		asset_transform_grid.add_theme_constant_override("h_separation", 8)
 		asset_transform_grid.add_theme_constant_override("v_separation", 4)
-		# The Pivot reads where its marker is drawn, not where it is stored: an
-		# Asset that has been moved would otherwise show a number nothing on the
-		# Canvas agrees with.
 		var asset_pivot := AssetScaleRebaseService.world_asset_pivot(asset)
 		var root_position := AssetScaleRebaseService.root_position(asset)
 		var asset_root_scale := AssetScaleRebaseService.root_scale(asset)
 		asset_root_position_fields = EditorWidgets.build_number_grid(asset_transform_grid, [
-			{"caption": "Position X (cm)", "property": "position_x", "value": ToolUnits.to_centimeters(root_position.x),
+			{"caption": "Translate X (cm)", "property": "position_x", "value": ToolUnits.to_centimeters(root_position.x),
 				"step": POSITION_STEP, "tooltip": ASSET_ROOT_POSITION_TOOLTIP},
-			{"caption": "Position Y (cm)", "property": "position_y", "value": ToolUnits.to_centimeters(root_position.y),
+			{"caption": "Translate Y (cm)", "property": "position_y", "value": ToolUnits.to_centimeters(root_position.y),
 				"step": POSITION_STEP, "tooltip": ASSET_ROOT_POSITION_TOOLTIP},
 		], asset_root_position_changed.emit)
-		asset_pivot_fields = EditorWidgets.build_number_grid(asset_transform_grid, [
-			{"caption": "Pivot X (cm)", "property": "pivot_x", "value": ToolUnits.to_centimeters(asset_pivot.x), "step": POSITION_STEP},
-			{"caption": "Pivot Y (cm)", "property": "pivot_y", "value": ToolUnits.to_centimeters(asset_pivot.y), "step": POSITION_STEP},
-		], asset_pivot_property_changed.emit)
 		asset_root_scale_fields = EditorWidgets.build_number_grid(asset_transform_grid, [
 			{"caption": "Scale X", "property": "scale_x", "value": asset_root_scale.x, "min": 0.01, "max": 100.0,
 				"step": SCALE_STEP, "tooltip": ASSET_ROOT_SCALE_TOOLTIP % "X"},
 			{"caption": "Scale Y", "property": "scale_y", "value": asset_root_scale.y, "min": 0.01, "max": 100.0,
 				"step": SCALE_STEP, "tooltip": ASSET_ROOT_SCALE_TOOLTIP % "Y"},
 		], asset_root_scale_changed.emit)
+		# The Pivot closes the block here too, and reads where its marker is
+		# drawn rather than where it is stored: an Asset that has been moved
+		# would otherwise show a number nothing on the Canvas agrees with.
+		asset_pivot_fields = EditorWidgets.build_number_grid(asset_transform_grid, [
+			{"caption": "Pivot X (cm)", "property": "pivot_x", "value": ToolUnits.to_centimeters(asset_pivot.x), "step": POSITION_STEP},
+			{"caption": "Pivot Y (cm)", "property": "pivot_y", "value": ToolUnits.to_centimeters(asset_pivot.y), "step": POSITION_STEP},
+		], asset_pivot_property_changed.emit)
 		asset_root_scale_field = asset_root_scale_fields.get("scale_x")
 		add_child(asset_transform_grid)
 		_render_asset_root_scale_rebase_inspector(asset)
@@ -604,35 +604,37 @@ func rebuild() -> void:
 		var transform: Dictionary = component.get("transform", WorldDocumentService.default_component_transform())
 		var transform_position: Vector2 = transform.get("position", Vector2.ZERO)
 		var transform_scale: Vector2 = transform.get("scale", Vector2.ONE)
+		# The block keeps the order it always had - Translate, Rotate, Scale, and
+		# the Pivot last - but the two placement pairs now name what they each
+		# move. Translate is where the shape sits against its anchor, read off
+		# the outline that is drawn right now; the Pivot is the anchor itself,
+		# which is what the authored position locates. Moving one never moves
+		# the other, and neither number is inherited from an older edit - which
+		# is exactly what the raw local pivot value used to be.
+		var bounds_center := ComponentHierarchy.local_bounds_center(component)
 		if show_global_transform:
 			var displayed_transform: Dictionary = ComponentHierarchy.world_transform_record(asset, selected_component_id)
 			var displayed_position: Vector2 = displayed_transform.get("position", Vector2.ZERO)
 			var global_scale: Vector2 = displayed_transform.get("scale", Vector2.ONE)
-			# Global values are read-only echoes of the hierarchy, so the returned
-			# fields are not kept: only local transform fields get live updates.
+			var global_offset := ComponentHierarchy.shape_offset_for(displayed_transform, bounds_center)
+			# Global values echo the hierarchy, so the returned fields are not
+			# kept: only local transform fields get live updates.
 			EditorWidgets.build_number_grid(transform_grid,
-				_component_transform_descriptors(ToolUnits.to_centimeters(displayed_position.x),
-					ToolUnits.to_centimeters(displayed_position.y),
-					float(displayed_transform.get("rotation", 0.0)), global_scale),
+				_component_transform_descriptors(ToolUnits.to_centimeters(global_offset.x),
+					ToolUnits.to_centimeters(global_offset.y),
+					float(displayed_transform.get("rotation", 0.0)), global_scale,
+					ToolUnits.to_centimeters(displayed_position.x),
+					ToolUnits.to_centimeters(displayed_position.y)),
 				global_transform_value_changed.emit)
 		else:
+			var shape_offset := ComponentHierarchy.shape_offset_for(transform, bounds_center)
 			transform_fields = EditorWidgets.build_number_grid(transform_grid,
-				_component_transform_descriptors(ToolUnits.to_centimeters(transform_position.x),
-					ToolUnits.to_centimeters(transform_position.y),
-					float(transform.get("rotation", 0.0)), transform_scale),
+				_component_transform_descriptors(ToolUnits.to_centimeters(shape_offset.x),
+					ToolUnits.to_centimeters(shape_offset.y),
+					float(transform.get("rotation", 0.0)), transform_scale,
+					ToolUnits.to_centimeters(transform_position.x),
+					ToolUnits.to_centimeters(transform_position.y)),
 				transform_value_changed.emit)
-		# The second pair says where the shape sits against that anchor, read off
-		# the outline that is drawn right now. Editing it moves the shape and
-		# leaves the Pivot; editing the Pivot above moves the anchor and leaves
-		# the shape. Neither number can be inherited from an older edit, which is
-		# what the local pivot value used to be.
-		var shape_offset := ComponentHierarchy.shape_offset_for(transform, ComponentHierarchy.local_bounds_center(component))
-		transform_fields.merge(EditorWidgets.build_number_grid(transform_grid, [
-			{"caption": "Bounds Center X (cm)", "property": "bounds_center_x",
-				"value": ToolUnits.to_centimeters(shape_offset.x), "step": POSITION_STEP, "silent": false},
-			{"caption": "Bounds Center Y (cm)", "property": "bounds_center_y",
-				"value": ToolUnits.to_centimeters(shape_offset.y), "step": POSITION_STEP, "silent": false},
-		], transform_value_changed.emit), true)
 	# A Hole is a constraint and, since the edge it cuts is drawn, a layer of its
 	# own: the section now names both rather than only the half it used to be.
 	add_child(EditorWidgets.create_inspector_section("Constraint / Layer" if hole_component else "Visibility / Layer", section_toggled.emit))
@@ -701,23 +703,27 @@ func _render_palette_variants() -> void:
 		add_child(variant_row)
 
 
-func _component_transform_descriptors(position_x: float, position_y: float, rotation: float, scale: Vector2) -> Array:
-	# One shape for the local and the global transform block. The first pair is
-	# the authored position, which is where the Pivot sits - `world` at the
-	# Pivot is exactly `position` - so it is captioned for what it locates
-	# rather than for the field it is stored in. Rotation steps and
-	# arrows in whole degrees; Pivot keeps hundredth text precision and Scale
-	# the far finer SCALE_STEP, because a Scale is a factor over a whole Component
-	# and its far decimals are a visible difference where a hundredth of a
-	# centimetre is not. Both keep tenth-unit arrows. None of them is silent: a
-	# few callers rely on the initial value_changed.
+func _component_transform_descriptors(translate_x: float, translate_y: float, rotation: float,
+	scale: Vector2, pivot_x: float, pivot_y: float) -> Array:
+	# One shape for the local and the global transform block. Translate carries
+	# the shape against its anchor; the Pivot pair closes the block and carries
+	# the anchor itself, which is what the authored position locates - `world`
+	# at the Pivot is exactly `position`, which is why the marker is drawn
+	# there. Rotation steps and arrows in whole degrees; both centimetre pairs
+	# keep hundredth text precision and Scale the far finer SCALE_STEP, because
+	# a Scale is a factor over a whole Component and its far decimals are a
+	# visible difference where a hundredth of a centimetre is not. All keep
+	# tenth-unit arrows. None of them is silent: a few callers rely on the
+	# initial value_changed.
 	return [
-		{"caption": "Pivot X (cm)", "property": "position_x", "value": position_x, "step": POSITION_STEP, "silent": false},
-		{"caption": "Pivot Y (cm)", "property": "position_y", "value": position_y, "step": POSITION_STEP, "silent": false},
+		{"caption": "Translate X (cm)", "property": "translate_x", "value": translate_x, "step": POSITION_STEP, "silent": false},
+		{"caption": "Translate Y (cm)", "property": "translate_y", "value": translate_y, "step": POSITION_STEP, "silent": false},
 		{"caption": "Rotation", "property": "rotation", "value": rotation,
 			"step": 1.0, "arrow_step": 1.0, "silent": false},
 		{"caption": "Scale X", "property": "scale_x", "value": scale.x, "step": SCALE_STEP, "silent": false},
 		{"caption": "Scale Y", "property": "scale_y", "value": scale.y, "step": SCALE_STEP, "silent": false},
+		{"caption": "Pivot X (cm)", "property": "position_x", "value": pivot_x, "step": POSITION_STEP, "silent": false},
+		{"caption": "Pivot Y (cm)", "property": "position_y", "value": pivot_y, "step": POSITION_STEP, "silent": false},
 	]
 
 
@@ -749,15 +755,17 @@ func _render_group_inspector(_asset: Dictionary, group: Dictionary) -> void:
 	var transform: Dictionary = group.get("transform", WorldDocumentService.default_component_transform())
 	var transform_position: Vector2 = transform.get("position", Vector2.ZERO)
 	var transform_scale: Vector2 = transform.get("scale", Vector2.ONE)
-	_add_group_transform_field(transform_grid, "Pivot X (cm)", ToolUnits.to_centimeters(transform_position.x), "position_x", POSITION_STEP, 0.01)
-	_add_group_transform_field(transform_grid, "Pivot Y (cm)", ToolUnits.to_centimeters(transform_position.y), "position_y", POSITION_STEP, 0.01)
+	# Same block, same order as a Component's: the Group travels against its
+	# anchor, and the Pivot that anchor sits on closes the block.
+	var group_shape_offset := ComponentHierarchy.shape_offset_for(transform,
+		ComponentHierarchy.group_local_bounds_center(_asset, str(group.get("id", ""))))
+	_add_group_transform_field(transform_grid, "Translate X (cm)", ToolUnits.to_centimeters(group_shape_offset.x), "translate_x", POSITION_STEP, 0.01)
+	_add_group_transform_field(transform_grid, "Translate Y (cm)", ToolUnits.to_centimeters(group_shape_offset.y), "translate_y", POSITION_STEP, 0.01)
 	_add_group_transform_field(transform_grid, "Rotation", float(transform.get("rotation", 0.0)), "rotation", 1.0)
 	_add_group_transform_field(transform_grid, "Scale X", transform_scale.x, "scale_x", SCALE_STEP, SCALE_ARROW_STEP)
 	_add_group_transform_field(transform_grid, "Scale Y", transform_scale.y, "scale_y", SCALE_STEP, SCALE_ARROW_STEP)
-	var group_shape_offset := ComponentHierarchy.shape_offset_for(transform,
-		ComponentHierarchy.group_local_bounds_center(_asset, str(group.get("id", ""))))
-	_add_group_transform_field(transform_grid, "Bounds Center X (cm)", ToolUnits.to_centimeters(group_shape_offset.x), "bounds_center_x", POSITION_STEP, 0.001)
-	_add_group_transform_field(transform_grid, "Bounds Center Y (cm)", ToolUnits.to_centimeters(group_shape_offset.y), "bounds_center_y", POSITION_STEP, 0.001)
+	_add_group_transform_field(transform_grid, "Pivot X (cm)", ToolUnits.to_centimeters(transform_position.x), "position_x", POSITION_STEP, 0.01)
+	_add_group_transform_field(transform_grid, "Pivot Y (cm)", ToolUnits.to_centimeters(transform_position.y), "position_y", POSITION_STEP, 0.01)
 	add_child(transform_grid)
 	add_child(EditorWidgets.create_inspector_section("Group Visibility", section_toggled.emit))
 	var visibility_toggle := CheckButton.new()

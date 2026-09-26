@@ -9921,33 +9921,11 @@ func _duplicate_component_record(source: Dictionary, _asset: Dictionary, forced_
 ## space. Parent space and world space are this one point carried through a
 ## transform, so everything that mirrors, measures or places from "the middle of
 ## the shape" means the same point.
+## The centre of a Component's own outline, in its local point coordinates.
+## Placement, the Inspector's Translate pair and the Canvas gizmo all mean the
+## same box, so they all read it from the one definition.
 func _component_local_bounds_center(component: Dictionary) -> Vector2:
-	var points: Array = component.get("points", [])
-	if points.is_empty() and PrimitiveGeometryService.has_analytic_shape(component):
-		var primitive_contour := PrimitiveGeometryService.contour(component)
-		if not primitive_contour.is_empty():
-			var primitive_minimum := Vector2(INF, INF)
-			var primitive_maximum := Vector2(-INF, -INF)
-			for primitive_point in primitive_contour:
-				primitive_minimum.x = minf(primitive_minimum.x, primitive_point.x)
-				primitive_minimum.y = minf(primitive_minimum.y, primitive_point.y)
-				primitive_maximum.x = maxf(primitive_maximum.x, primitive_point.x)
-				primitive_maximum.y = maxf(primitive_maximum.y, primitive_point.y)
-			return (primitive_minimum + primitive_maximum) * 0.5
-	if points.is_empty():
-		# Without geometry there is no box, and the Pivot is the one point the
-		# Component still stands for - it is what the local transform carries to
-		# the Component's Position.
-		return Vector2(component.get("transform", {}).get("pivot", Vector2.ZERO))
-	var minimum := Vector2(INF, INF)
-	var maximum := Vector2(-INF, -INF)
-	for point in points:
-		var point_position: Vector2 = point.get("position", Vector2.ZERO)
-		minimum.x = minf(minimum.x, point_position.x)
-		minimum.y = minf(minimum.y, point_position.y)
-		maximum.x = maxf(maximum.x, point_position.x)
-		maximum.y = maxf(maximum.y, point_position.y)
-	return (minimum + maximum) * 0.5
+	return ComponentHierarchy.local_bounds_center(component)
 
 
 func _component_visual_center_in_parent_space(component: Dictionary) -> Vector2:
@@ -12566,19 +12544,19 @@ func _on_transform_value_changed(value: float, property_name: String) -> void:
 	_invalidate_render(RENDER_CANVAS_CONTEXT)
 
 
-## The Transform block names two independent things. The Pivot pair is the
-## authored position, which is where the anchor sits: moving it moves the anchor
-## and nothing else, so the local anchor absorbs the same step and the shape
-## stays on screen. The Bounds Center pair is where the shape sits against that
-## anchor: moving it writes the local anchor alone, so the shape - and every
-## Child hanging off this frame - travels while the Pivot stays put. Neither
-## number is inherited from an earlier edit, which is what the raw local pivot
-## value used to be.
+## The Transform block names two independent things. Translate is where the
+## shape sits against its anchor: moving it writes the local anchor alone, so
+## the shape - and every Child hanging off this frame - travels while the Pivot
+## stays put. The Pivot pair is the authored position, which is where that
+## anchor sits: moving it moves the anchor and nothing else, so the local anchor
+## absorbs the same step and the shape stays on screen. Neither number is
+## inherited from an earlier edit, which is what the raw local pivot value used
+## to be.
 func _apply_transform_field(transform: Dictionary, bounds_center: Vector2, value: float, property_name: String) -> void:
 	var transform_position: Vector2 = transform.get("position", Vector2.ZERO)
 	var transform_scale: Vector2 = transform.get("scale", Vector2.ONE)
 	var pivot: Vector2 = transform.get("pivot", Vector2.ZERO)
-	if property_name in ["position_x", "position_y", "bounds_center_x", "bounds_center_y"]:
+	if property_name in ["position_x", "position_y", "translate_x", "translate_y"]:
 		value = _world_to_editor_units(value)
 	match property_name:
 		"position_x", "position_y":
@@ -12589,9 +12567,9 @@ func _apply_transform_field(transform: Dictionary, bounds_center: Vector2, value
 				moved.y = value
 			pivot = ComponentHierarchy.pivot_move_anchor(transform, moved - transform_position)
 			transform_position = moved
-		"bounds_center_x", "bounds_center_y":
+		"translate_x", "translate_y":
 			var offset := ComponentHierarchy.shape_offset_for(transform, bounds_center)
-			if property_name == "bounds_center_x":
+			if property_name == "translate_x":
 				offset.x = value
 			else:
 				offset.y = value
@@ -12613,8 +12591,8 @@ func _sync_transform_fields(transform: Dictionary, bounds_center: Vector2) -> vo
 	var values := {
 		"position_x": _editor_units_to_world(transform_position.x),
 		"position_y": _editor_units_to_world(transform_position.y),
-		"bounds_center_x": _editor_units_to_world(offset.x),
-		"bounds_center_y": _editor_units_to_world(offset.y)
+		"translate_x": _editor_units_to_world(offset.x),
+		"translate_y": _editor_units_to_world(offset.y)
 	}
 	for field_name in values:
 		var field = create_inspector_view.transform_fields.get(field_name)
@@ -12625,12 +12603,27 @@ func _sync_transform_fields(transform: Dictionary, bounds_center: Vector2) -> vo
 func _on_global_transform_value_changed(value: float, property_name: String) -> void:
 	var asset := _get_asset(selected_asset_id)
 	var component := _get_component(asset, selected_component_id)
-	if component.is_empty() or property_name not in ["position_x", "position_y", "rotation", "scale_x", "scale_y"]:
+	if component.is_empty() or property_name not in ["position_x", "position_y", "translate_x", "translate_y", "rotation", "scale_x", "scale_y"]:
 		return
 	_record_direct_change()
 	var world_record := ComponentHierarchy.world_transform_record(asset, selected_component_id)
-	if property_name in ["position_x", "position_y"]:
+	var bounds_center := ComponentHierarchy.local_bounds_center(component)
+	if property_name in ["position_x", "position_y", "translate_x", "translate_y"]:
 		value = _world_to_editor_units(value)
+	if property_name in ["translate_x", "translate_y"]:
+		# Translate is read in world direction here, but it writes the same
+		# local anchor the local block writes: the anchor is the Component's own
+		# point-space value either way, so the world record converts it directly.
+		var world_offset := ComponentHierarchy.shape_offset_for(world_record, bounds_center)
+		if property_name == "translate_x":
+			world_offset.x = value
+		else:
+			world_offset.y = value
+		var shape_transform: Dictionary = component.get("transform", WorldDocumentService.default_component_transform())
+		shape_transform["pivot"] = ComponentHierarchy.pivot_for_shape_offset(world_record, bounds_center, world_offset)
+		component["transform"] = shape_transform
+		_invalidate_render(RENDER_INSPECTOR | RENDER_CANVAS_CONTEXT)
+		return
 	var world_position: Vector2 = world_record.get("position", Vector2.ZERO)
 	var world_scale: Vector2 = world_record.get("scale", Vector2.ONE)
 	match property_name:
@@ -12641,7 +12634,14 @@ func _on_global_transform_value_changed(value: float, property_name: String) -> 
 		"scale_y": world_scale.y = value
 	world_record["position"] = world_position
 	world_record["scale"] = world_scale
-	component["transform"] = ComponentHierarchy.local_transform_from_world_record(asset, selected_component_id, world_record)
+	var local_record := ComponentHierarchy.local_transform_from_world_record(asset, selected_component_id, world_record)
+	if property_name in ["position_x", "position_y"]:
+		# Moving the Pivot moves the anchor and nothing else here too: the local
+		# anchor absorbs the same step so the shape does not stir.
+		var previous_position: Vector2 = component.get("transform", {}).get("position", Vector2.ZERO)
+		local_record["pivot"] = ComponentHierarchy.pivot_move_anchor(local_record,
+			Vector2(local_record.get("position", Vector2.ZERO)) - previous_position)
+	component["transform"] = local_record
 	_invalidate_render(RENDER_INSPECTOR | RENDER_CANVAS_CONTEXT)
 
 

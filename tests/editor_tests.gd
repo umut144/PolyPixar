@@ -3081,8 +3081,8 @@ func _test_inspector_value_precision() -> void:
 	application._render_inspector()
 	var component_scale_field: SpinBox = application.create_inspector_view.transform_fields["scale_x"]
 	var component_position_field: SpinBox = application.create_inspector_view.transform_fields["position_x"]
-	var component_bounds_field: SpinBox = application.create_inspector_view.transform_fields["bounds_center_x"]
-	_expect(is_equal_approx(component_scale_field.step, 0.00001) and is_equal_approx(component_position_field.step, 0.0001) and is_equal_approx(component_bounds_field.step, 0.0001), "A Component's Scale, Pivot and Bounds Center should each author their own precision, and the Bounds Center the same one as the Pivot it is measured from.")
+	var component_translate_field: SpinBox = application.create_inspector_view.transform_fields["translate_x"]
+	_expect(is_equal_approx(component_scale_field.step, 0.00001) and is_equal_approx(component_position_field.step, 0.0001) and is_equal_approx(component_translate_field.step, 0.0001), "A Component's Scale, Pivot and Translate should each author their own precision, and Translate the same one as the Pivot it is measured from.")
 	_edit_inspector_value(component_scale_field, 0.81253)
 	_expect(is_equal_approx(Vector2(body["transform"]["scale"]).x, 0.81253), "A Component Scale of 0.81253 must reach the transform unrounded.")
 	_edit_inspector_value(component_position_field, 11.1234)
@@ -3378,11 +3378,11 @@ func _test_pivot_is_an_anchor() -> void:
 	application.selected_component_id = "component_1"
 	application._render_inspector()
 	var pivot_field: SpinBox = application.create_inspector_view.transform_fields["position_x"]
-	var bounds_field: SpinBox = application.create_inspector_view.transform_fields["bounds_center_x"]
+	var translate_field: SpinBox = application.create_inspector_view.transform_fields["translate_x"]
 	_expect(is_equal_approx(pivot_field.value, application._editor_units_to_world(2.0)),
 		"The Pivot field should read the authored position, because that is where the Pivot marker is drawn.")
-	_expect(is_equal_approx(bounds_field.value, application._editor_units_to_world(1.0)),
-		"The Bounds Center should read the outline centre against the Pivot: local (5, 5) minus the anchor (4, 1) is (1, 4).")
+	_expect(is_equal_approx(translate_field.value, application._editor_units_to_world(1.0)),
+		"Translate should read the outline centre against the Pivot: local (5, 5) minus the anchor (4, 1) is (1, 4).")
 	var asset: Dictionary = application._get_asset("asset_1")
 	var first_point := Vector2(body["points"][0]["position"])
 	var point_before: Vector2 = ComponentHierarchy.world_transform(asset, "component_1") * first_point
@@ -3392,14 +3392,44 @@ func _test_pivot_is_an_anchor() -> void:
 	_expect((ComponentHierarchy.world_transform(asset, "component_1") * first_point).is_equal_approx(point_before),
 		"Moving the Pivot must move nothing else - the shape stays on screen while only its anchor travels.")
 	application._render_inspector()
-	var moved_bounds_field: SpinBox = application.create_inspector_view.transform_fields["bounds_center_x"]
+	var moved_translate_field: SpinBox = application.create_inspector_view.transform_fields["translate_x"]
 	var position_before := Vector2(body["transform"]["position"])
 	var shape_before: Vector2 = ComponentHierarchy.world_transform(asset, "component_1") * first_point
-	_edit_inspector_value(moved_bounds_field, moved_bounds_field.value + application._editor_units_to_world(2.0))
+	_edit_inspector_value(moved_translate_field, moved_translate_field.value + application._editor_units_to_world(2.0))
 	_expect(Vector2(body["transform"]["position"]).is_equal_approx(position_before),
 		"Moving the shape must leave the Pivot: the anchor is a fixed point in the Asset, not a handle on the drawing.")
 	_expect((ComponentHierarchy.world_transform(asset, "component_1") * first_point).is_equal_approx(shape_before + Vector2(2.0, 0.0)),
 		"The shape should travel by exactly the step that was typed.")
+	application.free()
+
+
+## The Transform block keeps the order it always had - Translate, Rotate, Scale,
+## and the Pivot last - so that giving the two placement pairs honest names did
+## not also reshuffle the block people read every day.
+func _test_transform_block_order() -> void:
+	var application: Control = load("res://scripts/main.gd").new()
+	application._build_ui()
+	var body := _outliner_test_component("component_1", "body")
+	body["transform"] = WorldDocumentService.default_component_transform()
+	var order_assets: Array[Dictionary] = [{"id": "asset_1", "name": "Cream", "asset_type": "prop",
+		"visibility": true, "components": [body], "groups": [], "guides": [],
+		"asset_pivot": Vector2.ZERO, "root_position": Vector2.ZERO, "root_scale": Vector2.ONE}]
+	application.assets = order_assets
+	application.active_module = "Create"
+	application.active_create_submodule = "Single"
+	application.selected_asset_id = "asset_1"
+	application.selected_component_id = "component_1"
+	application._render_inspector()
+	var expected: Array[String] = ["Translate X (cm)", "Translate Y (cm)", "Rotation",
+		"Scale X", "Scale Y", "Pivot X (cm)", "Pivot Y (cm)"]
+	var controls: Array = []
+	_inspector_controls(application.inspector_content, controls)
+	var captions: Array[String] = []
+	for control in controls:
+		if control is Label and expected.has(str(control.text)):
+			captions.append(str(control.text))
+	_expect(captions == expected,
+		"The Transform block should read Translate, Rotate, Scale, Pivot - got %s." % str(captions))
 	application.free()
 
 

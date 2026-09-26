@@ -283,26 +283,22 @@ static func transform_record_from_affine(affine: Transform2D, pivot: Vector2) ->
 	}
 
 
-## The outline a Component actually draws, in its own local point coordinates.
-## A Primitive reports its sampled contour, a Bezier Component its outer control
-## polygon, and anything that has neither falls back to its raw Points. The
-## Canvas keeps the same order in `display_polygon`, so the gizmo on screen and
-## the number in the Inspector always mean the same outline.
+## The outline a Component actually draws, in its own local point coordinates:
+## its Points where it has them, and a Primitive's sampled contour where it has
+## none. The Canvas asks the same two sources in the same order, so the gizmo on
+## screen and the number in the Inspector can never mean different outlines.
 static func local_outline_points(component: Dictionary) -> Array:
 	if component.is_empty():
 		return []
-	if PrimitiveGeometryService.has_analytic_shape(component):
-		var contour: Array = PrimitiveGeometryService.contour(component)
-		if not contour.is_empty():
-			return contour
-	var outer: Array = BezierTopology.outer_control_polygon(component)
-	if not outer.is_empty():
-		return outer
 	var positions: Array = []
 	for point_data in component.get("points", []):
 		if point_data is Dictionary:
 			positions.append(_vector(point_data.get("position", Vector2.ZERO), Vector2.ZERO))
-	return positions
+	if not positions.is_empty():
+		return positions
+	if PrimitiveGeometryService.has_analytic_shape(component):
+		return PrimitiveGeometryService.contour(component)
+	return []
 
 
 ## The centre of that outline. It is read off the geometry as it stands right
