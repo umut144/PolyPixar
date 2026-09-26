@@ -1280,9 +1280,27 @@ func _confirm_mirror_axis() -> void:
 
 
 func _set_mirror_axis_from_screen(screen_position: Vector2) -> void:
-	mirror_axis_start = _snap_to_grid(_world_to_local(_screen_to_world(screen_position)))
+	# The axis snaps to authored Points before it snaps to the grid. Where it
+	# runs decides whether the two halves join: an axis through the end of the
+	# mirrored run reflects that Point onto itself, which is what lets Mirror
+	# canonicalize both halves into one Chain instead of leaving a second one
+	# to be snapped and fused by hand. Only a Point that is not on a raster
+	# line would otherwise be out of reach.
+	var local_position := _world_to_local(_screen_to_world(screen_position))
+	var point_snap := _nearest_axis_point(local_position)
+	mirror_axis_start = Vector2(point_snap.get("position", local_position)) if bool(point_snap.get("found", false)) \
+		else _snap_to_grid(local_position)
 	mirror_axis_end = mirror_axis_start + _mirror_axis_direction()
 	mirror_axis_candidate_visible = true
+
+
+## The nearest authored Point the mirror axis can run through: the edited
+## Component's own Points first, a visible reference Point otherwise.
+func _nearest_axis_point(local_position: Vector2) -> Dictionary:
+	var own := _nearest_own_point(local_position, {})
+	if bool(own.get("found", false)):
+		return own
+	return _nearest_reference_point(local_position)
 
 
 func _mirror_axis_direction() -> Vector2:

@@ -6311,7 +6311,7 @@ func _activate_selection_mirror(axis_orientation := ComponentCanvas.MIRROR_AXIS_
 
 func _mirror_axis_prompt() -> String:
 	var axis_name := "horizontal" if active_mirror_axis_orientation == ComponentCanvas.MIRROR_AXIS_HORIZONTAL else "vertical"
-	return "%s · Place the %s axis on the snapped grid · Click or Enter to confirm · Escape to cancel" % [_mirror_command_label(), axis_name]
+	return "%s · Place the %s axis on a Point or the snapped grid · Click or Enter to confirm · Escape to cancel" % [_mirror_command_label(), axis_name]
 
 
 func _on_mirror_axis_stage_changed(stage: String) -> void:

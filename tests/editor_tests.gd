@@ -243,6 +243,28 @@ func _create_set_member(application: Control, asset_id: String, member_name: Str
 	return application.selected_component_id
 
 
+func _test_mirror_axis_point_snapping() -> void:
+	# Where the axis runs decides whether the two halves join: an axis through
+	# the end of the mirrored run reflects that Point onto itself, and Mirror
+	# canonicalizes both halves into one Chain. So the axis snaps to authored
+	# Points first and to the grid only when none is within reach.
+	var canvas := ComponentCanvas.new()
+	canvas.size = Vector2(800.0, 600.0)
+	canvas.set_component_transform(WorldDocumentService.default_component_transform())
+	canvas.set_snap_settings(true, 1.0, 15.0)
+	canvas.set_bezier_geometry([
+		{"id": "end", "position": Vector2(4.4, 2.2), "mode": "corner"},
+	], [], [])
+	canvas.start_mirror_command(ComponentCanvas.MIRROR_AXIS_VERTICAL)
+	var near_end := canvas._world_to_screen(canvas._local_to_world(Vector2(4.45, 2.25)))
+	canvas._set_mirror_axis_from_screen(near_end)
+	_expect(canvas.mirror_axis_start.distance_to(Vector2(4.4, 2.2)) < 0.000_001, "An axis placed near an authored Point should run exactly through it, whatever the grid says.")
+	var far_from_end := canvas._world_to_screen(canvas._local_to_world(Vector2(40.4, 40.2)))
+	canvas._set_mirror_axis_from_screen(far_from_end)
+	_expect(canvas.mirror_axis_start.distance_to(Vector2(4.4, 2.2)) > 1.0 and canvas.mirror_axis_start.distance_to(canvas._snap_to_grid(Vector2(40.4, 40.2))) < 0.000_001, "Out of reach of every Point the axis keeps the grid it always had.")
+	canvas.free()
+
+
 func _test_mirror_availability_reason() -> void:
 	# A command that cannot run says why. Mirror asks a lot of its subject, and
 	# a second Chain - what pasting Points leaves behind - is the reason an
