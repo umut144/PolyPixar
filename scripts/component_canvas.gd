@@ -24,9 +24,10 @@ signal pivot_changed(pivot: Vector2)
 signal asset_pivot_changed(pivot: Vector2)
 signal transform_changed(transform: Dictionary)
 ## Moving a Component moves its shape, not its anchor. The Canvas reports the
-## world offset the shape travelled and leaves the authored position alone, so
-## the Pivot stays the fixed point in the Asset it is meant to be.
-signal shape_offset_changed(world_delta: Vector2)
+## local anchor the shape now hangs from and leaves the authored position alone,
+## so the Pivot stays the fixed point in the Asset it is meant to be. The value
+## is absolute, not a step, so a dropped move event cannot accumulate drift.
+signal shape_anchor_changed(local_anchor: Vector2)
 signal primitive_placed(shape: String, shape_center: Vector2, size_cm: Vector2)
 signal primitive_center_changed(center: Vector2)
 signal primitive_preview_cancelled()
@@ -486,7 +487,7 @@ func _gui_input(event: InputEvent) -> void:
 				# the Child Components with it, while the authored position - and
 				# with it the Pivot marker - stays exactly where it was placed.
 				component_transform["pivot"] = _local_anchor_for_world_center(new_center)
-				shape_offset_changed.emit(new_center - transform_drag_start_center)
+				shape_anchor_changed.emit(component_transform["pivot"])
 			else:
 				# Without an outline of its own there is no shape to move against
 				# the anchor, so such a Component still travels as a whole.

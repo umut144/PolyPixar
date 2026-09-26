@@ -373,14 +373,6 @@ static func pivot_for_shape_offset(transform_record: Dictionary, bounds_center: 
 	return bounds_center - local_offset
 
 
-## Moving a record moves its shape, not its anchor: the offset is written to the
-## local anchor, which turns the whole local frame and takes Children along,
-## while the authored position - and with it the Pivot - stays put.
-static func offset_shape_by_world_delta(transform_record: Dictionary, world_affine: Transform2D, world_delta: Vector2) -> Vector2:
-	var pivot := _vector(transform_record.get("pivot", Vector2.ZERO), Vector2.ZERO)
-	return pivot - world_affine.affine_inverse().basis_xform(world_delta)
-
-
 ## The authored position that puts the Pivot at `position` without taking the
 ## shape along: the local anchor absorbs the same step in the other direction.
 static func pivot_move_anchor(transform_record: Dictionary, position_delta: Vector2) -> Vector2:

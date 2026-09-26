@@ -272,6 +272,15 @@ Worked example, `card` / `mana_glyph03`, child of `body` whose
 `component_pivot`. Applying `T(-component_pivot)` as well would move it to
 `(0, 0)`, the bottom centre.
 
+Since 2026-09-26 the editor treats the Pivot as a fixed anchor: moving a
+Component moves its shape against that anchor, and moving an Asset moves it
+against `asset_pivot`, neither of which drags the anchor along. Nothing about
+the schema or these formulas changes — `position` was always the Pivot's
+position and the vertices were always pivot-relative — but the offset between a
+Component's drawing and its `component_pivot` is now authored deliberately
+rather than incidentally, so a consumer that anchors on `component_pivot` sees
+what the artist placed there.
+
 Exported authored Component Scale is always `[1,1]`; PolyTools rejects a
 non-rebased Asset. Runtime animation may subsequently apply translate, rotate,
 or scale to the Component hierarchy. Fill, stroke, and closed region receive

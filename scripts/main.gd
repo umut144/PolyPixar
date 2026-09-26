@@ -1129,6 +1129,7 @@ func _build_ui() -> void:
 	canvas_view.mirror_axis_cancelled.connect(_on_mirror_axis_cancelled)
 	canvas_view.measure_stage_changed.connect(_on_measure_stage_changed)
 	canvas_view.pivot_changed.connect(_on_pivot_changed)
+	canvas_view.shape_anchor_changed.connect(_on_shape_anchor_changed)
 	canvas_view.asset_pivot_changed.connect(_on_asset_pivot_changed)
 	canvas_view.transform_changed.connect(_on_transform_changed)
 	canvas_view.primitive_placed.connect(_on_primitive_placed)
@@ -7358,15 +7359,18 @@ func _on_asset_pivot_property_changed(value: float, property_name: String) -> vo
 	var asset := _get_asset(selected_asset_id)
 	if asset.is_empty() or not selected_component_id.is_empty():
 		return
-	var pivot := _asset_pivot(asset)
+	# The field carries the marker's world position, so it is read back through
+	# the Root Transform before it is stored. Moving the Pivot moves nothing
+	# else: the Asset keeps standing where it stands.
+	var world_pivot := AssetScaleRebaseService.world_asset_pivot(asset)
 	var editor_value := _world_to_editor_units(value)
 	if property_name == "pivot_x":
-		pivot.x = editor_value
+		world_pivot.x = editor_value
 	else:
-		pivot.y = editor_value
+		world_pivot.y = editor_value
 	_record_direct_change()
-	asset["asset_pivot"] = pivot
-	canvas_view.set_asset_pivot(AssetScaleRebaseService.root_transform(asset) * pivot)
+	asset["asset_pivot"] = AssetScaleRebaseService.asset_pivot_for_world(asset, world_pivot)
+	canvas_view.set_asset_pivot(AssetScaleRebaseService.root_transform(asset) * _asset_pivot(asset))
 
 
 func _on_asset_root_position_changed(value: float, property_name: String) -> void:
@@ -7384,6 +7388,10 @@ func _on_asset_root_position_changed(value: float, property_name: String) -> voi
 	if root_position.is_equal_approx(AssetScaleRebaseService.root_position(asset)):
 		return
 	_record_coalesced_change()
+	# Moving the Asset moves the Asset, not its anchor: the authored Pivot takes
+	# the same step in the other direction, so the marker - and with it the
+	# origin Runtime Export measures from - stays where it was placed.
+	asset["asset_pivot"] = _asset_pivot(asset) - (root_position - AssetScaleRebaseService.root_position(asset))
 	asset["root_position"] = root_position
 	_invalidate_batch_status()
 	if is_instance_valid(create_inspector_view.asset_root_scale_rebase_button):
@@ -14021,13 +14029,13 @@ func _on_asset_pivot_changed(pivot: Vector2) -> void:
 	if asset.is_empty() or not selected_component_id.is_empty():
 		return
 	_record_coalesced_change()
-	var authored_pivot := pivot - AssetScaleRebaseService.root_position(asset)
-	asset["asset_pivot"] = authored_pivot
+	asset["asset_pivot"] = AssetScaleRebaseService.asset_pivot_for_world(asset, pivot)
+	# The field shows the marker's world position, which is what was dragged.
 	for property_name in ["pivot_x", "pivot_y"]:
 		var field = create_inspector_view.asset_pivot_fields.get(property_name)
 		if not is_instance_valid(field):
 			continue
-		var value := _editor_units_to_world(authored_pivot.x if property_name == "pivot_x" else authored_pivot.y)
+		var value := _editor_units_to_world(pivot.x if property_name == "pivot_x" else pivot.y)
 		field.set_value_no_signal(value)
 
 
@@ -14073,6 +14081,36 @@ func _on_transform_changed(transform: Dictionary) -> void:
 		var selected_reference_id := selected_component_id if _is_reference_component(component) else ""
 		var excluded_reference_id := "" if _is_reference_component(component) else selected_component_id
 		canvas_view.set_reference_shapes(_build_reference_shapes(asset, excluded_reference_id, selected_reference_id))
+
+
+## Dragging the Transform gizmo moves the shape, not the anchor. The Canvas
+## reports the local anchor the shape now hangs from; writing it turns the whole
+## local frame and carries the Child Components along, while the authored
+## position - and with it the Pivot marker - stays exactly where it was placed.
+## A record without an outline of its own, a Reference or a Weapon Guide, never
+## reports here and still travels whole.
+func _on_shape_anchor_changed(local_anchor: Vector2) -> void:
+	if not selected_guide_id.is_empty():
+		return
+	var asset := _get_asset(selected_asset_id)
+	if not selected_group_id.is_empty():
+		var group := ComponentHierarchy.group_by_id(asset, selected_group_id)
+		if group.is_empty():
+			return
+		_record_coalesced_change()
+		var group_transform: Dictionary = group.get("transform", WorldDocumentService.default_component_transform())
+		group_transform["pivot"] = local_anchor
+		group["transform"] = group_transform
+		_invalidate_render(RENDER_INSPECTOR | RENDER_CANVAS_CONTEXT)
+		return
+	var component := _get_component(asset, selected_component_id)
+	if component.is_empty():
+		return
+	_record_coalesced_change()
+	var transform: Dictionary = component.get("transform", WorldDocumentService.default_component_transform())
+	transform["pivot"] = local_anchor
+	component["transform"] = transform
+	_sync_transform_fields(transform, ComponentHierarchy.local_bounds_center(component))
 
 
 func _on_component_hierarchy_parent_selected(index: int, option: OptionButton) -> void:

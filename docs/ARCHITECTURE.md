@@ -430,6 +430,51 @@ never persisted. A Primitive's center handle moves its `primitive.center`; its
 Component pivot remains an independent transform handle. Do not add `outer_shape`, Component-level `closed`, the old
 Line tool, or synchronization from a display polygon back into source geometry.
 
+### The Pivot is an anchor
+
+A Component's `transform` stores `position`, `rotation`, `scale` and `pivot`,
+and `world = position + ((local_point - pivot) * scale).rotated(rotation)`.
+Substituting `local_point = pivot` leaves `world = position`, so **`position` is
+the Pivot's position** in the parent's space — which is why `_draw_pivot` draws
+the magenta marker there. `pivot` itself is a coordinate in the Component's own
+point space and says only *which* point of the drawing the anchor is pinned to.
+
+The Inspector therefore captions the `position` pair **Pivot X/Y (cm)** and does
+not show the raw local anchor at all. In its place the block shows **Bounds
+Center X/Y (cm)**: where the outline centre sits against the Pivot, read off the
+geometry as it stands right now through `ComponentHierarchy.local_bounds_center`
+and `shape_offset_for`. Both numbers are therefore always answerable from what
+is on screen. The raw local anchor is not: it is frozen point-space and drifts
+with every Point edit, which is how a Pivot drawn in the origin came to read
+`4.1713 cm` in the Inspector.
+
+The two halves move independently, and that is the rule the whole editor keeps:
+
+- **Moving the Pivot moves nothing else.** The authored position takes the step
+  and the local anchor absorbs the same step, so the shape does not stir.
+  Dragging the magenta marker, the `P` shortcut and the Pivot fields all go
+  through this.
+- **Moving a Component moves its shape, not its anchor.** Only the local anchor
+  is written, which shifts the whole local frame — Child Components included —
+  while the authored position, and with it the marker, stays where it was
+  placed. The Canvas reports the new anchor through `shape_anchor_changed` as an
+  absolute value rather than a step, so a dropped mouse-move cannot accumulate
+  drift.
+
+Because Translate grabs the shape, its gizmo handles ride the outline centre
+(`transform_gizmo_center`) and follow the pointer; Rotate and Scale turn and
+size the shape around its anchor and so stay on the Pivot. A record with no
+outline of its own — a Reference, a Weapon Guide — has no shape to move against
+its anchor: `shape_follows_transform_gizmo` is false for it and it still travels
+as a whole through `position`.
+
+A Group borrows its outline from its members
+(`ComponentHierarchy.group_local_outline_points`) and follows the same rule. The
+Asset Pivot does too: `AssetScaleRebaseService.world_asset_pivot` is what the
+Inspector shows and the marker draws, and changing `root_position` writes the
+opposite step into `asset_pivot`, so moving an Asset never moves the origin
+Runtime Export measures from.
+
 Closed-loop and Primitive Components also carry a persisted `topology_role`:
 `outer` by default or `hole` when authored as a hole. A Primitive retains its
 analytic source and does not create a Chain when its role changes. An Asset

@@ -22,6 +22,20 @@ static func root_position(asset: Dictionary) -> Vector2:
 	return value if value.is_finite() else Vector2.ZERO
 
 
+## Where the Asset Pivot sits once the Root Transform is applied - the point the
+## magenta marker is drawn on and the origin Runtime Export measures from. Root
+## Scale turns around the Pivot itself, so this is the authored Pivot plus the
+## Root Position for any Scale.
+static func world_asset_pivot(asset: Dictionary) -> Vector2:
+	return Vector2(asset.get("asset_pivot", Vector2.ZERO)) + root_position(asset)
+
+
+## The authored Pivot that puts the marker at `world_pivot`. Inverse of
+## `world_asset_pivot`, and what the Inspector writes back.
+static func asset_pivot_for_world(asset: Dictionary, world_pivot: Vector2) -> Vector2:
+	return world_pivot - root_position(asset)
+
+
 static func root_transform(asset: Dictionary) -> Transform2D:
 	var scale := root_scale(asset)
 	var pivot := Vector2(asset.get("asset_pivot", Vector2.ZERO))

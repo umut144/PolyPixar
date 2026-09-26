@@ -262,7 +262,10 @@ func rebuild() -> void:
 		asset_transform_grid.columns = 2
 		asset_transform_grid.add_theme_constant_override("h_separation", 8)
 		asset_transform_grid.add_theme_constant_override("v_separation", 4)
-		var asset_pivot := WorldDocumentService.asset_pivot(asset)
+		# The Pivot reads where its marker is drawn, not where it is stored: an
+		# Asset that has been moved would otherwise show a number nothing on the
+		# Canvas agrees with.
+		var asset_pivot := AssetScaleRebaseService.world_asset_pivot(asset)
 		var root_position := AssetScaleRebaseService.root_position(asset)
 		var asset_root_scale := AssetScaleRebaseService.root_scale(asset)
 		asset_root_position_fields = EditorWidgets.build_number_grid(asset_transform_grid, [
