@@ -14,8 +14,16 @@ worlds/*/catalog.json
 *.jpg
 *.jpeg
 
-# macOS
+# macOS / Windows
 .DS_Store
+._*
+Thumbs.db
+
+# Editors and scratch files
+.vscode/
+.idea/
+*.log
+*.tmp
 
 # Logs kept by tools/verify.sh
 .verify/
@@ -27,6 +35,8 @@ worlds/*/catalog.json
 # Local native-extension toolchain and build products
 native/polytools_cdt/.venv/
 native/polytools_cdt/.sconsign.dblite
+native/polytools_cdt/.sconsign*.dblite
+native/polytools_cdt/bin/*.dylib
 native/polytools_cdt/godot-cpp/bin/
 native/polytools_cdt/godot-cpp/gen/
 native/polytools_cdt/godot-cpp/obj/
@@ -35,3 +45,7 @@ native/polytools_cdt/src/*.o
 # The macOS framework is checked in; the Linux product is built on demand.
 native/polytools_cdt/bin/*.so
 .agent-check/
+
+# Local instructions for AI coding assistants
+AGENTS.md
+CLAUDE.md

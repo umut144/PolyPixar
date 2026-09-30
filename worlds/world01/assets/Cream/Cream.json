@@ -362,6 +362,7 @@
 					"topology_role": "outer"
 				}
 			],
+			"contour_stroke_width_px": 1.0,
 			"draw_mode": "closed_loop",
 			"edges": [
 				{
@@ -1962,11 +1963,11 @@
 			"topology_role": "outer",
 			"transform": {
 				"pivot": [
-					0.0000000508502111529197,
-					0.417130023241043
+					0.000127494335174561,
+					0.417129993438721
 				],
 				"position": [
-					0.0000000508502111529197,
+					0.0,
 					0.0000000298023223876953
 				],
 				"rotation": 0.0,
@@ -1982,6 +1983,7 @@
 		{
 			"catch_parent_component_id": "",
 			"chains": [],
+			"contour_stroke_width_px": 1.0,
 			"draw_mode": "primitive",
 			"edges": [],
 			"group_id": "",
@@ -2024,6 +2026,7 @@
 		{
 			"catch_parent_component_id": "",
 			"chains": [],
+			"contour_stroke_width_px": 1.0,
 			"draw_mode": "primitive",
 			"edges": [],
 			"group_id": "",
@@ -2186,6 +2189,7 @@
 					"topology_role": "outer"
 				}
 			],
+			"contour_stroke_width_px": 1.0,
 			"draw_mode": "closed_loop",
 			"edges": [
 				{
@@ -2522,7 +2526,7 @@
 			"group_id": "",
 			"id": "component_446",
 			"name": "cream",
-			"parent_component_id": "",
+			"parent_component_id": "component_432",
 			"points": [
 				{
 					"handle_in": [
@@ -3526,8 +3530,8 @@
 					0.418029993772507
 				],
 				"position": [
-					0.00000012858072295785,
-					0.0
+					0.000127622915897518,
+					0.417129963636398
 				],
 				"rotation": 0.0,
 				"scale": [

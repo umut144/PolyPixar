@@ -2,19 +2,19 @@
 	"asset_id": "asset_54",
 	"component_id": "component_445",
 	"component_mesh": {
-		"bake_id": "meshing_bake_6773567603215151975",
+		"bake_id": "meshing_bake_7704522184101355157",
 		"build_provenance": {
 			"attempts": 1,
 			"auto_recipe_version": 0,
 			"automatic_diagnostics": {},
-			"exact_input_hash": "e228f05905e0303304f8eae2932aace96bce3d70fe3ce8c191a8eef97a5361e5",
+			"exact_input_hash": "1b2aa6a4b9874c686b58d10543876bafb88d6c345abc9a44edee52a410305e8b",
 			"pipeline_recipe_hash": "",
 			"recipe_mode": "derived",
 			"schema_version": 1,
 			"source_signature": {
 				"geometry_tolerance": 0.001,
 				"meshing_algorithm": 5,
-				"recipe_hash": "caf9b66a7e7dc4d776cafc1d40b32371935ab17c0cc416cbb9ae17151aa32d53",
+				"recipe_hash": "4b27cb88964b99bdc31ac1e4e917a6021590b74c3b31e8389b72cb0cafdd80a7",
 				"recipe_version": 2,
 				"sampling_algorithm": 6,
 				"scalars": [
@@ -48,19 +48,19 @@
 		},
 		"last_error": "",
 		"last_failure_signature": {},
-		"mesh_fingerprint": "03c39337d237f4cb93d6c54ab12d0ee8cec6642237fc68f54af1272191b557fc",
+		"mesh_fingerprint": "c438ab845fc41418e3a80e2f16802b50f6fa411e26dcb78a55684746789daca8",
 		"method": "contour_stroke"
 	},
 	"meshing": {
 		"bakes": {
 			"contour_stroke": {
 				"algorithm_version": 5,
-				"bake_id": "meshing_bake_6773567603215151975",
+				"bake_id": "meshing_bake_7704522184101355157",
 				"boundary_constraints": [],
 				"errors": [],
 				"geometry_diagnostics": {
 					"minimum_nonadjacent_clearance_meters": 0.00392389856278896,
-					"narrow_overlap_pair_count": 76,
+					"narrow_overlap_pair_count": 16,
 					"self_intersection_count": 0,
 					"triangle_validation": "complete"
 				},
@@ -77,8 +77,8 @@
 					"join": "miter",
 					"miter_limit": 4.0,
 					"reference_pixels_per_meter": 192.0,
-					"stroke_width_meters": 0.0208333333333333,
-					"stroke_width_px": 4.0
+					"stroke_width_meters": 0.00520833333333333,
+					"stroke_width_px": 1.0
 				},
 				"runs": [
 					{
@@ -412,7 +412,7 @@
 						"geometry_diagnostics": {
 							"centerline_segment_count": 32,
 							"minimum_nonadjacent_clearance_tool_units": 0.0392389856278896,
-							"narrow_overlap_pair_count": 76,
+							"narrow_overlap_pair_count": 16,
 							"self_intersection_count": 0
 						},
 						"index_count": 384,
@@ -427,7 +427,7 @@
 				],
 				"source_chain_closed": true,
 				"source_draw_mode": "primitive",
-				"source_fingerprint": "f876f747841f0437afdcf88926a5a932fc862249f0ae7fdb52b147e5ce2f723f",
+				"source_fingerprint": "db7f55db72e90ed44b12d74200b92d6daeda9766c4d4bc05369ff2a79f094bee",
 				"topology_role": "hole",
 				"triangle_count": 128,
 				"triangles": [
@@ -1465,8 +1465,8 @@
 						"id": "vertex:contour:0",
 						"origin": "segment_left",
 						"position": [
-							0.824532568454742,
-							1.93813705444336
+							0.902149319648743,
+							1.94703423976898
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:0@0.000000000"
@@ -1477,8 +1477,8 @@
 						"id": "vertex:contour:1",
 						"origin": "segment_right",
 						"position": [
-							1.03151047229767,
-							1.96186280250549
+							0.953893780708313,
+							1.95296561717987
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:0@0.000000000"
@@ -1489,8 +1489,8 @@
 						"id": "vertex:contour:2",
 						"origin": "segment_left",
 						"position": [
-							0.820063889026642,
-							1.97712075710297
+							0.897680640220642,
+							1.98601794242859
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:0@1.000000000"
@@ -1501,8 +1501,8 @@
 						"id": "vertex:contour:3",
 						"origin": "segment_right",
 						"position": [
-							1.02704179286957,
-							2.00084662437439
+							0.949425101280212,
+							1.99194931983948
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:0@1.000000000"
@@ -1513,8 +1513,8 @@
 						"id": "vertex:contour:4",
 						"origin": "segment_left",
 						"position": [
-							0.82511568069458,
-							1.95491278171539
+							0.898943603038788,
+							1.98046588897705
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:0@1.000000000"
@@ -1525,8 +1525,8 @@
 						"id": "vertex:contour:5",
 						"origin": "segment_right",
 						"position": [
-							1.02199006080627,
-							2.02305436134338
+							0.948162138462067,
+							1.99750137329102
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:0@1.000000000"
@@ -1537,8 +1537,8 @@
 						"id": "vertex:contour:6",
 						"origin": "segment_left",
 						"position": [
-							0.811752676963806,
-							1.9935210943222
+							0.885580599308014,
+							2.01907420158386
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:1@1.000000000"
@@ -1549,8 +1549,8 @@
 						"id": "vertex:contour:7",
 						"origin": "segment_right",
 						"position": [
-							1.0086270570755,
-							2.0616626739502
+							0.934799134731293,
+							2.03610968589783
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:1@1.000000000"
@@ -1561,8 +1561,8 @@
 						"id": "vertex:contour:8",
 						"origin": "segment_left",
 						"position": [
-							0.820257365703583,
-							1.9750292301178
+							0.887706756591797,
+							2.01445126533508
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:1@1.000000000"
@@ -1573,8 +1573,8 @@
 						"id": "vertex:contour:9",
 						"origin": "segment_right",
 						"position": [
-							1.00012230873108,
-							2.08015465736389
+							0.93267297744751,
+							2.04073262214661
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:1@1.000000000"
@@ -1585,8 +1585,8 @@
 						"id": "vertex:contour:10",
 						"origin": "segment_left",
 						"position": [
-							0.798128724098206,
-							2.01289033889771
+							0.86557811498642,
+							2.05231237411499
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:2@1.000000000"
@@ -1597,8 +1597,8 @@
 						"id": "vertex:contour:11",
 						"origin": "segment_right",
 						"position": [
-							0.977993726730347,
-							2.1180157661438
+							0.910544335842133,
+							2.07859373092651
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:2@1.000000000"
@@ -1609,8 +1609,8 @@
 						"id": "vertex:contour:12",
 						"origin": "segment_left",
 						"position": [
-							0.808099031448364,
-							1.99869418144226
+							0.868070662021637,
+							2.04876327514648
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:2@1.000000000"
@@ -1621,8 +1621,8 @@
 						"id": "vertex:contour:13",
 						"origin": "segment_right",
 						"position": [
-							0.968023419380188,
-							2.13221192359924
+							0.908051788806915,
+							2.08214282989502
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:2@1.000000000"
@@ -1633,8 +1633,8 @@
 						"id": "vertex:contour:14",
 						"origin": "segment_left",
 						"position": [
-							0.777417898178101,
-							2.03544330596924
+							0.837389528751373,
+							2.08551239967346
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:3@1.000000000"
@@ -1645,8 +1645,8 @@
 						"id": "vertex:contour:15",
 						"origin": "segment_right",
 						"position": [
-							0.937342286109924,
-							2.16896104812622
+							0.877370655536652,
+							2.118891954422
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:3@1.000000000"
@@ -1657,8 +1657,8 @@
 						"id": "vertex:contour:16",
 						"origin": "segment_left",
 						"position": [
-							0.792218506336212,
-							2.02093315124512
+							0.841089725494385,
+							2.08188486099243
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:3@1.000000000"
@@ -1669,8 +1669,8 @@
 						"id": "vertex:contour:17",
 						"origin": "segment_right",
 						"position": [
-							0.922541677951813,
-							2.18347120285034
+							0.87367045879364,
+							2.12251949310303
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:3@1.000000000"
@@ -1681,8 +1681,8 @@
 						"id": "vertex:contour:18",
 						"origin": "segment_left",
 						"position": [
-							0.706460118293762,
-							2.0896942615509
+							0.755331337451935,
+							2.15064597129822
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:4@1.000000000"
@@ -1693,8 +1693,8 @@
 						"id": "vertex:contour:19",
 						"origin": "segment_right",
 						"position": [
-							0.836783289909363,
-							2.25223231315613
+							0.78791207075119,
+							2.19128060340881
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:4@1.000000000"
@@ -1705,8 +1705,8 @@
 						"id": "vertex:contour:20",
 						"origin": "segment_left",
 						"position": [
-							0.723403215408325,
-							2.07862877845764
+							0.759567081928253,
+							2.1478796005249
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:4@1.000000000"
@@ -1717,8 +1717,8 @@
 						"id": "vertex:contour:21",
 						"origin": "segment_right",
 						"position": [
-							0.8198401927948,
-							2.26329779624939
+							0.783676326274872,
+							2.19404697418213
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:4@1.000000000"
@@ -1729,8 +1729,8 @@
 						"id": "vertex:contour:22",
 						"origin": "segment_left",
 						"position": [
-							0.607991814613342,
-							2.13889837265015
+							0.64415568113327,
+							2.20814919471741
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:5@1.000000000"
@@ -1741,8 +1741,8 @@
 						"id": "vertex:contour:23",
 						"origin": "segment_right",
 						"position": [
-							0.704428791999817,
-							2.32356739044189
+							0.668264925479889,
+							2.25431656837463
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:5@1.000000000"
@@ -1753,8 +1753,8 @@
 						"id": "vertex:contour:24",
 						"origin": "segment_left",
 						"position": [
-							0.627533495426178,
-							2.13109135627747
+							0.64904111623764,
+							2.20619750022888
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:5@1.000000000"
@@ -1765,8 +1765,8 @@
 						"id": "vertex:contour:25",
 						"origin": "segment_right",
 						"position": [
-							0.684887111186981,
-							2.33137440681458
+							0.663379490375519,
+							2.25626826286316
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:5@1.000000000"
@@ -1777,8 +1777,8 @@
 						"id": "vertex:contour:26",
 						"origin": "segment_left",
 						"position": [
-							0.326461672782898,
-							2.21730709075928
+							0.347969263792038,
+							2.29241323471069
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:6@1.000000000"
@@ -1789,8 +1789,8 @@
 						"id": "vertex:contour:27",
 						"origin": "segment_right",
 						"position": [
-							0.383815288543701,
-							2.41759014129639
+							0.362307697534561,
+							2.34248399734497
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:6@1.000000000"
@@ -1801,8 +1801,8 @@
 						"id": "vertex:contour:28",
 						"origin": "segment_left",
 						"position": [
-							0.346290558576584,
-							2.21365833282471
+							0.35292649269104,
+							2.29150104522705
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:6@1.000000000"
@@ -1813,8 +1813,8 @@
 						"id": "vertex:contour:29",
 						"origin": "segment_right",
 						"position": [
-							0.363986402750015,
-							2.42123889923096
+							0.357350468635559,
+							2.34339618682861
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:6@1.000000000"
@@ -1825,8 +1825,8 @@
 						"id": "vertex:contour:30",
 						"origin": "segment_left",
 						"position": [
-							-0.00884792022407055,
-							2.24393320083618
+							-0.00221198447979987,
+							2.32177591323853
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:7@1.000000000"
@@ -1837,8 +1837,8 @@
 						"id": "vertex:contour:31",
 						"origin": "segment_right",
 						"position": [
-							0.00884790904819965,
-							2.45151376724243
+							0.00221197283826768,
+							2.37367105484009
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:7@1.000000000"
@@ -1849,8 +1849,8 @@
 						"id": "vertex:contour:32",
 						"origin": "segment_left",
 						"position": [
-							0.00884790904819965,
-							2.24393320083618
+							0.00221197283826768,
+							2.32177591323853
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:7@1.000000000"
@@ -1861,8 +1861,8 @@
 						"id": "vertex:contour:33",
 						"origin": "segment_right",
 						"position": [
-							-0.00884792022407055,
-							2.45151376724243
+							-0.00221198447979987,
+							2.37367105484009
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:7@1.000000000"
@@ -1873,8 +1873,8 @@
 						"id": "vertex:contour:34",
 						"origin": "segment_left",
 						"position": [
-							-0.346290558576584,
-							2.21365833282471
+							-0.35292649269104,
+							2.29150104522705
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:8@1.000000000"
@@ -1885,8 +1885,8 @@
 						"id": "vertex:contour:35",
 						"origin": "segment_right",
 						"position": [
-							-0.363986402750015,
-							2.42123889923096
+							-0.357350468635559,
+							2.34339618682861
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:8@1.000000000"
@@ -1897,8 +1897,8 @@
 						"id": "vertex:contour:36",
 						"origin": "segment_left",
 						"position": [
-							-0.326461672782898,
-							2.21730709075928
+							-0.347969263792038,
+							2.29241323471069
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:8@1.000000000"
@@ -1909,8 +1909,8 @@
 						"id": "vertex:contour:37",
 						"origin": "segment_right",
 						"position": [
-							-0.383815288543701,
-							2.41759014129639
+							-0.362307697534561,
+							2.34248399734497
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:8@1.000000000"
@@ -1921,8 +1921,8 @@
 						"id": "vertex:contour:38",
 						"origin": "segment_left",
 						"position": [
-							-0.627533495426178,
-							2.13109135627747
+							-0.64904111623764,
+							2.20619750022888
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:9@1.000000000"
@@ -1933,8 +1933,8 @@
 						"id": "vertex:contour:39",
 						"origin": "segment_right",
 						"position": [
-							-0.684887111186981,
-							2.33137440681458
+							-0.663379490375519,
+							2.25626826286316
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:9@1.000000000"
@@ -1945,8 +1945,8 @@
 						"id": "vertex:contour:40",
 						"origin": "segment_left",
 						"position": [
-							-0.607991814613342,
-							2.13889837265015
+							-0.64415568113327,
+							2.20814919471741
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:9@1.000000000"
@@ -1957,8 +1957,8 @@
 						"id": "vertex:contour:41",
 						"origin": "segment_right",
 						"position": [
-							-0.704428791999817,
-							2.32356739044189
+							-0.668264925479889,
+							2.25431656837463
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:9@1.000000000"
@@ -1969,8 +1969,8 @@
 						"id": "vertex:contour:42",
 						"origin": "segment_left",
 						"position": [
-							-0.723403215408325,
-							2.07862877845764
+							-0.759567081928253,
+							2.1478796005249
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:10@1.000000000"
@@ -1981,8 +1981,8 @@
 						"id": "vertex:contour:43",
 						"origin": "segment_right",
 						"position": [
-							-0.8198401927948,
-							2.26329779624939
+							-0.783676326274872,
+							2.19404697418213
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:10@1.000000000"
@@ -1993,8 +1993,8 @@
 						"id": "vertex:contour:44",
 						"origin": "segment_left",
 						"position": [
-							-0.706460118293762,
-							2.0896942615509
+							-0.755331337451935,
+							2.15064597129822
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:10@1.000000000"
@@ -2005,8 +2005,8 @@
 						"id": "vertex:contour:45",
 						"origin": "segment_right",
 						"position": [
-							-0.836783289909363,
-							2.25223231315613
+							-0.78791207075119,
+							2.19128060340881
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:10@1.000000000"
@@ -2017,8 +2017,8 @@
 						"id": "vertex:contour:46",
 						"origin": "segment_left",
 						"position": [
-							-0.792218506336212,
-							2.02093315124512
+							-0.841089725494385,
+							2.08188486099243
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:11@1.000000000"
@@ -2029,8 +2029,8 @@
 						"id": "vertex:contour:47",
 						"origin": "segment_right",
 						"position": [
-							-0.922541677951813,
-							2.18347120285034
+							-0.87367045879364,
+							2.12251949310303
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:11@1.000000000"
@@ -2041,8 +2041,8 @@
 						"id": "vertex:contour:48",
 						"origin": "segment_left",
 						"position": [
-							-0.777417898178101,
-							2.03544330596924
+							-0.837389528751373,
+							2.08551239967346
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:11@1.000000000"
@@ -2053,8 +2053,8 @@
 						"id": "vertex:contour:49",
 						"origin": "segment_right",
 						"position": [
-							-0.937342286109924,
-							2.16896104812622
+							-0.877370655536652,
+							2.118891954422
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:11@1.000000000"
@@ -2065,8 +2065,8 @@
 						"id": "vertex:contour:50",
 						"origin": "segment_left",
 						"position": [
-							-0.808099031448364,
-							1.99869418144226
+							-0.868070662021637,
+							2.04876327514648
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:12@1.000000000"
@@ -2077,8 +2077,8 @@
 						"id": "vertex:contour:51",
 						"origin": "segment_right",
 						"position": [
-							-0.968023419380188,
-							2.13221192359924
+							-0.908051788806915,
+							2.08214282989502
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:12@1.000000000"
@@ -2089,8 +2089,8 @@
 						"id": "vertex:contour:52",
 						"origin": "segment_left",
 						"position": [
-							-0.798128724098206,
-							2.01289033889771
+							-0.86557811498642,
+							2.05231237411499
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:12@1.000000000"
@@ -2101,8 +2101,8 @@
 						"id": "vertex:contour:53",
 						"origin": "segment_right",
 						"position": [
-							-0.977993726730347,
-							2.1180157661438
+							-0.910544335842133,
+							2.07859373092651
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:12@1.000000000"
@@ -2113,8 +2113,8 @@
 						"id": "vertex:contour:54",
 						"origin": "segment_left",
 						"position": [
-							-0.820257365703583,
-							1.9750292301178
+							-0.887706756591797,
+							2.01445126533508
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:13@1.000000000"
@@ -2125,8 +2125,8 @@
 						"id": "vertex:contour:55",
 						"origin": "segment_right",
 						"position": [
-							-1.00012230873108,
-							2.08015465736389
+							-0.93267297744751,
+							2.04073262214661
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:13@1.000000000"
@@ -2137,8 +2137,8 @@
 						"id": "vertex:contour:56",
 						"origin": "segment_left",
 						"position": [
-							-0.811752676963806,
-							1.9935210943222
+							-0.885580599308014,
+							2.01907420158386
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:13@1.000000000"
@@ -2149,8 +2149,8 @@
 						"id": "vertex:contour:57",
 						"origin": "segment_right",
 						"position": [
-							-1.0086270570755,
-							2.0616626739502
+							-0.934799134731293,
+							2.03610968589783
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:13@1.000000000"
@@ -2161,8 +2161,8 @@
 						"id": "vertex:contour:58",
 						"origin": "segment_left",
 						"position": [
-							-0.82511568069458,
-							1.95491278171539
+							-0.898943603038788,
+							1.98046588897705
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:14@1.000000000"
@@ -2173,8 +2173,8 @@
 						"id": "vertex:contour:59",
 						"origin": "segment_right",
 						"position": [
-							-1.02199006080627,
-							2.02305436134338
+							-0.948162138462067,
+							1.99750137329102
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:14@1.000000000"
@@ -2185,8 +2185,8 @@
 						"id": "vertex:contour:60",
 						"origin": "segment_left",
 						"position": [
-							-0.820063889026642,
-							1.97712075710297
+							-0.897680640220642,
+							1.98601794242859
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:14@1.000000000"
@@ -2197,8 +2197,8 @@
 						"id": "vertex:contour:61",
 						"origin": "segment_right",
 						"position": [
-							-1.02704179286957,
-							2.00084662437439
+							-0.949425101280212,
+							1.99194931983948
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:14@1.000000000"
@@ -2209,8 +2209,8 @@
 						"id": "vertex:contour:62",
 						"origin": "segment_left",
 						"position": [
-							-0.824532568454742,
-							1.93813705444336
+							-0.902149319648743,
+							1.94703423976898
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:15@1.000000000"
@@ -2221,8 +2221,8 @@
 						"id": "vertex:contour:63",
 						"origin": "segment_right",
 						"position": [
-							-1.03151047229767,
-							1.96186280250549
+							-0.953893780708313,
+							1.95296561717987
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:15@1.000000000"
@@ -2233,8 +2233,8 @@
 						"id": "vertex:contour:64",
 						"origin": "segment_left",
 						"position": [
-							-0.824532568454742,
-							1.96186280250549
+							-0.902149319648743,
+							1.95296561717987
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:15@1.000000000"
@@ -2245,8 +2245,8 @@
 						"id": "vertex:contour:65",
 						"origin": "segment_right",
 						"position": [
-							-1.03151047229767,
-							1.93813705444336
+							-0.953893780708313,
+							1.94703423976898
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:15@1.000000000"
@@ -2257,8 +2257,8 @@
 						"id": "vertex:contour:66",
 						"origin": "segment_left",
 						"position": [
-							-0.820063889026642,
-							1.92287909984589
+							-0.897680640220642,
+							1.91398191452026
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:16@1.000000000"
@@ -2269,8 +2269,8 @@
 						"id": "vertex:contour:67",
 						"origin": "segment_right",
 						"position": [
-							-1.02704179286957,
-							1.89915335178375
+							-0.949425101280212,
+							1.90805053710938
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:16@1.000000000"
@@ -2281,8 +2281,8 @@
 						"id": "vertex:contour:68",
 						"origin": "segment_left",
 						"position": [
-							-0.82511568069458,
-							1.94508707523346
+							-0.898943603038788,
+							1.9195339679718
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:16@1.000000000"
@@ -2293,8 +2293,8 @@
 						"id": "vertex:contour:69",
 						"origin": "segment_right",
 						"position": [
-							-1.02199006080627,
-							1.87694537639618
+							-0.948162138462067,
+							1.90249848365784
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:16@1.000000000"
@@ -2305,8 +2305,8 @@
 						"id": "vertex:contour:70",
 						"origin": "segment_left",
 						"position": [
-							-0.811752676963806,
-							1.90647876262665
+							-0.885580599308014,
+							1.88092565536499
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:17@1.000000000"
@@ -2317,8 +2317,8 @@
 						"id": "vertex:contour:71",
 						"origin": "segment_right",
 						"position": [
-							-1.0086270570755,
-							1.83833706378937
+							-0.934799134731293,
+							1.86389017105103
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:17@1.000000000"
@@ -2329,8 +2329,8 @@
 						"id": "vertex:contour:72",
 						"origin": "segment_left",
 						"position": [
-							-0.820257425308228,
-							1.92497074604034
+							-0.887706756591797,
+							1.88554859161377
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:17@1.000000000"
@@ -2341,8 +2341,8 @@
 						"id": "vertex:contour:73",
 						"origin": "segment_right",
 						"position": [
-							-1.00012230873108,
-							1.81984508037567
+							-0.93267297744751,
+							1.85926723480225
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:17@1.000000000"
@@ -2353,8 +2353,8 @@
 						"id": "vertex:contour:74",
 						"origin": "segment_left",
 						"position": [
-							-0.798128843307495,
-							1.88710975646973
+							-0.86557811498642,
+							1.84768760204315
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:18@1.000000000"
@@ -2365,8 +2365,8 @@
 						"id": "vertex:contour:75",
 						"origin": "segment_right",
 						"position": [
-							-0.977993607521057,
-							1.78198409080505
+							-0.910544335842133,
+							1.82140624523163
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:18@1.000000000"
@@ -2377,8 +2377,8 @@
 						"id": "vertex:contour:76",
 						"origin": "segment_left",
 						"position": [
-							-0.808098971843719,
-							1.90130567550659
+							-0.868070662021637,
+							1.85123658180237
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:18@1.000000000"
@@ -2389,8 +2389,8 @@
 						"id": "vertex:contour:77",
 						"origin": "segment_right",
 						"position": [
-							-0.968023478984833,
-							1.76778817176819
+							-0.908051788806915,
+							1.81785726547241
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:18@1.000000000"
@@ -2401,8 +2401,8 @@
 						"id": "vertex:contour:78",
 						"origin": "segment_left",
 						"position": [
-							-0.777417838573456,
-							1.86455643177032
+							-0.837389528751373,
+							1.8144873380661
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:19@1.000000000"
@@ -2413,8 +2413,8 @@
 						"id": "vertex:contour:79",
 						"origin": "segment_right",
 						"position": [
-							-0.937342345714569,
-							1.73103892803192
+							-0.877370655536652,
+							1.78110802173615
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:19@1.000000000"
@@ -2425,8 +2425,8 @@
 						"id": "vertex:contour:80",
 						"origin": "segment_left",
 						"position": [
-							-0.792218506336212,
-							1.87906670570374
+							-0.841089725494385,
+							1.81811499595642
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:19@1.000000000"
@@ -2437,8 +2437,8 @@
 						"id": "vertex:contour:81",
 						"origin": "segment_right",
 						"position": [
-							-0.922541677951813,
-							1.71652865409851
+							-0.87367045879364,
+							1.77748036384583
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:19@1.000000000"
@@ -2449,8 +2449,8 @@
 						"id": "vertex:contour:82",
 						"origin": "segment_left",
 						"position": [
-							-0.706460118293762,
-							1.81030559539795
+							-0.755331337451935,
+							1.74935388565063
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:20@1.000000000"
@@ -2461,8 +2461,8 @@
 						"id": "vertex:contour:83",
 						"origin": "segment_right",
 						"position": [
-							-0.836783289909363,
-							1.64776754379272
+							-0.78791207075119,
+							1.70871925354004
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:20@1.000000000"
@@ -2473,8 +2473,8 @@
 						"id": "vertex:contour:84",
 						"origin": "segment_left",
 						"position": [
-							-0.723403215408325,
-							1.82137107849121
+							-0.759567081928253,
+							1.75212025642395
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:20@1.000000000"
@@ -2485,8 +2485,8 @@
 						"id": "vertex:contour:85",
 						"origin": "segment_right",
 						"position": [
-							-0.8198401927948,
-							1.63670206069946
+							-0.783676326274872,
+							1.70595288276672
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:20@1.000000000"
@@ -2497,8 +2497,8 @@
 						"id": "vertex:contour:86",
 						"origin": "segment_left",
 						"position": [
-							-0.607991814613342,
-							1.76110148429871
+							-0.64415568113327,
+							1.69185066223145
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:21@1.000000000"
@@ -2509,8 +2509,8 @@
 						"id": "vertex:contour:87",
 						"origin": "segment_right",
 						"position": [
-							-0.704428791999817,
-							1.57643246650696
+							-0.668264925479889,
+							1.64568328857422
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:21@1.000000000"
@@ -2521,8 +2521,8 @@
 						"id": "vertex:contour:88",
 						"origin": "segment_left",
 						"position": [
-							-0.627533555030823,
-							1.76890850067139
+							-0.64904111623764,
+							1.69380235671997
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:21@1.000000000"
@@ -2533,8 +2533,8 @@
 						"id": "vertex:contour:89",
 						"origin": "segment_right",
 						"position": [
-							-0.684887051582336,
-							1.56862545013428
+							-0.663379490375519,
+							1.64373159408569
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:21@1.000000000"
@@ -2545,8 +2545,8 @@
 						"id": "vertex:contour:90",
 						"origin": "segment_left",
 						"position": [
-							-0.32646170258522,
-							1.68269300460815
+							-0.34796929359436,
+							1.60758674144745
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:22@1.000000000"
@@ -2557,8 +2557,8 @@
 						"id": "vertex:contour:91",
 						"origin": "segment_right",
 						"position": [
-							-0.383815258741379,
-							1.48240971565247
+							-0.362307667732239,
+							1.55751597881317
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:22@1.000000000"
@@ -2569,8 +2569,8 @@
 						"id": "vertex:contour:92",
 						"origin": "segment_left",
 						"position": [
-							-0.346290528774261,
-							1.68634152412415
+							-0.35292649269104,
+							1.60849893093109
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:22@1.000000000"
@@ -2581,8 +2581,8 @@
 						"id": "vertex:contour:93",
 						"origin": "segment_right",
 						"position": [
-							-0.363986432552338,
-							1.47876119613647
+							-0.357350468635559,
+							1.55660378932953
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:22@1.000000000"
@@ -2593,8 +2593,8 @@
 						"id": "vertex:contour:94",
 						"origin": "segment_left",
 						"position": [
-							0.00884794350713491,
-							1.65606653690338
+							0.0022119814530015,
+							1.57822394371033
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:23@1.000000000"
@@ -2605,8 +2605,8 @@
 						"id": "vertex:contour:95",
 						"origin": "segment_right",
 						"position": [
-							-0.00884795468300581,
-							1.44848620891571
+							-0.00221199309453368,
+							1.52632880210876
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:23@1.000000000"
@@ -2617,8 +2617,8 @@
 						"id": "vertex:contour:96",
 						"origin": "segment_left",
 						"position": [
-							-0.00884795468300581,
-							1.65606653690338
+							-0.00221199309453368,
+							1.57822394371033
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:23@1.000000000"
@@ -2629,8 +2629,8 @@
 						"id": "vertex:contour:97",
 						"origin": "segment_right",
 						"position": [
-							0.00884794350713491,
-							1.44848620891571
+							0.0022119814530015,
+							1.52632880210876
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:23@1.000000000"
@@ -2641,8 +2641,8 @@
 						"id": "vertex:contour:98",
 						"origin": "segment_left",
 						"position": [
-							0.346290528774261,
-							1.68634152412415
+							0.35292649269104,
+							1.60849893093109
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:24@1.000000000"
@@ -2653,8 +2653,8 @@
 						"id": "vertex:contour:99",
 						"origin": "segment_right",
 						"position": [
-							0.363986432552338,
-							1.47876119613647
+							0.357350468635559,
+							1.55660378932953
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:24@1.000000000"
@@ -2665,8 +2665,8 @@
 						"id": "vertex:contour:100",
 						"origin": "segment_left",
 						"position": [
-							0.32646170258522,
-							1.68269300460815
+							0.34796929359436,
+							1.60758674144745
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:24@1.000000000"
@@ -2677,8 +2677,8 @@
 						"id": "vertex:contour:101",
 						"origin": "segment_right",
 						"position": [
-							0.383815258741379,
-							1.48240971565247
+							0.362307667732239,
+							1.55751597881317
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:24@1.000000000"
@@ -2689,8 +2689,8 @@
 						"id": "vertex:contour:102",
 						"origin": "segment_left",
 						"position": [
-							0.627533555030823,
-							1.76890850067139
+							0.64904111623764,
+							1.69380235671997
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:25@1.000000000"
@@ -2701,8 +2701,8 @@
 						"id": "vertex:contour:103",
 						"origin": "segment_right",
 						"position": [
-							0.684887051582336,
-							1.56862545013428
+							0.663379490375519,
+							1.64373159408569
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:25@1.000000000"
@@ -2713,8 +2713,8 @@
 						"id": "vertex:contour:104",
 						"origin": "segment_left",
 						"position": [
-							0.607991814613342,
-							1.76110148429871
+							0.64415568113327,
+							1.69185066223145
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:25@1.000000000"
@@ -2725,8 +2725,8 @@
 						"id": "vertex:contour:105",
 						"origin": "segment_right",
 						"position": [
-							0.704428791999817,
-							1.57643246650696
+							0.668264925479889,
+							1.64568328857422
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:25@1.000000000"
@@ -2737,8 +2737,8 @@
 						"id": "vertex:contour:106",
 						"origin": "segment_left",
 						"position": [
-							0.723403215408325,
-							1.82137107849121
+							0.759567081928253,
+							1.75212025642395
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:26@1.000000000"
@@ -2749,8 +2749,8 @@
 						"id": "vertex:contour:107",
 						"origin": "segment_right",
 						"position": [
-							0.8198401927948,
-							1.63670206069946
+							0.783676326274872,
+							1.70595288276672
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:26@1.000000000"
@@ -2761,8 +2761,8 @@
 						"id": "vertex:contour:108",
 						"origin": "segment_left",
 						"position": [
-							0.706460118293762,
-							1.81030559539795
+							0.755331337451935,
+							1.74935388565063
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:26@1.000000000"
@@ -2773,8 +2773,8 @@
 						"id": "vertex:contour:109",
 						"origin": "segment_right",
 						"position": [
-							0.836783289909363,
-							1.64776754379272
+							0.78791207075119,
+							1.70871925354004
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:26@1.000000000"
@@ -2785,8 +2785,8 @@
 						"id": "vertex:contour:110",
 						"origin": "segment_left",
 						"position": [
-							0.792218506336212,
-							1.87906670570374
+							0.841089725494385,
+							1.81811499595642
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:27@1.000000000"
@@ -2797,8 +2797,8 @@
 						"id": "vertex:contour:111",
 						"origin": "segment_right",
 						"position": [
-							0.922541677951813,
-							1.71652865409851
+							0.87367045879364,
+							1.77748036384583
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:27@1.000000000"
@@ -2809,8 +2809,8 @@
 						"id": "vertex:contour:112",
 						"origin": "segment_left",
 						"position": [
-							0.777417838573456,
-							1.86455643177032
+							0.837389528751373,
+							1.8144873380661
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:27@1.000000000"
@@ -2821,8 +2821,8 @@
 						"id": "vertex:contour:113",
 						"origin": "segment_right",
 						"position": [
-							0.937342345714569,
-							1.73103892803192
+							0.877370655536652,
+							1.78110802173615
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:27@1.000000000"
@@ -2833,8 +2833,8 @@
 						"id": "vertex:contour:114",
 						"origin": "segment_left",
 						"position": [
-							0.808098971843719,
-							1.90130567550659
+							0.868070662021637,
+							1.85123658180237
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:28@1.000000000"
@@ -2845,8 +2845,8 @@
 						"id": "vertex:contour:115",
 						"origin": "segment_right",
 						"position": [
-							0.968023478984833,
-							1.76778817176819
+							0.908051788806915,
+							1.81785726547241
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:28@1.000000000"
@@ -2857,8 +2857,8 @@
 						"id": "vertex:contour:116",
 						"origin": "segment_left",
 						"position": [
-							0.798128843307495,
-							1.88710975646973
+							0.86557811498642,
+							1.84768760204315
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:28@1.000000000"
@@ -2869,8 +2869,8 @@
 						"id": "vertex:contour:117",
 						"origin": "segment_right",
 						"position": [
-							0.977993607521057,
-							1.78198409080505
+							0.910544335842133,
+							1.82140624523163
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:28@1.000000000"
@@ -2881,8 +2881,8 @@
 						"id": "vertex:contour:118",
 						"origin": "segment_left",
 						"position": [
-							0.820257425308228,
-							1.92497074604034
+							0.887706756591797,
+							1.88554859161377
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:29@1.000000000"
@@ -2893,8 +2893,8 @@
 						"id": "vertex:contour:119",
 						"origin": "segment_right",
 						"position": [
-							1.00012230873108,
-							1.81984508037567
+							0.93267297744751,
+							1.85926723480225
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:29@1.000000000"
@@ -2905,8 +2905,8 @@
 						"id": "vertex:contour:120",
 						"origin": "segment_left",
 						"position": [
-							0.811752676963806,
-							1.90647876262665
+							0.885580599308014,
+							1.88092565536499
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:29@1.000000000"
@@ -2917,8 +2917,8 @@
 						"id": "vertex:contour:121",
 						"origin": "segment_right",
 						"position": [
-							1.0086270570755,
-							1.83833706378937
+							0.934799134731293,
+							1.86389017105103
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:29@1.000000000"
@@ -2929,8 +2929,8 @@
 						"id": "vertex:contour:122",
 						"origin": "segment_left",
 						"position": [
-							0.82511568069458,
-							1.94508707523346
+							0.898943603038788,
+							1.9195339679718
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:30@1.000000000"
@@ -2941,8 +2941,8 @@
 						"id": "vertex:contour:123",
 						"origin": "segment_right",
 						"position": [
-							1.02199006080627,
-							1.87694537639618
+							0.948162138462067,
+							1.90249848365784
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:30@1.000000000"
@@ -2953,8 +2953,8 @@
 						"id": "vertex:contour:124",
 						"origin": "segment_left",
 						"position": [
-							0.820063889026642,
-							1.92287909984589
+							0.897680640220642,
+							1.91398191452026
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:30@1.000000000"
@@ -2965,8 +2965,8 @@
 						"id": "vertex:contour:125",
 						"origin": "segment_right",
 						"position": [
-							1.02704179286957,
-							1.89915335178375
+							0.949425101280212,
+							1.90805053710938
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:30@1.000000000"
@@ -2977,8 +2977,8 @@
 						"id": "vertex:contour:126",
 						"origin": "segment_left",
 						"position": [
-							0.824532568454742,
-							1.96186280250549
+							0.902149319648743,
+							1.95296561717987
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:0@0.000000000"
@@ -2989,8 +2989,8 @@
 						"id": "vertex:contour:127",
 						"origin": "segment_right",
 						"position": [
-							1.03151047229767,
-							1.93813705444336
+							0.953893780708313,
+							1.94703423976898
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:0@0.000000000"
@@ -3013,8 +3013,8 @@
 						"id": "vertex:contour:129",
 						"origin": "join_outer_previous",
 						"position": [
-							1.03151047229767,
-							1.93813705444336
+							0.953893780708313,
+							1.94703423976898
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:0@0.000000000"
@@ -3025,7 +3025,7 @@
 						"id": "vertex:contour:130",
 						"origin": "join_miter",
 						"position": [
-							1.03287029266357,
+							0.954233765602112,
 							1.94999992847443
 						],
 						"preserved": false,
@@ -3037,8 +3037,8 @@
 						"id": "vertex:contour:131",
 						"origin": "join_outer_next",
 						"position": [
-							1.03151047229767,
-							1.96186280250549
+							0.953893780708313,
+							1.95296561717987
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:0@0.000000000"
@@ -3061,8 +3061,8 @@
 						"id": "vertex:contour:133",
 						"origin": "join_outer_previous",
 						"position": [
-							1.02704179286957,
-							2.00084662437439
+							0.949425101280212,
+							1.99194931983948
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:0@1.000000000"
@@ -3073,8 +3073,8 @@
 						"id": "vertex:contour:134",
 						"origin": "join_miter",
 						"position": [
-							1.02573704719543,
-							2.01222848892212
+							0.949098944664001,
+							1.99479484558105
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:0@1.000000000"
@@ -3085,8 +3085,8 @@
 						"id": "vertex:contour:135",
 						"origin": "join_outer_next",
 						"position": [
-							1.02199006080627,
-							2.02305436134338
+							0.948162138462067,
+							1.99750137329102
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:0@1.000000000"
@@ -3109,8 +3109,8 @@
 						"id": "vertex:contour:137",
 						"origin": "join_outer_previous",
 						"position": [
-							1.0086270570755,
-							2.0616626739502
+							0.934799134731293,
+							2.03610968589783
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:1@1.000000000"
@@ -3121,8 +3121,8 @@
 						"id": "vertex:contour:138",
 						"origin": "join_miter",
 						"position": [
-							1.00528240203857,
-							2.07132577896118
+							0.933963000774384,
+							2.03852558135986
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:1@1.000000000"
@@ -3133,8 +3133,8 @@
 						"id": "vertex:contour:139",
 						"origin": "join_outer_next",
 						"position": [
-							1.00012230873108,
-							2.08015465736389
+							0.93267297744751,
+							2.04073262214661
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:1@1.000000000"
@@ -3157,8 +3157,8 @@
 						"id": "vertex:contour:141",
 						"origin": "join_outer_previous",
 						"position": [
-							0.977993726730347,
-							2.1180157661438
+							0.910544335842133,
+							2.07859373092651
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:2@1.000000000"
@@ -3169,8 +3169,8 @@
 						"id": "vertex:contour:142",
 						"origin": "join_miter",
 						"position": [
-							0.973601579666138,
-							2.1255304813385
+							0.909446120262146,
+							2.08047270774841
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:2@1.000000000"
@@ -3181,8 +3181,8 @@
 						"id": "vertex:contour:143",
 						"origin": "join_outer_next",
 						"position": [
-							0.968023419380188,
-							2.13221192359924
+							0.908051788806915,
+							2.08214282989502
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:2@1.000000000"
@@ -3205,8 +3205,8 @@
 						"id": "vertex:contour:145",
 						"origin": "join_outer_previous",
 						"position": [
-							0.937342286109924,
-							2.16896104812622
+							0.877370655536652,
+							2.118891954422
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:3@1.000000000"
@@ -3217,8 +3217,8 @@
 						"id": "vertex:contour:146",
 						"origin": "join_miter",
 						"position": [
-							0.930667579174042,
-							2.17695593833923
+							0.875702083110809,
+							2.12089061737061
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:3@1.000000000"
@@ -3229,8 +3229,8 @@
 						"id": "vertex:contour:147",
 						"origin": "join_outer_next",
 						"position": [
-							0.922541677951813,
-							2.18347120285034
+							0.87367045879364,
+							2.12251949310303
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:3@1.000000000"
@@ -3253,8 +3253,8 @@
 						"id": "vertex:contour:149",
 						"origin": "join_outer_previous",
 						"position": [
-							0.836783289909363,
-							2.25223231315613
+							0.78791207075119,
+							2.19128060340881
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:4@1.000000000"
@@ -3265,8 +3265,8 @@
 						"id": "vertex:contour:150",
 						"origin": "join_miter",
 						"position": [
-							0.828851759433746,
-							2.25859189033508
+							0.785929143428802,
+							2.19287061691284
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:4@1.000000000"
@@ -3277,8 +3277,8 @@
 						"id": "vertex:contour:151",
 						"origin": "join_outer_next",
 						"position": [
-							0.8198401927948,
-							2.26329779624939
+							0.783676326274872,
+							2.19404697418213
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:4@1.000000000"
@@ -3301,8 +3301,8 @@
 						"id": "vertex:contour:153",
 						"origin": "join_outer_previous",
 						"position": [
-							0.704428791999817,
-							2.32356739044189
+							0.668264925479889,
+							2.25431656837463
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:5@1.000000000"
@@ -3313,8 +3313,8 @@
 						"id": "vertex:contour:154",
 						"origin": "join_miter",
 						"position": [
-							0.695054233074188,
-							2.32846283912659
+							0.665921568870544,
+							2.25554037094116
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:5@1.000000000"
@@ -3325,8 +3325,8 @@
 						"id": "vertex:contour:155",
 						"origin": "join_outer_next",
 						"position": [
-							0.684887111186981,
-							2.33137440681458
+							0.663379490375519,
+							2.25626826286316
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:5@1.000000000"
@@ -3349,8 +3349,8 @@
 						"id": "vertex:contour:157",
 						"origin": "join_outer_previous",
 						"position": [
-							0.383815288543701,
-							2.41759014129639
+							0.362307697534561,
+							2.34248399734497
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:6@1.000000000"
@@ -3361,8 +3361,8 @@
 						"id": "vertex:contour:158",
 						"origin": "join_miter",
 						"position": [
-							0.374077647924423,
-							2.42037868499756
+							0.359873294830322,
+							2.34318113327026
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:6@1.000000000"
@@ -3373,8 +3373,8 @@
 						"id": "vertex:contour:159",
 						"origin": "join_outer_next",
 						"position": [
-							0.363986402750015,
-							2.42123889923096
+							0.357350468635559,
+							2.34339618682861
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:6@1.000000000"
@@ -3397,8 +3397,8 @@
 						"id": "vertex:contour:161",
 						"origin": "join_outer_previous",
 						"position": [
-							0.00884790904819965,
-							2.45151376724243
+							0.00221197283826768,
+							2.37367105484009
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:7@1.000000000"
@@ -3409,8 +3409,8 @@
 						"id": "vertex:contour:162",
 						"origin": "join_miter",
 						"position": [
-							-0.00000000651925802230835,
-							2.45226812362671
+							-0.00000000605359673500061,
+							2.37385964393616
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:7@1.000000000"
@@ -3421,8 +3421,8 @@
 						"id": "vertex:contour:163",
 						"origin": "join_outer_next",
 						"position": [
-							-0.00884792022407055,
-							2.45151376724243
+							-0.00221198447979987,
+							2.37367105484009
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:7@1.000000000"
@@ -3445,8 +3445,8 @@
 						"id": "vertex:contour:165",
 						"origin": "join_outer_previous",
 						"position": [
-							-0.363986402750015,
-							2.42123889923096
+							-0.357350468635559,
+							2.34339618682861
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:8@1.000000000"
@@ -3457,8 +3457,8 @@
 						"id": "vertex:contour:166",
 						"origin": "join_miter",
 						"position": [
-							-0.374077647924423,
-							2.42037868499756
+							-0.359873294830322,
+							2.34318113327026
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:8@1.000000000"
@@ -3469,8 +3469,8 @@
 						"id": "vertex:contour:167",
 						"origin": "join_outer_next",
 						"position": [
-							-0.383815288543701,
-							2.41759014129639
+							-0.362307697534561,
+							2.34248399734497
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:8@1.000000000"
@@ -3493,8 +3493,8 @@
 						"id": "vertex:contour:169",
 						"origin": "join_outer_previous",
 						"position": [
-							-0.684887111186981,
-							2.33137440681458
+							-0.663379490375519,
+							2.25626826286316
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:9@1.000000000"
@@ -3505,8 +3505,8 @@
 						"id": "vertex:contour:170",
 						"origin": "join_miter",
 						"position": [
-							-0.695054233074188,
-							2.32846283912659
+							-0.665921568870544,
+							2.25554037094116
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:9@1.000000000"
@@ -3517,8 +3517,8 @@
 						"id": "vertex:contour:171",
 						"origin": "join_outer_next",
 						"position": [
-							-0.704428791999817,
-							2.32356739044189
+							-0.668264925479889,
+							2.25431656837463
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:9@1.000000000"
@@ -3541,8 +3541,8 @@
 						"id": "vertex:contour:173",
 						"origin": "join_outer_previous",
 						"position": [
-							-0.8198401927948,
-							2.26329779624939
+							-0.783676326274872,
+							2.19404697418213
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:10@1.000000000"
@@ -3553,8 +3553,8 @@
 						"id": "vertex:contour:174",
 						"origin": "join_miter",
 						"position": [
-							-0.828851759433746,
-							2.25859189033508
+							-0.785929143428802,
+							2.19287061691284
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:10@1.000000000"
@@ -3565,8 +3565,8 @@
 						"id": "vertex:contour:175",
 						"origin": "join_outer_next",
 						"position": [
-							-0.836783289909363,
-							2.25223231315613
+							-0.78791207075119,
+							2.19128060340881
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:10@1.000000000"
@@ -3589,8 +3589,8 @@
 						"id": "vertex:contour:177",
 						"origin": "join_outer_previous",
 						"position": [
-							-0.922541677951813,
-							2.18347120285034
+							-0.87367045879364,
+							2.12251949310303
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:11@1.000000000"
@@ -3601,8 +3601,8 @@
 						"id": "vertex:contour:178",
 						"origin": "join_miter",
 						"position": [
-							-0.930667579174042,
-							2.17695593833923
+							-0.875702083110809,
+							2.12089061737061
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:11@1.000000000"
@@ -3613,8 +3613,8 @@
 						"id": "vertex:contour:179",
 						"origin": "join_outer_next",
 						"position": [
-							-0.937342286109924,
-							2.16896104812622
+							-0.877370655536652,
+							2.118891954422
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:11@1.000000000"
@@ -3637,8 +3637,8 @@
 						"id": "vertex:contour:181",
 						"origin": "join_outer_previous",
 						"position": [
-							-0.968023419380188,
-							2.13221192359924
+							-0.908051788806915,
+							2.08214282989502
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:12@1.000000000"
@@ -3649,8 +3649,8 @@
 						"id": "vertex:contour:182",
 						"origin": "join_miter",
 						"position": [
-							-0.973601579666138,
-							2.1255304813385
+							-0.909446120262146,
+							2.08047270774841
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:12@1.000000000"
@@ -3661,8 +3661,8 @@
 						"id": "vertex:contour:183",
 						"origin": "join_outer_next",
 						"position": [
-							-0.977993726730347,
-							2.1180157661438
+							-0.910544335842133,
+							2.07859373092651
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:12@1.000000000"
@@ -3685,8 +3685,8 @@
 						"id": "vertex:contour:185",
 						"origin": "join_outer_previous",
 						"position": [
-							-1.00012230873108,
-							2.08015465736389
+							-0.93267297744751,
+							2.04073262214661
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:13@1.000000000"
@@ -3697,8 +3697,8 @@
 						"id": "vertex:contour:186",
 						"origin": "join_miter",
 						"position": [
-							-1.00528240203857,
-							2.07132577896118
+							-0.933963000774384,
+							2.03852558135986
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:13@1.000000000"
@@ -3709,8 +3709,8 @@
 						"id": "vertex:contour:187",
 						"origin": "join_outer_next",
 						"position": [
-							-1.0086270570755,
-							2.0616626739502
+							-0.934799134731293,
+							2.03610968589783
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:13@1.000000000"
@@ -3733,8 +3733,8 @@
 						"id": "vertex:contour:189",
 						"origin": "join_outer_previous",
 						"position": [
-							-1.02199006080627,
-							2.02305436134338
+							-0.948162138462067,
+							1.99750137329102
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:14@1.000000000"
@@ -3745,8 +3745,8 @@
 						"id": "vertex:contour:190",
 						"origin": "join_miter",
 						"position": [
-							-1.02573704719543,
-							2.01222848892212
+							-0.949098944664001,
+							1.99479484558105
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:14@1.000000000"
@@ -3757,8 +3757,8 @@
 						"id": "vertex:contour:191",
 						"origin": "join_outer_next",
 						"position": [
-							-1.02704179286957,
-							2.00084662437439
+							-0.949425101280212,
+							1.99194931983948
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:14@1.000000000"
@@ -3781,8 +3781,8 @@
 						"id": "vertex:contour:193",
 						"origin": "join_outer_previous",
 						"position": [
-							-1.03151047229767,
-							1.96186280250549
+							-0.953893780708313,
+							1.95296561717987
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:15@1.000000000"
@@ -3793,7 +3793,7 @@
 						"id": "vertex:contour:194",
 						"origin": "join_miter",
 						"position": [
-							-1.03287029266357,
+							-0.954233765602112,
 							1.94999992847443
 						],
 						"preserved": false,
@@ -3805,8 +3805,8 @@
 						"id": "vertex:contour:195",
 						"origin": "join_outer_next",
 						"position": [
-							-1.03151047229767,
-							1.93813705444336
+							-0.953893780708313,
+							1.94703423976898
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:15@1.000000000"
@@ -3829,8 +3829,8 @@
 						"id": "vertex:contour:197",
 						"origin": "join_outer_previous",
 						"position": [
-							-1.02704179286957,
-							1.89915335178375
+							-0.949425101280212,
+							1.90805053710938
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:16@1.000000000"
@@ -3841,8 +3841,8 @@
 						"id": "vertex:contour:198",
 						"origin": "join_miter",
 						"position": [
-							-1.02573704719543,
-							1.88777124881744
+							-0.949098944664001,
+							1.9052050113678
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:16@1.000000000"
@@ -3853,8 +3853,8 @@
 						"id": "vertex:contour:199",
 						"origin": "join_outer_next",
 						"position": [
-							-1.02199006080627,
-							1.87694537639618
+							-0.948162138462067,
+							1.90249848365784
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:16@1.000000000"
@@ -3877,8 +3877,8 @@
 						"id": "vertex:contour:201",
 						"origin": "join_outer_previous",
 						"position": [
-							-1.0086270570755,
-							1.83833706378937
+							-0.934799134731293,
+							1.86389017105103
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:17@1.000000000"
@@ -3889,8 +3889,8 @@
 						"id": "vertex:contour:202",
 						"origin": "join_miter",
 						"position": [
-							-1.00528240203857,
-							1.82867383956909
+							-0.933963000774384,
+							1.86147439479828
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:17@1.000000000"
@@ -3901,8 +3901,8 @@
 						"id": "vertex:contour:203",
 						"origin": "join_outer_next",
 						"position": [
-							-1.00012230873108,
-							1.81984508037567
+							-0.93267297744751,
+							1.85926723480225
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:17@1.000000000"
@@ -3925,8 +3925,8 @@
 						"id": "vertex:contour:205",
 						"origin": "join_outer_previous",
 						"position": [
-							-0.977993607521057,
-							1.78198409080505
+							-0.910544335842133,
+							1.82140624523163
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:18@1.000000000"
@@ -3937,8 +3937,8 @@
 						"id": "vertex:contour:206",
 						"origin": "join_miter",
 						"position": [
-							-0.973601520061493,
-							1.77446937561035
+							-0.909446358680725,
+							1.8195276260376
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:18@1.000000000"
@@ -3949,8 +3949,8 @@
 						"id": "vertex:contour:207",
 						"origin": "join_outer_next",
 						"position": [
-							-0.968023478984833,
-							1.76778817176819
+							-0.908051788806915,
+							1.81785726547241
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:18@1.000000000"
@@ -3973,8 +3973,8 @@
 						"id": "vertex:contour:209",
 						"origin": "join_outer_previous",
 						"position": [
-							-0.937342345714569,
-							1.73103892803192
+							-0.877370655536652,
+							1.78110802173615
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:19@1.000000000"
@@ -3985,8 +3985,8 @@
 						"id": "vertex:contour:210",
 						"origin": "join_miter",
 						"position": [
-							-0.930667519569397,
-							1.72304391860962
+							-0.875701785087585,
+							1.77910912036896
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:19@1.000000000"
@@ -3997,8 +3997,8 @@
 						"id": "vertex:contour:211",
 						"origin": "join_outer_next",
 						"position": [
-							-0.922541677951813,
-							1.71652865409851
+							-0.87367045879364,
+							1.77748036384583
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:19@1.000000000"
@@ -4021,8 +4021,8 @@
 						"id": "vertex:contour:213",
 						"origin": "join_outer_previous",
 						"position": [
-							-0.836783289909363,
-							1.64776754379272
+							-0.78791207075119,
+							1.70871925354004
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:20@1.000000000"
@@ -4033,8 +4033,8 @@
 						"id": "vertex:contour:214",
 						"origin": "join_miter",
 						"position": [
-							-0.828851759433746,
-							1.64140808582306
+							-0.785929143428802,
+							1.7071293592453
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:20@1.000000000"
@@ -4045,8 +4045,8 @@
 						"id": "vertex:contour:215",
 						"origin": "join_outer_next",
 						"position": [
-							-0.8198401927948,
-							1.63670206069946
+							-0.783676326274872,
+							1.70595288276672
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:20@1.000000000"
@@ -4069,8 +4069,8 @@
 						"id": "vertex:contour:217",
 						"origin": "join_outer_previous",
 						"position": [
-							-0.704428791999817,
-							1.57643246650696
+							-0.668264925479889,
+							1.64568328857422
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:21@1.000000000"
@@ -4081,8 +4081,8 @@
 						"id": "vertex:contour:218",
 						"origin": "join_miter",
 						"position": [
-							-0.695054292678833,
-							1.57153701782227
+							-0.665921568870544,
+							1.64445960521698
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:21@1.000000000"
@@ -4093,8 +4093,8 @@
 						"id": "vertex:contour:219",
 						"origin": "join_outer_next",
 						"position": [
-							-0.684887051582336,
-							1.56862545013428
+							-0.663379490375519,
+							1.64373159408569
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:21@1.000000000"
@@ -4117,8 +4117,8 @@
 						"id": "vertex:contour:221",
 						"origin": "join_outer_previous",
 						"position": [
-							-0.383815258741379,
-							1.48240971565247
+							-0.362307667732239,
+							1.55751597881317
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:22@1.000000000"
@@ -4129,8 +4129,8 @@
 						"id": "vertex:contour:222",
 						"origin": "join_miter",
 						"position": [
-							-0.374078780412674,
-							1.47962152957916
+							-0.359873235225677,
+							1.55681884288788
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:22@1.000000000"
@@ -4141,8 +4141,8 @@
 						"id": "vertex:contour:223",
 						"origin": "join_outer_next",
 						"position": [
-							-0.363986432552338,
-							1.47876119613647
+							-0.357350468635559,
+							1.55660378932953
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:22@1.000000000"
@@ -4165,8 +4165,8 @@
 						"id": "vertex:contour:225",
 						"origin": "join_outer_previous",
 						"position": [
-							-0.00884795468300581,
-							1.44848620891571
+							-0.00221199309453368,
+							1.52632880210876
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:23@1.000000000"
@@ -4177,8 +4177,8 @@
 						"id": "vertex:contour:226",
 						"origin": "join_miter",
 						"position": [
-							-0.00000000558793544769287,
-							1.44773197174072
+							-0.00000000582076609134674,
+							1.5261402130127
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:23@1.000000000"
@@ -4189,8 +4189,8 @@
 						"id": "vertex:contour:227",
 						"origin": "join_outer_next",
 						"position": [
-							0.00884794350713491,
-							1.44848620891571
+							0.0022119814530015,
+							1.52632880210876
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:23@1.000000000"
@@ -4213,8 +4213,8 @@
 						"id": "vertex:contour:229",
 						"origin": "join_outer_previous",
 						"position": [
-							0.363986432552338,
-							1.47876119613647
+							0.357350468635559,
+							1.55660378932953
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:24@1.000000000"
@@ -4225,8 +4225,8 @@
 						"id": "vertex:contour:230",
 						"origin": "join_miter",
 						"position": [
-							0.374078780412674,
-							1.47962152957916
+							0.359873235225677,
+							1.55681884288788
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:24@1.000000000"
@@ -4237,8 +4237,8 @@
 						"id": "vertex:contour:231",
 						"origin": "join_outer_next",
 						"position": [
-							0.383815258741379,
-							1.48240971565247
+							0.362307667732239,
+							1.55751597881317
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:24@1.000000000"
@@ -4261,8 +4261,8 @@
 						"id": "vertex:contour:233",
 						"origin": "join_outer_previous",
 						"position": [
-							0.684887051582336,
-							1.56862545013428
+							0.663379490375519,
+							1.64373159408569
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:25@1.000000000"
@@ -4273,8 +4273,8 @@
 						"id": "vertex:contour:234",
 						"origin": "join_miter",
 						"position": [
-							0.695054292678833,
-							1.57153701782227
+							0.665921568870544,
+							1.64445960521698
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:25@1.000000000"
@@ -4285,8 +4285,8 @@
 						"id": "vertex:contour:235",
 						"origin": "join_outer_next",
 						"position": [
-							0.704428791999817,
-							1.57643246650696
+							0.668264925479889,
+							1.64568328857422
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:25@1.000000000"
@@ -4309,8 +4309,8 @@
 						"id": "vertex:contour:237",
 						"origin": "join_outer_previous",
 						"position": [
-							0.8198401927948,
-							1.63670206069946
+							0.783676326274872,
+							1.70595288276672
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:26@1.000000000"
@@ -4321,8 +4321,8 @@
 						"id": "vertex:contour:238",
 						"origin": "join_miter",
 						"position": [
-							0.828851759433746,
-							1.64140808582306
+							0.785929143428802,
+							1.7071293592453
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:26@1.000000000"
@@ -4333,8 +4333,8 @@
 						"id": "vertex:contour:239",
 						"origin": "join_outer_next",
 						"position": [
-							0.836783289909363,
-							1.64776754379272
+							0.78791207075119,
+							1.70871925354004
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:26@1.000000000"
@@ -4357,8 +4357,8 @@
 						"id": "vertex:contour:241",
 						"origin": "join_outer_previous",
 						"position": [
-							0.922541677951813,
-							1.71652865409851
+							0.87367045879364,
+							1.77748036384583
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:27@1.000000000"
@@ -4369,8 +4369,8 @@
 						"id": "vertex:contour:242",
 						"origin": "join_miter",
 						"position": [
-							0.930667519569397,
-							1.72304391860962
+							0.875701785087585,
+							1.77910912036896
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:27@1.000000000"
@@ -4381,8 +4381,8 @@
 						"id": "vertex:contour:243",
 						"origin": "join_outer_next",
 						"position": [
-							0.937342345714569,
-							1.73103892803192
+							0.877370655536652,
+							1.78110802173615
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:27@1.000000000"
@@ -4405,8 +4405,8 @@
 						"id": "vertex:contour:245",
 						"origin": "join_outer_previous",
 						"position": [
-							0.968023478984833,
-							1.76778817176819
+							0.908051788806915,
+							1.81785726547241
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:28@1.000000000"
@@ -4417,8 +4417,8 @@
 						"id": "vertex:contour:246",
 						"origin": "join_miter",
 						"position": [
-							0.973601520061493,
-							1.77446937561035
+							0.909446358680725,
+							1.8195276260376
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:28@1.000000000"
@@ -4429,8 +4429,8 @@
 						"id": "vertex:contour:247",
 						"origin": "join_outer_next",
 						"position": [
-							0.977993607521057,
-							1.78198409080505
+							0.910544335842133,
+							1.82140624523163
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:28@1.000000000"
@@ -4453,8 +4453,8 @@
 						"id": "vertex:contour:249",
 						"origin": "join_outer_previous",
 						"position": [
-							1.00012230873108,
-							1.81984508037567
+							0.93267297744751,
+							1.85926723480225
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:29@1.000000000"
@@ -4465,8 +4465,8 @@
 						"id": "vertex:contour:250",
 						"origin": "join_miter",
 						"position": [
-							1.00528240203857,
-							1.82867383956909
+							0.933963000774384,
+							1.86147439479828
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:29@1.000000000"
@@ -4477,8 +4477,8 @@
 						"id": "vertex:contour:251",
 						"origin": "join_outer_next",
 						"position": [
-							1.0086270570755,
-							1.83833706378937
+							0.934799134731293,
+							1.86389017105103
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:29@1.000000000"
@@ -4501,8 +4501,8 @@
 						"id": "vertex:contour:253",
 						"origin": "join_outer_previous",
 						"position": [
-							1.02199006080627,
-							1.87694537639618
+							0.948162138462067,
+							1.90249848365784
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:30@1.000000000"
@@ -4513,8 +4513,8 @@
 						"id": "vertex:contour:254",
 						"origin": "join_miter",
 						"position": [
-							1.02573704719543,
-							1.88777124881744
+							0.949098944664001,
+							1.9052050113678
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:30@1.000000000"
@@ -4525,8 +4525,8 @@
 						"id": "vertex:contour:255",
 						"origin": "join_outer_next",
 						"position": [
-							1.02704179286957,
-							1.89915335178375
+							0.949425101280212,
+							1.90805053710938
 						],
 						"preserved": false,
 						"source_id": "primitive:ellipse:edge:30@1.000000000"
