@@ -2,7 +2,9 @@
 
 A Godot 4 editor for drawing 2D game assets as Bézier outlines, turning them into triangle meshes, and exporting them as engine-neutral JSON packages that other projects can load.
 
-<!-- TODO: Screenshot of the editor with one asset open (Create > Single, Outliner on the left, Canvas with a Bézier outline and its handles). Suggested asset: Wizard or Potion from worlds/world01. Save as docs/images/editor-create.png. -->
+![PolyTools editor in Create > Single with the asset Chantres open: Outliner with Components on the left, Bézier outlines on the Canvas, Inspector on the right](docs/images/editor-create.png)
+
+The asset Chantres in `Create > Single`: the Outliner lists its Components and Regions, the Canvas shows the Bézier points of each Component, and the Inspector holds the selected Component's hierarchy, transform and stroke settings.
 
 ## Motivation and goal
 
